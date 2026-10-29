@@ -74,6 +74,7 @@
   label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
   input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font:600 14px Inter;width:100%}
   tr.best td{background:#f5c45112}
+  .lotbox{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:2px 0 12px;align-items:end}
   .basis{list-style:none;margin:0;padding:0}
   .basis li{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.45}
   .basis li b.k{min-width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none}
@@ -109,9 +110,11 @@
         <div class="tabs"><button class="on" id="tabMine">📍 Marked chart</button><button id="tabTv">📺 TradingView</button></div>
       </div>
       <div class="layers" id="layers">
-        <span><i style="background:#f5c451"></i> Entry</span><span><i style="background:#ea3943"></i> Stop-loss</span><span><i style="background:#16c784"></i> Targets</span><span><i style="background:#3b82f6"></i> Demand / <i style="background:#f43f5e"></i> Supply zone</span><span><i style="background:#f59e0b"></i> Support / resistance</span>
-        <span style="margin-left:auto"></span>
-        <label><input type="checkbox" data-l="all"> Show all detected zones</label>
+        <label><input type="checkbox" data-l="struct" checked> Structure, trendline, BOS</label>
+        <label><input type="checkbox" data-l="fib" checked> Fibonacci</label>
+        <label><input type="checkbox" data-l="htf" checked> 4H / daily zones</label>
+        <label><input type="checkbox" data-l="sess" checked> PDH / PDL &amp; Asian range</label>
+        <label><input type="checkbox" data-l="all"> Every detected zone</label>
         <label><input type="checkbox" data-l="ema" checked> EMA 20 / 50</label>
       </div>
       <div id="chart"><div class="legend" id="legend">Loading…</div><svg id="ov"></svg></div>
@@ -121,6 +124,11 @@
     <div class="card">
       <div class="hd"><h3>🧭 Why this trade — the chart basis</h3><span class="muted" style="font-size:12px" id="basisNote">Every reason below is drawn on the chart.</span></div>
       <div class="bd"><ul class="basis" id="basis"><li class="muted">Press "Get AI trade" — the reasons will appear here and on the chart.</li></ul></div>
+    </div>
+
+    <div class="card">
+      <div class="hd"><h3>📊 Every timeframe studied</h3><span class="muted" style="font-size:12px" id="mtfNote">1M → 1D, refreshed on every scan</span></div>
+      <div style="padding:0 6px 6px"><table><thead><tr><th>Timeframe</th><th>Structure</th><th>Price vs EMA 50</th><th>RSI</th><th>ATR ($)</th><th>Bias</th></tr></thead><tbody id="mtf"><tr><td colspan="6" class="muted" style="padding:14px 6px">Press "Get AI trade".</td></tr></tbody></table></div>
     </div>
 
     <div class="grid2">
@@ -146,16 +154,15 @@
     </div>
 
     <div class="card">
-      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">Strategy: EMA 20/50 trend + RSI filter · Stop 1.5×ATR · Target 2R · $0.30 spread per trade</span></div>
+      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">The desk tests 4 strategies × 1H/4H/1D × 0.5/1/2% risk, sizes lots automatically ($0.30 spread per trade) and picks the best with drawdown under 25%</span></div>
       <div class="bd">
         <div class="row" style="align-items:flex-end">
           <label class="f" style="width:150px">Starting balance ($)<input id="bBal" type="number" value="1000" min="10"></label>
-          <label class="f" style="width:150px">Risk per trade (%)<input id="bRisk" type="number" value="1" step="0.5" min="0.1" max="10"></label>
           <button class="btn gold" id="bt1">1 year</button>
           <button class="btn gold" id="bt2">2 years</button>
           <span class="muted" id="btInfo" style="font-size:12px"></span>
         </div>
-        <div style="margin-top:12px"><table><thead><tr><th>Timeframe</th><th>Trades</th><th>Win %</th><th>Profit / Loss</th><th>End balance</th><th>Return</th><th>Max drawdown</th><th>Profit factor</th></tr></thead><tbody id="btTable"><tr><td colspan="8" class="muted">Press "1 year" or "2 years".</td></tr></tbody></table></div>
+        <div style="margin-top:12px"><table><thead><tr><th>Strategy</th><th>TF</th><th>Risk · lot</th><th>Trades</th><th>Win %</th><th>Profit / Loss</th><th>End balance</th><th>Return</th><th>Max DD</th><th>PF</th></tr></thead><tbody id="btTable"><tr><td colspan="10" class="muted">Press "1 year" or "2 years".</td></tr></tbody></table></div>
         <div class="grid2" style="margin-top:12px">
           <div><div class="muted" style="font-size:12px;margin-bottom:6px" id="eqTitle">Equity curve</div><div id="eq"></div></div>
           <div><div class="muted" style="font-size:12px;margin-bottom:6px">Monthly profit / loss</div><div style="max-height:240px;overflow:auto"><table><thead><tr><th>Month</th><th>Trades</th><th>P/L</th></tr></thead><tbody id="months"></tbody></table></div></div>
@@ -244,14 +251,15 @@
   const TFS = ["1m","3m","5m","15m","30m","1h","2h","4h","1d"];
   const TF_SEC = { "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"2h":7200,"4h":14400,"1d":86400 };
   let chart, candles, e20, e50, curTf = "15m", lastSignal = null, BARS = [], MK = null;
-  const LAYERS = { all:false, ema:true };
+  const LAYERS = { struct:true, fib:true, htf:true, sess:true, all:false, ema:true };
   const tzOff = -new Date().getTimezoneOffset() * 60;
   const emaA = (v, p) => { const k = 2 / (p + 1); let e = null; return v.map(x => e = e == null ? x : x * k + e * (1 - k)); };
   const atrA = (b, p) => { let a = null; return b.map((x, i) => { const tr = i ? Math.max(x.h - x.l, Math.abs(x.h - b[i-1].c), Math.abs(x.l - b[i-1].c)) : x.h - x.l; a = a == null ? tr : (a*(p-1) + tr)/p; return a; }); };
 
   function initChart(){
-    chart = LightweightCharts.createChart($("chart"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8", fontFamily:"Inter" }, grid:{ vertLines:{ color:"#182030" }, horzLines:{ color:"#182030" } }, rightPriceScale:{ borderColor:"#232b3d", scaleMargins:{ top:.08, bottom:.08 } }, timeScale:{ borderColor:"#232b3d", timeVisible:true, secondsVisible:false, rightOffset:18 }, crosshair:{ mode:0 }, autoSize:true });
-    candles = chart.addCandlestickSeries({ upColor:"#16c784", downColor:"#ea3943", borderVisible:false, wickUpColor:"#16c784", wickDownColor:"#ea3943" });
+    chart = LightweightCharts.createChart($("chart"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8", fontFamily:"Inter" }, grid:{ vertLines:{ color:"#182030" }, horzLines:{ color:"#182030" } }, rightPriceScale:{ borderColor:"#232b3d", scaleMargins:{ top:.08, bottom:.08 } }, timeScale:{ borderColor:"#232b3d", timeVisible:true, secondsVisible:false, rightOffset:42 }, crosshair:{ mode:0 }, autoSize:true });
+    candles = chart.addCandlestickSeries({ upColor:"#16c784", downColor:"#ea3943", borderVisible:false, wickUpColor:"#16c784", wickDownColor:"#ea3943",
+      autoscaleInfoProvider:(orig) => { const r = orig(), f = lastSignal && lastSignal.final; if (r && f && f.action !== "WAIT" && f.sl && f.tp1){ const v = [f.entry, f.sl, f.tp1, f.tp2 || f.tp1]; r.priceRange.minValue = Math.min(r.priceRange.minValue, ...v); r.priceRange.maxValue = Math.max(r.priceRange.maxValue, ...v); } return r; } });
     e20 = chart.addLineSeries({ color:"#f5c45188", lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false });
     e50 = chart.addLineSeries({ color:"#3b82f688", lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false });
     $("tfs").innerHTML = TFS.map(t => `<button data-tf="${t}">${t.toUpperCase()}</button>`).join("");
@@ -271,13 +279,15 @@
       const c = BARS.map(b => b.c), a20 = emaA(c, 20), a50 = emaA(c, 50);
       e20.setData(BARS.map((x, i) => ({ time:x.t, value:a20[i] })));
       e50.setData(BARS.map((x, i) => ({ time:x.t, value:a50[i] })));
-      if (fit){ const n = BARS.length; chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 160), to: n + 18 }); }
+      if (fit){ const n = BARS.length; chart.timeScale().setVisibleLogicalRange({ from: Math.max(0, n - 130), to: n + 42 }); }
       const last = d.bars[d.bars.length - 1], dayAgo = d.bars.find(x => x.t >= last.t - 86400) || d.bars[0];
       $("px").textContent = fmt(last.c);
       const ch = last.c - dayAgo.o;
       $("pxc").textContent = (ch >= 0 ? "+" : "") + fmt(ch) + " (24h)";
       $("pxc").className = "mono " + (ch >= 0 ? "up" : "dn");
       MK = analyzeStructure(BARS);
+      if (MK) MK.pro = proMarks(BARS, MK);
+      loadHTF().then(() => requestAnimationFrame(draw));
       markers();
       draw();
       renderBasis();
@@ -380,7 +390,57 @@
     return { zones:[near(1), near(-1)].filter(Boolean).map(o => ({ ...o, z:"ob" })), levels:[MK.levels.find(l => l.kind === "R"), MK.levels.find(l => l.kind === "S")].filter(Boolean), liq:[], breaks:MK.breaks.slice(-1), eq:false };
   }
 
-  // ---- SVG overlay drawing (clean: few objects, labels never overlap) ----
+  // ---- pro-style analysis: major swings, fib leg, trendline, previous day, Asian range, higher-timeframe zones ----
+  function majorSwings(b, K, A){
+    const n = b.length, pts = [];
+    for (let i = K; i < n - K; i++){
+      let hi = true, lo = true;
+      for (let j = 1; j <= K; j++){ if (b[i-j].h > b[i].h || b[i+j].h >= b[i].h) hi = false; if (b[i-j].l < b[i].l || b[i+j].l <= b[i].l) lo = false; }
+      if (hi) pts.push({ i, type:"H", p:b[i].h });
+      if (lo) pts.push({ i, type:"L", p:b[i].l });
+    }
+    const z = [];
+    pts.sort((x, y) => x.i - y.i).forEach(p => { const last = z[z.length - 1]; if (last && last.type === p.type){ if ((p.type === "H" && p.p > last.p) || (p.type === "L" && p.p < last.p)) z[z.length - 1] = p; } else z.push(p); });
+    if (z.length){
+      const last = z[z.length - 1]; let ext = null;
+      for (let i = last.i + 1; i < n; i++){ if (last.type === "H"){ if (!ext || b[i].l < ext.p) ext = { i, type:"L", p:b[i].l }; } else { if (!ext || b[i].h > ext.p) ext = { i, type:"H", p:b[i].h }; } }
+      if (ext && Math.abs(ext.p - last.p) >= A) z.push({ ...ext, live:true });
+    }
+    let pH = null, pL = null;
+    z.forEach(s => { if (s.type === "H"){ s.lab = pH == null ? "H" : s.p > pH.p ? "HH" : "LH"; pH = s; } else { s.lab = pL == null ? "L" : s.p > pL.p ? "HL" : "LL"; pL = s; } });
+    return z;
+  }
+  function dayLevels(b){
+    const day = (t) => Math.floor((t - tzOff) / 86400), today = day(b[b.length - 1].t);
+    const prev = Math.max(...b.map(x => day(x.t)).filter(d => d < today));
+    let pdh = -Infinity, pdl = Infinity, ah = -Infinity, al = Infinity, ai = null, ae = null;
+    b.forEach((x, i) => {
+      const d = day(x.t);
+      if (d === prev){ pdh = Math.max(pdh, x.h); pdl = Math.min(pdl, x.l); }
+      const hr = ((x.t - tzOff) % 86400) / 3600;
+      if (d === today && hr < 7){ ah = Math.max(ah, x.h); al = Math.min(al, x.l); if (ai == null) ai = i; ae = i; }
+    });
+    return { pdh: isFinite(pdh) ? pdh : null, pdl: isFinite(pdl) ? pdl : null, asia: ai != null && ae > ai ? { hi:ah, lo:al, i0:ai, i1:ae } : null };
+  }
+  function proMarks(b, M){
+    const zz = majorSwings(b, TF_SEC[curTf] >= 14400 ? 4 : 6, M.atr);
+    let fib = null;
+    for (let k = zz.length - 1; k >= 1; k--){ const A2 = zz[k-1], B2 = zz[k]; if (Math.abs(B2.p - A2.p) >= M.atr * 2.5){ const a = A2.p, e = B2.p; fib = { i0:A2.i, i1:B2.i, a, b:e, lvl:(r) => e + (a - e) * r }; break; } }
+    const Hs = zz.filter(s => s.type === "H" && !s.live), Ls = zz.filter(s => s.type === "L" && !s.live);
+    let tl = null;
+    if (M.trend < 0 && Hs.length >= 2){ const [p, q] = Hs.slice(-2); if (q.p < p.p) tl = { kind:"R", i1:p.i, p1:p.p, slope:(q.p - p.p) / (q.i - p.i) }; }
+    if (M.trend >= 0 && Ls.length >= 2){ const [p, q] = Ls.slice(-2); if (q.p > p.p) tl = { kind:"S", i1:p.i, p1:p.p, slope:(q.p - p.p) / (q.i - p.i) }; }
+    return { zz, fib, tl, day: TF_SEC[curTf] <= 3600 ? dayLevels(b) : null };
+  }
+  let HTF = { tf:null, at:0 };
+  async function loadHTF(){
+    const htf = TF_SEC[curTf] < 3600 ? "4h" : TF_SEC[curTf] < 86400 ? "1d" : null;
+    if (!htf){ HTF = { tf:null, at:0 }; return; }
+    if (HTF.tf === htf && Date.now() - HTF.at < 300000) return;
+    try{ const d = await api("/tg/candles", { tf:htf }); const bb = d.bars.map(x => ({ t:x.t + tzOff, o:x.o, h:x.h, l:x.l, c:x.c })); HTF = { tf:htf, bars:bb, mk:analyzeStructure(bb), at:Date.now() }; }catch(e){}
+  }
+
+  // ---- SVG overlay drawing ----
   const NS = "http://www.w3.org/2000/svg";
   function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
   function draw(){
@@ -390,57 +450,138 @@
     const ts = chart.timeScale(), W = ts.width(), H = $("chart").clientHeight - ts.height();
     svg.setAttribute("width", W); svg.setAttribute("height", H);
     const defs = el("defs", {}, svg), cp = el("clipPath", { id:"clp" }, defs); el("rect", { x:0, y:0, width:W, height:H }, cp);
+    const am = el("marker", { id:"arr", viewBox:"0 0 10 10", refX:8, refY:5, markerWidth:8, markerHeight:8, orient:"auto-start-reverse" }, defs); el("path", { d:"M0,0 L10,5 L0,10 z", fill:"#f8fafc" }, am);
     const g = el("g", { "clip-path":"url(#clp)" }, svg);
     const X = (i) => ts.logicalToCoordinate(i), Y = (p) => candles.priceToCoordinate(p);
-    const right = W, tags = [];
-    const tag = (y, text, color, strong) => { if (y != null && y > -20 && y < H + 20) tags.push({ y, text, color, strong }); };
-    const P = pickMarks();
-    // zones (order blocks / FVGs)
+    const right = W, n0 = BARS.length - 1, tagsR = [], tagsL = [];
+    const tagR = (y, text, color, strong) => { if (y != null && y > -20 && y < H + 20) tagsR.push({ y, text, color, strong }); };
+    const tagL = (y, text, color) => { if (y != null && y > 48 && y < H - 5) tagsL.push({ y, text, color }); };
+    const txt = (x, y, s, color, size, anchor, weight) => { const t = el("text", { x, y, fill:color, "text-anchor":anchor || "start", style:`font:${weight || 700} ${size || 12}px Inter;paint-order:stroke;stroke:#0b0e14;stroke-width:3px` }, g); t.textContent = s; return t; };
+    const box = (x0, x1, y0, y1, c, op, dash) => el("rect", { x:Math.min(x0, x1), y:Math.min(y0, y1), width:Math.abs(x1 - x0), height:Math.max(2, Math.abs(y1 - y0)), fill:c, "fill-opacity":op, stroke:c, "stroke-opacity":.75, "stroke-dasharray":dash || "" }, g);
+    const line = (x1, y1, x2, y2, c, w, dash, op) => el("line", { x1, y1, x2, y2, stroke:c, "stroke-width":w || 1.3, "stroke-dasharray":dash || "", "stroke-opacity":op ?? 1 }, g);
+    const f = lastSignal && lastSignal.final, P = pickMarks(), PR = MK.pro || {};
+    // 1) previous day high/low + Asian session range
+    if (LAYERS.sess && PR.day){
+      const d = PR.day;
+      if (d.asia){ const x0 = X(d.asia.i0), x1 = X(d.asia.i1 + 1), y0 = Y(d.asia.hi), y1 = Y(d.asia.lo); if (x0 != null && x1 != null && y0 != null && y1 != null){ box(x0, x1, y0, y1, "#38bdf8", .07, "4 3"); txt(x0 + 4, Math.min(y0, y1) - 6, "ASIAN RANGE", "#7dd3fc", 11, "start", 800); } }
+      [["pdh", "PDH — yesterday's high"], ["pdl", "PDL — yesterday's low"]].forEach(([k, lab]) => { if (d[k] == null) return; const y = Y(d[k]); if (y == null) return; line(0, y, right, y, "#cbd5e1", 1.2, "12 4 2 4", .8); tagL(y, `${lab} ${fmt(d[k])}`, "#e2e8f0"); });
+    }
+    // 2) higher-timeframe supply / demand
+    if (LAYERS.htf && HTF.mk){
+      const price = MK.price;
+      const sup = HTF.mk.obs.filter(o => o.dir < 0 && o.top > price).sort((a, b) => a.bot - b.bot)[0];
+      const dem = HTF.mk.obs.filter(o => o.dir > 0 && o.bot < price).sort((a, b) => b.top - a.top)[0];
+      [sup, dem].filter(Boolean).forEach(o => {
+        const i = idxAt(HTF.bars[o.i].t), x0 = Math.max(0, X(i) ?? 0), y0 = Y(o.top), y1 = Y(o.bot); if (y0 == null || y1 == null) return;
+        const c = o.dir > 0 ? "#22c55e" : "#ef4444";
+        box(x0, right, y0, y1, c, .11);
+        txt(Math.max(x0 + 8, 8), o.dir > 0 ? Math.max(y0, y1) - 7 : Math.min(y0, y1) + 17, `${HTF.tf.toUpperCase()} ${o.dir > 0 ? "DEMAND" : "SUPPLY"} ZONE  ${fmt(o.bot)}–${fmt(o.top)}`, o.dir > 0 ? "#86efac" : "#fca5a5", 13, "start", 800);
+      });
+    }
+    // 3) Fibonacci retracement of the last impulse leg + golden zone
+    if (LAYERS.fib && PR.fib){
+      const F = PR.fib, x0 = Math.max(0, X(F.i0) ?? 0), xs = X(F.i0), xe = X(F.i1), ya = Y(F.a), yb = Y(F.b);
+      const y6 = Y(F.lvl(0.618)), y7 = Y(F.lvl(0.786));
+      if (y6 != null && y7 != null){ box(x0, right, y6, y7, "#f5c451", .12); txt(right - 12, Math.max(y6, y7) - 5, "GOLDEN ZONE 61.8–78.6% (OTE)", "#fde68a", 11, "end", 800); }
+      [0, 0.382, 0.5, 0.618, 0.786, 1].forEach(r => { const y = Y(F.lvl(r)); if (y == null) return; line(x0, y, right, y, "#f5c451", r === 0.5 ? 1.3 : 1, r === 0 || r === 1 ? "" : "5 4", .65); txt(x0 + 4, y - 4, `Fib ${(r * 100).toFixed(1).replace(".0", "")}%  ${fmt(F.lvl(r))}`, "#fde68a", 10.5, "start", 600); });
+      if (xs != null && xe != null && ya != null && yb != null) line(xs, ya, xe, yb, "#f5c451", 1.4, "2 3", .9);
+    }
+    // 4) market structure: zig-zag swings, HH/HL/LH/LL, trendline, last BOS / CHoCH
+    if (LAYERS.struct && PR.zz && PR.zz.length){
+      const pts = PR.zz.slice(-10).map(s => ({ s, x:X(s.i), y:Y(s.p) })).filter(q => q.x != null && q.y != null);
+      if (pts.length > 1) el("polyline", { points:pts.map(q => q.x + "," + q.y).join(" "), fill:"none", stroke:"#e2e8f0", "stroke-width":1.8, "stroke-opacity":.7 }, g);
+      pts.forEach(q => { const up = /HH|HL/.test(q.s.lab), c = q.s.lab.length === 1 ? "#cbd5e1" : up ? "#4ade80" : "#f87171"; el("circle", { cx:q.x, cy:q.y, r:4, fill:c, stroke:"#0b0e14", "stroke-width":1.5 }, g); txt(q.x, q.s.type === "H" ? q.y - 10 : q.y + 21, q.s.lab, c, 14, "middle", 800); });
+      if (PR.tl){
+        const T = PR.tl, at = (i) => T.p1 + T.slope * (i - T.i1), xa = X(T.i1), ya = Y(at(T.i1)), xb = X(n0 + 40), yb = Y(at(n0 + 40));
+        if (xa != null && ya != null && xb != null && yb != null){
+          const c = T.kind === "R" ? "#f87171" : "#4ade80";
+          line(xa, ya, xb, yb, c, 2.4, "", .95);
+          const xm = X(n0 - 8), ym = Y(at(n0 - 8)); if (xm != null && ym != null) txt(xm, ym + (T.kind === "R" ? -9 : 19), T.kind === "R" ? "DESCENDING TRENDLINE" : "RISING TRENDLINE", c, 12, "middle", 800);
+        }
+      }
+      P.breaks.forEach(br => {
+        const x0 = X(br.from), x1 = X(br.to), y = Y(br.p); if (x0 == null || x1 == null || y == null) return;
+        const c = br.dir > 0 ? "#22c55e" : "#ef4444";
+        line(x0, y, x1, y, c, 2.2, br.kind === "CHoCH" ? "7 4" : "");
+        txt((x0 + x1) / 2, y + (br.dir > 0 ? -8 : 18), br.kind === "CHoCH" ? "CHoCH" : "BOS", c, 13, "middle", 800);
+      });
+    }
+    // 5) execution zones the trade uses (order block / FVG / S-R / liquidity)
     P.zones.forEach(z => {
       const x0 = X(z.i), y0 = Y(z.top), y1 = Y(z.bot); if (x0 == null || y0 == null || y1 == null) return;
       const ob = z.z === "ob", c = ob ? (z.dir > 0 ? "#3b82f6" : "#f43f5e") : "#a78bfa";
-      el("rect", { x:Math.max(-2, x0), y:Math.min(y0, y1), width:Math.max(0, right - Math.max(-2, x0)), height:Math.max(2, Math.abs(y1 - y0)), fill:c, "fill-opacity":.13, stroke:c, "stroke-opacity":.6 }, g);
-      tag((y0 + y1) / 2, ob ? (z.dir > 0 ? "Demand zone (bullish OB)" : "Supply zone (bearish OB)") : (z.dir > 0 ? "Bullish FVG" : "Bearish FVG"), ob ? (z.dir > 0 ? "#93c5fd" : "#fda4af") : "#c4b5fd");
+      box(Math.max(-2, x0), right, y0, y1, c, .2);
+      tagR((y0 + y1) / 2, ob ? (z.dir > 0 ? `${curTf.toUpperCase()} demand (order block)` : `${curTf.toUpperCase()} supply (order block)`) : (z.dir > 0 ? "Bullish FVG" : "Bearish FVG"), ob ? (z.dir > 0 ? "#93c5fd" : "#fda4af") : "#c4b5fd");
     });
-    const hl = (i0, p, c, dash, w) => { const y = Y(p); if (y == null) return null; const x = i0 == null ? 0 : Math.max(0, X(i0) ?? 0); el("line", { x1:x, x2:right, y1:y, y2:y, stroke:c, "stroke-width":w || 1.3, "stroke-dasharray":dash || "" }, g); return y; };
-    P.levels.forEach(l => tag(hl(l.first, l.p, "#f59e0b", "7 5"), `${l.kind === "R" ? "Resistance" : "Support"} (${l.n} touches)`, "#fbbf24"));
-    P.liq.forEach(q => tag(hl(q.i, q.p, "#e879f9", "2 4"), q.type === "H" ? "Liquidity above highs" : "Liquidity below lows", "#f0abfc"));
-    if (P.eq && MK.range) tag(hl(MK.range.from, MK.range.eq, "#64748b", "2 5"), "50% of range", "#94a3b8");
-    P.breaks.forEach(br => {
-      const x0 = X(br.from), x1 = X(br.to), y = Y(br.p); if (x0 == null || x1 == null || y == null) return;
-      const c = br.dir > 0 ? "#16c784" : "#ea3943";
-      el("line", { x1:x0, x2:x1, y1:y, y2:y, stroke:c, "stroke-width":2, "stroke-dasharray":br.kind === "CHoCH" ? "6 3" : "" }, g);
-      const t = el("text", { x:(x0 + x1) / 2, y:y + (br.dir > 0 ? -7 : 16), fill:c, "text-anchor":"middle", style:"font:700 12px Inter" }, g); t.textContent = br.kind === "CHoCH" ? "CHoCH (trend change)" : "BOS (trend continues)";
-    });
-    // trade: position-tool box
-    const f = lastSignal && lastSignal.final;
+    const hl = (i0, p, c, dash, w) => { const y = Y(p); if (y == null) return null; const x = i0 == null ? 0 : Math.max(0, X(i0) ?? 0); line(x, y, right, y, c, w || 1.4, dash); return y; };
+    P.levels.forEach(l => tagR(hl(l.first, l.p, "#f59e0b", "8 5"), `${l.kind === "R" ? "Resistance" : "Support"} (${l.n} touches)`, "#fbbf24"));
+    P.liq.forEach(q => { const y = hl(q.i, q.p, "#e879f9", "2 4"); tagR(y, q.type === "H" ? "$$$ Buy-side liquidity" : "$$$ Sell-side liquidity", "#f0abfc"); });
+    if (P.eq && MK.range) tagR(hl(MK.range.from, MK.range.eq, "#64748b", "2 5"), "50% of range", "#94a3b8");
+    // 6) the trade: position box + projected path
     if (f && f.action !== "WAIT" && f.entry && f.sl && f.tp1){
-      const i0 = sigBarIndex(), xa = Math.max(0, X(i0) ?? 0), xb = Math.min(right, Math.max(xa + 120, X(BARS.length + 14) ?? right));
+      const xa = X(n0) ?? right - 220, xb = Math.min(right - 2, X(n0 + 38) ?? right);
       const yE = Y(f.entry), yS = Y(f.sl), y1 = Y(f.tp1), y2 = Y(f.tp2 || f.tp1);
       if (yE != null && yS != null && y1 != null && y2 != null){
-        el("rect", { x:xa, y:Math.min(yE, yS), width:xb - xa, height:Math.abs(yS - yE), fill:"#ea3943", "fill-opacity":.22 }, g);
-        el("rect", { x:xa, y:Math.min(yE, y2), width:xb - xa, height:Math.abs(y2 - yE), fill:"#16c784", "fill-opacity":.18 }, g);
-        const ln = (y, c, w, d) => el("line", { x1:xa, x2:xb, y1:y, y2:y, stroke:c, "stroke-width":w, "stroke-dasharray":d || "" }, g);
-        ln(yE, "#f5c451", 2.5); ln(yS, "#ea3943", 2); ln(y1, "#16c784", 2, "6 3"); ln(y2, "#16c784", 2);
+        box(xa, xb, yE, yS, "#ef4444", .25); box(xa, xb, yE, y2, "#22c55e", .2);
+        line(xa, yE, xb, yE, "#f5c451", 2.8); line(xa, yS, xb, yS, "#ef4444", 2.2); line(xa, y1, xb, y1, "#22c55e", 2, "7 4"); line(xa, y2, xb, y2, "#22c55e", 2.2);
+        txt((xa + xb) / 2, (yE + yS) / 2 + 5, "RISK", "#fecaca", 12, "middle", 800);
+        txt((xa + xb) / 2, (yE + y2) / 2 + 5, "REWARD", "#bbf7d0", 12, "middle", 800);
+        const path = [[n0, MK.price]];
+        if (Math.abs(f.entry - MK.price) > MK.atr * 0.1) path.push([n0 + 8, f.entry]);
+        path.push([n0 + 22, f.tp1]); if (f.tp2) path.push([n0 + 35, f.tp2]);
+        const pp = path.map(([i, p]) => [X(i), Y(p)]).filter(q => q[0] != null && q[1] != null);
+        if (pp.length > 1) el("polyline", { points:pp.map(q => q.join(",")).join(" "), fill:"none", stroke:"#f8fafc", "stroke-width":2.4, "stroke-dasharray":"8 5", "marker-end":"url(#arr)" }, g);
         const risk = Math.abs(f.entry - f.sl);
-        tag(yE, `${f.orderType} ${fmt(f.entry)}`, "#f5c451", true);
-        tag(yS, `SL ${fmt(f.sl)}  (-${fmt(risk)})`, "#ff6b74", true);
-        tag(y1, `TP1 ${fmt(f.tp1)}  (${(Math.abs(f.tp1 - f.entry) / risk).toFixed(1)}R)`, "#34d399", true);
-        if (f.tp2) tag(y2, `TP2 ${fmt(f.tp2)}  (${(Math.abs(f.tp2 - f.entry) / risk).toFixed(1)}R)`, "#34d399", true);
+        tagR(yE, `${f.orderType} ${fmt(f.entry)}`, "#f5c451", true);
+        tagR(yS, `STOP-LOSS ${fmt(f.sl)}  (-${fmt(risk)})`, "#ff7b84", true);
+        tagR(y1, `TP1 ${fmt(f.tp1)}  (${(Math.abs(f.tp1 - f.entry) / risk).toFixed(1)}R)`, "#4ade80", true);
+        if (f.tp2) tagR(y2, `TP2 ${fmt(f.tp2)}  (${(Math.abs(f.tp2 - f.entry) / risk).toFixed(1)}R)`, "#4ade80", true);
       }
     }
-    // labels: one column on the right, pushed apart so they never overlap
-    tags.sort((a, b) => a.y - b.y);
-    const GAP = 21;
-    for (let i = 1; i < tags.length; i++) if (tags[i].y - tags[i-1].y < GAP) tags[i].y = tags[i-1].y + GAP;
-    const over = tags.length ? tags[tags.length - 1].y - (H - 12) : 0;
-    if (over > 0) tags.forEach(t => t.y -= over);
-    tags.forEach(t => {
-      const tx = el("text", { x:right - 10, y:t.y + 5, fill:t.color, "text-anchor":"end", style:`font:${t.strong ? 800 : 600} ${t.strong ? 13 : 12}px Inter` }, g); tx.textContent = t.text;
-      try{ const bb = tx.getBBox(); const r = el("rect", { x:bb.x - 6, y:bb.y - 3, width:bb.width + 12, height:bb.height + 6, rx:5, fill:"#0b0e14", "fill-opacity":.92, stroke:t.color, "stroke-opacity":t.strong ? .9 : .5 }, g); g.insertBefore(r, tx); }catch(e){}
-    });
+    // label ladders (never overlap)
+    const place = (tags, x, anchor) => {
+      tags.sort((a, b) => a.y - b.y);
+      for (let i = 1; i < tags.length; i++) if (tags[i].y - tags[i-1].y < 22) tags[i].y = tags[i-1].y + 22;
+      const over = tags.length ? tags[tags.length - 1].y - (H - 12) : 0; if (over > 0) tags.forEach(t => t.y -= over);
+      tags.forEach(t => {
+        const tx = el("text", { x, y:t.y + 5, fill:t.color, "text-anchor":anchor, style:`font:${t.strong ? 800 : 700} ${t.strong ? 13 : 12}px Inter` }, g); tx.textContent = t.text;
+        try{ const bb = tx.getBBox(); const r = el("rect", { x:bb.x - 6, y:bb.y - 3, width:bb.width + 12, height:bb.height + 6, rx:5, fill:"#0b0e14", "fill-opacity":.94, stroke:t.color, "stroke-opacity":t.strong ? .95 : .55 }, g); g.insertBefore(r, tx); }catch(e){}
+      });
+    };
+    place(tagsR, right - 10, "end"); place(tagsL, 10, "start");
     const tr = MK.trend > 0 ? '<b class="up">Bullish</b>' : MK.trend < 0 ? '<b class="dn">Bearish</b>' : "Ranging";
-    $("legend").innerHTML = `${curTf.toUpperCase()} trend: ${tr} · ATR ${fmt(MK.atr)}${f && f.grade ? ` · Setup grade <b style="color:var(--gold)">${f.grade}</b>` : ""}`;
+    $("legend").innerHTML = `${curTf.toUpperCase()} trend: ${tr} · ATR ${fmt(MK.atr)}${HTF.tf ? ` · zones from ${HTF.tf.toUpperCase()}` : ""}${f && f.grade ? ` · Setup grade <b style="color:var(--gold)">${f.grade}</b>` : ""}`;
+  }
+
+  // ---- study every timeframe ----
+  let MTF = {};
+  const TFW = { "1m":0.5, "3m":0.5, "5m":1, "15m":1.5, "30m":1.5, "1h":2, "2h":2, "4h":2.5, "1d":3 };
+  async function studyAll(){
+    const res = await Promise.all(TFS.map(tf => api("/tg/candles", { tf }).then(d => [tf, d.bars]).catch(() => [tf, null])));
+    MTF = {};
+    res.forEach(([tf, raw]) => {
+      if (!raw || raw.length < 60) return;
+      const b = raw.map(x => ({ t:x.t + tzOff, o:x.o, h:x.h, l:x.l, c:x.c })), c = b.map(x => x.c), mk = analyzeStructure(b), e50 = emaA(c, 50), r = rsiArr(c, 14), k = c.length - 1;
+      const ema = c[k] > e50[k] ? 1 : -1, rsiV = r[k], rsi = rsiV > 55 ? 1 : rsiV < 45 ? -1 : 0, sc = (mk ? mk.trend : 0) + ema + rsi;
+      MTF[tf] = { mk, ema, rsiV, rsi, atr: mk ? mk.atr : null, bias: sc >= 2 ? 1 : sc <= -2 ? -1 : 0 };
+    });
+    let tot = 0, wsum = 0; TFS.forEach(tf => { if (MTF[tf]){ tot += MTF[tf].bias * TFW[tf]; wsum += TFW[tf]; } });
+    MTF._score = wsum ? tot / wsum : 0;
+    const hi = ["1h", "2h", "4h", "1d"].filter(t => MTF[t]);
+    MTF._htf = { up: hi.filter(t => MTF[t].bias > 0).length, dn: hi.filter(t => MTF[t].bias < 0).length, n: hi.length };
+    renderMTF();
+  }
+  function renderMTF(){
+    const lab = (v) => v > 0 ? '<b class="up">Bullish</b>' : v < 0 ? '<b class="dn">Bearish</b>' : '<span class="muted">Neutral</span>';
+    $("mtf").innerHTML = TFS.filter(t => MTF[t]).map(t => { const m = MTF[t]; return `<tr><td><b>${t.toUpperCase()}</b></td><td>${lab(m.mk ? m.mk.trend : 0)}</td><td>${m.ema > 0 ? '<span class="up">above</span>' : '<span class="dn">below</span>'}</td><td>${m.rsiV ? m.rsiV.toFixed(0) : "—"}</td><td>${fmt(m.atr)}</td><td>${lab(m.bias)}</td></tr>`; }).join("");
+    const s2 = MTF._score || 0;
+    $("mtfNote").innerHTML = `Overall ${s2 > 0.25 ? '<b class="up">bullish</b>' : s2 < -0.25 ? '<b class="dn">bearish</b>' : "<b>mixed</b>"} · higher timeframes (1H–1D): ${MTF._htf.up} up / ${MTF._htf.dn} down`;
+  }
+  let ACCT = 1000; try{ ACCT = +localStorage.getItem("gd_acct") || 1000; }catch(e){}
+  function updLot(f){
+    const risk = Math.abs(f.entry - f.sl), pct = f.grade === "A" ? 1 : 0.5, rUSD = ACCT * pct / 100;
+    let lots = Math.floor(rUSD / (risk * 100) * 100) / 100; const tooSmall = lots < 0.01; if (tooSmall) lots = 0.01;
+    $("lot").innerHTML = `<small class="muted">Lot size (auto)</small><div style="font:800 24px 'JetBrains Mono',monospace">${lots.toFixed(2)}</div><div class="muted" style="font-size:11.5px;line-height:1.45">Risk ${usd(lots * 100 * risk)} (${pct}% for grade ${f.grade})${tooSmall ? " — 0.01 is the minimum lot, so risk is higher than " + pct + "%" : ""}<br>TP1 <span class="up">+${usd(lots * 100 * Math.abs(f.tp1 - f.entry))}</span> · TP2 <span class="up">+${usd(lots * 100 * Math.abs((f.tp2 || f.tp1) - f.entry))}</span></div>`;
   }
 
   // ---- trader rules: AIs pick the direction, structure places entry / SL / TP ----
@@ -452,7 +593,8 @@
       .sort((a, b) => (a.z === "ob" ? 0 : 1) - (b.z === "ob" ? 0 : 1) || Math.abs((buy ? a.top : a.bot) - price) - Math.abs((buy ? b.top : b.bot) - price));
     const zone = zones[0] ? { ...zones[0], t:BARS[zones[0].i].t } : null;
     let entry = price, orderType = "MARKET " + side, why = "";
-    const withTrend = (buy && MK.trend > 0) || (!buy && MK.trend < 0);
+    const htfDir = MTF._htf && MTF._htf.n ? (MTF._htf.up > MTF._htf.dn ? 1 : MTF._htf.dn > MTF._htf.up ? -1 : 0) : MK.trend;
+    const withTrend = htfDir === dir;
     // breakout level just beyond price (for STOP orders)
     const brk = [...MK.levels.filter(l => l.kind === (buy ? "R" : "S")).map(l => l.p), ...MK.swings.filter(s => s.type === (buy ? "H" : "L")).slice(-6).map(s => s.p)]
       .filter(p2 => (p2 - price) * dir > A * 0.1 && Math.abs(p2 - price) <= A * 0.9).sort((a, b) => Math.abs(a - price) - Math.abs(b - price))[0];
@@ -475,13 +617,14 @@
     if (zone){ sl = buy ? zone.bot - buf : zone.top + buf; }
     const sws = MK.swings.filter(s => buy ? s.type === "L" && s.p < entry && entry - s.p <= A * 1.35 : s.type === "H" && s.p > entry && s.p - entry <= A * 1.35).sort((a, b) => Math.abs(a.p - entry) - Math.abs(b.p - entry));
     if (sws[0]){ const s2 = buy ? sws[0].p - buf : sws[0].p + buf; if (sl == null || (buy ? s2 < sl : s2 > sl)){ sl = s2; slSwing = { ...sws[0], t:BARS[sws[0].i].t }; } }
-    if (sl == null || Math.abs(entry - sl) < A * 0.5) sl = entry - dir * A * 0.8;
+    if (sl == null || Math.abs(entry - sl) < Math.max(A * 0.5, 1.2)) sl = entry - dir * Math.max(A * 0.8, 1.5);
     if (Math.abs(entry - sl) > A * 1.5) sl = entry - dir * A * 1.5;
     const risk = Math.abs(entry - sl);
     // 3) targets: next structure at least 2R away, second at least 3R
     const targets = [...MK.levels.filter(l => l.kind === (buy ? "R" : "S")).map(l => ({ p:l.p, what:l.kind === "R" ? "resistance" : "support", ref:l })),
       ...[buy ? MK.bsl : MK.ssl].filter(Boolean).map(q => ({ p:q.p, what:"liquidity", ref:q })),
-      ...MK.obs.filter(o => o.dir === -dir).map(o => ({ p: buy ? o.bot : o.top, what: buy ? "supply zone" : "demand zone" }))]
+      ...MK.obs.filter(o => o.dir === -dir).map(o => ({ p: buy ? o.bot : o.top, what: buy ? "supply zone" : "demand zone" })),
+      ...["15m", "1h"].flatMap(t => MTF[t] && MTF[t].mk ? [...MTF[t].mk.levels.filter(l => l.kind === (buy ? "R" : "S")).map(l => ({ p:l.p, what:`${t.toUpperCase()} ${l.kind === "R" ? "resistance" : "support"}` })), ...[buy ? MTF[t].mk.bsl : MTF[t].mk.ssl].filter(Boolean).map(q => ({ p:q.p, what:`${t.toUpperCase()} liquidity` }))] : [])]
       .filter(t => (t.p - entry) * dir > 0).sort((a, b) => (a.p - b.p) * dir);
     const t1 = targets.find(t => Math.abs(t.p - entry) >= risk * 2);
     const tp1 = t1 ? t1.p - dir * A * 0.05 : entry + dir * risk * 2;
@@ -491,16 +634,18 @@
     const stamp = (o) => o && ({ ...o, t: o.i != null ? BARS[o.i].t : undefined, tf: o.first != null ? BARS[o.first].t : undefined });
     const basis = { zone, levels:[lv, t1 && t1.ref && t1.ref.kind ? t1.ref : null].filter(Boolean).map(stamp), liq: stamp((t1 && t1.what === "liquidity") ? t1.ref : (t2 && t2.what === "liquidity" ? t2.ref : null)), t1, t2 };
     // 4) grade the setup
+    const R1 = (MTF["1h"] && MTF["1h"].mk && MTF["1h"].mk.range) || MK.range;
     const checks = [
-      { ok:(buy && MK.trend > 0) || (!buy && MK.trend < 0), txt:`With the ${curTf.toUpperCase()} trend (last break ${MK.trend > 0 ? "up" : MK.trend < 0 ? "down" : "none"})` },
+      { ok:withTrend, txt: MTF._htf && MTF._htf.n ? `Higher timeframes 1H / 2H / 4H / 1D: ${MTF._htf.up} bullish, ${MTF._htf.dn} bearish` : "Higher-timeframe bias unknown" },
+      { ok:(buy && MK.trend > 0) || (!buy && MK.trend < 0), txt:`${curTf.toUpperCase()} entry structure ${MK.trend > 0 ? "broke up" : MK.trend < 0 ? "broke down" : "is ranging"}` },
       { ok:!!(zone || lv), txt: zone ? `Entry on a ${zone.z === "ob" ? (buy ? "demand zone (bullish order block)" : "supply zone (bearish order block)") : (buy ? "bullish" : "bearish") + " fair value gap"} ${fmt(zone.bot)}–${fmt(zone.top)}` : lv ? `Entry at ${lv.kind === "R" ? "resistance" : "support"} ${fmt(lv.p)} (${lv.n} touches)` : "No zone at entry (entering mid-air)" },
-      { ok:!!MK.range && (buy ? entry <= MK.range.eq : entry >= MK.range.eq), txt: MK.range ? `${buy ? "Buying in discount" : "Selling in premium"} (50% of range = ${fmt(MK.range.eq)})` : "Range unclear" },
+      { ok:!!R1 && (buy ? entry <= R1.eq : entry >= R1.eq), txt: R1 ? `${buy ? "Buying in discount" : "Selling in premium"} of the 1H range (50% = ${fmt(R1.eq)})` : "Range unclear" },
       { ok:!!t1, txt: t1 ? `TP1 at real ${t1.what} ${fmt(t1.p)}` : "TP1 is a 2R measured move (no structure target)" },
       { ok:(aiPlan.agree || 0) >= 0.75, txt:`${aiPlan.count} of ${aiPlan.total} AIs agree on ${side}` }
     ];
     const score = checks.filter(c => c.ok).length;
-    const grade = score >= 4 ? "A" : score === 3 ? "B" : "C";
-    return { action:side, orderType, why, validFor, entry:+entry.toFixed(2), sl:+sl.toFixed(2), tp1:+tp1.toFixed(2), tp2:+tp2.toFixed(2), rr:+(Math.abs(tp1 - entry) / risk).toFixed(2), slSwing, basis, checks, grade, score };
+    const grade = score >= 5 ? "A" : score === 4 ? "B" : "C";
+    return { action:side, orderType, why, validFor, entry:+entry.toFixed(2), sl:+sl.toFixed(2), tp1:+tp1.toFixed(2), tp2:+tp2.toFixed(2), rr:+(Math.abs(tp1 - entry) / risk).toFixed(2), slSwing, basis, checks, grade, score, total:checks.length };
   }
 
   function buildTrade(d){
@@ -530,9 +675,9 @@
     const add = (tag, color, text) => items.push(`<li><b class="k" style="background:${color}22;color:${color}">${tag}</b><span>${text}</span></li>`);
     const plan = f.action !== "WAIT" ? f : f.rejected;
     if (f.action === "WAIT" && !f.rejected) add("⏸", "#8a94a8", `<b>No trade.</b> ${esc(f.agreement || "")}`);
-    if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/5 checks pass. Waiting for a cleaner setup protects your account.`);
+    if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/${f.rejected.total} checks pass. Waiting for a cleaner setup protects your account.`);
     if (plan && plan.checks){
-      add(plan.grade, plan.grade === "A" ? "#16c784" : plan.grade === "B" ? "#f5c451" : "#ea3943", `<b>Setup grade ${plan.grade}</b> — ${plan.score}/5 checks pass`);
+      add(plan.grade, plan.grade === "A" ? "#16c784" : plan.grade === "B" ? "#f5c451" : "#ea3943", `<b>Setup grade ${plan.grade}</b> — ${plan.score}/${plan.total} checks pass`);
       add("📌", "#f5c451", `<b>${esc(plan.orderType)} @ ${fmt(plan.entry)}</b> — ${esc(plan.why)}.`);
       plan.checks.forEach(c => add(c.ok ? "✓" : "✗", c.ok ? "#16c784" : "#ea3943", esc(c.txt)));
       add("SL", "#ea3943", `<b>Stop ${fmt(plan.sl)}</b> — ${plan.slSwing ? `just beyond the swing ${plan.action === "BUY" ? "low" : "high"} ${fmt(plan.slSwing.p)}` : plan.basis.zone ? "just beyond the zone" : "1 ATR away"}; risk ${fmt(Math.abs(plan.entry - plan.sl))} (max 1.5× ATR).`);
@@ -554,7 +699,7 @@
     if (busy) return;
     busy = true; $("btnAnalyze").disabled = true;
     const t0 = Date.now();
-    const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span> All AIs are reading 9 timeframes, every strategy, news, the calendar and DXY / yields / VIX… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
+    const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span> Studying all 9 timeframes (1M → 1D), every strategy, news, the calendar and DXY / yields / VIX… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
     try{
       const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 170000);
       const r = await fetch(WORKER_URL + "/tg/analyze", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ session:SESSION }), signal: ctl.signal });
@@ -563,15 +708,15 @@
       if (r.status === 401){ gate(true); throw new Error("Please sign in"); }
       if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
       const rawTf = String((readTrade(d.final) || {}).timeframe || "").toLowerCase().replace(/\s/g, "").replace("mins", "m").replace("min", "m").replace(/^(\d+)h(our)?s?$/, "$1h").replace(/^daily$|^1day$|^d$/, "1d");
-      curTf = ["1m", "3m", "5m"].includes(rawTf) || !TFS.includes(rawTf) ? "15m" : rawTf;
+      curTf = "5m";
       lastSignal = null;
       $("tabMine").click();
-      await loadChart(true); tv(TV_INT[curTf]);
+      await Promise.all([studyAll(), loadChart(true)]); tv(TV_INT[curTf]);
       d.final = buildTrade(d);
       lastSignal = d;
       showDecision(d); showCouncil(d.opinions || []); showNews(d.news); showInter(d.inter);
       markers(); draw(); renderBasis();
-      $("status").textContent = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}`;
+      $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
       loadHistory();
       if (d.final && d.final.action !== "WAIT") alertUser(d.final);
     }catch(e){ $("status").textContent = "❌ " + (e.name === "AbortError" ? "The AIs took too long — try again." : e.message); }
@@ -628,12 +773,13 @@
       <div class="muted" style="margin-top:2px">${esc(f.agreement || "")}</div>
       <div class="row" style="margin-top:8px">${f.grade ? `<span class="pill" style="color:var(--gold)">Grade ${f.grade}</span>` : ""}<span class="pill">Chart: ${curTf.toUpperCase()}</span>${f.horizon ? `<span class="pill">${esc(f.horizon)}</span>` : ""}</div>
       ${f.action !== "WAIT" ? `<div class="ord ${f.action === "BUY" ? "up" : "dn"}">👉 ${esc(f.orderType)} @ ${fmt(f.entry)} · SL ${fmt(f.sl)} · TP1 ${fmt(f.tp1)} · TP2 ${fmt(f.tp2)}${f.validFor ? `<div class="muted" style="font-size:11px;font-weight:500;margin-top:3px">Order valid: ${esc(f.validFor)}</div>` : ""}</div>` : ""}
-      ${f.action === "WAIT" ? `<p class="muted" style="margin:10px 0">${f.rejected ? `Best idea was ${f.rejected.orderType} @ ${fmt(f.rejected.entry)} (SL ${fmt(f.rejected.sl)}, TP1 ${fmt(f.rejected.tp1)}) but it only scores ${f.rejected.score}/5 — skipped. See the checklist under the chart.` : "No majority among the AIs — stay flat."}</p>` : `<div class="lv">${lv("entry", "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target 1 (" + f.rr + "R)")}${lv("tp2", "Target 2")}</div>`}
+      ${f.action === "WAIT" ? `<p class="muted" style="margin:10px 0">${f.rejected ? `Best idea was ${f.rejected.orderType} @ ${fmt(f.rejected.entry)} (SL ${fmt(f.rejected.sl)}, TP1 ${fmt(f.rejected.tp1)}) but it only scores ${f.rejected.score}/${f.rejected.total} — skipped. See the checklist under the chart.` : "No majority among the AIs — stay flat."}</p>` : `<div class="lv">${lv("entry", "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target 1 (" + f.rr + "R)")}${lv("tp2", "Target 2")}</div><div class="lotbox"><label class="f">Your balance ($)<input id="acct" type="number" min="10" value="${ACCT}"></label><div id="lot"></div></div>`}
       <div class="row" style="justify-content:space-between;font-size:12px"><span class="muted">Confidence</span><b>${Math.round(f.confidence || 0)}%</b></div>
       <div class="meter"><i style="width:${Math.round(f.confidence || 0)}%"></i></div>
       <div class="muted" style="font-size:12px">Risk : reward <b style="color:var(--ink)">${f.rr ? "1 : " + f.rr : "—"}</b></div>
       ${(f.risks || []).length ? `<div style="margin-top:10px;font-weight:700;font-size:12px">Risks</div><ul class="pts">${f.risks.map(r => "<li>" + esc(r) + "</li>").join("")}</ul>` : ""}
       <div class="muted" style="font-size:11px;margin-top:10px">The full reasoning is under the chart in "Why this trade".</div>`;
+    if ($("acct")){ $("acct").oninput = () => { ACCT = +$("acct").value || 0; try{ localStorage.setItem("gd_acct", ACCT); }catch(e){} updLot(f); }; updLot(f); }
   }
   function showCouncil(ops){
     $("councilNote").textContent = `${ops.filter(o => !o.error).length} / ${ops.length} AIs answered`;
@@ -678,63 +824,81 @@
   }
   $("btnHist").onclick = loadHistory;
 
-  // =============== backtest (dollars) ===============
+  // =============== backtest: 4 strategies × 3 timeframes × 3 risk levels — the desk picks the best, lots sized automatically ===============
   function rsiArr(c, p){ const out = Array(c.length).fill(null); let g = 0, l = 0; for (let i = 1; i < c.length; i++){ const d = c[i] - c[i-1]; if (i <= p){ g += Math.max(d,0); l += Math.max(-d,0); if (i === p){ g /= p; l /= p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } else { g = (g*(p-1) + Math.max(d,0))/p; l = (l*(p-1) + Math.max(-d,0))/p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } return out; }
-  function runBt(b, start, riskPct){
-    const c = b.map(x => x.c), ef = emaA(c, 20), es = emaA(c, 50), r = rsiArr(c, 14), a = atrA(b, 14);
-    const SPREAD = 0.30;
-    let bal = start, peak = start, maxDd = 0, pos = null;
-    const trades = [], curve = [{ time: b[0].t, value: start }], months = {};
-    for (let i = 51; i < b.length; i++){
-      if (pos){
-        const bar = b[i];
-        const hitSL = pos.side > 0 ? bar.l <= pos.sl : bar.h >= pos.sl;
-        const hitTP = pos.side > 0 ? bar.h >= pos.tp : bar.l <= pos.tp;
-        if (hitSL || hitTP){
-          const exit = hitSL ? pos.sl : pos.tp;
-          const pnl = (exit - pos.entry) * pos.side * pos.oz - SPREAD * pos.oz;
-          bal += pnl; peak = Math.max(peak, bal); maxDd = Math.max(maxDd, (peak - bal) / peak);
-          trades.push({ pnl, win: pnl > 0 });
-          const m = new Date(bar.t * 1000).toISOString().slice(0, 7);
-          months[m] = months[m] || { n: 0, pnl: 0 }; months[m].n++; months[m].pnl += pnl;
-          curve.push({ time: bar.t, value: +bal.toFixed(2) });
-          pos = null;
-          if (bal <= 0) break;
-        }
-      }
-      if (!pos && i < b.length - 1){
-        const up = ef[i-1] <= es[i-1] && ef[i] > es[i], dn = ef[i-1] >= es[i-1] && ef[i] < es[i];
-        const entry = b[i+1].o, stop = a[i] * 1.5;
-        if (stop <= 0) continue;
-        const oz = (bal * riskPct / 100) / stop;
-        if (up && r[i] > 50) pos = { side: 1, entry, sl: entry - stop, tp: entry + stop * 2, oz };
-        else if (dn && r[i] < 50) pos = { side: -1, entry, sl: entry + stop, tp: entry - stop * 2, oz };
+  const STRATS = { smc:"Smart money: BOS + order-block limit", breakout:"Breakout: 20-bar high/low with 200 EMA", ema:"Trend: EMA 20/50 cross + RSI", pullback:"Pullback: RSI 35/65 in 200 EMA trend" };
+  function signalsFor(name, b){
+    const c = b.map(x => x.c), a = atrA(b, 14), f20 = emaA(c, 20), f50 = emaA(c, 50), f200 = emaA(c, 200), r = rsiArr(c, 14), out = {};
+    const put = (i, o) => { out[i] = o; };
+    if (name === "ema") for (let i = 51; i < b.length - 1; i++){ const up = f20[i-1] <= f50[i-1] && f20[i] > f50[i], dn = f20[i-1] >= f50[i-1] && f20[i] < f50[i]; if (up && r[i] > 50) put(i, { side:1, stop:a[i] * 1.5, rr:2 }); else if (dn && r[i] < 50) put(i, { side:-1, stop:a[i] * 1.5, rr:2 }); }
+    if (name === "breakout") for (let i = 201; i < b.length - 1; i++){ let hh = -Infinity, ll = Infinity; for (let j = i - 20; j < i; j++){ hh = Math.max(hh, b[j].h); ll = Math.min(ll, b[j].l); } if (c[i] > hh && c[i] > f200[i]) put(i, { side:1, stop:a[i] * 1.5, rr:2 }); else if (c[i] < ll && c[i] < f200[i]) put(i, { side:-1, stop:a[i] * 1.5, rr:2 }); }
+    if (name === "pullback") for (let i = 201; i < b.length - 1; i++){ if (c[i] > f200[i] && r[i-1] < 35 && r[i] >= 35) put(i, { side:1, stop:a[i] * 1.2, rr:2 }); else if (c[i] < f200[i] && r[i-1] > 65 && r[i] <= 65) put(i, { side:-1, stop:a[i] * 1.2, rr:2 }); }
+    if (name === "smc"){
+      const K = 3, sw = [];
+      for (let i = K; i < b.length - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b[i-j].h >= b[i].h || b[i+j].h > b[i].h) hi = false; if (b[i-j].l <= b[i].l || b[i+j].l < b[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b[i].l }); }
+      sw.sort((x, y) => x.cf - y.cf);
+      let k = 0, lastH = null, lastL = null;
+      for (let i = 0; i < b.length - 1; i++){
+        while (k < sw.length && sw[k].cf <= i){ const s = sw[k++]; if (s.type === "H") lastH = { ...s, used:false }; else lastL = { ...s, used:false }; }
+        if (i < 200) continue;
+        if (lastH && !lastH.used && c[i] > lastH.p){ lastH.used = true; if (c[i] > f200[i]){ let ext = lastH.i; for (let j = lastH.i; j <= i; j++) if (b[j].l < b[ext].l) ext = j; for (let j = ext; j >= Math.max(0, ext - 6); j--) if (b[j].c < b[j].o){ put(i, { side:1, limit:b[j].h, slP:b[j].l - a[i] * 0.15, rr:2, ttl:20, atr:a[i] }); break; } } }
+        if (lastL && !lastL.used && c[i] < lastL.p){ lastL.used = true; if (c[i] < f200[i]){ let ext = lastL.i; for (let j = lastL.i; j <= i; j++) if (b[j].h > b[ext].h) ext = j; for (let j = ext; j >= Math.max(0, ext - 6); j--) if (b[j].c > b[j].o){ put(i, { side:-1, limit:b[j].l, slP:b[j].h + a[i] * 0.15, rr:2, ttl:20, atr:a[i] }); break; } } }
       }
     }
+    return out;
+  }
+  function simulate(b, orders, start, riskPct){
+    const SPREAD = 0.30, OZ = 100;
+    let bal = start, peak = start, maxDd = 0, pos = null, pend = null, lotSum = 0;
+    const trades = [], curve = [{ time:b[0].t, value:start }], months = {};
+    const close = (bar, exit) => {
+      const pnl = (exit - pos.entry) * pos.side * pos.lots * OZ - SPREAD * pos.lots * OZ;
+      bal += pnl; peak = Math.max(peak, bal); maxDd = Math.max(maxDd, (peak - bal) / peak);
+      trades.push({ pnl, win:pnl > 0 }); lotSum += pos.lots;
+      const m = new Date(bar.t * 1000).toISOString().slice(0, 7); months[m] = months[m] || { n:0, pnl:0 }; months[m].n++; months[m].pnl += pnl;
+      curve.push({ time:bar.t, value:+bal.toFixed(2) }); pos = null;
+    };
+    const lotsFor = (risk) => Math.max(0.01, Math.floor((bal * riskPct / 100) / (risk * OZ) * 100) / 100);
+    for (let i = 1; i < b.length && bal > start * 0.05; i++){
+      const bar = b[i], o = orders[i - 1];
+      if (!pos && !pend && o){
+        if (o.limit == null){ const entry = bar.o; pos = { side:o.side, entry, sl:entry - o.side * o.stop, tp:entry + o.side * o.stop * o.rr, lots:lotsFor(o.stop) }; }
+        else { let risk = Math.abs(o.limit - o.slP); if (risk > o.atr * 1.5) risk = o.atr * 1.5; if (risk >= o.atr * 0.3) pend = { side:o.side, entry:o.limit, sl:o.limit - o.side * risk, tp:o.limit + o.side * risk * o.rr, risk, exp:i + o.ttl }; }
+      }
+      if (!pos && pend){ if (i > pend.exp) pend = null; else if (pend.side > 0 ? bar.l <= pend.entry : bar.h >= pend.entry){ pos = { ...pend, lots:lotsFor(pend.risk) }; pend = null; } }
+      if (pos){ const hitSL = pos.side > 0 ? bar.l <= pos.sl : bar.h >= pos.sl, hitTP = pos.side > 0 ? bar.h >= pos.tp : bar.l <= pos.tp; if (hitSL) close(bar, pos.sl); else if (hitTP) close(bar, pos.tp); }
+    }
     const wins = trades.filter(t => t.win), gw = wins.reduce((s, t) => s + t.pnl, 0), gl = -trades.filter(t => !t.win).reduce((s, t) => s + t.pnl, 0);
-    return { trades: trades.length, winRate: trades.length ? Math.round(100 * wins.length / trades.length) : 0, net: bal - start, end: bal, ret: (bal / start - 1) * 100, maxDd: maxDd * 100, pf: gl ? gw / gl : (gw ? Infinity : 0), curve, months };
+    return { trades:trades.length, winRate:trades.length ? Math.round(100 * wins.length / trades.length) : 0, net:bal - start, end:bal, ret:(bal / start - 1) * 100, maxDd:maxDd * 100, pf:gl ? gw / gl : (gw ? Infinity : 0), avgLot:trades.length ? lotSum / trades.length : 0, curve, months };
   }
   let eqChart = null, eqSeries = null;
   async function backtest(days){
-    const start = Math.max(10, +$("bBal").value || 1000), risk = Math.min(10, Math.max(0.1, +$("bRisk").value || 1));
+    const start = Math.max(10, +$("bBal").value || 1000);
     $("bt1").disabled = $("bt2").disabled = true;
-    $("btInfo").innerHTML = `<span class="spin"></span> Loading ${days === 730 ? "2 years" : "1 year"} of data…`;
+    $("btInfo").innerHTML = `<span class="spin"></span> Testing 4 strategies × 3 timeframes × 3 risk levels on ${days === 730 ? "2 years" : "1 year"} of gold…`;
     $("btTable").innerHTML = "";
-    const results = [];
+    const rows = [], RISKS = [0.5, 1, 2];
+    let src = "", from = "";
     for (const tf of ["1h", "4h", "1d"]){
       try{
         const d = await api("/tg/longbars", { tf, days });
-        if (d.bars.length < 80){ results.push({ tf, err: "not enough data (" + d.bars.length + " candles)" }); continue; }
-        results.push({ tf, from: d.from, src: d.src, ...runBt(d.bars, start, risk) });
-      }catch(e){ results.push({ tf, err: e.message }); }
+        src = d.src || src; if (!from || d.from < from) from = d.from;
+        if (d.bars.length < 250){ rows.push({ tf, err:"not enough history (" + d.bars.length + " candles)" }); continue; }
+        for (const s in STRATS){ const orders = signalsFor(s, d.bars); for (const rk of RISKS) rows.push({ tf, s, rk, from:d.from, ...simulate(d.bars, orders, start, rk) }); }
+      }catch(e){ rows.push({ tf, err:e.message }); }
     }
-    const ok = results.filter(r => !r.err);
-    const best = ok.slice().sort((x, y) => y.net - x.net)[0];
-    $("btTable").innerHTML = results.map(r => r.err ? `<tr><td>${r.tf.toUpperCase()}</td><td colspan="7" class="muted">${esc(r.err)}</td></tr>` : `<tr class="${r === best ? "best" : ""}"><td><b>${r.tf.toUpperCase()}</b>${r === best ? " 🏆" : ""}<div class="muted" style="font-size:11px">since ${r.from}</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(r.end)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("");
-    const earliest = ok.map(r => r.from).sort()[0];
-    $("btInfo").textContent = ok.length ? `Start ${usd(start)} · ${risk}% risk per trade · data: ${ok[0].src}${earliest ? " · history available since " + earliest : ""}` : "No data";
+    const score = (r) => (r.maxDd > 25 ? -1e6 : 0) + (r.trades < 8 ? -1e5 : 0) + r.ret / Math.max(r.maxDd, 4);
+    const bestPer = {};
+    rows.filter(r => !r.err).forEach(r => { const k = r.s + r.tf; if (!bestPer[k] || score(r) > score(bestPer[k])) bestPer[k] = r; });
+    const list = Object.values(bestPer).sort((a, b) => score(b) - score(a));
+    const best = list[0];
+    $("btTable").innerHTML = list.map(r => `<tr class="${r === best ? "best" : ""}"><td><b>${esc(STRATS[r.s])}</b>${r === best ? " 🏆" : ""}</td><td>${r.tf.toUpperCase()}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(r.end)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("")
+      + rows.filter(r => r.err).map(r => `<tr><td colspan="10" class="muted">${r.tf.toUpperCase()}: ${esc(r.err)}</td></tr>`).join("");
     if (best){
-      $("eqTitle").textContent = `Equity curve — ${best.tf.toUpperCase()} (best)`;
+      $("btInfo").innerHTML = best.net > 0
+        ? `<b class="up">Best: ${esc(STRATS[best.s])} on ${best.tf.toUpperCase()} at ${best.rk}% risk → +${usd(best.net)} (${best.ret.toFixed(1)}%) from ${usd(start)}</b> · max drawdown ${best.maxDd.toFixed(1)}% · data since ${from} (${esc(src)})`
+        : `<b class="dn">No strategy made money in this period</b> — the best lost ${usd(-best.net)}. The desk would not trade these rules. Data since ${from}.`;
+      $("eqTitle").textContent = `Equity curve — ${STRATS[best.s]} · ${best.tf.toUpperCase()} · ${best.rk}% risk`;
       if (!eqChart){
         eqChart = LightweightCharts.createChart($("eq"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8" }, grid:{ vertLines:{ visible:false }, horzLines:{ color:"#1b2232" } }, rightPriceScale:{ borderColor:"#232b3d" }, timeScale:{ borderColor:"#232b3d" }, autoSize:true });
         eqSeries = eqChart.addAreaSeries({ lineColor:"#f5c451", topColor:"#f5c45140", bottomColor:"#f5c45100", lineWidth:2 });
@@ -743,7 +907,7 @@
       eqSeries.setData(best.curve.filter(p => !seen.has(p.time) && seen.add(p.time)));
       eqChart.timeScale().fitContent();
       $("months").innerHTML = Object.entries(best.months).sort().reverse().map(([m, v]) => `<tr><td>${m}</td><td>${v.n}</td><td class="${v.pnl >= 0 ? "up" : "dn"}">${v.pnl >= 0 ? "+" : ""}${usd(v.pnl)}</td></tr>`).join("");
-    }
+    } else $("btInfo").textContent = "No data";
     $("bt1").disabled = $("bt2").disabled = false;
   }
   $("bt1").onclick = () => backtest(365);
