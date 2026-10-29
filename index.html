@@ -96,7 +96,7 @@
   <div class="brand"><div class="dot">Au</div> Gold AI Desk</div>
   <div class="price row"><span class="muted mono">XAUUSD</span><b class="mono" id="px">—</b><span class="mono" id="pxc" style="font-size:13px"></span></div>
   <div class="spacer"></div>
-  <span class="muted row"><span class="live on"></span><span>Chart live</span></span>
+  <span class="muted row"><span class="live" id="tickDot"></span><span id="tickTxt">Connecting…</span></span>
   <span class="muted row"><span class="live" id="liveDot"></span><span id="autoTxt">Auto-scan: off</span></span>
   <div class="me" id="me"></div>
 </header>
@@ -295,6 +295,7 @@
       const ch = last.c - dayAgo.o;
       $("pxc").textContent = (ch >= 0 ? "+" : "") + fmt(ch) + " (24h)";
       $("pxc").className = "mono " + (ch >= 0 ? "up" : "dn");
+      syncOffset();
       MK = analyzeStructure(BARS);
       if (MK) MK.pro = proMarks(BARS, MK);
       loadHTF().then(scheduleDraw);
@@ -792,6 +793,31 @@
   };
   $("btnAnalyze").onclick = analyze;
 
+  // =============== real-time ticks (exchange WebSocket) → candle, price and open trade update every second ===============
+  let RAW = null, RAW_AT = 0, OFFSET = 0, wsConn = null, wsRetry = 0, lastPaint = 0;
+  function syncOffset(){ if (RAW != null && Date.now() - RAW_AT < 15000 && BARS.length) OFFSET = BARS[BARS.length - 1].c - RAW; }
+  function connectTicks(){
+    try{ wsConn && wsConn.close(); }catch(e){}
+    const ws = new WebSocket("wss://stream.bybit.com/v5/public/spot"); wsConn = ws;
+    let ping = null;
+    ws.onopen = () => { wsRetry = 0; ws.send(JSON.stringify({ op:"subscribe", args:["tickers.XAUTUSDT"] })); ping = setInterval(() => { try{ ws.send(JSON.stringify({ op:"ping" })); }catch(e){} }, 20000); $("tickDot").classList.add("on"); $("tickTxt").textContent = "Live ticks"; };
+    ws.onmessage = (e) => { try{ const m = JSON.parse(e.data); if (m.topic === "tickers.XAUTUSDT" && m.data && m.data.lastPrice){ const first = RAW == null; RAW = +m.data.lastPrice; RAW_AT = Date.now(); if (first) syncOffset(); onTick(RAW + OFFSET); } }catch(err){} };
+    ws.onclose = () => { clearInterval(ping); $("tickDot").classList.remove("on"); $("tickTxt").textContent = "Reconnecting…"; setTimeout(connectTicks, Math.min(15000, 1000 * Math.pow(2, wsRetry++))); };
+    ws.onerror = () => { try{ ws.close(); }catch(e){} };
+  }
+  function onTick(p){
+    if (!BARS.length || !candles) return;
+    const now = Date.now(); if (now - lastPaint < 250) return; lastPaint = now;
+    const sec = TF_SEC[curTf] || 3600, start = Math.floor(now / 1000 / sec) * sec + tzOff;
+    let last = BARS[BARS.length - 1];
+    if (start > last.t){ last = { t:start, o:last.c, h:Math.max(last.c, p), l:Math.min(last.c, p), c:p }; BARS.push(last); }
+    else { last.h = Math.max(last.h, p); last.l = Math.min(last.l, p); last.c = p; }
+    candles.update({ time:last.t, open:last.o, high:last.h, low:last.l, close:last.c });
+    $("px").textContent = fmt(p);
+    const t = JOURNAL.find(x => x.status === "open");
+    if (t){ const d = t.side === "BUY" ? 1 : -1; t.price = p; t.now = (p - t.entry) * d / t.risk; if (now - (onTick.m || 0) > 1000){ onTick.m = now; renderManage(); } }
+  }
+
   // =============== trade journal: every signal is saved to your account and tracked against real prices ===============
   let JOURNAL = [];
   function notify(title, body){ beep(); try{ if (Notification.permission === "granted") new Notification(title, { body }); }catch(e){} }
@@ -1012,7 +1038,8 @@
 
   function boot(){
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
-    loadChart(true); setInterval(() => loadChart(false), 10000);
+    loadChart(true); setInterval(() => loadChart(false), 30000);
+    connectTicks();
     setInterval(() => evalJournal(), 60000);
     loadHistory();
     api("/tg/news", {}).then(showNews).catch(() => {});
