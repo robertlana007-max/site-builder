@@ -620,7 +620,7 @@
     const validFor = /MARKET/.test(orderType) ? "now" : "next 6 hours, London–New York session only — cancel if not triggered";
     const checks = [
       { ok: againstTf.length === 0 && withTf.length >= Math.min(5, GT.length), txt: `All timeframes allow it: ${withTf.length} with (${withTf.map(t => t.toUpperCase()).join(", ") || "none"}), ${GT.length - withTf.length - againstTf.length} neutral, ${againstTf.length} against${againstTf.length ? " (" + againstTf.map(t => t.toUpperCase()).join(", ") + ")" : ""} — need 5+ with and none against` },
-      { ok: aiPlan.count >= Math.ceil(aiPlan.total / 2), txt: `${aiPlan.count} of ${aiPlan.total} AIs say ${side}` },
+      { ok: aiPlan.count === aiPlan.total && aiPlan.total >= 2, txt: `${aiPlan.count} of ${aiPlan.total} AIs say ${side}${aiPlan.count === aiPlan.total ? " — all agree" : " — not all agree"}` },
       { ok: inSess, txt: inSess ? "London / New York session is open (best liquidity for gold)" : "Outside London–New York hours (12:00 → 01:00 Pakistan time) — the tested rule does not trade now" }
     ];
     const score = checks.filter(c => c.ok).length;
@@ -656,7 +656,10 @@
     const plan = f.action !== "WAIT" ? f : f.rejected;
     if (f.userRejected){ add("✖", "#ea3943", `<b>You rejected this trade.</b> Press "Get AI trade" for a fresh analysis.`); $("basis").innerHTML = items.join(""); return; }
     if (f.action === "WAIT" && !f.rejected) add("⏸", "#8a94a8", `<b>No trade.</b> ${esc(f.agreement || "")}`);
-    if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/${f.rejected.total} checks pass. Waiting for a cleaner setup protects your account.`);
+    const C = lastSignal.confirm;
+    if (f.rejected && C && C.votes && !C.unanimous) add("✋", "#f59e0b", `<b>Trade skipped:</b> the desk found ${f.rejected.orderType} @ ${fmt(f.rejected.entry)}, but when every AI was asked to approve this exact trade only ${C.yes} of ${C.answered} said yes.`);
+    else if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/${f.rejected.total} checks pass. Waiting for a cleaner setup protects your account.`);
+    if (C && C.votes) C.votes.forEach(v => add(v.error ? "…" : v.approve ? "✅" : "❌", v.error ? "#8a94a8" : v.approve ? "#16c784" : "#ea3943", `<b>${esc(v.ai)}:</b> ${v.error ? "no answer" : (v.approve ? "APPROVE" : "REJECT") + " (" + v.confidence + "%) — " + esc(v.reason)}${v.concern ? ` <span class="muted">Risk: ${esc(v.concern)}</span>` : ""}`));
     if (plan && plan.checks){
       add(plan.grade, plan.grade === "A" ? "#16c784" : plan.grade === "B" ? "#f5c451" : "#ea3943", `<b>Setup grade ${plan.grade}</b> — ${plan.score}/${plan.total} checks pass`);
       add("📌", "#f5c451", `<b>${esc(plan.orderType)} @ ${fmt(plan.entry)}</b> — ${esc(plan.why)}.`);
@@ -694,6 +697,16 @@
       $("tabMine").click();
       await Promise.all([studyAll(), loadChart(true)]); tv(TV_INT[curTf]);
       d.final = buildTrade(d);
+      const cand = d.final.action !== "WAIT" ? d.final : null;
+      if (cand){
+        $("status").innerHTML = `<span class="spin"></span> Every AI is now checking the exact trade: ${esc(cand.orderType)} @ ${fmt(cand.entry)} · SL ${fmt(cand.sl)} · TP ${fmt(cand.tp1)}…`;
+        try{
+          const c = await api("/tg/confirm", { plan:{ action:cand.action, orderType:cand.orderType, entry:cand.entry, sl:cand.sl, tp:cand.tp1, rr:cand.rr, why:cand.why, price:d.price } });
+          d.confirm = c;
+          if (!c.unanimous){ d.final = { ...cand, action:"WAIT", rejected:{ ...cand }, agreement:`${c.yes} of ${c.answered} AIs approved the exact trade — not unanimous, so no trade` }; }
+          else d.final.agreement = `${c.answered} of ${c.answered} AIs approved this exact trade ✅`;
+        }catch(e){ d.confirm = { error:e.message }; }
+      }
       lastSignal = d;
       addToJournal(d);
       showDecision(d); showCouncil(d.opinions || [], d.debate); showCrowd(d.crowd); showNews(d.news); showInter(d.inter);
@@ -823,13 +836,13 @@
           if (d && d.mid){ RAW = d.mid; RAW_AT = Date.now(); OFFSET = 0; $("tickDot").classList.add("on"); $("tickTxt").textContent = "Live spot · Swissquote"; lastPaint = 0; onTick(d.mid); }
         }catch(e){ $("tickDot").classList.remove("on"); $("tickTxt").textContent = "Reconnecting…"; }
       }
-      setTimeout(poll, 2000);
+      setTimeout(poll, 500);
     };
     poll();
   }
   function onTick(p){
     if (!BARS.length || !candles) return;
-    const now = Date.now(); if (now - lastPaint < 250) return; lastPaint = now;
+    const now = Date.now(); if (now - lastPaint < 60) return; lastPaint = now;
     const sec = TF_SEC[curTf] || 3600, start = Math.floor(now / 1000 / sec) * sec + tzOff;
     let last = BARS[BARS.length - 1];
     if (start > last.t){ last = { t:start, o:last.c, h:Math.max(last.c, p), l:Math.min(last.c, p), c:p }; BARS.push(last); }
@@ -837,7 +850,9 @@
     candles.update({ time:last.t, open:last.o, high:last.h, low:last.l, close:last.c });
     $("px").textContent = fmt(p);
     const t = JOURNAL.find(x => x.status === "open");
-    if (t){ const d = t.side === "BUY" ? 1 : -1; t.price = p; t.now = (p - t.entry) * d / t.risk; if (now - (onTick.m || 0) > 1000){ onTick.m = now; renderManage(); } }
+    if (t){ const d = t.side === "BUY" ? 1 : -1; t.price = p; t.now = (p - t.entry) * d / t.risk; if (now - (onTick.m || 0) > 500){ onTick.m = now; renderManage(); } }
+    const pn = JOURNAL.find(x => x.status === "pending"); if (pn){ const d = pn.side === "BUY" ? 1 : -1; if ((p - pn.entry) * d >= 0 && Date.now() <= pn.validUntil){ pn.status = "open"; pn.fillTime = now; notify(`Gold ${pn.side} triggered`, `${pn.type} filled @ ${fmt(pn.entry)}`); renderJournal(); saveState(); } }
+    if (t){ const d = t.side === "BUY" ? 1 : -1; if ((d > 0 ? p <= t.sl : p >= t.sl)){ t.status = "loss"; t.R = -1; t.closeTime = now; notify("Gold trade closed: stop-loss", `${t.side} from ${fmt(t.entry)} · -1R`); renderJournal(); saveState(); } else if ((d > 0 ? p >= t.tp : p <= t.tp)){ t.status = "win"; t.R = 3; t.closeTime = now; notify("Gold trade closed: target hit 🎯", `${t.side} from ${fmt(t.entry)} · +3R`); renderJournal(); saveState(); } }
   }
 
   // =============== trade journal: every signal is saved to your account and tracked against real prices ===============
@@ -1068,7 +1083,7 @@
 
   function boot(){
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
-    loadChart(true); setInterval(() => loadChart(false), 30000);
+    loadChart(true); setInterval(() => { if (!document.hidden) loadChart(false); }, 60000);
     connectTicks();
     setInterval(() => evalJournal(), 60000);
     loadHistory();
