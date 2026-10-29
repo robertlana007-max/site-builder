@@ -109,12 +109,10 @@
         <div class="tabs"><button class="on" id="tabMine">📍 Marked chart</button><button id="tabTv">📺 TradingView</button></div>
       </div>
       <div class="layers" id="layers">
-        <label><input type="checkbox" data-l="trade" checked><i style="background:var(--gold)"></i>Trade plan</label>
-        <label><input type="checkbox" data-l="struct" checked><i style="background:#e7ebf3"></i>Structure (BOS / CHoCH, HH-HL)</label>
-        <label><input type="checkbox" data-l="ob" checked><i style="background:var(--blue)"></i>Order blocks</label>
-        <label><input type="checkbox" data-l="fvg" checked><i style="background:var(--violet)"></i>Fair value gaps</label>
-        <label><input type="checkbox" data-l="sr" checked><i style="background:#f59e0b"></i>Support / resistance &amp; liquidity</label>
-        <label><input type="checkbox" data-l="ema" checked><i style="background:#64748b"></i>EMA 20 / 50</label>
+        <span><i style="background:#f5c451"></i> Entry</span><span><i style="background:#ea3943"></i> Stop-loss</span><span><i style="background:#16c784"></i> Targets</span><span><i style="background:#3b82f6"></i> Demand / <i style="background:#f43f5e"></i> Supply zone</span><span><i style="background:#f59e0b"></i> Support / resistance</span>
+        <span style="margin-left:auto"></span>
+        <label><input type="checkbox" data-l="all"> Show all detected zones</label>
+        <label><input type="checkbox" data-l="ema" checked> EMA 20 / 50</label>
       </div>
       <div id="chart"><div class="legend" id="legend">Loading…</div><svg id="ov"></svg></div>
       <div id="tv"></div>
@@ -246,7 +244,7 @@
   const TFS = ["1m","3m","5m","15m","30m","1h","2h","4h","1d"];
   const TF_SEC = { "1m":60,"3m":180,"5m":300,"15m":900,"30m":1800,"1h":3600,"2h":7200,"4h":14400,"1d":86400 };
   let chart, candles, e20, e50, curTf = "15m", lastSignal = null, BARS = [], MK = null;
-  const LAYERS = { trade:true, struct:true, ob:true, fvg:true, sr:true, ema:true };
+  const LAYERS = { all:false, ema:true };
   const tzOff = -new Date().getTimezoneOffset() * 60;
   const emaA = (v, p) => { const k = 2 / (p + 1); let e = null; return v.map(x => e = e == null ? x : x * k + e * (1 - k)); };
   const atrA = (b, p) => { let a = null; return b.map((x, i) => { const tr = i ? Math.max(x.h - x.l, Math.abs(x.h - b[i-1].c), Math.abs(x.l - b[i-1].c)) : x.h - x.l; a = a == null ? tr : (a*(p-1) + tr)/p; return a; }); };
@@ -258,7 +256,7 @@
     e50 = chart.addLineSeries({ color:"#3b82f688", lineWidth:1, priceLineVisible:false, lastValueVisible:false, crosshairMarkerVisible:false });
     $("tfs").innerHTML = TFS.map(t => `<button data-tf="${t}">${t.toUpperCase()}</button>`).join("");
     document.querySelectorAll("#tfs button").forEach(b => b.onclick = () => { curTf = b.dataset.tf; loadChart(true); tv(TV_INT[curTf]); });
-    document.querySelectorAll("#layers input").forEach(i => i.onchange = () => { LAYERS[i.dataset.l] = i.checked; e20.applyOptions({ visible:LAYERS.ema }); e50.applyOptions({ visible:LAYERS.ema }); draw(); });
+    document.querySelectorAll("#layers input").forEach(i => i.onchange = () => { LAYERS[i.dataset.l] = i.checked; e20.applyOptions({ visible:LAYERS.ema }); e50.applyOptions({ visible:LAYERS.ema }); markers(); draw(); });
     chart.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(draw));
     chart.subscribeCrosshairMove(() => requestAnimationFrame(draw));
     new ResizeObserver(() => requestAnimationFrame(draw)).observe($("chart"));
@@ -350,15 +348,18 @@
   }
 
   function markers(){
-    if (!MK || !LAYERS.struct){ candles.setMarkers([]); return; }
-    const m = MK.swings.slice(-14).map(s => ({ time:BARS[s.i].t, position: s.type === "H" ? "aboveBar" : "belowBar", color: /HH|HL/.test(s.lab) ? "#16c784" : /LH|LL/.test(s.lab) ? "#ea3943" : "#8a94a8", shape:"circle", size:0.3, text:s.lab }));
+    if (!MK){ candles.setMarkers([]); return; }
+    const m = [];
+    if (LAYERS.all) MK.swings.slice(-10).forEach(s => m.push({ time:BARS[s.i].t, position: s.type === "H" ? "aboveBar" : "belowBar", color:"#8a94a8", shape:"circle", size:0.3, text:s.lab }));
     const f = lastSignal && lastSignal.final;
-    if (f && f.action !== "WAIT" && LAYERS.trade && BARS.length){
+    const sw0 = f && f.slSwing ? reidx(f.slSwing) : null;
+    if (sw0 && BARS[sw0.i]) m.push({ time:BARS[sw0.i].t, position: f.action === "SELL" ? "aboveBar" : "belowBar", color:"#ea3943", shape:"circle", size:0.6, text:"swing (SL beyond)" });
+    if (f && f.action !== "WAIT" && BARS.length){
       const t = sigBarIndex();
-      m.push({ time:BARS[t].t, position: f.action === "BUY" ? "belowBar" : "aboveBar", color: f.action === "BUY" ? "#16c784" : "#ea3943", shape: f.action === "BUY" ? "arrowUp" : "arrowDown", text:"AI " + f.action });
+      m.push({ time:BARS[t].t, position: f.action === "BUY" ? "belowBar" : "aboveBar", color: f.action === "BUY" ? "#16c784" : "#ea3943", shape: f.action === "BUY" ? "arrowUp" : "arrowDown", size:1.4, text:"AI " + f.action });
     }
-    m.sort((a, b) => a.time - b.time);
-    candles.setMarkers(m);
+    const seen = new Set();
+    candles.setMarkers(m.sort((a, b) => a.time - b.time).filter(x => { const k = x.time + x.text; if (seen.has(k)) return false; seen.add(k); return true; }));
   }
   function sigBarIndex(){
     const st = Math.floor(lastSignal.time / 1000) + tzOff;
@@ -367,109 +368,181 @@
     return idx;
   }
 
-  // ---- SVG overlay drawing ----
+  // which zones to show: by default only what the trade is based on
+  const idxAt = (t) => { if (t == null) return null; const k = BARS.findIndex(b => b.t >= t); return k < 0 ? BARS.length - 1 : k; };
+  const reidx = (o) => o && ({ ...o, i: o.t != null ? idxAt(o.t) : o.i, first: o.tf != null ? idxAt(o.tf) : o.first });
+  function pickMarks(){
+    if (!MK) return null;
+    if (LAYERS.all) return { zones:[...MK.obs.map(o => ({ ...o, z:"ob" })), ...MK.fvgs.map(g2 => ({ ...g2, z:"fvg" }))], levels:MK.levels, liq:[MK.bsl, MK.ssl].filter(Boolean), breaks:MK.breaks.slice(-3), eq:true };
+    const f = lastSignal && lastSignal.final;
+    if (f && f.action !== "WAIT" && f.basis) return { zones:f.basis.zone ? [reidx(f.basis.zone)] : [], levels:(f.basis.levels || []).map(reidx), liq:f.basis.liq ? [reidx(f.basis.liq)] : [], breaks:MK.breaks.slice(-1), eq:false };
+    const near = (dir) => MK.obs.filter(o => o.dir === dir).sort((a, b) => Math.abs((a.top + a.bot) / 2 - MK.price) - Math.abs((b.top + b.bot) / 2 - MK.price))[0];
+    return { zones:[near(1), near(-1)].filter(Boolean).map(o => ({ ...o, z:"ob" })), levels:[MK.levels.find(l => l.kind === "R"), MK.levels.find(l => l.kind === "S")].filter(Boolean), liq:[], breaks:MK.breaks.slice(-1), eq:false };
+  }
+
+  // ---- SVG overlay drawing (clean: few objects, labels never overlap) ----
   const NS = "http://www.w3.org/2000/svg";
   function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); parent.appendChild(e); return e; }
   function draw(){
     const svg = $("ov"); if (!svg || !chart) return;
     svg.innerHTML = "";
-    if (!BARS.length) return;
+    if (!BARS.length || !MK) return;
     const ts = chart.timeScale(), W = ts.width(), H = $("chart").clientHeight - ts.height();
     svg.setAttribute("width", W); svg.setAttribute("height", H);
     const defs = el("defs", {}, svg), cp = el("clipPath", { id:"clp" }, defs); el("rect", { x:0, y:0, width:W, height:H }, cp);
     const g = el("g", { "clip-path":"url(#clp)" }, svg);
     const X = (i) => ts.logicalToCoordinate(i), Y = (p) => candles.priceToCoordinate(p);
-    const n = BARS.length, right = W;
-    const label = (x, y, text, color, anchor, bg) => {
-      const t = el("text", { x, y: y + 4, fill: color, "text-anchor": anchor || "start" }, g); t.textContent = text;
-      try{ const bb = t.getBBox(); el("rect", { x:bb.x - 4, y:bb.y - 2, width:bb.width + 8, height:bb.height + 4, rx:4, fill: bg || "#0b0e14d9", stroke: color, "stroke-opacity":.5 }, g); g.insertBefore(g.lastChild, t); }catch(e){}
-    };
-    const zone = (i0, top, bot, color, op, text, textColor) => {
-      const x0 = X(i0), y0 = Y(top), y1 = Y(bot); if (x0 == null || y0 == null || y1 == null) return;
-      const x = Math.max(-5, x0);
-      el("rect", { x, y:Math.min(y0, y1), width:Math.max(0, right - x), height:Math.max(1, Math.abs(y1 - y0)), fill:color, "fill-opacity":op, stroke:color, "stroke-opacity":.55, "stroke-width":1 }, g);
-      if (text) label(Math.max(x + 6, 6), Math.min(y0, y1) + Math.abs(y1 - y0) / 2, text, textColor || color);
-    };
-    const hline = (i0, p, color, dash, text, side) => {
-      const x0 = i0 == null ? 0 : X(i0), y = Y(p); if (y == null) return;
-      const x = Math.max(0, x0 ?? 0);
-      el("line", { x1:x, x2:right, y1:y, y2:y, stroke:color, "stroke-width":1.4, "stroke-dasharray":dash || "" }, g);
-      if (text) label(side === "left" ? x + 6 : right - 8, y - 9, text, color, side === "left" ? "start" : "end");
-    };
-    if (!MK) return;
-    // premium / discount equilibrium
-    if (LAYERS.struct && MK.range){
-      hline(MK.range.from, MK.range.eq, "#8a94a8", "2 4", "Equilibrium 50% — above = premium (sell zone), below = discount (buy zone)", "left");
-    }
-    // support / resistance
-    if (LAYERS.sr){
-      MK.levels.forEach(l => hline(l.first, l.p, l.kind === "R" ? "#f97316" : "#f59e0b", "6 4", `${l.kind === "R" ? "Resistance" : "Support"} ${fmt(l.p)} · tested ${l.n}×`));
-      if (MK.bsl) hline(MK.bsl.i, MK.bsl.p, "#e879f9", "1 3", `Buy-side liquidity ${fmt(MK.bsl.p)} (stops above highs)`, "left");
-      if (MK.ssl) hline(MK.ssl.i, MK.ssl.p, "#e879f9", "1 3", `Sell-side liquidity ${fmt(MK.ssl.p)} (stops below lows)`, "left");
-    }
-    // order blocks
-    if (LAYERS.ob) MK.obs.forEach(o => zone(o.i, o.top, o.bot, o.dir > 0 ? "#3b82f6" : "#f43f5e", .14, o.dir > 0 ? `Bullish order block (demand) ${fmt(o.bot)}–${fmt(o.top)}` : `Bearish order block (supply) ${fmt(o.bot)}–${fmt(o.top)}`, o.dir > 0 ? "#93c5fd" : "#fda4af"));
-    // FVGs
-    if (LAYERS.fvg) MK.fvgs.forEach(f => zone(f.i, f.top, f.bot, "#a78bfa", .16, `${f.dir > 0 ? "Bullish" : "Bearish"} FVG (imbalance) ${fmt(f.bot)}–${fmt(f.top)}`, "#c4b5fd"));
-    // BOS / CHoCH
-    if (LAYERS.struct) MK.breaks.forEach(br => {
+    const right = W, tags = [];
+    const tag = (y, text, color, strong) => { if (y != null && y > -20 && y < H + 20) tags.push({ y, text, color, strong }); };
+    const P = pickMarks();
+    // zones (order blocks / FVGs)
+    P.zones.forEach(z => {
+      const x0 = X(z.i), y0 = Y(z.top), y1 = Y(z.bot); if (x0 == null || y0 == null || y1 == null) return;
+      const ob = z.z === "ob", c = ob ? (z.dir > 0 ? "#3b82f6" : "#f43f5e") : "#a78bfa";
+      el("rect", { x:Math.max(-2, x0), y:Math.min(y0, y1), width:Math.max(0, right - Math.max(-2, x0)), height:Math.max(2, Math.abs(y1 - y0)), fill:c, "fill-opacity":.13, stroke:c, "stroke-opacity":.6 }, g);
+      tag((y0 + y1) / 2, ob ? (z.dir > 0 ? "Demand zone (bullish OB)" : "Supply zone (bearish OB)") : (z.dir > 0 ? "Bullish FVG" : "Bearish FVG"), ob ? (z.dir > 0 ? "#93c5fd" : "#fda4af") : "#c4b5fd");
+    });
+    const hl = (i0, p, c, dash, w) => { const y = Y(p); if (y == null) return null; const x = i0 == null ? 0 : Math.max(0, X(i0) ?? 0); el("line", { x1:x, x2:right, y1:y, y2:y, stroke:c, "stroke-width":w || 1.3, "stroke-dasharray":dash || "" }, g); return y; };
+    P.levels.forEach(l => tag(hl(l.first, l.p, "#f59e0b", "7 5"), `${l.kind === "R" ? "Resistance" : "Support"} (${l.n} touches)`, "#fbbf24"));
+    P.liq.forEach(q => tag(hl(q.i, q.p, "#e879f9", "2 4"), q.type === "H" ? "Liquidity above highs" : "Liquidity below lows", "#f0abfc"));
+    if (P.eq && MK.range) tag(hl(MK.range.from, MK.range.eq, "#64748b", "2 5"), "50% of range", "#94a3b8");
+    P.breaks.forEach(br => {
       const x0 = X(br.from), x1 = X(br.to), y = Y(br.p); if (x0 == null || x1 == null || y == null) return;
       const c = br.dir > 0 ? "#16c784" : "#ea3943";
-      el("line", { x1:x0, x2:x1, y1:y, y2:y, stroke:c, "stroke-width":1.5, "stroke-dasharray":br.kind === "CHoCH" ? "5 3" : "" }, g);
-      const t = el("text", { x:(x0 + x1) / 2, y: y + (br.dir > 0 ? -5 : 13), fill:c, "text-anchor":"middle" }, g); t.textContent = br.kind + (br.dir > 0 ? " ↑" : " ↓");
+      el("line", { x1:x0, x2:x1, y1:y, y2:y, stroke:c, "stroke-width":2, "stroke-dasharray":br.kind === "CHoCH" ? "6 3" : "" }, g);
+      const t = el("text", { x:(x0 + x1) / 2, y:y + (br.dir > 0 ? -7 : 16), fill:c, "text-anchor":"middle", style:"font:700 12px Inter" }, g); t.textContent = br.kind === "CHoCH" ? "CHoCH (trend change)" : "BOS (trend continues)";
     });
-    // AI trade plan: position tool (risk box + reward box)
+    // trade: position-tool box
     const f = lastSignal && lastSignal.final;
-    if (LAYERS.trade && f && f.entry && f.sl && f.action !== "WAIT"){
-      const i0 = sigBarIndex(), x0 = Math.max(0, X(i0) ?? 0), xe = right;
+    if (f && f.action !== "WAIT" && f.entry && f.sl && f.tp1){
+      const i0 = sigBarIndex(), xa = Math.max(0, X(i0) ?? 0), xb = Math.min(right, Math.max(xa + 120, X(BARS.length + 14) ?? right));
       const yE = Y(f.entry), yS = Y(f.sl), y1 = Y(f.tp1), y2 = Y(f.tp2 || f.tp1);
-      if (yE != null && yS != null && y1 != null){
-        const risk = Math.abs(f.entry - f.sl), R = (p) => risk ? (Math.abs(p - f.entry) / risk).toFixed(1) : "—";
-        el("rect", { x:x0, y:Math.min(yE, yS), width:xe - x0, height:Math.abs(yS - yE), fill:"#ea3943", "fill-opacity":.16 }, g);
-        el("rect", { x:x0, y:Math.min(yE, y2 ?? y1), width:xe - x0, height:Math.abs((y2 ?? y1) - yE), fill:"#16c784", "fill-opacity":.13 }, g);
-        const ot = (f.orderType || "market").toUpperCase();
-        hline(i0, f.entry, "#f5c451", "", `${ot} ${f.action} entry ${fmt(f.entry)}`);
-        hline(i0, f.sl, "#ea3943", "", `Stop-loss ${fmt(f.sl)}  (−${fmt(risk)} = −1R)`);
-        hline(i0, f.tp1, "#16c784", "4 3", `TP1 ${fmt(f.tp1)}  (+${fmt(Math.abs(f.tp1 - f.entry))} = ${R(f.tp1)}R)`);
-        if (f.tp2) hline(i0, f.tp2, "#16c784", "", `TP2 ${fmt(f.tp2)}  (+${fmt(Math.abs(f.tp2 - f.entry))} = ${R(f.tp2)}R)`);
+      if (yE != null && yS != null && y1 != null && y2 != null){
+        el("rect", { x:xa, y:Math.min(yE, yS), width:xb - xa, height:Math.abs(yS - yE), fill:"#ea3943", "fill-opacity":.22 }, g);
+        el("rect", { x:xa, y:Math.min(yE, y2), width:xb - xa, height:Math.abs(y2 - yE), fill:"#16c784", "fill-opacity":.18 }, g);
+        const ln = (y, c, w, d) => el("line", { x1:xa, x2:xb, y1:y, y2:y, stroke:c, "stroke-width":w, "stroke-dasharray":d || "" }, g);
+        ln(yE, "#f5c451", 2.5); ln(yS, "#ea3943", 2); ln(y1, "#16c784", 2, "6 3"); ln(y2, "#16c784", 2);
+        const risk = Math.abs(f.entry - f.sl);
+        tag(yE, `${f.orderType} ${fmt(f.entry)}`, "#f5c451", true);
+        tag(yS, `SL ${fmt(f.sl)}  (-${fmt(risk)})`, "#ff6b74", true);
+        tag(y1, `TP1 ${fmt(f.tp1)}  (${(Math.abs(f.tp1 - f.entry) / risk).toFixed(1)}R)`, "#34d399", true);
+        if (f.tp2) tag(y2, `TP2 ${fmt(f.tp2)}  (${(Math.abs(f.tp2 - f.entry) / risk).toFixed(1)}R)`, "#34d399", true);
       }
     }
-    // legend
-    const tr = MK.trend > 0 ? '<b class="up">Bullish</b> (last break up)' : MK.trend < 0 ? '<b class="dn">Bearish</b> (last break down)' : "Ranging";
-    const pz = MK.range ? (MK.price > MK.range.eq ? '<b class="dn">premium</b>' : '<b class="up">discount</b>') : "—";
-    $("legend").innerHTML = `${curTf.toUpperCase()} structure: ${tr} · price in ${pz} · ATR ${fmt(MK.atr)}`;
+    // labels: one column on the right, pushed apart so they never overlap
+    tags.sort((a, b) => a.y - b.y);
+    const GAP = 21;
+    for (let i = 1; i < tags.length; i++) if (tags[i].y - tags[i-1].y < GAP) tags[i].y = tags[i-1].y + GAP;
+    const over = tags.length ? tags[tags.length - 1].y - (H - 12) : 0;
+    if (over > 0) tags.forEach(t => t.y -= over);
+    tags.forEach(t => {
+      const tx = el("text", { x:right - 10, y:t.y + 5, fill:t.color, "text-anchor":"end", style:`font:${t.strong ? 800 : 600} ${t.strong ? 13 : 12}px Inter` }, g); tx.textContent = t.text;
+      try{ const bb = tx.getBBox(); const r = el("rect", { x:bb.x - 6, y:bb.y - 3, width:bb.width + 12, height:bb.height + 6, rx:5, fill:"#0b0e14", "fill-opacity":.92, stroke:t.color, "stroke-opacity":t.strong ? .9 : .5 }, g); g.insertBefore(r, tx); }catch(e){}
+    });
+    const tr = MK.trend > 0 ? '<b class="up">Bullish</b>' : MK.trend < 0 ? '<b class="dn">Bearish</b>' : "Ranging";
+    $("legend").innerHTML = `${curTf.toUpperCase()} trend: ${tr} · ATR ${fmt(MK.atr)}${f && f.grade ? ` · Setup grade <b style="color:var(--gold)">${f.grade}</b>` : ""}`;
   }
 
-  // ---- connect the AI trade to what is on the chart ----
+  // ---- trader rules: AIs pick the direction, structure places entry / SL / TP ----
+  function planTrade(side, price, aiPlan){
+    const A = MK.atr, buy = side === "BUY", dir = buy ? 1 : -1;
+    // 1) entry: limit on the nearest fresh zone in the right place, otherwise market
+    const zones = [...MK.obs.map(o => ({ ...o, z:"ob" })), ...MK.fvgs.map(g2 => ({ ...g2, z:"fvg" }))]
+      .filter(z => z.dir === dir && (buy ? z.top <= price + A * 0.1 && z.top >= price - A * 1.6 : z.bot >= price - A * 0.1 && z.bot <= price + A * 1.6))
+      .sort((a, b) => (a.z === "ob" ? 0 : 1) - (b.z === "ob" ? 0 : 1) || Math.abs((buy ? a.top : a.bot) - price) - Math.abs((buy ? b.top : b.bot) - price));
+    const zone = zones[0] ? { ...zones[0], t:BARS[zones[0].i].t } : null;
+    let entry = price, orderType = "MARKET " + side, why = "";
+    const withTrend = (buy && MK.trend > 0) || (!buy && MK.trend < 0);
+    // breakout level just beyond price (for STOP orders)
+    const brk = [...MK.levels.filter(l => l.kind === (buy ? "R" : "S")).map(l => l.p), ...MK.swings.filter(s => s.type === (buy ? "H" : "L")).slice(-6).map(s => s.p)]
+      .filter(p2 => (p2 - price) * dir > A * 0.1 && Math.abs(p2 - price) <= A * 0.9).sort((a, b) => Math.abs(a - price) - Math.abs(b - price))[0];
+    if (zone){
+      const proximal = buy ? zone.top : zone.bot;
+      if (Math.abs(proximal - price) > A * 0.15){ entry = proximal; orderType = side + " LIMIT"; why = `wait for the pullback into the ${zone.z === "ob" ? (buy ? "demand zone" : "supply zone") : "fair value gap"}`; }
+      else why = `price is already inside the ${zone.z === "ob" ? (buy ? "demand zone" : "supply zone") : "fair value gap"} — enter now`;
+    } else if (brk != null && withTrend){
+      entry = brk + dir * A * 0.1; orderType = side + " STOP"; why = `enter only if price breaks ${buy ? "above" : "below"} ${fmt(brk)} (breakout confirmation)`;
+    } else if (withTrend){
+      why = "trend is moving now and no better level is close — enter at market";
+    } else {
+      entry = price - dir * A * 0.5; orderType = side + " LIMIT"; why = "counter-trend idea — only take it on a 0.5 ATR pullback for a better price";
+    }
+    const tfMin = { "1m":1,"3m":3,"5m":5,"15m":15,"30m":30,"1h":60,"2h":120,"4h":240,"1d":1440 }[curTf] || 15;
+    const validFor = /MARKET/.test(orderType) ? "now" : `next ${Math.round(tfMin * 6 / 60 * 10) / 10 >= 1 ? Math.round(tfMin * 6 / 60 * 10) / 10 + " hours" : tfMin * 6 + " min"} (6 × ${curTf.toUpperCase()} candles) — cancel after that`;
+    // 2) stop: just beyond the zone or the nearest swing, never more than 1.5 ATR
+    const buf = Math.max(A * 0.15, 0.3);
+    let sl = null, slSwing = null;
+    if (zone){ sl = buy ? zone.bot - buf : zone.top + buf; }
+    const sws = MK.swings.filter(s => buy ? s.type === "L" && s.p < entry && entry - s.p <= A * 1.35 : s.type === "H" && s.p > entry && s.p - entry <= A * 1.35).sort((a, b) => Math.abs(a.p - entry) - Math.abs(b.p - entry));
+    if (sws[0]){ const s2 = buy ? sws[0].p - buf : sws[0].p + buf; if (sl == null || (buy ? s2 < sl : s2 > sl)){ sl = s2; slSwing = { ...sws[0], t:BARS[sws[0].i].t }; } }
+    if (sl == null || Math.abs(entry - sl) < A * 0.5) sl = entry - dir * A * 0.8;
+    if (Math.abs(entry - sl) > A * 1.5) sl = entry - dir * A * 1.5;
+    const risk = Math.abs(entry - sl);
+    // 3) targets: next structure at least 2R away, second at least 3R
+    const targets = [...MK.levels.filter(l => l.kind === (buy ? "R" : "S")).map(l => ({ p:l.p, what:l.kind === "R" ? "resistance" : "support", ref:l })),
+      ...[buy ? MK.bsl : MK.ssl].filter(Boolean).map(q => ({ p:q.p, what:"liquidity", ref:q })),
+      ...MK.obs.filter(o => o.dir === -dir).map(o => ({ p: buy ? o.bot : o.top, what: buy ? "supply zone" : "demand zone" }))]
+      .filter(t => (t.p - entry) * dir > 0).sort((a, b) => (a.p - b.p) * dir);
+    const t1 = targets.find(t => Math.abs(t.p - entry) >= risk * 2);
+    const tp1 = t1 ? t1.p - dir * A * 0.05 : entry + dir * risk * 2;
+    const t2 = targets.find(t => Math.abs(t.p - entry) >= Math.max(risk * 3, Math.abs(tp1 - entry) + risk * 0.8));
+    const tp2 = t2 ? t2.p - dir * A * 0.05 : entry + dir * Math.max(risk * 3, Math.abs(tp1 - entry) + risk);
+    const lv = MK.levels.find(l => Math.abs(l.p - entry) <= A * 0.5);
+    const stamp = (o) => o && ({ ...o, t: o.i != null ? BARS[o.i].t : undefined, tf: o.first != null ? BARS[o.first].t : undefined });
+    const basis = { zone, levels:[lv, t1 && t1.ref && t1.ref.kind ? t1.ref : null].filter(Boolean).map(stamp), liq: stamp((t1 && t1.what === "liquidity") ? t1.ref : (t2 && t2.what === "liquidity" ? t2.ref : null)), t1, t2 };
+    // 4) grade the setup
+    const checks = [
+      { ok:(buy && MK.trend > 0) || (!buy && MK.trend < 0), txt:`With the ${curTf.toUpperCase()} trend (last break ${MK.trend > 0 ? "up" : MK.trend < 0 ? "down" : "none"})` },
+      { ok:!!(zone || lv), txt: zone ? `Entry on a ${zone.z === "ob" ? (buy ? "demand zone (bullish order block)" : "supply zone (bearish order block)") : (buy ? "bullish" : "bearish") + " fair value gap"} ${fmt(zone.bot)}–${fmt(zone.top)}` : lv ? `Entry at ${lv.kind === "R" ? "resistance" : "support"} ${fmt(lv.p)} (${lv.n} touches)` : "No zone at entry (entering mid-air)" },
+      { ok:!!MK.range && (buy ? entry <= MK.range.eq : entry >= MK.range.eq), txt: MK.range ? `${buy ? "Buying in discount" : "Selling in premium"} (50% of range = ${fmt(MK.range.eq)})` : "Range unclear" },
+      { ok:!!t1, txt: t1 ? `TP1 at real ${t1.what} ${fmt(t1.p)}` : "TP1 is a 2R measured move (no structure target)" },
+      { ok:(aiPlan.agree || 0) >= 0.75, txt:`${aiPlan.count} of ${aiPlan.total} AIs agree on ${side}` }
+    ];
+    const score = checks.filter(c => c.ok).length;
+    const grade = score >= 4 ? "A" : score === 3 ? "B" : "C";
+    return { action:side, orderType, why, validFor, entry:+entry.toFixed(2), sl:+sl.toFixed(2), tp1:+tp1.toFixed(2), tp2:+tp2.toFixed(2), rr:+(Math.abs(tp1 - entry) / risk).toFixed(2), slSwing, basis, checks, grade, score };
+  }
+
+  function buildTrade(d){
+    const ops = (d.opinions || []).filter(o => !o.error).map(readTrade).filter(Boolean);
+    const chief = readTrade(d.final);
+    const votes = { BUY:0, SELL:0, WAIT:0 }; ops.forEach(o => votes[o.action]++);
+    const total = ops.length || 1;
+    let side = votes.BUY > votes.SELL ? "BUY" : votes.SELL > votes.BUY ? "SELL" : (chief && chief.action !== "WAIT" ? chief.action : "WAIT");
+    const count = side === "WAIT" ? 0 : votes[side];
+    const base = { timeframe: (chief && chief.timeframe) || (ops[0] && ops[0].timeframe), horizon: chief && chief.horizon, validFor: chief && chief.validFor, strategies: (chief && chief.strategies && chief.strategies.length) ? chief.strategies : (ops.find(o => o.action === side && o.strategies) || {}).strategies, reasons: ops.filter(o => o.action === side).flatMap(o => (o.reasons || []).slice(0, 1)).slice(0, 4), risks: (chief && chief.risks) || [] };
+    const aiLv = ops.filter(o => o.action === side && validTrade(o));
+    const ai = aiLv.length ? { entry:median(aiLv.map(o => o.entry)), sl:median(aiLv.map(o => o.sl)), tp1:median(aiLv.map(o => o.tp1)) } : null;
+    if (side === "WAIT" || count < Math.ceil(total / 2) || !MK){
+      return { ...base, action:"WAIT", agreement:`${votes.BUY} buy · ${votes.SELL} sell · ${votes.WAIT} wait — no majority`, reasons: ops.flatMap(o => (o.reasons || []).slice(0, 1)).slice(0, 3), ai };
+    }
+    const p = planTrade(side, d.price, { count, total, agree: count / total });
+    const t = { ...base, ...p, agreement:`${count} of ${total} AIs say ${side}`, confidence: Math.round(aiLv.reduce((s, o) => s + (o.confidence || 0), 0) / (aiLv.length || 1)), ai };
+    if (p.grade === "C"){ t.rejected = { ...p }; t.action = "WAIT"; t.agreement += " — but the setup is weak (grade C), so no trade"; }
+    return t;
+  }
+
+  // ---- explain the trade in plain words ----
   function renderBasis(){
     const f = lastSignal && lastSignal.final;
-    if (!f || !MK){ return; }
-    const A = MK.atr, near = (p, a, b2) => p >= Math.min(a, b2) - A * 0.35 && p <= Math.max(a, b2) + A * 0.35;
+    if (!f) return;
     const items = [];
     const add = (tag, color, text) => items.push(`<li><b class="k" style="background:${color}22;color:${color}">${tag}</b><span>${text}</span></li>`);
-    if (f.action === "WAIT"){
-      add("⏸", "#8a94a8", "The council says WAIT — " + esc((f.reasons || [])[0] || "no clean setup or high-impact news is close."));
-    } else {
-      const buy = f.action === "BUY";
-      const trendOk = (buy && MK.trend > 0) || (!buy && MK.trend < 0);
-      add("1", trendOk ? "#16c784" : "#f59e0b", `<b>Market structure on ${curTf.toUpperCase()}:</b> ${MK.trend > 0 ? "bullish (higher highs / break up)" : MK.trend < 0 ? "bearish (lower lows / break down)" : "ranging"} — the trade is ${trendOk ? "<b>with</b> the trend" : "<b>against</b> this timeframe's trend (counter-trend / pullback trade)"}.`);
-      if (MK.range){ const inDisc = f.entry < MK.range.eq; add("2", (buy && inDisc) || (!buy && !inDisc) ? "#16c784" : "#f59e0b", `<b>Premium / discount:</b> entry ${fmt(f.entry)} is in the ${inDisc ? "discount" : "premium"} half of the range ${fmt(MK.range.lo)}–${fmt(MK.range.hi)} (50% = ${fmt(MK.range.eq)}). ${buy ? (inDisc ? "Buying cheap — good." : "Buying in premium — less ideal.") : (!inDisc ? "Selling expensive — good." : "Selling in discount — less ideal.")}`); }
-      const ob = MK.obs.find(o => near(f.entry, o.top, o.bot));
-      if (ob) add("OB", "#3b82f6", `<b>Entry sits on a ${ob.dir > 0 ? "bullish order block (demand)" : "bearish order block (supply)"}</b> ${fmt(ob.bot)}–${fmt(ob.top)} — the last ${ob.dir > 0 ? "down" : "up"} candle before the move that broke structure; big orders are often left there.`);
-      const fg = MK.fvgs.find(g2 => near(f.entry, g2.top, g2.bot));
-      if (fg) add("FVG", "#a78bfa", `<b>Entry fills a fair value gap</b> ${fmt(fg.bot)}–${fmt(fg.top)} — price usually returns to rebalance these imbalances.`);
-      const lv = MK.levels.find(l => Math.abs(l.p - f.entry) <= A * 0.6);
-      if (lv) add("S/R", "#f59e0b", `<b>Entry at ${lv.kind === "R" ? "resistance" : "support"} ${fmt(lv.p)}</b> tested ${lv.n} times.`);
-      const slSw = MK.swings.filter(s => buy ? s.type === "L" && s.p > f.sl : s.type === "H" && s.p < f.sl).sort((a, b2) => Math.abs(a.p - f.sl) - Math.abs(b2.p - f.sl))[0];
-      add("SL", "#ea3943", `<b>Stop-loss ${fmt(f.sl)}</b> — ${slSw ? `placed ${buy ? "below the swing low" : "above the swing high"} ${fmt(slSw.p)} so normal noise / a liquidity grab doesn't stop you out` : `${fmt(Math.abs(f.entry - f.sl))} away (${(Math.abs(f.entry - f.sl) / A).toFixed(1)}× ATR)`}.`);
-      const tgt = buy ? [...MK.levels.filter(l => l.kind === "R"), MK.bsl].filter(Boolean) : [...MK.levels.filter(l => l.kind === "S"), MK.ssl].filter(Boolean);
-      const tHit = tgt.find(l => Math.abs(l.p - f.tp1) <= A * 0.8 || (f.tp2 && Math.abs(l.p - f.tp2) <= A * 0.8));
-      add("TP", "#16c784", `<b>Targets ${fmt(f.tp1)}${f.tp2 ? " / " + fmt(f.tp2) : ""}</b> — ${tHit ? `aimed at ${tHit.kind === "R" ? "resistance" : tHit.kind === "S" ? "support" : "resting liquidity"} ${fmt(tHit.p)}` : "next objective in the trade direction"}. Risk : reward ${f.rr ? "1 : " + f.rr : "—"}.`);
+    const plan = f.action !== "WAIT" ? f : f.rejected;
+    if (f.action === "WAIT" && !f.rejected) add("⏸", "#8a94a8", `<b>No trade.</b> ${esc(f.agreement || "")}`);
+    if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/5 checks pass. Waiting for a cleaner setup protects your account.`);
+    if (plan && plan.checks){
+      add(plan.grade, plan.grade === "A" ? "#16c784" : plan.grade === "B" ? "#f5c451" : "#ea3943", `<b>Setup grade ${plan.grade}</b> — ${plan.score}/5 checks pass`);
+      add("📌", "#f5c451", `<b>${esc(plan.orderType)} @ ${fmt(plan.entry)}</b> — ${esc(plan.why)}.`);
+      plan.checks.forEach(c => add(c.ok ? "✓" : "✗", c.ok ? "#16c784" : "#ea3943", esc(c.txt)));
+      add("SL", "#ea3943", `<b>Stop ${fmt(plan.sl)}</b> — ${plan.slSwing ? `just beyond the swing ${plan.action === "BUY" ? "low" : "high"} ${fmt(plan.slSwing.p)}` : plan.basis.zone ? "just beyond the zone" : "1 ATR away"}; risk ${fmt(Math.abs(plan.entry - plan.sl))} (max 1.5× ATR).`);
+      add("TP", "#16c784", `<b>TP1 ${fmt(plan.tp1)} (${plan.rr}R)</b>${plan.basis.t1 ? ` at ${plan.basis.t1.what}` : " — 2R measured move"} · <b>TP2 ${fmt(plan.tp2)}</b>${plan.basis.t2 ? ` at ${plan.basis.t2.what}` : ""}. Move SL to entry when TP1 hits.`);
     }
-    (f.strategies || []).forEach(st => add("✓", /bull/i.test(st.says) ? "#16c784" : /bear/i.test(st.says) ? "#ea3943" : "#8a94a8", `<b>${esc(st.name)}:</b> ${esc(st.says || "")}${st.note ? " — " + esc(st.note) : ""}`));
-    (f.reasons || []).slice(0, 4).forEach(r => add("AI", "#f5c451", esc(r)));
+    if (f.ai) add("AI", "#8a94a8", `The AIs' own levels were entry ${fmt(f.ai.entry)} · SL ${fmt(f.ai.sl)} · TP1 ${fmt(f.ai.tp1)} — the desk re-placed them on structure so the stop is tight and the target is at least 2× the risk.`);
+    (f.strategies || []).slice(0, 9).forEach(st => add("•", /bull/i.test(st.says) ? "#16c784" : /bear/i.test(st.says) ? "#ea3943" : "#8a94a8", `<b>${esc(st.name)}:</b> ${esc(st.says || "")}${st.note ? " — " + esc(st.note) : ""}`));
+    (f.reasons || []).slice(0, 3).forEach(r => add("💬", "#f5c451", esc(r)));
     $("basis").innerHTML = items.join("");
-    $("basisNote").textContent = `Chart: ${curTf.toUpperCase()} · zones are detected from live candles`;
+    $("basisNote").textContent = `Chart ${curTf.toUpperCase()} · only the levels this trade uses are drawn`;
   }
 
   $("tabMine").onclick = () => { $("tabMine").classList.add("on"); $("tabTv").classList.remove("on"); $("chart").style.display = "block"; $("tv").style.display = "none"; requestAnimationFrame(draw); };
@@ -489,13 +562,15 @@
       const d = await r.json().catch(() => ({ error:"Bad response from server" }));
       if (r.status === 401){ gate(true); throw new Error("Please sign in"); }
       if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
-      d.final = normalizeFinal(d.final, d.opinions || [], d.price);
-      lastSignal = d;
-      showDecision(d); showCouncil(d.opinions || []); showNews(d.news); showInter(d.inter);
-      const tf = (d.final && d.final.timeframe || "").toLowerCase().replace(/\s/g, "").replace("mins", "m").replace("min", "m").replace(/^(\d+)h(our)?s?$/, "$1h").replace(/^daily$|^1day$|^d$/, "1d");
-      if (TFS.includes(tf)) curTf = tf;
+      const rawTf = String((readTrade(d.final) || {}).timeframe || "").toLowerCase().replace(/\s/g, "").replace("mins", "m").replace("min", "m").replace(/^(\d+)h(our)?s?$/, "$1h").replace(/^daily$|^1day$|^d$/, "1d");
+      curTf = ["1m", "3m", "5m"].includes(rawTf) || !TFS.includes(rawTf) ? "15m" : rawTf;
+      lastSignal = null;
       $("tabMine").click();
       await loadChart(true); tv(TV_INT[curTf]);
+      d.final = buildTrade(d);
+      lastSignal = d;
+      showDecision(d); showCouncil(d.opinions || []); showNews(d.news); showInter(d.inter);
+      markers(); draw(); renderBasis();
       $("status").textContent = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}`;
       loadHistory();
       if (d.final && d.final.action !== "WAIT") alertUser(d.final);
@@ -550,14 +625,13 @@
     $("sig").className = "sig " + f.action;
     $("sig").innerHTML = `
       <div class="act">${word}</div>
-      <div class="muted" style="margin-top:2px">${esc(f.agreement || "")}${d.chief ? " · final call by " + esc(d.chief) : ""}</div>
-      <div class="row" style="margin-top:8px"><span class="pill">Timeframe: ${esc(f.timeframe || "—")}</span>${f.horizon ? `<span class="pill">${esc(f.horizon)}</span>` : ""}${f.orderType ? `<span class="pill">${esc(f.orderType)} order</span>` : ""}</div>
-      ${f.action !== "WAIT" ? `<div class="ord ${f.action === "BUY" ? "up" : "dn"}">👉 ${esc((f.orderType || "market").toUpperCase())} ${f.action} @ ${fmt(f.entry)} · SL ${fmt(f.sl)} · TP1 ${fmt(f.tp1)} · TP2 ${fmt(f.tp2)}${f.validFor ? `<div class="muted" style="font-size:11px;font-weight:500;margin-top:3px">Order valid: ${esc(f.validFor)}</div>` : ""}</div>` : ""}
-      <div class="lv">${lv("entry", f.action === "WAIT" ? "Level to watch" : "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target 1")}${lv("tp2", "Target 2")}</div>
+      <div class="muted" style="margin-top:2px">${esc(f.agreement || "")}</div>
+      <div class="row" style="margin-top:8px">${f.grade ? `<span class="pill" style="color:var(--gold)">Grade ${f.grade}</span>` : ""}<span class="pill">Chart: ${curTf.toUpperCase()}</span>${f.horizon ? `<span class="pill">${esc(f.horizon)}</span>` : ""}</div>
+      ${f.action !== "WAIT" ? `<div class="ord ${f.action === "BUY" ? "up" : "dn"}">👉 ${esc(f.orderType)} @ ${fmt(f.entry)} · SL ${fmt(f.sl)} · TP1 ${fmt(f.tp1)} · TP2 ${fmt(f.tp2)}${f.validFor ? `<div class="muted" style="font-size:11px;font-weight:500;margin-top:3px">Order valid: ${esc(f.validFor)}</div>` : ""}</div>` : ""}
+      ${f.action === "WAIT" ? `<p class="muted" style="margin:10px 0">${f.rejected ? `Best idea was ${f.rejected.orderType} @ ${fmt(f.rejected.entry)} (SL ${fmt(f.rejected.sl)}, TP1 ${fmt(f.rejected.tp1)}) but it only scores ${f.rejected.score}/5 — skipped. See the checklist under the chart.` : "No majority among the AIs — stay flat."}</p>` : `<div class="lv">${lv("entry", "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target 1 (" + f.rr + "R)")}${lv("tp2", "Target 2")}</div>`}
       <div class="row" style="justify-content:space-between;font-size:12px"><span class="muted">Confidence</span><b>${Math.round(f.confidence || 0)}%</b></div>
       <div class="meter"><i style="width:${Math.round(f.confidence || 0)}%"></i></div>
       <div class="muted" style="font-size:12px">Risk : reward <b style="color:var(--ink)">${f.rr ? "1 : " + f.rr : "—"}</b></div>
-      ${f.summary ? `<p style="margin:12px 0 0;line-height:1.55">${esc(f.summary)}</p>` : ""}
       ${(f.risks || []).length ? `<div style="margin-top:10px;font-weight:700;font-size:12px">Risks</div><ul class="pts">${f.risks.map(r => "<li>" + esc(r) + "</li>").join("")}</ul>` : ""}
       <div class="muted" style="font-size:11px;margin-top:10px">The full reasoning is under the chart in "Why this trade".</div>`;
   }
