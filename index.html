@@ -154,7 +154,7 @@
     </div>
 
     <div class="card">
-      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">The desk tests 4 strategies × 1H/4H/1D × 0.5/1/2% risk, sizes lots automatically ($0.30 spread per trade) and picks the best with drawdown under 25%</span></div>
+      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">Same rule as the live desk, replayed on real 5M candles: 1D/4H/1H must agree, 15M must not disagree, 5M break of structure → order-block limit, tight stop, 50% at 2R + stop to entry, rest at 4R. Lots and risk chosen automatically, $0.30 spread per trade.</span></div>
       <div class="bd">
         <div class="row" style="align-items:flex-end">
           <label class="f" style="width:150px">Starting balance ($)<input id="bBal" type="number" value="1000" min="10"></label>
@@ -162,11 +162,13 @@
           <button class="btn gold" id="bt2">2 years</button>
           <span class="muted" id="btInfo" style="font-size:12px"></span>
         </div>
-        <div style="margin-top:12px"><table><thead><tr><th>Strategy</th><th>TF</th><th>Risk · lot</th><th>Trades</th><th>Win %</th><th>Profit / Loss</th><th>End balance</th><th>Return</th><th>Max DD</th><th>PF</th></tr></thead><tbody id="btTable"><tr><td colspan="10" class="muted">Press "1 year" or "2 years".</td></tr></tbody></table></div>
+        <div style="margin-top:12px"><table><thead><tr><th>Strategy</th><th>Period</th><th>Risk · lot</th><th>Trades</th><th>Win %</th><th>Profit / Loss</th><th>End balance</th><th>Return</th><th>Max DD</th><th>PF</th></tr></thead><tbody id="btTable"><tr><td colspan="10" class="muted">Press "1 year" or "2 years".</td></tr></tbody></table></div>
         <div class="grid2" style="margin-top:12px">
           <div><div class="muted" style="font-size:12px;margin-bottom:6px" id="eqTitle">Equity curve</div><div id="eq"></div></div>
           <div><div class="muted" style="font-size:12px;margin-bottom:6px">Monthly profit / loss</div><div style="max-height:240px;overflow:auto"><table><thead><tr><th>Month</th><th>Trades</th><th>P/L</th></tr></thead><tbody id="months"></tbody></table></div></div>
         </div>
+        <div class="muted" style="font-size:12px;margin:14px 0 6px">Last 40 backtest trades</div>
+        <div style="max-height:320px;overflow:auto"><table><thead><tr><th>Time</th><th>Order</th><th>Entry</th><th>SL</th><th>TP1 / TP2</th><th>Lots</th><th>Result</th><th>P/L</th></tr></thead><tbody id="btTrades"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -719,6 +721,7 @@
       $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
       loadHistory();
       if (d.final && d.final.action !== "WAIT") alertUser(d.final);
+      saveState();
     }catch(e){ $("status").textContent = "❌ " + (e.name === "AbortError" ? "The AIs took too long — try again." : e.message); }
     finally{ clearInterval(tick); busy = false; $("btnAnalyze").disabled = false; }
   }
@@ -779,7 +782,7 @@
       <div class="muted" style="font-size:12px">Risk : reward <b style="color:var(--ink)">${f.rr ? "1 : " + f.rr : "—"}</b></div>
       ${(f.risks || []).length ? `<div style="margin-top:10px;font-weight:700;font-size:12px">Risks</div><ul class="pts">${f.risks.map(r => "<li>" + esc(r) + "</li>").join("")}</ul>` : ""}
       <div class="muted" style="font-size:11px;margin-top:10px">The full reasoning is under the chart in "Why this trade".</div>`;
-    if ($("acct")){ $("acct").oninput = () => { ACCT = +$("acct").value || 0; try{ localStorage.setItem("gd_acct", ACCT); }catch(e){} updLot(f); }; updLot(f); }
+    if ($("acct")){ $("acct").oninput = () => { ACCT = +$("acct").value || 0; try{ localStorage.setItem("gd_acct", ACCT); }catch(e){} updLot(f); saveState(); }; updLot(f); }
   }
   function showCouncil(ops){
     $("councilNote").textContent = `${ops.filter(o => !o.error).length} / ${ops.length} AIs answered`;
@@ -805,12 +808,12 @@
     if (autoTimer){
       clearInterval(autoTimer); autoTimer = null;
       $("btnAuto").textContent = "▶ Start — auto-scan every 10 min"; $("btnAuto").className = "btn go";
-      $("liveDot").classList.remove("on"); $("autoTxt").textContent = "Auto-scan: off"; return;
+      $("liveDot").classList.remove("on"); $("autoTxt").textContent = "Auto-scan: off"; saveState(); return;
     }
     try{ if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }catch(e){}
     analyze(); autoTimer = setInterval(analyze, 10 * 60000);
     $("btnAuto").textContent = "■ Stop"; $("btnAuto").className = "btn stop";
-    $("liveDot").classList.add("on"); $("autoTxt").textContent = "Auto-scan: on (every 10 min)";
+    $("liveDot").classList.add("on"); $("autoTxt").textContent = "Auto-scan: on (every 10 min)"; saveState();
   };
   $("btnAnalyze").onclick = analyze;
 
@@ -824,100 +827,171 @@
   }
   $("btnHist").onclick = loadHistory;
 
-  // =============== backtest: 4 strategies × 3 timeframes × 3 risk levels — the desk picks the best, lots sized automatically ===============
+  // =============== backtest of the desk's own rule: all timeframes must agree, then one 5M entry ===============
   function rsiArr(c, p){ const out = Array(c.length).fill(null); let g = 0, l = 0; for (let i = 1; i < c.length; i++){ const d = c[i] - c[i-1]; if (i <= p){ g += Math.max(d,0); l += Math.max(-d,0); if (i === p){ g /= p; l /= p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } else { g = (g*(p-1) + Math.max(d,0))/p; l = (l*(p-1) + Math.max(-d,0))/p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } return out; }
-  const STRATS = { smc:"Smart money: BOS + order-block limit", breakout:"Breakout: 20-bar high/low with 200 EMA", ema:"Trend: EMA 20/50 cross + RSI", pullback:"Pullback: RSI 35/65 in 200 EMA trend" };
-  function signalsFor(name, b){
-    const c = b.map(x => x.c), a = atrA(b, 14), f20 = emaA(c, 20), f50 = emaA(c, 50), f200 = emaA(c, 200), r = rsiArr(c, 14), out = {};
-    const put = (i, o) => { out[i] = o; };
-    if (name === "ema") for (let i = 51; i < b.length - 1; i++){ const up = f20[i-1] <= f50[i-1] && f20[i] > f50[i], dn = f20[i-1] >= f50[i-1] && f20[i] < f50[i]; if (up && r[i] > 50) put(i, { side:1, stop:a[i] * 1.5, rr:2 }); else if (dn && r[i] < 50) put(i, { side:-1, stop:a[i] * 1.5, rr:2 }); }
-    if (name === "breakout") for (let i = 201; i < b.length - 1; i++){ let hh = -Infinity, ll = Infinity; for (let j = i - 20; j < i; j++){ hh = Math.max(hh, b[j].h); ll = Math.min(ll, b[j].l); } if (c[i] > hh && c[i] > f200[i]) put(i, { side:1, stop:a[i] * 1.5, rr:2 }); else if (c[i] < ll && c[i] < f200[i]) put(i, { side:-1, stop:a[i] * 1.5, rr:2 }); }
-    if (name === "pullback") for (let i = 201; i < b.length - 1; i++){ if (c[i] > f200[i] && r[i-1] < 35 && r[i] >= 35) put(i, { side:1, stop:a[i] * 1.2, rr:2 }); else if (c[i] < f200[i] && r[i-1] > 65 && r[i] <= 65) put(i, { side:-1, stop:a[i] * 1.2, rr:2 }); }
-    if (name === "smc"){
-      const K = 3, sw = [];
-      for (let i = K; i < b.length - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b[i-j].h >= b[i].h || b[i+j].h > b[i].h) hi = false; if (b[i-j].l <= b[i].l || b[i+j].l < b[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b[i].l }); }
-      sw.sort((x, y) => x.cf - y.cf);
-      let k = 0, lastH = null, lastL = null;
-      for (let i = 0; i < b.length - 1; i++){
-        while (k < sw.length && sw[k].cf <= i){ const s = sw[k++]; if (s.type === "H") lastH = { ...s, used:false }; else lastL = { ...s, used:false }; }
-        if (i < 200) continue;
-        if (lastH && !lastH.used && c[i] > lastH.p){ lastH.used = true; if (c[i] > f200[i]){ let ext = lastH.i; for (let j = lastH.i; j <= i; j++) if (b[j].l < b[ext].l) ext = j; for (let j = ext; j >= Math.max(0, ext - 6); j--) if (b[j].c < b[j].o){ put(i, { side:1, limit:b[j].h, slP:b[j].l - a[i] * 0.15, rr:2, ttl:20, atr:a[i] }); break; } } }
-        if (lastL && !lastL.used && c[i] < lastL.p){ lastL.used = true; if (c[i] < f200[i]){ let ext = lastL.i; for (let j = lastL.i; j <= i; j++) if (b[j].h > b[ext].h) ext = j; for (let j = ext; j >= Math.max(0, ext - 6); j--) if (b[j].c > b[j].o){ put(i, { side:-1, limit:b[j].l, slP:b[j].h + a[i] * 0.15, rr:2, ttl:20, atr:a[i] }); break; } } }
-      }
-    }
-    return out;
+  function resample(b, sec){
+    const out = []; let cur = null;
+    for (const x of b){ const k = Math.floor(x.t / sec) * sec; if (!cur || cur.t !== k){ if (cur) out.push(cur); cur = { t:k, o:x.o, h:x.h, l:x.l, c:x.c }; } else { cur.h = Math.max(cur.h, x.h); cur.l = Math.min(cur.l, x.l); cur.c = x.c; } }
+    if (cur) out.push(cur); return out;
   }
-  function simulate(b, orders, start, riskPct){
+  // per-bar trend from confirmed swings (no look-ahead), plus EMA50 side and RSI → bias, exactly like the live study
+  function biasSeries(b){
+    const n = b.length, K = 3, c = b.map(x => x.c), e50 = emaA(c, 50), r = rsiArr(c, 14), sw = [];
+    for (let i = K; i < n - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b[i-j].h >= b[i].h || b[i+j].h > b[i].h) hi = false; if (b[i-j].l <= b[i].l || b[i+j].l < b[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b[i].l }); }
+    sw.sort((x, y) => x.cf - y.cf);
+    const bias = new Array(n).fill(0), eq = new Array(n).fill(null); let k = 0, lastH = null, lastL = null, trend = 0, rh = null, rl = null;
+    for (let i = 0; i < n; i++){
+      while (k < sw.length && sw[k].cf <= i){ const s = sw[k++]; if (s.type === "H"){ lastH = { ...s, used:false }; rh = s.p; } else { lastL = { ...s, used:false }; rl = s.p; } }
+      if (lastH && !lastH.used && c[i] > lastH.p){ lastH.used = true; trend = 1; }
+      if (lastL && !lastL.used && c[i] < lastL.p){ lastL.used = true; trend = -1; }
+      const sc = trend + (c[i] > e50[i] ? 1 : -1) + (r[i] > 55 ? 1 : r[i] < 45 ? -1 : 0);
+      bias[i] = i < 60 ? 0 : sc >= 2 ? 1 : sc <= -2 ? -1 : 0;
+      eq[i] = rh != null && rl != null ? (rh + rl) / 2 : null;
+    }
+    return { bias, eq };
+  }
+  // value of a higher-timeframe series at time T, using only bars that had already closed
+  function lookup(htf, sec){ let j = -1; return (T) => { while (j + 1 < htf.t.length && htf.t[j + 1] + sec <= T) j++; return j; }; }
+  function deskBacktest(b5, start, riskPct){
     const SPREAD = 0.30, OZ = 100;
-    let bal = start, peak = start, maxDd = 0, pos = null, pend = null, lotSum = 0;
-    const trades = [], curve = [{ time:b[0].t, value:start }], months = {};
-    const close = (bar, exit) => {
-      const pnl = (exit - pos.entry) * pos.side * pos.lots * OZ - SPREAD * pos.lots * OZ;
-      bal += pnl; peak = Math.max(peak, bal); maxDd = Math.max(maxDd, (peak - bal) / peak);
-      trades.push({ pnl, win:pnl > 0 }); lotSum += pos.lots;
-      const m = new Date(bar.t * 1000).toISOString().slice(0, 7); months[m] = months[m] || { n:0, pnl:0 }; months[m].n++; months[m].pnl += pnl;
+    const tfs = { "15m":900, "1h":3600, "4h":14400, "1d":86400 }, H = {};
+    for (const k in tfs){ const bb = resample(b5, tfs[k]); H[k] = { t:bb.map(x => x.t), ...biasSeries(bb) }; H[k].at = lookup(H[k], tfs[k]); }
+    const n = b5.length, c = b5.map(x => x.c), a = atrA(b5, 14), K = 3, sw = [];
+    for (let i = K; i < n - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b5[i-j].h >= b5[i].h || b5[i+j].h > b5[i].h) hi = false; if (b5[i-j].l <= b5[i].l || b5[i+j].l < b5[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b5[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b5[i].l }); }
+    sw.sort((x, y) => x.cf - y.cf);
+    let bal = start, peak = start, maxDd = 0, pos = null, pend = null, k = 0, lastH = null, lastL = null, lotSum = 0;
+    const trades = [], curve = [{ time:b5[0].t, value:start }], months = {};
+    const book = (bar, pnl) => { bal += pnl; peak = Math.max(peak, bal); maxDd = Math.max(maxDd, (peak - bal) / peak); };
+    const finish = (bar, why) => {
+      const m = new Date(bar.t * 1000).toISOString().slice(0, 7); months[m] = months[m] || { n:0, pnl:0 }; months[m].n++; months[m].pnl += pos.pnl;
+      trades.push({ t:pos.t, side:pos.side, entry:pos.entry, sl:pos.sl0, tp1:pos.tp1, tp2:pos.tp2, lots:pos.lots, pnl:pos.pnl, res:why }); lotSum += pos.lots;
       curve.push({ time:bar.t, value:+bal.toFixed(2) }); pos = null;
     };
-    const lotsFor = (risk) => Math.max(0.01, Math.floor((bal * riskPct / 100) / (risk * OZ) * 100) / 100);
-    for (let i = 1; i < b.length && bal > start * 0.05; i++){
-      const bar = b[i], o = orders[i - 1];
-      if (!pos && !pend && o){
-        if (o.limit == null){ const entry = bar.o; pos = { side:o.side, entry, sl:entry - o.side * o.stop, tp:entry + o.side * o.stop * o.rr, lots:lotsFor(o.stop) }; }
-        else { let risk = Math.abs(o.limit - o.slP); if (risk > o.atr * 1.5) risk = o.atr * 1.5; if (risk >= o.atr * 0.3) pend = { side:o.side, entry:o.limit, sl:o.limit - o.side * risk, tp:o.limit + o.side * risk * o.rr, risk, exp:i + o.ttl }; }
+    for (let i = 1; i < n && bal > start * 0.05; i++){
+      const bar = b5[i], T = bar.t;
+      // manage open trade: 50% off at TP1 and stop to entry, rest at TP2
+      if (!pos && pend){
+        if (i > pend.exp) pend = null;
+        else if (pend.side > 0 ? bar.l <= pend.entry : bar.h >= pend.entry){ const lots = Math.max(0.01, Math.floor((bal * riskPct / 100) / (pend.risk * OZ) * 100) / 100); pos = { ...pend, lots, half:false, pnl:0, sl0:pend.sl }; pend = null; }
       }
-      if (!pos && pend){ if (i > pend.exp) pend = null; else if (pend.side > 0 ? bar.l <= pend.entry : bar.h >= pend.entry){ pos = { ...pend, lots:lotsFor(pend.risk) }; pend = null; } }
-      if (pos){ const hitSL = pos.side > 0 ? bar.l <= pos.sl : bar.h >= pos.sl, hitTP = pos.side > 0 ? bar.h >= pos.tp : bar.l <= pos.tp; if (hitSL) close(bar, pos.sl); else if (hitTP) close(bar, pos.tp); }
+      if (pos){
+        const s = pos.side, lo = bar.l, hi = bar.h;
+        const hitSL = s > 0 ? lo <= pos.sl : hi >= pos.sl;
+        if (hitSL){ const q = pos.half ? pos.lots / 2 : pos.lots; const p = ((pos.sl - pos.entry) * s - SPREAD) * q * OZ; book(bar, p); pos.pnl += p; finish(bar, pos.half ? "TP1 + breakeven" : "stop-loss"); }
+        else {
+          if (!pos.half && (s > 0 ? hi >= pos.tp1 : lo <= pos.tp1)){ const q = pos.lots / 2; const p = ((pos.tp1 - pos.entry) * s - SPREAD) * q * OZ; book(bar, p); pos.pnl += p; pos.half = true; pos.sl = pos.entry; }
+          if (pos && pos.half && (s > 0 ? hi >= pos.tp2 : lo <= pos.tp2)){ const q = pos.lots / 2; const p = ((pos.tp2 - pos.entry) * s - SPREAD) * q * OZ; book(bar, p); pos.pnl += p; finish(bar, "TP2"); }
+        }
+      }
+      // structure on 5M
+      while (k < sw.length && sw[k].cf <= i){ const s = sw[k++]; if (s.type === "H") lastH = { ...s, used:false }; else lastL = { ...s, used:false }; }
+      let brk = 0, from = null;
+      if (lastH && !lastH.used && c[i] > lastH.p){ lastH.used = true; brk = 1; from = lastH.i; }
+      if (lastL && !lastL.used && c[i] < lastL.p){ lastL.used = true; brk = -1; from = lastL.i; }
+      if (!brk || pos || pend || i < 300) continue;
+      // every timeframe must agree: 1H / 4H / 1D (2+ with the trade, none against) and 15M not against
+      const v = ["1h", "4h", "1d"].map(t => { const j = H[t].at(T + 300); return j < 0 ? 0 : H[t].bias[j]; });
+      const j15 = H["15m"].at(T + 300), b15 = j15 < 0 ? 0 : H["15m"].bias[j15];
+      const agree = v.filter(x => x === brk).length, against = v.filter(x => x === -brk).length;
+      if (agree < 2 || against > 0 || b15 === -brk) continue;
+      // order block of the leg that broke structure → limit entry
+      let ext = from; for (let j = from; j <= i; j++) if (brk > 0 ? b5[j].l < b5[ext].l : b5[j].h > b5[ext].h) ext = j;
+      let ob = null; for (let j = ext; j >= Math.max(0, ext - 6); j--) if (brk > 0 ? b5[j].c < b5[j].o : b5[j].c > b5[j].o){ ob = b5[j]; break; }
+      if (!ob) continue;
+      const A = a[i], buf = Math.max(A * 0.15, 0.3);
+      const entry = brk > 0 ? ob.h : ob.l;
+      let sl = brk > 0 ? ob.l - buf : ob.h + buf, risk = Math.abs(entry - sl);
+      if (risk > A * 1.5){ risk = A * 1.5; sl = entry - brk * risk; }
+      if (risk < Math.max(A * 0.5, 1.2)){ risk = Math.max(A * 0.8, 1.5); sl = entry - brk * risk; }
+      // premium / discount of the 1H range: buy below 50%, sell above it
+      const jh = H["1h"].at(T + 300), eq = jh < 0 ? null : H["1h"].eq[jh];
+      if (eq != null && (brk > 0 ? entry > eq : entry < eq)) continue;
+      pend = { t:T, side:brk, entry, sl, risk, tp1:entry + brk * risk * 2, tp2:entry + brk * risk * 4, exp:i + 6 };
     }
-    const wins = trades.filter(t => t.win), gw = wins.reduce((s, t) => s + t.pnl, 0), gl = -trades.filter(t => !t.win).reduce((s, t) => s + t.pnl, 0);
-    return { trades:trades.length, winRate:trades.length ? Math.round(100 * wins.length / trades.length) : 0, net:bal - start, end:bal, ret:(bal / start - 1) * 100, maxDd:maxDd * 100, pf:gl ? gw / gl : (gw ? Infinity : 0), avgLot:trades.length ? lotSum / trades.length : 0, curve, months };
+    const wins = trades.filter(t => t.pnl > 0), gw = wins.reduce((s, t) => s + t.pnl, 0), gl = -trades.filter(t => t.pnl <= 0).reduce((s, t) => s + t.pnl, 0);
+    return { trades:trades.length, list:trades, winRate:trades.length ? Math.round(100 * wins.length / trades.length) : 0, net:bal - start, end:bal, ret:(bal / start - 1) * 100, maxDd:maxDd * 100, pf:gl ? gw / gl : (gw ? Infinity : 0), avgLot:trades.length ? lotSum / trades.length : 0, curve, months };
   }
-  let eqChart = null, eqSeries = null;
+  let eqChart = null, eqSeries = null, LAST_BT = null;
+  async function loadFiveMin(days, onStep){
+    const CH = 100, n = Math.ceil(days / CH), now = Date.now(); let done = 0;
+    const parts = await Promise.all(Array.from({ length:n }, (_, k) => api("/tg/longbars", { tf:"5m", days:Math.min(CH, days - k * CH), raw:true, endMs: now - k * CH * 864e5 }).then(d => { onStep(++done, n); return d; })));
+    const seen = new Set(), bars = [];
+    parts.flatMap(p => p.bars).sort((x, y) => x.t - y.t).forEach(x => { if (!seen.has(x.t)){ seen.add(x.t); bars.push(x); } });
+    return { bars, src: parts[0] && parts[0].src };
+  }
   async function backtest(days){
     const start = Math.max(10, +$("bBal").value || 1000);
     $("bt1").disabled = $("bt2").disabled = true;
-    $("btInfo").innerHTML = `<span class="spin"></span> Testing 4 strategies × 3 timeframes × 3 risk levels on ${days === 730 ? "2 years" : "1 year"} of gold…`;
-    $("btTable").innerHTML = "";
-    const rows = [], RISKS = [0.5, 1, 2];
-    let src = "", from = "";
-    for (const tf of ["1h", "4h", "1d"]){
-      try{
-        const d = await api("/tg/longbars", { tf, days });
-        src = d.src || src; if (!from || d.from < from) from = d.from;
-        if (d.bars.length < 250){ rows.push({ tf, err:"not enough history (" + d.bars.length + " candles)" }); continue; }
-        for (const s in STRATS){ const orders = signalsFor(s, d.bars); for (const rk of RISKS) rows.push({ tf, s, rk, from:d.from, ...simulate(d.bars, orders, start, rk) }); }
-      }catch(e){ rows.push({ tf, err:e.message }); }
-    }
-    const score = (r) => (r.maxDd > 25 ? -1e6 : 0) + (r.trades < 8 ? -1e5 : 0) + r.ret / Math.max(r.maxDd, 4);
-    const bestPer = {};
-    rows.filter(r => !r.err).forEach(r => { const k = r.s + r.tf; if (!bestPer[k] || score(r) > score(bestPer[k])) bestPer[k] = r; });
-    const list = Object.values(bestPer).sort((a, b) => score(b) - score(a));
-    const best = list[0];
-    $("btTable").innerHTML = list.map(r => `<tr class="${r === best ? "best" : ""}"><td><b>${esc(STRATS[r.s])}</b>${r === best ? " 🏆" : ""}</td><td>${r.tf.toUpperCase()}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(r.end)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("")
-      + rows.filter(r => r.err).map(r => `<tr><td colspan="10" class="muted">${r.tf.toUpperCase()}: ${esc(r.err)}</td></tr>`).join("");
-    if (best){
-      $("btInfo").innerHTML = best.net > 0
-        ? `<b class="up">Best: ${esc(STRATS[best.s])} on ${best.tf.toUpperCase()} at ${best.rk}% risk → +${usd(best.net)} (${best.ret.toFixed(1)}%) from ${usd(start)}</b> · max drawdown ${best.maxDd.toFixed(1)}% · data since ${from} (${esc(src)})`
-        : `<b class="dn">No strategy made money in this period</b> — the best lost ${usd(-best.net)}. The desk would not trade these rules. Data since ${from}.`;
-      $("eqTitle").textContent = `Equity curve — ${STRATS[best.s]} · ${best.tf.toUpperCase()} · ${best.rk}% risk`;
-      if (!eqChart){
-        eqChart = LightweightCharts.createChart($("eq"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8" }, grid:{ vertLines:{ visible:false }, horzLines:{ color:"#1b2232" } }, rightPriceScale:{ borderColor:"#232b3d" }, timeScale:{ borderColor:"#232b3d" }, autoSize:true });
-        eqSeries = eqChart.addAreaSeries({ lineColor:"#f5c451", topColor:"#f5c45140", bottomColor:"#f5c45100", lineWidth:2 });
-      }
-      const seen = new Set();
-      eqSeries.setData(best.curve.filter(p => !seen.has(p.time) && seen.add(p.time)));
-      eqChart.timeScale().fitContent();
-      $("months").innerHTML = Object.entries(best.months).sort().reverse().map(([m, v]) => `<tr><td>${m}</td><td>${v.n}</td><td class="${v.pnl >= 0 ? "up" : "dn"}">${v.pnl >= 0 ? "+" : ""}${usd(v.pnl)}</td></tr>`).join("");
-    } else $("btInfo").textContent = "No data";
+    try{
+      const { bars, src } = await loadFiveMin(days, (d, n) => { $("btInfo").innerHTML = `<span class="spin"></span> Loading 5M gold history… ${d}/${n}`; });
+      if (bars.length < 5000) throw new Error("not enough 5M history (" + bars.length + " candles)");
+      $("btInfo").innerHTML = `<span class="spin"></span> Replaying ${bars.length.toLocaleString()} 5M candles with 15M / 1H / 4H / 1D confirmation…`;
+      await new Promise(r => setTimeout(r, 30));
+      const runs = [0.5, 1, 2].map(rk => ({ rk, ...deskBacktest(bars, start, rk) }));
+      const score = (r) => (r.maxDd > 25 ? -1e6 : 0) + r.ret / Math.max(r.maxDd, 4);
+      const best = runs.slice().sort((x, y) => score(y) - score(x))[0];
+      const from = new Date(bars[0].t * 1000).toISOString().slice(0, 10);
+      LAST_BT = { days, start, from, src, best: { ...best, curve: best.curve.filter((_, i, arr) => i % Math.ceil(arr.length / 400) === 0 || i === arr.length - 1), list: best.list.slice(-40) }, runs: runs.map(r => ({ rk:r.rk, trades:r.trades, winRate:r.winRate, net:r.net, ret:r.ret, maxDd:r.maxDd, pf:r.pf, avgLot:r.avgLot })) };
+      renderBacktest(LAST_BT);
+      saveState();
+    }catch(e){ $("btInfo").textContent = "❌ " + e.message; }
     $("bt1").disabled = $("bt2").disabled = false;
+  }
+  function renderBacktest(R){
+    if (!R) return;
+    const b = R.best;
+    $("btTable").innerHTML = R.runs.map(r => `<tr class="${r.rk === b.rk ? "best" : ""}"><td><b>Desk rule (all TFs agree)</b>${r.rk === b.rk ? " 🏆 chosen" : ""}</td><td>${R.days === 730 ? "2 years" : "1 year"}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(R.start + r.net)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity || r.pf == null ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("");
+    $("btInfo").innerHTML = b.net > 0
+      ? `<b class="up">${usd(R.start)} → ${usd(R.start + b.net)} (+${b.ret.toFixed(1)}%) with the desk's own rule at ${b.rk}% risk</b> · ${b.trades} trades · max drawdown ${b.maxDd.toFixed(1)}% · 5M data since ${R.from}`
+      : `<b class="dn">The desk rule lost ${usd(-b.net)} in this period</b> · ${b.trades} trades · 5M data since ${R.from}`;
+    $("eqTitle").textContent = `Equity curve — desk rule · ${b.rk}% risk`;
+    if (!eqChart){
+      eqChart = LightweightCharts.createChart($("eq"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8" }, grid:{ vertLines:{ visible:false }, horzLines:{ color:"#1b2232" } }, rightPriceScale:{ borderColor:"#232b3d" }, timeScale:{ borderColor:"#232b3d" }, autoSize:true });
+      eqSeries = eqChart.addAreaSeries({ lineColor:"#f5c451", topColor:"#f5c45140", bottomColor:"#f5c45100", lineWidth:2 });
+    }
+    const seen = new Set();
+    eqSeries.setData(b.curve.filter(p => !seen.has(p.time) && seen.add(p.time)));
+    eqChart.timeScale().fitContent();
+    $("months").innerHTML = Object.entries(b.months).sort().reverse().map(([m, v]) => `<tr><td>${m}</td><td>${v.n}</td><td class="${v.pnl >= 0 ? "up" : "dn"}">${v.pnl >= 0 ? "+" : ""}${usd(v.pnl)}</td></tr>`).join("");
+    $("btTrades").innerHTML = b.list.slice().reverse().map(t => `<tr><td>${new Date(t.t * 1000).toLocaleString([], { day:"numeric", month:"short", year:"2-digit", hour:"2-digit", minute:"2-digit" })}</td><td><span class="pill ${t.side > 0 ? "BUY" : "SELL"}">${t.side > 0 ? "BUY" : "SELL"} LIMIT</span></td><td class="mono">${fmt(t.entry)}</td><td class="mono">${fmt(t.sl)}</td><td class="mono">${fmt(t.tp1)} / ${fmt(t.tp2)}</td><td>${t.lots.toFixed(2)}</td><td>${esc(t.res)}</td><td class="${t.pnl >= 0 ? "up" : "dn"}"><b>${t.pnl >= 0 ? "+" : ""}${usd(t.pnl)}</b></td></tr>`).join("");
   }
   $("bt1").onclick = () => backtest(365);
   $("bt2").onclick = () => backtest(730);
+
+  // =============== everything saved to your account ===============
+  let saveTimer = null;
+  function saveState(){
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      const sig = lastSignal ? { ...lastSignal, news: lastSignal.news } : null;
+      api("/tg/state", { set: { v:1, signal:sig, acct:ACCT, auto:!!autoTimer, bt:LAST_BT, mtf:MTF_SNAP, saved:Date.now() } }).catch(() => {});
+    }, 1200);
+  }
+  let MTF_SNAP = null;
+  async function restoreState(){
+    try{
+      const { state } = await api("/tg/state", {});
+      if (!state) return;
+      if (state.acct) ACCT = +state.acct || ACCT;
+      if (state.bt){ LAST_BT = state.bt; renderBacktest(LAST_BT); }
+      if (state.mtf){ MTF_SNAP = state.mtf; }
+      if (state.signal && state.signal.final){
+        lastSignal = state.signal; curTf = "5m";
+        showDecision(lastSignal); showCouncil(lastSignal.opinions || []); showNews(lastSignal.news); showInter(lastSignal.inter);
+        $("status").innerHTML = `Last analysis: ${new Date(lastSignal.time).toLocaleString()} (saved to your account)`;
+        await loadChart(true); renderBasis();
+        studyAll().catch(() => {});
+      }
+      if (state.auto && !autoTimer) $("btnAuto").click();
+    }catch(e){}
+  }
 
   function boot(){
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
     loadChart(true); setInterval(() => loadChart(false), 10000);
     loadHistory();
     api("/tg/news", {}).then(showNews).catch(() => {});
+    restoreState();
   }
   initChart();
   if (SESSION) boot(); else gate(true);
