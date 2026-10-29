@@ -185,11 +185,15 @@
       <div class="hd"><h3>🎯 Final trade</h3><span class="muted" id="sigTime" style="font-size:12px;margin-left:auto"></span></div>
       <div class="bd"><div class="sig WAIT" id="sig"><div class="act">—</div><div class="muted" style="margin-top:4px">No analysis yet.</div></div></div>
     </div>
+    <div class="card" id="manageCard" style="display:none;border-color:#f5c45166">
+      <div class="hd"><h3>📈 Your trade right now</h3><span class="muted" style="font-size:12px;margin-left:auto">updates every minute</span></div>
+      <div class="bd" id="manage"></div>
+    </div>
     <div class="card">
-      <div class="hd"><h3>📒 Signal track record</h3><button class="btn" id="btnHist" style="margin-left:auto;padding:5px 10px">Refresh</button></div>
+      <div class="hd"><h3>📒 Trade journal</h3><span class="muted" style="font-size:11px">tracked from real prices, even while the site is closed</span><button class="btn" id="btnHist" style="margin-left:auto;padding:5px 10px">Refresh</button></div>
       <div class="bd">
         <div class="stats" id="hstats"><div><small>Signals</small><b>—</b></div><div><small>Win rate</small><b>—</b></div><div><small>Wins / Losses</small><b>—</b></div></div>
-        <div style="max-height:300px;overflow:auto"><table><thead><tr><th>Time</th><th>Call</th><th>Entry</th><th>SL</th><th>TP1</th><th>Result</th></tr></thead><tbody id="hist"></tbody></table></div>
+        <div style="max-height:300px;overflow:auto"><table><thead><tr><th>Time</th><th>Order</th><th>Entry</th><th>SL</th><th>Target</th><th>Result</th></tr></thead><tbody id="hist"></tbody></table></div>
       </div>
     </div>
   </div>
@@ -686,6 +690,7 @@
       await Promise.all([studyAll(), loadChart(true)]); tv(TV_INT[curTf]);
       d.final = buildTrade(d);
       lastSignal = d;
+      addToJournal(d);
       showDecision(d); showCouncil(d.opinions || []); showNews(d.news); showInter(d.inter);
       markers(); draw(); renderBasis();
       $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
@@ -787,15 +792,85 @@
   };
   $("btnAnalyze").onclick = analyze;
 
-  async function loadHistory(){
-    try{
-      const d = await api("/tg/history", {});
-      const s = d.stats;
-      $("hstats").innerHTML = `<div><small>Signals</small><b>${s.total}</b></div><div><small>Win rate</small><b>${s.winRate == null ? "—" : s.winRate + "%"}</b></div><div><small>Wins / Losses</small><b><span class="up">${s.wins}</span> / <span class="dn">${s.losses}</span></b></div>`;
-      $("hist").innerHTML = d.signals.map(h => `<tr><td>${new Date(h.time).toLocaleString([], { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</td><td><span class="pill ${h.action}">${h.action}</span></td><td class="mono">${fmt(h.entry)}</td><td class="mono">${fmt(h.sl)}</td><td class="mono">${fmt(h.tp1)}</td><td><span class="pill ${h.status}">${{ win:"win", loss:"loss", open:"open", expired:"expired" }[h.status] || h.status}</span></td></tr>`).join("") || `<tr><td colspan="6" class="muted">No BUY/SELL signals yet.</td></tr>`;
-    }catch(e){}
+  // =============== trade journal: every signal is saved to your account and tracked against real prices ===============
+  let JOURNAL = [];
+  function notify(title, body){ beep(); try{ if (Notification.permission === "granted") new Notification(title, { body }); }catch(e){} }
+  function addToJournal(d){
+    const f = d.final; if (!f || f.action === "WAIT" || !f.entry || !f.sl) return;
+    if (JOURNAL.some(t => t.status === "pending" || t.status === "open")) return;
+    const risk = Math.abs(f.entry - f.sl), mkt = /MARKET/.test(f.orderType);
+    const lots = Math.max(0.01, Math.floor((ACCT * 0.01) / (risk * 100) * 100) / 100);
+    JOURNAL.unshift({ id:String(d.time), time:d.time, side:f.action, type:f.orderType, entry:f.entry, sl:f.sl, tp:f.tp1, risk, lots, validUntil: mkt ? d.time : d.time + 6 * 3600e3, status: mkt ? "open" : "pending", fillTime: mkt ? d.time : null, best:0, now:0 });
+    JOURNAL = JOURNAL.slice(0, 200);
   }
+  let jBusy = false;
+  async function evalJournal(){
+    if (jBusy) return; jBusy = true;
+    try{
+      const act = JOURNAL.filter(t => t.status === "pending" || t.status === "open");
+      if (act.length){
+        const oldest = Math.min(...act.map(t => t.time));
+        const bars = Date.now() - oldest < 2.4 * 864e5 ? (await api("/tg/candles", { tf:"5m" })).bars : (await api("/tg/longbars", { tf:"5m", days: Math.ceil((Date.now() - oldest) / 864e5) + 1 })).bars;
+        let changed = false;
+        for (const t of act){
+          const d = t.side === "BUY" ? 1 : -1;
+          t.best = 0;
+          for (const b of bars){
+            const bt = b.t * 1000;
+            if (t.status === "pending"){
+              if (bt + 300e3 <= t.time) continue;
+              if (bt > t.validUntil){ t.status = "expired"; changed = true; notify("Gold order cancelled", `${t.type} @ ${fmt(t.entry)} was not triggered in time`); break; }
+              if (d > 0 ? b.h >= t.entry : b.l <= t.entry){ t.status = "open"; t.fillTime = bt; changed = true; notify(`Gold ${t.side} triggered`, `${t.type} filled @ ${fmt(t.entry)} · SL ${fmt(t.sl)} · target ${fmt(t.tp)}`); }
+              else continue;
+            }
+            if (t.status === "open"){
+              if (bt + 300e3 <= t.fillTime) continue;
+              if (d > 0 ? b.l <= t.sl : b.h >= t.sl){ t.status = "loss"; t.R = -1; t.closeTime = bt; changed = true; notify("Gold trade closed: stop-loss", `${t.side} from ${fmt(t.entry)} · -1R`); break; }
+              if (d > 0 ? b.h >= t.tp : b.l <= t.tp){ t.status = "win"; t.R = 3; t.closeTime = bt; changed = true; notify("Gold trade closed: target hit 🎯", `${t.side} from ${fmt(t.entry)} · +3R`); break; }
+              t.best = Math.max(t.best, ((d > 0 ? b.h : b.l) - t.entry) * d / t.risk);
+            }
+          }
+          if (t.status === "open" && bars.length){ t.price = bars[bars.length - 1].c; t.now = (t.price - t.entry) * d / t.risk; }
+        }
+        if (changed) saveState();
+      }
+    }catch(e){}
+    finally{ jBusy = false; renderJournal(); }
+  }
+  function renderJournal(){
+    const closed = JOURNAL.filter(t => t.status === "win" || t.status === "loss");
+    const wins = closed.filter(t => t.status === "win").length, totR = closed.reduce((s, t) => s + (t.R || 0), 0);
+    const usdOf = (t, r) => r * t.risk * t.lots * 100;
+    const pnl = closed.reduce((s, t) => s + usdOf(t, t.R || 0) - 0.30 * t.lots * 100, 0);
+    $("hstats").innerHTML = `<div><small>Closed trades</small><b>${closed.length}</b></div><div><small>Win rate</small><b>${closed.length ? Math.round(100 * wins / closed.length) + "%" : "—"}</b></div><div><small>Result</small><b class="${totR >= 0 ? "up" : "dn"}">${totR >= 0 ? "+" : ""}${totR.toFixed(1)}R · ${pnl >= 0 ? "+" : ""}${usd(pnl)}</b></div>`;
+    const lab = (t) => t.status === "win" ? `<span class="pill win">win +3R</span>` : t.status === "loss" ? `<span class="pill loss">loss -1R</span>` : t.status === "open" ? `<span class="pill open">open ${t.now >= 0 ? "+" : ""}${(t.now || 0).toFixed(2)}R</span>` : t.status === "pending" ? `<span class="pill">waiting</span>` : `<span class="pill expired">not triggered</span>`;
+    $("hist").innerHTML = JOURNAL.map(t => `<tr><td>${new Date(t.time).toLocaleString([], { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</td><td><span class="pill ${t.side}">${esc(t.type)}</span></td><td class="mono">${fmt(t.entry)}</td><td class="mono">${fmt(t.sl)}</td><td class="mono">${fmt(t.tp)}</td><td>${lab(t)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">No signals yet — each BUY/SELL the desk gives is saved here and tracked automatically.</td></tr>`;
+    renderManage();
+  }
+  function renderManage(){
+    const t = JOURNAL.find(x => x.status === "open" || x.status === "pending");
+    $("manageCard").style.display = t ? "block" : "none";
+    if (!t) return;
+    const d = t.side === "BUY" ? 1 : -1, be2 = t.entry + d * 2 * t.risk, money = (r) => usd(r * t.risk * t.lots * 100);
+    if (t.status === "pending"){
+      $("manage").innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(t.type)} @ ${fmt(t.entry)}</b><span class="pill">waiting for trigger</span></div>
+        <p class="muted" style="margin:8px 0 0;line-height:1.5">The order starts only if price reaches ${fmt(t.entry)} before ${new Date(t.validUntil).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })}. If it doesn't, cancel it. Stop ${fmt(t.sl)} · target ${fmt(t.tp)} · ${t.lots.toFixed(2)} lots (1% of $${ACCT}).</p>`;
+      return;
+    }
+    const now = t.now || 0, col = now >= 0 ? "up" : "dn";
+    const advice = now >= 2
+      ? `Price has reached +2R. <b>Keep the stop at ${fmt(t.sl)}</b> to follow the tested rule, or — if you prefer safety — move it to entry ${fmt(t.entry)} now (the 2-year test shows this costs about 20% of total profit).`
+      : now >= 1
+        ? `In profit, but <b>do not move the stop yet</b>. Keep it at ${fmt(t.sl)}. In the 2-year test, moving to breakeven at +1R cut total profit from +79.8R to +52.3R — the trades that win usually pull back first.`
+        : `Keep the stop at ${fmt(t.sl)} and the target at ${fmt(t.tp)}. Don't close early — a 3R winner pays for three losers.`;
+    $("manage").innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(t.side)} from ${fmt(t.entry)}</b><b class="${col}" style="font-size:20px">${now >= 0 ? "+" : ""}${now.toFixed(2)}R · ${now >= 0 ? "+" : "-"}${money(Math.abs(now))}</b></div>
+      <div class="muted" style="font-size:12px;margin-top:4px">Price now ${fmt(t.price)} · best so far +${(t.best || 0).toFixed(2)}R · ${t.lots.toFixed(2)} lots</div>
+      <div class="lv"><div><small>Stop-loss (keep)</small><b>${fmt(t.sl)}</b></div><div><small>Target 3R</small><b>${fmt(t.tp)}</b></div><div><small>+1R price</small><b>${fmt(t.entry + d * t.risk)}</b></div><div><small>Optional breakeven at +2R</small><b>${fmt(be2)}</b></div></div>
+      <p style="margin:0;line-height:1.55">${advice}</p>`;
+  }
+  async function loadHistory(){ await evalJournal(); }
   $("btnHist").onclick = loadHistory;
+
 
   // =============== backtest of the desk's own rule: all timeframes must agree, then one 5M entry ===============
   function rsiArr(c, p){ const out = Array(c.length).fill(null); let g = 0, l = 0; for (let i = 1; i < c.length; i++){ const d = c[i] - c[i-1]; if (i <= p){ g += Math.max(d,0); l += Math.max(-d,0); if (i === p){ g /= p; l /= p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } else { g = (g*(p-1) + Math.max(d,0))/p; l = (l*(p-1) + Math.max(-d,0))/p; out[i] = 100 - 100/(1 + g/(l||1e-9)); } } return out; }
@@ -911,14 +986,16 @@
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
       const sig = lastSignal ? { ...lastSignal, news: lastSignal.news } : null;
-      api("/tg/state", { set: { v:1, signal:sig, acct:ACCT, auto:!!autoTimer, bt:LAST_BT, mtf:MTF_SNAP, saved:Date.now() } }).catch(() => {});
+      api("/tg/state", { set: { v:1, signal:sig, acct:ACCT, auto:!!autoTimer, bt:LAST_BT, mtf:MTF_SNAP, journal:JOURNAL, saved:Date.now() } }).catch(() => {});
     }, 1200);
   }
   let MTF_SNAP = null;
   async function restoreState(){
     try{
       const { state } = await api("/tg/state", {});
-      if (!state) return;
+      if (!state){ renderJournal(); return; }
+      JOURNAL = Array.isArray(state.journal) ? state.journal : [];
+      evalJournal();
       if (state.acct) ACCT = +state.acct || ACCT;
       if (state.bt){ LAST_BT = state.bt; renderBacktest(LAST_BT); }
       if (state.mtf){ MTF_SNAP = state.mtf; }
@@ -936,6 +1013,7 @@
   function boot(){
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
     loadChart(true); setInterval(() => loadChart(false), 10000);
+    setInterval(() => evalJournal(), 60000);
     loadHistory();
     api("/tg/news", {}).then(showNews).catch(() => {});
     restoreState();
