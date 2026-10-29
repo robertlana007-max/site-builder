@@ -78,6 +78,9 @@
   .basis{list-style:none;margin:0;padding:0}
   .basis li{display:flex;gap:10px;padding:8px 0;border-bottom:1px dashed var(--line);font-size:13px;line-height:1.45}
   .basis li b.k{min-width:22px;height:22px;border-radius:6px;display:grid;place-items:center;font-size:11px;flex:none}
+  .todo{margin:10px 0 4px;padding:12px 14px;border-radius:12px;background:#0b0e14;border:1px solid var(--gold);font-size:14px;line-height:1.5}
+  .todo.wait{border-color:var(--line)}
+  .todo ol{margin:6px 0 0;padding-left:20px} .todo li{margin:3px 0}
   .disclaimer{font-size:11.5px;color:var(--muted);line-height:1.5;padding:0 14px 24px;max-width:1600px;margin:0 auto}
   .spin{display:inline-block;width:14px;height:14px;border:2px solid #fff3;border-top-color:var(--gold);border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px}
   @keyframes sp{to{transform:rotate(360deg)}}
@@ -88,7 +91,16 @@
   .live{width:8px;height:8px;border-radius:50%;background:var(--muted);display:inline-block}
   .live.on{background:var(--buy);animation:pulse 1.6s infinite}
   @keyframes pulse{70%{box-shadow:0 0 0 8px #16c78400}0%{box-shadow:0 0 0 0 #16c78488}}
-  @media (max-width:1150px){.wrap{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}#tv,#chart{height:500px}}
+  @media (max-width:1150px){.wrap{grid-template-columns:1fr}.grid2{grid-template-columns:1fr}#tv,#chart{height:500px}.wrap>div:last-child{order:-1}}
+  @media (max-width:700px){
+    header{padding:8px 10px;gap:8px} .brand{font-size:15px} .price b{font-size:16px} .me span{display:none}
+    .wrap{padding:8px;gap:10px} .card{border-radius:12px} .hd{padding:10px 10px} .bd{padding:10px}
+    #tv,#chart{height:380px} .layers{padding:6px 10px;gap:8px;font-size:11px} .tfs{overflow-x:auto;flex-wrap:nowrap;max-width:60vw}
+    .sig .act{font-size:26px} .ord{font-size:13px} .lv b{font-size:14px} .big{font-size:15px;padding:12px}
+    table{font-size:11.5px} th,td{padding:6px 4px} .card>div[style*="padding:0 6px"]{overflow-x:auto}
+    .legend{font-size:10.5px;padding:4px 6px} .lotbox{grid-template-columns:1fr} .basis li{font-size:12.5px}
+    .disclaimer{font-size:10.5px}
+  }
 </style>
 </head>
 <body>
@@ -679,44 +691,64 @@
 
   // =============== AI analysis ===============
   let busy = false;
+  let analyzeStart = 0;
   async function analyze(){
     if (busy) return;
     busy = true; $("btnAnalyze").disabled = true;
-    const t0 = Date.now();
-    const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span> Studying all 9 timeframes (1M → 1D), every strategy, news, the calendar and DXY / yields / VIX… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
+    const t0 = Date.now(); analyzeStart = t0;
+    const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span> Studying all 9 timeframes (1M → 1D), every strategy, news, the calendar, trader sentiment and DXY / yields / VIX, then the AIs debate… ${Math.round((Date.now() - t0) / 1000)}s<br><span style="font-size:11px">You can leave this page — the result will be waiting in your account.</span>`; }, 1000);
     try{
-      const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 240000);
-      const r = await fetch(WORKER_URL + "/tg/analyze", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ session:SESSION }), signal: ctl.signal });
-      clearTimeout(to);
-      const d = await r.json().catch(() => ({ error:"Bad response from server" }));
-      if (r.status === 401){ gate(true); throw new Error("Please sign in"); }
-      if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
-      const rawTf = String((readTrade(d.final) || {}).timeframe || "").toLowerCase().replace(/\s/g, "").replace("mins", "m").replace("min", "m").replace(/^(\d+)h(our)?s?$/, "$1h").replace(/^daily$|^1day$|^d$/, "1d");
-      curTf = "1h";
-      lastSignal = null;
-      $("tabMine").click();
-      await Promise.all([studyAll(), loadChart(true)]); tv(TV_INT[curTf]);
-      d.final = buildTrade(d);
-      const cand = d.final.action !== "WAIT" ? d.final : null;
-      if (cand){
-        $("status").innerHTML = `<span class="spin"></span> Every AI is now checking the exact trade: ${esc(cand.orderType)} @ ${fmt(cand.entry)} · SL ${fmt(cand.sl)} · TP ${fmt(cand.tp1)}…`;
-        try{
-          const c = await api("/tg/confirm", { plan:{ action:cand.action, orderType:cand.orderType, entry:cand.entry, sl:cand.sl, tp:cand.tp1, rr:cand.rr, why:cand.why, price:d.price } });
-          d.confirm = c;
-          if (!c.unanimous){ d.final = { ...cand, action:"WAIT", rejected:{ ...cand }, agreement:`${c.yes} of ${c.answered} AIs approved the exact trade — not unanimous, so no trade` }; }
-          else d.final.agreement = `${c.answered} of ${c.answered} AIs approved this exact trade ✅`;
-        }catch(e){ d.confirm = { error:e.message }; }
-      }
-      lastSignal = d;
-      addToJournal(d);
-      showDecision(d); showCouncil(d.opinions || [], d.debate); showCrowd(d.crowd); showNews(d.news); showInter(d.inter);
-      markers(); draw(); renderBasis();
-      $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
-      loadHistory();
-      if (d.final && d.final.action !== "WAIT") alertUser(d.final);
-      saveState();
-    }catch(e){ $("status").textContent = "❌ " + (e.name === "AbortError" ? "The AIs took too long — try again." : e.message); }
+      // keepalive: the server keeps working even if this page is closed; the result is stored in your account
+      const direct = fetch(WORKER_URL + "/tg/analyze", { method:"POST", headers:{ "Content-Type":"application/json" }, body: JSON.stringify({ session:SESSION }), keepalive:true })
+        .then(async r => { const d = await r.json().catch(() => ({ error:"Bad response from server" })); if (r.status === 401){ gate(true); throw new Error("Please sign in"); } if (!r.ok) throw new Error(d.error || ("HTTP " + r.status)); return d; });
+      const polled = (async () => { while (true){ await new Promise(r => setTimeout(r, 5000)); try{ const jb = await api("/tg/job", {}); if (jb.status === "done" && jb.started >= t0 - 15000) return jb.result; if (jb.status === "error" && jb.started >= t0 - 15000) throw new Error(jb.error || "analysis failed"); }catch(e){ if (!/HTTP 5|Failed to fetch/.test(e.message)) throw e; } if (Date.now() - t0 > 330000) throw new Error("The AIs took too long — try again."); } })();
+      const d = await Promise.race([direct, polled]);
+      await applyAnalysis(d, t0);
+    }catch(e){ $("status").textContent = "❌ " + e.message; }
     finally{ clearInterval(tick); busy = false; $("btnAnalyze").disabled = false; }
+  }
+  async function applyAnalysis(d, t0){
+    t0 = t0 || Date.now();
+    curTf = "1h";
+    lastSignal = null;
+    $("tabMine").click();
+    await Promise.all([studyAll(), loadChart(true)]); tv(TV_INT[curTf]);
+    d.final = buildTrade(d);
+    const cand = d.final.action !== "WAIT" ? d.final : null;
+    if (cand){
+      $("status").innerHTML = `<span class="spin"></span> Every AI is now checking the exact trade: ${esc(cand.orderType)} @ ${fmt(cand.entry)} · SL ${fmt(cand.sl)} · TP ${fmt(cand.tp1)}…`;
+      try{
+        const c = await api("/tg/confirm", { plan:{ action:cand.action, orderType:cand.orderType, entry:cand.entry, sl:cand.sl, tp:cand.tp1, rr:cand.rr, why:cand.why, price:d.price } });
+        d.confirm = c;
+        if (!c.unanimous){ d.final = { ...cand, action:"WAIT", rejected:{ ...cand }, agreement:`${c.yes} of ${c.answered} AIs approved the exact trade — not unanimous, so no trade` }; }
+        else d.final.agreement = `${c.answered} of ${c.answered} AIs approved this exact trade ✅`;
+      }catch(e){ d.confirm = { error:e.message }; }
+    }
+    d.applied = true;
+    lastSignal = d;
+    addToJournal(d);
+    showDecision(d); showCouncil(d.opinions || [], d.debate); showCrowd(d.crowd); showNews(d.news); showInter(d.inter);
+    markers(); draw(); renderBasis();
+    $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs${d.claude ? " · Claude " + esc(d.claude) : ""} · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
+    loadHistory();
+    if (d.final && d.final.action !== "WAIT") alertUser(d.final);
+    saveState();
+  }
+  // when you come back: pick up an analysis that finished (or is still running) while you were away
+  async function resumeJob(){
+    try{
+      const jb = await api("/tg/job", {});
+      if (!jb || jb.status === "none") return;
+      const known = lastSignal ? lastSignal.time : 0;
+      if (jb.status === "done" && jb.result && jb.result.time > known){ $("status").innerHTML = "Applying the analysis that finished while you were away…"; busy = true; $("btnAnalyze").disabled = true; try{ await applyAnalysis(jb.result, jb.started); } finally{ busy = false; $("btnAnalyze").disabled = false; } }
+      else if (jb.status === "running" && Date.now() - jb.started < 330000 && !busy){
+        busy = true; $("btnAnalyze").disabled = true; const t0 = jb.started;
+        const tick = setInterval(() => { $("status").innerHTML = `<span class="spin"></span> Your analysis is still running on the server… ${Math.round((Date.now() - t0) / 1000)}s`; }, 1000);
+        try{ while (true){ await new Promise(r => setTimeout(r, 5000)); const j2 = await api("/tg/job", {}); if (j2.status === "done"){ await applyAnalysis(j2.result, t0); break; } if (j2.status === "error") throw new Error(j2.error || "analysis failed"); if (Date.now() - t0 > 330000) throw new Error("The AIs took too long — try again."); } }
+        catch(e){ $("status").textContent = "❌ " + e.message; }
+        finally{ clearInterval(tick); busy = false; $("btnAnalyze").disabled = false; }
+      }
+    }catch(e){}
   }
   // Accept every answer shape the AIs use, check the levels make sense, and fall back to the council's consensus
   const num = (v) => { const x = parseFloat(v); return isFinite(x) ? x : null; };
@@ -758,6 +790,20 @@
     }
     return t;
   }
+  function todo(f, d){
+    const pk = (ms) => new Date(ms).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
+    const lots = f.entry && f.sl ? Math.max(0.01, Math.floor((ACCT * (f.grade === "A" ? 1 : 0.5) / 100) / (Math.abs(f.entry - f.sl) * 100) * 100) / 100).toFixed(2) : null;
+    if (f.userRejected) return "";
+    if (f.action === "WAIT"){
+      const nxt = f.rejected ? `${f.rejected.orderType.replace(/ STOP| LIMIT|MARKET /g, "")} if ${f.rejected.action === "BUY" ? "1H closes above" : "1H closes below"} ${fmt(f.rejected.trigger || f.rejected.entry)} and every AI agrees` : "a 1H break of structure that all timeframes and all AIs agree on";
+      return `<div class="todo wait"><b>NOTHING TO DO NOW</b> — do not open any trade.<br><span class="muted">Next possible trade: ${esc(nxt)}. ${autoTimer ? "Auto-scan checks every 10 minutes." : "Press Start so the desk keeps checking every 10 minutes."}</span></div>`;
+    }
+    const mkt = /MARKET/.test(f.orderType);
+    const steps = mkt
+      ? [`Open a <b>${f.action}</b> at market now (price ≈ ${fmt(d.price)})`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `Then do nothing — don't move the stop, don't close early`]
+      : [`Place a <b>${esc(f.orderType)}</b> pending order at <b>${fmt(f.entry)}</b>`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `If price has not reached ${fmt(f.entry)} by <b>${pk(d.time + 6 * 3600e3)}</b>, delete the order`];
+    return `<div class="todo"><b>DO THIS NOW</b><ol>${steps.map(x => "<li>" + x + "</li>").join("")}</ol></div>`;
+  }
   function showDecision(d){
     const f = d.final || { action:"WAIT" };
     $("sigTime").textContent = new Date(d.time).toLocaleString();
@@ -766,6 +812,7 @@
     $("sig").className = "sig " + f.action;
     $("sig").innerHTML = `
       <div class="act">${word}</div>
+      ${todo(f, d)}
       <div class="muted" style="margin-top:2px">${esc(f.agreement || "")}</div>
       <div class="row" style="margin-top:8px">${f.grade ? `<span class="pill" style="color:var(--gold)">Grade ${f.grade}</span>` : ""}<span class="pill">Chart: ${curTf.toUpperCase()}</span>${f.horizon ? `<span class="pill">${esc(f.horizon)}</span>` : ""}</div>
       ${f.action !== "WAIT" ? `<div class="ord ${f.action === "BUY" ? "up" : "dn"}">👉 ${esc(f.orderType)} @ ${fmt(f.entry)} · SL ${fmt(f.sl)} · Target ${fmt(f.tp1)}${f.validFor ? `<div class="muted" style="font-size:11px;font-weight:500;margin-top:3px">Order valid: ${esc(f.validFor)}</div>` : ""}</div>` : ""}
@@ -818,7 +865,7 @@
       $("liveDot").classList.remove("on"); $("autoTxt").textContent = "Auto-scan: off"; saveState(); return;
     }
     try{ if ("Notification" in window && Notification.permission === "default") Notification.requestPermission(); }catch(e){}
-    analyze(); autoTimer = setInterval(analyze, 10 * 60000);
+    analyze(); autoTimer = setInterval(() => { if (!busy) analyze(); }, 10 * 60000);
     $("btnAuto").textContent = "■ Stop"; $("btnAuto").className = "btn stop";
     $("liveDot").classList.add("on"); $("autoTxt").textContent = "Auto-scan: on (every 10 min)"; saveState();
   };
@@ -1064,7 +1111,7 @@
   async function restoreState(){
     try{
       const { state } = await api("/tg/state", {});
-      if (!state){ renderJournal(); return; }
+      if (!state){ renderJournal(); resumeJob(); return; }
       JOURNAL = Array.isArray(state.journal) ? state.journal : [];
       evalJournal();
       if (state.acct) ACCT = +state.acct || ACCT;
@@ -1079,6 +1126,7 @@
       }
       if (state.auto && !autoTimer) $("btnAuto").click();
     }catch(e){}
+    resumeJob();
   }
 
   function boot(){
