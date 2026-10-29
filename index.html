@@ -802,19 +802,30 @@
     }
     return t;
   }
+  function aiIdea(d, side){
+    const ops = (d.opinions || []).filter(o => !o.error).map(readTrade).filter(o => o && validTrade(o) && (!side || o.action === side));
+    if (!ops.length) return null;
+    const lim = ops.filter(o => /LIMIT/.test(o.orderType)), use = lim.length ? lim : ops;
+    return { action: use[0].action, type: lim.length ? use[0].action + " LIMIT" : "MARKET", entry: median(use.map(o => o.entry)), sl: median(use.map(o => o.sl)), tp: median(use.map(o => o.tp1)), who: use.map(o => o.ai).join(", ") };
+  }
   function todo(f, d){
     const pk = (ms) => new Date(ms).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
     const lots = f.entry && f.sl ? Math.max(0.01, Math.floor((ACCT * (f.grade === "A" ? 1 : 0.5) / 100) / (Math.abs(f.entry - f.sl) * OZ_PER_LOT) * 100) / 100).toFixed(2) : null;
     if (f.userRejected) return "";
+    const now = fmt(RAW || d.price);
+    const idea = aiIdea(d, f.action !== "WAIT" ? f.action : null);
+    const ideaLine = idea ? `<div class="muted" style="margin-top:8px;font-size:12px">AIs' own idea (advisory, not backtested): <b>${esc(idea.type)} ${idea.action} at ${fmt(idea.entry)}</b> · SL ${fmt(idea.sl)} · TP ${fmt(idea.tp)} <span style="opacity:.8">(${esc(idea.who)})</span></div>` : "";
     if (f.action === "WAIT"){
-      const nxt = f.rejected ? `${f.rejected.orderType.replace(/ STOP| LIMIT|MARKET /g, "")} if ${f.rejected.action === "BUY" ? "1H closes above" : "1H closes below"} ${fmt(f.rejected.trigger || f.rejected.entry)} and every AI agrees` : "a 1H break of structure that all timeframes and all AIs agree on";
-      return `<div class="todo wait"><b>NOTHING TO DO NOW</b> — do not open any trade.<br><span class="muted">Next possible trade: ${esc(nxt)}. ${autoTimer ? "Auto-scan checks every 10 minutes." : "Press Start so the desk keeps checking every 10 minutes."}</span></div>`;
+      const r = f.rejected;
+      const nxt = r ? `if price ${r.action === "BUY" ? "rises to" : "falls to"} <b>${fmt(r.trigger || r.entry)}</b> and breaks it → ${r.action === "BUY" ? "buy" : "sell"} there` : "a 1H break of structure in the direction all timeframes agree on";
+      return `<div class="todo wait"><b>Market is at ${now}. DO NOTHING NOW</b> — no buy, no sell.<br><span class="muted">Next trade: ${nxt}. ${autoTimer ? "Auto-scan checks every 10 minutes." : "Press Start so the desk keeps checking every 10 minutes."}</span>${ideaLine}</div>`;
     }
-    const mkt = /MARKET/.test(f.orderType);
+    const mkt = /MARKET/.test(f.orderType), buy = f.action === "BUY";
+    const head = mkt ? `Market is at ${now}. <span class="${buy ? "up" : "dn"}">${buy ? "BUY NOW" : "SELL NOW"}</span>` : `Market is at ${now}. <span class="${buy ? "up" : "dn"}">${buy ? "BUY" : "SELL"} only if price ${buy ? "rises to" : "falls to"} ${fmt(f.entry)}</span> — do not ${buy ? "buy" : "sell"} now`;
     const steps = mkt
-      ? [`Open a <b>${f.action}</b> at market now (price ≈ ${fmt(d.price)})`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `Then do nothing — don't move the stop, don't close early`]
-      : [`Place a <b>${esc(f.orderType)}</b> pending order at <b>${fmt(f.entry)}</b>`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `If price has not reached ${fmt(f.entry)} by <b>${pk(d.time + 6 * 3600e3)}</b>, delete the order`];
-    return `<div class="todo"><b>DO THIS NOW</b><ol>${steps.map(x => "<li>" + x + "</li>").join("")}</ol></div>`;
+      ? [`${buy ? "Buy" : "Sell"} at market now (≈ ${now})`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `Then do nothing — don't move the stop, don't close early`]
+      : [`In your broker set a <b>${esc(f.orderType)}</b> at <b>${fmt(f.entry)}</b> — it fills by itself when price gets there`, `Lot size <b>${lots}</b> (risk 1% of $${ACCT})`, `Stop-loss <b>${fmt(f.sl)}</b>`, `Take-profit <b>${fmt(f.tp1)}</b>`, `If price has not reached ${fmt(f.entry)} by <b>${pk(d.time + 6 * 3600e3)}</b>, delete the order`];
+    return `<div class="todo"><b>${head}</b><ol>${steps.map(x => "<li>" + x + "</li>").join("")}</ol>${ideaLine}</div>`;
   }
   function showDecision(d){
     const f = d.final || { action:"WAIT" };
