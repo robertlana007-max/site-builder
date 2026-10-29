@@ -203,7 +203,7 @@
 
 <div class="disclaimer">⚠️ This is an AI opinion, not financial advice. Gold moves fast, the AI can be wrong and you can lose money. Always use a stop-loss, only risk what you can afford to lose, and test on a demo account first. The backtest is one technical strategy on past data; past results do not guarantee future results. Prices come from XAUT/USDT (Bybit/OKX) aligned to XAU spot, so they can differ slightly from your broker.</div>
 
-<div class="gate" id="gate"><div class="box"><div style="font-size:42px">🔒</div><h2 style="margin:8px 0">Gold AI Desk</h2><div class="muted">Private desk — sign in with the owner Google account.</div><div id="gbtn"></div><div class="muted" id="gateMsg" style="font-size:12px;margin-top:10px"></div></div></div>
+<div class="gate" id="gate"><div class="box"><div style="font-size:42px">🔒</div><h2 style="margin:8px 0">Gold AI Desk</h2><div class="muted">Sign in with Google to use the desk — free.</div><div id="gbtn"></div><div class="muted" id="gateMsg" style="font-size:12px;margin-top:10px"></div></div></div>
 
 <script>
   const WORKER_URL = "https://sitegenie.jma384.workers.dev";
@@ -813,15 +813,19 @@
 
   // =============== real-time ticks (exchange WebSocket) → candle, price and open trade update every second ===============
   let RAW = null, RAW_AT = 0, OFFSET = 0, wsConn = null, wsRetry = 0, lastPaint = 0;
-  function syncOffset(){ if (RAW != null && Date.now() - RAW_AT < 15000 && BARS.length) OFFSET = BARS[BARS.length - 1].c - RAW; }
+  function syncOffset(){}
   function connectTicks(){
-    try{ wsConn && wsConn.close(); }catch(e){}
-    const ws = new WebSocket("wss://stream.bybit.com/v5/public/spot"); wsConn = ws;
-    let ping = null;
-    ws.onopen = () => { wsRetry = 0; ws.send(JSON.stringify({ op:"subscribe", args:["tickers.XAUTUSDT"] })); ping = setInterval(() => { try{ ws.send(JSON.stringify({ op:"ping" })); }catch(e){} }, 20000); $("tickDot").classList.add("on"); $("tickTxt").textContent = "Live ticks"; };
-    ws.onmessage = (e) => { try{ const m = JSON.parse(e.data); if (m.topic === "tickers.XAUTUSDT" && m.data && m.data.lastPrice){ const first = RAW == null; RAW = +m.data.lastPrice; RAW_AT = Date.now(); if (first) syncOffset(); onTick(RAW + OFFSET); } }catch(err){} };
-    ws.onclose = () => { clearInterval(ping); $("tickDot").classList.remove("on"); $("tickTxt").textContent = "Reconnecting…"; setTimeout(connectTicks, Math.min(15000, 1000 * Math.pow(2, wsRetry++))); };
-    ws.onerror = () => { try{ ws.close(); }catch(e){} };
+    // real spot gold (Swissquote XAU/USD bid/ask) through our server, every 2 seconds while the page is visible
+    const poll = async () => {
+      if (!document.hidden){
+        try{
+          const d = await api("/tg/tick", {});
+          if (d && d.mid){ RAW = d.mid; RAW_AT = Date.now(); OFFSET = 0; $("tickDot").classList.add("on"); $("tickTxt").textContent = "Live spot · Swissquote"; lastPaint = 0; onTick(d.mid); }
+        }catch(e){ $("tickDot").classList.remove("on"); $("tickTxt").textContent = "Reconnecting…"; }
+      }
+      setTimeout(poll, 2000);
+    };
+    poll();
   }
   function onTick(p){
     if (!BARS.length || !candles) return;
