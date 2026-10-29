@@ -194,6 +194,7 @@
       <div class="bd">
         <button class="btn gold big" id="btnAnalyze" style="width:100%">🤖 Get AI trade</button>
         <button class="btn go" id="btnAuto" style="width:100%;margin-top:8px">▶ Start — auto-scan every 10 min</button>
+        <label class="f" style="margin-top:10px">Who decides<select id="modeSel"><option value="rule">Tested rule decides · AIs advise (backtested, +145%)</option><option value="strict">Strict · every AI must agree (fewer trades)</option></select></label>
         <div class="muted" id="status" style="font-size:12px;margin-top:8px">All AIs study every timeframe (1m → 1D), all strategies, news, the calendar and DXY / yields / VIX, then agree on one trade. They choose the timeframe and style themselves.</div>
       </div>
     </div>
@@ -606,6 +607,7 @@
     $("mtfNote").innerHTML = `Overall ${s2 > 0.25 ? '<b class="up">bullish</b>' : s2 < -0.25 ? '<b class="dn">bearish</b>' : "<b>mixed</b>"} · higher timeframes (1H–1D): ${MTF._htf.up} up / ${MTF._htf.dn} down`;
   }
   let ACCT = 1000; try{ ACCT = +localStorage.getItem("gd_acct") || 1000; }catch(e){}
+  let STRICT = false; try{ STRICT = localStorage.getItem("gd_strict") === "1"; }catch(e){}
   let OZ_PER_LOT = 100; try{ OZ_PER_LOT = +localStorage.getItem("gd_oz") || 100; }catch(e){}
   const minBalanceFor = (risk, pct) => Math.ceil(0.01 * OZ_PER_LOT * risk / (pct / 100));
   function updLot(f){
@@ -637,7 +639,7 @@
     const validFor = /MARKET/.test(orderType) ? "now" : "next 6 hours, London–New York session only — cancel if not triggered";
     const checks = [
       { ok: againstTf.length === 0 && withTf.length >= Math.min(5, GT.length), txt: `All timeframes allow it: ${withTf.length} with (${withTf.map(t => t.toUpperCase()).join(", ") || "none"}), ${GT.length - withTf.length - againstTf.length} neutral, ${againstTf.length} against${againstTf.length ? " (" + againstTf.map(t => t.toUpperCase()).join(", ") + ")" : ""} — need 5+ with and none against` },
-      { ok: aiPlan.count === aiPlan.total && aiPlan.total >= 2, txt: `${aiPlan.count} of ${aiPlan.total} AIs say ${side}${aiPlan.count === aiPlan.total ? " — all agree" : " — not all agree"}` },
+      { ok: STRICT ? (aiPlan.count === aiPlan.total && aiPlan.total >= 2) : true, txt: STRICT ? `${aiPlan.count} of ${aiPlan.total} AIs say ${side}${aiPlan.count === aiPlan.total ? " — all agree" : " — not all agree"}` : `AI council: ${aiPlan.count} of ${aiPlan.total} agree with ${side} (advisory — the tested rule decides)` },
       { ok: inSess, txt: inSess ? "London / New York session is open (best liquidity for gold)" : "Outside London–New York hours (12:00 → 01:00 Pakistan time) — the tested rule does not trade now" }
     ];
     const score = checks.filter(c => c.ok).length;
@@ -651,15 +653,20 @@
     const votes = { BUY:0, SELL:0, WAIT:0 }; ops.forEach(o => votes[o.action]++);
     const total = ops.length || 1;
     let side = votes.BUY > votes.SELL ? "BUY" : votes.SELL > votes.BUY ? "SELL" : (chief && chief.action !== "WAIT" ? chief.action : "WAIT");
+    if (!STRICT && MK){
+      const brk = MK.breaks.slice(-1)[0];
+      const hb = MTF._htf && MTF._htf.n ? (MTF._htf.up > MTF._htf.dn ? "BUY" : MTF._htf.dn > MTF._htf.up ? "SELL" : null) : null;
+      side = brk ? (brk.dir > 0 ? "BUY" : "SELL") : (hb || side);
+    }
     const count = side === "WAIT" ? 0 : votes[side];
     const base = { timeframe: (chief && chief.timeframe) || (ops[0] && ops[0].timeframe), horizon: chief && chief.horizon, validFor: chief && chief.validFor, strategies: (chief && chief.strategies && chief.strategies.length) ? chief.strategies : (ops.find(o => o.action === side && o.strategies) || {}).strategies, reasons: ops.filter(o => o.action === side).flatMap(o => (o.reasons || []).slice(0, 1)).slice(0, 4), risks: (chief && chief.risks) || [] };
     const aiLv = ops.filter(o => o.action === side && validTrade(o));
     const ai = aiLv.length ? { entry:median(aiLv.map(o => o.entry)), sl:median(aiLv.map(o => o.sl)), tp1:median(aiLv.map(o => o.tp1)) } : null;
-    if (side === "WAIT" || count < Math.ceil(total / 2) || !MK){
+    if (side === "WAIT" || (STRICT && count < Math.ceil(total / 2)) || !MK){
       return { ...base, action:"WAIT", agreement:`${votes.BUY} buy · ${votes.SELL} sell · ${votes.WAIT} wait — no majority`, reasons: ops.flatMap(o => (o.reasons || []).slice(0, 1)).slice(0, 3), ai };
     }
     const p = planTrade(side, d.price, { count, total, agree: count / total });
-    const t = { ...base, ...p, agreement:`${count} of ${total} AIs say ${side}`, confidence: Math.round(aiLv.reduce((s, o) => s + (o.confidence || 0), 0) / (aiLv.length || 1)), ai };
+    const t = { ...base, ...p, agreement: STRICT ? `${count} of ${total} AIs say ${side}` : `Rule: 1H structure says ${side} · AIs: ${count} of ${total} agree`, confidence: Math.round(aiLv.reduce((s, o) => s + (o.confidence || 0), 0) / (aiLv.length || 1)), ai };
     if (p.grade === "C"){ t.rejected = { ...p }; t.action = "WAIT"; t.agreement += " — but the setup is weak (grade C), so no trade"; }
     return t;
   }
@@ -725,8 +732,8 @@
       try{
         const c = await api("/tg/confirm", { plan:{ action:cand.action, orderType:cand.orderType, entry:cand.entry, sl:cand.sl, tp:cand.tp1, rr:cand.rr, why:cand.why, price:d.price } });
         d.confirm = c;
-        if (!c.unanimous){ d.final = { ...cand, action:"WAIT", rejected:{ ...cand }, agreement:`${c.yes} of ${c.answered} AIs approved the exact trade — not unanimous, so no trade` }; }
-        else d.final.agreement = `${c.answered} of ${c.answered} AIs approved this exact trade ✅`;
+        if (STRICT && !c.unanimous){ d.final = { ...cand, action:"WAIT", rejected:{ ...cand }, agreement:`${c.yes} of ${c.answered} AIs approved the exact trade — not unanimous, so no trade` }; }
+        else d.final.agreement = `${c.yes} of ${c.answered} AIs approved this exact trade${c.unanimous ? " ✅" : STRICT ? "" : " (advisory)"}`;
       }catch(e){ d.confirm = { error:e.message }; }
     }
     d.applied = true;
@@ -1138,9 +1145,10 @@
     resumeJob();
   }
 
+  $("modeSel").onchange = () => { STRICT = $("modeSel").value === "strict"; try{ localStorage.setItem("gd_strict", STRICT ? "1" : "0"); }catch(e){} $("status").textContent = STRICT ? "Strict mode: every AI must agree before a trade is shown." : "Tested-rule mode: the backtested rule decides, the AIs advise. Press Get AI trade to re-run."; };
   $("acctType").onchange = () => { OZ_PER_LOT = +$("acctType").value || 100; try{ localStorage.setItem("gd_oz", OZ_PER_LOT); }catch(e){} if (lastSignal && lastSignal.final && lastSignal.final.action !== "WAIT" && $("lot")) updLot(lastSignal.final); renderJournal(); };
   function boot(){
-    $("acctType").value = String(OZ_PER_LOT);
+    $("acctType").value = String(OZ_PER_LOT); $("modeSel").value = STRICT ? "strict" : "rule";
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
     loadChart(true); setInterval(() => { if (!document.hidden) loadChart(false); }, 60000);
     connectTicks();
