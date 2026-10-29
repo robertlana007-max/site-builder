@@ -72,6 +72,7 @@
   .up{color:var(--buy)} .dn{color:var(--sell)}
   #eq{height:220px}
   label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--muted)}
+  select{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font:600 14px Inter;width:100%}
   input[type=number]{background:var(--panel2);border:1px solid var(--line);color:var(--ink);border-radius:9px;padding:9px;font:600 14px Inter;width:100%}
   tr.best td{background:#f5c45112}
   .lotbox{display:grid;grid-template-columns:1fr 1.5fr;gap:10px;margin:2px 0 12px;align-items:end}
@@ -171,7 +172,8 @@
       <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">Same rule as the live desk — the winner of 1,350 rules tested on real gold candles: 1H break of structure that all timeframes 5M→1D allow (5+ with, none against), London–New York session only, stop 1.5 × 1H ATR, target 3R. Lots and risk chosen automatically, $0.30 spread per trade.</span></div>
       <div class="bd">
         <div class="row" style="align-items:flex-end">
-          <label class="f" style="width:150px">Starting balance ($)<input id="bBal" type="number" value="1000" min="10"></label>
+          <label class="f" style="width:150px">Starting balance ($)<input id="bBal" type="number" value="1000" min="1"></label>
+          <label class="f" style="width:170px">Account type<select id="acctType"><option value="100">Standard (0.01 lot = 1 oz)</option><option value="1">Cent account (100× smaller)</option></select></label>
           <button class="btn gold" id="bt1">1 year</button>
           <button class="btn gold" id="bt2">2 years</button>
           <span class="muted" id="btInfo" style="font-size:12px"></span>
@@ -604,10 +606,13 @@
     $("mtfNote").innerHTML = `Overall ${s2 > 0.25 ? '<b class="up">bullish</b>' : s2 < -0.25 ? '<b class="dn">bearish</b>' : "<b>mixed</b>"} · higher timeframes (1H–1D): ${MTF._htf.up} up / ${MTF._htf.dn} down`;
   }
   let ACCT = 1000; try{ ACCT = +localStorage.getItem("gd_acct") || 1000; }catch(e){}
+  let OZ_PER_LOT = 100; try{ OZ_PER_LOT = +localStorage.getItem("gd_oz") || 100; }catch(e){}
+  const minBalanceFor = (risk, pct) => Math.ceil(0.01 * OZ_PER_LOT * risk / (pct / 100));
   function updLot(f){
     const risk = Math.abs(f.entry - f.sl), pct = f.grade === "A" ? 1 : 0.5, rUSD = ACCT * pct / 100;
-    let lots = Math.floor(rUSD / (risk * 100) * 100) / 100; const tooSmall = lots < 0.01; if (tooSmall) lots = 0.01;
-    $("lot").innerHTML = `<small class="muted">Lot size (auto)</small><div style="font:800 24px 'JetBrains Mono',monospace">${lots.toFixed(2)}</div><div class="muted" style="font-size:11.5px;line-height:1.45">Risk ${usd(lots * 100 * risk)} (${pct}% for grade ${f.grade})${tooSmall ? " — 0.01 is the minimum lot, so risk is higher than " + pct + "%" : ""}<br>If target hits <span class="up">+${usd(lots * 100 * Math.abs(f.tp1 - f.entry))}</span> · if stop hits <span class="dn">-${usd(lots * 100 * risk)}</span></div>`;
+    let lots = Math.floor(rUSD / (risk * OZ_PER_LOT) * 100) / 100; const tooSmall = lots < 0.01; if (tooSmall) lots = 0.01;
+    const lossAtMin = 0.01 * OZ_PER_LOT * risk, pctReal = ACCT ? (lots * OZ_PER_LOT * risk / ACCT * 100) : 0;
+    $("lot").innerHTML = `<small class="muted">Lot size (auto) · ${OZ_PER_LOT === 1 ? "cent account" : "standard account"}</small><div style="font:800 24px 'JetBrains Mono',monospace">${lots.toFixed(2)}</div><div class="muted" style="font-size:11.5px;line-height:1.45">Risk ${usd(lots * OZ_PER_LOT * risk)} = ${pctReal.toFixed(1)}% of your balance${tooSmall ? ` — <span class="dn">0.01 is the minimum lot, so one loss costs ${usd(lossAtMin)}. For ${pct}% risk you need at least ${usd(minBalanceFor(risk, pct))}${OZ_PER_LOT === 100 ? ", or switch to a cent account" : ""}.</span>` : ""}<br>If target hits <span class="up">+${usd(lots * OZ_PER_LOT * Math.abs(f.tp1 - f.entry))}</span> · if stop hits <span class="dn">-${usd(lots * OZ_PER_LOT * risk)}</span></div>`;
   }
 
   // ---- the rule that won the 2-year test (1,350 rules compared): 1H break of structure that every timeframe 5M→1D allows,
@@ -792,7 +797,7 @@
   }
   function todo(f, d){
     const pk = (ms) => new Date(ms).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" });
-    const lots = f.entry && f.sl ? Math.max(0.01, Math.floor((ACCT * (f.grade === "A" ? 1 : 0.5) / 100) / (Math.abs(f.entry - f.sl) * 100) * 100) / 100).toFixed(2) : null;
+    const lots = f.entry && f.sl ? Math.max(0.01, Math.floor((ACCT * (f.grade === "A" ? 1 : 0.5) / 100) / (Math.abs(f.entry - f.sl) * OZ_PER_LOT) * 100) / 100).toFixed(2) : null;
     if (f.userRejected) return "";
     if (f.action === "WAIT"){
       const nxt = f.rejected ? `${f.rejected.orderType.replace(/ STOP| LIMIT|MARKET /g, "")} if ${f.rejected.action === "BUY" ? "1H closes above" : "1H closes below"} ${fmt(f.rejected.trigger || f.rejected.entry)} and every AI agrees` : "a 1H break of structure that all timeframes and all AIs agree on";
@@ -909,7 +914,7 @@
     const f = d.final; if (!f || f.action === "WAIT" || !f.entry || !f.sl) return;
     if (JOURNAL.some(t => t.status === "pending" || t.status === "open")) return;
     const risk = Math.abs(f.entry - f.sl), mkt = /MARKET/.test(f.orderType);
-    const lots = Math.max(0.01, Math.floor((ACCT * 0.01) / (risk * 100) * 100) / 100);
+    const lots = Math.max(0.01, Math.floor((ACCT * 0.01) / (risk * OZ_PER_LOT) * 100) / 100);
     JOURNAL.unshift({ id:String(d.time), time:d.time, side:f.action, type:f.orderType, entry:f.entry, sl:f.sl, tp:f.tp1, risk, lots, validUntil: mkt ? d.time : d.time + 6 * 3600e3, status: mkt ? "open" : "pending", fillTime: mkt ? d.time : null, best:0, now:0 });
     JOURNAL = JOURNAL.slice(0, 200);
   }
@@ -950,8 +955,8 @@
   function renderJournal(){
     const closed = JOURNAL.filter(t => t.status === "win" || t.status === "loss");
     const wins = closed.filter(t => t.status === "win").length, totR = closed.reduce((s, t) => s + (t.R || 0), 0);
-    const usdOf = (t, r) => r * t.risk * t.lots * 100;
-    const pnl = closed.reduce((s, t) => s + usdOf(t, t.R || 0) - 0.30 * t.lots * 100, 0);
+    const usdOf = (t, r) => r * t.risk * t.lots * OZ_PER_LOT;
+    const pnl = closed.reduce((s, t) => s + usdOf(t, t.R || 0) - 0.30 * t.lots * OZ_PER_LOT, 0);
     $("hstats").innerHTML = `<div><small>Closed trades</small><b>${closed.length}</b></div><div><small>Win rate</small><b>${closed.length ? Math.round(100 * wins / closed.length) + "%" : "—"}</b></div><div><small>Result</small><b class="${totR >= 0 ? "up" : "dn"}">${totR >= 0 ? "+" : ""}${totR.toFixed(1)}R · ${pnl >= 0 ? "+" : ""}${usd(pnl)}</b></div>`;
     const lab = (t) => t.status === "win" ? `<span class="pill win">win +3R</span>` : t.status === "loss" ? `<span class="pill loss">loss -1R</span>` : t.status === "open" ? `<span class="pill open">open ${t.now >= 0 ? "+" : ""}${(t.now || 0).toFixed(2)}R</span>` : t.status === "pending" ? `<span class="pill">waiting</span>` : t.status === "rejected" ? `<span class="pill expired">rejected by you</span>` : `<span class="pill expired">not triggered</span>`;
     $("hist").innerHTML = JOURNAL.map(t => `<tr><td>${new Date(t.time).toLocaleString([], { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</td><td><span class="pill ${t.side}">${esc(t.type)}</span></td><td class="mono">${fmt(t.entry)}</td><td class="mono">${fmt(t.sl)}</td><td class="mono">${fmt(t.tp)}</td><td>${lab(t)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">No signals yet — each BUY/SELL the desk gives is saved here and tracked automatically.</td></tr>`;
@@ -961,7 +966,7 @@
     const t = JOURNAL.find(x => x.status === "open" || x.status === "pending");
     $("manageCard").style.display = t ? "block" : "none";
     if (!t) return;
-    const d = t.side === "BUY" ? 1 : -1, be2 = t.entry + d * 2 * t.risk, money = (r) => usd(r * t.risk * t.lots * 100);
+    const d = t.side === "BUY" ? 1 : -1, be2 = t.entry + d * 2 * t.risk, money = (r) => usd(r * t.risk * t.lots * OZ_PER_LOT);
     if (t.status === "pending"){
       $("manage").innerHTML = `<div class="row" style="justify-content:space-between"><b>${esc(t.type)} @ ${fmt(t.entry)}</b><span class="pill">waiting for trigger</span></div>
         <p class="muted" style="margin:8px 0 0;line-height:1.5">The order starts only if price reaches ${fmt(t.entry)} before ${new Date(t.validUntil).toLocaleTimeString([], { hour:"2-digit", minute:"2-digit" })}. If it doesn't, cancel it. Stop ${fmt(t.sl)} · target ${fmt(t.tp)} · ${t.lots.toFixed(2)} lots (1% of $${ACCT}).</p>`;
@@ -1016,7 +1021,7 @@
   // value of a higher-timeframe series at time T, using only bars that had already closed
   function lookup(htf, sec){ let j = -1; return (T) => { while (j + 1 < htf.t.length && htf.t[j + 1] + sec <= T) j++; return j; }; }
   function deskBacktest(b5, start, riskPct){
-    const SPREAD = 0.30, OZ = 100, b = resample(b5, 3600), n = b.length, a = atrA(b, 14), c = b.map(x => x.c), K = 3, sw = [];
+    const SPREAD = 0.30, OZ = OZ_PER_LOT, b = resample(b5, 3600), n = b.length, a = atrA(b, 14), c = b.map(x => x.c), K = 3, sw = [];
     const H = {}; [["5m", 300], ["15m", 900], ["30m", 1800], ["1h", 3600], ["2h", 7200], ["4h", 14400], ["1d", 86400]].forEach(([k, sec]) => { const bb = k === "1h" ? b : k === "5m" ? b5 : resample(b5, sec); H[k] = { t:bb.map(x => x.t), sec, ...biasSeries(bb) }; });
     const atIdx = (h, T) => { let lo = 0, hi = h.t.length - 1, r = -1; while (lo <= hi){ const m = (lo + hi) >> 1; if (h.t[m] + h.sec <= T){ r = m; lo = m + 1; } else hi = m - 1; } return r; };
     for (let i = K; i < n - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b[i-j].h >= b[i].h || b[i+j].h > b[i].h) hi = false; if (b[i-j].l <= b[i].l || b[i+j].l < b[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b[i].l }); }
@@ -1058,7 +1063,8 @@
     return { bars, src: parts[0] && parts[0].src };
   }
   async function backtest(days){
-    const start = Math.max(10, +$("bBal").value || 1000);
+    const start = Math.max(1, +$("bBal").value || 1000);
+    OZ_PER_LOT = +$("acctType").value || 100; try{ localStorage.setItem("gd_oz", OZ_PER_LOT); }catch(e){}
     $("bt1").disabled = $("bt2").disabled = true;
     try{
       const { bars, src } = await loadFiveMin(days, (d, n) => { $("btInfo").innerHTML = `<span class="spin"></span> Loading 5M gold history… ${d}/${n}`; });
@@ -1083,12 +1089,15 @@
     $("btTable").innerHTML = R.runs.map(r => `<tr class="${r.rk === b.rk ? "best" : ""}"><td><b>1H BOS · all TFs allow · London–NY</b>${r.rk === b.rk ? " 🏆 chosen" : ""}</td><td>${R.days === 730 ? "2 years" : "1 year"}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(R.start + r.net)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity || r.pf == null ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("");
     $("btInfo").innerHTML = b.net > 0
       ? `<b class="up">${usd(R.start)} → ${usd(R.start + b.net)} (+${b.ret.toFixed(1)}%) with the desk's rule at ${b.rk}% risk</b> · ${b.trades} trades · win rate ${b.winRate}% · max drawdown ${b.maxDd.toFixed(1)}% · data since ${R.from}${R.oos ? ` · unseen period since ${R.oos.from}: ${R.oos.trades} trades, ${R.oos.R >= 0 ? "+" : ""}${R.oos.R}R` : ""}`
-      : `<b class="dn">The desk rule lost ${usd(-b.net)} in this period</b> · ${b.trades} trades · 5M data since ${R.from}`;
+      : (b.trades <= 3 && R.start < 200 * (OZ_PER_LOT / 100)
+        ? `<b class="dn">Account too small, not a failed strategy.</b> With ${usd(R.start)} the minimum lot (0.01) already risks about ${usd(0.01 * OZ_PER_LOT * 20)} per trade, so the first loss wiped it out after ${b.trades} trade${b.trades === 1 ? "" : "s"}. The same rule made money from $1,000. For 1% risk you need about ${usd(minBalanceFor(20, 1))}${OZ_PER_LOT === 100 ? " — or choose “Cent account” above and run again" : ""}.`
+        : `<b class="dn">The desk rule lost ${usd(-b.net)} in this period</b> · ${b.trades} trades · 5M data since ${R.from}`);
     $("eqTitle").textContent = `Equity curve — desk rule · ${b.rk}% risk`;
     if (!eqChart){
       eqChart = LightweightCharts.createChart($("eq"), { layout:{ background:{ color:"#121722" }, textColor:"#8a94a8" }, grid:{ vertLines:{ visible:false }, horzLines:{ color:"#1b2232" } }, rightPriceScale:{ borderColor:"#232b3d" }, timeScale:{ borderColor:"#232b3d" }, autoSize:true });
       eqSeries = eqChart.addAreaSeries({ lineColor:"#f5c451", topColor:"#f5c45140", bottomColor:"#f5c45100", lineWidth:2 });
     }
+    $("acctType").value = String(OZ_PER_LOT);
     const seen = new Set();
     eqSeries.setData(b.curve.filter(p => !seen.has(p.time) && seen.add(p.time)));
     eqChart.timeScale().fitContent();
@@ -1129,7 +1138,9 @@
     resumeJob();
   }
 
+  $("acctType").onchange = () => { OZ_PER_LOT = +$("acctType").value || 100; try{ localStorage.setItem("gd_oz", OZ_PER_LOT); }catch(e){} if (lastSignal && lastSignal.final && lastSignal.final.action !== "WAIT" && $("lot")) updLot(lastSignal.final); renderJournal(); };
   function boot(){
+    $("acctType").value = String(OZ_PER_LOT);
     if (USER) $("me").innerHTML = (USER.picture ? `<img src="${esc(USER.picture)}" alt="">` : "") + `<span>${esc((USER.name || USER.email).split(" ")[0])}</span>`;
     loadChart(true); setInterval(() => { if (!document.hidden) loadChart(false); }, 60000);
     connectTicks();
