@@ -267,13 +267,17 @@
     $("tfs").innerHTML = TFS.map(t => `<button data-tf="${t}">${t.toUpperCase()}</button>`).join("");
     document.querySelectorAll("#tfs button").forEach(b => b.onclick = () => { curTf = b.dataset.tf; loadChart(true); tv(TV_INT[curTf]); });
     document.querySelectorAll("#layers input").forEach(i => i.onchange = () => { LAYERS[i.dataset.l] = i.checked; e20.applyOptions({ visible:LAYERS.ema }); e50.applyOptions({ visible:LAYERS.ema }); markers(); draw(); });
-    chart.timeScale().subscribeVisibleLogicalRangeChange(() => requestAnimationFrame(draw));
-    chart.subscribeCrosshairMove(() => requestAnimationFrame(draw));
-    new ResizeObserver(() => requestAnimationFrame(draw)).observe($("chart"));
+    chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleDraw);
+    new ResizeObserver(scheduleDraw).observe($("chart"));
+    ["mouseup", "wheel", "touchend"].forEach(ev => $("chart").addEventListener(ev, () => setTimeout(scheduleDraw, 30), { passive:true }));
   }
 
+  let drawQueued = false, chartBusy = false;
+  function scheduleDraw(){ if (drawQueued) return; drawQueued = true; requestAnimationFrame(() => { drawQueued = false; try{ draw(); }catch(e){} }); }
   async function loadChart(fit){
     document.querySelectorAll("#tfs button").forEach(b => b.classList.toggle("on", b.dataset.tf === curTf));
+    if (chartBusy && !fit) return;
+    chartBusy = true;
     try{
       const d = await api("/tg/candles", { tf: curTf });
       BARS = d.bars.map(b => ({ t: b.t + tzOff, o:b.o, h:b.h, l:b.l, c:b.c }));
@@ -289,11 +293,12 @@
       $("pxc").className = "mono " + (ch >= 0 ? "up" : "dn");
       MK = analyzeStructure(BARS);
       if (MK) MK.pro = proMarks(BARS, MK);
-      loadHTF().then(() => requestAnimationFrame(draw));
+      loadHTF().then(scheduleDraw);
       markers();
-      draw();
+      scheduleDraw();
       renderBasis();
     }catch(e){}
+    finally{ chartBusy = false; }
   }
 
   // ---- detect what a trader would mark: swings, BOS/CHoCH, order blocks, FVGs, S/R, liquidity, premium/discount ----
