@@ -133,12 +133,14 @@
 
     <div class="grid2">
       <div class="card">
-        <div class="hd"><h3>🤖 AI council — each AI's view</h3><span class="muted" id="councilNote" style="font-size:12px"></span></div>
+        <div class="hd"><h3>🤖 AI council — round 1 → after debate</h3><span class="muted" id="councilNote" style="font-size:12px"></span></div>
         <div style="padding:0 6px 6px"><table><thead><tr><th>AI</th><th>Call</th><th>Entry · SL · TP1</th><th>TF</th><th>Conf.</th></tr></thead><tbody id="council"><tr><td colspan="5" class="muted" style="padding:14px 6px">Press "Get AI trade".</td></tr></tbody></table></div>
       </div>
       <div class="card">
         <div class="hd"><h3>🌍 Market pulse</h3><span class="muted" style="font-size:12px">what the AIs checked</span></div>
         <div style="padding:0 6px 6px"><table><thead><tr><th>Market</th><th>Last</th><th>1 day</th><th>5 days</th></tr></thead><tbody id="inter"><tr><td colspan="4" class="muted" style="padding:14px 6px">Shown after the analysis.</td></tr></tbody></table></div>
+        <div class="hd" style="border-top:1px solid var(--line)"><h3>🗣️ What traders are saying</h3></div>
+        <div class="bd news" id="crowd" style="font-size:13px;line-height:1.55"><div class="muted">Shown after the analysis.</div></div>
       </div>
     </div>
 
@@ -154,7 +156,7 @@
     </div>
 
     <div class="card">
-      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">Same rule as the live desk — the winner of 1,350 rules tested on real gold candles: 1H break of structure in the direction of 1H/4H/1D, London–New York session only, stop 1.5 × 1H ATR, target 3R. Lots and risk chosen automatically, $0.30 spread per trade.</span></div>
+      <div class="hd"><h3>🧪 Backtest in dollars</h3><span class="muted" style="font-size:12px">Same rule as the live desk — the winner of 1,350 rules tested on real gold candles: 1H break of structure that all timeframes 5M→1D allow (5+ with, none against), London–New York session only, stop 1.5 × 1H ATR, target 3R. Lots and risk chosen automatically, $0.30 spread per trade.</span></div>
       <div class="bd">
         <div class="row" style="align-items:flex-end">
           <label class="f" style="width:150px">Starting balance ($)<input id="bBal" type="number" value="1000" min="10"></label>
@@ -596,11 +598,12 @@
     $("lot").innerHTML = `<small class="muted">Lot size (auto)</small><div style="font:800 24px 'JetBrains Mono',monospace">${lots.toFixed(2)}</div><div class="muted" style="font-size:11.5px;line-height:1.45">Risk ${usd(lots * 100 * risk)} (${pct}% for grade ${f.grade})${tooSmall ? " — 0.01 is the minimum lot, so risk is higher than " + pct + "%" : ""}<br>If target hits <span class="up">+${usd(lots * 100 * Math.abs(f.tp1 - f.entry))}</span> · if stop hits <span class="dn">-${usd(lots * 100 * risk)}</span></div>`;
   }
 
-  // ---- the rule that won the 2-year test (1,350 rules compared): 1H break of structure in the direction of 1H/4H/1D,
+  // ---- the rule that won the 2-year test (1,350 rules compared): 1H break of structure that every timeframe 5M→1D allows,
   //      London–New York session only, stop 1.5 × 1H ATR, target 3R. The AI council must agree on the direction. ----
   function planTrade(side, price, aiPlan){
     const A = MK.atr, dir = side === "BUY" ? 1 : -1, buy = dir > 0;
-    const v = ["1h", "4h", "1d"].map(t => MTF[t] ? MTF[t].bias : 0), agree = v.filter(x => x === dir).length, against = v.filter(x => x === -dir).length;
+    const GT = ["5m", "15m", "30m", "1h", "2h", "4h", "1d"].filter(t => MTF[t]);
+    const withTf = GT.filter(t => MTF[t].bias === dir), againstTf = GT.filter(t => MTF[t].bias === -dir);
     const hr = new Date().getUTCHours(), inSess = hr >= 7 && hr < 20;
     const lastBrk = MK.breaks.filter(b => b.dir === dir).slice(-1)[0];
     const fresh = !!lastBrk && lastBrk.to >= BARS.length - 3;
@@ -616,7 +619,7 @@
     const risk = A * 1.5, sl = entry - dir * risk, tp1 = entry + dir * risk * 3;
     const validFor = /MARKET/.test(orderType) ? "now" : "next 6 hours, London–New York session only — cancel if not triggered";
     const checks = [
-      { ok: agree >= 2 && against === 0, txt: `Higher timeframes agree: 1H ${["bearish", "neutral", "bullish"][MTF["1h"] ? MTF["1h"].bias + 1 : 1]}, 4H ${["bearish", "neutral", "bullish"][MTF["4h"] ? MTF["4h"].bias + 1 : 1]}, 1D ${["bearish", "neutral", "bullish"][MTF["1d"] ? MTF["1d"].bias + 1 : 1]} (need 2+ with the trade, none against)` },
+      { ok: againstTf.length === 0 && withTf.length >= Math.min(5, GT.length), txt: `All timeframes allow it: ${withTf.length} with (${withTf.map(t => t.toUpperCase()).join(", ") || "none"}), ${GT.length - withTf.length - againstTf.length} neutral, ${againstTf.length} against${againstTf.length ? " (" + againstTf.map(t => t.toUpperCase()).join(", ") + ")" : ""} — need 5+ with and none against` },
       { ok: aiPlan.count >= Math.ceil(aiPlan.total / 2), txt: `${aiPlan.count} of ${aiPlan.total} AIs say ${side}` },
       { ok: inSess, txt: inSess ? "London / New York session is open (best liquidity for gold)" : "Outside London–New York hours (12:00 → 01:00 Pakistan time) — the tested rule does not trade now" }
     ];
@@ -651,6 +654,7 @@
     const items = [];
     const add = (tag, color, text) => items.push(`<li><b class="k" style="background:${color}22;color:${color}">${tag}</b><span>${text}</span></li>`);
     const plan = f.action !== "WAIT" ? f : f.rejected;
+    if (f.userRejected){ add("✖", "#ea3943", `<b>You rejected this trade.</b> Press "Get AI trade" for a fresh analysis.`); $("basis").innerHTML = items.join(""); return; }
     if (f.action === "WAIT" && !f.rejected) add("⏸", "#8a94a8", `<b>No trade.</b> ${esc(f.agreement || "")}`);
     if (f.rejected) add("✋", "#f59e0b", `<b>Trade skipped:</b> the AIs lean ${f.rejected.action}, but only ${f.rejected.score}/${f.rejected.total} checks pass. Waiting for a cleaner setup protects your account.`);
     if (plan && plan.checks){
@@ -658,7 +662,7 @@
       add("📌", "#f5c451", `<b>${esc(plan.orderType)} @ ${fmt(plan.entry)}</b> — ${esc(plan.why)}.`);
       plan.checks.forEach(c => add(c.ok ? "✓" : "✗", c.ok ? "#16c784" : "#ea3943", esc(c.txt)));
       add("SL", "#ea3943", `<b>Stop ${fmt(plan.sl)}</b> — 1.5 × 1H ATR (${fmt(Math.abs(plan.entry - plan.sl))}). In the 2-year test, tight 5M stops lost money because normal gold noise hit them; this distance survived. The lot size is cut so your dollar risk stays the same.`);
-      add("TP", "#16c784", `<b>Target ${fmt(plan.tp1)}</b> — 3 × the risk (3R). Tested on 2 years of gold: first 60% of the data +60R (profit factor 1.82), unseen last 40% +19.7R (profit factor 1.40).`);
+      add("TP", "#16c784", `<b>Target ${fmt(plan.tp1)}</b> — 3 × the risk (3R). Tested on gold since April 2025 with the all-timeframes rule: +78.6R in total, worst drawdown 10.4R; on the unseen last 40% of the data +18.6R.`);
     }
     if (f.ai) add("AI", "#8a94a8", `The AIs' own levels were entry ${fmt(f.ai.entry)} · SL ${fmt(f.ai.sl)} · TP1 ${fmt(f.ai.tp1)} — the desk re-placed them on structure so the stop is tight and the target is at least 2× the risk.`);
     (f.strategies || []).slice(0, 9).forEach(st => add("•", /bull/i.test(st.says) ? "#16c784" : /bear/i.test(st.says) ? "#ea3943" : "#8a94a8", `<b>${esc(st.name)}:</b> ${esc(st.says || "")}${st.note ? " — " + esc(st.note) : ""}`));
@@ -692,7 +696,7 @@
       d.final = buildTrade(d);
       lastSignal = d;
       addToJournal(d);
-      showDecision(d); showCouncil(d.opinions || []); showNews(d.news); showInter(d.inter);
+      showDecision(d); showCouncil(d.opinions || [], d.debate); showCrowd(d.crowd); showNews(d.news); showInter(d.inter);
       markers(); draw(); renderBasis();
       $("status").innerHTML = `Done in ${Math.round((Date.now() - t0) / 1000)}s · price ${fmt(d.price)} · ${new Date(d.time).toLocaleTimeString()}<br>Studied: <b>${TFS.filter(t => MTF[t]).length} timeframes</b> · ${(d.opinions || []).filter(o => !o.error).length} AIs · ${((d.news || {}).headlines || []).length} headlines · ${((d.news || {}).calendar || []).length} calendar events · ${(d.inter || []).length} markets (DXY, yields, VIX…)`;
       loadHistory();
@@ -752,19 +756,33 @@
       <div class="muted" style="margin-top:2px">${esc(f.agreement || "")}</div>
       <div class="row" style="margin-top:8px">${f.grade ? `<span class="pill" style="color:var(--gold)">Grade ${f.grade}</span>` : ""}<span class="pill">Chart: ${curTf.toUpperCase()}</span>${f.horizon ? `<span class="pill">${esc(f.horizon)}</span>` : ""}</div>
       ${f.action !== "WAIT" ? `<div class="ord ${f.action === "BUY" ? "up" : "dn"}">👉 ${esc(f.orderType)} @ ${fmt(f.entry)} · SL ${fmt(f.sl)} · Target ${fmt(f.tp1)}${f.validFor ? `<div class="muted" style="font-size:11px;font-weight:500;margin-top:3px">Order valid: ${esc(f.validFor)}</div>` : ""}</div>` : ""}
-      ${f.action === "WAIT" ? `<p class="muted" style="margin:10px 0">${f.rejected ? `Best idea was ${f.rejected.orderType} @ ${fmt(f.rejected.entry)} (SL ${fmt(f.rejected.sl)}, TP1 ${fmt(f.rejected.tp1)}) but it only scores ${f.rejected.score}/${f.rejected.total} — skipped. See the checklist under the chart.` : "No majority among the AIs — stay flat."}</p>` : `<div class="lv">${lv("entry", "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target (" + f.rr + "R)")}<div><small>Order valid</small><b style="font-size:12px">${esc(f.validFor || "now")}</b></div></div><div class="lotbox"><label class="f">Your balance ($)<input id="acct" type="number" min="10" value="${ACCT}"></label><div id="lot"></div></div>`}
+      ${f.userRejected ? "" : f.action === "WAIT" ? `<p class="muted" style="margin:10px 0">${f.rejected ? `Best idea was ${f.rejected.orderType} @ ${fmt(f.rejected.entry)} (SL ${fmt(f.rejected.sl)}, TP1 ${fmt(f.rejected.tp1)}) but it only scores ${f.rejected.score}/${f.rejected.total} — skipped. See the checklist under the chart.` : "No majority among the AIs — stay flat."}</p>` : `<div class="lv">${lv("entry", "Entry")}${lv("sl", "Stop-loss")}${lv("tp1", "Target (" + f.rr + "R)")}<div><small>Order valid</small><b style="font-size:12px">${esc(f.validFor || "now")}</b></div></div><div class="lotbox"><label class="f">Your balance ($)<input id="acct" type="number" min="10" value="${ACCT}"></label><div id="lot"></div></div>`}
       <div class="row" style="justify-content:space-between;font-size:12px"><span class="muted">Confidence</span><b>${Math.round(f.confidence || 0)}%</b></div>
       <div class="meter"><i style="width:${Math.round(f.confidence || 0)}%"></i></div>
       <div class="muted" style="font-size:12px">Risk : reward <b style="color:var(--ink)">${f.rr ? "1 : " + f.rr : "—"}</b></div>
       ${(f.risks || []).length ? `<div style="margin-top:10px;font-weight:700;font-size:12px">Risks</div><ul class="pts">${f.risks.map(r => "<li>" + esc(r) + "</li>").join("")}</ul>` : ""}
+      ${f.action !== "WAIT" ? `<button class="btn" id="btnReject" style="width:100%;margin-top:12px;border-color:#ea394366;color:#ff8a92">✖ Reject this trade — I don't want it</button>` : ""}
+      ${f.userRejected ? `<p style="margin:10px 0 0;line-height:1.5">You rejected <b>${esc(f.rejectedPlan.orderType)} @ ${fmt(f.rejectedPlan.entry)}</b> (SL ${fmt(f.rejectedPlan.sl)}, target ${fmt(f.rejectedPlan.tp1)}). It is removed from the chart and is not counted in the journal.</p>` : ""}
       <div class="muted" style="font-size:11px;margin-top:10px">The full reasoning is under the chart in "Why this trade".</div>`;
+    if ($("btnReject")) $("btnReject").onclick = rejectTrade;
     if ($("acct")){ $("acct").oninput = () => { ACCT = +$("acct").value || 0; try{ localStorage.setItem("gd_acct", ACCT); }catch(e){} updLot(f); saveState(); }; updLot(f); }
   }
-  function showCouncil(ops){
-    $("councilNote").textContent = `${ops.filter(o => !o.error).length} / ${ops.length} AIs answered`;
-    $("council").innerHTML = ops.map(o => o.error
-      ? `<tr><td><b>${esc(o.ai)}</b></td><td colspan="4" class="muted">busy / no answer</td></tr>`
-      : `<tr><td><b>${esc(o.ai)}</b><div class="muted" style="font-size:11px;max-width:170px">${esc((o.reasons || [])[0] || "")}</div></td><td><span class="pill ${o.action}">${o.action}</span><div class="muted" style="font-size:10px">${esc(o.orderType || "")}</div></td><td class="mono" style="font-size:12px">${fmt(o.entry)}<br><span class="dn">${fmt(o.sl)}</span> · <span class="up">${fmt(o.tp1)}</span></td><td>${esc(o.timeframe || "—")}</td><td>${Math.round(o.confidence || 0)}%</td></tr>`).join("");
+  function showCouncil(ops, debate){
+    const D = {}; (debate || []).forEach(x => D[x.ai] = x);
+    $("councilNote").textContent = `${ops.filter(o => !o.error).length} / ${ops.length} AIs answered${(debate || []).length ? ` · ${(debate || []).length} took part in the debate` : ""}`;
+    $("council").innerHTML = ops.map(o => {
+      if (o.error) return `<tr><td><b>${esc(o.ai)}</b></td><td colspan="4" class="muted">busy / no answer</td></tr>`;
+      const r2 = D[o.ai], f = r2 || o, moved = r2 && r2.action !== o.action;
+      return `<tr><td><b>${esc(o.ai)}</b><div class="muted" style="font-size:11px;max-width:220px">${esc(r2 && r2.rebuttal ? "🗣️ " + r2.rebuttal : (o.reasons || [])[0] || "")}</div></td><td><span class="pill ${o.action}">${o.action}</span>${r2 ? ` → <span class="pill ${r2.action}">${r2.action}</span>${moved ? `<div class="muted" style="font-size:10px">changed after debate</div>` : ""}` : ""}</td><td class="mono" style="font-size:12px">${fmt(f.entry)}<br><span class="dn">${fmt(f.sl)}</span> · <span class="up">${fmt(f.tp1)}</span></td><td>${esc(f.timeframe || "—")}</td><td>${Math.round(f.confidence || 0)}%</td></tr>`;
+    }).join("");
+  }
+  function showCrowd(c){
+    if (!c){ $("crowd").innerHTML = `<div class="muted">Trader sentiment not available this time.</div>`; return; }
+    const parts = [];
+    if (c.stocktwits_gold) parts.push(`<div><b>StockTwits (gold):</b> <span class="up">${c.stocktwits_gold.bullish} bullish</span> · <span class="dn">${c.stocktwits_gold.bearish} bearish</span> of last ${c.stocktwits_gold.of} posts</div>`);
+    if (c.myfxbook_retail_positions) parts.push(`<div><b>Myfxbook retail traders:</b> <span class="up">${c.myfxbook_retail_positions.long_pct}% long</span> · <span class="dn">${c.myfxbook_retail_positions.short_pct}% short</span> <span class="muted">(the crowd is often wrong at extremes)</span></div>`);
+    if (c.reddit_latest && c.reddit_latest.length) parts.push(`<div style="margin-top:6px"><b>Reddit right now:</b><ul class="pts">${c.reddit_latest.slice(0, 5).map(t => `<li>${esc(t)}</li>`).join("")}</ul></div>`);
+    $("crowd").innerHTML = parts.join("") || `<div class="muted">Trader sentiment not available this time.</div>`;
   }
   function showInter(rows){
     if (!rows || !rows.length) return;
@@ -869,7 +887,7 @@
     const usdOf = (t, r) => r * t.risk * t.lots * 100;
     const pnl = closed.reduce((s, t) => s + usdOf(t, t.R || 0) - 0.30 * t.lots * 100, 0);
     $("hstats").innerHTML = `<div><small>Closed trades</small><b>${closed.length}</b></div><div><small>Win rate</small><b>${closed.length ? Math.round(100 * wins / closed.length) + "%" : "—"}</b></div><div><small>Result</small><b class="${totR >= 0 ? "up" : "dn"}">${totR >= 0 ? "+" : ""}${totR.toFixed(1)}R · ${pnl >= 0 ? "+" : ""}${usd(pnl)}</b></div>`;
-    const lab = (t) => t.status === "win" ? `<span class="pill win">win +3R</span>` : t.status === "loss" ? `<span class="pill loss">loss -1R</span>` : t.status === "open" ? `<span class="pill open">open ${t.now >= 0 ? "+" : ""}${(t.now || 0).toFixed(2)}R</span>` : t.status === "pending" ? `<span class="pill">waiting</span>` : `<span class="pill expired">not triggered</span>`;
+    const lab = (t) => t.status === "win" ? `<span class="pill win">win +3R</span>` : t.status === "loss" ? `<span class="pill loss">loss -1R</span>` : t.status === "open" ? `<span class="pill open">open ${t.now >= 0 ? "+" : ""}${(t.now || 0).toFixed(2)}R</span>` : t.status === "pending" ? `<span class="pill">waiting</span>` : t.status === "rejected" ? `<span class="pill expired">rejected by you</span>` : `<span class="pill expired">not triggered</span>`;
     $("hist").innerHTML = JOURNAL.map(t => `<tr><td>${new Date(t.time).toLocaleString([], { day:"numeric", month:"short", hour:"2-digit", minute:"2-digit" })}</td><td><span class="pill ${t.side}">${esc(t.type)}</span></td><td class="mono">${fmt(t.entry)}</td><td class="mono">${fmt(t.sl)}</td><td class="mono">${fmt(t.tp)}</td><td>${lab(t)}</td></tr>`).join("") || `<tr><td colspan="6" class="muted">No signals yet — each BUY/SELL the desk gives is saved here and tracked automatically.</td></tr>`;
     renderManage();
   }
@@ -895,6 +913,14 @@
       <p style="margin:0;line-height:1.55">${advice}</p>`;
   }
   async function loadHistory(){ await evalJournal(); }
+  function rejectTrade(){
+    if (!lastSignal || !lastSignal.final || lastSignal.final.action === "WAIT") return;
+    const f = lastSignal.final;
+    lastSignal.final = { ...f, action:"WAIT", userRejected:true, rejected:null, rejectedPlan:{ orderType:f.orderType, entry:f.entry, sl:f.sl, tp1:f.tp1 } };
+    const j = JOURNAL.find(t => t.id === String(lastSignal.time) && (t.status === "pending" || t.status === "open"));
+    if (j) j.status = "rejected";
+    showDecision(lastSignal); markers(); scheduleDraw(); renderBasis(); renderJournal(); saveState();
+  }
   $("btnHist").onclick = loadHistory;
 
 
@@ -925,7 +951,7 @@
   function lookup(htf, sec){ let j = -1; return (T) => { while (j + 1 < htf.t.length && htf.t[j + 1] + sec <= T) j++; return j; }; }
   function deskBacktest(b5, start, riskPct){
     const SPREAD = 0.30, OZ = 100, b = resample(b5, 3600), n = b.length, a = atrA(b, 14), c = b.map(x => x.c), K = 3, sw = [];
-    const H = {}; [["1h", 3600], ["4h", 14400], ["1d", 86400]].forEach(([k, sec]) => { const bb = k === "1h" ? b : resample(b5, sec); H[k] = { t:bb.map(x => x.t), sec, ...biasSeries(bb) }; });
+    const H = {}; [["5m", 300], ["15m", 900], ["30m", 1800], ["1h", 3600], ["2h", 7200], ["4h", 14400], ["1d", 86400]].forEach(([k, sec]) => { const bb = k === "1h" ? b : k === "5m" ? b5 : resample(b5, sec); H[k] = { t:bb.map(x => x.t), sec, ...biasSeries(bb) }; });
     const atIdx = (h, T) => { let lo = 0, hi = h.t.length - 1, r = -1; while (lo <= hi){ const m = (lo + hi) >> 1; if (h.t[m] + h.sec <= T){ r = m; lo = m + 1; } else hi = m - 1; } return r; };
     for (let i = K; i < n - K; i++){ let hi = true, lo = true; for (let j = 1; j <= K; j++){ if (b[i-j].h >= b[i].h || b[i+j].h > b[i].h) hi = false; if (b[i-j].l <= b[i].l || b[i+j].l < b[i].l) lo = false; } if (hi) sw.push({ i, cf:i + K, type:"H", p:b[i].h }); if (lo) sw.push({ i, cf:i + K, type:"L", p:b[i].l }); }
     sw.sort((x, y) => x.cf - y.cf);
@@ -950,8 +976,8 @@
       if (lastL && !lastL.used && c[i] < lastL.p){ lastL.used = true; d = -1; }
       if (!d || pos || i < 100 || i >= n - 1) continue;
       const hr = new Date(b[i].t * 1000).getUTCHours(); if (hr < 7 || hr >= 20) continue;
-      const T = b[i].t + 3600, v = ["1h", "4h", "1d"].map(t => { const j = atIdx(H[t], T); return j < 0 ? 0 : H[t].bias[j]; });
-      if (v.filter(x => x === d).length < 2 || v.some(x => x === -d)) continue;
+      const T = b[i].t + 3600, v = Object.keys(H).map(t => { const j = atIdx(H[t], T); return j < 0 ? 0 : H[t].bias[j]; });
+      if (v.filter(x => x === d).length < 5 || v.some(x => x === -d)) continue;
       sig = { d, A:a[i] };
     }
     const wins = trades.filter(t => t.pnl > 0), gw = wins.reduce((s, t) => s + t.pnl, 0), gl = -trades.filter(t => t.pnl <= 0).reduce((s, t) => s + t.pnl, 0);
@@ -988,7 +1014,7 @@
   function renderBacktest(R){
     if (!R) return;
     const b = R.best;
-    $("btTable").innerHTML = R.runs.map(r => `<tr class="${r.rk === b.rk ? "best" : ""}"><td><b>1H BOS · 1H/4H/1D agree · London–NY</b>${r.rk === b.rk ? " 🏆 chosen" : ""}</td><td>${R.days === 730 ? "2 years" : "1 year"}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(R.start + r.net)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity || r.pf == null ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("");
+    $("btTable").innerHTML = R.runs.map(r => `<tr class="${r.rk === b.rk ? "best" : ""}"><td><b>1H BOS · all TFs allow · London–NY</b>${r.rk === b.rk ? " 🏆 chosen" : ""}</td><td>${R.days === 730 ? "2 years" : "1 year"}</td><td>${r.rk}%<div class="muted" style="font-size:11px">~${r.avgLot.toFixed(2)} lots</div></td><td>${r.trades}</td><td>${r.winRate}%</td><td class="${r.net >= 0 ? "up" : "dn"}"><b>${r.net >= 0 ? "+" : ""}${usd(r.net)}</b></td><td>${usd(R.start + r.net)}</td><td class="${r.ret >= 0 ? "up" : "dn"}">${r.ret >= 0 ? "+" : ""}${r.ret.toFixed(1)}%</td><td class="dn">-${r.maxDd.toFixed(1)}%</td><td>${r.pf === Infinity || r.pf == null ? "∞" : r.pf.toFixed(2)}</td></tr>`).join("");
     $("btInfo").innerHTML = b.net > 0
       ? `<b class="up">${usd(R.start)} → ${usd(R.start + b.net)} (+${b.ret.toFixed(1)}%) with the desk's rule at ${b.rk}% risk</b> · ${b.trades} trades · win rate ${b.winRate}% · max drawdown ${b.maxDd.toFixed(1)}% · data since ${R.from}${R.oos ? ` · unseen period since ${R.oos.from}: ${R.oos.trades} trades, ${R.oos.R >= 0 ? "+" : ""}${R.oos.R}R` : ""}`
       : `<b class="dn">The desk rule lost ${usd(-b.net)} in this period</b> · ${b.trades} trades · 5M data since ${R.from}`;
@@ -1027,7 +1053,7 @@
       if (state.mtf){ MTF_SNAP = state.mtf; }
       if (state.signal && state.signal.final){
         lastSignal = state.signal; curTf = "1h";
-        showDecision(lastSignal); showCouncil(lastSignal.opinions || []); showNews(lastSignal.news); showInter(lastSignal.inter);
+        showDecision(lastSignal); showCouncil(lastSignal.opinions || [], lastSignal.debate); showCrowd(lastSignal.crowd); showNews(lastSignal.news); showInter(lastSignal.inter);
         $("status").innerHTML = `Last analysis: ${new Date(lastSignal.time).toLocaleString()} (saved to your account)`;
         await loadChart(true); renderBasis();
         studyAll().catch(() => {});
