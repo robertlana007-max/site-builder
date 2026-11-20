@@ -121,6 +121,10 @@
 <section class="card">
 <label for="txt">Text to hash</label>
 <textarea id="txt" spellcheck="false" style="min-height:120px" placeholder="Type or paste text..."></textarea>
+<div class="drop" id="drop" tabindex="0" role="button" style="padding:16px;margin:12px 0 4px"><b>Or click or drop a file here to hash it</b>The file is read on your device. Nothing is uploaded.</div>
+<input type="file" id="file" hidden>
+<p class="msg" id="src" style="margin-top:4px"></p>
+<div class="kv"><span>MD5</span><code id="md5">–</code><button class="btn ghost" data-c="md5">Copy</button></div>
 <div class="kv"><span>SHA-1</span><code id="h1">–</code><button class="btn ghost" data-c="h1">Copy</button></div>
 <div class="kv"><span>SHA-256</span><code id="h256">–</code><button class="btn ghost" data-c="h256">Copy</button></div>
 <div class="kv"><span>SHA-384</span><code id="h384">–</code><button class="btn ghost" data-c="h384">Copy</button></div>
@@ -129,19 +133,72 @@
 <script>
 (function () {
   var A = { h1: 'SHA-1', h256: 'SHA-256', h384: 'SHA-384', h512: 'SHA-512' }, run = 0;
-  function calc() {
-    var mine = ++run, data = new TextEncoder().encode($('txt').value);
-    if (!window.crypto || !crypto.subtle) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser does not support hashing on this page. Open the site over HTTPS.'; return; }
-    Object.keys(A).forEach(function (id) {
+  function hex(buf) { return Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join(''); }
+  // MD5 (RFC 1321). Not built into browsers, so it is calculated here. Only for checksums, never for security.
+  var K = [], S = [7, 12, 17, 22, 5, 9, 14, 20, 4, 11, 16, 23, 6, 10, 15, 21];
+  for (var i = 0; i < 64; i++) K[i] = Math.floor(Math.abs(Math.sin(i + 1)) * 4294967296) | 0;
+  function md5(bytes) {
+    var n = bytes.length, total = (Math.floor((n + 8) / 64) + 1) * 64, buf = new Uint8Array(total);
+    buf.set(bytes); buf[n] = 0x80;
+    var dv = new DataView(buf.buffer);
+    dv.setUint32(total - 8, (n * 8) % 4294967296, true);
+    dv.setUint32(total - 4, Math.floor(n / 536870912), true);
+    var a0 = 0x67452301, b0 = 0xefcdab89 | 0, c0 = 0x98badcfe | 0, d0 = 0x10325476, M = new Int32Array(16);
+    for (var off = 0; off < total; off += 64) {
+      for (var j = 0; j < 16; j++) M[j] = dv.getInt32(off + j * 4, true);
+      var a = a0, b = b0, c = c0, d = d0;
+      for (var k = 0; k < 64; k++) {
+        var f, g, r = k >> 4;
+        if (r === 0) { f = (b & c) | (~b & d); g = k; }
+        else if (r === 1) { f = (d & b) | (~d & c); g = (5 * k + 1) & 15; }
+        else if (r === 2) { f = b ^ c ^ d; g = (3 * k + 5) & 15; }
+        else { f = c ^ (b | ~d); g = (7 * k) & 15; }
+        f = (f + a + K[k] + M[g]) | 0;
+        var s = S[r * 4 + (k & 3)];
+        a = d; d = c; c = b; b = (b + ((f << s) | (f >>> (32 - s)))) | 0;
+      }
+      a0 = (a0 + a) | 0; b0 = (b0 + b) | 0; c0 = (c0 + c) | 0; d0 = (d0 + d) | 0;
+    }
+    var out = new DataView(new ArrayBuffer(16));
+    out.setInt32(0, a0, true); out.setInt32(4, b0, true); out.setInt32(8, c0, true); out.setInt32(12, d0, true);
+    return hex(out.buffer);
+  }
+  function blank() { ['md5'].concat(Object.keys(A)).forEach(function (id) { $(id).textContent = '–'; }); }
+  function hashAll(data) {
+    var mine = ++run;
+    if (!data) { blank(); return; }
+    if (!window.crypto || !crypto.subtle) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser does not support SHA hashing on this page. Open the site over HTTPS.'; }
+    else Object.keys(A).forEach(function (id) {
       crypto.subtle.digest(A[id], data).then(function (buf) {
-        if (mine !== run) return; // a newer keystroke already started
-        $(id).textContent = Array.from(new Uint8Array(buf)).map(function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+        if (mine !== run) return; // a newer keystroke or file already started
+        $(id).textContent = hex(buf);
       });
     });
+    $('md5').textContent = md5(data);
+  }
+  function calc() {
+    var t = $('txt').value;
+    $('src').textContent = t ? 'Hashes of the text above (UTF-8).' : 'Type some text, or choose a file, to see its hashes.';
+    hashAll(t ? new TextEncoder().encode(t) : null);
   }
   $('txt').addEventListener('input', calc);
+  setupDrop('drop', 'file', function (f) {
+    var mine = ++run;
+    $('src').textContent = 'Reading ' + f.name + '...';
+    blank();
+    f.arrayBuffer().then(function (buf) {
+      if (mine !== run) return;
+      $('txt').value = '';
+      hashAll(new Uint8Array(buf));
+      $('src').textContent = 'Hashes of the file ' + f.name + ' (' + fmtBytes(f.size) + '). Type in the box above to hash text again.';
+      $('file').value = '';
+    }, function () {
+      if (mine !== run) return;
+      $('src').textContent = 'That file could not be read. Try choosing it again.';
+    });
+  });
   document.querySelectorAll('[data-c]').forEach(function (b) {
-    b.addEventListener('click', function () { copyText($(b.dataset.c).textContent, b); });
+    b.addEventListener('click', function () { var v = $(b.dataset.c).textContent; if (v !== '–') copyText(v, b); });
   });
   calc();
 })();

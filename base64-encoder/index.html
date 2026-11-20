@@ -128,25 +128,60 @@
   <button class="btn ghost" id="clr">Clear</button>
 </div>
 <p class="msg" id="msg"></p>
+<div class="btns" id="binBox" hidden><a class="btn" id="dl" download="decoded.bin">Download decoded file</a></div>
 <script>
 (function () {
+  var url = null;
   function say(cls, t) { $('msg').className = 'msg ' + cls; $('msg').textContent = t; }
+  function noFile() { $('binBox').hidden = true; if (url) { URL.revokeObjectURL(url); url = null; } }
+  // Recognise common file types by their first bytes, so the download gets a sensible name.
+  function kind(b) {
+    var h = function (i, n) { return Array.from(b.slice(i, i + n)).map(function (x) { return x.toString(16).padStart(2, '0'); }).join(''); };
+    var asc = function (i, n) { return String.fromCharCode.apply(null, b.slice(i, i + n)); };
+    if (h(0, 8) === '89504e470d0a1a0a') return ['PNG image', 'png', 'image/png'];
+    if (h(0, 3) === 'ffd8ff') return ['JPEG image', 'jpg', 'image/jpeg'];
+    if (asc(0, 4) === 'GIF8') return ['GIF image', 'gif', 'image/gif'];
+    if (asc(0, 4) === 'RIFF' && asc(8, 4) === 'WEBP') return ['WebP image', 'webp', 'image/webp'];
+    if (asc(0, 5) === '%PDF-') return ['PDF document', 'pdf', 'application/pdf'];
+    if (h(0, 4) === '504b0304') return ['ZIP file', 'zip', 'application/zip'];
+    if (h(0, 2) === '1f8b') return ['GZIP file', 'gz', 'application/gzip'];
+    if (asc(0, 4) === 'wOFF' || asc(0, 4) === 'wOF2') return ['web font', asc(3, 1) === '2' ? 'woff2' : 'woff', 'font/woff'];
+    if (h(0, 4) === '00000100') return ['icon', 'ico', 'image/x-icon'];
+    return ['file', 'bin', 'application/octet-stream'];
+  }
   $('enc').addEventListener('click', function () {
+    noFile();
     var bytes = new TextEncoder().encode($('txt').value), bin = '';
     for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-    $('txt').value = btoa(bin); say('ok', 'Encoded.');
+    $('txt').value = btoa(bin); say('ok', bytes.length ? 'Encoded.' : 'The box is empty, so there is nothing to encode.');
   });
   $('dec').addEventListener('click', function () {
+    noFile();
+    var raw = $('txt').value.trim();
+    if (!raw) return say('', 'Paste some Base64 first.');
+    raw = raw.replace(/^data:[^,]*;base64,/i, ''); // accept a whole data URL too
+    var bytes;
     try {
-      var s = $('txt').value.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+      var s = raw.replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
       while (s.length % 4) s += '=';
-      var bin = atob(s), bytes = new Uint8Array(bin.length);
+      var bin = atob(s);
+      bytes = new Uint8Array(bin.length);
       for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    } catch (e) { return say('bad', 'That is not valid Base64. Base64 only uses the letters A-Z and a-z, the digits 0-9, + and / (or - and _), and = at the end.'); }
+    try {
       $('txt').value = new TextDecoder('utf-8', { fatal: true }).decode(bytes); say('ok', 'Decoded.');
-    } catch (e) { say('bad', 'That is not valid Base64 text.'); }
+    } catch (e) {
+      // Valid Base64, but the bytes are not UTF-8 text (an image, a PDF, ...). Offer them as a file instead.
+      var k = kind(bytes);
+      url = URL.createObjectURL(new Blob([bytes], { type: k[2] }));
+      $('dl').href = url; $('dl').download = 'decoded.' + k[1];
+      $('dl').textContent = 'Download decoded ' + (k[1] === 'bin' ? 'file' : k[1].toUpperCase());
+      $('binBox').hidden = false;
+      say('ok', 'This is valid Base64, but it holds binary data, not text (' + fmtBytes(bytes.length) + (k[1] === 'bin' ? '' : ', looks like a ' + k[0]) + '). Download it as a file below.');
+    }
   });
   $('cp').addEventListener('click', function () { copyText($('txt').value, $('cp')); });
-  $('clr').addEventListener('click', function () { $('txt').value = ''; say('', ''); });
+  $('clr').addEventListener('click', function () { $('txt').value = ''; say('', ''); noFile(); });
 })();
 </script>
 

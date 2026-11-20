@@ -9,15 +9,35 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
+  // Re-print the original tokens instead of JSON.stringify(JSON.parse(...)), so numbers keep every digit
+  // (12345678901234567890 and 1.10 stay as typed) and repeated keys are not dropped.
+  function reprint(t, indent) {
+    var out = '', depth = 0, pad = function (d) { return indent ? '\n' + ' '.repeat(indent * d) : ''; };
+    var re = /"(?:[^"\\]|\\.)*"|[{}\[\],:]|[^\s{}\[\],:"]+/g, m, prev = '';
+    while ((m = re.exec(t))) {
+      var k = m[0];
+      if (k === '{' || k === '[') { out += k; depth++; prev = k; continue; }
+      if (k === '}' || k === ']') { depth--; out += (prev === '{' || prev === '[') ? k : pad(depth) + k; prev = k; continue; }
+      if (prev === '{' || prev === '[') out += pad(depth);
+      if (k === ',') out += ',' + pad(depth);
+      else if (k === ':') out += indent ? ': ' : ':';
+      else out += k;
+      prev = k;
+    }
+    return out;
+  }
   function run(indent) {
     var t = $('txt').value.trim();
     if (!t) { $('msg').className = 'msg'; $('msg').textContent = 'Paste some JSON first.'; return; }
-    try {
-      $('txt').value = JSON.stringify(JSON.parse(t), null, indent);
-      $('msg').className = 'msg ok'; $('msg').textContent = 'Valid JSON.';
-    } catch (e) {
-      $('msg').className = 'msg bad'; $('msg').textContent = 'Invalid JSON: ' + e.message;
+    try { JSON.parse(t); }
+    catch (e) {
+      var msg = e.message, at = /position (\d+)/.exec(msg);
+      if (at && !/line \d+/.test(msg)) { var before = t.slice(0, +at[1]).split('\n'); msg += ' (line ' + before.length + ', column ' + (before[before.length - 1].length + 1) + ')'; }
+      $('msg').className = 'msg bad'; $('msg').textContent = 'Invalid JSON: ' + msg;
+      return;
     }
+    $('txt').value = reprint(t, indent);
+    $('msg').className = 'msg ok'; $('msg').textContent = 'Valid JSON. ' + (indent ? 'Formatted.' : 'Minified.');
   }
   $('fmt').addEventListener('click', function () { run(2); });
   $('min').addEventListener('click', function () { run(0); });

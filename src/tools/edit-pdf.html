@@ -195,18 +195,193 @@
     return bold ? (ital ? F.HelveticaBoldOblique : F.HelveticaBold) : (ital ? F.HelveticaOblique : F.Helvetica);
   }
 
+  // ---------- Taking the old words out of the file ----------
+  // Covering a line only hides it: the words would still be found by copying or searching. So the page's
+  // drawing instructions are read, and each instruction that writes a changed line is swapped for a blank
+  // move of the same width (the rest of the line keeps its place). Text whose letter widths are unknown,
+  // or that also holds words outside the changed line, is left alone and only covered.
+  var L = PDFLib, NAME = function (n) { return L.PDFName.of(n); };
+  function toStr(u) { var out = ''; for (var i = 0; i < u.length; i += 8192) out += String.fromCharCode.apply(null, u.subarray(i, i + 8192)); return out; }
+  function toBytes(t) { var u = new Uint8Array(t.length); for (var i = 0; i < t.length; i++) u[i] = t.charCodeAt(i) & 255; return u; }
+  function num(o) { return o instanceof L.PDFNumber ? o.asNumber() : null; }
+  function tokens(t) {
+    var out = [], i = 0, n = t.length, WS = /[\x00\t\n\f\r ]/, DL = /[()<>\[\]{}\/%]/, c, a, v;
+    while (i < n) {
+      c = t[i]; a = i;
+      if (WS.test(c)) { i++; continue; }
+      if (c === '%') { while (i < n && t[i] !== '\n' && t[i] !== '\r') i++; continue; }
+      if (c === '(') { // literal string
+        var depth = 1; v = ''; i++;
+        while (i < n && depth) {
+          c = t[i++];
+          if (c === '\\') {
+            var d = t[i++], E = { n: '\n', r: '\r', t: '\t', b: '\b', f: '\f' };
+            if (d in E) v += E[d];
+            else if (d === '\r') { if (t[i] === '\n') i++; }
+            else if (d === '\n') {}
+            else if (/[0-7]/.test(d)) { var o = d; while (o.length < 3 && /[0-7]/.test(t[i])) o += t[i++]; v += String.fromCharCode(parseInt(o, 8) & 255); }
+            else v += d;
+          } else if (c === '(') { depth++; v += c; } else if (c === ')') { if (--depth) v += c; } else v += c;
+        }
+        out.push({ t: 'str', v: v, a: a, b: i }); continue;
+      }
+      if (c === '<' && t[i + 1] === '<') { out.push({ t: '<<', a: a, b: i += 2 }); continue; }
+      if (c === '>' && t[i + 1] === '>') { out.push({ t: '>>', a: a, b: i += 2 }); continue; }
+      if (c === '<') { // hex string
+        var e = t.indexOf('>', i); if (e < 0) e = n;
+        var hx = t.slice(i + 1, e).replace(/[^0-9a-fA-F]/g, ''); if (hx.length % 2) hx += '0';
+        v = ''; for (var k = 0; k < hx.length; k += 2) v += String.fromCharCode(parseInt(hx.substr(k, 2), 16));
+        out.push({ t: 'str', v: v, a: a, b: i = e + 1 }); continue;
+      }
+      if ('[]{}'.indexOf(c) !== -1) { out.push({ t: c, a: a, b: ++i }); continue; }
+      if (c === '/') { i++; while (i < n && !WS.test(t[i]) && !DL.test(t[i])) i++; out.push({ t: 'name', v: t.slice(a + 1, i), a: a, b: i }); continue; }
+      while (i < n && !WS.test(t[i]) && !DL.test(t[i])) i++;
+      if (i === a) { i++; continue; }
+      var w = t.slice(a, i);
+      if (/^[+-]?(\d+\.?\d*|\.\d+)$/.test(w)) { out.push({ t: 'num', v: +w, a: a, b: i }); continue; }
+      out.push({ t: 'op', v: w, a: a, b: i });
+      if (w === 'ID') { var re = /[\x00\t\n\f\r ]EI(?=[\x00\t\n\f\r ]|$)/g; re.lastIndex = i; var r = re.exec(t); i = r ? r.index + 1 : n; } // skip inline image data
+    }
+    return out;
+  }
+  var STD14 = /^(Helvetica|Helvetica-Bold|Helvetica-Oblique|Helvetica-BoldOblique|Times-Roman|Times-Bold|Times-Italic|Times-BoldItalic|Courier|Courier-Bold|Courier-Oblique|Courier-BoldOblique)$/;
+  var cp1252 = null;
+  // How wide each character code of a page font is (in 1/1000 of the font size), or null when that cannot be known.
+  function fontWidths(page, name) {
+    try {
+      var res = page.node.Resources(), fonts = res && res.lookup(NAME('Font')), f = fonts instanceof L.PDFDict ? fonts.lookup(NAME(name)) : null;
+      if (!(f instanceof L.PDFDict)) return null;
+      var sub = String(f.lookup(NAME('Subtype')));
+      if (sub === '/Type0') {
+        if (String(f.lookup(NAME('Encoding'))) !== '/Identity-H') return null;
+        var df = f.lookup(NAME('DescendantFonts')), desc = df instanceof L.PDFArray ? df.lookup(0) : null;
+        if (!(desc instanceof L.PDFDict)) return null;
+        var dw = num(desc.lookup(NAME('DW'))), W = desc.lookup(NAME('W')), map = {};
+        if (dw == null) dw = 1000;
+        if (W instanceof L.PDFArray) {
+          var arr = W.asArray(), j = 0, look = function (x) { return desc.context.lookup(x); };
+          while (j < arr.length) {
+            var first = num(look(arr[j])), nx = look(arr[j + 1]);
+            if (nx instanceof L.PDFArray) { nx.asArray().forEach(function (x, k) { map[first + k] = num(look(x)); }); j += 2; }
+            else { var last = num(nx), wd = num(look(arr[j + 2])); for (var c = first; c <= last && c - first < 65536; c++) map[c] = wd; j += 3; }
+          }
+        }
+        return { two: true, w: function (c) { return c in map ? map[c] : dw; } };
+      }
+      if (sub !== '/Type1' && sub !== '/TrueType' && sub !== '/MMType1') return null;
+      var widths = f.lookup(NAME('Widths')), fc = num(f.lookup(NAME('FirstChar'))), fd = f.lookup(NAME('FontDescriptor'));
+      var miss = fd instanceof L.PDFDict ? num(fd.lookup(NAME('MissingWidth'))) || 0 : 0;
+      if (widths instanceof L.PDFArray && fc != null) {
+        var list = widths.asArray().map(function (x) { return num(f.context.lookup(x)); });
+        return { two: false, w: function (c) { var v = list[c - fc]; return v == null ? miss : v; } };
+      }
+      var base = String(f.lookup(NAME('BaseFont'))).replace(/^\/([A-Z]{6}\+)?/, '');
+      var enc = f.lookup(NAME('Encoding'));
+      if (!STD14.test(base) || (enc && String(enc) !== '/WinAnsiEncoding')) return null;
+      var emb = L.StandardFontEmbedder.for(base);
+      if (!cp1252) cp1252 = new TextDecoder('windows-1252');
+      return { two: false, w: function (c) { try { return emb.widthOfTextAtSize(cp1252.decode(new Uint8Array([c])), 1000); } catch (e) { return null; } } };
+    } catch (e) { return null; }
+  }
+  function mul(a, b) { return [a[0] * b[0] + a[1] * b[2], a[0] * b[1] + a[1] * b[3], a[2] * b[0] + a[3] * b[2], a[2] * b[1] + a[3] * b[3], a[4] * b[0] + a[5] * b[2] + b[4], a[4] * b[1] + a[5] * b[3] + b[5]]; }
+  function fmt(x) { return (Math.round(x * 1000) / 1000).toFixed(3).replace(/\.?0+$/, '') || '0'; }
+  // targets: edited lines on this page, each { x, y, w, size } in PDF points. Sets target.removed when all of its words were taken out.
+  function stripText(doc, page, targets) {
+    var C = page.node.Contents(), list = C instanceof L.PDFArray ? C.asArray().map(function (r) { return doc.context.lookup(r); }) : C ? [C] : [];
+    var src = '';
+    for (var i = 0; i < list.length; i++) {
+      var st = list[i], bytes;
+      if (st instanceof L.PDFRawStream) bytes = L.decodePDFRawStream(st).decode();
+      else if (st && st.getUnencodedContents) bytes = st.getUnencodedContents();
+      else return;
+      src += toStr(bytes) + '\n';
+    }
+    targets.forEach(function (t) { t.spans = []; t.partial = false; });
+    var tk = tokens(src), from = 0, fonts = {}, edits = [];
+    var gs = { ctm: [1, 0, 0, 1, 0, 0], tc: 0, tw: 0, th: 1, tl: 0, font: null, fs: 0, rise: 0 }, stack = [], tm = [1, 0, 0, 1, 0, 0], tlm = tm, lost = false;
+    function nums(k) { return tk.slice(from, k).filter(function (x) { return x.t === 'num'; }).map(function (x) { return x.v; }); }
+    function td(x, y) { tlm = mul([1, 0, 0, 1, x, y], tlm); tm = tlm; lost = false; }
+    function show(k, parts, prefix) {
+      var info = gs.font in fonts ? fonts[gs.font] : (fonts[gs.font] = fontWidths(page, gs.font));
+      var m = mul(mul([gs.fs * gs.th, 0, 0, gs.fs, 0, gs.rise], tm), gs.ctm), sx = m[4], sy = m[5], size = Math.hypot(m[2], m[3]);
+      var tx = 0, known = !!info && gs.fs * gs.th !== 0;
+      parts.forEach(function (p) {
+        if (!known) return;
+        if (typeof p === 'number') { tx -= p / 1000 * gs.fs * gs.th; return; }
+        for (var j = 0; j < p.length; j += info.two ? 2 : 1) {
+          var code = info.two ? (p.charCodeAt(j) << 8) | (p.charCodeAt(j + 1) || 0) : p.charCodeAt(j), w = info.w(code);
+          if (w == null) { known = false; return; }
+          tx += (w / 1000 * gs.fs + gs.tc + (!info.two && code === 32 ? gs.tw : 0)) * gs.th;
+        }
+      });
+      var upright = Math.abs(m[1]) < .01 && Math.abs(m[2]) < .01 && m[0] > 0;
+      targets.forEach(function (t) {
+        var tol = Math.max(1, t.size * .15);
+        if (lost || !upright || Math.abs(sy - t.y) > t.size * .35 || Math.abs(size / t.size - 1) > .25 || sx < t.x - tol || sx > t.x + t.w - tol) return;
+        if (!known) { t.partial = true; return; }
+        var ex = mul([1, 0, 0, 1, tx, 0], mul(tm, gs.ctm))[4];
+        if (ex > t.x + t.w + tol) { t.partial = true; return; } // this instruction also writes words after the changed line
+        t.spans.push([sx, ex]);
+        edits.push({ a: tk[from].a, b: tk[k].b, text: prefix + '[' + fmt(-tx * 1000 / (gs.fs * gs.th)) + '] TJ' });
+      });
+      if (!known) lost = true; // where later text starts is no longer known
+      else tm = mul([1, 0, 0, 1, tx, 0], tm);
+    }
+    for (var k = 0; k < tk.length; k++) {
+      var x = tk[k];
+      if (x.t !== 'op') continue;
+      var op = x.v, n = nums(k);
+      if (op === 'q') stack.push(Object.assign({}, gs));
+      else if (op === 'Q') { if (stack.length) gs = stack.pop(); }
+      else if (op === 'cm' && n.length === 6) gs.ctm = mul(n, gs.ctm);
+      else if (op === 'BT') { tm = tlm = [1, 0, 0, 1, 0, 0]; lost = false; }
+      else if (op === 'Tc' && n.length) gs.tc = n[0];
+      else if (op === 'Tw' && n.length) gs.tw = n[0];
+      else if (op === 'Tz' && n.length) gs.th = n[0] / 100;
+      else if (op === 'TL' && n.length) gs.tl = n[0];
+      else if (op === 'Ts' && n.length) gs.rise = n[0];
+      else if (op === 'Tf') { var nm = tk.slice(from, k).filter(function (y) { return y.t === 'name'; })[0]; gs.font = nm ? nm.v : null; gs.fs = n.length ? n[0] : 0; }
+      else if (op === 'Td' && n.length === 2) td(n[0], n[1]);
+      else if (op === 'TD' && n.length === 2) { gs.tl = -n[1]; td(n[0], n[1]); }
+      else if (op === 'Tm' && n.length === 6) { tlm = tm = n; lost = false; }
+      else if (op === 'T*') td(0, -gs.tl);
+      else if (op === 'Tj' || op === "'" || op === '"' || op === 'TJ') {
+        var prefix = '';
+        if (op === '"' && n.length >= 2) { gs.tw = n[0]; gs.tc = n[1]; prefix = fmt(n[0]) + ' Tw ' + fmt(n[1]) + ' Tc T* '; td(0, -gs.tl); }
+        else if (op === "'") { prefix = 'T* '; td(0, -gs.tl); }
+        var parts = tk.slice(from, k).filter(function (y) { return y.t === 'str' || (op === 'TJ' && y.t === 'num'); }).map(function (y) { return y.t === 'str' ? y.v : y.v; });
+        if (parts.length) show(k, parts, prefix);
+      }
+      from = k + 1;
+    }
+    targets.forEach(function (t) {
+      var spans = t.spans.sort(function (p, q) { return p[0] - q[0]; }), covered = 0, end = -Infinity;
+      spans.forEach(function (sp) { var a = Math.max(sp[0], end); if (sp[1] > a) covered += sp[1] - a; end = Math.max(end, sp[1]); });
+      t.removed = !t.partial && t.w > 0 && covered >= t.w * .85;
+    });
+    if (!edits.length) return;
+    edits.sort(function (p, q) { return p.a - q.a; });
+    var out = '', at = 0;
+    edits.forEach(function (e) { if (e.a < at) return; out += src.slice(at, e.a) + e.text; at = e.b; });
+    out += src.slice(at);
+    page.node.set(NAME('Contents'), doc.context.register(doc.context.flateStream(toBytes(out))));
+  }
+
   $('go').addEventListener('click', function () {
     if (cur) deselect();
     PT.run(async function () {
-      var doc = await PT.open(file), own = {}, std = {}, usedOwn = 0, usedStd = 0, list = Object.keys(edits).map(function (k) { return edits[k]; });
+      var doc = await PT.open(file), own = {}, std = {}, usedOwn = 0, usedStd = 0, covered = 0, list = Object.keys(edits).map(function (k) { return edits[k]; });
       if (window.fontkit) doc.registerFontkit(fontkit);
+      // First take the old words out of every page that has changes (before anything new is drawn on it).
+      var byPage = {};
+      list.forEach(function (e) { e.removed = false; if (!e.fit) (byPage[e.page] = byPage[e.page] || []).push(e); });
+      Object.keys(byPage).forEach(function (pn) {
+        try { stripText(doc, doc.getPage(pn - 1), byPage[pn]); } catch (err) { byPage[pn].forEach(function (e) { e.removed = false; }); }
+      });
       for (var i = 0; i < list.length; i++) {
         var e = list[i], page = doc.getPage(e.page - 1), rgb = function (c) { return PDFLib.rgb(c[0] / 255, c[1] / 255, c[2] / 255); };
-        var pad = e.size * .08, size = e.size;
-        page.drawRectangle({ x: e.x - pad, y: e.y + e.desc * e.size - pad, width: e.w + pad * 2, height: e.size * (e.asc - e.desc) + pad * 2, color: rgb(e.bg) });
-        if (!e.text.trim()) continue;
-        var font = null, set = null;
-        if (e.data && window.fontkit) { // try the document's own font first
+        var pad = e.size * .08, size = e.size, font = null, set = null, has = !!e.text.trim(), wide = 0;
+        if (has && e.data && window.fontkit) { // try the document's own font first
           try {
             if (!(e.fontId in own)) own[e.fontId] = await doc.embedFont(e.data, { subset: false });
             set = own[e.fontId].getCharacterSet();
@@ -214,23 +389,36 @@
             if (ok && own[e.fontId].widthOfTextAtSize(e.text.replace(/ /g, ''), e.size) > 0) font = own[e.fontId];
           } catch (err) { own[e.fontId] = null; }
         }
-        if (font) {
-          usedOwn++;
-          // A PDF's own font often has no space glyph, so place the words one by one.
-          var gap = set.indexOf(32) !== -1 ? font.widthOfTextAtSize(' ', size) : (e.space || size * .3), x = e.x;
-          e.text.split(' ').forEach(function (word) {
-            if (word) { page.drawText(word, { x: x, y: e.y, size: size, font: font, color: rgb(e.ink) }); x += font.widthOfTextAtSize(word, size); }
-            x += gap;
-          });
-        } else {
+        var gap = 0, mine = !!font;
+        if (mine) {
+          // A PDF's own font often has no space glyph, so the words are placed one by one.
+          gap = set.indexOf(32) !== -1 ? font.widthOfTextAtSize(' ', size) : (e.space || size * .3);
+          wide = e.text.split(' ').reduce(function (s, w) { return s + (w ? font.widthOfTextAtSize(w, size) : 0); }, 0) + gap * (e.text.split(' ').length - 1);
+        } else if (has) {
           var name = standard(e);
           if (!std[name]) std[name] = await doc.embedFont(name);
           font = std[name];
           try {
             font.widthOfTextAtSize(e.text, size);
             // on a scanned page the size is whatever makes the original words as wide as they were
-            if (e.fit) { var wide = font.widthOfTextAtSize(e.orig, 1); if (wide > 0) size = Math.max(e.size * .5, Math.min(e.size * 1.6, e.w / wide)); }
+            if (e.fit) { var ow = font.widthOfTextAtSize(e.orig, 1); if (ow > 0) size = Math.max(e.size * .5, Math.min(e.size * 1.6, e.w / ow)); }
           } catch (err) { throw new Error('On page ' + e.page + ', "' + e.text.slice(0, 30) + '" has letters this tool cannot write into the PDF. Only Latin letters work when the PDF lacks those letters in its own font.'); }
+          wide = font.widthOfTextAtSize(e.text, size);
+        }
+        // Cover the old line (when its words could not be taken out) and, if the new text is longer, the space it needs.
+        var cw = e.removed ? (wide > e.w ? wide : 0) : Math.max(e.w, wide), cx = e.removed ? e.x + e.w : e.x;
+        if (e.removed && cw) cw -= e.w;
+        if (cw > 0) page.drawRectangle({ x: cx - pad, y: e.y + e.desc * e.size - pad, width: cw + pad * 2, height: e.size * (e.asc - e.desc) + pad * 2, color: rgb(e.bg) });
+        if (!e.removed) covered++;
+        if (!has) continue;
+        if (mine) {
+          usedOwn++;
+          var x = e.x;
+          e.text.split(' ').forEach(function (word) {
+            if (word) { page.drawText(word, { x: x, y: e.y, size: size, font: font, color: rgb(e.ink) }); x += font.widthOfTextAtSize(word, size); }
+            x += gap;
+          });
+        } else {
           usedStd++;
           page.drawText(e.text, { x: e.x, y: e.y, size: size, font: font, color: rgb(e.ink) });
         }
@@ -238,6 +426,7 @@
       var note = 'Saved ' + list.length + (list.length === 1 ? ' change' : ' changes');
       if (usedStd) note += '. ' + (usedOwn ? usedOwn + ' kept the original font; ' : '') + usedStd + ' used the closest standard font, because the PDF does not contain those letters in its own font';
       else if (usedOwn) note += ' in the original font';
+      if (covered) note += '. Note: ' + (covered === list.length ? 'the old text was' : covered + (covered === 1 ? ' old line was' : ' old lines were')) + ' only covered over, so it is hidden but can still be found by copying or searching the file';
       PT.done(await doc.save(), PT.base(file.name) + '-edited.pdf', 'application/pdf', note);
     });
   });

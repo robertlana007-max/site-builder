@@ -122,8 +122,8 @@
 <div class="big" id="time" role="timer" aria-live="off">05:00</div>
 <div class="fields">
   <div><label for="h">Hours</label><input type="number" id="h" min="0" max="99" step="1" value="0"></div>
-  <div><label for="m">Minutes</label><input type="number" id="m" min="0" max="59" step="1" value="5"></div>
-  <div><label for="s">Seconds</label><input type="number" id="s" min="0" max="59" step="1" value="0"></div>
+  <div><label for="m">Minutes</label><input type="number" id="m" min="0" step="1" value="5"></div>
+  <div><label for="s">Seconds</label><input type="number" id="s" min="0" step="1" value="0"></div>
 </div>
 <div class="btns" style="margin:0 0 6px">
   <button class="btn ghost" data-min="1">1 min</button>
@@ -141,8 +141,9 @@
   var p = function (x) { return String(x).padStart(2, '0'); };
   function fmt(ms) { var t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return (h ? p(h) + ':' : '') + p(m) + ':' + p(s); }
   function inputMs() {
-    var v = function (id, max) { return Math.min(max, Math.max(0, Math.floor(+$(id).value) || 0)); };
-    return (v('h', 99) * 3600 + v('m', 59) * 60 + v('s', 59)) * 1000;
+    // Boxes are added up, so 90 minutes is 1:30:00 and 1.5 hours is 1:30:00. Capped at 99:59:59.
+    var v = function (id) { return Math.max(0, +$(id).value || 0); };
+    return Math.min(359999, Math.round(v('h') * 3600 + v('m') * 60 + v('s'))) * 1000;
   }
   function beep() {
     try {
@@ -173,13 +174,13 @@
     if (left <= 0) left = inputMs();
     if (left <= 0) { $('msg').className = 'msg bad'; $('msg').textContent = 'Set a time longer than zero.'; return; }
     $('msg').textContent = '';
-    if ($('snd').checked) { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {} } // must be created on a click
+    try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {} // must be created on a click, even if the sound is ticked later
     endAt = Date.now() + left; running = true; $('go').textContent = 'Pause';
     timer = setInterval(tick, 200); tick();
   });
   function reset() { stop(); left = 0; $('msg').textContent = ''; show(inputMs()); }
   $('reset').addEventListener('click', reset);
-  ['h', 'm', 's'].forEach(function (id) { $(id).addEventListener('input', function () { if (!running) { left = 0; $('go').textContent = 'Start'; show(inputMs()); } }); });
+  ['h', 'm', 's'].forEach(function (id) { $(id).addEventListener('input', function () { if (!running) { left = 0; $('go').textContent = 'Start'; $('msg').textContent = ''; document.title = title; show(inputMs()); } else { $('msg').className = 'msg'; $('msg').textContent = 'Click Reset to use the new time.'; } }); });
   document.querySelectorAll('[data-min]').forEach(function (b) {
     b.addEventListener('click', function () { var t = +b.dataset.min; $('h').value = Math.floor(t / 60); $('m').value = t % 60; $('s').value = 0; reset(); });
   });

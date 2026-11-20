@@ -137,11 +137,17 @@
     say('ok', b.length + (b.length === 1 ? ' byte.' : ' bytes.'));
   });
   $('dec').addEventListener('click', function () {
-    var s = $('txt').value.replace(/\s+/g, '');
-    if (!s || /[^01]/.test(s)) return say('bad', 'Binary can only contain 0 and 1.');
-    if (s.length % 8) return say('bad', 'Binary text must be in groups of 8 digits. This has ' + s.length + ' digits.');
-    var bytes = new Uint8Array(s.length / 8);
-    for (var i = 0; i < bytes.length; i++) bytes[i] = parseInt(s.substr(i * 8, 8), 2);
+    var groups = $('txt').value.trim().split(/\s+/), s = groups.join(''), bytes, i;
+    if (!s) return say('', 'Paste some binary first, like 01001000 01101001.');
+    if (/[^01]/.test(s)) return say('bad', 'Binary can only contain 0 and 1 (and spaces between the groups).');
+    if (groups.length > 1 && groups.every(function (g) { return g.length <= 8; })) {
+      // separate groups such as "1001000 1101001": each group is one byte, even when its leading zeros were left out
+      bytes = new Uint8Array(groups.map(function (g) { return parseInt(g, 2); }));
+    } else {
+      if (s.length % 8) return say('bad', 'Binary text must be in groups of 8 digits. This has ' + s.length + ' digits, which is not a multiple of 8.');
+      bytes = new Uint8Array(s.length / 8);
+      for (i = 0; i < bytes.length; i++) bytes[i] = parseInt(s.substr(i * 8, 8), 2);
+    }
     try { $('txt').value = new TextDecoder('utf-8', { fatal: true }).decode(bytes); say('ok', 'Decoded.'); }
     catch (e) { say('bad', 'These bytes are not valid text.'); }
   });

@@ -136,9 +136,29 @@
     try { $('txt').value = ($('full').checked ? encodeURI : encodeURIComponent)($('txt').value); say('ok', 'Encoded.'); }
     catch (e) { say('bad', 'This text contains characters that cannot be encoded.'); }
   });
+  // Decode runs of %XX codes. UTF-8 is tried first; codes that are not valid UTF-8 (such as %E9 for é,
+  // made by older systems) are read as Latin-1 / Windows-1252 instead of failing.
+  function decode(str, keep) {
+    var latin = false;
+    // with "Keep URL structure", codes for : / ? & = # and friends stay encoded, like decodeURI does
+    var run = keep ? /(?:%(?!(?:23|24|26|2b|2c|2f|3a|3b|3d|3f|40))[0-9a-f]{2})+/gi : /(?:%[0-9a-f]{2})+/gi;
+    var out = str.replace(run, function (m) {
+      var b = new Uint8Array(m.length / 3);
+      for (var i = 0; i < b.length; i++) b[i] = parseInt(m.substr(i * 3 + 1, 2), 16);
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+      catch (e) { latin = true; return new TextDecoder('windows-1252').decode(b); }
+    });
+    return { text: out, latin: latin };
+  }
   $('dec').addEventListener('click', function () {
-    try { $('txt').value = ($('full').checked ? decodeURI : decodeURIComponent)($('txt').value.replace(/\+/g, $('full').checked ? '+' : ' ')); say('ok', 'Decoded.'); }
-    catch (e) { say('bad', 'This text contains a broken % sequence and cannot be decoded.'); }
+    var t = $('txt').value, keep = $('full').checked;
+    if (!t) return say('', 'Paste some encoded text first.');
+    var badAt = t.search(/%(?![0-9a-fA-F]{2})/);
+    if (badAt !== -1) return say('bad', 'This text has a % sign that is not followed by two hexadecimal digits (at character ' + (badAt + 1) + ': "' + t.substr(badAt, 3) + '"), so it cannot be decoded. A real % sign is written %25.');
+    var r = decode(keep ? t : t.replace(/\+/g, ' '), keep);
+    $('txt').value = r.text;
+    if (r.latin) say('ok', 'Decoded. Some codes (such as %E9) were not valid UTF-8, so they were read as Latin-1 (Windows-1252), the older encoding they usually come from.');
+    else say('ok', 'Decoded.');
   });
   $('cp').addEventListener('click', function () { copyText($('txt').value, $('cp')); });
   $('clr').addEventListener('click', function () { $('txt').value = ''; say('', ''); });
