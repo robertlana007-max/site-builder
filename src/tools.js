@@ -1407,5 +1407,102 @@ module.exports = [
         ['Is the photo quality lost?', 'At 90% JPG quality the difference is invisible for normal viewing. Choose 100% or PNG if you need the highest quality.']
       ],
       icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-5-8 9"/><path d="M14 3h4M18 3l-1.5-1.5M18 3l-1.5 1.5"/>'
+  },
+  {
+      slug: 'quiz-maker', cat: 'Study tools', name: 'Quiz Maker',
+      title: 'Quiz Maker - Create, Share and Print Quizzes Free',
+      desc: 'Make a quiz with multiple choice, true/false and short answer questions. Take it with a timer, share it by link or print it with an answer key.',
+      card: 'Create quizzes, share them by link or print them.',
+      intro: 'Build a quiz in minutes, then take it on screen with instant marking, send it to others as a link, or print it as a paper test with an answer key. Nothing is uploaded: quizzes are saved in your browser and the share link carries the quiz itself.',
+      steps: ['Type a title, then add multiple choice, true/false or short answer questions.', 'Tick the correct options, list accepted answers and add an explanation if you like.', 'Click Take this quiz to try it, or Copy share link to send it to others.', 'Use Print paper test for a printable version with an answer key, and Save quiz to keep it.'],
+      faq: [
+        ['Do the people I share with need an account?', 'No. They just open the link. The quiz is stored inside the link itself, so it works without any sign-up and nothing is kept on a server.'],
+        ['Can students see the answers in the link?', 'The answers have to be inside the link so the quiz can be marked in the browser. They are compressed, not hidden, so a determined person could decode them. Use it for practice and revision, not for high-stakes exams.'],
+        ['Can a question have more than one correct answer?', 'Yes. Tick every correct option. The person taking the quiz is told how many to choose, and the question only counts as right when they pick exactly those options.'],
+        ['How are short answers marked?', 'The answer is compared with each accepted answer you list. Capital letters, extra spaces and a final full stop are ignored, and numbers like 3 and 3.0 count as the same.'],
+        ['Where are my quizzes saved?', 'In this browser only. Use Export JSON to keep a backup or to move a quiz to another device, then Import JSON there.'],
+        ['Is there a limit on questions?', 'A quiz can have up to 200 questions. Very long quizzes make long share links, so for big quizzes share the exported file instead.']
+      ],
+      icon: '<rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h1M12 8h4M8 12h1M12 12h4M8 16h1M12 16h4"/>'
+  },
+  {
+      slug: 'vocabulary-builder', cat: 'Study tools', name: 'Vocabulary Builder',
+      title: 'Vocabulary Builder - 560 Academic English Words',
+      desc: 'Learn 560 useful academic English words with simple meanings and examples. Filter by B1, B2 or C1 level, quiz yourself and keep a daily streak.',
+      card: 'Learn academic English words with quizzes and streaks.',
+      intro: 'Build the vocabulary you need for essays, exams like IELTS and TOEFL, and university reading. Every word has a plain-English meaning, its part of speech, an example sentence and a level from B1 to C1.',
+      steps: ['Browse or search the word list and filter it by level.', 'Click Mark as known for words you already use confidently.', 'Open Practice quiz and choose the meaning, choose the word or fill the gap.', 'Reach your daily goal of correct answers to keep your streak going.'],
+      faq: [
+        ['What do B1, B2 and C1 mean?', 'They are levels from the Common European Framework of Reference (CEFR). B1 is intermediate, B2 upper intermediate and C1 advanced. The levels here are a guide to how common and how advanced each word is.'],
+        ['How does the streak work?', 'Each correct quiz answer counts towards your daily goal. Reach the goal on a day and that day counts. Your streak is the number of days in a row you reached it. Today does not break the streak until the day is over.'],
+        ['Why can I not hear the words?', 'Pronunciation uses your browser\'s built-in speech voices. If your device has no English voice, the speaker buttons are hidden. Most current versions of Chrome, Edge and Safari include one.'],
+        ['Is my progress saved?', 'Yes, in this browser. Known words, your goal and your streak stay when you come back, but they do not move to other devices.'],
+        ['Who are these words for?', 'Students preparing for academic study or English exams, and anyone who wants to read and write more formal English with confidence.']
+      ],
+      icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5M9 7h7M9 11h5"/>'
+  },
+  {
+      slug: 'math-practice', cat: 'Study tools', name: 'Math Practice',
+      title: 'Math Practice - Times Tables and Mental Math Drills',
+      desc: 'Practise times tables 1 to 20 and mixed addition, subtraction, multiplication and division. Timed rounds, instant feedback and printable worksheets.',
+      card: 'Times tables and + − × ÷ drills with instant feedback.',
+      intro: 'Quick, focused arithmetic practice for children and adults. Choose the times tables or the operations you want, answer with your keyboard or the big on-screen number pad, and see right away whether you were correct.',
+      steps: ['Pick Times tables and select tables 1 to 20, or pick Mixed and choose the operations and difficulty.', 'Choose a number of questions or a 1, 2 or 5 minute timed round.', 'Type each answer and press Enter or Check. Wrong answers show the right one.', 'At the end, retry your mistakes or print a worksheet with an answer key.'],
+      faq: [
+        ['Are division answers always whole numbers?', 'Yes. Every division question is built from a multiplication, so the answer is always a whole number with no remainder.'],
+        ['What do the difficulty levels mean?', 'Easy uses single digits. Medium uses two-digit numbers, such as 47 + 38 or 84 ÷ 7. Hard uses three-digit numbers, such as 352 − 187 or 744 ÷ 12.'],
+        ['Can it be used on a phone?', 'Yes. On touch screens the large number pad replaces the phone keyboard, so the question and your answer stay in view.'],
+        ['How are best scores saved?', 'Your best score is kept in this browser for each combination of settings, so a 1 minute round on the 7 times table has its own record.'],
+        ['Can I print practice sheets?', 'Yes. Print worksheet with answers makes a new set of problems with your current settings, with the answer key on a separate page.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h4M9 6v4M14 8h4M7 16l3-3M10 16l-3-3M14 15h4M14 17h4"/>'
+  },
+  {
+      slug: 'reading-speed-test', cat: 'Study tools', name: 'Reading Speed Test',
+      title: 'Reading Speed Test - Check Your WPM and Comprehension',
+      desc: 'Measure your reading speed in words per minute, answer comprehension questions and get your effective speed. 13 passages at three levels.',
+      card: 'Find your reading speed and comprehension score.',
+      intro: 'Read a short passage at your normal pace, then answer a few questions about it. You get your reading speed in words per minute, your comprehension score and your effective speed, which combines the two.',
+      steps: ['Choose a passage, or click Random passage I have not read.', 'Click Start reading and read at your usual pace.', 'Click I have finished as soon as you reach the end.', 'Answer the questions from memory to see your speed, comprehension and effective speed.'],
+      faq: [
+        ['What is a good reading speed?', 'Most adults read everyday non-fiction at about 200 to 300 words per minute. Students and keen readers are often faster. Speed only matters if you understand what you read, which is why comprehension is measured too.'],
+        ['What is effective reading speed?', 'It is your reading speed multiplied by your comprehension score. Reading 300 WPM with 60% understanding gives 180 effective WPM, which is less useful than 240 WPM with full understanding.'],
+        ['Why can I not look back at the text?', 'The questions check what you took in during one normal reading. Being able to look back would measure searching rather than reading.'],
+        ['Are the passages the same difficulty?', 'No. There are Easy, Medium and Hard passages of about 180 to 320 words. Compare results on passages of the same level for a fair picture of your progress.'],
+        ['Is my history saved?', 'Yes, in this browser only. You can clear it at any time.']
+      ],
+      icon: '<path d="M2 4h6a4 4 0 0 1 4 4v13a3 3 0 0 0-3-3H2zM22 4h-6a4 4 0 0 0-4 4v13a3 3 0 0 1 3-3h7z"/>'
+  },
+  {
+      slug: 'readability-checker', cat: 'Study tools', name: 'Readability Checker',
+      title: 'Readability Checker - Flesch, Fog, SMOG & Grade Level',
+      desc: 'Check how easy your essay is to read with Flesch, Flesch-Kincaid, Gunning Fog, SMOG, Coleman-Liau and ARI. Highlights long sentences and passive voice.',
+      card: 'Score your writing and find hard-to-read sentences.',
+      intro: 'Paste an essay, article or report to see how easy it is to read. You get six standard readability scores, an average grade level, and your text highlighted to show long sentences, hard words, possible passive voice and adverbs.',
+      steps: ['Paste or type your text into the box.', 'Read the Flesch Reading Ease score and the average grade level.', 'Look at the highlighted text to find long sentences, hard words, passive voice and adverbs.', 'Follow the tips, edit your text and watch the scores update.'],
+      faq: [
+        ['What is a good Flesch Reading Ease score?', 'Higher is easier. 60 to 70 is plain English that most teenagers and adults read comfortably. Academic writing is often 30 to 50, and anything below 30 is very hard going.'],
+        ['Why do the grade levels differ?', 'Each formula measures something slightly different. Flesch-Kincaid and SMOG count syllables, Coleman-Liau and ARI count letters, and Gunning Fog counts long words. Looking at the average gives a balanced picture.'],
+        ['How are syllables counted?', 'With rules for English spelling plus a list of tricky words. Checked against a pronouncing dictionary it agrees on about 97 out of 100 words, which is accurate enough for the formulas.'],
+        ['Is passive voice always wrong?', 'No. It is useful when the person doing the action is unknown or unimportant. The tool marks possible passives, such as "was written", so you can decide whether an active sentence would be clearer.'],
+        ['Is my essay uploaded?', 'No. Everything is worked out in your browser and your text is never sent anywhere.']
+      ],
+      icon: '<path d="M4 6h16M4 10h12M4 14h16M4 18h9"/><circle cx="18.5" cy="18.5" r="2.5"/>'
+  },
+  {
+      slug: 'spelling-test', cat: 'Study tools', name: 'Spelling Test',
+      title: 'Spelling Test - Listen and Type Spelling Practice',
+      desc: 'Hear a word read aloud, type it and check your spelling. Five built-in word lists by level or your own list, with scores and retry for missed words.',
+      card: 'Hear words read aloud and practise spelling them.',
+      intro: 'A spelling test that reads each word aloud, so children and adults can practise on their own. Use one of five built-in lists from early primary to commonly misspelled words, or type in this week\'s list from school.',
+      steps: ['Choose a word list, or pick My own word list and type your words.', 'Click Start test. Each word is read aloud; press Say it in a sentence to hear it used.', 'Type the word and press Enter or Check.', 'See your score, then retry the words you missed.'],
+      faq: [
+        ['What if my device cannot speak?', 'If no speech voice is available, the test shows a meaning and a sentence with a gap instead, and tells you that audio is unavailable. You can still practise every word.'],
+        ['Can I add my child\'s school spelling list?', 'Yes. Choose My own word list and type one word per line. You can add a sentence and a meaning after a | sign. The list is saved in this browser for next time.'],
+        ['Do capital letters matter?', 'No. Answers are checked without caring about capitals or extra spaces, so february and February both count.'],
+        ['Which accent is used?', 'The test uses an English voice from your device, usually British or American English. Spelling follows British forms such as favourite in the built-in lists.'],
+        ['Can I print the words?', 'Yes. After a test, Print this list prints the words with their meanings and space to practise writing them.']
+      ],
+      icon: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 8l3 3M3 6h6M3 10h3"/>'
   }
 ];
