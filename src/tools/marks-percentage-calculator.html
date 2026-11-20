@@ -1,0 +1,189 @@
+<style>
+.mkp .seg { margin-bottom: 14px; flex-wrap: wrap; }
+.mkp .mkp-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr) 40px; gap: 8px; align-items: end; margin-bottom: 8px; }
+.mkp .mkp-row label { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.mkp .mkp-pct { min-height: 44px; display: flex; flex-direction: column; justify-content: center; font-variant-numeric: tabular-nums; font-weight: 600; font-size: 15px; line-height: 1.2; }
+.mkp .mkp-pct small { color: var(--muted); font-weight: 500; font-size: 12.5px; }
+.mkp .mkp-x { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; cursor: pointer; font: inherit; font-size: 18px; line-height: 1; padding: 0; }
+.mkp .mkp-x:hover { border-color: var(--bad); color: var(--bad); }
+.mkp [aria-invalid="true"] { border-color: var(--bad) !important; }
+.mkp .mkp-big { margin-top: 16px; padding: 16px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); text-align: center; }
+.mkp .mkp-big span { display: block; font-size: 14px; color: var(--muted); }
+.mkp .mkp-big b { display: block; font-size: 32px; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.mkp .mkp-band { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr) 40px; gap: 6px; align-items: center; margin-bottom: 6px; max-width: 420px; }
+.mkp .mkp-band input { min-height: 40px; padding: 6px 8px; }
+.mkp details { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 14px 0 0; background: var(--bg); }
+.mkp summary { cursor: pointer; font-weight: 600; }
+@media (max-width: 560px) {
+  .mkp .mkp-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr) 40px; grid-template-areas: "n n n n" "o t p x"; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .mkp .mkp-row > :nth-child(1) { grid-area: n; } .mkp .mkp-row > :nth-child(2) { grid-area: o; } .mkp .mkp-row > :nth-child(3) { grid-area: t; } .mkp .mkp-row > :nth-child(4) { grid-area: p; } .mkp .mkp-row > :nth-child(5) { grid-area: x; }
+}
+</style>
+<div class="mkp">
+<div class="seg" role="group" aria-label="Calculator mode"><button type="button" data-mode="one" aria-pressed="true">Total marks</button><button type="button" data-mode="subj" aria-pressed="false">Subject-wise</button></div>
+<select id="mkMode" hidden aria-hidden="true" tabindex="-1"><option value="one">one</option><option value="subj">subj</option></select>
+<div class="fields">
+  <div><label for="mkScheme">Grade or division scheme</label>
+    <select id="mkScheme">
+      <option value="pk">Pakistan boards (A1, A, B, C, D, E)</option>
+      <option value="in">India divisions (First, Second, Third)</option>
+      <option value="custom">Custom grades</option>
+    </select></div>
+</div>
+<div id="mkOne">
+  <div class="fields">
+    <div><label for="mkObt">Marks obtained</label><input type="number" id="mkObt" min="0" step="any" placeholder="e.g. 912"></div>
+    <div><label for="mkTot">Total marks</label><input type="number" id="mkTot" min="0" step="any" placeholder="e.g. 1100"></div>
+  </div>
+</div>
+<div id="mkSubj" hidden>
+  <div id="mkRows"></div>
+  <div class="btns" style="margin:0 0 4px"><button type="button" class="btn ghost" id="mkAdd">+ Add subject</button><button type="button" class="btn ghost" id="mkClr">Clear subjects</button></div>
+</div>
+<div class="mkp-big"><span>Percentage</span><b id="mkPct">–</b><span id="mkGrade">&nbsp;</span></div>
+<div class="stats">
+  <div class="stat"><span>Marks obtained</span><b id="mkO">–</b></div>
+  <div class="stat"><span>Total marks</span><b id="mkT">–</b></div>
+  <div class="stat"><span id="mkGL">Grade</span><b id="mkG">–</b></div>
+</div>
+<p class="msg" id="mkMsg"></p>
+<div class="btns"><button type="button" class="btn ghost" id="mkCopy">Copy result</button></div>
+<details id="mkCustomBox" hidden open>
+  <summary>Custom grades</summary>
+  <p class="msg" style="margin-top:6px">Each grade and the lowest percentage that earns it. Anything below the lowest one is a fail.</p>
+  <div id="mkBands"></div>
+  <div class="btns" style="margin:6px 0 4px"><button type="button" class="btn ghost" id="mkAddBand">+ Add grade</button><button type="button" class="btn ghost" id="mkResetBands">Reset</button></div>
+</details>
+<p class="msg" id="mkSchemeInfo"></p>
+</div>
+<script>
+(function () {
+  /*MATH*/
+  var M = {
+    // bands from highest to lowest: [label, minimum %]. Below the last band = fail label.
+    SCHEMES: {
+      pk: { bands: [['A1', 80], ['A', 70], ['B', 60], ['C', 50], ['D', 40], ['E', 33]], fail: 'F (Fail)', label: 'Grade', pass: 33 },
+      in: { bands: [['First Division', 60], ['Second Division', 45], ['Third Division', 33]], fail: 'Fail', label: 'Division', pass: 33 }
+    },
+    pct: function (o, t) { return t > 0 ? o / t * 100 : NaN; },
+    grade: function (p, bands, fail) {
+      if (!(p >= 0)) return '';
+      var b = bands.slice().sort(function (x, y) { return y[1] - x[1]; });
+      for (var i = 0; i < b.length; i++) if (p >= b[i][1] - 1e-9) return b[i][0];
+      return fail;
+    },
+    // rows: [{o, t}] -> totals of valid rows, and a list of row errors
+    check: function (o, t) {
+      if (isNaN(o) || isNaN(t)) return 'empty';
+      if (t <= 0) return 'Total must be more than 0';
+      if (o < 0) return 'Marks cannot be negative';
+      if (o > t) return 'Obtained is more than the total';
+      return '';
+    }
+  };
+  /*ENDMATH*/
+  var KEY = 'gtn-marks-percentage', DEFBANDS = [['A+', 90], ['A', 80], ['B', 70], ['C', 60], ['D', 50]];
+  var st = { rows: [], bands: DEFBANDS.map(function (b) { return b.slice(); }) }, saved = false;
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function blank() { return { n: '', o: '', t: '100' }; }
+  function defaults() { st.rows = ['English', 'Urdu / Hindi', 'Mathematics', 'Physics', 'Chemistry'].map(function (n) { return { n: n, o: '', t: '100' }; }); }
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY));
+    if (s && Array.isArray(s.rows)) { st.rows = s.rows.map(function (r) { return { n: String(r.n || ''), o: String(r.o == null ? '' : r.o), t: String(r.t == null ? '' : r.t) }; }); saved = true; }
+    if (s && Array.isArray(s.bands)) st.bands = s.bands.filter(Array.isArray).map(function (b) { return [String(b[0] || ''), String(b[1] == null ? '' : b[1])]; });
+  } catch (e) {}
+  if (!st.rows.length) defaults();
+  var saveT;
+  function save() { clearTimeout(saveT); saveT = setTimeout(function () { try { localStorage.setItem(KEY, JSON.stringify(st)); saved = true; if ($('clearBtn')) $('clearBtn').hidden = false; } catch (e) {} }, 300); }
+  function num(v) { return v === '' || v == null ? NaN : +v; }
+
+  function scheme() {
+    var k = $('mkScheme').value;
+    if (k !== 'custom') return M.SCHEMES[k];
+    var bands = st.bands.filter(function (b) { return b[0].trim() && b[1] !== '' && isFinite(+b[1]); }).map(function (b) { return [b[0].trim(), +b[1]]; });
+    return { bands: bands, fail: 'Fail', label: 'Grade', pass: null };
+  }
+  function drawRows() {
+    $('mkRows').innerHTML = st.rows.map(function (r, i) {
+      var id = 'mkR' + i;
+      return '<div class="mkp-row" data-i="' + i + '">' +
+        '<div><label for="' + id + 'n">Subject ' + (i + 1) + '</label><input type="text" id="' + id + 'n" data-nomemo data-f="n" value="' + esc(r.n) + '" placeholder="Name" maxlength="60"></div>' +
+        '<div><label for="' + id + 'o">Obtained</label><input type="number" id="' + id + 'o" data-nomemo data-f="o" min="0" step="any" value="' + esc(r.o) + '"></div>' +
+        '<div><label for="' + id + 't">Out of</label><input type="number" id="' + id + 't" data-nomemo data-f="t" min="0" step="any" value="' + esc(r.t) + '"></div>' +
+        '<div><label aria-hidden="true">Result</label><div class="mkp-pct" data-out="' + i + '" aria-live="polite">–</div></div>' +
+        '<button type="button" class="mkp-x" data-rm="' + i + '" aria-label="Remove subject ' + (i + 1) + '" title="Remove this subject">×</button></div>';
+    }).join('');
+  }
+  function drawBands() {
+    $('mkBands').innerHTML = st.bands.map(function (b, i) {
+      return '<div class="mkp-band" data-b="' + i + '"><input type="text" data-nomemo data-f="0" value="' + esc(b[0]) + '" aria-label="Grade name" maxlength="20"><input type="number" data-nomemo data-f="1" value="' + esc(b[1]) + '" min="0" max="100" step="any" aria-label="Lowest percentage for ' + esc(b[0]) + '"><button type="button" class="mkp-x" aria-label="Remove grade ' + esc(b[0]) + '">×</button></div>';
+    }).join('');
+  }
+  $('mkRows').addEventListener('input', function (e) { var el = e.target, row = el.closest('[data-i]'); if (!row || !el.dataset.f) return; st.rows[+row.dataset.i][el.dataset.f] = el.value; calc(); save(); });
+  $('mkRows').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-rm]'); if (!b) return;
+    st.rows.splice(+b.dataset.rm, 1); if (!st.rows.length) st.rows.push(blank()); drawRows(); calc(); save();
+  });
+  $('mkAdd').addEventListener('click', function () { st.rows.push(blank()); drawRows(); calc(); save(); var n = $('mkRows').querySelectorAll('[data-f="n"]'); n[n.length - 1].focus(); });
+  $('mkClr').addEventListener('click', function () { st.rows = []; for (var i = 0; i < 5; i++) st.rows.push(blank()); drawRows(); calc(); save(); });
+  $('mkBands').addEventListener('input', function (e) { var el = e.target, row = el.closest('[data-b]'); if (!row) return; st.bands[+row.dataset.b][+el.dataset.f] = el.value; calc(); save(); });
+  $('mkBands').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; st.bands.splice(+b.closest('[data-b]').dataset.b, 1); drawBands(); calc(); save(); });
+  $('mkAddBand').addEventListener('click', function () { st.bands.push(['', '']); drawBands(); var n = $('mkBands').querySelectorAll('input[type=text]'); n[n.length - 1].focus(); save(); });
+  $('mkResetBands').addEventListener('click', function () { st.bands = DEFBANDS.map(function (b) { return b.slice(); }); drawBands(); calc(); save(); });
+
+  var lastText = '';
+  function f2(n) { return fmtNum(n, 2); }
+  function calc() {
+    var mode = $('mkMode').value === 'subj' ? 'subj' : 'one', sc = scheme(), msg = $('mkMsg'), warn = [], low = [];
+    document.querySelectorAll('.mkp .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode); });
+    $('mkOne').hidden = mode !== 'one'; $('mkSubj').hidden = mode !== 'subj';
+    $('mkCustomBox').hidden = $('mkScheme').value !== 'custom';
+    $('mkGL').textContent = sc.label;
+    $('mkSchemeInfo').textContent = $('mkScheme').value === 'custom' ? '' : sc.bands.map(function (b, i) { return b[0] + ': ' + (i ? b[1] + '% to under ' + sc.bands[i - 1][1] + '%' : b[1] + '% or more'); }).join(' · ') + ' · ' + sc.fail + ': below ' + sc.bands[sc.bands.length - 1][1] + '%. Boards and universities can have extra rules, such as passing every subject.';
+    var O = NaN, T = NaN;
+    if (mode === 'one') {
+      var o = num($('mkObt').value), t = num($('mkTot').value), err = M.check(o, t);
+      $('mkObt').setAttribute('aria-invalid', !!err && err !== 'empty' && err !== 'Total must be more than 0');
+      $('mkTot').setAttribute('aria-invalid', err === 'Total must be more than 0');
+      if (err && err !== 'empty') warn.push(err + '.');
+      if (!err) { O = o; T = t; }
+    } else {
+      O = 0; T = 0; var any = false;
+      st.rows.forEach(function (r, i) {
+        var o = num(r.o), t = num(r.t), err = M.check(o, t), out = $('mkRows').querySelector('[data-out="' + i + '"]'), row = out && out.closest('.mkp-row');
+        if (row) { row.querySelector('[data-f="o"]').setAttribute('aria-invalid', !!err && err !== 'empty' && err !== 'Total must be more than 0'); row.querySelector('[data-f="t"]').setAttribute('aria-invalid', err === 'Total must be more than 0' && r.t !== ''); }
+        var name = r.n.trim() || 'Subject ' + (i + 1);
+        if (err) { if (out) out.textContent = '–'; if (err !== 'empty' && !(err === 'Total must be more than 0' && r.t === '')) warn.push(name + ': ' + err.toLowerCase() + '.'); return; }
+        any = true; O += o; T += t;
+        var p = M.pct(o, t), g = M.grade(p, sc.bands, sc.fail);
+        if (sc.pass != null && p < sc.pass - 1e-9) low.push(name);
+        if (out) out.innerHTML = f2(p) + '%' + (g ? '<small>' + esc(g) + '</small>' : '');
+      });
+      if (!any) { O = NaN; T = NaN; }
+    }
+    var P = M.pct(O, T), g = M.grade(P, sc.bands, sc.fail);
+    $('mkPct').textContent = isNaN(P) ? '–' : f2(P) + '%';
+    $('mkGrade').textContent = isNaN(P) || !g ? ' ' : sc.label + ': ' + g;
+    $('mkO').textContent = isNaN(P) ? '–' : fmtNum(O);
+    $('mkT').textContent = isNaN(P) ? '–' : fmtNum(T);
+    $('mkG').textContent = isNaN(P) || !g ? '–' : g;
+    if (low.length) warn.push('Below the usual ' + sc.pass + '% pass mark in: ' + low.join(', ') + '. Many boards require a pass in every subject.');
+    if ($('mkScheme').value === 'custom' && !sc.bands.length) warn.push('Add at least one custom grade with a name and a lowest percentage.');
+    msg.className = 'msg' + (warn.length ? ' bad' : '');
+    msg.textContent = warn.length ? warn.join(' ') : isNaN(P) ? (mode === 'one' ? 'Enter your marks and the total marks.' : 'Enter obtained and total marks for at least one subject.') : 'Percentage = marks obtained ÷ total marks × 100.';
+    lastText = isNaN(P) ? '' : (mode === 'subj' ? st.rows.filter(function (r) { return !M.check(num(r.o), num(r.t)); }).map(function (r, i) { return (r.n.trim() || 'Subject') + ': ' + r.o + '/' + r.t + ' = ' + M.pct(+r.o, +r.t).toFixed(2) + '%'; }).join('\n') + '\n' : '') +
+      'Total: ' + O + '/' + T + ' = ' + P.toFixed(2) + '%' + (g ? ' (' + sc.label + ': ' + g + ')' : '');
+  }
+  document.querySelectorAll('.mkp .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { $('mkMode').value = b.dataset.mode; $('mkMode').dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+  ['mkMode', 'mkScheme', 'mkObt', 'mkTot'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('mkCopy').addEventListener('click', function () { if (!lastText) { toast('Enter your marks first.'); return; } copyText(lastText, this); });
+  document.addEventListener('DOMContentLoaded', function () {
+    var cb = $('clearBtn'); if (!cb) return;
+    if (saved) cb.hidden = false;
+    cb.addEventListener('click', function () { clearTimeout(saveT); try { localStorage.removeItem(KEY); } catch (e) {} });
+  });
+  drawRows(); drawBands(); calc();
+})();
+</script>

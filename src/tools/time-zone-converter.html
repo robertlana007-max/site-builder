@@ -149,7 +149,7 @@
   })();
 
   // ---------- state ----------
-  var live = true, timer = null, instant = Date.now(), lastSummary = '';
+  var live = true, timer = null, instant = Date.now(), lastSummary = '', lastKey = '';
   function setInputsFrom(t) {
     var p = parts(t, $('tzSrc').value);
     $('tzDate').value = String(p.y).padStart(4, '0') + '-' + String(p.mo).padStart(2, '0') + '-' + String(p.d).padStart(2, '0');
@@ -177,10 +177,13 @@
   }
   function render() {
     var ok = compute(), list = $('tzList'), src = $('tzSrc').value;
-    list.textContent = '';
-    if (!ok) { lastSummary = ''; return; }
+    if (!ok) { list.textContent = ''; lastKey = ''; lastSummary = ''; return; }
     var sp = parts(instant, src), sday = utcOf(sp.y, sp.mo, sp.d, 0, 0, 0), soff = off(instant, src), lines = [];
     var show = [src].concat(zones.filter(function (z) { return canon(z) !== canon(src); }));
+    // same rows as last time (the live clock ticking): only swap the times, so buttons stay put and clicks are not lost
+    var key = show.join('|'), reuse = key === lastKey && list.children.length === show.length;
+    if (!reuse) list.textContent = '';
+    lastKey = key;
     show.forEach(function (z, i) {
       var p = parts(instant, z), o = off(instant, z), dd = Math.round((utcOf(p.y, p.mo, p.d, 0, 0, 0) - sday) / 864e5), inf = info(z), ab = abbr(instant, z);
       var li = document.createElement('li'); li.className = 'tz-row' + (i === 0 ? ' src' : '');
@@ -193,12 +196,13 @@
       var diff = (o - soff) / 36e5, dtxt = i === 0 ? '' : diff === 0 ? ' · same time' : ' · ' + (diff > 0 ? '+' : '−') + fmtHours(Math.abs(diff));
       var small = document.createElement('small'); small.textContent = day(p) + ' · ' + fmtOff(o) + (ab && !/^GMT[+-−]/.test(ab) && ab !== 'UTC' ? ' ' + ab : '') + dtxt;
       b.appendChild(big); b.appendChild(small);
+      lines.push(inf.name + ': ' + clock(p) + ', ' + day(p) + ' (' + fmtOff(o) + ')' + (dd ? ' ' + (dd > 0 ? '+' : '−') + Math.abs(dd) + ' day' + (Math.abs(dd) === 1 ? '' : 's') : ''));
+      if (reuse) { var old = list.children[i]; old.replaceChild(b, old.children[1]); return; }
       var x = document.createElement('button'); x.className = 'tz-x'; x.type = 'button'; x.textContent = '×';
       x.setAttribute('aria-label', 'Remove ' + inf.name);
       if (i === 0) x.disabled = true;
       else x.addEventListener('click', function () { zones = zones.filter(function (q) { return canon(q) !== canon(z); }); save(); render(); picks(); });
       li.appendChild(a); li.appendChild(b); li.appendChild(x); list.appendChild(li);
-      lines.push(inf.name + ': ' + clock(p) + ', ' + day(p) + ' (' + fmtOff(o) + ')' + (dd ? ' ' + (dd > 0 ? '+' : '−') + Math.abs(dd) + ' day' + (Math.abs(dd) === 1 ? '' : 's') : ''));
     });
     lastSummary = lines.join('\n');
   }

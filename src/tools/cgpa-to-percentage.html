@@ -1,0 +1,110 @@
+<style>
+.c2p .c2p-big { margin-top: 16px; padding: 16px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); text-align: center; }
+.c2p .c2p-big span { display: block; font-size: 14px; color: var(--muted); }
+.c2p .c2p-big b { display: block; font-size: 32px; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.c2p .c2p-big.bad { background: var(--bg); border-color: var(--bad); }
+.c2p .c2p-note { margin-top: 14px; font-size: 14.5px; color: var(--muted); border-inline-start: 3px solid var(--line); padding-inline-start: 10px; }
+.c2p .c2p-note b { color: var(--ink); }
+.c2p .seg { margin-bottom: 14px; flex-wrap: wrap; }
+</style>
+<div class="c2p">
+<div class="seg" role="group" aria-label="Conversion direction"><button type="button" data-dir="c2p" aria-pressed="true">CGPA → Percentage</button><button type="button" data-dir="p2c" aria-pressed="false">Percentage → CGPA</button></div>
+<select id="c2pDir" hidden aria-hidden="true" tabindex="-1"><option value="c2p">c2p</option><option value="p2c">p2c</option></select>
+<div class="fields">
+  <div style="grid-column:1/-1"><label for="c2pF">Formula</label>
+    <select id="c2pF">
+      <option value="simple4">Simple proportional, 4.0 scale (Pakistan estimate): CGPA ÷ 4 × 100</option>
+      <option value="cbse">CBSE, 10-point: CGPA × 9.5</option>
+      <option value="vtu">VTU, 10-point: (CGPA − 0.75) × 10</option>
+      <option value="mu">Mumbai University, 10-point: 7.1 × CGPA + 11</option>
+      <option value="anna">Anna University, 10-point: CGPA × 10</option>
+      <option value="custom">Custom: CGPA × multiplier + offset</option>
+    </select></div>
+  <div data-cu hidden><label for="c2pMul">Multiplier</label><input type="number" id="c2pMul" step="any" value="10"></div>
+  <div data-cu hidden><label for="c2pOff">Offset (added after multiplying)</label><input type="number" id="c2pOff" step="any" value="0"></div>
+  <div data-cu hidden><label for="c2pMax">Highest possible CGPA</label><input type="number" id="c2pMax" min="0.1" step="any" value="10"></div>
+  <div data-in="c2p"><label for="c2pC">Your CGPA</label><input type="number" id="c2pC" min="0" step="0.01" placeholder="e.g. 3.25"></div>
+  <div data-in="p2c" hidden><label for="c2pP">Your percentage (%)</label><input type="number" id="c2pP" min="0" max="100" step="0.01" placeholder="e.g. 78"></div>
+</div>
+<div class="c2p-big" id="c2pBox"><span id="c2pLbl">Percentage</span><b id="c2pOut">–</b><span id="c2pHow"></span></div>
+<p class="msg" id="c2pMsg"></p>
+<div class="btns"><button type="button" class="btn ghost" id="c2pCopy">Copy result</button></div>
+<p class="c2p-note" id="c2pNote"></p>
+<h3 id="c2pTblH">Quick reference</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>CGPA</th><th>Percentage</th></tr></thead><tbody id="c2pTbl"></tbody></table></div>
+<p class="c2p-note"><b>Always check the official rule.</b> The result is only as right as the formula you pick. Your university, board or employer may use its own formula or table, and theirs is the one that counts. When a form asks for a percentage, use the figure your university prints on the transcript or gives in a conversion certificate if it has one.</p>
+</div>
+<script>
+(function () {
+  /*MATH*/
+  var M = {
+    // percentage = CGPA × m + b, valid for CGPA from 0 to max
+    F: {
+      simple4: { m: 25, b: 0, max: 4, how: '% = CGPA ÷ 4 × 100' },
+      cbse: { m: 9.5, b: 0, max: 10, how: '% = CGPA × 9.5' },
+      vtu: { m: 10, b: -7.5, max: 10, how: '% = (CGPA − 0.75) × 10' },
+      mu: { m: 7.1, b: 11, max: 10, how: '% = 7.1 × CGPA + 11' },
+      anna: { m: 10, b: 0, max: 10, how: '% = CGPA × 10' }
+    },
+    toPct: function (f, c) { return c * f.m + f.b; },
+    toCgpa: function (f, p) { return (p - f.b) / f.m; }
+  };
+  /*ENDMATH*/
+  var NOTES = {
+    simple4: '<b>Pakistan: there is no single national formula.</b> HEC and most universities in Pakistan use their own CGPA-to-percentage equivalence tables, and these differ from one university to another (some are stricter, some more generous than this). This simple proportional figure is only a rough estimate. Check the table on your transcript or in your university’s examination rules, or ask the examinations office for an equivalence certificate.',
+    cbse: '<b>CBSE (10-point scale).</b> CBSE suggested multiplying by 9.5 to get an indicative percentage for grades given under its CGPA system (the CCE system for Class 10, used until 2017). Many colleges in India also use × 9.5 informally, but it is not an official rule for them, so check with your institution.',
+    vtu: '<b>VTU (Visvesvaraya Technological University).</b> This is the formula widely quoted for VTU’s CBCS-scheme grades. It can give a different answer to other schemes or batches, so confirm it with your college or the VTU notification for your scheme.',
+    mu: '<b>Mumbai University.</b> 7.1 × CGPA + 11 is a commonly quoted formula for Mumbai University’s 10-point grades, but the university has used different formulas for different courses and years. Use the one printed on your marksheet or notified for your batch if it differs.',
+    anna: '<b>Anna University.</b> CGPA × 10 is the commonly quoted conversion for Anna University’s 10-point grades. Check your regulation year, as rules for class and distinction are separate.',
+    custom: '<b>Custom formula.</b> Enter the multiplier and offset your university gives. For example, a plain proportional conversion on a 4.0 scale is multiplier 25 and offset 0, on a 5.0 scale multiplier 20, and on a 10-point scale multiplier 10.'
+  };
+  function fm() {
+    var k = $('c2pF').value;
+    if (k !== 'custom') return M.F[k];
+    var m = +$('c2pMul').value, b = $('c2pOff').value === '' ? 0 : +$('c2pOff').value, max = +$('c2pMax').value;
+    if (!isFinite(m) || m <= 0 || !isFinite(b) || !(max > 0)) return null;
+    return { m: m, b: b, max: max, how: '% = CGPA × ' + m + (b ? (b > 0 ? ' + ' : ' − ') + Math.abs(b) : '') };
+  }
+  function dir() { return $('c2pDir').value === 'p2c' ? 'p2c' : 'c2p'; }
+  function f2(n) { return fmtNum(n, 2); }
+  var lastText = '';
+  function calc() {
+    var d = dir(), k = $('c2pF').value, f = fm(), box = $('c2pBox'), out = $('c2pOut'), how = $('c2pHow'), msg = $('c2pMsg');
+    document.querySelectorAll('.c2p .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.dir === d); });
+    document.querySelectorAll('.c2p [data-in]').forEach(function (el) { el.hidden = el.dataset.in !== d; });
+    document.querySelectorAll('.c2p [data-cu]').forEach(function (el) { el.hidden = k !== 'custom'; });
+    $('c2pNote').innerHTML = NOTES[k];
+    $('c2pLbl').textContent = d === 'c2p' ? 'Percentage' : 'CGPA';
+    box.className = 'c2p-big'; msg.className = 'msg'; msg.textContent = ''; out.textContent = '–'; how.textContent = ''; lastText = '';
+    if (!f) { msg.className = 'msg bad'; msg.textContent = 'Enter a multiplier above 0, an offset, and a highest CGPA above 0.'; $('c2pTbl').innerHTML = ''; return; }
+    // reference table
+    var step = f.max <= 5 ? f.max / 16 : f.max / 20, rows = '';
+    for (var i = 0, n = Math.round(f.max / 2 / step); i <= n; i++) { var c = f.max - i * step, p = M.toPct(f, c); rows += '<tr><td>' + f2(c) + '</td><td>' + f2(p) + '%</td></tr>'; }
+    $('c2pTbl').innerHTML = rows;
+    $('c2pTblH').textContent = 'Quick reference (' + (k === 'custom' ? 'your formula' : $('c2pF').selectedOptions[0].textContent.split(':')[0]) + ')';
+    if (d === 'c2p') {
+      var v = $('c2pC').value; if (v === '') { msg.textContent = 'Enter your CGPA (0 to ' + f.max + ').'; return; }
+      var cg = +v;
+      if (!isFinite(cg) || cg < 0 || cg > f.max) { box.className = 'c2p-big bad'; msg.className = 'msg bad'; msg.textContent = 'This formula is for a CGPA from 0 to ' + f.max + '. Check the scale, or pick another formula.'; return; }
+      var pct = M.toPct(f, cg);
+      out.textContent = f2(pct) + '%'; how.textContent = f.how.replace('CGPA', f2(cg));
+      if (pct < 0) { msg.className = 'msg bad'; msg.textContent = 'This formula gives a negative percentage for such a low CGPA, so it does not apply here.'; }
+      lastText = 'CGPA ' + cg + ' = ' + pct.toFixed(2) + '% (' + f.how + ')';
+    } else {
+      var w = $('c2pP').value; if (w === '') { msg.textContent = 'Enter your percentage (0 to 100).'; return; }
+      var pc = +w;
+      if (!isFinite(pc) || pc < 0 || pc > 100) { box.className = 'c2p-big bad'; msg.className = 'msg bad'; msg.textContent = 'Enter a percentage from 0 to 100.'; return; }
+      var r = M.toCgpa(f, pc), lo = M.toPct(f, 0), hi = M.toPct(f, f.max);
+      if (r < -1e-9 || r > f.max + 1e-9) { box.className = 'c2p-big bad'; msg.className = 'msg bad'; msg.textContent = 'This formula only gives percentages from ' + f2(Math.max(0, lo)) + '% to ' + f2(hi) + '%, so ' + f2(pc) + '% has no matching CGPA on it.'; return; }
+      out.textContent = f2(Math.min(f.max, Math.max(0, r))) + ' / ' + f.max; how.textContent = 'from ' + f.how;
+      lastText = pc + '% = CGPA ' + r.toFixed(2) + ' out of ' + f.max + ' (' + f.how + ')';
+    }
+  }
+  document.querySelectorAll('.c2p .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { $('c2pDir').value = b.dataset.dir; $('c2pDir').dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+  ['c2pDir', 'c2pF', 'c2pMul', 'c2pOff', 'c2pMax', 'c2pC', 'c2pP'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('c2pCopy').addEventListener('click', function () { if (!lastText) { toast('Enter a value first.'); return; } copyText(lastText, this); });
+  calc();
+})();
+</script>
