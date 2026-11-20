@@ -168,6 +168,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:image" content="${SITE}/assets/og.png">
 ${cfg.googleSiteVerification ? `<meta name="google-site-verification" content="${esc(cfg.googleSiteVerification)}">` : ''}
+<link rel="icon" href="${rel}favicon.ico" sizes="48x48">
 <link rel="icon" href="${rel}assets/favicon.svg" type="image/svg+xml">
 <link rel="icon" href="${rel}assets/icon-48.png" type="image/png" sizes="48x48">
 <link rel="icon" href="${rel}assets/icon-192.png" type="image/png" sizes="192x192">
@@ -188,7 +189,7 @@ ${head}
 </head>
 <body>
 <header class="site-header"><div class="wrap">
-  <a class="logo" href="${rel || './'}"><b></b><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
+  <a class="logo" href="${rel || './'}"><img src="${rel}assets/favicon.svg" alt="" width="30" height="30"><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
   <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
   <span class="sp"></span>
   <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
@@ -607,7 +608,7 @@ write('.nojekyll', '');
 // GitHub Pages reads the custom domain from this file.
 const host = new URL(SITE).hostname;
 if (!host.endsWith('.github.io')) write('CNAME', host + '\n');
-write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="15" fill="#2563eb"/><path d="M18 20h28v8H36v18h-8V28H18z" fill="#fff"/></svg>\n`);
+write('assets/favicon.svg', "<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 64 64\"><defs><linearGradient id=\"g\" x1=\"0\" y1=\"0\" x2=\"1\" y2=\"1\"><stop offset=\"0\" stop-color=\"#3b82f6\"/><stop offset=\"1\" stop-color=\"#7c3aed\"/></linearGradient><mask id=\"m\"><rect width=\"64\" height=\"64\" fill=\"#fff\"/><rect x=\"40\" y=\"6\" width=\"7\" height=\"12\" rx=\"1\" transform=\"rotate(45 43.5 12)\" fill=\"#000\"/></mask></defs><rect width=\"64\" height=\"64\" rx=\"15\" fill=\"url(#g)\"/><g mask=\"url(#m)\" fill=\"#fff\"><circle cx=\"41\" cy=\"17\" r=\"8.5\"/><rect x=\"18\" y=\"20\" width=\"6.5\" height=\"24\" rx=\"3.25\" transform=\"rotate(45 32 30)\"/></g><g fill=\"none\" stroke=\"#fff\" stroke-linecap=\"round\"><path d=\"M11 36c4 11.5 12 17 21 17s17-5.5 21-17\" stroke-width=\"5\"/><path d=\"M17.5 38c3 6 8 9 14.5 9s11.5-3 14.5-9\" stroke-width=\"3\" opacity=\".5\"/></g></svg>" + '\n');
 
 // ---------- app: manifest and service worker ----------
 const shortcuts = ['merge-pdf', 'edit-pdf', 'image-compressor', 'qr-code-generator'].map(bySlug);

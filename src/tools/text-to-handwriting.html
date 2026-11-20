@@ -1,0 +1,319 @@
+<style>
+@font-face { font-family: "GTN Caveat"; src: url(../assets/vendor/fonts/caveat-latin-400-normal.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "GTN Indie Flower"; src: url(../assets/vendor/fonts/indie-flower-latin-400-normal.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "GTN Kalam"; src: url(../assets/vendor/fonts/kalam-latin-400-normal.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "GTN Shadows Into Light"; src: url(../assets/vendor/fonts/shadows-into-light-latin-400-normal.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "GTN Dancing Script"; src: url(../assets/vendor/fonts/dancing-script-latin-400-normal.woff2) format("woff2"); font-display: block; }
+@font-face { font-family: "GTN Great Vibes"; src: url(../assets/vendor/fonts/great-vibes-latin-400-normal.woff2) format("woff2"); font-display: block; }
+.thw-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 820px) { .thw-grid { grid-template-columns: minmax(0, 1fr); } }
+.thw-ink { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.thw-ink input[type=color] { width: 44px; height: 40px; padding: 2px; border-radius: 8px; }
+.thw-view { background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 12px; }
+.thw-view canvas { display: block; width: 100%; max-width: 640px; height: auto; margin: 0 auto; aspect-ratio: 1240 / 1754; box-shadow: 0 2px 10px rgba(0, 0, 0, .18); background: #fff; }
+.thw-nav { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+.thw-nav .btn { min-width: 44px; justify-content: center; }
+.thw-nav b { min-width: 110px; text-align: center; font-weight: 600; }
+</style>
+<div class="thw-grid">
+  <div>
+    <label for="txt">Your text</label>
+    <textarea id="txt" class="plain" data-nomemo style="min-height:220px" placeholder="Type or paste the text you want written by hand...">Dear diary,
+
+Today I finally finished my history homework. It took the whole afternoon, but I think it reads well. Tomorrow I want to start the science project early, so I am not rushing on Sunday night.
+
+Things to remember:
+- buy a new notebook
+- return the library books
+- call Grandma</textarea>
+    <div class="fields" style="margin-top:14px">
+      <div><label for="font">Handwriting</label><select id="font">
+        <option value="caveat">Caveat (quick and neat)</option>
+        <option value="indie">Indie Flower (round, friendly)</option>
+        <option value="kalam">Kalam (school notes)</option>
+        <option value="shadows">Shadows Into Light (thin, light)</option>
+        <option value="dancing">Dancing Script (joined-up)</option>
+        <option value="vibes">Great Vibes (fancy cursive)</option>
+      </select></div>
+      <div><label for="paper">Paper</label><select id="paper">
+        <option value="ruled">Ruled notebook (red margin)</option>
+        <option value="plain">Plain white</option>
+        <option value="grid">Squared (grid)</option>
+      </select></div>
+      <div><label for="ink">Ink colour</label><div class="thw-ink">
+        <select id="ink" style="flex:1;min-width:0">
+          <option value="#1d3fa3">Blue pen</option>
+          <option value="#1c1c22">Black pen</option>
+          <option value="#b4231b">Red pen</option>
+          <option value="#4a4a4a">Pencil grey</option>
+          <option value="custom">Custom colour</option>
+        </select>
+        <input type="color" id="inkc" value="#0b6e4f" aria-label="Custom ink colour" hidden>
+      </div></div>
+    </div>
+    <div class="fields">
+      <div><label for="size">Letter size: <span id="sizev">48</span></label><input type="range" id="size" min="24" max="80" value="48"></div>
+      <div><label for="lh">Line spacing: <span id="lhv">1.6</span>×</label><input type="range" id="lh" min="1.1" max="2.6" step="0.1" value="1.6"></div>
+      <div><label for="ws">Word spacing: <span id="wsv">100</span>%</label><input type="range" id="ws" min="50" max="250" step="10" value="100"></div>
+      <div><label for="mess">Messiness: <span id="messv">4</span></label><input type="range" id="mess" min="0" max="10" value="4"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="scan">Scanned look (shadow and grain)</label>
+      <label><input type="checkbox" id="ragged" checked>Uneven left edge</label>
+    </div>
+    <input type="number" id="seed" value="7" hidden>
+    <div class="btns">
+      <button class="btn ghost" id="shuffle" type="button">New variation</button>
+      <button class="btn ghost" id="clr" type="button">Clear text</button>
+    </div>
+  </div>
+  <div>
+    <div class="thw-view">
+      <canvas id="page" width="1240" height="1754" role="img" aria-label="Handwritten page preview"></canvas>
+      <div class="thw-nav">
+        <button class="btn ghost" id="prev" type="button" aria-label="Previous page">‹</button>
+        <b id="pinfo" aria-live="polite">Page 1 of 1</b>
+        <button class="btn ghost" id="next" type="button" aria-label="Next page">›</button>
+      </div>
+    </div>
+    <div class="btns">
+      <button class="btn" id="png" type="button">Download this page (PNG)</button>
+      <button class="btn ghost" id="pdf" type="button">All pages as PDF</button>
+      <button class="btn ghost" id="zip" type="button">All pages as PNG (ZIP)</button>
+    </div>
+    <p class="msg" id="msg"></p>
+  </div>
+</div>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var W = 1240, H = 1754, MAXPAGES = 150; // A4 at 150 dpi
+  var FONTS = { // family, size factor so every hand looks about the same size, cursive = letters join up
+    caveat: ['GTN Caveat', 1.12, false], indie: ['GTN Indie Flower', 0.9, false], kalam: ['GTN Kalam', 0.86, false],
+    shadows: ['GTN Shadows Into Light', 0.98, false], dancing: ['GTN Dancing Script', 0.98, true], vibes: ['GTN Great Vibes', 1.18, true]
+  };
+  var cv = $('page'), meas = document.createElement('canvas').getContext('2d');
+  var pages = [[]], cur = 0, timer = 0, busy = false, fontReady = {};
+
+  function opts() {
+    var f = FONTS[$('font').value] || FONTS.caveat, size = +$('size').value * f[1];
+    return {
+      fam: f[0], cursive: f[2], size: size, lh: Math.round(+$('size').value * +$('lh').value), ws: +$('ws').value / 100,
+      mess: +$('mess').value / 10, paper: $('paper').value, ink: $('ink').value === 'custom' ? $('inkc').value : $('ink').value,
+      scan: $('scan').checked, ragged: $('ragged').checked, seed: (+$('seed').value || 1) >>> 0
+    };
+  }
+  // the writing area of a page, which depends on the paper
+  function box(o) {
+    var left = o.paper === 'ruled' ? 190 : 120;
+    var top = o.paper === 'ruled' ? 210 : 150;
+    return { left: left, right: W - 100, top: top, bottom: H - 110 };
+  }
+  // small deterministic random numbers, so the same text always looks the same
+  function rnd(a, b, c) {
+    var h = (a * 374761393 + b * 668265263 + c * 2246822519) >>> 0;
+    h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+    return (h >>> 0) / 4294967296;
+  }
+  function sym(a, b, c) { return rnd(a, b, c) * 2 - 1; }
+
+  // Break the text into lines and pages. Only measures, never draws.
+  function layout(o) {
+    var b = box(o), maxW = b.right - b.left, perPage = Math.max(1, Math.floor((b.bottom - b.top) / o.lh));
+    meas.font = o.size + 'px "' + o.fam + '"';
+    var space = meas.measureText(' ').width * o.ws, lines = [], n = 0;
+    var text = $('txt').value.replace(/\r\n?/g, '\n').replace(/\t/g, '    ');
+    text.split('\n').forEach(function (para) {
+      var words = para.split(/ +/).filter(function (w) { return w !== ''; }), line = [], x = 0;
+      if (!words.length) { lines.push([]); return; }
+      words.forEach(function (w) {
+        var pieces = [w];
+        if (meas.measureText(w).width > maxW) { // a very long word or link: split it over lines
+          pieces = []; var p = '';
+          Array.from(w).forEach(function (ch) { if (meas.measureText(p + ch).width > maxW && p) { pieces.push(p); p = ''; } p += ch; });
+          if (p) pieces.push(p);
+        }
+        pieces.forEach(function (pc) {
+          var ww = meas.measureText(pc).width;
+          if (line.length && x + space + ww > maxW) { lines.push(line); line = []; x = 0; }
+          if (line.length) x += space;
+          line.push({ t: pc, x: x, w: ww, i: n++ }); x += ww;
+        });
+      });
+      lines.push(line);
+    });
+    while (lines.length > 1 && !lines[lines.length - 1].length) lines.pop(); // no blank page at the end
+    var out = [];
+    for (var i = 0; i < lines.length; i += perPage) out.push(lines.slice(i, i + perPage));
+    if (!out.length) out.push([]);
+    return out;
+  }
+
+  function drawPaper(ctx, o) {
+    var b = box(o);
+    ctx.fillStyle = o.paper === 'plain' ? '#fffefb' : '#fdfcf6';
+    ctx.fillRect(0, 0, W, H);
+    if (o.paper === 'ruled') {
+      ctx.strokeStyle = 'rgba(70, 120, 200, .42)'; ctx.lineWidth = 2;
+      for (var y = b.top + o.lh; y < H - 40; y += o.lh) { ctx.beginPath(); ctx.moveTo(0, y + .5); ctx.lineTo(W, y + .5); ctx.stroke(); }
+      ctx.strokeStyle = 'rgba(215, 60, 70, .6)'; ctx.lineWidth = 2.5;
+      [b.left - 32, b.left - 40].forEach(function (x) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); });
+    } else if (o.paper === 'grid') {
+      var g = o.lh / 2;
+      ctx.strokeStyle = 'rgba(80, 130, 200, .26)'; ctx.lineWidth = 1.5;
+      for (var gy = b.top + o.lh - Math.floor((b.top + o.lh) / g) * g; gy < H; gy += g) { ctx.beginPath(); ctx.moveTo(0, gy + .5); ctx.lineTo(W, gy + .5); ctx.stroke(); }
+      for (var gx = b.left % g; gx < W; gx += g) { ctx.beginPath(); ctx.moveTo(gx + .5, 0); ctx.lineTo(gx + .5, H); ctx.stroke(); }
+    }
+  }
+
+  function drawText(ctx, o, lines, pageNo) {
+    var b = box(o), m = o.mess, letterAmt = o.cursive ? 0.3 : 1, sz = o.size;
+    ctx.fillStyle = o.ink; ctx.textBaseline = 'alphabetic';
+    lines.forEach(function (line, li) {
+      var base = b.top + o.lh * (li + 1) - (o.paper === 'plain' ? 0 : Math.max(4, o.lh * 0.12));
+      var s = o.seed + pageNo * 7919;
+      var slope = sym(s, li, 1) * 0.006 * m, x0 = b.left + (o.ragged ? sym(s, li, 2) * 10 * m : 0);
+      line.forEach(function (w) {
+        var k = w.i;
+        var wRot = sym(o.seed, k, 3) * 0.025 * m, wDy = sym(o.seed, k, 4) * sz * 0.05 * m, wSc = 1 + sym(o.seed, k, 5) * 0.05 * m;
+        var wx = x0 + w.x + sym(o.seed, k, 6) * 3 * m, wy = base + w.x * slope + wDy;
+        ctx.save();
+        ctx.translate(wx, wy); ctx.rotate(wRot + slope); ctx.scale(wSc, wSc);
+        ctx.font = sz + 'px "' + o.fam + '"';
+        ctx.globalAlpha = 0.82 + rnd(o.seed, k, 7) * 0.18; // ink is never perfectly even
+        if (m === 0) { ctx.fillText(w.t, 0, 0); ctx.restore(); return; }
+        var chars = Array.from(w.t), pre = '';
+        chars.forEach(function (ch, ci) {
+          var cx = ctx.measureText(pre).width; pre += ch;
+          var a = sym(o.seed + 31, k * 64 + ci, 8) * 0.07 * m * letterAmt;
+          var dy = sym(o.seed + 31, k * 64 + ci, 9) * sz * 0.035 * m * letterAmt;
+          var sc = 1 + sym(o.seed + 31, k * 64 + ci, 10) * 0.06 * m * letterAmt;
+          ctx.save(); ctx.translate(cx, dy); ctx.rotate(a); ctx.scale(sc, sc); ctx.fillText(ch, 0, 0); ctx.restore();
+        });
+        ctx.restore();
+      });
+    });
+    ctx.globalAlpha = 1;
+  }
+
+  // a light "scanner" pass: uneven lighting, a soft edge shadow and paper grain
+  function scanLook(ctx, o, pageNo) {
+    var g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(0.7, 'rgba(0,0,0,.025)'); g.addColorStop(1, 'rgba(0,0,0,.09)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    var e = ctx.createLinearGradient(0, 0, 60, 0);
+    e.addColorStop(0, 'rgba(0,0,0,.22)'); e.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = e; ctx.fillRect(0, 0, 60, H);
+    // grain in 2 x 2 dots: looks like paper and keeps the PNG files smaller than single-pixel noise
+    var img = ctx.getImageData(0, 0, W, H), d = img.data, s = (o.seed * 2654435761 + pageNo * 97) >>> 0, row = new Float32Array(W / 2);
+    for (var y = 0; y < H; y++) {
+      if (!(y & 1)) for (var j = 0; j < row.length; j++) { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; s >>>= 0; row[j] = ((s & 255) - 128) / 128 * 7; }
+      for (var x = 0, i = y * W * 4; x < W; x++, i += 4) { var nz = row[x >> 1]; d[i] += nz; d[i + 1] += nz; d[i + 2] += nz; }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function drawPage(canvas, o, i) {
+    var ctx = canvas.getContext('2d', { willReadFrequently: true });
+    drawPaper(ctx, o); drawText(ctx, o, pages[i] || [], i);
+    if (o.scan) scanLook(ctx, o, i);
+  }
+
+  function waitFont(o) {
+    if (fontReady[o.fam] || !document.fonts || !document.fonts.load) return Promise.resolve();
+    return document.fonts.load('40px "' + o.fam + '"', 'abcABC').then(function () { fontReady[o.fam] = true; }, function () {});
+  }
+
+  function render() {
+    var o = opts();
+    return waitFont(o).then(function () {
+      pages = layout(o);
+      var msg = '';
+      if (pages.length > MAXPAGES) { pages = pages.slice(0, MAXPAGES); msg = 'Your text is very long, so only the first ' + MAXPAGES + ' pages are shown and downloaded.'; }
+      if (cur >= pages.length) cur = pages.length - 1;
+      drawPage(cv, o, cur);
+      $('pinfo').textContent = 'Page ' + (cur + 1) + ' of ' + pages.length;
+      $('prev').disabled = cur === 0; $('next').disabled = cur >= pages.length - 1;
+      var empty = !$('txt').value.trim();
+      ['png', 'pdf', 'zip'].forEach(function (id) { $(id).disabled = empty; });
+      if (!busy) PT.say(msg ? 'bad' : '', msg || (empty ? 'Type some text to see it written by hand.' : ''));
+    });
+  }
+  function soon() { clearTimeout(timer); timer = setTimeout(render, 120); }
+
+  function save(blob, name) {
+    var a = document.createElement('a'), url = URL.createObjectURL(blob);
+    a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+  }
+  // draw every page in turn on a spare canvas, handing each one to fn
+  function eachPage(o, fn) {
+    var c = document.createElement('canvas'); c.width = W; c.height = H;
+    var i = 0;
+    function next() {
+      if (i >= pages.length) return Promise.resolve();
+      PT.say('', 'Drawing page ' + (i + 1) + ' of ' + pages.length + '…');
+      drawPage(c, o, i);
+      return Promise.resolve(fn(c, i++)).then(function () { return new Promise(function (r) { setTimeout(r, 0); }); }).then(next);
+    }
+    return next();
+  }
+  function job(btn, work) {
+    if (busy) return;
+    busy = true; btn.disabled = true;
+    var o = opts();
+    waitFont(o).then(function () { pages = layout(o).slice(0, MAXPAGES); return work(o); })
+      .catch(function () { PT.say('bad', 'Sorry, the file could not be made. Try fewer pages or turn off the scanned look.'); })
+      .then(function () { busy = false; btn.disabled = false; });
+  }
+
+  $('png').addEventListener('click', function () {
+    job($('png'), function (o) {
+      var c = document.createElement('canvas'); c.width = W; c.height = H; drawPage(c, o, cur);
+      return PT.blob(c, 'image/png').then(function (b) { save(b, 'handwriting-page-' + (cur + 1) + '.png'); PT.say('ok', 'Saved page ' + (cur + 1) + ' · ' + fmtBytes(b.size)); });
+    });
+  });
+  $('zip').addEventListener('click', function () {
+    job($('zip'), function (o) {
+      var files = [];
+      return eachPage(o, function (c, i) {
+        return PT.blob(c, 'image/png').then(function (b) { return b.arrayBuffer(); }).then(function (buf) { files.push({ name: 'handwriting-page-' + String(i + 1).padStart(2, '0') + '.png', data: new Uint8Array(buf) }); });
+      }).then(function () {
+        var z = PT.zip(files); save(z, 'handwriting-pages.zip');
+        PT.say('ok', 'Saved ' + files.length + (files.length === 1 ? ' page' : ' pages') + ' as a ZIP · ' + fmtBytes(z.size));
+      });
+    });
+  });
+  $('pdf').addEventListener('click', function () {
+    job($('pdf'), function (o) {
+      var doc;
+      return PDFLib.PDFDocument.create().then(function (d) {
+        doc = d;
+        return eachPage(o, function (c) {
+          return PT.blob(c, 'image/jpeg', 0.9).then(function (b) { return b.arrayBuffer(); }).then(function (buf) { return doc.embedJpg(buf); }).then(function (img) {
+            doc.addPage([595.28, 841.89]).drawImage(img, { x: 0, y: 0, width: 595.28, height: 841.89 });
+          });
+        });
+      }).then(function () { doc.setTitle('Handwritten notes'); return doc.save(); }).then(function (bytes) {
+        var b = new Blob([bytes], { type: 'application/pdf' }); save(b, 'handwriting.pdf');
+        PT.say('ok', 'Saved a ' + doc.getPageCount() + '-page PDF · ' + fmtBytes(b.size));
+      });
+    });
+  });
+
+  $('prev').addEventListener('click', function () { if (cur > 0) { cur--; render(); } });
+  $('next').addEventListener('click', function () { if (cur < pages.length - 1) { cur++; render(); } });
+  $('shuffle').addEventListener('click', function () { $('seed').value = 1 + Math.floor(Math.random() * 99999); $('seed').dispatchEvent(new Event('input', { bubbles: true })); render(); });
+  $('clr').addEventListener('click', function () { $('txt').value = ''; cur = 0; render(); $('txt').focus(); });
+  $('ink').addEventListener('change', function () { $('inkc').hidden = $('ink').value !== 'custom'; });
+  [['size', 'sizev'], ['lh', 'lhv'], ['ws', 'wsv'], ['mess', 'messv']].forEach(function (p) {
+    $(p[0]).addEventListener('input', function () { $(p[1]).textContent = $(p[0]).value; });
+  });
+  ['txt', 'font', 'paper', 'ink', 'inkc', 'size', 'lh', 'ws', 'mess', 'scan', 'ragged', 'seed'].forEach(function (id) {
+    $(id).addEventListener('input', soon); $(id).addEventListener('change', soon);
+  });
+  $('inkc').hidden = $('ink').value !== 'custom';
+  render();
+})();
+</script>

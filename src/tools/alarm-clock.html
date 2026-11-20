@@ -1,0 +1,320 @@
+<style>
+.ac-clock { text-align: center; margin: 0 0 6px; }
+.ac-clock .big { margin: 0; }
+.ac-clock .big small { font-size: .32em; font-weight: 600; margin-inline-start: 6px; letter-spacing: 0; color: var(--muted); }
+.ac-date { color: var(--muted); font-size: 15px; margin: 0 0 14px; }
+.ac-top { display: flex; justify-content: center; margin-bottom: 14px; }
+.ac-days { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 14px; border: 0; padding: 0; }
+.ac-days legend { font-size: 14px; font-weight: 600; margin-bottom: 6px; padding: 0; }
+.ac-days label { margin: 0; font-weight: 600; font-size: 14px; }
+.ac-days input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.ac-days span { display: inline-flex; align-items: center; justify-content: center; min-width: 46px; height: 38px; padding: 0 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); cursor: pointer; }
+.ac-days input:checked + span { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.ac-days input:focus-visible + span { box-shadow: 0 0 0 3px var(--accent-soft); }
+#acTimeIn { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.ac-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
+.ac-item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 10px 12px; }
+.ac-item.off { opacity: .6; }
+.ac-item b { font-size: 26px; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.ac-item b small { font-size: 14px; font-weight: 600; color: var(--muted); margin-inline-start: 3px; }
+.ac-meta { min-width: 0; overflow-wrap: anywhere; font-size: 14px; color: var(--muted); }
+.ac-meta strong { display: block; color: var(--ink); font-size: 15px; }
+.ac-acts { display: flex; gap: 6px; align-items: center; }
+.ac-acts button { font: inherit; font-size: 14px; height: 36px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.ac-acts button:hover { border-color: var(--accent); color: var(--accent); }
+.ac-sw { position: relative; width: 46px; height: 28px; margin: 0; flex: none; }
+.ac-sw input { position: absolute; inset: 0; opacity: 0; margin: 0; width: 100%; height: 100%; cursor: pointer; }
+.ac-sw i { position: absolute; inset: 0; border-radius: 999px; background: var(--line); pointer-events: none; transition: background .15s; }
+.ac-sw i::after { content: ''; position: absolute; top: 3px; left: 3px; width: 22px; height: 22px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); transition: transform .15s; }
+.ac-sw input:checked + i { background: var(--accent); }
+.ac-sw input:checked + i::after { transform: translateX(18px); }
+.ac-sw input:focus-visible + i { box-shadow: 0 0 0 3px var(--accent-soft); }
+.ac-ring { position: fixed; inset: 0; z-index: 60; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(0,0,0,.55); }
+.ac-ring[hidden] { display: none; }
+.ac-ring > div { width: min(420px, 100%); background: var(--surface); color: var(--ink); border: 2px solid var(--accent); border-radius: 18px; padding: 24px 20px; text-align: center; box-shadow: 0 24px 60px -12px rgba(0,0,0,.45); }
+.ac-ring h2 { margin: 0 0 4px; font-size: clamp(40px, 12vw, 64px); font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.ac-ring p { margin: 0 0 18px; font-size: 18px; font-weight: 600; overflow-wrap: anywhere; }
+.ac-ring .btns { justify-content: center; }
+.ac-ring .btn { min-width: 130px; justify-content: center; font-size: 18px; }
+.ac-bell { display: inline-block; font-size: 40px; animation: acShake .5s ease-in-out infinite alternate; }
+@keyframes acShake { from { transform: rotate(-14deg); } to { transform: rotate(14deg); } }
+@media (prefers-reduced-motion: reduce) { .ac-bell { animation: none; } }
+@media (max-width: 560px) {
+  .ac-item { grid-template-columns: minmax(0, 1fr); }
+  .ac-acts { justify-content: flex-end; }
+}
+</style>
+<div class="ac-clock"><div class="big" id="acNow" role="timer" aria-live="off">--:--:--</div><p class="ac-date" id="acDate"></p></div>
+<div class="ac-top"><div class="seg" role="group" aria-label="Clock format"><button type="button" id="ac24" aria-pressed="true">24-hour</button><button type="button" id="ac12" aria-pressed="false">12-hour</button></div></div>
+<div class="warnbox" id="acWarn"><b>Keep this tab open and your computer awake.</b> The alarm runs inside this page. It cannot ring if you close the tab, close the laptop lid or the computer goes to sleep. On phones, keep the screen on and the browser in front, or use your phone's own clock app for important alarms.</div>
+<div class="notice bad" id="acSound" hidden><p>Click or tap anywhere on this page once so your browser lets the alarm play sound.</p></div>
+
+<h3 style="font-size:17px;margin:20px 0 10px" id="acFormTitle">Add an alarm</h3>
+<div class="fields">
+  <div><label for="acTimeIn">Time</label><input type="time" id="acTimeIn" value="07:00" data-nomemo></div>
+  <div><label for="acLabel">Label (optional)</label><input type="text" id="acLabel" maxlength="60" placeholder="e.g. Wake up, Take medicine" data-nomemo></div>
+  <div><label for="acTone">Sound</label><select id="acTone" data-nomemo>
+    <option value="beep">Classic beep</option><option value="digital">Digital watch</option><option value="chime">Chimes</option><option value="gentle">Gentle rise</option><option value="siren">Siren (loud)</option><option value="bird">Birds</option>
+  </select></div>
+</div>
+<fieldset class="ac-days" id="acDays"><legend>Repeat on (leave all off for a one-time alarm)</legend></fieldset>
+<div class="btns" style="margin-top:0"><button class="btn" id="acAdd">Add alarm</button><button class="btn ghost" id="acCancel" hidden>Cancel editing</button><button class="btn ghost" id="acTest">Test sound</button></div>
+<p class="msg" id="acMsg"></p>
+
+<ul class="ac-list" id="acList" aria-live="polite"></ul>
+<p class="msg" id="acEmpty">No alarms yet. Set a time above and click Add alarm.</p>
+
+<h3 style="font-size:17px;margin:24px 0 10px">Sound and alerts</h3>
+<div class="fields">
+  <div><label for="acVol">Volume: <span id="acVolV">80%</span></label><input type="range" id="acVol" min="5" max="100" step="5" value="80" data-nomemo></div>
+  <div><label for="acSnooze">Snooze length</label><select id="acSnooze" data-nomemo><option value="5">5 minutes</option><option value="9">9 minutes</option><option value="10">10 minutes</option><option value="15">15 minutes</option><option value="20">20 minutes</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="acRamp" checked data-nomemo>Start quietly and get louder over 30 seconds</label></div>
+<div class="btns" style="margin-top:0"><button class="btn ghost" id="acNotify">Turn on desktop notifications</button></div>
+<p class="msg" id="acNotifyMsg"></p>
+
+<div class="ac-ring" id="acRing" role="alertdialog" aria-modal="true" aria-labelledby="acRingTime" hidden>
+  <div><span class="ac-bell" aria-hidden="true">⏰</span><h2 id="acRingTime"></h2><p id="acRingLabel"></p>
+  <div class="btns"><button class="btn ghost" id="acSnoozeBtn">Snooze</button><button class="btn" id="acStop">Stop</button></div></div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-alarms', DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'], ORDER = [1, 2, 3, 4, 5, 6, 0];
+  var LATE = 10 * 60e3, MAXRING = 10 * 60e3, title = document.title;
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+  var S = load();
+  var alarms = Array.isArray(S.alarms) ? S.alarms.filter(function (a) { return a && a.id && a.h >= 0 && a.h < 24 && a.m >= 0 && a.m < 60; }) : [];
+  var cfg = { fmt: S.fmt === 12 ? 12 : 24, vol: S.vol >= 5 && S.vol <= 100 ? S.vol : 80, ramp: S.ramp !== false, snooze: [5, 9, 10, 15, 20].indexOf(S.snooze) >= 0 ? S.snooze : 9 };
+  var editing = null, ringing = [], ringStart = 0, missed = [];
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ alarms: alarms, fmt: cfg.fmt, vol: cfg.vol, ramp: cfg.ramp, snooze: cfg.snooze })); } catch (e) {} }
+  var p2 = function (x) { return String(x).padStart(2, '0'); };
+  function hm(h, m) { if (cfg.fmt === 24) return { t: p2(h) + ':' + p2(m), ap: '' }; return { t: (h % 12 || 12) + ':' + p2(m), ap: h < 12 ? 'AM' : 'PM' }; }
+  function hmText(h, m) { var x = hm(h, m); return x.t + (x.ap ? ' ' + x.ap : ''); }
+
+  // ---------- scheduling: every alarm keeps the exact timestamp of its next ring ----------
+  function nextAt(a, from) {
+    for (var i = 0; i < 8; i++) {
+      var d = new Date(from); d.setDate(d.getDate() + i); d.setHours(a.h, a.m, 0, 0);
+      if (d.getTime() > from && (!a.days.length || a.days.indexOf(d.getDay()) >= 0)) return d.getTime();
+    }
+    return 0;
+  }
+  function repeatText(a) {
+    if (!a.days.length) return 'Once';
+    if (a.days.length === 7) return 'Every day';
+    var s = a.days.slice().sort().join();
+    if (s === '1,2,3,4,5') return 'Weekdays';
+    if (s === '0,6') return 'Weekends';
+    return ORDER.filter(function (d) { return a.days.indexOf(d) >= 0; }).map(function (d) { return DAYS[d]; }).join(', ');
+  }
+  function inText(ms) {
+    var m = Math.max(0, Math.round(ms / 60e3)), d = Math.floor(m / 1440), h = Math.floor(m / 60) % 24, mm = m % 60;
+    if (m < 1) return 'in less than a minute';
+    return 'in ' + (d ? d + ' d ' : '') + (h ? h + ' h ' : '') + (d ? '' : mm + ' min');
+  }
+
+  // ---------- sound: generated with the Web Audio API, nothing to download ----------
+  var ctx = null, master = null, tones = null, schedUntil = 0, testStop = 0;
+  function audio() {
+    if (!ctx) { try { ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { return null; } }
+    if (ctx.state === 'suspended') ctx.resume().catch(function () {});
+    return ctx;
+  }
+  function note(t, f, dur, type, peak, f2) {
+    var o = ctx.createOscillator(), g = ctx.createGain();
+    o.type = type; o.frequency.setValueAtTime(f, t);
+    if (f2) o.frequency.exponentialRampToValueAtTime(f2, t + dur);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(peak, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(g); g.connect(tones); o.start(t); o.stop(t + dur + 0.02);
+  }
+  // each pattern schedules one cycle starting at t and returns its length in seconds
+  var PAT = {
+    beep: function (t) { for (var i = 0; i < 4; i++) note(t + i * 0.16, 880, 0.1, 'square', 0.35); return 1.2; },
+    digital: function (t) { for (var i = 0; i < 8; i++) note(t + i * 0.07, i % 2 ? 4000 : 3200, 0.05, 'square', 0.18); return 1; },
+    chime: function (t) { [1047, 1319, 1568, 2093].forEach(function (f, i) { note(t + i * 0.3, f, 1.4, 'sine', 0.6); }); return 2.4; },
+    gentle: function (t) { [523, 659, 784, 659].forEach(function (f, i) { note(t + i * 0.45, f, 0.9, 'triangle', 0.5); }); return 2.6; },
+    siren: function (t) { note(t, 600, 0.7, 'sawtooth', 0.25, 1300); note(t + 0.7, 1300, 0.7, 'sawtooth', 0.25, 600); return 1.4; },
+    bird: function (t) { [0, 0.18, 0.36, 1.1, 1.25].forEach(function (d) { note(t + d, 2600 + Math.random() * 900, 0.12, 'sine', 0.4, 4200); }); return 2.2; }
+  };
+  function soundStart(tone, ramp) {
+    if (!audio()) return;
+    soundStop();
+    master = ctx.createGain(); tones = ctx.createGain(); tones.connect(master); master.connect(ctx.destination);
+    var v = cfg.vol / 100, now = ctx.currentTime;
+    if (ramp) { master.gain.setValueAtTime(v * 0.04, now); master.gain.linearRampToValueAtTime(v, now + 30); }
+    else master.gain.setValueAtTime(v, now);
+    master._tone = PAT[tone] ? tone : 'beep'; schedUntil = now + 0.05;
+    soundPump();
+  }
+  function soundPump() { // keep about 3 seconds of sound queued; called from the ticker
+    if (!master || !ctx) return;
+    if (schedUntil < ctx.currentTime) schedUntil = ctx.currentTime + 0.05;
+    while (schedUntil < ctx.currentTime + 3) schedUntil += PAT[master._tone](schedUntil);
+  }
+  function soundStop() {
+    if (!master) return;
+    var m = master, t = tones; master = null; tones = null;
+    try { m.gain.cancelScheduledValues(ctx.currentTime); m.gain.setValueAtTime(0, ctx.currentTime); setTimeout(function () { try { t.disconnect(); m.disconnect(); } catch (e) {} }, 100); } catch (e) {}
+  }
+  function unlocked() { return ctx && ctx.state === 'running'; }
+  ['pointerdown', 'keydown', 'touchend'].forEach(function (ev) { document.addEventListener(ev, function () { audio(); setTimeout(paintSound, 300); }, true); });
+  function paintSound() { $('acSound').hidden = unlocked() || !alarms.some(function (a) { return a.on; }); }
+
+  // ---------- ringing ----------
+  var flash = 0;
+  function ring(a, late) {
+    if (ringing.indexOf(a.id) < 0) ringing.push(a.id);
+    if (!ringStart) { ringStart = Date.now(); soundStart(a.tone, cfg.ramp); }
+    var list = ringing.map(function (id) { return alarms.filter(function (x) { return x.id === id; })[0]; }).filter(Boolean);
+    $('acRingTime').textContent = hmText(a.h, a.m);
+    $('acRingLabel').textContent = list.map(function (x) { return x.label || 'Alarm'; }).join(' · ') + (late > 60e3 ? ' (rang ' + Math.round(late / 60e3) + ' min late because the computer was asleep or busy)' : '');
+    $('acRing').hidden = false; $('acStop').focus();
+    clearInterval(flash);
+    flash = setInterval(function () { document.title = document.title.indexOf('⏰') === 0 ? title : '⏰ ' + hmText(a.h, a.m) + ' ' + (a.label || 'Alarm'); }, 1000);
+    if (window.Notification && Notification.permission === 'granted') {
+      try { var n = new Notification('Alarm ' + hmText(a.h, a.m), { body: a.label || 'Your alarm is ringing.', tag: 'gtn-alarm', requireInteraction: true }); n.onclick = function () { window.focus(); n.close(); }; } catch (e) {}
+    }
+  }
+  function endRing(snooze) {
+    var until = snooze ? Date.now() + cfg.snooze * 60e3 : 0;
+    ringing.forEach(function (id) { alarms.forEach(function (a) { if (a.id === id) a.snooze = until; }); });
+    ringing = []; ringStart = 0; soundStop(); clearInterval(flash); document.title = title; $('acRing').hidden = true;
+    say(snooze ? 'Snoozed until ' + new Date(until).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: cfg.fmt === 12 }) + '.' : 'Alarm stopped.', 'ok');
+    save(); paint();
+  }
+  $('acStop').addEventListener('click', function () { endRing(false); });
+  $('acSnoozeBtn').addEventListener('click', function () { endRing(true); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && ringing.length) endRing(false); });
+
+  // ---------- the check: runs every 250 ms and compares timestamps, so a late tick still catches up ----------
+  function check() {
+    var now = Date.now(), changed = false;
+    alarms.forEach(function (a) {
+      if (a.snooze && now >= a.snooze) { var sl = now - a.snooze; a.snooze = 0; changed = true; ring(a, sl > LATE ? 0 : sl); return; }
+      if (!a.on || !a.next || now < a.next) return;
+      var late = now - a.next;
+      if (late <= LATE) ring(a, late);
+      else missed.push(hmText(a.h, a.m) + (a.label ? ' (' + a.label + ')' : ''));
+      if (a.days.length) a.next = nextAt(a, now); else { a.on = false; a.next = 0; }
+      changed = true;
+    });
+    if (missed.length) { say('Missed: ' + missed.join(', ') + '. The page was closed or the computer was asleep at that time.', 'bad'); missed = []; }
+    if (ringStart && now - ringStart > MAXRING) { endRing(false); say('The alarm rang for 10 minutes and was stopped automatically.', 'bad'); }
+    if (master) soundPump();
+    if (testStop && now > testStop) { testStop = 0; if (!ringing.length) soundStop(); }
+    if (changed) { save(); paint(); }
+  }
+  // Timers in a background tab can be slowed to once a minute; a worker's timer is not, so it drives the check.
+  var lastSec = -1;
+  function tick() { check(); var s = Math.floor(Date.now() / 1000); if (s !== lastSec) { lastSec = s; clock(); } }
+  try {
+    var w = new Worker(URL.createObjectURL(new Blob(['setInterval(function(){postMessage(0)},250)'], { type: 'text/javascript' })));
+    w.onmessage = tick;
+  } catch (e) {}
+  setInterval(tick, 250);
+  document.addEventListener('visibilitychange', tick);
+
+  // ---------- display ----------
+  function clock() {
+    var d = new Date(), x = hm(d.getHours(), d.getMinutes());
+    $('acNow').innerHTML = '';
+    $('acNow').appendChild(document.createTextNode(x.t + ':' + p2(d.getSeconds())));
+    if (x.ap) { var sm = document.createElement('small'); sm.textContent = x.ap; $('acNow').appendChild(sm); }
+    $('acDate').textContent = d.toLocaleDateString([], { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    if (d.getSeconds() === 0) paintNext();
+  }
+  function paintNext() {
+    var now = Date.now();
+    document.querySelectorAll('[data-next]').forEach(function (el) {
+      var a = alarms.filter(function (x) { return x.id === el.dataset.next; })[0]; if (!a) return;
+      el.textContent = a.snooze > now ? 'Snoozed, rings ' + inText(a.snooze - now) : a.on && a.next ? 'Rings ' + inText(a.next - now) : 'Off';
+    });
+  }
+  function paint() {
+    var ul = $('acList'); ul.innerHTML = '';
+    alarms.slice().sort(function (a, b) { return a.h * 60 + a.m - b.h * 60 - b.m; }).forEach(function (a) {
+      var li = document.createElement('li'); li.className = 'ac-item' + (a.on || a.snooze ? '' : ' off');
+      var sw = document.createElement('label'); sw.className = 'ac-sw';
+      var cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = a.on; cb.setAttribute('data-nomemo', ''); cb.setAttribute('aria-label', 'Alarm at ' + hmText(a.h, a.m) + ' on or off');
+      cb.addEventListener('change', function () { a.on = cb.checked; a.snooze = 0; a.next = a.on ? nextAt(a, Date.now()) : 0; audio(); save(); paint(); if (a.on) say('Alarm set for ' + hmText(a.h, a.m) + ', ' + inText(a.next - Date.now()) + '.', 'ok'); });
+      sw.appendChild(cb); sw.appendChild(document.createElement('i'));
+      var meta = document.createElement('div'); meta.className = 'ac-meta';
+      var b = document.createElement('b'), x = hm(a.h, a.m); b.textContent = x.t;
+      if (x.ap) { var s = document.createElement('small'); s.textContent = x.ap; b.appendChild(s); }
+      var lab = document.createElement('strong'); lab.textContent = a.label || 'Alarm';
+      var info = document.createElement('span'); info.textContent = repeatText(a) + ' · ';
+      var nx = document.createElement('span'); nx.dataset.next = a.id;
+      meta.appendChild(b); meta.appendChild(lab); meta.appendChild(info); meta.appendChild(nx);
+      var acts = document.createElement('div'); acts.className = 'ac-acts';
+      var ed = document.createElement('button'); ed.type = 'button'; ed.textContent = 'Edit'; ed.addEventListener('click', function () { startEdit(a); });
+      var del = document.createElement('button'); del.type = 'button'; del.textContent = 'Delete';
+      del.addEventListener('click', function () { alarms = alarms.filter(function (y) { return y !== a; }); if (editing === a) stopEdit(); save(); paint(); say('Alarm deleted.', ''); });
+      acts.appendChild(ed); acts.appendChild(del); acts.appendChild(sw);
+      li.appendChild(meta); li.appendChild(acts);
+      ul.appendChild(li);
+    });
+    $('acEmpty').hidden = alarms.length > 0;
+    paintNext(); paintSound();
+  }
+  function say(t, cls) { $('acMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('acMsg').textContent = t; }
+
+  // ---------- form ----------
+  ORDER.forEach(function (d) {
+    var l = document.createElement('label'), i = document.createElement('input'), s = document.createElement('span');
+    i.type = 'checkbox'; i.value = d; i.setAttribute('data-nomemo', ''); i.setAttribute('aria-label', ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][d]);
+    s.textContent = DAYS[d]; l.appendChild(i); l.appendChild(s); $('acDays').appendChild(l);
+  });
+  function formDays() { return Array.prototype.map.call($('acDays').querySelectorAll('input:checked'), function (i) { return +i.value; }); }
+  function startEdit(a) {
+    editing = a; $('acTimeIn').value = p2(a.h) + ':' + p2(a.m); $('acLabel').value = a.label; $('acTone').value = a.tone;
+    $('acDays').querySelectorAll('input').forEach(function (i) { i.checked = a.days.indexOf(+i.value) >= 0; });
+    $('acAdd').textContent = 'Save changes'; $('acCancel').hidden = false; $('acFormTitle').textContent = 'Edit alarm';
+    $('acFormTitle').scrollIntoView({ block: 'nearest' }); $('acTimeIn').focus();
+  }
+  function stopEdit() { editing = null; $('acAdd').textContent = 'Add alarm'; $('acCancel').hidden = true; $('acFormTitle').textContent = 'Add an alarm'; $('acLabel').value = ''; $('acDays').querySelectorAll('input').forEach(function (i) { i.checked = false; }); }
+  $('acCancel').addEventListener('click', function () { stopEdit(); say('', ''); });
+  $('acAdd').addEventListener('click', function () {
+    audio();
+    var m = /^(\d{1,2}):(\d{2})/.exec($('acTimeIn').value);
+    if (!m || +m[1] > 23 || +m[2] > 59) { say('Enter a valid time, for example 07:30.', 'bad'); return; }
+    var a = editing || { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6) };
+    a.h = +m[1]; a.m = +m[2]; a.label = $('acLabel').value.trim().slice(0, 60); a.tone = $('acTone').value; a.days = formDays(); a.on = true; a.snooze = 0;
+    a.next = nextAt(a, Date.now());
+    if (!editing) alarms.push(a);
+    var was = !!editing; stopEdit(); save(); paint();
+    say((was ? 'Alarm updated: ' : 'Alarm set for ') + hmText(a.h, a.m) + ' (' + repeatText(a).toLowerCase() + '), ' + inText(a.next - Date.now()) + '.', 'ok');
+  });
+  $('acTest').addEventListener('click', function () {
+    if (master && !ringing.length) { soundStop(); testStop = 0; return; }
+    if (ringing.length) return;
+    soundStart($('acTone').value, false); testStop = Date.now() + 4000;
+    if (!ctx) say('Your browser cannot play generated sound.', 'bad');
+  });
+
+  // ---------- settings ----------
+  function fmtBtns() { $('ac24').setAttribute('aria-pressed', cfg.fmt === 24); $('ac12').setAttribute('aria-pressed', cfg.fmt === 12); }
+  $('ac24').addEventListener('click', function () { cfg.fmt = 24; fmtBtns(); save(); clock(); paint(); });
+  $('ac12').addEventListener('click', function () { cfg.fmt = 12; fmtBtns(); save(); clock(); paint(); });
+  $('acVol').value = cfg.vol; $('acVolV').textContent = cfg.vol + '%';
+  $('acVol').addEventListener('input', function () {
+    cfg.vol = +$('acVol').value; $('acVolV').textContent = cfg.vol + '%'; save();
+    if (master && ctx) { master.gain.cancelScheduledValues(ctx.currentTime); master.gain.setValueAtTime(cfg.vol / 100, ctx.currentTime); }
+  });
+  $('acRamp').checked = cfg.ramp; $('acRamp').addEventListener('change', function () { cfg.ramp = $('acRamp').checked; save(); });
+  $('acSnooze').value = cfg.snooze; $('acSnooze').addEventListener('change', function () { cfg.snooze = +$('acSnooze').value; $('acSnoozeBtn').textContent = 'Snooze ' + cfg.snooze + ' min'; save(); });
+  $('acSnoozeBtn').textContent = 'Snooze ' + cfg.snooze + ' min';
+  function notifyState() {
+    var m = $('acNotifyMsg'), b = $('acNotify');
+    if (!window.Notification) { b.hidden = true; m.textContent = 'This browser does not support desktop notifications. The alarm still rings and the tab title flashes.'; return; }
+    if (Notification.permission === 'granted') { b.hidden = true; m.className = 'msg ok'; m.textContent = 'Desktop notifications are on. You will see a pop-up even when this tab is in the background.'; }
+    else if (Notification.permission === 'denied') { b.hidden = true; m.className = 'msg'; m.textContent = 'Notifications are blocked for this site. To allow them, click the lock or settings icon next to the address bar. The alarm still rings without them.'; }
+    else { b.hidden = false; m.textContent = 'Optional: a pop-up when the alarm rings, useful if this tab is behind other windows.'; }
+  }
+  $('acNotify').addEventListener('click', function () {
+    try { var p = Notification.requestPermission(notifyState); if (p && p.then) p.then(notifyState, notifyState); } catch (e) { notifyState(); }
+  });
+
+  fmtBtns(); notifyState(); clock(); paint(); check();
+})();
+</script>

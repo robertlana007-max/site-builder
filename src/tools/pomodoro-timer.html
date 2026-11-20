@@ -1,0 +1,296 @@
+<style>
+.pm-modes { display: flex; justify-content: center; margin: 0 0 6px; }
+.pm-modes .seg { flex-wrap: wrap; justify-content: center; }
+.pm-modes .seg button { height: 38px; font-size: 14px; }
+.pm-wrap { text-align: center; }
+.pm-wrap .big { margin-bottom: 4px; }
+.pm-label { color: var(--muted); font-size: 15px; margin: 0 0 10px; }
+.pm-dots { display: flex; justify-content: center; gap: 6px; margin: 8px 0 0; }
+.pm-dots i { width: 10px; height: 10px; border-radius: 50%; border: 2px solid var(--accent); }
+.pm-dots i.on { background: var(--accent); }
+.pm-wrap .btns { justify-content: center; }
+.pm-wrap .meter { max-width: 420px; margin: 10px auto 0; }
+.pm-tasks { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 8px; }
+.pm-tasks li { display: flex; align-items: center; gap: 8px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 6px 6px 12px; }
+.pm-tasks li.cur { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pm-tasks li.done .pm-t { text-decoration: line-through; color: var(--muted); }
+.pm-tasks .pm-t { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 15px; cursor: pointer; }
+.pm-tasks .pm-n { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--muted); white-space: nowrap; }
+.pm-tasks button { font: inherit; font-size: 13px; height: 34px; min-width: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; flex: none; }
+.pm-tasks button:hover { border-color: var(--accent); color: var(--accent); }
+.pm-tasks input[type=checkbox] { margin: 0; flex: none; }
+.pm-add { display: flex; gap: 8px; }
+.pm-add input[type=text] { flex: 1; min-width: 0; }
+.pm-add input[type=number] { width: 84px; flex: none; }
+.pm-cur { font-size: 14px; color: var(--muted); margin: 10px 0 0; min-height: 1.4em; }
+.pm-cur b { color: var(--ink); }
+details.pm-set { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-top: 20px; }
+details.pm-set summary { cursor: pointer; font-weight: 600; }
+details.pm-set[open] summary { margin-bottom: 12px; }
+</style>
+<div class="pm-modes"><div class="seg" role="group" aria-label="Session type">
+  <button type="button" data-mode="focus" aria-pressed="true">Focus</button>
+  <button type="button" data-mode="short" aria-pressed="false">Short break</button>
+  <button type="button" data-mode="long" aria-pressed="false">Long break</button>
+</div></div>
+<div class="pm-wrap">
+  <div class="big" id="pmTime" role="timer" aria-live="off">25:00</div>
+  <p class="pm-label" id="pmLabel">Time to focus</p>
+  <div class="meter" aria-hidden="true"><i id="pmBar"></i></div>
+  <div class="pm-dots" id="pmDots" title="Focus sessions until the long break"></div>
+  <div class="btns"><button type="button" class="btn big" id="pmGo">Start</button><button type="button" class="btn ghost" id="pmReset">Reset</button><button type="button" class="btn ghost" id="pmSkip">Skip</button></div>
+  <p class="pm-cur" id="pmCur"></p>
+</div>
+<p class="msg" id="msg" style="text-align:center"></p>
+
+<h3>Tasks</h3>
+<form class="pm-add" id="pmAddForm">
+  <input type="text" id="pmTask" data-nomemo maxlength="200" placeholder="What are you working on?" aria-label="New task">
+  <input type="number" id="pmEst" data-nomemo min="1" max="99" placeholder="Est." aria-label="Estimated pomodoros (optional)" title="Estimated pomodoros (optional)">
+  <button type="submit" class="btn">Add</button>
+</form>
+<ul class="pm-tasks" id="pmTasks"></ul>
+<div class="btns" id="pmTaskBtns" hidden><button type="button" class="btn ghost" id="pmClearDone">Remove finished tasks</button></div>
+
+<h3>Today</h3>
+<div class="stats" style="margin-top:0">
+  <div class="stat"><span>Pomodoros</span><b id="pmStatN">0</b></div>
+  <div class="stat"><span>Focus time</span><b id="pmStatMin">0 min</b></div>
+  <div class="stat"><span>Breaks taken</span><b id="pmStatB">0</b></div>
+  <div class="stat"><span>Tasks finished</span><b id="pmStatT">0</b></div>
+</div>
+<p class="msg" id="pmWeek"></p>
+
+<details class="pm-set" id="pmSet">
+  <summary>Timer settings</summary>
+  <div class="fields">
+    <div><label for="pmFocus">Focus (minutes)</label><input type="number" id="pmFocus" data-nomemo min="1" max="180" value="25"></div>
+    <div><label for="pmShort">Short break (minutes)</label><input type="number" id="pmShort" data-nomemo min="1" max="60" value="5"></div>
+    <div><label for="pmLong">Long break (minutes)</label><input type="number" id="pmLong" data-nomemo min="1" max="120" value="15"></div>
+    <div><label for="pmEvery">Long break after every</label><select id="pmEvery" data-nomemo><option value="2">2 focus sessions</option><option value="3">3 focus sessions</option><option value="4" selected>4 focus sessions</option><option value="5">5 focus sessions</option><option value="6">6 focus sessions</option></select></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="pmAutoBreak" data-nomemo>Start breaks automatically</label>
+    <label><input type="checkbox" id="pmAutoFocus" data-nomemo>Start focus sessions automatically</label>
+    <label><input type="checkbox" id="pmSnd" data-nomemo checked>Play a sound when a session ends</label>
+    <label><input type="checkbox" id="pmNotify" data-nomemo>Show a notification</label>
+    <label><input type="checkbox" id="pmTitle" data-nomemo checked>Show the countdown in the tab title</label>
+  </div>
+  <div class="btns" style="margin:0 0 6px"><button type="button" class="btn ghost" id="pmTest">Test sound</button><button type="button" class="btn ghost" id="pmDefaults">Back to 25 / 5 / 15</button><button type="button" class="btn ghost danger" id="pmResetStats">Reset today’s stats</button></div>
+</details>
+<script>
+(function () {
+  var KEY = 'gtn-pomodoro';
+  var NAMES = { focus: 'Focus', short: 'Short break', long: 'Long break' };
+  var LABELS = { focus: 'Time to focus', short: 'Take a short break', long: 'Take a long break' };
+  var baseTitle = document.title, audio = null;
+  var st = {
+    cfg: { focus: 25, short: 5, long: 15, every: 4, autoBreak: false, autoFocus: false, sound: true, notify: false, title: true },
+    mode: 'focus', running: false, endAt: 0, left: 25 * 60000, cycle: 0, tasks: [], cur: null, days: {}
+  };
+  try { if (window.Prefs) st.cfg.sound = Prefs.get().sounds !== false; } catch (e) {} // first visit follows the site's Sounds setting
+  try {
+    var s = JSON.parse(localStorage.getItem(KEY));
+    if (s && typeof s === 'object') {
+      if (s.cfg) for (var k in st.cfg) if (typeof s.cfg[k] === typeof st.cfg[k]) st.cfg[k] = s.cfg[k];
+      if (NAMES[s.mode]) st.mode = s.mode;
+      st.running = !!s.running; st.endAt = +s.endAt || 0; st.left = +s.left > 0 ? +s.left : 0; st.cycle = +s.cycle || 0;
+      st.tasks = Array.isArray(s.tasks) ? s.tasks.filter(function (t) { return t && typeof t.text === 'string'; }) : [];
+      st.cur = s.cur || null; st.days = s.days && typeof s.days === 'object' ? s.days : {};
+    }
+  } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function dur(mode) { return Math.round(Math.max(1, Math.min(600, +st.cfg[mode] || 1)) * 60000); }
+  function dayKey(t) { var d = new Date(t || Date.now()); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function today(t) { var k = dayKey(t); return st.days[k] || (st.days[k] = { n: 0, ms: 0, b: 0, t: 0 }); }
+  function pruneDays() { var keys = Object.keys(st.days).sort(); while (keys.length > 60) delete st.days[keys.shift()]; }
+  var p2 = function (x) { return String(x).padStart(2, '0'); };
+  function fmt(ms) { var t = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return (h ? h + ':' + p2(m) : p2(m)) + ':' + p2(s); }
+  function remaining() { return st.running ? st.endAt - Date.now() : st.left; }
+
+  // ---------- sound and notifications ----------
+  function ctx() { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); if (audio.state === 'suspended') audio.resume(); } catch (e) { audio = null; } return audio; }
+  function chime(mode) {
+    var a = ctx(); if (!a) return;
+    var notes = mode === 'focus' ? [523.25, 659.25, 783.99] : [783.99, 659.25, 523.25];
+    notes.concat(notes).forEach(function (f, i) {
+      var o = a.createOscillator(), g = a.createGain(), t0 = a.currentTime + i * 0.22 + (i > 2 ? 0.35 : 0);
+      o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(a.destination);
+      g.gain.setValueAtTime(0.0001, t0); g.gain.exponentialRampToValueAtTime(0.3, t0 + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.5);
+      o.start(t0); o.stop(t0 + 0.55);
+    });
+  }
+  function notify(text) {
+    if (!st.cfg.notify || !('Notification' in window) || Notification.permission !== 'granted') return;
+    try { var n = new Notification('Pomodoro Study Timer', { body: text, tag: 'gtn-pomodoro', icon: '../assets/icon-192.png' }); n.onclick = function () { window.focus(); n.close(); }; } catch (e) {}
+  }
+
+  // ---------- drawing ----------
+  function draw() {
+    var ms = remaining(), total = dur(st.mode);
+    $('pmTime').textContent = fmt(ms);
+    $('pmBar').style.width = Math.max(0, Math.min(100, 100 - ms / total * 100)) + '%';
+    $('pmLabel').textContent = st.running ? LABELS[st.mode] : ms < total ? NAMES[st.mode] + ' paused' : LABELS[st.mode];
+    $('pmGo').textContent = st.running ? 'Pause' : ms < total ? 'Resume' : 'Start';
+    document.querySelectorAll('[data-mode]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === st.mode); });
+    document.title = st.cfg.title && (st.running || ms < total) ? fmt(ms) + ' · ' + NAMES[st.mode] + (st.running ? '' : ' (paused)') : baseTitle;
+  }
+  function drawDots() {
+    var box = $('pmDots'), n = st.cfg.every, done = st.cycle % n; box.innerHTML = '';
+    for (var i = 0; i < n; i++) { var d = document.createElement('i'); if (i < done) d.className = 'on'; box.appendChild(d); }
+    box.setAttribute('aria-label', done + ' of ' + n + ' focus sessions before the long break');
+  }
+  function drawStats() {
+    var d = today();
+    $('pmStatN').textContent = d.n; $('pmStatMin').textContent = d.ms >= 3600000 ? Math.floor(d.ms / 3600000) + ' h ' + Math.round(d.ms % 3600000 / 60000) + ' min' : Math.round(d.ms / 60000) + ' min';
+    $('pmStatB').textContent = d.b; $('pmStatT').textContent = d.t;
+    var week = 0, now = new Date();
+    for (var i = 0; i < 7; i++) { var k = dayKey(new Date(now.getFullYear(), now.getMonth(), now.getDate() - i)); if (st.days[k]) week += st.days[k].n; }
+    $('pmWeek').textContent = week ? 'Last 7 days: ' + week + (week === 1 ? ' pomodoro.' : ' pomodoros.') : '';
+  }
+  function drawTasks() {
+    var ul = $('pmTasks'); ul.innerHTML = '';
+    st.tasks.forEach(function (t) {
+      var li = document.createElement('li'), cb = document.createElement('input'), sp = document.createElement('span'), n = document.createElement('span'), up = document.createElement('button'), x = document.createElement('button');
+      li.className = (t.id === st.cur ? 'cur' : '') + (t.done ? ' done' : '');
+      cb.type = 'checkbox'; cb.checked = !!t.done; cb.setAttribute('aria-label', 'Mark “' + t.text + '” as finished');
+      cb.addEventListener('change', function () { t.done = cb.checked; today().t += cb.checked ? 1 : (today().t > 0 ? -1 : 0); if (t.done && st.cur === t.id) st.cur = null; save(); drawTasks(); drawStats(); });
+      sp.className = 'pm-t'; sp.textContent = t.text; sp.title = 'Click to work on this task'; sp.tabIndex = 0;
+      var pick = function () { if (t.done) return; st.cur = st.cur === t.id ? null : t.id; save(); drawTasks(); };
+      sp.addEventListener('click', pick); sp.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } });
+      n.className = 'pm-n'; n.textContent = '🍅 ' + (t.n || 0) + (t.est ? ' / ' + t.est : ''); n.title = 'Pomodoros done' + (t.est ? ' / estimated' : '');
+      up.type = 'button'; up.textContent = t.id === st.cur ? 'Working' : 'Work on'; up.disabled = !!t.done; up.addEventListener('click', pick); up.setAttribute('aria-pressed', t.id === st.cur);
+      x.type = 'button'; x.textContent = '✕'; x.setAttribute('aria-label', 'Delete “' + t.text + '”');
+      x.addEventListener('click', function () { st.tasks = st.tasks.filter(function (o) { return o !== t; }); if (st.cur === t.id) st.cur = null; save(); drawTasks(); });
+      li.appendChild(cb); li.appendChild(sp); li.appendChild(n); li.appendChild(up); li.appendChild(x); ul.appendChild(li);
+    });
+    $('pmTaskBtns').hidden = !st.tasks.some(function (t) { return t.done; });
+    var cur = st.tasks.filter(function (t) { return t.id === st.cur; })[0];
+    $('pmCur').innerHTML = ''; if (cur) { $('pmCur').appendChild(document.createTextNode('Working on: ')); var b = document.createElement('b'); b.textContent = cur.text; $('pmCur').appendChild(b); }
+  }
+
+  // ---------- the clock: everything is worked out from timestamps, so a sleeping tab stays exact ----------
+  var timer = 0, endTimer = 0;
+  function schedule() {
+    clearInterval(timer); clearTimeout(endTimer);
+    if (!st.running) return;
+    timer = setInterval(tick, 250);
+    endTimer = setTimeout(tick, Math.max(0, st.endAt - Date.now()) + 30);
+  }
+  function finish(at) {
+    var was = st.mode, next;
+    if (was === 'focus') {
+      var d = today(at); d.n++; d.ms += dur('focus'); st.cycle++;
+      var cur = st.tasks.filter(function (t) { return t.id === st.cur; })[0]; if (cur) cur.n = (cur.n || 0) + 1;
+      next = st.cycle % st.cfg.every === 0 ? 'long' : 'short';
+    } else { today(at).b++; next = 'focus'; }
+    pruneDays();
+    st.mode = next;
+    var auto = next === 'focus' ? st.cfg.autoFocus : st.cfg.autoBreak;
+    if (auto) { st.running = true; st.endAt = at + dur(next); }
+    else { st.running = false; st.left = dur(next); }
+    return { was: was, text: was === 'focus' ? 'Focus session done. ' + (next === 'long' ? 'Time for a long break.' : 'Time for a short break.') : 'Break over. Time to focus.' };
+  }
+  function tick() {
+    if (!st.running) return;
+    var now = Date.now(), n = 0, last = null;
+    // Catch up on any sessions that ended while the page was asleep; only the last one makes a sound.
+    while (st.running && now >= st.endAt && n++ < 50) last = finish(st.endAt);
+    var finished = !!last;
+    if (last) {
+      if (st.cfg.sound) chime(last.was);
+      notify(last.text); say('ok', last.text);
+      if (last.was === 'focus' && window.burst) burst($('pmTime'));
+    }
+    if (finished) { save(); schedule(); drawDots(); drawStats(); drawTasks(); }
+    draw();
+  }
+
+  function start() {
+    ctx(); // sound must be unlocked by a click, even if it plays later
+    if (st.left <= 0) st.left = dur(st.mode);
+    st.running = true; st.endAt = Date.now() + st.left; say('', '');
+    save(); schedule(); draw();
+  }
+  function pause() { st.left = Math.max(0, st.endAt - Date.now()); st.running = false; save(); schedule(); draw(); }
+  function setMode(m) { st.running = false; st.mode = m; st.left = dur(m); save(); schedule(); draw(); say('', ''); }
+
+  $('pmGo').addEventListener('click', function () { if (st.running) pause(); else start(); });
+  $('pmReset').addEventListener('click', function () { setMode(st.mode); });
+  $('pmSkip').addEventListener('click', function () {
+    var next = st.mode === 'focus' ? ((st.cycle + 1) % st.cfg.every === 0 ? 'long' : 'short') : 'focus';
+    if (st.mode === 'focus') st.cycle++; // a skipped focus still moves you along the cycle
+    setMode(next); drawDots(); say('', 'Skipped to ' + NAMES[next].toLowerCase() + '.');
+  });
+  document.querySelectorAll('[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (st.running && b.dataset.mode !== st.mode && !confirm('Stop the running ' + NAMES[st.mode].toLowerCase() + ' and switch?')) return;
+      setMode(b.dataset.mode);
+    });
+  });
+  document.addEventListener('visibilitychange', tick);
+  window.addEventListener('focus', tick);
+  document.addEventListener('keydown', function (e) {
+    if (e.code !== 'Space' || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target; if (t.closest && t.closest('input,textarea,select,button,a,summary,[contenteditable],[role=button],dialog,.pm-t')) return;
+    e.preventDefault(); $('pmGo').click();
+  });
+
+  // ---------- tasks ----------
+  $('pmAddForm').addEventListener('submit', function (e) {
+    e.preventDefault();
+    var text = $('pmTask').value.trim(); if (!text) { $('pmTask').focus(); return; }
+    var est = Math.round(+$('pmEst').value); var t = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 5), text: text, n: 0, est: est > 0 ? Math.min(99, est) : 0, done: false };
+    st.tasks.push(t); if (!st.cur) st.cur = t.id;
+    $('pmTask').value = ''; $('pmEst').value = ''; save(); drawTasks(); $('pmTask').focus();
+  });
+  $('pmClearDone').addEventListener('click', function () { st.tasks = st.tasks.filter(function (t) { return !t.done; }); save(); drawTasks(); });
+
+  // ---------- settings ----------
+  var NUM = { pmFocus: 'focus', pmShort: 'short', pmLong: 'long' }, BOX = { pmAutoBreak: 'autoBreak', pmAutoFocus: 'autoFocus', pmSnd: 'sound', pmTitle: 'title' };
+  function showCfg() {
+    for (var id in NUM) $(id).value = st.cfg[NUM[id]];
+    for (id in BOX) $(id).checked = st.cfg[BOX[id]];
+    $('pmEvery').value = st.cfg.every;
+    $('pmNotify').checked = st.cfg.notify && 'Notification' in window && Notification.permission === 'granted';
+  }
+  Object.keys(NUM).forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      var v = +$(id).value; if (!(v > 0)) return;
+      var key = NUM[id], wasFull = !st.running && st.left === dur(key);
+      st.cfg[key] = Math.min(+$(id).max, Math.round(v * 10) / 10);
+      if (key === st.mode && !st.running && (wasFull || st.left > dur(key))) st.left = dur(key);
+      if (key === st.mode && st.running) say('', 'The new length applies from the next ' + NAMES[key].toLowerCase() + '.');
+      save(); draw();
+    });
+  });
+  Object.keys(BOX).forEach(function (id) { $(id).addEventListener('change', function () { st.cfg[BOX[id]] = $(id).checked; save(); draw(); }); });
+  $('pmEvery').addEventListener('change', function () { st.cfg.every = +$('pmEvery').value; save(); drawDots(); });
+  $('pmNotify').addEventListener('change', function () {
+    var box = $('pmNotify');
+    if (!box.checked) { st.cfg.notify = false; save(); return; }
+    if (!('Notification' in window)) { box.checked = false; say('bad', 'This browser cannot show notifications from a web page. On an iPhone or iPad, add this site to your Home Screen first. The sound and the tab title still work.'); return; }
+    var apply = function (p) {
+      st.cfg.notify = p === 'granted'; box.checked = st.cfg.notify; save();
+      if (p === 'granted') { say('ok', 'Notifications are on. You will get one when each session ends.'); }
+      else if (p === 'denied') say('bad', 'Notifications are blocked for this site. Allow them in your browser’s site settings (the icon next to the address), then tick the box again.');
+      else say('', 'Notifications were not allowed.');
+    };
+    if (Notification.permission === 'granted' || Notification.permission === 'denied') { apply(Notification.permission); return; }
+    try { var r = Notification.requestPermission(apply); if (r && r.then) r.then(apply); } catch (e) { apply('default'); }
+  });
+  $('pmTest').addEventListener('click', function () { chime('focus'); });
+  $('pmDefaults').addEventListener('click', function () { st.cfg.focus = 25; st.cfg.short = 5; st.cfg.long = 15; st.cfg.every = 4; if (!st.running) st.left = dur(st.mode); showCfg(); save(); draw(); drawDots(); });
+  $('pmResetStats').addEventListener('click', function () { if (!confirm('Reset today’s pomodoros, focus time and breaks to zero?')) return; delete st.days[dayKey()]; st.cycle = 0; save(); drawStats(); drawDots(); });
+
+  // ---------- start up ----------
+  if (!st.running && !(st.left > 0)) st.left = dur(st.mode);
+  if (!st.running && st.left > dur(st.mode)) st.left = dur(st.mode);
+  showCfg(); drawDots(); drawTasks(); drawStats();
+  if (st.running) tick();
+  schedule(); draw();
+  // A new day starts with fresh stats even if the page stays open overnight.
+  var lastDay = dayKey(); setInterval(function () { if (dayKey() !== lastDay) { lastDay = dayKey(); st.cycle = 0; drawStats(); drawDots(); } }, 60000);
+})();
+</script>

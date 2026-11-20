@@ -19,7 +19,8 @@
 .qzm .qzm-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--bg); }
 .qzm .qzm-item div { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
 .qzm .qzm-item small { color: var(--muted); display: block; }
-.qzm .qzm-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+.qzm .qzm-bar { position: sticky; top: 78px; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+html[data-nosticky] .qzm .qzm-bar { top: 8px; }
 .qzm .qzm-bar.low { border-color: var(--bad); color: var(--bad); }
 .qzm .qzm-take { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; background: var(--surface); }
 .qzm .qzm-take p.qt { margin: 0 0 10px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
@@ -36,8 +37,8 @@
 #qzmPrint { display: none; }
 @media print {
   @page { margin: 14mm; }
-  body > *:not(#qzmPrint) { display: none !important; }
-  html, body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }
+  html.qzm-printing body > *:not(#qzmPrint) { display: none !important; }
+  html.qzm-printing, html.qzm-printing body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }
   #qzmPrint { display: block !important; font: 11.5pt/1.45 Georgia, 'Times New Roman', serif; color: #000; }
   #qzmPrint h1 { font-size: 18pt; margin: 0 0 4pt; }
   #qzmPrint .meta { display: flex; gap: 24pt; margin: 8pt 0 14pt; }
@@ -538,7 +539,7 @@
   // ---------- print ----------
   function printBox(t) {
     var box = $('qzmPrint'); if (!box) { box = document.createElement('div'); box.id = 'qzmPrint'; document.body.appendChild(box); }
-    box.textContent = '';
+    box.textContent = ''; document.documentElement.classList.add('qzm-printing');
     box.appendChild(el('h1', null, t.title));
     var m = el('div', { className: 'meta' }); m.appendChild(el('span', null, 'Name: ____________________')); m.appendChild(el('span', null, 'Date: ____________')); m.appendChild(el('span', null, 'Score: ______ / ' + t.questions.length)); box.appendChild(m);
     if (t.desc) box.appendChild(el('p', { style: 'white-space:pre-wrap' }, t.desc));
@@ -562,7 +563,12 @@
     }
   }
   $('qzmPrintBtn').addEventListener('click', function () { var t = ready(); if (!t) return; printBox(t); window.print(); });
-  window.addEventListener('afterprint', function () { var b = $('qzmPrint'); if (b) b.textContent = ''; });
+  window.addEventListener('beforeprint', function () {
+    if (document.documentElement.classList.contains('qzm-printing') || cur !== 'edit') return;
+    var t = tidy(quiz), okq = t.questions.every(function (x) { return x.text && (x.type !== 'mc' || (x.options.length > 1 && x.correct.length)) && (x.type !== 'short' || x.accepted.length); });
+    if (okq) { if (!t.title.trim()) t.title = 'Untitled quiz'; printBox(t); }
+  });
+  window.addEventListener('afterprint', function () { var b = $('qzmPrint'); if (b) b.textContent = ''; document.documentElement.classList.remove('qzm-printing'); });
 
   // ---------- new and sample ----------
   $('qzmNew').addEventListener('click', function () {
