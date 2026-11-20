@@ -67,6 +67,8 @@ const ICON = {
   'stopwatch': '<circle cx="12" cy="14" r="7"/><path d="M12 14v-3.5M10 3h4M12 3v4"/>',
   star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
   share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
+  undo: '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
@@ -78,7 +80,7 @@ const ICON = {
 };
 const icon = k => svg(ICON[k]);
 // One flat colour per category. Key order here is also the order of sections on the home page.
-const COLOR = { 'PDF tools': '#ff6b4a', 'Image tools': '#a78bfa', 'Finance calculators': '#34d399', 'Calculators': '#ff7ab6', 'Time tools': '#ffc53d', 'Generators': '#2dd4bf', 'Text tools': '#fdba74', 'Developer tools': '#60a5fa' };
+const COLOR = { 'PDF tools': '#ff5d73', 'Image tools': '#b18cff', 'Finance calculators': '#2af5a0', 'Calculators': '#ff7bd5', 'Time tools': '#ffc94d', 'Generators': '#22e3f5', 'Text tools': '#ff9d5c', 'Developer tools': '#5b9dff' };
 const tile = t => `<span class="tile" style="--c:${COLOR[t.cat]}">${icon(t.slug)}</span>`;
 
 function write(rel, content) {
@@ -93,6 +95,9 @@ function ad(slot) {
 }
 
 // rel = path prefix back to the site root ('' for root pages, '../' for tool pages)
+// Languages offered in the header menu. The page is translated in place by Google Translate.
+const LANGS = [['en', 'English'], ['ur', 'اردو'], ['hi', 'हिन्दी'], ['ar', 'العربية'], ['es', 'Español'], ['fr', 'Français'], ['pt', 'Português'], ['de', 'Deutsch'], ['id', 'Indonesia'], ['tr', 'Türkçe'], ['ru', 'Русский'], ['bn', 'বাংলা'], ['zh-CN', '中文'], ['ja', '日本語'], ['ko', '한국어'], ['it', 'Italiano'], ['fa', 'فارسی'], ['vi', 'Tiếng Việt'], ['th', 'ไทย'], ['sw', 'Kiswahili'], ['nl', 'Nederlands'], ['pl', 'Polski'], ['ms', 'Melayu'], ['pa', 'ਪੰਜਾਬੀ']];
+
 function layout({ rel, urlPath, title, desc, body, band = '', bandClass = 'plain', after = '', slug = '', color = '', head = '', noindex = false }) {
   const canonical = SITE + '/' + urlPath;
   return `<!doctype html>
@@ -112,7 +117,7 @@ ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <meta name="twitter:card" content="summary">
 ${cfg.googleSiteVerification ? `<meta name="google-site-verification" content="${esc(cfg.googleSiteVerification)}">` : ''}
 <link rel="icon" href="${rel}assets/favicon.svg" type="image/svg+xml">
-<link rel="preload" href="${rel}assets/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="${rel}assets/fonts/orbitron.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${rel}assets/style.css">
 <script src="${rel}assets/tools-index.js"></script>
 <script src="${rel}assets/site.js"></script>
@@ -127,10 +132,13 @@ ${head}
   <nav class="nav">
     <a class="hide-s" href="${rel || './'}">All tools</a>
     <button class="nav-find" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span><kbd>Ctrl K</kbd></button>
+    <button id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
+    <div class="lang-menu notranslate" id="langMenu" translate="no" hidden><p>LANGUAGE · translated by Google</p>${LANGS.map(([code, name]) => `<button data-lang="${code}" lang="${code}">${name}</button>`).join('')}</div>
     <button class="auth" id="authBtn" hidden>Sign in</button>
     <button class="theme-btn" id="themeBtn" aria-label="Switch light or dark theme">${icon('theme')}</button>
   </nav>
 </div></header>
+<div id="gt"></div>
 <dialog class="palette" id="palette" aria-label="Search tools">
   <div class="finder">${icon('search')}<input type="search" id="palInput" data-empty="all" placeholder="Search ${tools.length} tools…" aria-label="Search tools" autocomplete="off"></div>
   <div class="f-list" id="palResults"></div>
@@ -170,49 +178,113 @@ write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [
 const typed = [['merge two PDFs', 'merge-pdf'], ['shrink a photo', 'image-compressor'], ['work out a mortgage', 'mortgage-calculator'], ['make a QR code', 'qr-code-generator'], ['turn a PDF into images', 'pdf-to-jpg'], ['create a strong password', 'password-generator']];
 typed.forEach(x => bySlug(x[1]));
 // Six tiles on the home page that act out what the tool does.
-const live = (slug, label, scene) => { const t = bySlug(slug); return `<a class="live" style="--c:${COLOR[t.cat]}" href="${slug}/" aria-label="${esc(t.name)}"><span aria-hidden="true">${scene}</span><b>${label}</b></a>`; };
+let liveN = 0;
+const live = (slug, label, scene) => { const t = bySlug(slug); return `<a class="live" style="--c:${COLOR[t.cat]};--n:${liveN++}" href="${slug}/" aria-label="${esc(t.name)}"><span aria-hidden="true">${scene}</span><b>${label}</b></a>`; };
 const bento = [
   live('merge-pdf', 'Merge PDF', '<span class="scene sc-merge"><i></i><i></i></span>'),
-  live('image-compressor', 'Shrink a photo', '<span class="scene sc-shrink"><u><i></i></u><em><span>4.2 MB</span><span>0.9 MB</span></em></span>'),
+  live('image-compressor', 'Compress', '<span class="scene sc-shrink"><u><i></i></u><em><span>4.2 MB</span><span>0.9 MB</span></em></span>'),
   live('password-generator', 'Password', '<span class="scene sc-pw"><span id="livePw">x7$Kq!9mZp</span></span>'),
   live('qr-code-generator', 'QR code', `<span class="scene"><span class="qr" id="liveQr">${'<i></i>'.repeat(49)}</span></span>`),
   live('stopwatch', 'Stopwatch', '<span class="scene sc-sw"><span id="liveSw">00:00.00</span></span>'),
-  live('mortgage-calculator', 'Mortgage', `<span class="scene sc-bars">${[.45, .7, .55, .9, 1].map((h, n) => `<i style="--n:${n};--s:${h}"></i>`).join('')}</span>`)
+  live('mortgage-calculator', 'Mortgage', `<span class="scene sc-bars">${[.45, .7, .55, .9, 1].map((h, k) => `<i style="--k:${k};--s:${h}"></i>`).join('')}</span>`)
 ].join('');
 const ticker = tools.map(t => `<a href="${t.slug}/">${esc(t.name)}</a><span>✦</span>`).join('');
+const links = slugs => slugs.map(s => { const t = bySlug(s); return `<a href="${s}/">${esc(t.name)}</a>`; }).join('');
+const who = (color, title, text, slugs) => `<div class="who reveal" style="--c:${color}"><h3>${title}</h3><p>${text}</p>${links(slugs)}</div>`;
+const keepLine = cfg.firebase
+  ? 'Your work is saved on this device automatically. <b>Want it on every device? Sign in with Google</b> using the button at the top.'
+  : 'Your work is saved on this device automatically, so it is still here when you come back.';
+const homeFaq = [
+  [`Is ${cfg.siteName} really free?`, 'Yes. Every tool is free, with no daily limits, no watermarks and no “premium” button hiding the good part. The site may show ads to cover its costs.'],
+  ['Do you upload my files?', 'No. The tools are small programs that run inside your own browser. Your PDFs, photos and text are processed on your device and are never sent to us.'],
+  ['Will my work still be here when I come back?', 'Yes. Pinned tools, recently used tools and the values you typed into calculators are saved in your browser on this device, so a calculation you left is waiting for you. Files and long text are not saved. Clearing your browser data erases it.'],
+  ['How do I keep my data on all my devices?', cfg.firebase ? 'Press Sign in at the top and choose your Google account. Your pinned tools and saved entries then follow you to any device where you sign in.' : 'Right now your data is saved on the device you are using. Sign-in with Google, which keeps it in step across all your devices, is being added.'],
+  ['Can I use the site in my own language?', 'Yes. Open the language menu at the top and choose from 24 languages, including Urdu, Hindi, Arabic and Spanish. Translation is done by Google Translate, so some wording may be imperfect.'],
+  ['Does it work on a phone?', 'Yes. Every tool is built for a phone screen first and works the same on a tablet or laptop.'],
+  ['What happens to my files when I close the page?', 'They are gone from the page. Nothing was uploaded, so there is nothing on a server to delete.'],
+  ['A tool I need is missing. Can you add it?', 'Probably. Use the contact page to tell us what you need and we will consider building it.']
+];
 
 write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
   desc: `${tools.length} free online tools: merge PDF, compress PDF, image compressor, mortgage calculator, QR code generator and more. No sign-up. Files never leave your device.`,
-  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }),
-  band: `<section class="hero">
+  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }) + jsonLd({
+    '@context': 'https://schema.org', '@type': 'FAQPage',
+    mainEntity: homeFaq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } }))
+  }),
+  band: `<canvas id="stars" aria-hidden="true"></canvas><div class="floor" aria-hidden="true"></div>
+<section class="hero">
   <div class="hero-copy">
-    <span class="sticker">${tools.length} tools · 100% free</span>
-    <h1>Free online tools that <span class="hl">just work.</span></h1>
+    <span class="hud"><i></i>All systems go · ${tools.length} tools online</span>
+    <h1>Free online tools with <span class="grad">superpowers.</span></h1>
     <p class="typed-line">Right now you could <a id="typed" href="${typed[0][1]}/" data-list="${esc(JSON.stringify(typed))}">${typed[0][0]}</a><i class="caret" aria-hidden="true"></i></p>
-    <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="What do you need to do?" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
-    <ul class="trust"><li>${icon('check')}Files never leave your device</li><li>${icon('check')}No account needed</li><li>${icon('check')}Works on your phone</li></ul>
+    <p class="sub">No installs. No uploads. No waiting in a queue. Drop it in, get it done, get on with your day.</p>
+    <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Ask for a tool… try “pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
+    <ul class="trust"><li>${icon('check')}Files never leave your device</li><li>${icon('check')}Saved for when you come back</li><li>${icon('check')}Works on your phone</li></ul>
+    <p class="keep">${keepLine}</p>
   </div>
   <div class="bento" aria-label="Popular tools">${bento}</div>
 </section>`,
   after: `<div class="marquee"><div><span aria-hidden="true">✦</span>${ticker}<span aria-hidden="true" style="display:contents">${ticker.replace(/<a /g, '<a tabindex="-1" ')}</span></div></div>`,
-  body: `<section class="mine" id="mine" hidden>
-  <h2>My tools</h2>
-  <p id="mineNote">Saved on this device.</p>
-  <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
-  <div id="mineRecentBox"><h3>Recently used</h3><div class="chiprow" id="mineRecent"></div></div>
-</section>
-<div class="pills" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All ${tools.length}</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false" style="--c:${COLOR[c]}"><i></i>${esc(c)}</button>`).join('')}</div>
-${ad(cfg.adSlotTop)}
-${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}" style="--c:${COLOR[c]}"><h2 class="cat-title"><span>${list.length}</span>${esc(c)}</h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
-${ad(cfg.adSlotBottom)}
-<h2 class="section-title">No catches. Really.</h2>
-<div class="features">
-  <div class="feature reveal" style="--c:#34d399"><span class="tile">${icon('shield')}</span><h3>Private by design</h3><p>Every tool runs inside your browser. Your files, text and numbers are processed on your own device and are not uploaded to us.</p></div>
-  <div class="feature reveal" style="--c:#ffc53d"><span class="tile">${icon('zap')}</span><h3>Instant results</h3><p>Nothing to install and no waiting for uploads. Open a tool and the answer appears as you type.</p></div>
-  <div class="feature reveal" style="--c:#a78bfa"><span class="tile">${icon('star')}</span><h3>It remembers you</h3><p>Pin the tools you use most and they wait for you on this page. Calculators keep the settings you used last time.</p></div>
+  body: `<div class="statbar">
+  <div class="stat-big reveal" style="--c:#22d3ee"><b data-count="${tools.length}">${tools.length}</b><span>Tools online</span></div>
+  <div class="stat-big reveal" style="--c:#8b7bff"><b data-count="${cats.length}">${cats.length}</b><span>Categories</span></div>
+  <div class="stat-big reveal" style="--c:#f06bd9"><b>0</b><span>Files uploaded. Ever.</span></div>
+  <div class="stat-big reveal" style="--c:#4ff0b0"><b data-count="${LANGS.length}">${LANGS.length}</b><span>Languages</span></div>
 </div>
+<section class="mine" id="mine" hidden>
+  <h2>Welcome back</h2>
+  <p id="mineNote">${cfg.firebase ? 'Saved on this device. Sign in to sync across devices.' : 'Everything below is saved on this device.'}</p>
+  <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
+  <div id="mineRecentBox"><h3>Pick up where you left off</h3><div class="chiprow" id="mineRecent"></div></div>
+</section>
+<section class="block" id="tools">
+  <span class="eyebrow">// The toolbox</span>
+  <h2 class="section-title">${tools.length} tools. Zero excuses.</h2>
+  <p class="section-sub">Tap a star to pin your favourites. Hit <kbd>Ctrl</kbd> <kbd>K</kbd> anywhere to jump straight to a tool.</p>
+  <div class="pills" role="group" aria-label="Filter by category" style="margin-top:0"><button class="pill on" data-cat="" aria-pressed="true">All ${tools.length}</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false" style="--c:${COLOR[c]}"><i></i>${esc(c)}</button>`).join('')}</div>
+  ${ad(cfg.adSlotTop)}
+  ${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}" style="--c:${COLOR[c]}"><h2 class="cat-title">${esc(c)}<span>${list.length} tools</span></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
+</section>
+${ad(cfg.adSlotBottom)}
+<section class="block">
+  <span class="eyebrow">// How it works</span>
+  <h2 class="section-title">Three steps. No instruction manual.</h2>
+  <p class="section-sub">If you can drag a file or type a number, you already know how to use this site.</p>
+  <ol class="how">
+    <li class="reveal" style="--c:#22d3ee"><h3>Pick your tool</h3><p>Search for it, tap it, done. No sign-up wall, no pop-up maze, no “start your free trial”.</p></li>
+    <li class="reveal" style="--c:#8b7bff"><h3>Feed it</h3><p>Drop in a file or type your numbers. The work happens right there on your own device, so nothing waits in an upload queue.</p></li>
+    <li class="reveal" style="--c:#f06bd9"><h3>Boom. Done.</h3><p>Results appear as you type. Download, copy, and leave. When you come back, your numbers are still where you left them.</p></li>
+  </ol>
+</section>
+<section class="block">
+  <span class="eyebrow">// Who it is for</span>
+  <h2 class="section-title">Built for real life, not for demos.</h2>
+  <p class="section-sub">Whatever landed on your desk today, there is probably a tool here that makes it a two-minute job.</p>
+  <div class="whos">
+    ${who('#b18cff', 'Students', 'Assignments, deadlines and that one form that only accepts a PDF under 2 MB.', ['merge-pdf', 'compress-pdf', 'word-counter', 'gpa-calculator', 'jpg-to-pdf'])}
+    ${who('#2af5a0', 'Money and home', 'Know the real cost before you sign anything.', ['mortgage-calculator', 'loan-calculator', 'credit-card-payoff-calculator', 'compound-interest-calculator', 'salary-calculator'])}
+    ${who('#ffc94d', 'Shops and freelancers', 'Price it, tax it, brand it and send it.', ['profit-margin-calculator', 'sales-tax-calculator', 'discount-calculator', 'watermark-pdf', 'qr-code-generator'])}
+    ${who('#5b9dff', 'Developers', 'The small utilities you keep searching for, minus the cookie banners.', ['json-formatter', 'base64-encoder', 'hash-generator', 'uuid-generator', 'color-converter'])}
+  </div>
+</section>
+<section class="block">
+  <span class="eyebrow">// Why it is different</span>
+  <h2 class="section-title">No catches. Really.</h2>
+  <p class="section-sub">Most online tools want your email, your file and your patience. This one wants none of them.</p>
+  <div class="features">
+    <div class="feature reveal" style="--c:#4ff0b0"><span class="tile">${icon('shield')}</span><h3>Private by design</h3><p>Every tool runs inside your browser. Your files, text and numbers are processed on your own device and are not uploaded to us.</p></div>
+    <div class="feature reveal" style="--c:#ffc94d"><span class="tile">${icon('zap')}</span><h3>Instant results</h3><p>Nothing to install and no waiting for uploads. Open a tool and the answer appears while you are still typing.</p></div>
+    <div class="feature reveal" style="--c:#b18cff"><span class="tile">${icon('star')}</span><h3>It remembers you</h3><p>Pin the tools you use most. Leave a calculation half done, come back next week, and it is exactly where you left it.</p></div>
+    <div class="feature reveal" style="--c:#22e3f5"><span class="tile">${icon('globe')}</span><h3>Speaks your language</h3><p>Switch the whole site into ${LANGS.length} languages from the menu at the top, from Urdu and Hindi to Arabic and Spanish.</p></div>
+  </div>
+</section>
+<section class="block">
+  <span class="eyebrow">// Straight answers</span>
+  <h2 class="section-title">Questions people ask before they trust us.</h2>
+  <div class="faq" style="max-width:820px;--c:#22d3ee">${homeFaq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
+</section>
 <section class="cta reveal"><h2>Need a tool that is not here yet?</h2><p>Tell us what would save you time and we will consider building it.</p><a class="btn" href="contact/">Suggest a tool ${icon('arrow')}</a></section>`
 }));
 
@@ -241,14 +313,14 @@ for (const t of tools) {
   <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)}</p>
   <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
   <p class="lead">${esc(t.intro)}</p>
-  <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button></div>
+  <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>`,
     body: `<div class="cols">
 <div class="content">
 <section class="card">
 ${body}
 </section>
-<p class="safe">${icon('shield')}Runs on your device. Nothing you enter here is uploaded.</p>
+<p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded. Your entries are saved here for your next visit.</p>
 ${ad(cfg.adSlotTop)}
 <h2>How to use ${esc(t.name)}</h2>
 <ol class="steps">${t.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
@@ -292,7 +364,9 @@ ${contact}` },
 <h2>Data you enter into tools</h2>
 <p>PDFs, images, text, numbers and passwords you enter are processed in your browser. They are not uploaded to or stored by ${esc(cfg.siteName)}.</p>
 <h2>Local storage</h2>
-<p>To make the site more useful when you come back, your browser's local storage keeps: your light or dark theme, the tools you pin, the tools you opened recently, and the settings of calculators (numbers, sliders, tick boxes and menus). Text you type or paste, files, and generated passwords are never saved. You can erase all of it by clearing this site's data in your browser.</p>
+<p>To make the site more useful when you come back, your browser's local storage keeps: your theme and language, the tools you pin, the tools you opened recently, and what you entered into the short fields of a tool (numbers, dates, sliders, tick boxes, menus and one-line text boxes), so a calculation is still there on your next visit. Large text boxes, files and generated passwords are never saved. This data stays on your device. You can erase it with the "Clear my saved entries" button on a tool, or by clearing this site's data in your browser.</p>
+<h2>Translation</h2>
+<p>If you choose a language other than English, the page is translated by Google Translate. Your browser then loads a script from Google, the text of the page is sent to Google to be translated, and Google sets a cookie that remembers the language. If you stay in English, none of this happens.</p>
 ${cfg.firebase ? `<h2>Optional Google sign-in</h2>
 <p>You can use every tool without an account. If you choose to sign in with Google, we receive your name, email address and a user ID from Google, and we store your pinned tools, recent tools and calculator settings in Google Firebase so they appear on your other devices. Files and text you process in the tools are still never uploaded. To delete this data, sign in and email us from the same address.</p>` : ''}
 <h2>Analytics</h2>
@@ -345,6 +419,6 @@ write('.nojekyll', '');
 // GitHub Pages reads the custom domain from this file.
 const host = new URL(SITE).hostname;
 if (!host.endsWith('.github.io')) write('CNAME', host + '\n');
-write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="5" y="5" width="50" height="50" rx="13" fill="#15120f" transform="translate(5 5)"/><rect x="3" y="3" width="50" height="50" rx="13" fill="#c8f23a" stroke="#15120f" stroke-width="4"/><path d="M17 20h22v7h-7.500v16h-7V27H17z" fill="#15120f"/></svg>\n`.replace('7.500', '7.5'));
+write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#22d3ee"/><stop offset=".55" stop-color="#8b7bff"/><stop offset="1" stop-color="#f06bd9"/></linearGradient></defs><rect width="64" height="64" rx="16" fill="#04050c"/><rect x="6" y="6" width="52" height="52" rx="13" fill="url(#g)"/><path d="M19 21h26v8h-9v17h-8V29h-9z" fill="#04050c"/></svg>\n`);
 
 console.log(`Built ${urls.length} pages for ${SITE}`);

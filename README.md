@@ -24,7 +24,9 @@ node build.js
 
 ## Saved state and Google sign-in
 
-Pinned tools, recently used tools and calculator settings are kept in the visitor's `localStorage`. Free text, files and generated passwords are never stored.
+Pinned tools, recently used tools and what was entered into a tool's short fields (numbers, dates, menus, one-line text) are kept in the visitor's `localStorage`, so a calculation is still there on the next visit. Textareas, files and generated passwords are never stored.
+
+The language menu translates the page in place with Google Translate. Its script is only loaded after a visitor picks a language other than English.
 
 Google sign-in is off until `firebase` in `config.json` holds a Firebase web config (`apiKey`, `authDomain`, `projectId`, `appId`). When set, a Sign in button appears and the same saved state is synced to one Firestore document per user (`users/{uid}`). In Firebase: enable the Google provider under Authentication, add the site domain to the authorised domains, create a Firestore database, and use these rules:
 

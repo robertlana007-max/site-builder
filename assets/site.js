@@ -10,6 +10,27 @@
   var REL = root.getAttribute('data-rel') || '';
   var SLUG = root.getAttribute('data-slug') || '';
   var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var fine = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+  // ---------- language: the page is translated in place by Google Translate, loaded only when asked for ----------
+  var LANG = 'en';
+  try { LANG = localStorage.getItem('lang') || 'en'; } catch (e) {}
+  function langCookie(code) {
+    var host = location.hostname.replace(/^www\./, ''), tail = code ? '' : ';expires=Thu, 01 Jan 1970 00:00:00 GMT';
+    var v = 'googtrans=' + (code ? '/en/' + code : '') + tail + ';path=/';
+    document.cookie = v;
+    if (host.indexOf('.') !== -1) document.cookie = v + ';domain=.' + host;
+  }
+  window.setLang = function (code) {
+    try { localStorage.setItem('lang', code); } catch (e) {}
+    langCookie(code === 'en' ? '' : code);
+    location.reload();
+  };
+  if (LANG !== 'en') {
+    langCookie(LANG);
+    if (/^(ar|ur|fa|he|iw|ps|sd)$/.test(LANG)) root.setAttribute('dir', 'rtl');
+    window.gtInit = function () { new google.translate.TranslateElement({ pageLanguage: 'en', autoDisplay: false }, 'gt'); };
+  }
 
   // ---------- helpers used by the tools ----------
   window.$ = function (id) { return document.getElementById(id); };
@@ -55,14 +76,14 @@
   };
 
   // ---------- small delights ----------
-  var COLORS = ['#c8f23a', '#ff6b4a', '#a78bfa', '#34d399', '#ffc53d', '#ff7ab6', '#60a5fa'];
+  var COLORS = ['#22d3ee', '#8b7bff', '#f06bd9', '#4ff0b0', '#ffd166'];
   window.burst = function (el) {
     if (calm || !el || !el.animate) return;
     var r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
     for (var i = 0; i < 14; i++) {
       var b = document.createElement('i'), a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
       b.className = 'bit'; b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.style.background = COLORS[i % COLORS.length]; b.style.borderRadius = i % 3 ? '2px' : '50%';
+      b.style.background = COLORS[i % COLORS.length]; b.style.boxShadow = '0 0 10px ' + COLORS[i % COLORS.length];
       document.body.appendChild(b);
       b.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
         { transform: 'translate(' + (Math.cos(a) * d - 4) + 'px,' + (Math.sin(a) * d + 30) + 'px) rotate(' + (Math.random() * 540 - 270) + 'deg) scale(.4)', opacity: 0 }],
@@ -101,17 +122,19 @@
     }
   };
   function tool(slug) { var T = window.TOOLS || []; for (var i = 0; i < T.length; i++) if (T[i][0] === slug) return T[i]; return null; }
-  function chip(t) {
+  function chip(t, saved) {
     var a = document.createElement('a'), dot = document.createElement('i');
     a.className = 'chip'; a.href = REL + t[0] + '/'; a.style.setProperty('--c', t[3]);
     a.appendChild(dot); a.appendChild(document.createTextNode(t[1]));
+    if (saved) { var em = document.createElement('em'); em.textContent = 'saved'; a.title = 'Your last numbers are saved here'; a.appendChild(em); }
     return a;
   }
   function fill(box, slugs) {
     if (!box) return 0;
     box.innerHTML = '';
     var n = 0;
-    slugs.forEach(function (s) { var t = tool(s); if (t) { box.appendChild(chip(t)); n++; } });
+    var mem = read().inputs;
+    slugs.forEach(function (s) { var t = tool(s); if (t) { box.appendChild(chip(t, !!mem[s])); n++; } });
     return n;
   }
   // Reflect saved state in whatever this page has: stars, pin button, "my tools" lists.
@@ -171,8 +194,7 @@
     // theme
     var themeBtn = $('themeBtn');
     if (themeBtn) themeBtn.addEventListener('click', function () {
-      var dark = root.getAttribute('data-theme') ? root.getAttribute('data-theme') === 'dark' : matchMedia('(prefers-color-scheme: dark)').matches;
-      var next = dark ? 'light' : 'dark';
+      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
       root.setAttribute('data-theme', next);
       try { localStorage.setItem('theme', next); } catch (e) {}
     });
@@ -224,27 +246,35 @@
       var o = read(), at = o.recent.indexOf(SLUG);
       if (at !== 0) { if (at > 0) o.recent.splice(at, 1); o.recent.unshift(SLUG); o.recent = o.recent.slice(0, 12); write(o); }
 
-      // Remember calculator settings. Only numbers, sliders, tick boxes and menus:
-      // never free text, which could be something private.
+      // Remember what was entered so a returning visitor finds their work as they left it.
+      // Short fields only: never textareas, which may hold private documents, and never files.
       var card = document.querySelector('.card');
       if (card) {
-        var pick = function () { return card.querySelectorAll('input[type=number][id],input[type=range][id],input[type=checkbox][id],select[id]'); };
-        var mem = read().inputs[SLUG];
+        var pick = function () { return card.querySelectorAll('input[type=number][id],input[type=range][id],input[type=checkbox][id],input[type=date][id],input[type=text][id],select[id]'); };
+        var mem = read().inputs[SLUG], restored = 0, clear = $('clearBtn');
         if (mem) pick().forEach(function (el) {
           if (el.disabled || !(el.id in mem)) return;
           if (el.type === 'checkbox') { if (el.checked === !!mem[el.id]) return; el.checked = !!mem[el.id]; }
           else { if (el.value === String(mem[el.id])) return; el.value = mem[el.id]; if (el.value !== String(mem[el.id])) return; }
+          restored++;
           el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
         });
+        if (clear) {
+          clear.hidden = !mem;
+          clear.addEventListener('click', function () { var s = read(); delete s.inputs[SLUG]; write(s); location.reload(); });
+        }
+        if (restored) setTimeout(function () { toast('Welcome back. Your last entries are restored.'); }, 500);
         var saveTimer, ready = false;
         setTimeout(function () { ready = true; }, 0); // ignore the events fired by the restore above
         var remember = function (e) {
-          if (!ready || !e.isTrusted) return;
+          if (!ready) return;
           clearTimeout(saveTimer);
           saveTimer = setTimeout(function () {
             var s = read(), v = {};
             pick().forEach(function (el) { if (!el.disabled) v[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+            if (!Object.keys(v).length) return; // this tool has nothing worth remembering
             s.inputs[SLUG] = v; write(s);
+            if (clear) clear.hidden = false;
           }, 500);
         };
         card.addEventListener('input', remember); card.addEventListener('change', remember);
@@ -274,6 +304,83 @@
         entries.forEach(function (en) { if (en.isIntersecting) { en.target.style.setProperty('--i', n++); en.target.classList.add('in'); io.unobserve(en.target); } });
       }, { rootMargin: '0px 0px -40px 0px' });
       rev.forEach(function (el) { io.observe(el); });
+    }
+
+    // ---------- language menu ----------
+    var langBtn = $('langBtn'), langMenu = $('langMenu');
+    if (langBtn && langMenu) {
+      langMenu.querySelectorAll('button').forEach(function (b) {
+        if (b.dataset.lang === LANG) { b.setAttribute('aria-current', 'true'); langBtn.lastChild.textContent = b.dataset.lang.slice(0, 2).toUpperCase(); }
+        b.addEventListener('click', function () { if (b.dataset.lang !== LANG) setLang(b.dataset.lang); else langMenu.hidden = true; });
+      });
+      langBtn.addEventListener('click', function (e) { e.stopPropagation(); langMenu.hidden = !langMenu.hidden; langBtn.setAttribute('aria-expanded', !langMenu.hidden); });
+      document.addEventListener('click', function (e) { if (!langMenu.hidden && !e.target.closest('#langMenu')) langMenu.hidden = true; });
+      document.addEventListener('keydown', function (e) { if (e.key === 'Escape') langMenu.hidden = true; });
+    }
+    if (LANG !== 'en') {
+      // Values the tools compute, and text that keeps changing, must not be rewritten by the translator.
+      document.querySelectorAll('.out,.stat b,.stat-big b,.kv code,.big,.diff,.files,.thumbs,.sched tbody,.scene,.typed-line a,.marquee,textarea,input,code,kbd,.logo,#langMenu').forEach(function (el) { el.setAttribute('translate', 'no'); el.classList.add('notranslate'); });
+      var gs = document.createElement('script');
+      gs.src = 'https://translate.google.com/translate_a/element.js?cb=gtInit'; gs.async = true;
+      gs.onerror = function () { toast('Translation could not load. Showing English.'); };
+      document.head.appendChild(gs);
+    }
+
+    // ---------- pointer glow and 3D tilt on cards ----------
+    if (fine && !calm) {
+      var tilted = null;
+      document.addEventListener('pointermove', function (e) {
+        var el = e.target.closest ? e.target.closest('.tool-card,.live,.feature,.who') : null;
+        if (tilted && tilted !== el) { tilted.style.removeProperty('--rx'); tilted.style.removeProperty('--ry'); }
+        tilted = el;
+        if (!el) return;
+        var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+        el.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); el.style.setProperty('--my', (y * 100).toFixed(1) + '%');
+        if (el.matches('.tool-card,.live')) { el.style.setProperty('--ry', ((x - .5) * 10).toFixed(2) + 'deg'); el.style.setProperty('--rx', ((.5 - y) * 10).toFixed(2) + 'deg'); }
+      }, { passive: true });
+    }
+
+    // ---------- numbers that count up when they scroll into view ----------
+    var counts = document.querySelectorAll('[data-count]');
+    if (counts.length) {
+      var run = function (el) {
+        var to = +el.dataset.count, pre = el.dataset.pre || '', suf = el.dataset.suf || '', t0 = performance.now();
+        if (calm || !to) { el.textContent = pre + to + suf; return; }
+        (function step(now) { var k = Math.min(1, (now - t0) / 1100), e = 1 - Math.pow(1 - k, 3); el.textContent = pre + Math.round(to * e) + suf; if (k < 1) requestAnimationFrame(step); })(t0);
+      };
+      if (!window.IntersectionObserver) counts.forEach(run);
+      else { var co = new IntersectionObserver(function (en) { en.forEach(function (x) { if (x.isIntersecting) { run(x.target); co.unobserve(x.target); } }); }); counts.forEach(function (el) { co.observe(el); }); }
+    }
+
+    // ---------- star field behind the hero ----------
+    var cv = $('stars');
+    if (cv && cv.getContext) {
+      var ctx = cv.getContext('2d'), pts = [], W = 0, H = 0, seen = true, raf = 0;
+      var size = function () {
+        var r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
+        W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        var n = Math.round(Math.min(90, W * H / 14000)); pts = [];
+        for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.4 + .4 });
+      };
+      var draw = function () {
+        ctx.clearRect(0, 0, W, H);
+        var light = root.getAttribute('data-theme') === 'light', dot = light ? '80,90,200' : '170,200,255';
+        for (var i = 0; i < pts.length; i++) {
+          var p = pts[i]; p.x += p.vx; p.y += p.vy;
+          if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1;
+          ctx.fillStyle = 'rgba(' + dot + ',.8)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.3); ctx.fill();
+          for (var j = i + 1; j < pts.length; j++) {
+            var q = pts[j], dx = p.x - q.x, dy = p.y - q.y, d2 = dx * dx + dy * dy;
+            if (d2 < 13000) { ctx.strokeStyle = 'rgba(' + (light ? '90,80,220' : '110,170,255') + ',' + (.22 * (1 - d2 / 13000)).toFixed(3) + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
+          }
+        }
+        if (!calm && seen && !document.hidden) raf = requestAnimationFrame(draw); else raf = 0;
+      };
+      var kick = function () { if (!raf) raf = requestAnimationFrame(draw); };
+      size(); draw();
+      window.addEventListener('resize', function () { size(); kick(); });
+      document.addEventListener('visibilitychange', kick);
+      if (window.IntersectionObserver) new IntersectionObserver(function (en) { seen = en[0].isIntersecting; if (seen) kick(); }).observe(cv);
     }
 
     // ---------- home page: the typed line and the three script-driven live tiles ----------
