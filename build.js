@@ -323,12 +323,14 @@ write('index.html', layout({
     mainEntity: homeFaq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } }))
   }),
   body: `<section class="hero hero2"><div class="hero-copy">
-  <h1>Free online tools that just work</h1>
-  <p class="sub">${tools.length} simple tools for PDFs, pictures, money and text. Nothing to install, nothing uploaded.</p>
+  <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
+  <h1>Use any tool you need, <span class="hl">completely free</span></h1>
+  <p class="sub">Scroll down and pick whatever you need. All ${tools.length} tools for PDFs, pictures, money, text and code are free for everyone, with no sign-up and nothing to install.</p>
   <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search for a tool, for example “pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
-  <ul class="trust"><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Your work is saved for next time</li><li>${icon('check')}Works on your phone</li></ul>
-  ${cfg.firebase ? `<p class="keep">${keepLine}</p>` : ''}
+  <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
+  ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>Want a tool to work better, or need a new one?</b> Send us an email and we will improve it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
+  <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
 <section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
   <div class="spot-track" id="spotTrack">
