@@ -1,0 +1,181 @@
+<style>
+.nb-in input[type=text] { font-family: var(--mono); font-size: 18px; }
+.nb-out { display: grid; gap: 8px; margin-top: 16px; }
+.nb-row { display: grid; grid-template-columns: 110px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+.nb-row > span { font-size: 13.5px; font-weight: 600; color: var(--muted); }
+.nb-row code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--mono); font-size: 15px; overflow-wrap: anywhere; word-break: break-all; min-height: 44px; }
+.nb-row .btn { padding: 7px 12px; min-height: 40px; }
+.nb-row select, .nb-row input { min-height: 40px; }
+.nb-to { display: flex; gap: 6px; align-items: center; }
+.nb-to input { width: 70px; padding: 6px 8px; }
+.nb-note { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+.nb-tc { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 8px; }
+.nb-tc th, .nb-tc td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
+.nb-tc th { color: var(--muted); font-size: 13px; }
+.nb-tc code { font-family: var(--mono); overflow-wrap: anywhere; word-break: break-all; }
+.nb-steps table { border-collapse: collapse; font-family: var(--mono); font-size: 14px; margin: 6px 0 10px; }
+.nb-steps td, .nb-steps th { padding: 4px 12px; border-bottom: 1px solid var(--line); text-align: end; white-space: nowrap; }
+.nb-steps th { font-family: system-ui, sans-serif; color: var(--muted); font-size: 13px; }
+.nb-steps p { margin: 6px 0; overflow-wrap: anywhere; }
+.nb-steps .hl { color: var(--accent); font-weight: 700; }
+@media (max-width: 520px) { .nb-row { grid-template-columns: minmax(0, 1fr) auto; } .nb-row > span { grid-column: 1 / -1; margin-bottom: -4px; } }
+</style>
+<div class="fields nb-in">
+  <div style="grid-column: 1 / -1"><label for="num">Number</label><input type="text" id="num" value="255.625" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. 1011.01, -42, FF, 0x1A"></div>
+  <div><label for="from">It is written in</label><select id="from"><option value="10">Decimal (base 10)</option><option value="2">Binary (base 2)</option><option value="8">Octal (base 8)</option><option value="16">Hexadecimal (base 16)</option><option value="other">Other base…</option></select></div>
+  <div id="fromWrap" hidden><label for="fromb">Base (2 to 36)</label><input type="number" id="fromb" min="2" max="36" value="5"></div>
+  <div><label for="digits">Fraction digits</label><select id="digits"><option value="12">Up to 12</option><option value="24" selected>Up to 24</option><option value="48">Up to 48</option><option value="96">Up to 96</option></select></div>
+  <div><label for="tcin">Read input as two's complement</label><select id="tcin"><option value="0">No, a plain number</option><option value="8">8-bit</option><option value="16">16-bit</option><option value="32">32-bit</option><option value="64">64-bit</option></select></div>
+</div>
+<p class="msg" id="msg"></p>
+<div class="nb-out" id="out">
+  <div class="nb-row"><span>Binary (2)</span><code id="o2"></code><button type="button" class="btn ghost" data-c="o2">Copy</button></div>
+  <div class="nb-row"><span>Octal (8)</span><code id="o8"></code><button type="button" class="btn ghost" data-c="o8">Copy</button></div>
+  <div class="nb-row"><span>Decimal (10)</span><code id="o10"></code><button type="button" class="btn ghost" data-c="o10">Copy</button></div>
+  <div class="nb-row"><span>Hex (16)</span><code id="o16"></code><button type="button" class="btn ghost" data-c="o16">Copy</button></div>
+  <div class="nb-row"><span class="nb-to"><label for="to" style="margin:0">Base</label><input type="number" id="to" min="2" max="36" value="36"></span><code id="oN"></code><button type="button" class="btn ghost" data-c="oN">Copy</button></div>
+</div>
+<p class="nb-note" id="fnote"></p>
+<h3>Two's complement</h3>
+<p class="nb-note" id="tcnote" style="margin-top:0"></p>
+<div class="scroll-x"><table class="nb-tc" id="tc"></table></div>
+<h3>Step-by-step working</h3>
+<div class="fields" style="margin-bottom:6px"><div><label for="stepTo">Show the steps for converting to</label><select id="stepTo"><option value="2">Binary</option><option value="8">Octal</option><option value="16">Hexadecimal</option><option value="10">Decimal</option><option value="N">The base above</option></select></div></div>
+<div class="nb-steps" id="steps"></div>
+<script>
+(function () {
+  var DIG = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  function bAbs(a) { return a < 0n ? -a : a; }
+  function base() { var f = $('from').value; if (f !== 'other') return +f; var b = parseInt($('fromb').value, 10); return b; }
+  // Reads the text as { neg, I (BigInt), fn, fd (fraction fn/fd, BigInt), digits }
+  function parse(text, b) {
+    var s = text.trim().replace(/[\s_']/g, '').replace(/[−–]/g, '-'), neg = false, note = '';
+    if (!s) throw new Error('Type a number to convert.');
+    if (s[0] === '-' || s[0] === '+') { neg = s[0] === '-'; s = s.slice(1); }
+    var pre = /^0([xbo])/i.exec(s);
+    if (pre && !(b === 16 && pre[1].toLowerCase() === 'b')) { // 0x1A, 0b101, 0o17; but 0B1 in hex is the number B1
+      var pb = { x: 16, b: 2, o: 8 }[pre[1].toLowerCase()];
+      if (pb !== b) note = 'The prefix 0' + pre[1] + ' means base ' + pb + ', so the number was read in base ' + pb + '.';
+      b = pb; s = s.slice(2);
+    }
+    if (!s) throw new Error('There are no digits after the sign or prefix.');
+    var parts = s.split('.');
+    if (parts.length > 2) throw new Error('A number can only have one point.');
+    var ip = parts[0] || '0', fp = parts[1] || '';
+    if (parts.length === 2 && !parts[0] && !fp) throw new Error('Type some digits.');
+    function val(str) {
+      var n = 0n, B = BigInt(b);
+      for (var i = 0; i < str.length; i++) {
+        var d = DIG.indexOf(str[i].toUpperCase());
+        if (d < 0) throw new Error('"' + str[i] + '" is not a digit.');
+        if (d >= b) throw new Error('The digit "' + str[i] + '" is not allowed in base ' + b + '. Base ' + b + ' uses only ' + (b <= 10 ? '0 to ' + (b - 1) : '0 to 9 and A to ' + DIG[b - 1]) + '.');
+        n = n * B + BigInt(d);
+      }
+      return n;
+    }
+    if (ip.length + fp.length > 5000) throw new Error('That number is too long (over 5,000 digits).');
+    var I = val(ip), fn = val(fp), fd = BigInt(b) ** BigInt(fp.length);
+    return { neg: neg, I: I, fn: fn, fd: fd, b: b, ip: ip.toUpperCase(), fp: fp.toUpperCase(), note: note };
+  }
+  // Fraction fn/fd in base t: exact digits, repeating block detection, limited length.
+  function fracDigits(fn, fd, t, limit) {
+    var T = BigInt(t), out = '', seen = new Map(), r = fn, rep = -1;
+    while (r !== 0n && out.length < limit) {
+      var k = r.toString(); if (seen.has(k)) { rep = seen.get(k); break; }
+      seen.set(k, out.length); r *= T; out += DIG[Number(r / fd)]; r %= fd;
+    }
+    if (r === 0n) return { s: out, exact: true };
+    if (rep >= 0) return { s: out.slice(0, rep) + '(' + out.slice(rep) + ')', repeats: true };
+    return { s: out, cut: true };
+  }
+  function group(s, n) { var out = ''; for (var i = s.length; i > 0; i -= n) out = s.slice(Math.max(0, i - n), i) + (out ? ' ' + out : ''); return out; }
+  function conv(v, t, limit) {
+    var s = (v.neg && (v.I || v.fn) ? '-' : '') + v.I.toString(t).toUpperCase(), info = null;
+    if (v.fn) { var f = fracDigits(v.fn, v.fd, t, limit); s += '.' + f.s; info = f; }
+    return { s: s, info: info };
+  }
+  var cur = null;
+  function run() {
+    var msg = $('msg'); msg.className = 'msg'; msg.textContent = '';
+    $('fromWrap').hidden = $('from').value !== 'other';
+    var b = base(), limit = +$('digits').value, to = parseInt($('to').value, 10);
+    try {
+      if (!(b >= 2 && b <= 36)) throw new Error('The input base must be a whole number from 2 to 36.');
+      var v = parse($('num').value, b), tcw = +$('tcin').value, tcNote = '';
+      if (tcw) {
+        if (v.fn || v.neg) throw new Error('Two\'s complement input must be a whole, non-negative bit pattern, like 11111111 or FF.');
+        var lim = 1n << BigInt(tcw);
+        if (v.I >= lim) throw new Error('That pattern needs more than ' + tcw + ' bits.');
+        if (v.I >= lim >> 1n) { tcNote = 'The top bit is 1, so this ' + tcw + '-bit two\'s complement pattern is negative: ' + v.I + ' − 2^' + tcw + ' = ' + v.I + ' − ' + lim + ' = −' + (lim - v.I) + '.'; v.I = lim - v.I; v.neg = true; v.ip = v.I.toString(v.b).toUpperCase(); }
+      }
+      cur = v;
+      [2, 8, 10, 16].forEach(function (t) { var c = conv(v, t, limit); $('o' + t).textContent = (t === 2 && !v.fn ? group(c.s.replace('-', ''), 4).replace(/^/, v.neg && v.I ? '-' : '') : c.s).replace('-', '−'); });
+      if (!(to >= 2 && to <= 36)) { $('oN').textContent = 'Choose a base from 2 to 36'; } else $('oN').textContent = conv(v, to, limit).s.replace('-', '−');
+      var c2 = conv(v, 2, limit), notes = [];
+      if (v.note) notes.push(v.note);
+      if (tcNote) notes.push(tcNote);
+      if (v.fn) {
+        var any = [2, 8, 10, 16, to].some(function (t) { return t >= 2 && t <= 36 && conv(v, t, limit).info.cut; });
+        notes.push('Digits in brackets repeat forever, e.g. 0.(3) = 0.333…' + (any ? ' Some fractions are cut off after ' + limit + ' digits because they do not end or repeat within that length.' : ''));
+      }
+      $('fnote').textContent = notes.join(' ');
+      twos(v); steps(v);
+      $('out').style.opacity = 1;
+    } catch (e) {
+      cur = null; msg.className = 'msg bad'; msg.textContent = e.message;
+      ['o2', 'o8', 'o10', 'o16', 'oN'].forEach(function (id) { $(id).textContent = ''; });
+      $('tc').innerHTML = ''; $('steps').innerHTML = ''; $('fnote').textContent = ''; $('tcnote').textContent = '';
+    }
+  }
+  function twos(v) {
+    var n = v.neg ? -v.I : v.I, rows = '<thead><tr><th>Bits</th><th>Pattern</th><th>Hex</th><th>Range (signed)</th></tr></thead><tbody>';
+    $('tcnote').textContent = (v.fn ? 'Only the whole-number part (' + (v.neg ? '−' : '') + v.I + ') is shown here; two\'s complement stores integers. ' : '') + (n < 0n ? 'For a negative number: write the positive value in binary, flip every bit, then add 1.' : 'For a positive number the pattern is just the binary value padded with zeros.');
+    [8, 16, 32, 64].forEach(function (w) {
+      var W = BigInt(w), max = (1n << (W - 1n)) - 1n, min = -(1n << (W - 1n)), mod = 1n << W, pat, hex, extra = '';
+      if (n >= min && n <= max) { var u = ((n % mod) + mod) % mod; pat = group(u.toString(2).padStart(w, '0'), 4); hex = u.toString(16).toUpperCase().padStart(w / 4, '0'); }
+      else if (n > max && n < mod) { pat = group(n.toString(2).padStart(w, '0'), 4); hex = n.toString(16).toUpperCase().padStart(w / 4, '0'); extra = '<br><small>Too big for signed; fits only as unsigned (0 to ' + (mod - 1n) + ')</small>'; }
+      else { pat = 'Does not fit'; hex = '–'; }
+      rows += '<tr><td>' + w + '-bit</td><td><code>' + pat + '</code>' + extra + '</td><td><code>' + hex + '</code></td><td>' + String(min).replace('-', '−') + ' to ' + max + '</td></tr>';
+    });
+    $('tc').innerHTML = rows + '</tbody>';
+  }
+  function steps(v) {
+    var st = '', t = $('stepTo').value === 'N' ? parseInt($('to').value, 10) : +$('stepTo').value, b = v.b, B = BigInt(b);
+    if (!(t >= 2 && t <= 36)) { $('steps').innerHTML = ''; return; }
+    var sign = v.neg ? '−' : '';
+    if (b !== 10) { // step 1: to decimal by place values
+      var ds = v.ip.replace(/^0+(?=.)/, ''), terms = [], fterms = [];
+      for (var i = 0; i < ds.length; i++) terms.push(DIG.indexOf(ds[i]) + '×' + b + '<sup>' + (ds.length - 1 - i) + '</sup>');
+      for (var j = 0; j < v.fp.length; j++) fterms.push(DIG.indexOf(v.fp[j]) + '×' + b + '<sup>−' + (j + 1) + '</sup>');
+      var all = terms.concat(fterms), shown = all.length > 16 ? all.slice(0, 8).concat(['…'], all.slice(-4)) : all;
+      st += '<p><b>1. Base ' + b + ' to decimal: multiply each digit by its place value and add.</b></p><p>' + sign + v.ip + (v.fp ? '.' + v.fp : '') + '<sub>' + b + '</sub> = ' + shown.join(' + ') + ' = ' + sign + conv({ neg: false, I: v.I, fn: v.fn, fd: v.fd }, 10, 30).s + '<sub>10</sub></p>';
+      if (t === 10) { $('steps').innerHTML = st; return; }
+      st += '<p><b>2. Decimal to base ' + t + '</b></p>';
+    } else if (t === 10) { $('steps').innerHTML = '<p>The number is already in decimal.</p>'; return; }
+    else st += '<p><b>Decimal to base ' + t + '</b></p>';
+    // whole part: repeated division
+    var T = BigInt(t), n = v.I, rows = [], k = 0;
+    if (n === 0n) rows.push([0n, 0n, 0n]);
+    while (n > 0n) { rows.push([n, n / T, n % T]); n /= T; k++; }
+    st += '<p>Whole part: divide by ' + t + ' again and again and keep the remainders. Read them from the <b>bottom up</b>.</p>';
+    var tr = rows.length > 40 ? rows.slice(0, 20).concat([null], rows.slice(-10)) : rows;
+    st += '<div class="scroll-x"><table><thead><tr><th>Number</th><th>÷ ' + t + ' =</th><th>Remainder</th><th>Digit</th></tr></thead><tbody>' + tr.map(function (r) { return r ? '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td><td>' + r[2] + '</td><td class="hl">' + DIG[Number(r[2])] + '</td></tr>' : '<tr><td colspan="4">… ' + (rows.length - 30) + ' more rows …</td></tr>'; }).join('') + '</tbody></table></div>';
+    st += '<p>Whole part = <span class="hl">' + v.I.toString(t).toUpperCase() + '</span><sub>' + t + '</sub></p>';
+    if (v.fn) { // fraction: repeated multiplication
+      var fn = v.fn, fd = v.fd, mrows = [], lim = 12;
+      for (var m = 0; m < lim && fn !== 0n; m++) { var x = fn * T; mrows.push([fn, x / fd, x % fd]); fn = x % fd; }
+      var fmt = function (a) { return fd > 10n ** 12n ? '…' : (Number(a) / Number(fd)).toString(); };
+      st += '<p>Fraction part: multiply by ' + t + ' again and again. The whole number you get each time is the next digit, read from the <b>top down</b>.</p>';
+      st += '<div class="scroll-x"><table><thead><tr><th>Fraction</th><th>× ' + t + ' =</th><th>Digit</th></tr></thead><tbody>' + mrows.map(function (r) { return '<tr><td>' + fmt(r[0]) + '</td><td>' + (Number(r[1]) + Number(r[2]) / Number(fd)) + '</td><td class="hl">' + DIG[Number(r[1])] + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      var f = fracDigits(v.fn, v.fd, t, +$('digits').value);
+      st += '<p>' + (fn === 0n && mrows.length < lim ? 'The fraction reached 0, so it ends here.' : f.repeats ? 'The fractions start to repeat, so the digits repeat too.' : 'It keeps going; the table shows the first ' + lim + ' digits.') + ' Fraction part = <span class="hl">0.' + f.s + '</span><sub>' + t + '</sub></p>';
+    }
+    st += '<p><b>Answer:</b> ' + sign + v.ip + (v.fp ? '.' + v.fp : '') + '<sub>' + b + '</sub> = <span class="hl">' + conv(v, t, +$('digits').value).s.replace('-', '−') + '</span><sub>' + t + '</sub></p>';
+    $('steps').innerHTML = st;
+  }
+  ['num', 'fromb', 'to'].forEach(function (id) { $(id).addEventListener('input', run); });
+  ['from', 'digits', 'tcin', 'stepTo'].forEach(function (id) { $(id).addEventListener('change', run); });
+  document.querySelectorAll('[data-c]').forEach(function (b) { b.addEventListener('click', function () { var t = $(b.dataset.c).textContent.replace(/−/g, '-'); if (b.dataset.c === 'o2') t = t.replace(/ /g, ''); if (t) copyText(t, b); }); });
+  run();
+})();
+</script>

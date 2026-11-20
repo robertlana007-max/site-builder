@@ -1,0 +1,212 @@
+<style>
+.yc-rows { display: grid; gap: 8px; margin-top: 8px; }
+.yc-row { display: grid; grid-template-columns: 34px 110px minmax(0, 1fr) 44px; gap: 8px; align-items: center; }
+.yc-row .yc-n { color: var(--muted); font-size: 14px; text-align: right; font-variant-numeric: tabular-nums; }
+.yc-row input.bad { border-color: var(--bad); }
+.yc-x { width: 44px; height: 44px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 10px; font-size: 20px; cursor: pointer; }
+.yc-x:hover { color: var(--bad); border-color: var(--bad); }
+@media (max-width: 520px) { .yc-row { grid-template-columns: 92px minmax(0, 1fr) 44px; } .yc-row .yc-n { display: none; } }
+.yc-checks { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 6px; font-size: 15px; }
+.yc-checks li { padding-left: 26px; position: relative; }
+.yc-checks li::before { position: absolute; left: 0; top: 0; font-weight: 700; }
+.yc-checks li.ok { color: var(--ok); } .yc-checks li.ok::before { content: "✓"; }
+.yc-checks li.bad { color: var(--bad); } .yc-checks li.bad::before { content: "✕"; }
+.yc-checks li.warn { color: #b45309; } .yc-checks li.warn::before { content: "!"; left: 4px; }
+[data-theme="dark"] .yc-checks li.warn { color: #fbbf24; }
+.yc-sec { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.yc-sec h2 { font-size: 19px; margin: 0 0 4px; }
+.yc-out { font-family: var(--mono); font-size: 14.5px; min-height: 140px; }
+details.yc-imp { margin-top: 14px; }
+details.yc-imp summary { cursor: pointer; font-weight: 600; }
+</style>
+<div class="fields">
+  <div><label for="ycLen">Video length (optional)</label><input type="text" id="ycLen" data-nomemo placeholder="e.g. 12:45 or 1:02:30" autocomplete="off"></div>
+  <div><label for="ycFmt">Time style</label><select id="ycFmt"><option value="short">0:00, 1:05, 1:02:30</option><option value="pad">00:00, 01:05, 1:02:30</option></select></div>
+</div>
+<label>Chapters <small style="font-weight:400;color:var(--muted)">(time, then title)</small></label>
+<div class="yc-rows" id="ycRows"></div>
+<div class="btns">
+  <button class="btn ghost" id="ycAdd" type="button">+ Add chapter</button>
+  <button class="btn ghost" id="ycSort" type="button">Sort by time</button>
+  <button class="btn ghost" id="ycReset" type="button">Start over</button>
+</div>
+<details class="yc-imp">
+  <summary>Paste an existing list instead</summary>
+  <label for="ycImport" style="margin-top:10px">One chapter per line, with the time anywhere on the line</label>
+  <textarea id="ycImport" class="plain" data-nomemo style="min-height:110px" placeholder="0:00 Intro&#10;1:24 Unboxing&#10;5:10 - Camera test&#10;(12:03) Verdict"></textarea>
+  <div class="btns"><button class="btn ghost" id="ycImportBtn" type="button">Load these chapters</button></div>
+</details>
+<ul class="yc-checks" id="ycChecks" aria-live="polite"></ul>
+<label for="ycOut" style="margin-top:16px">Paste this into your video description</label>
+<textarea id="ycOut" class="plain yc-out" data-nomemo readonly></textarea>
+<div class="btns">
+  <button class="btn" id="ycCopy" type="button">Copy chapters</button>
+</div>
+<p class="msg" id="ycMsg" aria-live="polite"></p>
+
+<div class="yc-sec">
+  <h2>Timestamp link maker</h2>
+  <p class="msg" style="margin-top:0">Make a link that starts the video at a chosen moment.</p>
+  <div class="fields" style="margin-top:10px">
+    <div style="grid-column:1/-1"><label for="ylUrl">Video link or ID</label><input type="text" id="ylUrl" data-nomemo inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=…"></div>
+    <div><label for="ylTime">Start at</label><input type="text" id="ylTime" data-nomemo placeholder="e.g. 2:35" autocomplete="off"></div>
+  </div>
+  <div class="kv"><span>Full link</span><code id="ylFull">–</code><button class="btn ghost" id="ylCopyFull" type="button" disabled>Copy</button></div>
+  <div class="kv"><span>Short link</span><code id="ylShort">–</code><button class="btn ghost" id="ylCopyShort" type="button" disabled>Copy</button></div>
+  <p class="msg" id="ylMsg" aria-live="polite"></p>
+</div>
+<p class="msg">YouTube shows chapters only when the first one starts at 0:00, there are at least three, each is at least 10 seconds long, and they are in order. Chapters may also be turned off for some videos or channels by YouTube. Not affiliated with YouTube.</p>
+<script>
+(function () {
+  // "75", "1:15", "01:15", "1:02:30" -> seconds; null if not a valid time
+  function parseT(s) {
+    s = String(s || '').trim().replace(/[.,]/g, ':');
+    if (!s) return null;
+    if (/^\d+$/.test(s)) return +s;
+    var m = /^(?:(\d+):)?(\d{1,2}):(\d{1,2})$/.exec(s);
+    if (!m) return null;
+    var h = +(m[1] || 0), mi = +m[2], se = +m[3];
+    if (se > 59 || (m[1] != null && mi > 59)) return null;
+    return h * 3600 + mi * 60 + se;
+  }
+  function fmtT(sec, pad) {
+    var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60, two = function (n) { return (n < 10 ? '0' : '') + n; };
+    if (h) return h + ':' + two(m) + ':' + two(s);
+    return (pad ? two(m) : m) + ':' + two(s);
+  }
+  function human(sec) { return sec < 60 ? sec + ' s' : fmtT(sec); }
+  var rows = $('ycRows');
+  function addRow(t, title, focus) {
+    var r = document.createElement('div');
+    r.className = 'yc-row';
+    r.innerHTML = '<span class="yc-n"></span><input type="text" class="yc-t" autocomplete="off" placeholder="0:00" aria-label="Time"><input type="text" class="yc-title" autocomplete="off" maxlength="100" placeholder="Chapter title" aria-label="Chapter title"><button type="button" class="yc-x" aria-label="Remove chapter">×</button>';
+    r.querySelector('.yc-t').value = t || '';
+    r.querySelector('.yc-title').value = title || '';
+    r.querySelector('.yc-x').addEventListener('click', function () { r.remove(); if (!rows.children.length) addRow('0:00', ''); update(); });
+    r.querySelectorAll('input').forEach(function (i) {
+      i.addEventListener('input', update);
+      i.addEventListener('keydown', function (e) {
+        if (e.key === 'Enter') { e.preventDefault(); if (r === rows.lastElementChild) { var nx = addRow('', '', false); nx.querySelector('.yc-t').focus(); update(); } else r.nextElementSibling.querySelector(i.classList.contains('yc-t') ? '.yc-t' : '.yc-title').focus(); }
+      });
+    });
+    r.querySelector('.yc-t').addEventListener('blur', function () { var v = parseT(this.value); if (v != null) { this.value = fmtT(v, $('ycFmt').value === 'pad'); update(); } });
+    rows.appendChild(r);
+    if (focus) r.querySelector(t ? '.yc-title' : '.yc-t').focus();
+    return r;
+  }
+  function read() {
+    return Array.prototype.map.call(rows.children, function (r) { var ti = r.querySelector('.yc-t'); return { el: r, raw: ti.value.trim(), t: parseT(ti.value), title: r.querySelector('.yc-title').value.trim() }; });
+  }
+  function update() {
+    var list = read(), pad = $('ycFmt').value === 'pad', checks = [], len = parseT($('ycLen').value), lenRaw = $('ycLen').value.trim();
+    Array.prototype.forEach.call(rows.children, function (r, i) { r.querySelector('.yc-n').textContent = i + 1; });
+    var filled = list.filter(function (c) { return c.raw || c.title; });
+    var badT = filled.filter(function (c) { return c.t == null; });
+    list.forEach(function (c) { c.el.querySelector('.yc-t').classList.toggle('bad', !!c.raw && c.t == null || (!c.raw && !!c.title)); });
+    var good = filled.filter(function (c) { return c.t != null; });
+    // the checks YouTube applies
+    if (lenRaw && len == null) checks.push(['bad', 'The video length "' + lenRaw + '" is not a time. Use m:ss or h:mm:ss.']);
+    if (badT.length) checks.push(['bad', badT.length + ' chapter' + (badT.length > 1 ? 's have' : ' has') + ' a missing or invalid time. Use m:ss (like 4:05) or h:mm:ss (like 1:02:30).']);
+    if (!good.length) checks.push(['bad', 'Add your first chapter at 0:00.']);
+    else checks.push(good[0].t === 0 ? ['ok', 'The first chapter starts at 0:00.'] : ['bad', 'The first chapter must start at 0:00. Yours starts at ' + fmtT(good[0].t) + '.']);
+    checks.push(good.length >= 3 ? ['ok', good.length + ' chapters (at least 3 needed).'] : ['bad', 'You need at least 3 chapters. You have ' + good.length + '.']);
+    var order = true, short = [], dup = [];
+    for (var i = 1; i < good.length; i++) {
+      if (good[i].t < good[i - 1].t) order = false;
+      else if (good[i].t === good[i - 1].t) dup.push(fmtT(good[i].t));
+      else if (good[i].t - good[i - 1].t < 10) short.push('"' + (good[i - 1].title || fmtT(good[i - 1].t)) + '" (' + human(good[i].t - good[i - 1].t) + ')');
+    }
+    if (!order) checks.push(['bad', 'The times are not in order. Click "Sort by time" to fix it.']);
+    else if (good.length > 1) checks.push(['ok', 'The times go in order.']);
+    if (dup.length) checks.push(['bad', 'Two chapters start at the same time: ' + dup.join(', ') + '.']);
+    if (len != null && good.length) {
+      var last = good.reduce(function (a, c) { return Math.max(a, c.t); }, 0), beyond = good.filter(function (c) { return c.t >= len; });
+      if (beyond.length) checks.push(['bad', beyond.length + ' chapter' + (beyond.length > 1 ? 's start' : ' starts') + ' at or after the end of the video (' + fmtT(len) + ').']);
+      else if (len - last < 10) short.push('"' + (good.filter(function (c) { return c.t === last; })[0].title || fmtT(last)) + '" (' + human(len - last) + ' before the end)');
+    }
+    if (short.length) checks.push(['bad', 'Each chapter must be at least 10 seconds long. Too short: ' + short.join(', ') + '.']);
+    else if (good.length > 1 && order && !dup.length) checks.push(['ok', 'Every chapter is at least 10 seconds long' + (len == null ? ' (add the video length to check the last one).' : '.')]);
+    var untitled = good.filter(function (c) { return !c.title; }).length;
+    if (untitled) checks.push(['warn', untitled + ' chapter' + (untitled > 1 ? 's have' : ' has') + ' no title. Viewers see the title in the progress bar.']);
+    var long = good.filter(function (c) { return c.title.length > 60; }).length;
+    if (long) checks.push(['warn', long + ' title' + (long > 1 ? 's are' : ' is') + ' long and may be cut off in the player. Aim for under 40 characters.']);
+    var ul = $('ycChecks'); ul.innerHTML = '';
+    checks.forEach(function (c) { var li = document.createElement('li'); li.className = c[0]; li.textContent = c[1]; ul.appendChild(li); });
+    $('ycOut').value = good.map(function (c) { return fmtT(c.t, pad) + ' ' + (c.title || 'Chapter'); }).join('\n');
+    $('ycCopy').dataset.ok = checks.every(function (c) { return c[0] !== 'bad'; }) ? '1' : '';
+  }
+  function say(id, c, t) { $(id).className = 'msg' + (c ? ' ' + c : ''); $(id).textContent = t; }
+  $('ycAdd').addEventListener('click', function () {
+    var list = read().filter(function (c) { return c.t != null; }), last = list.length ? Math.max.apply(null, list.map(function (c) { return c.t; })) : -1;
+    var r = addRow('', '', false); r.querySelector('.yc-t').placeholder = last >= 0 ? fmtT(last + 30) : '0:00'; r.querySelector('.yc-t').focus(); update();
+  });
+  $('ycSort').addEventListener('click', function () {
+    var list = read();
+    list.sort(function (a, b) { var x = a.t == null ? Infinity : a.t, y = b.t == null ? Infinity : b.t; return x - y; });
+    list.forEach(function (c) { rows.appendChild(c.el); });
+    update(); say('ycMsg', 'ok', 'Sorted by time.');
+  });
+  $('ycReset').addEventListener('click', function () {
+    if (read().some(function (c) { return c.title || (c.raw && c.raw !== '0:00' && c.raw !== '00:00'); }) && !confirm('Remove all chapters and start again?')) return;
+    rows.innerHTML = ''; addRow('0:00', 'Intro'); addRow('', ''); addRow('', ''); update(); say('ycMsg', '', '');
+  });
+  $('ycFmt').addEventListener('change', function () { var pad = this.value === 'pad'; read().forEach(function (c) { if (c.t != null) c.el.querySelector('.yc-t').value = fmtT(c.t, pad); }); update(); });
+  $('ycLen').addEventListener('input', update);
+  $('ycImportBtn').addEventListener('click', function () {
+    var out = [];
+    $('ycImport').value.split(/\r?\n/).forEach(function (l) {
+      var m = /(?:^|[^\d:])((?:\d{1,2}:)?\d{1,2}:\d{2})(?![\d:])/.exec(' ' + l);
+      if (!m) return;
+      var t = parseT(m[1]); if (t == null) return;
+      var title = (' ' + l).replace(m[0], m[0].slice(0, m[0].length - m[1].length)).replace(/^[\s\-–—:|•·\[\]()]+|[\s\-–—:|•·\[\]()]+$/g, '').replace(/\s*[\[(]\s*[\])]\s*/g, ' ').trim();
+      out.push([t, title]);
+    });
+    if (!out.length) { say('ycMsg', 'bad', 'No times found. Each line needs a time like 0:00, 4:05 or 1:02:30.'); return; }
+    rows.innerHTML = '';
+    var pad = $('ycFmt').value === 'pad';
+    out.forEach(function (c) { addRow(fmtT(c[0], pad), c[1]); });
+    update(); say('ycMsg', 'ok', 'Loaded ' + out.length + ' chapter' + (out.length > 1 ? 's' : '') + '. Check the list below.');
+  });
+  $('ycCopy').addEventListener('click', function () {
+    var v = $('ycOut').value;
+    if (!v) { say('ycMsg', 'bad', 'Add some chapters first.'); return; }
+    copyText(v, $('ycCopy'));
+    say('ycMsg', $('ycCopy').dataset.ok ? 'ok' : 'bad', $('ycCopy').dataset.ok ? 'Copied. Paste it on its own lines in your video description and save.' : 'Copied, but fix the problems marked with ✕ first or YouTube will not show chapters.');
+  });
+
+  // ---- timestamp links ----
+  var ID = /^[A-Za-z0-9_-]{11}$/;
+  function videoId(input) {
+    var s = String(input || '').trim().replace(/^[<"'(\[]+|[>"')\].,;]+$/g, '');
+    if (!s) return '';
+    if (ID.test(s)) return s;
+    try {
+      var u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s), host = u.hostname.replace(/^(www|m|music)\./, ''), p = u.pathname.split('/').filter(Boolean);
+      if (host === 'youtu.be' && ID.test(p[0] || '')) return p[0];
+      if (/(^|\.)youtube(-nocookie)?\.com$/.test(host)) {
+        if (ID.test(u.searchParams.get('v') || '')) return u.searchParams.get('v');
+        if (p.length >= 2 && /^(shorts|embed|live|v|e)$/.test(p[0]) && ID.test(p[1])) return p[1];
+      }
+    } catch (e) {}
+    var m = s.match(/(?:[?&]v=|\/(?:shorts|embed|live|v|e)\/|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/);
+    return m ? m[1] : '';
+  }
+  function tlink() {
+    var raw = $('ylUrl').value, id = videoId(raw), tr = $('ylTime').value.trim(), t = tr ? parseT(tr) : 0;
+    var ok = id && t != null;
+    if (!raw.trim()) say('ylMsg', '', '');
+    else if (!id) say('ylMsg', 'bad', 'Could not find a video ID in that link.');
+    else if (t == null) say('ylMsg', 'bad', 'Use a time like 2:35 or 1:02:30, or a number of seconds.');
+    else say('ylMsg', 'ok', t ? 'The video will start at ' + fmtT(t) + '.' : 'Add a start time, or share this to start at the beginning.');
+    $('ylFull').textContent = ok ? 'https://www.youtube.com/watch?v=' + id + (t ? '&t=' + t + 's' : '') : '–';
+    $('ylShort').textContent = ok ? 'https://youtu.be/' + id + (t ? '?t=' + t : '') : '–';
+    $('ylCopyFull').disabled = $('ylCopyShort').disabled = !ok;
+  }
+  $('ylUrl').addEventListener('input', tlink); $('ylTime').addEventListener('input', tlink);
+  $('ylCopyFull').addEventListener('click', function () { copyText($('ylFull').textContent, this); });
+  $('ylCopyShort').addEventListener('click', function () { copyText($('ylShort').textContent, this); });
+
+  addRow('0:00', 'Intro'); addRow('', ''); addRow('', '');
+  update(); tlink();
+})();
+</script>

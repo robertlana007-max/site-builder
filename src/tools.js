@@ -1259,5 +1259,22 @@ module.exports = [
         ['Is my history saved?', 'Your last 50 results and the statistics are kept in this browser until you click Clear history and statistics.']
       ],
       icon: '<circle cx="8.5" cy="8.5" r="5.5"/><path d="M8.5 6v5"/><rect x="12" y="12" width="9" height="9" rx="2"/><path d="M15 15h.01M18 18h.01"/>'
+  },
+  {
+      slug: 'background-remover', cat: 'Image tools', name: 'Background Remover',
+      title: 'Background Remover - Remove Photo Background Free',
+      desc: 'Remove the background from any photo in your browser. Get a transparent PNG or add a colour, blur or new picture. Free, no upload, no sign-up.',
+      card: 'Cut out the subject of a photo, no upload.',
+      intro: 'Remove the background from a photo of a person, product or pet and download a transparent PNG. An AI model runs on your own device, so your photo is never uploaded.',
+      steps: ['Click the box or drop a photo onto it. The background is removed automatically.', 'Drag across the picture to compare it with the original, and use Restore or Erase to fix any spots by hand.', 'Pick a background: transparent, a solid colour, a blurred copy of the original or your own picture.', 'Click Download PNG, or Download JPG for a smaller file with a filled background.'],
+      faq: [
+        ['Is my photo uploaded to a server?', 'No. The AI model is downloaded to your browser and the background is removed on your own device. Your photo is never sent anywhere.'],
+        ['Is it really free?', 'Yes. There is no sign-up, no watermark and no limit on the number of photos, and you get the full-size result.'],
+        ['What is the difference between Fast and Best quality?', 'Fast uses a small 5 MB model and takes a second or two. Best quality uses a larger 47 MB model that copes much better with busy backgrounds and thin parts like mirrors and straps, but takes several seconds or more on a phone.'],
+        ['Why is part of my subject missing or some background left?', 'The AI guesses what the main subject is. Choose Fine-tune, then paint with Restore to bring parts back or Erase to remove leftovers. Trying Best quality also often helps.'],
+        ['Does it work offline?', 'After the first photo the AI files are saved by your browser, so later photos work even without an internet connection.'],
+        ['Why does the JPG have a white background?', 'JPG files cannot be see-through, so the empty area is filled with your background colour. Download PNG to keep the transparent background.']
+      ],
+      icon: '<path d="M4 20h16"/><path d="M12 3c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4z"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M3 3l3 3M18 3l3 3M3 9l2 0M19 9l2 0" stroke-dasharray="2 2"/>'
   }
 ];
