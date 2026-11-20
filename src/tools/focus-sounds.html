@@ -1,0 +1,356 @@
+<style>
+.fs-top { display: flex; flex-wrap: wrap; gap: 14px 20px; align-items: center; margin-bottom: 16px; }
+.fs-play { min-width: 150px; justify-content: center; }
+.fs-play svg { width: 20px; height: 20px; }
+.fs-master { flex: 1 1 220px; min-width: 0; }
+.fs-master input { width: 100%; }
+.fs-presets { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 18px; }
+.fs-presets .btn { min-height: 40px; padding: 6px 14px; }
+.fs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 190px), 1fr)); gap: 12px; margin-bottom: 18px; }
+.fs-card { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 10px; background: var(--surface); transition: border-color .15s, background .15s; min-width: 0; }
+.fs-card.on { border-color: var(--accent); background: var(--accent-soft); }
+.fs-card button { display: flex; align-items: center; gap: 10px; width: 100%; border: 0; background: none; padding: 0; margin: 0 0 8px; font: 600 15.5px/1.2 inherit; font-family: inherit; color: var(--ink); cursor: pointer; text-align: left; min-height: 36px; }
+.fs-card button svg { width: 26px; height: 26px; flex: none; color: var(--muted); }
+.fs-card.on button svg { color: var(--accent); }
+.fs-card button small { display: block; font-weight: 400; font-size: 12.5px; color: var(--muted); }
+.fs-card input[type=range] { width: 100%; }
+.fs-timer { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: end; }
+.fs-timer > div { min-width: 180px; }
+.fs-left { font-variant-numeric: tabular-nums; font-weight: 600; min-height: 24px; }
+.fs-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--muted); margin-right: 6px; vertical-align: middle; }
+.fs-dot.live { background: var(--ok); animation: fs-pulse 1.6s ease-in-out infinite; }
+@keyframes fs-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .fs-dot.live { animation: none; } }
+</style>
+<div class="fs-top">
+  <button class="btn big fs-play" id="play" type="button" aria-pressed="false"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" id="playIc"><path d="M7 4.5v15l13-7.5z"/></svg><span id="playTx">Play</span></button>
+  <div class="fs-master"><label for="master">Master volume: <span id="masterv">70</span>%</label><input type="range" id="master" min="0" max="100" value="70" data-nomemo></div>
+</div>
+<div class="fs-presets" role="group" aria-label="Presets">
+  <button class="btn ghost" type="button" data-preset="focus">Deep focus</button>
+  <button class="btn ghost" type="button" data-preset="rain">Rain study</button>
+  <button class="btn ghost" type="button" data-preset="sleep">Sleep</button>
+  <button class="btn ghost" type="button" data-preset="cafe">Coffee shop</button>
+  <button class="btn ghost" type="button" data-preset="camp">Campfire night</button>
+  <button class="btn ghost" type="button" data-preset="none">All off</button>
+</div>
+<div class="fs-grid" id="grid"></div>
+<div class="fs-timer">
+  <div><label for="timer">Sleep or study timer</label><select id="timer" data-nomemo>
+    <option value="0">No timer, play until I stop</option>
+    <option value="5">5 minutes</option><option value="15">15 minutes</option><option value="25">25 minutes (one Pomodoro)</option>
+    <option value="30">30 minutes</option><option value="45">45 minutes</option><option value="60">1 hour</option>
+    <option value="90">1 hour 30 minutes</option><option value="120">2 hours</option><option value="240">4 hours</option><option value="480">8 hours</option>
+  </select></div>
+  <p class="fs-left" id="left" aria-live="polite"><span class="fs-dot" id="dot"></span><span id="leftTx">Stopped</span></p>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var KEY = 'gtn-focus-sounds';
+  var SOUNDS = [
+    ['rain', 'Rain', 'Steady rain with drops', '<path d="M7 15a4 4 0 0 1-.5-8A6 6 0 0 1 18 8a3.5 3.5 0 0 1 0 7"/><path d="M8 18l-1 3M12 18l-1 3M16 18l-1 3"/>'],
+    ['ocean', 'Ocean waves', 'Slow waves on a beach', '<path d="M2 12c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1"/><path d="M2 17c2.5-3 5-3 7.5 0s5 3 7.5 0 3.5-2 5-1"/><path d="M2 7c2.5-3 5-3 7.5 0s5 3 7.5 0"/>'],
+    ['wind', 'Wind', 'Gusts rising and falling', '<path d="M3 8h11a3 3 0 1 0-3-3"/><path d="M3 12h16a3 3 0 1 1-3 3"/><path d="M3 16h7"/>'],
+    ['fire', 'Fireplace', 'Crackling logs', '<path d="M12 22c4 0 7-2.5 7-6.5 0-4-3-6-4-9-1.5 2-2 3-3 3.5C12 7 11 4 8.5 2 8.5 6 5 8.5 5 15.5 5 19.5 8 22 12 22z"/>'],
+    ['cafe', 'Coffee shop', 'Distant chatter and cups', '<path d="M4 9h13v5a6 6 0 0 1-6 6h-1a6 6 0 0 1-6-6z"/><path d="M17 11h1.5a2.5 2.5 0 0 1 0 5H17M8 2v3M12 2v3"/>'],
+    ['white', 'White noise', 'Bright, hides voices', '<path d="M3 12h2l2-6 3 12 3-14 3 16 2-8h3"/>'],
+    ['pink', 'Pink noise', 'Softer, like steady rain', '<path d="M3 12h3l2-4 3 8 3-6 2 4h5"/>'],
+    ['brown', 'Brown noise', 'Deep rumble, very calm', '<path d="M3 12c3-5 5-5 7 0s4 5 7 0 3-3 4-2"/>'],
+    ['hum', 'Low hum', 'Warm engine-like drone', '<circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="7"/><circle cx="12" cy="12" r="10.5"/>']
+  ];
+  var PRESETS = {
+    focus: { brown: 60, hum: 18 }, rain: { rain: 70, pink: 15 }, sleep: { ocean: 60, brown: 30 },
+    cafe: { cafe: 65, rain: 18 }, camp: { fire: 70, wind: 30 }, none: {}
+  };
+  var state = { vol: {}, on: {}, master: 70 };
+  SOUNDS.forEach(function (s) { state.vol[s[0]] = 50; state.on[s[0]] = false; });
+  try { var saved = JSON.parse(localStorage.getItem(KEY)); if (saved && saved.vol) { Object.keys(state.vol).forEach(function (k) { if (isFinite(saved.vol[k])) state.vol[k] = Math.max(0, Math.min(100, +saved.vol[k])); state.on[k] = !!(saved.on && saved.on[k]); }); if (isFinite(saved.master)) state.master = Math.max(0, Math.min(100, +saved.master)); } } catch (e) {}
+  function persist() { try { localStorage.setItem(KEY, JSON.stringify(state)); } catch (e) {} }
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+
+  // ================= sound engine (Web Audio only, no audio files) =================
+  function rng(seed) { var s = seed >>> 0 || 1; return function () { s ^= s << 13; s ^= s >>> 17; s ^= s << 5; return (s >>> 0) / 4294967296; }; }
+  // RBJ biquad for building buffers ahead of time
+  function biquad(type, f, q, sr) {
+    var w = 2 * Math.PI * f / sr, cs = Math.cos(w), al = Math.sin(w) / (2 * q), b0, b1, b2, a0 = 1 + al, a1 = -2 * cs, a2 = 1 - al;
+    if (type === 'lp') { b0 = (1 - cs) / 2; b1 = 1 - cs; b2 = b0; } else if (type === 'hp') { b0 = (1 + cs) / 2; b1 = -(1 + cs); b2 = b0; } else { b0 = al; b1 = 0; b2 = -al; }
+    b0 /= a0; b1 /= a0; b2 /= a0; a1 /= a0; a2 /= a0;
+    var x1 = 0, x2 = 0, y1 = 0, y2 = 0;
+    var fn = function (x) { var y = b0 * x + b1 * x1 + b2 * x2 - a1 * y1 - a2 * y2; x2 = x1; x1 = x; y2 = y1; y1 = y; return y; };
+    fn.set = function (nf) { w = 2 * Math.PI * nf / sr; cs = Math.cos(w); al = Math.sin(w) / (2 * q); var n0 = 1 + al; b0 = al / n0; b1 = 0; b2 = -al / n0; a1 = -2 * cs / n0; a2 = (1 - al) / n0; };
+    return fn;
+  }
+  // a buffer that loops without a click: the extra tail is cross-faded into the start
+  function loopBuf(ac, secs, chans, fill) {
+    var sr = ac.sampleRate, n = Math.round(secs * sr), F = Math.round(0.25 * sr), buf = ac.createBuffer(chans, n, sr);
+    for (var c = 0; c < chans; c++) {
+      var a = new Float32Array(n + F); fill(a, c, sr);
+      var d = buf.getChannelData(c);
+      for (var i = 0; i < n; i++) d[i] = a[i];
+      for (i = 0; i < F; i++) { var t = i / F; d[i] = a[i] * Math.sqrt(t) + a[n + i] * Math.sqrt(1 - t); }
+    }
+    return buf;
+  }
+  var GEN = {
+    white: function (ac) { return loopBuf(ac, 6, 2, function (a, c) { var r = rng(11 + c); for (var i = 0; i < a.length; i++) a[i] = r() * 2 - 1; }); },
+    pink: function (ac) {
+      return loopBuf(ac, 7, 2, function (a, c) {
+        var r = rng(23 + c), b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+        for (var i = 0; i < a.length; i++) {
+          var w = r() * 2 - 1;
+          b0 = 0.99886 * b0 + w * 0.0555179; b1 = 0.99332 * b1 + w * 0.0750759; b2 = 0.969 * b2 + w * 0.153852;
+          b3 = 0.8665 * b3 + w * 0.3104856; b4 = 0.55 * b4 + w * 0.5329522; b5 = -0.7616 * b5 - w * 0.016898;
+          a[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + w * 0.5362) * 0.11; b6 = w * 0.115926;
+        }
+      });
+    },
+    brown: function (ac) {
+      return loopBuf(ac, 8, 2, function (a, c) {
+        var r = rng(37 + c), last = 0, i;
+        for (i = 0; i < a.length; i++) { last = (last + 0.02 * (r() * 2 - 1)) / 1.02; a[i] = last * 3.5; }
+        var m = 0; for (i = 0; i < a.length; i++) m += a[i]; m /= a.length; for (i = 0; i < a.length; i++) a[i] -= m; // no DC offset
+      });
+    },
+    drops: function (ac) { // rain drops and the odd "plink", spread across the stereo field
+      var sr = ac.sampleRate, n = Math.round(11 * sr), F = Math.round(0.25 * sr), L = new Float32Array(n + F), R = new Float32Array(n + F), r = rng(51);
+      for (var t = 0; t < n + F;) {
+        t += Math.round(-Math.log(1 - r()) / 55 * sr);
+        var amp = 0.04 + 0.35 * Math.pow(r(), 3), pan = r(), gl = Math.cos(pan * Math.PI / 2), gr = Math.sin(pan * Math.PI / 2), len, k, v;
+        if (r() < 0.8) { // tick
+          len = Math.round((0.002 + r() * 0.01) * sr); var prev = 0;
+          for (k = 0; k < len && t + k < L.length; k++) { var nz = r() * 2 - 1; v = (nz - prev) * 0.5 * amp * Math.exp(-k / (len / 4)); prev = nz; L[t + k] += v * gl; R[t + k] += v * gr; }
+        } else { // plink
+          len = Math.round((0.02 + r() * 0.04) * sr); var f = 1800 + r() * 3000, ph = 0;
+          for (k = 0; k < len && t + k < L.length; k++) { ph += 2 * Math.PI * f * (1 - 0.3 * k / len) / sr; v = Math.sin(ph) * amp * 0.35 * Math.exp(-k / (len / 5)); L[t + k] += v * gl; R[t + k] += v * gr; }
+        }
+      }
+      return fromArrays(ac, [L, R], n, F);
+    },
+    crackle: function (ac) { // pops and snaps of burning wood, in little clusters
+      var sr = ac.sampleRate, n = Math.round(13 * sr), F = Math.round(0.25 * sr), L = new Float32Array(n + F), R = new Float32Array(n + F), r = rng(73);
+      for (var t = 0; t < n + F;) {
+        t += Math.round(-Math.log(1 - r()) / 7 * sr);
+        var clicks = 1 + Math.floor(r() * r() * 7), pan = 0.2 + r() * 0.6, gl = Math.cos(pan * Math.PI / 2), gr = Math.sin(pan * Math.PI / 2);
+        for (var c = 0, at = t; c < clicks; c++) {
+          at += Math.round(r() * 0.03 * sr);
+          var amp = 0.1 + 0.6 * Math.pow(r(), 2), len = Math.round((0.0008 + r() * 0.004) * sr), prev = 0;
+          for (var k = 0; k < len && at + k < L.length; k++) { var nz = r() * 2 - 1, v = (nz - prev) * 0.5 * amp * Math.exp(-k / (len / 3)); prev = nz; L[at + k] += v * gl; R[at + k] += v * gr; }
+        }
+      }
+      return fromArrays(ac, [L, R], n, F);
+    },
+    babble: function (ac) { // far-off voices: noise shaped by moving vowel formants and syllable rhythm
+      // built at 22.05 kHz (the voices are muffled anyway), which halves the work; the browser resamples on playback
+      var sr = 22050, n = Math.round(15 * sr), F = Math.round(0.25 * sr), N = n + F, L = new Float32Array(N), R = new Float32Array(N), r = rng(97);
+      for (var vo = 0; vo < 6; vo++) {
+        var pan = 0.15 + r() * 0.7, gl = Math.cos(pan * Math.PI / 2), gr = Math.sin(pan * Math.PI / 2), level = 0.5 + r() * 0.6;
+        var f1 = biquad('bp', 500, 2.5, sr), f2 = biquad('bp', 1500, 4, sr), lp = biquad('lp', 2200, 0.7, sr);
+        var talking = r() < 0.6, segEnd = 0, sylEnd = 0, sylLen = 1, sylAmp = 0, b0 = 0, b1 = 0, b2 = 0, w;
+        for (var i = 0; i < N; i++) {
+          if (i >= segEnd) { talking = !talking; segEnd = i + Math.round((talking ? 1 + r() * 3.5 : 0.4 + r() * 1.8) * sr); }
+          if (i >= sylEnd) {
+            sylLen = Math.round((0.12 + r() * 0.16) * sr); sylEnd = i + sylLen; sylAmp = talking ? 0.4 + r() * 0.6 : 0;
+            f1.set(300 + r() * 500); f2.set(900 + r() * 1600);
+          }
+          var e = Math.sin(Math.PI * (1 - (sylEnd - i) / sylLen)); e *= e;
+          w = r() * 2 - 1; b0 = 0.997 * b0 + w * 0.03; b1 = 0.96 * b1 + w * 0.15; b2 = 0.6 * b2 + w * 0.5; // rough pink
+          var x = (b0 + b1 + b2) * e * sylAmp * level, y = lp(f1(x) * 1.6 + f2(x) * 0.8);
+          L[i] += y * gl; R[i] += y * gr;
+        }
+      }
+      for (var t = Math.round(r() * sr); t < N; t += Math.round((1.5 + r() * 4) * sr)) { // cups and spoons
+        var f = 2600 + r() * 2600, amp = 0.03 + r() * 0.05, len = Math.round(0.25 * sr), p2 = r();
+        for (var k = 0; k < len && t + k < N; k++) { var v = (Math.sin(2 * Math.PI * f * k / sr) + 0.5 * Math.sin(2 * Math.PI * f * 2.76 * k / sr)) * amp * Math.exp(-k / (0.04 * sr)); L[t + k] += v * (1 - p2); R[t + k] += v * p2; }
+      }
+      return fromArrays(ac, [L, R], n, F, sr);
+    }
+  };
+  function fromArrays(ac, arrs, n, F, rate) {
+    var buf = ac.createBuffer(arrs.length, n, rate || ac.sampleRate);
+    arrs.forEach(function (a, c) {
+      var d = buf.getChannelData(c);
+      for (var i = 0; i < n; i++) d[i] = a[i];
+      for (i = 0; i < F; i++) { var t = i / F; d[i] = a[i] * Math.sqrt(t) + a[n + i] * Math.sqrt(1 - t); }
+    });
+    return buf;
+  }
+
+  // Build one sound's graph. Returns { out: GainNode, stop() }.
+  function makeSound(ac, name, cache) {
+    function buf(k) { return cache[k] || (cache[k] = GEN[k](ac)); }
+    var parts = [], out = ac.createGain();
+    function src(k) { var s = ac.createBufferSource(); s.buffer = buf(k); s.loop = true; parts.push(s); return s; }
+    function osc(f, type) { var o = ac.createOscillator(); o.type = type || 'sine'; o.frequency.value = f; parts.push(o); return o; }
+    function filt(type, f, q) { var b = ac.createBiquadFilter(); b.type = type; b.frequency.value = f; if (q) b.Q.value = q; return b; }
+    function gain(v) { var g = ac.createGain(); g.gain.value = v; return g; }
+    function mod(param, f, depth) { var o = osc(f), g = gain(depth); o.connect(g); g.connect(param); }
+    function chain() { for (var i = 0; i < arguments.length - 1; i++) arguments[i].connect(arguments[i + 1]); return arguments[arguments.length - 1]; }
+    var g;
+    if (name === 'white') chain(src('white'), filt('lowpass', 9000), gain(0.32), out);
+    else if (name === 'pink') chain(src('pink'), gain(0.75), out);
+    else if (name === 'brown') chain(src('brown'), gain(0.8), out);
+    else if (name === 'rain') {
+      chain(src('pink'), filt('highpass', 500), filt('lowpass', 7000), gain(0.75), out);
+      chain(src('drops'), gain(0.9), out);
+    } else if (name === 'ocean') {
+      var lp = filt('lowpass', 650, 0.5); g = gain(0.5);
+      mod(lp.frequency, 0.083, 420); mod(lp.frequency, 0.051, 180);
+      mod(g.gain, 0.083, 0.36); mod(g.gain, 0.051, 0.12);
+      chain(src('brown'), lp, g, gain(1.0), out);
+      var foam = gain(0.05); mod(foam.gain, 0.083, 0.045);
+      chain(src('pink'), filt('highpass', 1500), foam, out);
+    } else if (name === 'wind') {
+      var bp = filt('bandpass', 480, 1.1); g = gain(0.9);
+      mod(bp.frequency, 0.07, 230); mod(bp.frequency, 0.19, 90);
+      mod(g.gain, 0.11, 0.45); mod(g.gain, 0.031, 0.25);
+      chain(src('pink'), bp, g, gain(1.5), out);
+      var wh = filt('bandpass', 950, 9), wg = gain(0.12); mod(wh.frequency, 0.05, 160); mod(wg.gain, 0.09, 0.1);
+      chain(src('white'), wh, wg, out);
+    } else if (name === 'fire') {
+      g = gain(0.55); mod(g.gain, 0.13, 0.12);
+      chain(src('brown'), filt('lowpass', 260), g, out);
+      chain(src('crackle'), filt('highpass', 400), gain(0.9), out);
+    } else if (name === 'cafe') {
+      chain(src('babble'), gain(0.9), out);
+      chain(src('pink'), filt('lowpass', 500), gain(0.12), out);
+    } else if (name === 'hum') {
+      var hum = gain(1); mod(hum.gain, 0.05, 0.15);
+      [[55, 0.22], [110, 0.12], [165, 0.05], [82.5, 0.05]].forEach(function (h) { chain(osc(h[0]), gain(h[1]), hum); });
+      chain(osc(55.4), gain(0.06), hum); // same in both ears: a slow, gentle beat, not binaural
+      chain(hum, filt('lowpass', 500), gain(0.55), out);
+    }
+    var now = ac.currentTime;
+    parts.forEach(function (p) { if (p.buffer) p.start(now, Math.random() * p.buffer.duration); else p.start(now); });
+    return { out: out, stop: function (t) { parts.forEach(function (p) { try { p.stop(t); } catch (e) {} }); setTimeout(function () { out.disconnect(); }, Math.max(0, (t - ac.currentTime) * 1000) + 200); } };
+  }
+  function vol(v) { return Math.pow(v / 100, 2); } // sliders feel even to the ear
+  // master chain: sounds -> master -> fade (timer) -> limiter -> speakers
+  function makeBus(ac, dest) {
+    var master = ac.createGain(), fade = ac.createGain(), lim = ac.createDynamicsCompressor(), soft = ac.createWaveShaper(), curve = new Float32Array(2049);
+    lim.threshold.value = -10; lim.knee.value = 6; lim.ratio.value = 12; lim.attack.value = 0.003; lim.release.value = 0.25;
+    // a gentle soft clipper after the compressor: never lets the output reach full scale, even with every sound at maximum
+    for (var i = 0; i < curve.length; i++) { var x = (i / 1024 - 1) * 2; curve[i] = 0.95 * Math.tanh(x / 0.95); }
+    soft.curve = curve; soft.oversample = '2x';
+    var pre = ac.createGain(); pre.gain.value = 0.5; // the curve covers signals from -2 to 2
+    master.connect(fade); fade.connect(lim); lim.connect(pre); pre.connect(soft); soft.connect(dest);
+    return { master: master, fade: fade };
+  }
+  // used by the self-test and handy for anyone curious: render a mix offline and return the audio buffer
+  window.FocusSounds = {
+    render: function (mix, seconds, masterVol) {
+      var sr = 44100, ac = new OfflineAudioContext(2, Math.round(sr * (seconds || 4)), sr), cache = {}, bus = makeBus(ac, ac.destination);
+      bus.master.gain.value = vol(masterVol == null ? 100 : masterVol);
+      Object.keys(mix).forEach(function (k) { var s = makeSound(ac, k, cache), g = ac.createGain(); g.gain.value = vol(mix[k]); s.out.connect(g); g.connect(bus.master); });
+      return ac.startRendering();
+    },
+    sounds: SOUNDS.map(function (s) { return s[0]; })
+  };
+
+  // ================= player =================
+  var ac = null, bus = null, cache = {}, live = {}, playing = false, endAt = 0, tick = 0;
+  function ensure() {
+    if (ac) return true;
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { say('bad', 'Your browser cannot make sounds with Web Audio. Try an up-to-date Chrome, Firefox, Edge or Safari.'); return false; }
+    try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) {} // iPhone: play even with the silent switch on
+    ac = new AC(); bus = makeBus(ac, ac.destination);
+    ac.onstatechange = function () { if (playing && ac.state === 'interrupted') say('', 'Paused by your device (for example a phone call). Press Play to continue.'); };
+    return true;
+  }
+  function setGain(param, v, secs) { var t = ac.currentTime; param.cancelScheduledValues(t); param.setValueAtTime(param.value, t); param.linearRampToValueAtTime(v, t + (secs || 0.08)); }
+  function sync() { // make the running graph match the on/off switches and sliders
+    if (!ac || !playing) return;
+    SOUNDS.forEach(function (s) {
+      var k = s[0], want = state.on[k] && state.vol[k] > 0;
+      if (want && !live[k]) {
+        var sd = makeSound(ac, k, cache), g = ac.createGain(); g.gain.value = 0; sd.out.connect(g); g.connect(bus.master);
+        live[k] = { s: sd, g: g }; setGain(g.gain, vol(state.vol[k]), 1.2);
+      } else if (!want && live[k]) {
+        var L = live[k]; delete live[k]; setGain(L.g.gain, 0, 0.6); L.s.stop(ac.currentTime + 0.7);
+      } else if (want) setGain(live[k].g.gain, vol(state.vol[k]), 0.1);
+    });
+    setGain(bus.master.gain, vol(state.master), 0.1);
+  }
+  function anyOn() { return SOUNDS.some(function (s) { return state.on[s[0]] && state.vol[s[0]] > 0; }); }
+  function start() {
+    if (!ensure()) return;
+    if (!anyOn()) { applyPreset('focus', true); }
+    say('', 'Starting…');
+    ac.resume().then(function () {
+      playing = true; bus.fade.gain.cancelScheduledValues(ac.currentTime); bus.fade.gain.setValueAtTime(1, ac.currentTime);
+      sync(); armTimer(); ui(); say('', '');
+      if ('mediaSession' in navigator) try { navigator.mediaSession.metadata = new MediaMetadata({ title: 'Focus Sounds', artist: 'GetToolNest' }); navigator.mediaSession.setActionHandler('play', start); navigator.mediaSession.setActionHandler('pause', stop); } catch (e) {}
+    }, function () { say('bad', 'Your browser blocked the sound. Click Play again.'); });
+  }
+  function stop(msg) {
+    if (!ac) return;
+    playing = false; endAt = 0; clearInterval(tick);
+    setGain(bus.fade.gain, 0, 0.4);
+    Object.keys(live).forEach(function (k) { live[k].s.stop(ac.currentTime + 0.5); delete live[k]; });
+    setTimeout(function () { if (!playing) ac.suspend(); }, 600);
+    ui(); if (typeof msg === 'string') say('ok', msg);
+  }
+  function armTimer() {
+    clearInterval(tick); endAt = 0;
+    var mins = +$('timer').value;
+    if (playing && ac) {
+      var t = ac.currentTime, p = bus.fade.gain;
+      p.cancelScheduledValues(t); p.setValueAtTime(p.value, t); p.linearRampToValueAtTime(1, t + 0.3);
+      if (mins > 0) { // the fade is scheduled on the audio clock, so it still happens in a background tab
+        endAt = t + mins * 60;
+        var fadeLen = Math.min(120, mins * 60 * 0.2);
+        p.setValueAtTime(1, endAt - fadeLen); p.linearRampToValueAtTime(0.0001, endAt);
+      }
+      tick = setInterval(ui, 1000);
+    }
+    ui();
+  }
+  function fmt(s) { s = Math.max(0, Math.ceil(s)); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+  function ui() {
+    if (playing && endAt && ac.currentTime >= endAt) { stop('Timer finished. Sweet dreams, or well done!'); return; }
+    $('play').setAttribute('aria-pressed', playing); $('playTx').textContent = playing ? 'Pause' : 'Play';
+    $('playIc').innerHTML = playing ? '<path d="M6 4h4v16H6zM14 4h4v16h-4z"/>' : '<path d="M7 4.5v15l13-7.5z"/>';
+    $('dot').className = 'fs-dot' + (playing ? ' live' : '');
+    var n = SOUNDS.filter(function (s) { return state.on[s[0]] && state.vol[s[0]] > 0; }).length;
+    $('leftTx').textContent = !playing ? 'Stopped' : endAt ? 'Fades out and stops in ' + fmt(endAt - ac.currentTime) : 'Playing ' + n + (n === 1 ? ' sound' : ' sounds');
+  }
+
+  // ================= controls =================
+  var cards = {};
+  SOUNDS.forEach(function (s) {
+    var k = s[0], d = document.createElement('div'); d.className = 'fs-card';
+    d.innerHTML = '<button type="button" aria-pressed="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + s[3] + '</svg><span>' + s[1] + '<small>' + s[2] + '</small></span></button>' +
+      '<input type="range" min="0" max="100" data-nomemo aria-label="' + s[1] + ' volume" id="v-' + k + '">';
+    var b = d.querySelector('button'), r = d.querySelector('input');
+    r.value = state.vol[k];
+    b.addEventListener('click', function () {
+      state.on[k] = !state.on[k]; if (state.on[k] && state.vol[k] < 5) state.vol[k] = 50;
+      persist(); paint();
+      if (state.on[k] && !playing) start(); else { sync(); ui(); }
+    });
+    r.addEventListener('input', function () { state.vol[k] = +r.value; if (+r.value > 0 && !state.on[k]) state.on[k] = true; persist(); paint(); sync(); ui(); });
+    $('grid').appendChild(d); cards[k] = { d: d, b: b, r: r };
+  });
+  function paint() {
+    SOUNDS.forEach(function (s) { var c = cards[s[0]], on = state.on[s[0]] && state.vol[s[0]] > 0; c.d.classList.toggle('on', on); c.b.setAttribute('aria-pressed', on); c.r.value = state.vol[s[0]]; });
+    $('master').value = state.master; $('masterv').textContent = state.master;
+  }
+  function applyPreset(name, quiet) {
+    var p = PRESETS[name] || {};
+    SOUNDS.forEach(function (s) { var k = s[0]; state.on[k] = k in p; if (k in p) state.vol[k] = p[k]; });
+    persist(); paint(); sync(); ui();
+    if (!quiet && name !== 'none' && !playing) start();
+    if (name === 'none') say('', 'All sounds are off. Pick a sound or a preset.');
+  }
+  document.querySelectorAll('[data-preset]').forEach(function (b) { b.addEventListener('click', function () { applyPreset(b.dataset.preset); }); });
+  $('play').addEventListener('click', function () { playing ? stop() : start(); });
+  $('master').addEventListener('input', function () { state.master = +$('master').value; $('masterv').textContent = state.master; persist(); sync(); });
+  $('timer').addEventListener('change', function () { armTimer(); if ($('timer').value !== '0' && !playing) say('', 'The timer starts when you press Play.'); });
+  document.addEventListener('keydown', function (e) { // Space toggles play when nothing else wants it
+    if (e.key !== ' ' || e.target !== document.body) return;
+    e.preventDefault(); playing ? stop() : start();
+  });
+  paint(); ui();
+})();
+</script>

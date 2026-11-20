@@ -13,7 +13,8 @@
 .es-steps { margin: 16px 0 0; padding-inline-start: 22px; display: grid; gap: 10px; }
 .es-steps li { padding-inline-start: 4px; overflow-x: auto; line-height: 1.7; }
 .es-steps li b { display: block; font-size: 15px; }
-.es-x { font-family: var(--mono); font-size: 15.5px; }
+.es-x { display: block; font-size: 16px; color: var(--ink); }
+.es-help { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
 .es-fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; font-size: .86em; line-height: 1.15; margin: 0 2px; }
 .es-fr > span:first-child { border-bottom: 1.5px solid currentColor; padding: 0 3px; }
 .es-fr > span:last-child { padding: 0 3px; }
@@ -35,7 +36,7 @@
 <div class="es-pane es-eq" data-p="type">
   <label for="eq">Your equation in x</label>
   <input type="text" id="eq" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. 2x + 3 = 7 or x^2 - 5x + 6 = 0" value="x^2 - 5x + 6 = 0">
-  <p class="es-form" style="margin-top:8px">Linear, quadratic and cubic equations. Brackets, fractions and powers are fine: (x+1)^2 = 2x + 9, x/2 + 1/3 = 5, x^3 = 8.</p>
+  <p class="es-help">Linear, quadratic and cubic equations. Brackets, fractions and powers are fine: (x+1)^2 = 2x + 9, x/2 + 1/3 = 5, x^3 = 8.</p>
 </div>
 <div class="es-pane" data-p="lin" hidden>
   <p class="es-form">a·x + b = c</p>
@@ -468,7 +469,7 @@
   }
   function solveQuadratic(a, b, c, opt) {
     opt = opt || {};
-    var st = '', exact = isQ(a) && isQ(b) && isQ(c), tol = tolOf([a, b, c]);
+    var st = '', exact = isQ(a) && isQ(b) && isQ(c), tol = tolOf([a, b, c]), form = null;
     if (nIsZero(a, tol)) { var lin = solveLinear(b, c, Q(0), true); lin.steps = step('a = 0, so this is a linear equation', polyH([b, c]) + ' = 0') + lin.steps; return lin; }
     if (!opt.inner) st += step('Identify a, b and c', 'a = ' + H(a) + ', b = ' + H(b) + ', c = ' + H(c));
     var D = nSub(nMul(b, b), nMul(Q(4), nMul(a, c))); if (!exact && Math.abs(D) < tol * tol * 1e3) D = 0;
@@ -491,7 +492,7 @@
       } else {
         if (!(km[0] === 1n && Dabs.d === 1n)) st += step('Simplify the square root', '√' + (sgn < 0 ? '(' + H(D) + ')' : H(D)) + ' = ' + (sgn < 0 ? 'i·' : '') + (isOne(k) ? '' : H(k)) + (m === 1n ? '' : '√' + m));
         else if (sgn < 0) st += step('Use i = √−1', '√(' + H(D) + ') = i' + (m === 1n ? '' : '√' + m));
-        var form = surd(h, R, m, sgn < 0), hd = fmtF(nF(h)), rd = nF(R) * Math.sqrt(Number(m));
+        form = surd(h, R, m, sgn < 0); var hd = fmtF(nF(h)), rd = nF(R) * Math.sqrt(Number(m));
         st += step('Split into a real part and the ± part', 'x = ' + form);
         if (sgn > 0) {
           roots = [nF(h) - rd, nF(h) + rd];
@@ -520,11 +521,11 @@
     if (!opt.inner) {
       var kv = nSub(c, nDiv(nMul(b, b), nMul(Q(4), a)));
       var info = '<p><small>Vertex (turning point): (' + H(h) + ', ' + H(kv) + ')' + (isQ(h) && (!h.isInt() || !kv.isInt()) ? ' ≈ (' + dec(h) + ', ' + dec(kv) + ')' : '') + ' · axis of symmetry x = ' + H(h) + ' · the parabola opens ' + (nF(a) > 0 ? 'upwards, so the vertex is a minimum' : 'downwards, so the vertex is a maximum') + ' · y-intercept (0, ' + H(c) + ')</small></p>';
-      if (exact && sgn >= 0 && isQ(roots[0])) info += '<p><small>Factored form: ' + (isOne(a) ? '' : H(a)) + factor(roots[0]) + factor(roots[1]) + '</small></p>';
+      if (exact && sgn >= 0 && isQ(roots[0])) info += '<p><small>Factored form: ' + (isOne(a) ? '' : a.eq(Q(-1)) ? '−' : H(a)) + (roots[0].eq(roots[1]) ? factor(roots[0]) + '²' : factor(roots[0]) + factor(roots[1])) + '</small></p>';
       st += step('Vertex', 'x = −b ÷ 2a = ' + H(h) + ', &nbsp; y = c − b² ÷ 4a = ' + H(kv));
       ans += info;
     }
-    return { ans: ans, steps: st, text: text, roots: roots };
+    return { ans: ans, steps: st, text: text, roots: roots, form: form };
   }
   function factor(r) { return '(x ' + (r.sign() < 0 ? '+ ' + H(r.neg()) : '− ' + H(r)) + ')'; }
 
@@ -563,7 +564,7 @@
       var qq = solveQuadratic(q2[0], q2[1], q2[2], { inner: true });
       st += '<li><b>Solve ' + polyH(q2) + ' = 0</b><ol class="es-steps">' + qq.steps + '</ol></li>';
       var all = [root].concat(qq.roots || []);
-      return { ans: rootsHtml(all), steps: st, text: rootsText(all) };
+      return { ans: rootsHtml(all) + (qq.form ? '<p><small>Exact form of the other two roots: x = ' + qq.form + '</small></p>' : ''), steps: st, text: rootsText(all) };
     }
     // general method: reduce to t³ + pt + q = 0 with x = t − B/3
     var B = nDiv(b, a), C = nDiv(c, a), Dd = nDiv(d, a), shift = nDiv(B, Q(3));

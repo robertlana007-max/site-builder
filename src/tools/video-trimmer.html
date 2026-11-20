@@ -227,12 +227,15 @@ var VT = (function () {
     busy = true; cancelled = false;
     $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
     say('', label + '…');
-    var started = Date.now();
-    function pct(p) { bar(p); say('', label + '… ' + Math.round(p * 100) + '%'); }
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
     return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
       say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
     }, function (e) {
-      bar(null);
+      clearInterval(tick); bar(null);
       if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
       else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
     }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
@@ -316,7 +319,8 @@ var VT = (function () {
       return FF.run(f, function (input) {
         var a = ['-ss', r.a.toFixed(3), '-i', input, '-t', len, '-map', '0:v:0'];
         if (!mute) a.push('-map', '0:a?');
-        if (copy) a.push('-c', 'copy', '-avoid_negative_ts', 'make_zero');
+        // MP4/MOV keep an edit list so players start on the chosen time; other containers start at zero
+        if (copy) { a.push('-c', 'copy'); if (!/^(mp4|m4v|mov|3gp)$/.test(e)) a.push('-avoid_negative_ts', 'make_zero'); }
         else {
           a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2');
           if (!mute) a.push('-c:a', 'aac', '-b:a', '160k');
