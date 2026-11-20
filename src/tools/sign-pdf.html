@@ -1,0 +1,502 @@
+<style>
+@font-face { font-family: "GTN Dancing Script"; src: url(../assets/vendor/fonts/dancing-script-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "GTN Great Vibes"; src: url(../assets/vendor/fonts/great-vibes-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+@font-face { font-family: "GTN Caveat"; src: url(../assets/vendor/fonts/caveat-latin-400-normal.woff2) format("woff2"); font-display: swap; }
+.sg-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.sg-tools .btn { min-height: 40px; padding: 6px 13px; }
+.sg-tools select { width: auto; min-height: 40px; padding: 6px 10px; }
+.sg-chip { display: inline-flex; align-items: center; height: 40px; padding: 2px 8px; border: 1px solid var(--line); border-radius: 10px; background: #fff; cursor: pointer; }
+.sg-chip img { max-height: 32px; max-width: 110px; display: block; }
+.sg-chip[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sg-maker { border: 2px solid var(--accent); border-radius: 12px; padding: 14px; margin-bottom: 14px; background: var(--surface); }
+.sg-tabs { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+.sg-tabs .btn { min-height: 38px; padding: 6px 14px; }
+.sg-pad { display: block; width: 100%; height: 190px; background: #fff; border: 1px dashed #9aa5b4; border-radius: 10px; touch-action: none; cursor: crosshair; }
+.sg-fonts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; margin-top: 10px; }
+.sg-fonts button { font-size: 30px; line-height: 1.2; min-height: 64px; padding: 6px 10px; background: #fff; color: #111; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.sg-fonts button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sg-up { display: block; max-width: 100%; max-height: 190px; margin: 10px auto 0; background: repeating-conic-gradient(#e5e7eb 0 25%, #fff 0 50%) 0 0 / 16px 16px; border-radius: 8px; }
+.sg-page { position: relative; margin: 0 auto; background: #fff; touch-action: pan-x pan-y; }
+.sg-page canvas { position: absolute; inset: 0; display: block; }
+.sg-page.arm { cursor: copy; outline: 3px dashed var(--accent); outline-offset: 2px; }
+.sg-it { position: absolute; box-sizing: border-box; border: 1.5px dashed transparent; cursor: move; touch-action: none; user-select: none; -webkit-user-select: none; }
+.sg-it:hover, .sg-it.on { border-color: #2563eb; }
+.sg-it.on { background: rgba(37, 99, 235, .06); }
+.sg-it img { width: 100%; height: 100%; display: block; pointer-events: none; }
+.sg-it span { display: block; white-space: pre; line-height: 1.2; font-family: Helvetica, Arial, "Liberation Sans", sans-serif; pointer-events: none; }
+.sg-rs { position: absolute; right: -12px; bottom: -12px; width: 24px; height: 24px; border-radius: 50%; background: #2563eb; border: 3px solid #fff; cursor: nwse-resize; touch-action: none; display: none; box-shadow: 0 1px 3px rgba(0,0,0,.4); }
+.sg-x { position: absolute; right: -12px; top: -12px; width: 24px; height: 24px; border-radius: 50%; background: #e5484d; color: #fff; border: 2px solid #fff; font: 700 13px/18px system-ui, sans-serif; text-align: center; cursor: pointer; display: none; padding: 0; }
+.sg-it.on .sg-rs, .sg-it.on .sg-x { display: block; }
+@media (pointer: coarse) { .sg-rs, .sg-x { width: 32px; height: 32px; right: -16px; } .sg-rs { bottom: -16px; } .sg-x { top: -16px; line-height: 26px; } }
+.sg-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.sg-edit input[type=text] { flex: 1 1 180px; min-width: 0; }
+.sg-edit select { width: auto; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Sign it on your device. The file is never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div id="editor" hidden>
+  <div class="sg-tools">
+    <button class="btn" id="newSig">✍ New signature</button>
+    <span id="sigs" class="sg-tools" style="margin:0"></span>
+    <button class="btn ghost" id="addDate">+ Date</button>
+    <select id="datefmt" aria-label="Date format"></select>
+    <button class="btn ghost" id="addText">+ Text</button>
+  </div>
+  <div class="sg-maker" id="maker" hidden>
+    <div class="sg-tabs" role="group" aria-label="How to make your signature">
+      <button class="btn ghost" id="tDraw" aria-pressed="true">Draw</button>
+      <button class="btn ghost" id="tType" aria-pressed="false">Type</button>
+      <button class="btn ghost" id="tUp" aria-pressed="false">Upload image</button>
+    </div>
+    <div id="pDraw">
+      <canvas class="sg-pad" id="pad" aria-label="Signature pad. Draw your signature with a mouse, finger or pen."></canvas>
+      <div class="btns" style="margin-top:8px"><button class="btn ghost" id="undoStroke">Undo stroke</button><button class="btn ghost" id="clearPad">Clear</button></div>
+    </div>
+    <div id="pType" hidden>
+      <label for="sigName">Your name</label>
+      <input type="text" id="sigName" autocomplete="name" maxlength="60" placeholder="Type your name" data-nomemo>
+      <div class="sg-fonts" id="fonts"></div>
+    </div>
+    <div id="pUp" hidden>
+      <div class="btns" style="margin-top:0"><button class="btn ghost" id="pickSig">Choose a photo or scan of your signature</button></div>
+      <input type="file" id="sigFile" accept="image/*" hidden data-nomemo>
+      <div class="checks" style="margin:10px 0 0"><label><input type="checkbox" id="rmbg" checked>Remove white background</label></div>
+      <canvas class="sg-up" id="upPrev" hidden></canvas>
+    </div>
+    <div class="fields" style="margin:12px 0 0">
+      <div id="inkRow"><label for="ink">Ink colour</label><select id="ink"><option value="#111111">Black</option><option value="#1d3fa8">Blue</option><option value="#b42318">Red</option></select></div>
+    </div>
+    <div class="btns"><button class="btn" id="useSig">Use this signature</button><button class="btn ghost" id="cancelSig">Cancel</button></div>
+  </div>
+  <div class="pager">
+    <button class="btn ghost" id="prev" aria-label="Previous page">‹</button>
+    <span id="pageNo">Page 1 of 1</span>
+    <button class="btn ghost" id="next" aria-label="Next page">›</button>
+    <span class="grow"></span>
+    <span id="count">Nothing placed yet</span>
+  </div>
+  <div class="notice" id="notice"><p id="hint">Opening…</p></div>
+  <div class="stage" id="stage"><div class="sg-page" id="sheet"><canvas id="cv"></canvas><div id="layer" style="position:absolute;inset:0"></div></div></div>
+  <div class="editbar sg-edit" id="bar" hidden>
+    <input type="text" id="itText" aria-label="Text" autocomplete="off" data-nomemo>
+    <select id="itSize" aria-label="Text size"></select>
+    <select id="itColor" aria-label="Text colour"><option value="#111111">Black</option><option value="#1d3fa8">Blue</option><option value="#b42318">Red</option></select>
+    <button class="btn ghost" id="itAll">Put on every page</button>
+    <button class="btn ghost" id="itDel">Delete</button>
+    <button class="btn" id="itDone">Done</button>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Save signed PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var FONTS = ['GTN Dancing Script', 'GTN Great Vibes', 'GTN Caveat'];
+  var file = null, pdf = null, pageNum = 1, scale = 1, pages = {}, items = [], sigs = [], armed = null, sel = null, nextId = 1, busy = false, rendering = 0;
+  var cv = $('cv'), layer = $('layer'), sheet = $('sheet');
+
+  function tell(t, cls) { $('notice').className = 'notice ' + (cls || ''); $('hint').textContent = t; }
+  function refresh() {
+    var n = items.length;
+    $('count').textContent = n ? n + (n === 1 ? ' item placed' : ' items placed') : 'Nothing placed yet';
+    $('go').disabled = !n; $('dl').hidden = true;
+  }
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+
+  // ---------- dates ----------
+  var now = new Date(), MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function two(n) { return (n < 10 ? '0' : '') + n; }
+  var DATES = [
+    now.getDate() + ' ' + MONTHS[now.getMonth()] + ' ' + now.getFullYear(),
+    MONTHS[now.getMonth()] + ' ' + now.getDate() + ', ' + now.getFullYear(),
+    two(now.getDate()) + '/' + two(now.getMonth() + 1) + '/' + now.getFullYear(),
+    two(now.getMonth() + 1) + '/' + two(now.getDate()) + '/' + now.getFullYear(),
+    now.getFullYear() + '-' + two(now.getMonth() + 1) + '-' + two(now.getDate())
+  ];
+  $('datefmt').innerHTML = DATES.map(function (d, i) { return '<option value="' + i + '">' + d + '</option>'; }).join('');
+  $('itSize').innerHTML = [8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 40, 48].map(function (s) { return '<option value="' + s + '">' + s + ' pt</option>'; }).join('');
+
+  // ---------- making a signature ----------
+  var mode = 'draw', strokes = [], cur = null, font = FONTS[0], upCanvas = null, upImg = null;
+  function tab(m) {
+    mode = m;
+    [['draw', 'tDraw', 'pDraw'], ['type', 'tType', 'pType'], ['up', 'tUp', 'pUp']].forEach(function (t) {
+      $(t[1]).setAttribute('aria-pressed', t[0] === m); $(t[2]).hidden = t[0] !== m;
+    });
+    $('inkRow').hidden = m === 'up';
+    if (m === 'draw') sizePad();
+    if (m === 'type') { paintFonts(); setTimeout(function () { $('sigName').focus(); }, 0); }
+  }
+  $('tDraw').addEventListener('click', function () { tab('draw'); });
+  $('tType').addEventListener('click', function () { tab('type'); });
+  $('tUp').addEventListener('click', function () { tab('up'); });
+  $('newSig').addEventListener('click', function () {
+    var open = $('maker').hidden;
+    $('maker').hidden = !open;
+    if (open) { strokes = []; tab(mode); $('maker').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+  });
+  $('cancelSig').addEventListener('click', function () { $('maker').hidden = true; });
+
+  // Drawing pad: smooth curves through the midpoints, a little thinner when the pen moves fast.
+  var pad = $('pad'), pctx = pad.getContext('2d'), padScale = 1;
+  function sizePad() {
+    var r = pad.getBoundingClientRect(); if (!r.width) return;
+    padScale = Math.min(3, Math.max(2, window.devicePixelRatio || 1));
+    var w = Math.round(r.width * padScale), h = Math.round(r.height * padScale);
+    if (pad.width !== w || pad.height !== h) { pad.width = w; pad.height = h; }
+    redraw();
+  }
+  function redraw() {
+    pctx.setTransform(1, 0, 0, 1, 0, 0); pctx.clearRect(0, 0, pad.width, pad.height);
+    var s = pad.width / Math.max(1, pad.getBoundingClientRect().width);
+    pctx.setTransform(s, 0, 0, s, 0, 0);
+    // a faint line to sign on
+    pctx.strokeStyle = '#cbd5e1'; pctx.lineWidth = 1; pctx.beginPath(); var bh = pad.height / s; pctx.moveTo(16, bh * .72); pctx.lineTo(pad.width / s - 16, bh * .72); pctx.stroke();
+    strokes.forEach(function (st) { drawStroke(pctx, st, $('ink').value); });
+  }
+  function drawStroke(c, pts, color) {
+    c.strokeStyle = c.fillStyle = color; c.lineCap = c.lineJoin = 'round';
+    if (pts.length === 1) { c.beginPath(); c.arc(pts[0].x, pts[0].y, pts[0].w / 2, 0, 7); c.fill(); return; }
+    for (var i = 1; i < pts.length; i++) {
+      var a = pts[i - 1], b = pts[i], p0 = i > 1 ? { x: (pts[i - 2].x + a.x) / 2, y: (pts[i - 2].y + a.y) / 2 } : a, p1 = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (i === pts.length - 1) p1 = b;
+      c.beginPath(); c.lineWidth = (a.w + b.w) / 2; c.moveTo(p0.x, p0.y); c.quadraticCurveTo(a.x, a.y, p1.x, p1.y); c.stroke();
+    }
+  }
+  function padPt(e) { var r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top, t: e.timeStamp }; }
+  pad.addEventListener('pointerdown', function (e) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault(); try { pad.setPointerCapture(e.pointerId); } catch (x) {}
+    var p = padPt(e); p.w = 3.2; cur = [p]; strokes.push(cur); redraw();
+  });
+  pad.addEventListener('pointermove', function (e) {
+    if (!cur) return;
+    e.preventDefault();
+    var evs = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
+    if (!evs.length) evs = [e];
+    evs.forEach(function (ev) {
+      var p = padPt(ev), last = cur[cur.length - 1], d = Math.hypot(p.x - last.x, p.y - last.y);
+      if (d < 1.2) return;
+      var v = d / Math.max(1, p.t - last.t), w = clamp(4.2 - v * 1.6, 1.6, 4.2);
+      if (e.pressure && e.pointerType === 'pen') w = clamp(1.2 + e.pressure * 4, 1.2, 5.2);
+      p.w = last.w * .6 + w * .4; cur.push(p);
+    });
+    redraw();
+  });
+  function endStroke() { cur = null; }
+  pad.addEventListener('pointerup', endStroke); pad.addEventListener('pointercancel', endStroke);
+  pad.addEventListener('touchmove', function (e) { if (cur) e.preventDefault(); }, { passive: false });
+  $('undoStroke').addEventListener('click', function () { strokes.pop(); redraw(); });
+  $('clearPad').addEventListener('click', function () { strokes = []; redraw(); });
+  $('ink').addEventListener('change', function () { redraw(); paintFonts(); });
+
+  function paintFonts() {
+    var name = $('sigName').value.trim() || 'Your Name';
+    $('fonts').innerHTML = '';
+    FONTS.forEach(function (f) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = name; b.style.fontFamily = '"' + f + '", cursive'; b.style.color = $('ink').value;
+      b.setAttribute('aria-pressed', f === font); b.setAttribute('aria-label', 'Use font ' + f.replace('GTN ', ''));
+      b.addEventListener('click', function () { font = f; paintFonts(); });
+      $('fonts').appendChild(b);
+    });
+  }
+  $('sigName').addEventListener('input', paintFonts);
+
+  // Crop a canvas to its visible pixels.
+  function trim(c, padPx) {
+    var x = c.getContext('2d', { willReadFrequently: true }), d = x.getImageData(0, 0, c.width, c.height).data, w = c.width, h = c.height;
+    var x0 = w, y0 = h, x1 = -1, y1 = -1;
+    for (var y = 0; y < h; y++) for (var i = 0; i < w; i++) if (d[(y * w + i) * 4 + 3] > 8) { if (i < x0) x0 = i; if (i > x1) x1 = i; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return null;
+    x0 = Math.max(0, x0 - padPx); y0 = Math.max(0, y0 - padPx); x1 = Math.min(w - 1, x1 + padPx); y1 = Math.min(h - 1, y1 + padPx);
+    var o = document.createElement('canvas'); o.width = x1 - x0 + 1; o.height = y1 - y0 + 1;
+    o.getContext('2d').drawImage(c, x0, y0, o.width, o.height, 0, 0, o.width, o.height);
+    return o;
+  }
+  // Uploaded signature: make the paper see-through, keeping the ink.
+  function prepUpload() {
+    if (!upImg) return;
+    var k = Math.min(1, 1400 / Math.max(upImg.naturalWidth, upImg.naturalHeight)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(upImg.naturalWidth * k)); c.height = Math.max(1, Math.round(upImg.naturalHeight * k));
+    var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(upImg, 0, 0, c.width, c.height);
+    if ($('rmbg').checked) {
+      var id = x.getImageData(0, 0, c.width, c.height), p = id.data, hist = new Uint32Array(256), n = 0, i, l;
+      for (i = 0; i < p.length; i += 4) { if (p[i + 3] < 10) continue; l = (p[i] * 299 + p[i + 1] * 587 + p[i + 2] * 114) / 1000 | 0; hist[l]++; n++; }
+      // the paper is the bright majority: take the brightness that 60% of the picture is darker than
+      var acc = 0, paper = 255; for (i = 0; i < 256; i++) { acc += hist[i]; if (acc >= n * .6) { paper = i; break; } }
+      var hi = Math.max(60, paper - 18), lo = Math.max(10, hi - 70);
+      for (i = 0; i < p.length; i += 4) {
+        l = (p[i] * 299 + p[i + 1] * 587 + p[i + 2] * 114) / 1000;
+        var a = l >= hi ? 0 : l <= lo ? 1 : (hi - l) / (hi - lo);
+        p[i + 3] = Math.round(p[i + 3] * a);
+        if (a > 0 && a < 1) { var f = lo / Math.max(1, l); p[i] *= f; p[i + 1] *= f; p[i + 2] *= f; } // darken soft edges so they are not grey halos
+      }
+      x.putImageData(id, 0, 0);
+    }
+    upCanvas = c;
+    var pv = $('upPrev'); pv.width = c.width; pv.height = c.height; pv.getContext('2d').drawImage(c, 0, 0); pv.hidden = false;
+  }
+  $('pickSig').addEventListener('click', function () { $('sigFile').click(); });
+  $('sigFile').addEventListener('change', function () {
+    var f = $('sigFile').files[0]; $('sigFile').value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) return PT.say('bad', 'Please choose an image (JPG, PNG or WebP) of your signature.');
+    loadImage(f, function (im) {
+      if (!im) return PT.say('bad', 'That image could not be opened.');
+      upImg = im; prepUpload(); PT.say('', '');
+    });
+  });
+  $('rmbg').addEventListener('change', prepUpload);
+
+  $('useSig').addEventListener('click', async function () {
+    var c = document.createElement('canvas'), out = null;
+    if (mode === 'draw') {
+      if (!strokes.length) return PT.say('bad', 'Draw your signature in the box first.');
+      var r = pad.getBoundingClientRect(), s = 3; c.width = Math.round(r.width * s); c.height = Math.round(r.height * s);
+      var x = c.getContext('2d'); x.setTransform(s, 0, 0, s, 0, 0);
+      strokes.forEach(function (st) { drawStroke(x, st, $('ink').value); });
+      out = trim(c, 6);
+    } else if (mode === 'type') {
+      var name = $('sigName').value.trim();
+      if (!name) { $('sigName').focus(); return PT.say('bad', 'Type your name first.'); }
+      try { await document.fonts.load('160px "' + font + '"', name); } catch (e) {}
+      var x2 = c.getContext('2d'); x2.font = '160px "' + font + '", cursive';
+      c.width = Math.ceil(x2.measureText(name).width + 160); c.height = 300;
+      x2 = c.getContext('2d'); x2.font = '160px "' + font + '", cursive'; x2.fillStyle = $('ink').value; x2.textBaseline = 'alphabetic';
+      x2.fillText(name, 60, 200);
+      out = trim(c, 8);
+    } else {
+      if (!upCanvas) return PT.say('bad', 'Choose an image of your signature first.');
+      out = trim(upCanvas, 4);
+      if (!out) return PT.say('bad', 'Nothing is left after removing the background. Untick "Remove white background" or use a darker photo.');
+    }
+    if (!out) return PT.say('bad', 'The signature is empty.');
+    var sig = { id: 's' + nextId++, url: out.toDataURL('image/png'), ratio: out.width / out.height };
+    sigs.push(sig); paintSigs(); arm({ kind: 'sig', sig: sig });
+    $('maker').hidden = true; PT.say('', '');
+  });
+  function paintSigs() {
+    $('sigs').innerHTML = '';
+    sigs.forEach(function (s, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'sg-chip'; b.setAttribute('aria-label', 'Place signature ' + (i + 1));
+      b.setAttribute('aria-pressed', !!(armed && armed.sig === s));
+      var im = document.createElement('img'); im.src = s.url; im.alt = ''; b.appendChild(im);
+      b.addEventListener('click', function () { if (armed && armed.sig === s) arm(null); else arm({ kind: 'sig', sig: s }); });
+      $('sigs').appendChild(b);
+    });
+  }
+
+  // ---------- placing things on the page ----------
+  function arm(a) {
+    armed = a; select(null); sheet.classList.toggle('arm', !!a); paintSigs();
+    $('addDate').setAttribute('aria-pressed', !!(a && a.kind === 'date')); $('addText').setAttribute('aria-pressed', !!(a && a.kind === 'text'));
+    if (!a) return tell(items.length ? 'Drag to move, use the round handle to resize. Then press Save signed PDF.' : 'Press New signature, + Date or + Text, then tap the page where it should go.');
+    tell('Now click or tap the page where the ' + (a.kind === 'sig' ? 'signature' : a.kind === 'date' ? 'date' : 'text') + ' should go.', 'ok');
+  }
+  $('addDate').addEventListener('click', function () { arm(armed && armed.kind === 'date' ? null : { kind: 'date' }); });
+  $('addText').addEventListener('click', function () { arm(armed && armed.kind === 'text' ? null : { kind: 'text' }); });
+  $('datefmt').addEventListener('change', function () { arm({ kind: 'date' }); });
+
+  var meter = document.createElement('canvas').getContext('2d');
+  function textSize(it) { meter.font = it.size + 'px Helvetica, Arial, "Liberation Sans", sans-serif'; it.w = Math.max(it.size, meter.measureText(it.text || ' ').width) + 2; it.h = it.size * 1.2; }
+
+  sheet.addEventListener('click', function (e) {
+    if (e.target.closest('.sg-it')) return;
+    if (!armed) { if (sel) { select(null); arm(null); } return; }
+    if (!pdf || !pages[pageNum]) return;
+    var r = sheet.getBoundingClientRect(), u = (e.clientX - r.left) / scale, v = (e.clientY - r.top) / scale, pw = pages[pageNum].w, ph = pages[pageNum].h, it;
+    if (armed.kind === 'sig') {
+      var w = Math.min(160, pw * .4), h = w / armed.sig.ratio;
+      if (h > ph * .3) { h = ph * .3; w = h * armed.sig.ratio; }
+      it = { kind: 'img', sig: armed.sig, w: w, h: h };
+    } else {
+      it = { kind: 'text', text: armed.kind === 'date' ? DATES[+$('datefmt').value] : 'Text', size: 12, color: '#111111' };
+      textSize(it);
+    }
+    it.id = nextId++; it.page = pageNum; it.x = clamp(u - it.w / 2, 0, pw - it.w); it.y = clamp(v - it.h / 2, 0, ph - it.h);
+    items.push(it);
+    var k = armed.kind; armed = null; sheet.classList.remove('arm'); paintSigs();
+    $('addDate').setAttribute('aria-pressed', false); $('addText').setAttribute('aria-pressed', false);
+    paintItems(); select(it); refresh();
+    if (k === 'text') { $('itText').focus(); $('itText').select(); }
+  });
+
+  function paintItems() {
+    layer.innerHTML = '';
+    items.filter(function (it) { return it.page === pageNum; }).forEach(function (it) {
+      var el = document.createElement('div'); el.className = 'sg-it' + (it === sel ? ' on' : ''); el.tabIndex = 0; it.el = el;
+      el.setAttribute('role', 'button'); el.setAttribute('aria-label', (it.kind === 'img' ? 'Signature' : 'Text: ' + it.text) + '. Drag to move, arrow keys to nudge, Delete to remove.');
+      if (it.kind === 'img') { var im = document.createElement('img'); im.src = it.sig.url; im.alt = ''; el.appendChild(im); }
+      else { var sp = document.createElement('span'); sp.textContent = it.text; el.appendChild(sp); }
+      var rs = document.createElement('i'); rs.className = 'sg-rs'; rs.setAttribute('aria-hidden', 'true'); el.appendChild(rs);
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'sg-x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove'); el.appendChild(x);
+      x.addEventListener('click', function (e) { e.stopPropagation(); remove(it); });
+      x.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      el.addEventListener('pointerdown', function (e) { startDrag(e, it, e.target === rs ? 'size' : 'move'); });
+      el.addEventListener('keydown', function (e) {
+        var st = e.shiftKey ? 10 : 1, m = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+        if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); return remove(it); }
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); return select(it); }
+        if (!m) return;
+        e.preventDefault(); var pg = pages[it.page]; it.x = clamp(it.x + m[0], 0, pg.w - it.w); it.y = clamp(it.y + m[1], 0, pg.h - it.h); place(it); $('dl').hidden = true;
+      });
+      place(it); layer.appendChild(el);
+    });
+  }
+  function place(it) {
+    var el = it.el; if (!el) return;
+    el.style.left = it.x * scale + 'px'; el.style.top = it.y * scale + 'px'; el.style.width = it.w * scale + 'px'; el.style.height = it.h * scale + 'px';
+    if (it.kind === 'text') { var sp = el.querySelector('span'); sp.textContent = it.text; sp.style.fontSize = it.size * scale + 'px'; sp.style.color = it.color; }
+  }
+  function select(it) {
+    sel = it;
+    items.forEach(function (o) { if (o.el) o.el.classList.toggle('on', o === it); });
+    $('bar').hidden = !it;
+    if (!it) return;
+    var t = it.kind === 'text';
+    $('itText').hidden = $('itSize').hidden = $('itColor').hidden = !t;
+    if (t) { $('itText').value = it.text; $('itSize').value = String(it.size); if ($('itSize').value !== String(it.size)) { var o = document.createElement('option'); o.value = it.size; o.textContent = Math.round(it.size * 10) / 10 + ' pt'; $('itSize').appendChild(o); $('itSize').value = String(it.size); } $('itColor').value = it.color; }
+    tell(t ? 'Edit the text in the bar below the page. Drag the box to move it.' : 'Drag the signature to move it. Drag the round handle to make it bigger or smaller.', 'ok');
+  }
+  function remove(it) { items = items.filter(function (o) { return o !== it; }); if (sel === it) select(null); paintItems(); refresh(); arm(null); }
+  $('itDel').addEventListener('click', function () { if (sel) remove(sel); });
+  $('itDone').addEventListener('click', function () { select(null); arm(null); });
+  $('itText').addEventListener('input', function () { if (!sel || sel.kind !== 'text') return; sel.text = $('itText').value; textSize(sel); fit(sel); place(sel); $('dl').hidden = true; });
+  $('itText').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); select(null); arm(null); } });
+  $('itSize').addEventListener('change', function () { if (!sel) return; sel.size = +$('itSize').value; textSize(sel); fit(sel); place(sel); $('dl').hidden = true; });
+  $('itColor').addEventListener('change', function () { if (!sel) return; sel.color = $('itColor').value; place(sel); $('dl').hidden = true; });
+  $('itAll').addEventListener('click', function () {
+    if (!sel) return;
+    var src = sel, made = 0;
+    for (var p = 1; p <= pdf.numPages; p++) {
+      if (p === src.page || items.some(function (o) { return o.page === p && o.from === src.id; })) continue;
+      var pg = pages[p] || pages[src.page], c = Object.assign({}, src, { id: nextId++, page: p, from: src.id, el: null });
+      // same distance from the bottom-right corner, so it lands in the same spot on pages of another size
+      c.x = clamp(pg.w - (pages[src.page].w - src.x), 0, pg.w - c.w); c.y = clamp(pg.h - (pages[src.page].h - src.y), 0, pg.h - c.h);
+      items.push(c); made++;
+    }
+    refresh(); tell(made ? 'Copied to ' + made + (made === 1 ? ' other page.' : ' other pages.') : 'It is already on every page.', 'ok');
+  });
+  function fit(it) { var pg = pages[it.page]; it.x = clamp(it.x, 0, Math.max(0, pg.w - it.w)); it.y = clamp(it.y, 0, Math.max(0, pg.h - it.h)); }
+
+  var drag = null;
+  function startDrag(e, it, what) {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault(); e.stopPropagation();
+    if (sel !== it) select(it);
+    drag = { it: it, what: what, x: e.clientX, y: e.clientY, o: { x: it.x, y: it.y, w: it.w, h: it.h, size: it.size }, id: e.pointerId };
+    try { it.el.setPointerCapture(e.pointerId); } catch (x) {}
+    it.el.focus({ preventScroll: true });
+  }
+  document.addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    e.preventDefault();
+    var it = drag.it, o = drag.o, dx = (e.clientX - drag.x) / scale, dy = (e.clientY - drag.y) / scale, pg = pages[it.page];
+    if (drag.what === 'move') { it.x = clamp(o.x + dx, 0, pg.w - it.w); it.y = clamp(o.y + dy, 0, pg.h - it.h); }
+    else {
+      // keep the shape: grow by whichever way the handle moved further
+      var f = Math.max((o.w + dx) / o.w, (o.h + dy) / o.h);
+      f = clamp(f, 12 / Math.min(o.w, o.h), Math.min((pg.w - o.x) / o.w, (pg.h - o.y) / o.h));
+      it.w = o.w * f; it.h = o.h * f;
+      if (it.kind === 'text') it.size = Math.round(o.size * f * 10) / 10;
+    }
+    place(it); $('dl').hidden = true;
+  });
+  function endDrag(e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var it = drag.it; drag = null;
+    if (it.kind === 'text') { textSize(it); fit(it); place(it); select(it); }
+  }
+  document.addEventListener('pointerup', endDrag); document.addEventListener('pointercancel', endDrag);
+  layer.addEventListener('touchmove', function (e) { if (drag) e.preventDefault(); }, { passive: false });
+
+  // ---------- showing pages ----------
+  async function show(n) {
+    var mine = ++rendering;
+    pageNum = n;
+    var page = await pdf.getPage(n), base = page.getViewport({ scale: 1 });
+    if (mine !== rendering) return;
+    pages[n] = { w: base.width, h: base.height };
+    scale = Math.max(.3, Math.min(2, ($('stage').clientWidth - 2) / base.width));
+    var vp = page.getViewport({ scale: scale }), dpr = Math.min(2, window.devicePixelRatio || 1), ctx = cv.getContext('2d');
+    var off = document.createElement('canvas'); off.width = Math.floor(vp.width * dpr); off.height = Math.floor(vp.height * dpr);
+    await page.render({ canvasContext: off.getContext('2d'), viewport: vp, transform: dpr === 1 ? null : [dpr, 0, 0, dpr, 0, 0] }).promise;
+    if (mine !== rendering) return;
+    cv.width = off.width; cv.height = off.height; ctx.drawImage(off, 0, 0);
+    sheet.style.width = cv.style.width = vp.width + 'px'; sheet.style.height = cv.style.height = vp.height + 'px';
+    $('pageNo').textContent = 'Page ' + n + ' of ' + pdf.numPages;
+    $('prev').disabled = n <= 1; $('next').disabled = n >= pdf.numPages;
+    if (sel && sel.page !== n) select(null);
+    paintItems();
+    page.cleanup();
+  }
+  function go(n) { show(n).catch(function () { tell('This page could not be shown.', 'bad'); }); }
+  $('prev').addEventListener('click', function () { if (pageNum > 1) go(pageNum - 1); });
+  $('next').addEventListener('click', function () { if (pdf && pageNum < pdf.numPages) go(pageNum + 1); });
+  var lastW = 0;
+  if (window.ResizeObserver) new ResizeObserver(function () { var w = $('stage').clientWidth; if (pdf && w && Math.abs(w - lastW) > 4 && !drag) { lastW = w; go(pageNum); } }).observe($('stage'));
+  window.addEventListener('resize', function () { if (!$('maker').hidden && mode === 'draw') sizePad(); });
+
+  PT.drop(false, function (f) {
+    if (!PT.isPdf(f)) return PT.say('bad', 'Please choose a PDF file.');
+    PT.say('', 'Opening…');
+    PT.render(f).then(async function (doc) {
+      if (pdf) pdf.destroy();
+      file = f; pdf = doc; pages = {}; items = []; sel = null; armed = null;
+      $('editor').hidden = false; refresh(); select(null);
+      // page sizes for "put on every page"
+      for (var i = 1; i <= doc.numPages && i <= 2000; i++) { var vp = (await doc.getPage(i)).getViewport({ scale: 1 }); pages[i] = { w: vp.width, h: vp.height }; }
+      PT.say('', f.name + ' · ' + doc.numPages + (doc.numPages === 1 ? ' page' : ' pages'));
+      lastW = $('stage').clientWidth;
+      await show(1);
+      if (!sigs.length) { $('maker').hidden = false; tab(mode); tell('Make your signature: draw it, type it or upload a picture of it. Then press Use this signature.'); }
+      else arm(null);
+    }).catch(function (e) { PT.say('bad', e && e.message ? e.message : 'This file could not be read as a PDF.'); });
+  });
+
+  // ---------- saving ----------
+  function pngBytes(url) { var b = atob(url.split(',')[1]), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function textPng(it) { // text the standard PDF font cannot write (for example non-Latin letters) goes in as a sharp picture
+    var k = 6, c = document.createElement('canvas'); c.width = Math.ceil(it.w * k); c.height = Math.ceil(it.h * k);
+    var x = c.getContext('2d'); x.scale(k, k); x.font = it.size + 'px Helvetica, Arial, sans-serif'; x.fillStyle = it.color; x.textBaseline = 'alphabetic';
+    x.fillText(it.text, 1, it.size * .9465);
+    return c.toDataURL('image/png');
+  }
+  $('go').addEventListener('click', function () {
+    select(null);
+    PT.run(async function () {
+      var doc = await PT.open(file), L = PDFLib, embedded = {}, helv = null, n = 0, asPic = 0;
+      for (var i = 0; i < items.length; i++) {
+        var it = items[i];
+        if (it.kind === 'text' && !it.text.trim()) continue;
+        var page = doc.getPage(it.page - 1), view = PT.view(page), pg = pages[it.page];
+        // from on-screen points (top-left origin) to the page as the reader sees it, then to PDF space
+        var sx = view.width / pg.w, sy = view.height / pg.h, rot = L.degrees(view.angle);
+        var u = it.x * sx, w = it.w * sx, h = it.h * sy, vb = view.height - (it.y + it.h) * sy;
+        var drawn = false;
+        if (it.kind === 'text') {
+          if (!helv) helv = await doc.embedFont(L.StandardFonts.Helvetica);
+          try {
+            helv.widthOfTextAtSize(it.text, 10);
+            var c = parseInt(it.color.slice(1), 16), base = view.at(u + 1 * sx, view.height - (it.y + it.size * .9465) * sy);
+            page.drawText(it.text, { x: base.x, y: base.y, size: it.size * sy, font: helv, color: L.rgb((c >> 16) / 255, ((c >> 8) & 255) / 255, (c & 255) / 255), rotate: rot });
+            drawn = true;
+          } catch (e) { asPic++; }
+        }
+        if (!drawn) {
+          var key = it.kind === 'img' ? it.sig.id : 't' + it.id + it.text + it.size + it.color;
+          if (!embedded[key]) embedded[key] = await doc.embedPng(pngBytes(it.kind === 'img' ? it.sig.url : textPng(it)));
+          var o = view.at(u, vb);
+          page.drawImage(embedded[key], { x: o.x, y: o.y, width: w, height: h, rotate: rot });
+        }
+        n++;
+      }
+      if (!n) throw new Error('There is nothing to save yet. Place a signature, date or text on the page first.');
+      var bytes = await doc.save();
+      PT.done(bytes, PT.base(file.name) + '-signed.pdf', 'application/pdf', 'Signed PDF ready: ' + n + (n === 1 ? ' item' : ' items') + ' added, every other part of the file is unchanged');
+    });
+  });
+})();
+</script>

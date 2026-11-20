@@ -1,0 +1,183 @@
+<style>
+.typ-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.typ-box { position: relative; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; cursor: text; }
+.typ-box.focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.typ-text { font: 500 21px/1.65 var(--mono); height: calc(21px * 1.65 * 3); overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; color: var(--muted); user-select: none; -webkit-user-select: none; }
+.typ-text span.ok { color: var(--ink); }
+.typ-text span.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 16%, transparent); border-radius: 3px; }
+.typ-text span.cur { box-shadow: inset 2px 0 0 var(--accent); animation: typ-blink 1s steps(1) infinite; }
+.typ-box:not(.focus) .typ-text span.cur { animation: none; }
+@keyframes typ-blink { 50% { box-shadow: none; } }
+:root[data-calm] .typ-text span.cur { animation: none; }
+@media (prefers-reduced-motion: reduce) { .typ-text span.cur { animation: none; } }
+.typ-box textarea { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; opacity: 0; resize: none; font-size: 16px; color: transparent; caret-color: transparent; background: none; border: 0; cursor: text; }
+.typ-hint { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--bg) 70%, transparent); border-radius: 12px; font-weight: 600; pointer-events: none; text-align: center; padding: 10px; }
+.typ-res { margin-top: 16px; border: 2px solid var(--accent); border-radius: 14px; padding: 16px; background: var(--surface); }
+.typ-res h3 { margin: 0 0 4px; font-size: 18px; }
+.typ-best { font-weight: 700; color: var(--ok); }
+@media (max-width: 480px) { .typ-text { font-size: 18px; height: calc(18px * 1.65 * 3); } }
+</style>
+<div class="typ-top">
+  <div class="seg" role="group" aria-label="Test length"><button type="button" data-dur="30" aria-pressed="false">30 s</button><button type="button" data-dur="60" aria-pressed="true">60 s</button><button type="button" data-dur="120" aria-pressed="false">120 s</button></div>
+  <span class="msg" id="bestNow" style="margin:0"></span>
+</div>
+<div class="stats" style="margin:0 0 14px">
+  <div class="stat"><span>Time left</span><b id="left">60</b></div>
+  <div class="stat"><span>Net WPM</span><b id="wpm">0</b></div>
+  <div class="stat"><span>Accuracy</span><b id="acc">100%</b></div>
+  <div class="stat"><span>Errors</span><b id="err">0</b></div>
+</div>
+<div class="typ-box" id="box">
+  <div class="typ-text" id="text" aria-hidden="true"></div>
+  <label for="typed" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Type the passage here</label>
+  <textarea id="typed" data-nomemo autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="done"></textarea>
+  <div class="typ-hint" id="hint">Tap here and start typing. The timer starts on your first key.</div>
+</div>
+<div class="btns"><button class="btn" id="restart">Restart</button><button class="btn ghost" id="newText">New passage</button></div>
+<p class="msg">Tip: press Tab then Enter to restart without the mouse. Backspace fixes mistakes.</p>
+<p id="passageSr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></p>
+<div class="typ-res" id="res" hidden aria-live="polite">
+  <h3 id="resTitle">Your result</h3>
+  <p class="typ-best" id="resBest" hidden></p>
+  <div class="stats">
+    <div class="stat"><span>Net speed</span><b id="rWpm">0 WPM</b></div>
+    <div class="stat"><span>Accuracy</span><b id="rAcc">0%</b></div>
+    <div class="stat"><span>Raw speed</span><b id="rRaw">0 WPM</b></div>
+    <div class="stat"><span>Characters</span><b id="rChars">0</b></div>
+    <div class="stat"><span>Uncorrected errors</span><b id="rErr">0</b></div>
+    <div class="stat"><span>Best (this length)</span><b id="rBest">–</b></div>
+  </div>
+  <div class="btns"><button class="btn" id="again">Try again</button><button class="btn ghost" id="resetBest">Reset best scores</button></div>
+</div>
+<script>
+(function () {
+  var PASSAGES = [
+    'The quick brown fox jumps over the lazy dog. This famous sentence uses every letter of the alphabet, which is why typists and font designers have used it for more than a century to test their keyboards and their typefaces.',
+    'Every morning the bakery on the corner opens its doors at six. The smell of fresh bread drifts down the street, and a short queue forms before the sun is fully up. Most people buy a warm loaf and a coffee, then hurry off to work.',
+    'Learning to type without looking at the keys takes patience. Start slowly and keep your fingers on the home row. Accuracy matters more than speed at first, because speed grows naturally once your hands know where every letter lives.',
+    'The ocean covers about seventy percent of our planet, yet much of it remains unexplored. Deep below the surface, strange creatures glow in the dark, and pressure is so great that only specially built machines can visit.',
+    'A good night of sleep helps your brain store what you learned during the day. Try to go to bed at the same time each night, keep your room cool and dark, and put your phone away at least half an hour before you sleep.',
+    'When the train finally pulled into the station, the platform was crowded with travellers. Some carried heavy suitcases, others held small children by the hand, and a few simply stood still, reading the departure board in silence.',
+    'Gardening teaches you to wait. You plant a seed, water it, and then nothing seems to happen for days. One morning a tiny green shoot appears, and suddenly all that waiting feels worth it as the plant grows a little every day.',
+    'The library was quiet except for the soft turning of pages. Tall shelves stretched toward the ceiling, filled with books about history, science, art and travel. A student in the corner had fallen asleep on top of her notes.',
+    'Cooking at home can save money and is often healthier than eating out. A simple meal of rice, vegetables and a little protein takes about twenty minutes to make, and leftovers can become tomorrow\'s lunch with almost no effort.',
+    'Mountains have always attracted adventurers. Climbing a high peak requires careful planning, the right equipment and a lot of training. Many climbers say the view from the top is not the best part; the journey there is.',
+    'Bees play a vital role in growing the food we eat. As they move from flower to flower collecting nectar, they carry pollen that helps plants produce fruit and seeds. Without them, many of our favourite foods would be rare.',
+    'The old clock in the hall had not worked for years, but nobody wanted to throw it away. It had belonged to a grandmother who wound it every Sunday, and its silent face still reminded the family of quiet afternoons long ago.',
+    'Good writing is clear writing. Use short sentences when you can, choose simple words over complicated ones, and read your work out loud before you share it. If a sentence makes you stumble, it will probably confuse your reader too.',
+    'On a clear night far from city lights, you can see thousands of stars with your own eyes. The pale band across the sky is our own galaxy, the Milky Way, seen from the inside. Its light has travelled for a very long time.',
+    'Riding a bicycle is one of the most efficient ways to travel. It needs no fuel, makes no noise and keeps you fit. In many cities, new bike lanes have made cycling safer, and more people now ride to school and to work.',
+    'The meeting started ten minutes late because the projector would not connect. Once it finally worked, the team reviewed the plan for the next quarter, agreed on three clear goals and promised to keep the next meeting short.',
+    'Rain tapped gently against the window while the kettle began to whistle. It was the kind of grey afternoon that invites you to stay inside with a warm drink, a soft blanket and a story you have been meaning to finish for weeks.',
+    'Computers follow instructions exactly as they are written, which is both their strength and their weakness. A single missing comma in a program can stop it from running, so programmers learn to read their code with great care.',
+    'The market was full of colour and noise. Sellers called out their prices, children ran between the stalls, and the air smelled of spices, fresh fruit and grilled corn. Everyone seemed to be bargaining for something.',
+    'Walking for thirty minutes a day can improve your mood, your heart and your sleep. You do not need special equipment or a gym membership. Just put on comfortable shoes, step outside and enjoy the world around you.',
+    'Elephants are known for their memory and their strong family bonds. A herd is usually led by the oldest female, who remembers where to find water during dry seasons. Young elephants stay close to their mothers for years.',
+    'Saving a little money every month adds up faster than most people expect. Even small amounts, put aside regularly, can build an emergency fund that turns a stressful surprise, like a broken phone, into a minor problem.'
+  ];
+  var KEY = 'gtn-typing', st = { dur: 60, best: {} };
+  try { var s0 = JSON.parse(localStorage.getItem(KEY)); if (s0 && typeof s0 === 'object') { if ([30, 60, 120].indexOf(s0.dur) !== -1) st.dur = s0.dur; if (s0.best && typeof s0.best === 'object') st.best = s0.best; } } catch (e) {}
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+
+  var text = '', spans = [], prev = '', started = 0, done = false, timer = 0, keys = 0, misses = 0, order = [], next = 0, firstAt = 0;
+  var box = $('box'), ta = $('typed'), tx = $('text');
+  function rand(n) { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+  function shuffled() { var o = PASSAGES.map(function (_, i) { return i; }); for (var i = o.length - 1; i > 0; i--) { var j = rand(i + 1), t = o[i]; o[i] = o[j]; o[j] = t; } return o; }
+  function addPassage() {
+    if (next >= order.length) { order = shuffled(); next = 0; }
+    var p = PASSAGES[order[next++]], add = (text ? ' ' : '') + p, frag = document.createDocumentFragment();
+    Array.from(add).forEach(function (c) { var s = document.createElement('span'); s.textContent = c; frag.appendChild(s); spans.push(s); });
+    text += add; tx.appendChild(frag);
+  }
+  // Phone keyboards may send curly quotes or long dashes; count them as the plain characters in the passage.
+  function norm(s) { return s.replace(/[‘’ʼ′]/g, '\'').replace(/[“”″]/g, '"').replace(/[–—]/g, '-').replace(/ /g, ' ').replace(/\n/g, ' '); }
+  function reset(fresh) {
+    clearInterval(timer); timer = 0; started = 0; done = false; keys = 0; misses = 0; prev = '';
+    if (fresh || !order.length) { order = shuffled(); next = 0; }
+    else next = firstAt; // Restart keeps the same passage
+    firstAt = next;
+    text = ''; spans = []; tx.textContent = ''; addPassage(); addPassage();
+    ta.value = ''; ta.readOnly = false; $('res').hidden = true; tx.scrollTop = 0;
+    paint(0); stats(); $('hint').hidden = document.activeElement === ta;
+    $('passageSr').textContent = 'Passage: ' + text;
+  }
+  function paint(from, upto) {
+    var v = prev, n = v.length;
+    for (var i = from; i < spans.length && i <= Math.max(n, upto || 0) + 1; i++) {
+      spans[i].className = i < n ? (v[i] === text[i] ? 'ok' : 'bad') : i === n ? 'cur' : '';
+    }
+    var cur = spans[n];
+    if (cur) { var lh = cur.offsetHeight || 30, want = Math.max(0, cur.offsetTop - tx.offsetTop - lh * 0.95); if (Math.abs(tx.scrollTop - want) > 2) tx.scrollTop = want; }
+  }
+  function elapsed() { return started ? Math.min(performance.now() - started, st.dur * 1000) : 0; }
+  function calc() {
+    var v = prev, wrong = 0;
+    for (var i = 0; i < v.length; i++) if (v[i] !== text[i]) wrong++;
+    var min = elapsed() / 60000, raw = min > 0 ? (v.length / 5) / min : 0, net = min > 0 ? Math.max(0, (v.length / 5 - wrong) / min) : 0;
+    return { chars: v.length, wrong: wrong, raw: raw, net: net, acc: keys ? Math.max(0, (keys - misses) / keys * 100) : 100, min: min };
+  }
+  function stats() {
+    var r = calc(), t = elapsed();
+    $('left').textContent = Math.ceil(st.dur - t / 1000);
+    $('wpm').textContent = t >= 2000 || done ? Math.round(r.net) : '0';
+    $('acc').textContent = Math.round(r.acc) + '%';
+    $('err').textContent = r.wrong;
+  }
+  function finish() {
+    if (done) return;
+    done = true; clearInterval(timer); timer = 0; ta.readOnly = true;
+    var r = calc(), net = Math.round(r.net), b = st.best[st.dur], isBest = r.chars > 0 && (!b || net > b.wpm);
+    if (isBest) { st.best[st.dur] = { wpm: net, acc: Math.round(r.acc), at: Date.now() }; save(); }
+    stats();
+    $('rWpm').textContent = net + ' WPM'; $('rAcc').textContent = Math.round(r.acc) + '%'; $('rRaw').textContent = Math.round(r.raw) + ' WPM';
+    $('rChars').textContent = fmtNum(r.chars); $('rErr').textContent = r.wrong;
+    var nb = st.best[st.dur]; $('rBest').textContent = nb ? nb.wpm + ' WPM' : '–';
+    $('resTitle').textContent = 'Your result for ' + st.dur + ' seconds';
+    $('resBest').hidden = !isBest; $('resBest').textContent = b ? 'New personal best! Up from ' + b.wpm + ' WPM.' : 'Your first score for this length is saved as your best.';
+    $('res').hidden = false; drawBest();
+    if (isBest) burst($('rWpm'));
+    $('again').focus({ preventScroll: true });
+    setTimeout(function () { $('res').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 50);
+  }
+  function tick() { stats(); if (elapsed() >= st.dur * 1000) finish(); }
+  ta.addEventListener('input', function () {
+    if (done) { ta.value = prev; return; }
+    var v = norm(ta.value);
+    if (v !== ta.value) ta.value = v;
+    if (!started && v.length) { started = performance.now(); timer = setInterval(tick, 200); }
+    var p = 0, old = prev.length; while (p < prev.length && p < v.length && prev[p] === v[p]) p++;
+    for (var i = p; i < v.length; i++) { keys++; if (v[i] !== text[i]) misses++; } // every new character counts toward accuracy, even if fixed later
+    prev = v;
+    while (text.length - v.length < 160) addPassage(); // never run out of text
+    paint(Math.max(0, p - 1), old); stats();
+  });
+  ta.addEventListener('paste', function (e) { e.preventDefault(); });
+  ta.addEventListener('drop', function (e) { e.preventDefault(); });
+  ta.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') e.preventDefault(); // the passage has no line breaks
+    if (e.key === 'Escape') { e.preventDefault(); reset(false); }
+  });
+  ta.addEventListener('focus', function () { box.classList.add('focus'); $('hint').hidden = true; });
+  ta.addEventListener('blur', function () { box.classList.remove('focus'); if (!done) { $('hint').hidden = false; $('hint').textContent = started ? 'Paused view: tap here to keep typing. The timer is still running.' : 'Tap here and start typing. The timer starts on your first key.'; } });
+  // keep the cursor at the end: the test is typed in order
+  ['click', 'select', 'keyup'].forEach(function (ev) { ta.addEventListener(ev, function () { var n = ta.value.length; if (ta.selectionStart !== n || ta.selectionEnd !== n) ta.setSelectionRange(n, n); }); });
+
+  function drawBest() {
+    var b = st.best[st.dur];
+    $('bestNow').textContent = b ? 'Your best for ' + st.dur + ' s: ' + b.wpm + ' WPM at ' + b.acc + '% accuracy' : 'No best score yet for ' + st.dur + ' s';
+    $('resetBest').hidden = !Object.keys(st.best).length;
+  }
+  function setDur(d) {
+    st.dur = d; save();
+    document.querySelectorAll('[data-dur]').forEach(function (b) { b.setAttribute('aria-pressed', +b.dataset.dur === d); });
+    drawBest(); reset(false);
+  }
+  document.querySelectorAll('[data-dur]').forEach(function (b) { b.addEventListener('click', function () { setDur(+b.dataset.dur); }); });
+  $('restart').addEventListener('click', function () { reset(false); ta.focus(); });
+  $('again').addEventListener('click', function () { reset(true); ta.focus(); });
+  $('newText').addEventListener('click', function () { reset(true); ta.focus(); });
+  $('resetBest').addEventListener('click', function () { if (!confirm('Delete your saved best scores?')) return; st.best = {}; save(); drawBest(); $('rBest').textContent = '–'; });
+  document.addEventListener('visibilitychange', function () { if (started && !done) tick(); });
+  setDur(st.dur);
+})();
+</script>

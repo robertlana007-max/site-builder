@@ -1,0 +1,213 @@
+<style>
+.mm-bgs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: -4px 0 16px; font-size: 14px; color: var(--muted); }
+.mm-bgs button { width: 36px; height: 36px; border-radius: 10px; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.mm-bgs button:hover { border-color: var(--accent); }
+.mm-stage { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 14px; text-align: center; }
+.mm-stage canvas { max-width: 100%; max-height: 62vh; display: block; margin: 0 auto; touch-action: none; cursor: default; border-radius: 4px; }
+.mm-stage canvas.grab { cursor: grab; } .mm-stage canvas.grabbing { cursor: grabbing; }
+.mm-stage canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.mm-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; }
+.mm-box { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+.mm-box input { flex: 1; min-width: 0; }
+.mm-box button { flex: none; width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; }
+.mm-box button:hover { border-color: var(--bad); color: var(--bad); }
+.mm-box.on input { border-color: var(--accent); }
+.mm-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a picture here</b>Or paste one with Ctrl+V. Your picture stays on your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="mm-bgs" id="bgs"><span>Or start with a plain background:</span></div>
+<div class="mm-stage" id="stage" hidden>
+  <canvas id="cv" tabindex="0" aria-label="Meme preview. Drag text to move it. With a text box selected, arrow keys move it too."></canvas>
+  <p class="mm-hint">Drag any text to move it. Tip: click a text to select it, then use the arrow keys.</p>
+</div>
+<div id="boxes">
+  <label for="top">Top text</label>
+  <div class="mm-box" data-k="0"><input type="text" id="top" value="When the code works" maxlength="300" autocomplete="off"></div>
+  <label for="bottom">Bottom text</label>
+  <div class="mm-box" data-k="1"><input type="text" id="bottom" value="on the first try" maxlength="300" autocomplete="off"></div>
+</div>
+<div id="extra"></div>
+<div class="btns" style="margin:0 0 16px"><button class="btn ghost" id="add" type="button">+ Add text box</button><button class="btn ghost" id="reset" type="button">Reset positions</button></div>
+<div class="fields">
+  <div><label for="size">Text size: <span id="sizeV">9</span>%</label><input type="range" id="size" min="3" max="25" step="0.5" value="9"></div>
+  <div><label for="outline">Outline: <span id="outlineV">12</span>%</label><input type="range" id="outline" min="0" max="40" value="12"></div>
+  <div class="mm-col"><label for="fill">Text colour</label><input type="color" id="fill" value="#ffffff"></div>
+  <div class="mm-col"><label for="stroke">Outline colour</label><input type="color" id="stroke" value="#000000"></div>
+  <div><label for="font">Font</label><select id="font"><option value="impact">Impact (classic)</option><option value="sans">Bold sans</option><option value="serif">Bold serif</option><option value="comic">Comic style</option></select></div>
+  <div><label for="fmt">Download as</label><select id="fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPG</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="upper" checked> ALL CAPITALS</label></div>
+<div class="btns"><button class="btn" id="go" disabled>Download meme</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var cv = $('cv'), ctx = cv.getContext('2d'), src = null, name = 'meme', boxes = [], sel = -1, drag = null;
+  var MAXSIDE = 4096, PREV = 1200;
+  var FONTS = {
+    impact: 'Impact, Haettenschweiler, "Arial Narrow Bold", "Anton", "Oswald", "Arial Black", "Helvetica Neue", Arial, sans-serif',
+    sans: '"Arial Black", "Helvetica Neue", Helvetica, system-ui, Arial, sans-serif',
+    serif: 'Georgia, "Times New Roman", serif',
+    comic: '"Comic Sans MS", "Comic Neue", "Chalkboard SE", cursive, sans-serif'
+  };
+  var BGS = [['#ffffff', 'White'], ['#111111', 'Black'], ['#facc15', 'Yellow'], ['#2563eb', 'Blue'], ['#16a34a', 'Green'], ['#dc2626', 'Red'], ['#9ca3af', 'Grey']];
+
+  // Each box: an input, plus a position. Top and bottom hug their edge until dragged; then x, y are the centre (0-1).
+  function box(input, kind) { return { input: input, kind: kind, x: 0.5, y: kind === 'top' ? 0.1 : kind === 'bottom' ? 0.9 : 0.5, free: kind === 'extra', rect: null }; }
+  boxes.push(box($('top'), 'top'), box($('bottom'), 'bottom'));
+
+  function wrap(text, maxW) {
+    var lines = [];
+    text.split(/\n/).forEach(function (para) {
+      var words = para.split(/\s+/).filter(Boolean), line = '';
+      words.forEach(function (w) {
+        while (ctx.measureText(w).width > maxW && w.length > 1) { // a word too long for the width is split
+          var k = w.length - 1; while (k > 1 && ctx.measureText(w.slice(0, k)).width > maxW) k--;
+          if (line) { lines.push(line); line = ''; }
+          lines.push(w.slice(0, k)); w = w.slice(k);
+        }
+        var t = line ? line + ' ' + w : w;
+        if (line && ctx.measureText(t).width > maxW) { lines.push(line); line = w; } else line = t;
+      });
+      if (line) lines.push(line);
+    });
+    return lines;
+  }
+  // Draw everything at a given scale into the given context (the preview and the download share this).
+  function paint(c, W, H, showSel) {
+    var g = c.getContext('2d'); ctx = g;
+    g.clearRect(0, 0, W, H);
+    if (src.color) { g.fillStyle = src.color; g.fillRect(0, 0, W, H); } else g.drawImage(src.img, 0, 0, W, H);
+    var size0 = Math.max(8, Math.min(W, H) * $('size').value / 100), pad = Math.max(4, H * 0.025), fam = FONTS[$('font').value];
+    g.textAlign = 'center'; g.textBaseline = 'middle'; g.lineJoin = 'round'; g.miterLimit = 2;
+    boxes.forEach(function (b, k) {
+      var t = b.input.value.trim(); if ($('upper').checked) t = t.toUpperCase();
+      if (!t) { b.rect = null; return; }
+      // long top and bottom captions shrink a little so they stay on two or three lines, like classic memes
+      var size = size0; g.font = '900 ' + size + 'px ' + fam;
+      var lines = wrap(t, W * 0.92);
+      while (!b.free && lines.length > 2 && size > size0 * 0.6) { size *= 0.92; g.font = '900 ' + size + 'px ' + fam; lines = wrap(t, W * 0.92); }
+      var lh = size * 1.12, ow = size * $('outline').value / 100, bh = lines.length * lh, cx = b.x * W, cy;
+      if (b.free) cy = b.y * H; else cy = b.kind === 'top' ? pad + bh / 2 : H - pad - bh / 2;
+      var bw = Math.max.apply(null, lines.map(function (l) { return g.measureText(l).width; }));
+      b.rect = { x: (cx - bw / 2) / W, y: (cy - bh / 2) / H, w: bw / W, h: bh / H, cy: cy / H };
+      lines.forEach(function (l, i) {
+        var y = cy - bh / 2 + lh * (i + 0.5);
+        if (ow > 0) { g.lineWidth = ow * 2; g.strokeStyle = $('stroke').value; g.strokeText(l, cx, y); }
+        g.fillStyle = $('fill').value; g.fillText(l, cx, y);
+      });
+      if (showSel && k === sel) {
+        g.save(); g.setLineDash([8, 6]); g.lineWidth = Math.max(2, W / 400); g.strokeStyle = '#3b82f6';
+        g.strokeRect(cx - bw / 2 - 6, cy - bh / 2 - 4, bw + 12, bh + 8); g.restore();
+      }
+    });
+  }
+  function dims(max) { var w = src.w, h = src.h, s = Math.min(1, max / Math.max(w, h)); return [Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))]; }
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true;
+    if (!src || raf) return;
+    raf = requestAnimationFrame(function () { raf = 0; var d = dims(PREV); cv.width = d[0]; cv.height = d[1]; paint(cv, d[0], d[1], true); });
+  }
+  function start(s, label) {
+    src = s; name = label; $('stage').hidden = false; $('go').disabled = false; $('dl').hidden = true; draw();
+  }
+
+  // ---------- picture in ----------
+  function takeFile(f) {
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { PT.say('bad', 'Please choose an image file, like a JPG or PNG.'); return; }
+    loadImage(f, function (img) {
+      if (!img || !img.naturalWidth) { PT.say('bad', 'Could not read that picture. Try a JPG or PNG.'); return; }
+      start({ img: img, w: img.naturalWidth, h: img.naturalHeight }, PT.base(f.name) + '-meme');
+      PT.say('', img.naturalWidth + ' × ' + img.naturalHeight + ' px. Type your captions below.');
+    });
+  }
+  PT.drop(false, takeFile);
+  document.addEventListener('paste', function (e) {
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) if (/^image\//.test(items[i].type)) { e.preventDefault(); takeFile(items[i].getAsFile()); return; }
+  });
+  BGS.forEach(function (c) {
+    var b = document.createElement('button'); b.type = 'button'; b.style.background = c[0]; b.setAttribute('aria-label', c[1] + ' background'); b.title = c[1];
+    b.addEventListener('click', function () {
+      start({ color: c[0], w: 1080, h: 1080 }, 'meme');
+      // dark text on light plain backgrounds reads better; the outline keeps the classic look either way
+      PT.say('', 'Plain ' + c[1].toLowerCase() + ' background, 1080 × 1080 px.');
+    });
+    $('bgs').appendChild(b);
+  });
+
+  // ---------- text boxes ----------
+  function addBox(text) {
+    var row = document.createElement('div'); row.className = 'mm-box';
+    var inp = document.createElement('input'); inp.type = 'text'; inp.maxLength = 300; inp.value = text || 'More text'; inp.setAttribute('aria-label', 'Extra text'); inp.setAttribute('data-nomemo', ''); inp.autocomplete = 'off';
+    var rm = document.createElement('button'); rm.type = 'button'; rm.textContent = '✕'; rm.setAttribute('aria-label', 'Remove this text box');
+    row.appendChild(inp); row.appendChild(rm); $('extra').appendChild(row);
+    var b = box(inp, 'extra'); b.y = 0.5 + ((boxes.length - 2) % 4) * 0.08 - 0.12; boxes.push(b);
+    rm.addEventListener('click', function () { var k = boxes.indexOf(b); boxes.splice(k, 1); row.remove(); if (sel === k) sel = -1; else if (sel > k) sel--; mark(); draw(); });
+    wire(inp);
+    return inp;
+  }
+  function wire(inp) {
+    inp.addEventListener('input', draw);
+    inp.addEventListener('focus', function () { sel = boxes.findIndex(function (b) { return b.input === inp; }); mark(); draw(); });
+  }
+  boxes.forEach(function (b) { wire(b.input); });
+  function mark() { boxes.forEach(function (b, k) { b.input.parentNode.classList.toggle('on', k === sel); }); }
+  $('add').addEventListener('click', function () { var i = addBox(); sel = boxes.length - 1; mark(); draw(); i.focus(); i.select(); });
+  $('reset').addEventListener('click', function () { boxes.forEach(function (b, k) { if (b.kind !== 'extra') { b.free = false; b.x = 0.5; } else { b.x = 0.5; b.y = 0.38 + ((k - 2) % 4) * 0.08; } }); draw(); });
+
+  // ---------- dragging on the picture (mouse, touch and pen) ----------
+  function at(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height }; }
+  function hit(p) {
+    for (var k = boxes.length - 1; k >= 0; k--) { var r = boxes[k].rect, m = 0.02; if (r && p.x >= r.x - m && p.x <= r.x + r.w + m && p.y >= r.y - m && p.y <= r.y + r.h + m) return k; }
+    return -1;
+  }
+  function freeze(b) { if (!b.free && b.rect) { b.free = true; b.y = b.rect.cy; } }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!src) return;
+    var p = at(e), k = hit(p);
+    sel = k; mark(); draw();
+    if (k < 0) return;
+    e.preventDefault(); cv.focus({ preventScroll: true });
+    var b = boxes[k]; freeze(b);
+    drag = { b: b, dx: p.x - b.x, dy: p.y - b.y, id: e.pointerId };
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    cv.classList.add('grabbing');
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) { if (src && e.pointerType === 'mouse') cv.classList.toggle('grab', hit(at(e)) >= 0); return; }
+    if (e.pointerId !== drag.id) return;
+    var p = at(e);
+    drag.b.x = Math.min(1, Math.max(0, p.x - drag.dx)); drag.b.y = Math.min(1, Math.max(0, p.y - drag.dy)); draw();
+  });
+  function end(e) { if (drag && e.pointerId === drag.id) { drag = null; cv.classList.remove('grabbing'); } }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('keydown', function (e) {
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || sel < 0 || !boxes[sel]) return;
+    e.preventDefault(); var b = boxes[sel], st = e.shiftKey ? 0.05 : 0.01; freeze(b);
+    b.x = Math.min(1, Math.max(0, b.x + d[0] * st)); b.y = Math.min(1, Math.max(0, b.y + d[1] * st)); draw();
+  });
+
+  // ---------- settings and download ----------
+  [['size', 'sizeV'], ['outline', 'outlineV']].forEach(function (p) { var f = function () { $(p[1]).textContent = $(p[0]).value; }; $(p[0]).addEventListener('input', f); f(); });
+  ['size', 'outline', 'fill', 'stroke', 'font', 'upper', 'fmt'].forEach(function (id) { $(id).addEventListener('input', draw); $(id).addEventListener('change', draw); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+  var busy = false;
+  $('go').addEventListener('click', function () {
+    if (!src || busy) return;
+    busy = true; $('go').disabled = true;
+    var d = dims(MAXSIDE), c = document.createElement('canvas'), type = $('fmt').value; c.width = d[0]; c.height = d[1];
+    paint(c, d[0], d[1], false); ctx = cv.getContext('2d');
+    PT.blob(c, type, 0.92).then(function (b) {
+      busy = false; $('go').disabled = false;
+      if (!b) { PT.say('bad', 'Your browser could not create the image. Try the other format.'); return; }
+      PT.done(b, name + (type === 'image/png' ? '.png' : '.jpg'), type, 'Your meme is ready (' + d[0] + ' × ' + d[1] + ' px)');
+      $('dl').textContent = 'Download ' + (type === 'image/png' ? 'PNG' : 'JPG'); $('dl').click();
+    });
+  });
+})();
+</script>

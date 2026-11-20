@@ -1,0 +1,186 @@
+<style>
+.sr-stage { position: relative; margin: 6px 0 4px; }
+.sr-time { font-size: clamp(40px, 11vw, 64px); margin: 0; }
+.sr-state { text-align: center; color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.sr-state.rec { color: var(--bad); font-weight: 600; }
+.sr-count { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 84px; font-weight: 800; color: var(--accent); background: var(--surface); border-radius: 12px; }
+.sr-video { display: block; width: 100%; max-height: 420px; border-radius: 10px; background: #000; margin-top: 16px; }
+</style>
+<div class="notice bad" id="unsup" hidden><p id="unsupText"></p></div>
+<div id="setup">
+  <div class="fields">
+    <div><label for="surface">Start with</label><select id="surface"><option value="monitor">Entire screen</option><option value="window">A window</option><option value="browser">A browser tab</option></select></div>
+    <div><label for="fmt">Video format</label><select id="fmt"></select></div>
+    <div><label for="fps">Smoothness</label><select id="fps"><option value="30" selected>30 frames a second</option><option value="60">60 frames a second (bigger file)</option><option value="15">15 frames a second (smaller file)</option></select></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="sys" checked> Record computer or tab sound</label>
+    <label><input type="checkbox" id="mic"> Record my microphone</label>
+    <label><input type="checkbox" id="cd" checked> 3-2-1 countdown</label>
+  </div>
+</div>
+<div class="sr-stage">
+  <div class="big sr-time" id="time" translate="no">0:00</div>
+  <div class="sr-count" id="count" hidden aria-live="assertive"></div>
+</div>
+<p class="sr-state" id="state">Press Start recording, then choose what to share.</p>
+<div class="btns"><button class="btn" id="go">● Start recording</button><button class="btn ghost" id="pause" disabled>Pause</button><button class="btn ghost" id="stop" disabled>■ Stop</button></div>
+<div id="result" hidden>
+  <video class="sr-video" id="play" controls playsinline></video>
+  <div class="btns"><a class="btn" id="dl">Download video</a></div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/fix-webm-duration/fix-webm-duration.js"></script>
+<script>
+(function () {
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function clock(ms) { var s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); }
+  function stamp() { var d = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); }
+  function setState(text, live) { $('state').textContent = text; $('state').className = 'sr-state' + (live ? ' rec' : ''); }
+
+  var md = navigator.mediaDevices, AC = window.AudioContext || window.webkitAudioContext;
+  var rec = null, screen = null, micStream = null, actx = null, chunks = [], t0 = 0, spent = 0, paused = false, tick = null, size = 0, url = null, starting = false;
+
+  // ---------- what this browser can do ----------
+  function unsupported(text) { $('unsup').hidden = false; $('unsupText').textContent = text; $('go').disabled = true; $('setup').hidden = true; setState(''); }
+  var phone = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  var ios = /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!window.isSecureContext) unsupported('Screen recording needs a secure (https) page. Open this tool from its https:// address.');
+  else if (!md || !md.getDisplayMedia) unsupported(ios
+    ? 'iPhone and iPad browsers cannot record the screen from a website. Use the built-in recorder instead: open Control Centre and tap the Screen Recording button (add it in Settings › Control Centre if you do not see it).'
+    : phone ? 'Phone browsers cannot record the screen from a website. Use your phone\'s built-in screen recorder instead: swipe down from the top of the screen and tap Screen recorder (or Screen record). On a computer, this tool works in Chrome, Edge, Firefox and Safari.'
+    : 'This browser cannot record the screen. Use a current version of Chrome, Edge, Firefox or Safari (version 13 or newer).');
+  else if (!window.MediaRecorder) unsupported('This browser can share the screen but cannot record it. Update it, or use Chrome, Edge or Firefox.');
+
+  // The best video formats this browser can record, best first.
+  var FORMATS = [
+    ['mp4', 'MP4 (plays everywhere)', ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/mp4;codecs=avc1', 'video/mp4']],
+    ['webm', 'WebM (VP9, small file)', ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp9']],
+    ['webm8', 'WebM (VP8, older players)', ['video/webm;codecs=vp8,opus', 'video/webm;codecs=vp8', 'video/webm']]
+  ];
+  var types = {};
+  if (window.MediaRecorder) FORMATS.forEach(function (f) {
+    var ok = MediaRecorder.isTypeSupported ? f[2].filter(function (t) { return MediaRecorder.isTypeSupported(t); })[0] : null;
+    if (!ok) return;
+    types[f[0]] = ok;
+    var o = document.createElement('option'); o.value = f[0]; o.textContent = f[1]; $('fmt').appendChild(o);
+  });
+  if (!$('fmt').options.length) { var o = document.createElement('option'); o.value = ''; o.textContent = 'Browser default'; $('fmt').appendChild(o); }
+  if (!AC) { $('mic').checked = false; $('mic').disabled = true; }
+
+  function why(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError') return /system|policy/i.test(e.message || '')
+      ? 'Your computer blocked screen recording. On a Mac, open System Settings › Privacy & Security › Screen Recording, turn it on for your browser, then restart the browser.'
+      : 'Recording was cancelled or screen sharing was blocked. Press Start recording and choose a screen, window or tab, then press Share.';
+    if (n === 'NotFoundError') return 'No screen was found to record.';
+    if (n === 'NotReadableError' || n === 'AbortError') return 'The screen could not be captured. Another app may be blocking it. Close it and try again.';
+    if (n === 'NotSupportedError' || n === 'TypeError') return 'This browser does not support screen recording here.';
+    return 'Screen recording could not start' + (e && e.message ? ': ' + e.message : '.');
+  }
+  function elapsed() { return spent + (paused || !t0 ? 0 : performance.now() - t0); }
+  function guard(e) { e.preventDefault(); e.returnValue = ''; }
+  function release() {
+    clearInterval(tick);
+    [screen, micStream].forEach(function (s) { if (s) s.getTracks().forEach(function (t) { t.stop(); }); });
+    screen = micStream = null;
+    if (actx) { actx.close().catch(function () {}); actx = null; }
+    window.removeEventListener('beforeunload', guard);
+  }
+  function idle() {
+    starting = false; rec = null;
+    $('go').disabled = false; $('pause').disabled = true; $('pause').textContent = 'Pause'; $('stop').disabled = true; $('setup').hidden = false;
+  }
+  function countdown(n) {
+    return new Promise(function (res) {
+      if (!n) return res();
+      var box = $('count'); box.hidden = false;
+      (function step(i) {
+        if (!screen) { box.hidden = true; return res(); } // sharing ended during the countdown
+        if (i === 0) { box.hidden = true; return res(); }
+        box.textContent = i; setTimeout(function () { step(i - 1); }, 1000);
+      })(n);
+    });
+  }
+
+  $('go').addEventListener('click', function () {
+    if (rec || starting) return;
+    starting = true; $('go').disabled = true; say('', ''); setState('Choose what to share in the box your browser shows…');
+    var opts = { video: { frameRate: { ideal: +$('fps').value, max: +$('fps').value }, displaySurface: $('surface').value }, audio: $('sys').checked };
+    if ($('sys').checked) { opts.systemAudio = 'include'; opts.selfBrowserSurface = 'exclude'; }
+    md.getDisplayMedia(opts).catch(function (e) {
+      if (e && e.name === 'TypeError') return md.getDisplayMedia({ video: true, audio: $('sys').checked }); // older browsers reject the extra options
+      throw e;
+    }).then(function (s) {
+      screen = s;
+      if (!$('mic').checked) return null;
+      return md.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).catch(function (e) {
+        say('bad', e && e.name === 'NotAllowedError' ? 'The microphone was blocked, so this recording has no voice. Allow the microphone next to the web address to add it next time.' : 'The microphone could not start, so this recording has no voice.');
+        return null;
+      });
+    }).then(function (m) {
+      micStream = m;
+      var v = screen.getVideoTracks()[0];
+      v.addEventListener('ended', function () { if (rec && rec.state !== 'inactive') rec.stop(); else if (starting) { release(); idle(); setState('Sharing stopped before the recording began.'); } });
+      // One sound track: the screen sound and the microphone mixed together.
+      var tracks = [v], sys = screen.getAudioTracks();
+      if (sys.length && !micStream) tracks.push(sys[0]);
+      else if (micStream && !sys.length) tracks.push(micStream.getAudioTracks()[0]);
+      else if (micStream && sys.length) {
+        actx = new AC(); var dest = actx.createMediaStreamDestination();
+        actx.createMediaStreamSource(new MediaStream([sys[0]])).connect(dest);
+        actx.createMediaStreamSource(micStream).connect(dest);
+        tracks.push(dest.stream.getAudioTracks()[0]);
+      }
+      if ($('sys').checked && !sys.length && !$('msg').textContent) say('', 'No computer sound is being recorded. To include it, tick "Share audio" (or "Share tab audio") in the sharing box. Some browsers can only share sound from a tab.');
+      window.addEventListener('beforeunload', guard);
+      return countdown($('cd').checked ? 3 : 0).then(function () { return tracks; });
+    }).then(function (tracks) {
+      if (!screen) return;
+      var mime = types[$('fmt').value] || '';
+      try { rec = new MediaRecorder(new MediaStream(tracks), mime ? { mimeType: mime, videoBitsPerSecond: 2500000 * (+$('fps').value >= 60 ? 2 : 1) } : undefined); }
+      catch (e) { rec = new MediaRecorder(new MediaStream(tracks)); }
+      chunks = []; size = 0; spent = 0; paused = false;
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) { chunks.push(e.data); size += e.data.size; } };
+      rec.onstop = finished;
+      rec.onerror = function () { say('bad', 'The recording stopped because of an error. What was recorded so far is kept below.'); };
+      rec.start(1000);
+      starting = false; t0 = performance.now();
+      tick = setInterval(function () { $('time').textContent = clock(elapsed()); if (!paused) setState('Recording · ' + fmtBytes(size) + ' so far', true); }, 250);
+      $('time').textContent = '0:00'; setState('Recording…', true);
+      $('pause').disabled = false; $('stop').disabled = false; $('setup').hidden = true; $('result').hidden = true;
+    }).catch(function (e) {
+      release(); idle(); setState('Press Start recording, then choose what to share.');
+      say('bad', why(e));
+    });
+  });
+
+  $('pause').addEventListener('click', function () {
+    if (!rec || rec.state === 'inactive') return;
+    if (!paused) { rec.pause(); spent += performance.now() - t0; paused = true; $('pause').textContent = 'Resume'; setState('Paused. Press Resume to carry on.'); }
+    else { rec.resume(); t0 = performance.now(); paused = false; $('pause').textContent = 'Pause'; setState('Recording…', true); }
+  });
+  $('stop').addEventListener('click', function () { if (rec && rec.state !== 'inactive') { $('stop').disabled = true; rec.stop(); } });
+
+  function finished() {
+    var ms = elapsed(), type = (rec && rec.mimeType) || (chunks[0] && chunks[0].type) || 'video/webm';
+    release(); idle();
+    $('time').textContent = clock(ms);
+    $('go').textContent = '● Record again';
+    if (!chunks.length) { setState('Nothing was recorded.'); return say('bad', 'No video was captured. Try again and keep sharing for at least a second.'); }
+    var mp4 = /mp4/.test(type), blob = new Blob(chunks, { type: type.split(';')[0] });
+    var ready = !mp4 && window.ysFixWebmDuration ? ysFixWebmDuration(blob, ms, { logger: false }) : Promise.resolve(blob); // so players can show the length and seek
+    setState('Getting your video ready…');
+    ready.then(function (b) {
+      chunks = [];
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(b);
+      $('play').src = url;
+      var a = $('dl'); a.href = url; a.download = 'screen-recording-' + stamp() + (mp4 ? '.mp4' : '.webm'); a.textContent = 'Download ' + (mp4 ? 'MP4' : 'WebM') + ' (' + fmtBytes(b.size) + ')';
+      $('result').hidden = false;
+      setState('Done. Watch it below, then download.');
+      if (!/bad/.test($('msg').className)) say('ok', 'Recorded ' + clock(ms) + ' · ' + fmtBytes(b.size));
+    });
+  }
+})();
+</script>
