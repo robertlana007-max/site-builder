@@ -265,6 +265,9 @@ if (cfg.adsenseClient) {
   write('ads.txt', `google.com, ${cfg.adsenseClient.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`);
 }
 write('.nojekyll', '');
+// GitHub Pages reads the custom domain from this file.
+const host = new URL(SITE).hostname;
+if (!host.endsWith('.github.io')) write('CNAME', host + '\n');
 write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M16 20h32v8H36v20h-8V28H16z" fill="#fff"/></svg>\n`);
 
 console.log(`Built ${urls.length} pages for ${SITE}`);
