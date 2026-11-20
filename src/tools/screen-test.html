@@ -1,0 +1,208 @@
+<style>
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.st-sw { font: inherit; font-size: 13px; font-weight: 600; min-height: 64px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; display: flex; align-items: flex-end; justify-content: flex-start; padding: 6px 8px; color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, .7); text-align: start; }
+.st-sw:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+.st-view { position: fixed; inset: 0; z-index: 9999; cursor: pointer; background: #000; touch-action: manipulation; }
+.st-view.st-hidecursor { cursor: none; }
+.st-hint { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: rgba(0, 0, 0, .72); color: #fff; font-size: 14px; padding: 8px 14px; border-radius: 10px; max-width: calc(100vw - 32px); text-align: center; transition: opacity .4s; pointer-events: none; }
+.st-hint.st-gone { opacity: 0; }
+.st-x { position: absolute; top: 12px; right: 12px; font: 600 14px/1 system-ui, sans-serif; background: rgba(0, 0, 0, .6); color: #fff; border: 1px solid rgba(255, 255, 255, .5); border-radius: 10px; padding: 10px 14px; cursor: pointer; transition: opacity .4s; }
+.st-x.st-gone { opacity: 0; pointer-events: none; }
+.st-fix { position: absolute; width: 200px; height: 200px; cursor: move; touch-action: none; border: 1px solid rgba(255, 255, 255, .3); }
+.st-warn { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, var(--surface)); }
+.st-warn p { margin: 0 0 8px; font-weight: 400; } .st-warn p:first-child { font-weight: 700; }
+.st-info { margin-top: 0; }
+.st-info .stat b { font-size: 18px; }
+</style>
+<p class="msg" style="margin-top:0">Pick a test to fill your whole screen with it. Click, tap or press <kbd>→</kbd> / <kbd>Space</kbd> for the next one, <kbd>←</kbd> for the previous one and <kbd>Esc</kbd> to stop.</p>
+<div class="st-grid" id="tests" role="group" aria-label="Screen tests"></div>
+<div class="btns" style="margin:0 0 8px"><button class="btn" id="go">▶ Start full-screen test</button></div>
+
+<h3>Stuck pixel fixer</h3>
+<div class="notice st-warn" id="warn">
+  <p>⚠ Warning: flashing lights</p>
+  <p>The fixer flashes bright colours very quickly. Do not use it if you or anyone who can see the screen has photosensitive epilepsy or is sensitive to flashing lights. Stop at once if you feel dizzy, sick or unwell. Do not stare at the flashing area.</p>
+  <label style="font-weight:600;margin:0"><input type="checkbox" id="agree" data-nomemo> I have read the warning and want to use the flashing fixer</label>
+</div>
+<div class="fields">
+  <div><label for="fsize">Flashing area</label><select id="fsize"><option value="100">Small (100 px)</option><option value="200" selected>Medium (200 px)</option><option value="400">Large (400 px)</option><option value="full">Whole screen</option></select></div>
+  <div><label for="fspeed">Speed</label><select id="fspeed"><option value="0">Fastest (every screen refresh)</option><option value="100" selected>Fast (10 changes a second)</option><option value="250">Slower (4 changes a second)</option></select></div>
+  <div><label for="fmins">Stop after</label><select id="fmins"><option value="1">1 minute</option><option value="5">5 minutes</option><option value="10" selected>10 minutes</option><option value="20">20 minutes</option><option value="30">30 minutes</option></select></div>
+</div>
+<div class="btns" style="margin-top:0"><button class="btn ghost" id="fix" disabled>Start stuck pixel fixer</button></div>
+<p class="msg" id="fixmsg">Tick the box above first. Then drag the flashing square over the stuck pixel. Press <kbd>Esc</kbd> or click Stop to end.</p>
+
+<h3>Your screen</h3>
+<div class="stats st-info">
+  <div class="stat"><span>Screen size (CSS pixels)</span><b id="iScreen">–</b></div>
+  <div class="stat"><span>Pixel ratio</span><b id="iDpr">–</b></div>
+  <div class="stat"><span>Approx. real pixels</span><b id="iReal">–</b></div>
+  <div class="stat"><span>Browser window</span><b id="iWin">–</b></div>
+  <div class="stat"><span>Refresh rate (estimate)</span><b id="iHz">–</b></div>
+  <div class="stat"><span>Colour depth</span><b id="iDepth">–</b></div>
+  <div class="stat"><span>Colour range</span><b id="iGamut">–</b></div>
+  <div class="stat"><span>HDR</span><b id="iHdr">–</b></div>
+</div>
+<div class="btns"><button class="btn ghost" id="hz">Measure refresh rate again</button></div>
+<p class="msg" id="msg">The refresh rate is measured from how often your browser draws. Battery saving, a busy computer or a background tab can make it read lower than the real value.</p>
+<script>
+(function () {
+  var TESTS = [
+    ['Black', '#000'], ['White', '#fff'], ['Red', '#f00'], ['Green', '#0f0'], ['Blue', '#00f'], ['Grey', '#808080'],
+    ['Cyan', '#0ff'], ['Magenta', '#f0f'], ['Yellow', '#ff0'],
+    ['Grey gradient', 'linear-gradient(to right, #000, #fff)'],
+    ['Colour gradient', 'linear-gradient(to right, #f00, #ff0, #0f0, #0ff, #00f, #f0f, #f00)'],
+    ['RGB ramps', 'linear-gradient(to right, #000, #f00) 0 0 / 100% 25% no-repeat, linear-gradient(to right, #000, #0f0) 0 33.33% / 100% 25% no-repeat, linear-gradient(to right, #000, #00f) 0 66.66% / 100% 25% no-repeat, linear-gradient(to right, #000, #fff) 0 100% / 100% 25% no-repeat'],
+    ['Checkerboard', 'repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0 / 16px 16px'],
+    ['Fine checker', 'repeating-conic-gradient(#000 0 25%, #fff 0 50%) 0 0 / 2px 2px'],
+    ['Grid lines', 'linear-gradient(#fff 1px, transparent 1px) 0 0 / 40px 40px, linear-gradient(90deg, #fff 1px, #000 1px) 0 0 / 40px 40px']
+  ];
+  var idx = 0, view = null, hideTimer = 0, fixRaf = 0, fixTimer = 0, fixEnd = 0, onKey = null;
+
+  TESTS.forEach(function (t, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.className = 'st-sw'; b.textContent = t[0]; b.style.background = t[1];
+    if (/^#(fff|0f0|0ff|ff0)$/.test(t[1])) { b.style.color = '#000'; b.style.textShadow = 'none'; }
+    b.addEventListener('click', function () { open('test', i); });
+    $('tests').appendChild(b);
+  });
+
+  function full(el) {
+    var f = el.requestFullscreen || el.webkitRequestFullscreen;
+    if (f) { try { var p = f.call(el); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+  }
+  function isFull() { return !!(document.fullscreenElement || document.webkitFullscreenElement); }
+  function leaveFull() { if (isFull()) { var x = document.exitFullscreen || document.webkitExitFullscreen; try { var p = x.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} } }
+
+  function wake() { // show the hint and the close button for a moment, then hide them and the mouse pointer
+    if (!view) return;
+    view.classList.remove('st-hidecursor');
+    view.querySelectorAll('.st-hint,.st-x').forEach(function (n) { n.classList.remove('st-gone'); });
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(function () {
+      if (!view) return;
+      view.classList.add('st-hidecursor');
+      view.querySelectorAll('.st-hint,.st-x').forEach(function (n) { n.classList.add('st-gone'); });
+    }, 2500);
+  }
+  function paint() {
+    var t = TESTS[idx];
+    view.style.background = t[1];
+    view.querySelector('.st-hint').textContent = (idx + 1) + ' of ' + TESTS.length + ': ' + t[0] + ' · click or → for next, ← back, Esc to stop';
+  }
+  function close() {
+    if (!view) return;
+    cancelAnimationFrame(fixRaf); clearTimeout(fixTimer); clearTimeout(hideTimer);
+    document.removeEventListener('keydown', onKey, true);
+    view.remove(); view = null;
+    document.documentElement.style.overflow = '';
+    leaveFull();
+  }
+  function open(mode, start) {
+    close();
+    view = document.createElement('div');
+    view.className = 'st-view'; view.setAttribute('role', 'dialog'); view.setAttribute('aria-label', mode === 'fix' ? 'Stuck pixel fixer' : 'Screen test');
+    view.innerHTML = '<div class="st-hint"></div><button type="button" class="st-x">✕ Stop</button>';
+    document.body.appendChild(view);
+    document.documentElement.style.overflow = 'hidden';
+    view.querySelector('.st-x').addEventListener('click', function (e) { e.stopPropagation(); close(); });
+    onKey = function (e) {
+      if (!view) return;
+      var k = e.key;
+      if (k === 'Escape') { e.preventDefault(); close(); return; }
+      if (mode === 'test') {
+        if (k === 'ArrowRight' || k === 'ArrowDown' || k === ' ' || k === 'Enter' || k === 'PageDown') { e.preventDefault(); idx = (idx + 1) % TESTS.length; paint(); wake(); }
+        else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'PageUp' || k === 'Backspace') { e.preventDefault(); idx = (idx - 1 + TESTS.length) % TESTS.length; paint(); wake(); }
+      }
+    };
+    document.addEventListener('keydown', onKey, true);
+    view.addEventListener('mousemove', wake);
+    full(view);
+    if (mode === 'test') {
+      idx = start || 0; paint();
+      view.addEventListener('click', function (e) { if (e.target.closest('.st-x')) return; idx = (idx + 1) % TESTS.length; paint(); wake(); });
+      view.addEventListener('contextmenu', function (e) { e.preventDefault(); idx = (idx - 1 + TESTS.length) % TESTS.length; paint(); wake(); });
+    } else startFix();
+    view.querySelector('.st-x').focus({ preventScroll: true });
+    wake();
+  }
+  document.addEventListener('fullscreenchange', function () { if (view && !isFull() && view.dataset.wasFull) close(); if (view && isFull()) view.dataset.wasFull = '1'; });
+  document.addEventListener('webkitfullscreenchange', function () { if (view && !isFull() && view.dataset.wasFull) close(); if (view && isFull()) view.dataset.wasFull = '1'; });
+  $('go').addEventListener('click', function () { open('test', 0); });
+
+  // ---------- stuck pixel fixer ----------
+  $('agree').addEventListener('change', function () { $('fix').disabled = !$('agree').checked; });
+  $('fix').addEventListener('click', function () {
+    if (!$('agree').checked) return;
+    open('fix');
+  });
+  function startFix() {
+    var size = $('fsize').value, every = +$('fspeed').value, box = document.createElement('div');
+    view.style.background = '#000';
+    box.className = 'st-fix';
+    if (size === 'full') { box.style.inset = '0'; box.style.width = box.style.height = 'auto'; box.style.cursor = 'default'; box.style.border = '0'; }
+    else {
+      var s = Math.min(+size, innerWidth - 20, innerHeight - 20);
+      box.style.width = box.style.height = s + 'px';
+      box.style.left = Math.round((innerWidth - s) / 2) + 'px'; box.style.top = Math.round((innerHeight - s) / 2) + 'px';
+      var drag = null;
+      box.addEventListener('pointerdown', function (e) { drag = { x: e.clientX - box.offsetLeft, y: e.clientY - box.offsetTop }; box.setPointerCapture(e.pointerId); });
+      box.addEventListener('pointermove', function (e) {
+        if (!drag) return;
+        box.style.left = Math.max(0, Math.min(innerWidth - box.offsetWidth, e.clientX - drag.x)) + 'px';
+        box.style.top = Math.max(0, Math.min(innerHeight - box.offsetHeight, e.clientY - drag.y)) + 'px';
+      });
+      box.addEventListener('pointerup', function () { drag = null; });
+      box.addEventListener('pointercancel', function () { drag = null; });
+    }
+    view.insertBefore(box, view.firstChild);
+    var COLS = ['#f00', '#0f0', '#00f', '#fff', '#000'], n = 0, last = 0;
+    fixEnd = Date.now() + (+$('fmins').value) * 60000;
+    var hint = view.querySelector('.st-hint');
+    (function step(t) {
+      if (!view) return;
+      if (Date.now() >= fixEnd) { close(); $('fixmsg').className = 'msg ok'; $('fixmsg').textContent = 'The fixer stopped after ' + $('fmins').value + ' minute(s). Check whether the pixel has changed. You can run it again if it has not.'; return; }
+      if (!every || t - last >= every) { last = t; n = (n + 1) % COLS.length; box.style.background = COLS[n]; }
+      var left = Math.ceil((fixEnd - Date.now()) / 1000);
+      hint.textContent = (size === 'full' ? '' : 'Drag the square over the stuck pixel · ') + 'stops in ' + Math.floor(left / 60) + ':' + String(left % 60).padStart(2, '0') + ' · Esc to stop';
+      fixRaf = requestAnimationFrame(step);
+    })(0);
+  }
+
+  // ---------- screen information ----------
+  function info() {
+    var s = window.screen || {}, d = window.devicePixelRatio || 1;
+    $('iScreen').textContent = (s.width || '?') + ' × ' + (s.height || '?');
+    $('iDpr').textContent = (Math.round(d * 100) / 100) + '×';
+    $('iReal').textContent = s.width ? Math.round(s.width * d) + ' × ' + Math.round(s.height * d) : '?';
+    $('iWin').textContent = innerWidth + ' × ' + innerHeight;
+    $('iDepth').textContent = s.colorDepth ? s.colorDepth + '-bit' : '?';
+    var mq = function (q) { return window.matchMedia && matchMedia(q).matches; };
+    $('iGamut').textContent = mq('(color-gamut: rec2020)') ? 'Rec. 2020 (very wide)' : mq('(color-gamut: p3)') ? 'Display P3 (wide)' : mq('(color-gamut: srgb)') ? 'sRGB (standard)' : 'Unknown';
+    $('iHdr').textContent = mq('(dynamic-range: high)') ? 'Yes' : 'No';
+  }
+  function measureHz() {
+    $('iHz').textContent = 'Measuring…'; $('hz').disabled = true;
+    var times = [], start = 0;
+    function tick(t) {
+      times.push(t);
+      if (!start) start = t;
+      if (t - start < 1500 && times.length < 600) return requestAnimationFrame(tick);
+      $('hz').disabled = false;
+      var gaps = [];
+      for (var i = 1; i < times.length; i++) gaps.push(times[i] - times[i - 1]);
+      gaps.sort(function (a, b) { return a - b; });
+      var med = gaps[Math.floor(gaps.length / 2)];
+      if (!med || document.hidden) { $('iHz').textContent = 'Could not measure'; return; }
+      var hz = 1000 / med, common = [24, 30, 48, 50, 60, 72, 75, 90, 100, 120, 144, 165, 170, 180, 200, 240, 280, 360, 480, 500];
+      var near = common.reduce(function (a, b) { return Math.abs(b - hz) < Math.abs(a - hz) ? b : a; });
+      $('iHz').textContent = (Math.abs(near - hz) / near < 0.04 ? near : Math.round(hz)) + ' Hz';
+    }
+    requestAnimationFrame(tick);
+  }
+  info(); measureHz();
+  addEventListener('resize', info);
+  $('hz').addEventListener('click', measureHz);
+  addEventListener('pagehide', close);
+})();
+</script>
