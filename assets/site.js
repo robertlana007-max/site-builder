@@ -10,7 +10,17 @@
 
   // ---------- visitor preferences (Settings). Stored with the rest of the saved state, so they sync with an account. ----------
   var ACCENTS = { blue: '#2563eb', violet: '#7c3aed', green: '#059669', teal: '#0d9488', orange: '#ea580c', pink: '#db2777', red: '#dc2626', gray: '#475569' };
-  var PREF = { theme: 'light', accent: 'blue', size: 'm', density: 'comfy', corners: 'round', tiles: true, desc: true, newtab: false, motion: true, rememberInputs: true, rememberRecent: true, confetti: true };
+  var PREF = { theme: 'light', accent: 'blue', size: 'm', density: 'comfy', corners: 'round', tiles: true, desc: true, newtab: false, motion: true, rememberInputs: true, rememberRecent: true, confetti: true,
+    toasts: true, sounds: true, font: 'system', lineh: 'normal', width: 'standard', cards: 'border', icons: 'color', bgstyle: 'plain', sticky: true,
+    contrast: false, gray: false, underline: false, bigtargets: false, focus: false, letters: false,
+    popular: true, welcome: true, sections: true, homecat: '', order: 'cat',
+    toolbar: true, guides: true, related: true, units: 'metric', imgfmt: 'auto', quality: 'auto', pdfres: 'auto',
+    numfmt: 'en-US', decimals: 'auto', shortcuts: true };
+  var P = PREF;
+  // attribute on <html> for every on/off or choice setting that only changes the look
+  var LOOK = { font: 'font', lineh: 'lineh', width: 'width', cards: 'cards', icons: 'icons', bgstyle: 'bg' };
+  var FLAGS = { contrast: 'contrast', gray: 'gray', underline: 'underline', bigtargets: 'bigtargets', focus: 'focus', letters: 'letters' };
+  var OFFS = { sticky: 'nosticky', popular: 'nopopular', welcome: 'nowelcome', sections: 'nosections', toolbar: 'notoolbar', guides: 'noguides', related: 'norelated' };
   function rawState() { try { return JSON.parse(localStorage.getItem('gtn1')) || {}; } catch (e) { return {}; } }
   function prefsOf(o) {
     var p = {}, src = (o && o.prefs && typeof o.prefs === 'object') ? o.prefs : {}, k;
@@ -29,6 +39,11 @@
     root.setAttribute('data-size', p.size); root.setAttribute('data-density', p.density); root.setAttribute('data-corners', p.corners);
     root.toggleAttribute('data-notiles', !p.tiles); root.toggleAttribute('data-nodesc', !p.desc);
     calm = calmOS || !p.motion; root.toggleAttribute('data-calm', !p.motion);
+    var k;
+    for (k in LOOK) root.setAttribute('data-' + LOOK[k], p[k]);
+    for (k in FLAGS) root.toggleAttribute('data-' + FLAGS[k], !!p[k]);
+    for (k in OFFS) root.toggleAttribute('data-' + OFFS[k], !p[k]);
+    P = p;
     return p;
   };
   applyPrefs();
@@ -63,7 +78,8 @@
     return (n / 1048576).toFixed(2) + ' MB';
   };
   window.fmtNum = function (n, d) {
-    return Number(n).toLocaleString('en-US', { minimumFractionDigits: d || 0, maximumFractionDigits: d == null ? 2 : d });
+    var max = d == null ? (P.decimals === 'auto' ? 2 : +P.decimals) : d;
+    return Number(n).toLocaleString(P.numfmt || 'en-US', { minimumFractionDigits: Math.min(d || 0, max), maximumFractionDigits: max });
   };
   window.copyText = function (text, btn) {
     var done = function () {
@@ -115,7 +131,7 @@
   };
   var toastTimer;
   window.toast = function (text) {
-    var t = $('toast'); if (!t) return;
+    var t = $('toast'); if (!t || !P.toasts) return;
     t.hidden = true; void t.offsetWidth; // restart the entrance animation
     t.textContent = text; t.hidden = false;
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.hidden = true; }, 2400);
@@ -296,18 +312,20 @@
 
     // ---------- settings dialog ----------
     var setBox = $('setBox');
-    window.openSettings = function () { if (!setBox) return; refreshSettings(); if (setBox.showModal) setBox.showModal(); };
+    window.openSettings = function () { if (!setBox) return; refreshSettings(); if (setBox.showModal) setBox.showModal(); var f = setBox.querySelector('.setnav button'); if (f) f.focus(); }; // do not pop up the phone keyboard
     window.refreshSettings = function () {
       if (!setBox) return;
       var p = read().prefs;
       setBox.querySelectorAll('[data-pref]').forEach(function (g) {
         var k = g.dataset.pref;
         if (g.type === 'checkbox') g.checked = !!p[k];
+        else if (g.tagName === 'SELECT') g.value = String(p[k]);
         else g.querySelectorAll('[data-v]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === String(p[k])); });
       });
       var u = window.GTNAuth && window.GTNAuth.user ? window.GTNAuth.user() : null;
       $('setAcct').textContent = u ? 'Signed in as ' + (u.email || u.displayName) + '. Your settings, pinned tools and saved work are kept in your account and follow you to every device.' : 'Not signed in. Your settings are saved on this device only. Sign in to keep them on every device.';
-      $('setSignIn').hidden = !!u; $('setSignOut').hidden = !u;
+      $('setSignIn').hidden = !!u; $('setSignOut').hidden = !u; $('setNameRow').hidden = !u; $('setDelAcct').hidden = !u;
+      if (u && document.activeElement !== $('setName')) $('setName').value = u.displayName || '';
       var o = read(); $('setCounts').textContent = o.favs.length + ' pinned · ' + o.recent.length + ' recent · ' + Object.keys(o.inputs).length + ' tools with saved entries';
       if ($('setLang')) $('setLang').value = LANG;
     };
@@ -321,6 +339,43 @@
         var b = e.target.closest('[data-v]'), g = b && b.closest('[data-pref]');
         if (g) { Prefs.set(g.dataset.pref, b.dataset.v); refreshSettings(); toast('Saved'); }
       });
+      setBox.querySelectorAll('select[data-pref]').forEach(function (c) {
+        c.addEventListener('change', function () { Prefs.set(c.dataset.pref, c.value); toast('Saved'); });
+      });
+      // section links on the left, and the search box
+      setBox.querySelectorAll('[data-go]').forEach(function (b) {
+        b.addEventListener('click', function () {
+          $('setFind').value = ''; findSetting();
+          var sec = $('set-' + b.dataset.go); $('setBody').scrollTo({ top: sec.offsetTop - $('setBody').offsetTop - 4, behavior: calm ? 'auto' : 'smooth' });
+          setBox.querySelectorAll('[data-go]').forEach(function (o) { o.setAttribute('aria-current', o === b); });
+        });
+      });
+      $('setBody').addEventListener('scroll', function () {
+        var top = $('setBody').scrollTop + 40, cur = null;
+        setBox.querySelectorAll('[data-sec]').forEach(function (sec) { if (sec.offsetTop - $('setBody').offsetTop <= top) cur = sec.dataset.sec; });
+        setBox.querySelectorAll('[data-go]').forEach(function (o) { o.setAttribute('aria-current', o.dataset.go === cur); });
+      }, { passive: true });
+      var findSetting = function () {
+        var q = $('setFind').value.trim().toLowerCase(), any = false;
+        setBox.querySelectorAll('[data-sec]').forEach(function (sec) {
+          var items = sec.querySelectorAll('.row, .tog, .setbtns, .keys, .setnote, h4'), hit = !q || sec.querySelector('h3').textContent.toLowerCase().indexOf(q) !== -1;
+          items.forEach(function (it) { var m = !q || hit || it.textContent.toLowerCase().indexOf(q) !== -1; it.classList.toggle('miss', !m); if (m) any = true; });
+          sec.hidden = !!q && !hit && !sec.querySelector('.row:not(.miss), .tog:not(.miss), .setbtns:not(.miss)');
+        });
+        $('setNone').hidden = any || !q;
+      };
+      $('setFind').addEventListener('input', findSetting);
+      $('setNameSave').addEventListener('click', function () {
+        var a = window.GTNAuth, n = $('setName').value.trim();
+        if (!n) return toast('Type your name first.');
+        if (a && a.updateName) a.updateName(n).then(function () { toast('Name saved.'); refreshSettings(); }, function (e) { toast(e.message); });
+      });
+      $('setDelAcct').addEventListener('click', function () {
+        var a = window.GTNAuth; if (!a || !a.deleteAccount) return;
+        if (!confirm('Delete your account for good? Your pinned tools and saved work in the account are removed. What is saved on this device stays.')) return;
+        a.deleteAccount().then(function () { refreshSettings(); toast('Your account was deleted.'); }, function (e) { alert(e.message); });
+      });
+      $('setClearPins').addEventListener('click', function () { var o = read(); o.favs = []; write(o); paint(); refreshSettings(); toast('All tools unpinned.'); });
       setBox.querySelectorAll('input[type=checkbox][data-pref]').forEach(function (c) {
         c.addEventListener('change', function () { Prefs.set(c.dataset.pref, c.checked); if (c.dataset.pref === 'newtab') newTab(); toast('Saved'); });
       });
@@ -363,6 +418,7 @@
       $('palBtn').addEventListener('click', open);
       document.addEventListener('keydown', function (e) {
         var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || '')) || e.target.isContentEditable;
+        if (!P.shortcuts) return;
         if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); open(); }
         else if (e.key === '/' && !typing && !e.ctrlKey && !e.metaKey && !e.altKey) { e.preventDefault(); open(); }
       });
@@ -386,6 +442,17 @@
       });
     });
 
+    // home page order and starting category
+    if (P.order === 'az' && document.querySelector('.cat .grid')) {
+      var first = document.querySelector('.cat'), all = Array.prototype.slice.call(document.querySelectorAll('.cat .tool-card'));
+      all.sort(function (a, b) { return a.textContent.localeCompare(b.textContent); }).forEach(function (c) { first.querySelector('.grid').appendChild(c); });
+      document.querySelectorAll('.cat').forEach(function (s) { if (s !== first) s.hidden = true; });
+      first.querySelector('.cat-title').firstChild.textContent = 'All tools, A to Z';
+      var pills = document.querySelector('.pills'); if (pills) pills.hidden = true;
+    } else if (P.homecat) {
+      var startPill = document.querySelector('.pill[data-cat="' + P.homecat.replace(/"/g, '') + '"]'); if (startPill) startPill.click();
+    }
+
     // stars and pin button
     document.querySelectorAll('.star').forEach(function (b) {
       b.addEventListener('click', function () { var on = Store.toggleFav(b.dataset.slug); if (on) burst(b); toast(on ? 'Pinned. Find it on the home page.' : 'Unpinned'); });
@@ -408,6 +475,12 @@
       // Short fields only: never textareas, which may hold private documents, and never files.
       var card = document.querySelector('.card');
       if (card) {
+        var setStart = function (id, val) { var el = $(id); if (!el || val == null) return; if (el.type === 'checkbox') { if (el.checked === val) return; el.checked = val; } else { if (el.tagName === 'SELECT' && !el.querySelector('option[value="' + val + '"]')) return; if (el.value === String(val)) return; el.value = val; } el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); };
+        if ($('unit') && $('unit').querySelector('option[value="i"]')) setStart('unit', P.units === 'imperial' ? 'i' : 'm');
+        if (P.imgfmt !== 'auto') setStart('fmt', { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp' }[P.imgfmt]);
+        if (P.quality !== 'auto' && $('q') && $('q').type === 'range') setStart('q', P.quality);
+        if (P.pdfres !== 'auto') setStart('scale', P.pdfres);
+        setStart('snd', P.sounds);
         var pick = function () { return card.querySelectorAll('input[type=number][id],input[type=range][id],input[type=checkbox][id],input[type=date][id],input[type=text][id],select[id]'); };
         var mem = read().inputs[SLUG], restored = 0, clear = $('clearBtn');
         if (mem) pick().forEach(function (el) {

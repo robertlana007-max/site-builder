@@ -6,7 +6,7 @@
   var cfg = window.FIREBASE_CONFIG;
   if (!cfg || !window.Store) return;
   var SDK = 'https://www.gstatic.com/firebasejs/10.12.2/';
-  var auth = null, doc = null, user = null, timer, ready;
+  var auth = null, doc = null, user = null, timer, ready, usersDb = null;
 
   function load(name) {
     return new Promise(function (ok, fail) {
@@ -47,6 +47,7 @@
     if (c === 'auth/popup-blocked') return 'Your browser blocked the Google window. Allow pop-ups for this site and try again.';
     if (c === 'auth/popup-closed-by-user' || c === 'auth/cancelled-popup-request') return '';
     if (c === 'auth/operation-not-allowed') return 'This way of signing in is not switched on yet. Please use Continue with Google.';
+    if (c === 'auth/requires-recent-login') return 'For your safety, sign out, sign in again, and then try once more.';
     if (c === 'auth/unauthorized-domain') return 'This website address is not allowed to sign in yet. The site owner needs to add it in Firebase.';
     return 'Something went wrong. Please try again.';
   }
@@ -57,6 +58,7 @@
     firebase.initializeApp(cfg);
     auth = firebase.auth();
     var db = firebase.firestore();
+    usersDb = db;
     auth.onAuthStateChanged(function (u) {
       user = u; doc = null; clearTimeout(timer);
       if (window.GTNAuth.onChange) window.GTNAuth.onChange(u);
@@ -91,6 +93,15 @@
       });
     },
     reset: function (email) { return run(function () { return auth.sendPasswordResetEmail(email); }); },
-    signOut: function () { return run(function () { return auth.signOut(); }); }
+    signOut: function () { return run(function () { return auth.signOut(); }); },
+    updateName: function (name) {
+      return run(function () { var u = auth.currentUser; return u.updateProfile({ displayName: name }).then(function () { if (window.GTNAuth.onChange) window.GTNAuth.onChange(u); }); });
+    },
+    deleteAccount: function () {
+      return run(function () {
+        var u = auth.currentUser; doc = null;
+        return usersDb.collection('users').doc(u.uid).delete().catch(function () {}).then(function () { return u.delete(); });
+      });
+    }
   };
 })();
