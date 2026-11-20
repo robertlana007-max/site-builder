@@ -368,8 +368,8 @@ ${contact}` },
 <p>To make the site more useful when you come back, your browser's local storage keeps: your theme and language, the tools you pin, the tools you opened recently, and what you entered into the short fields of a tool (numbers, dates, sliders, tick boxes, menus and one-line text boxes), so a calculation is still there on your next visit. Large text boxes, files and generated passwords are never saved. This data stays on your device. You can erase it with the "Clear my saved entries" button on a tool, or by clearing this site's data in your browser.</p>
 <h2>Translation</h2>
 <p>If you choose a language other than English, the page is translated by Google Translate. Your browser then loads a script from Google, the text of the page is sent to Google to be translated, and Google sets a cookie that remembers the language. If you stay in English, none of this happens.</p>
-${cfg.firebase ? `<h2>Optional Google sign-in</h2>
-<p>You can use every tool without an account. If you choose to sign in with Google, we receive your name, email address and a user ID from Google, and we store your pinned tools, recent tools and calculator settings in Google Firebase so they appear on your other devices. Files and text you process in the tools are still never uploaded. To delete this data, sign in and email us from the same address.</p>` : ''}
+${cfg.firebase ? `<h2>Optional account</h2>
+<p>You can use every tool without an account. If you create one, with Google or with an email address and password, Google Firebase stores your name, email address and a user ID (passwords are handled by Firebase and never seen by us), and we store your pinned tools, recent tools and calculator settings in Google Firebase so they appear on your other devices. Files and text you process in the tools are still never uploaded. To delete this data, sign in and email us from the same address.</p>` : ''}
 <h2>Analytics</h2>
 ${analytics}
 ${adsPolicy}
