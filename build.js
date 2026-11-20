@@ -121,9 +121,16 @@ ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <meta property="og:title" content="${esc(title)}">
 <meta property="og:description" content="${esc(desc)}">
 <meta property="og:url" content="${esc(canonical)}">
-<meta name="twitter:card" content="summary">
+<meta property="og:image" content="${SITE}/assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="${SITE}/assets/og.png">
 ${cfg.googleSiteVerification ? `<meta name="google-site-verification" content="${esc(cfg.googleSiteVerification)}">` : ''}
 <link rel="icon" href="${rel}assets/favicon.svg" type="image/svg+xml">
+<link rel="icon" href="${rel}assets/icon-48.png" type="image/png" sizes="48x48">
+<link rel="icon" href="${rel}assets/icon-192.png" type="image/png" sizes="192x192">
+<link rel="apple-touch-icon" href="${rel}assets/icon-180.png">
 <link rel="stylesheet" href="${rel}assets/style.css">
 <script src="${rel}assets/tools-index.js"></script>
 <script src="${rel}assets/site.js"></script>
@@ -272,8 +279,8 @@ const who = (title, text, slugs) => `<div class="who"><h3>${title}</h3><p>${text
 write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
-  desc: `${tools.length} free online tools: merge PDF, edit PDF text, compress PDF, image compressor, mortgage calculator and more. No sign-up. Files never leave your device.`,
-  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }) + jsonLd({
+  desc: `${tools.length} free online tools: merge PDF, edit PDF text, compress PDF, image compressor, mortgage calculator and more. No sign-up needed. Files never leave your device.`,
+  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, alternateName: 'GetToolNest free online tools', url: SITE + '/', potentialAction: { '@type': 'SearchAction', target: SITE + '/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) + jsonLd({ '@context': 'https://schema.org', '@type': 'Organization', name: cfg.siteName, url: SITE + '/', logo: SITE + '/assets/icon-512.png', email: cfg.contactEmail || undefined }) + jsonLd({
     '@context': 'https://schema.org', '@type': 'FAQPage',
     mainEntity: homeFaq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } }))
   }),

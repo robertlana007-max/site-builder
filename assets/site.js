@@ -371,6 +371,8 @@
     var hero = $('toolSearch');
     if (hero) {
       finder(hero, $('heroResults'));
+      var q = new URLSearchParams(location.search).get('q'); // site search from Google results: /?q=pdf
+      if (q) { hero.value = q.slice(0, 80); hero.dispatchEvent(new Event('input')); hero.focus(); }
       document.addEventListener('click', function (e) { if (!e.target.closest('.finder')) $('heroResults').hidden = true; });
     }
 
