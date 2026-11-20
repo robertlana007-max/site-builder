@@ -2,7 +2,7 @@
 // To add a tool: add an entry here, add its HTML file, then run `node build.js`.
 module.exports = [
   {
-    slug: 'image-compressor', cat: 'Image tools', icon: '🗜️', name: 'Image Compressor',
+    slug: 'image-compressor', cat: 'Image tools', name: 'Image Compressor',
     title: 'Image Compressor - Reduce JPG, PNG & WebP Size Free',
     desc: 'Compress JPG, PNG and WebP images in your browser. Pick the quality, see the size saved and download. No upload, no sign-up.',
     card: 'Shrink JPG, PNG and WebP files without uploading them.',
@@ -15,7 +15,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'image-resizer', cat: 'Image tools', icon: '📐', name: 'Image Resizer',
+    slug: 'image-resizer', cat: 'Image tools', name: 'Image Resizer',
     title: 'Image Resizer - Resize Photos to Any Pixel Size Free',
     desc: 'Resize an image to exact pixel dimensions online. Keep the aspect ratio or set a custom width and height. Runs in your browser.',
     card: 'Change an image to exact pixel dimensions.',
@@ -28,7 +28,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'qr-code-generator', cat: 'Generators', icon: '🔳', name: 'QR Code Generator',
+    slug: 'qr-code-generator', cat: 'Generators', name: 'QR Code Generator',
     title: 'QR Code Generator - Create Free QR Codes Instantly',
     desc: 'Create a QR code for any link or text and download it as a PNG. Free, no sign-up, and the codes never expire.',
     card: 'Turn any link or text into a QR code PNG.',
@@ -41,7 +41,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'password-generator', cat: 'Generators', icon: '🔑', name: 'Password Generator',
+    slug: 'password-generator', cat: 'Generators', name: 'Password Generator',
     title: 'Password Generator - Strong Random Passwords',
     desc: 'Generate strong, random passwords with the length and characters you choose. Created on your device and never stored or sent.',
     card: 'Create strong random passwords on your device.',
@@ -54,7 +54,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'word-counter', cat: 'Text tools', icon: '📝', name: 'Word Counter',
+    slug: 'word-counter', cat: 'Text tools', name: 'Word Counter',
     title: 'Word Counter - Count Words & Characters Online',
     desc: 'Count words, characters, sentences and paragraphs as you type, with an estimated reading time. Free and private.',
     card: 'Count words, characters, sentences and reading time.',
@@ -67,7 +67,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'case-converter', cat: 'Text tools', icon: '🔠', name: 'Case Converter',
+    slug: 'case-converter', cat: 'Text tools', name: 'Case Converter',
     title: 'Case Converter - UPPERCASE, lowercase, Title Case',
     desc: 'Convert text to uppercase, lowercase, title case, sentence case, camelCase, snake_case or kebab-case with one click.',
     card: 'Switch text between upper, lower, title and code cases.',
@@ -80,7 +80,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'json-formatter', cat: 'Developer tools', icon: '🧩', name: 'JSON Formatter',
+    slug: 'json-formatter', cat: 'Developer tools', name: 'JSON Formatter',
     title: 'JSON Formatter & Validator - Beautify or Minify JSON',
     desc: 'Format, validate and minify JSON online. Clear error messages show where the JSON is broken. Your data stays in the browser.',
     card: 'Beautify, validate and minify JSON.',
@@ -93,7 +93,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'age-calculator', cat: 'Calculators', icon: '🎂', name: 'Age Calculator',
+    slug: 'age-calculator', cat: 'Calculators', name: 'Age Calculator',
     title: 'Age Calculator - Exact Age in Years, Months & Days',
     desc: 'Work out an exact age in years, months and days from a date of birth, plus total weeks, total days and days to the next birthday.',
     card: 'Exact age in years, months and days.',
@@ -106,7 +106,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'percentage-calculator', cat: 'Calculators', icon: '％', name: 'Percentage Calculator',
+    slug: 'percentage-calculator', cat: 'Calculators', name: 'Percentage Calculator',
     title: 'Percentage Calculator - Percent Of, Change & Ratio',
     desc: 'Three percentage calculators in one: find X% of a number, what percent one number is of another, and percentage increase or decrease.',
     card: 'Percent of a number, ratio and percentage change.',
@@ -119,7 +119,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'loan-calculator', cat: 'Calculators', icon: '🏦', name: 'Loan Calculator',
+    slug: 'loan-calculator', cat: 'Calculators', name: 'Loan Calculator',
     title: 'Loan & EMI Calculator - Monthly Payment and Interest',
     desc: 'Calculate the monthly payment (EMI), total interest and a yearly breakdown for a mortgage, car loan or personal loan.',
     card: 'Monthly payment, total interest and yearly schedule.',
@@ -132,7 +132,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'bmi-calculator', cat: 'Calculators', icon: '⚖️', name: 'BMI Calculator',
+    slug: 'bmi-calculator', cat: 'Calculators', name: 'BMI Calculator',
     title: 'BMI Calculator - Body Mass Index (Metric & Imperial)',
     desc: 'Calculate your body mass index in metric or imperial units and see the healthy weight range for your height.',
     card: 'Body mass index and healthy weight range.',
@@ -145,7 +145,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'unit-converter', cat: 'Calculators', icon: '🔁', name: 'Unit Converter',
+    slug: 'unit-converter', cat: 'Calculators', name: 'Unit Converter',
     title: 'Unit Converter - Length, Weight, Temperature & More',
     desc: 'Convert length, weight, temperature, area, volume, speed, data and time units instantly. Free and works offline once loaded.',
     card: 'Length, weight, temperature, area, volume and more.',

@@ -71,16 +71,34 @@
       try { localStorage.setItem('theme', next); } catch (e) {}
     });
 
+    // Home page: search box and category pills filter the same grid.
     var search = $('toolSearch');
-    if (search) search.addEventListener('input', function () {
-      var q = search.value.trim().toLowerCase();
-      document.querySelectorAll('.tool-card').forEach(function (c) {
-        c.hidden = q && c.textContent.toLowerCase().indexOf(q) === -1;
+    if (search) {
+      var cat = '';
+      var apply = function () {
+        var q = search.value.trim().toLowerCase();
+        document.querySelectorAll('.cat').forEach(function (s) {
+          var any = false;
+          s.querySelectorAll('.tool-card').forEach(function (c) {
+            var show = (!cat || s.dataset.cat === cat) && (!q || c.textContent.toLowerCase().indexOf(q) !== -1);
+            c.hidden = !show;
+            if (show) any = true;
+          });
+          s.hidden = !any;
+        });
+        $('noResults').hidden = !!document.querySelector('.cat:not([hidden])');
+      };
+      search.addEventListener('input', apply);
+      document.querySelectorAll('.pill').forEach(function (p) {
+        p.addEventListener('click', function () {
+          cat = p.dataset.cat;
+          document.querySelectorAll('.pill').forEach(function (o) {
+            o.classList.toggle('on', o === p);
+            o.setAttribute('aria-pressed', o === p);
+          });
+          apply();
+        });
       });
-      document.querySelectorAll('.cat').forEach(function (s) {
-        s.hidden = !s.querySelector('.tool-card:not([hidden])');
-      });
-      $('noResults').hidden = !!document.querySelector('.tool-card:not([hidden])');
-    });
+    }
   });
 })();

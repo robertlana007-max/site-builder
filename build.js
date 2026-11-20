@@ -14,6 +14,35 @@ const TODAY = new Date().toISOString().slice(0, 10);
 const esc = s => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const jsonLd = o => `<script type="application/ld+json">${JSON.stringify(o).replace(/</g, '\\u003c')}</script>`;
 
+// Inline SVG icons (24x24, stroked with currentColor).
+const svg = p => `<svg class="i" viewBox="0 0 24 24" aria-hidden="true">${p}</svg>`;
+const ICON = {
+  'image-compressor': '<polyline points="4 14 10 14 10 20"/><polyline points="20 10 14 10 14 4"/><path d="M14 10l7-7M3 21l7-7"/>',
+  'image-resizer': '<polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><path d="M21 3l-7 7M3 21l7-7"/>',
+  'qr-code-generator': '<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M21 14v3M14 21h3M21 21h-1v-1"/>',
+  'password-generator': '<circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l3 3M14 9l2 2"/>',
+  'word-counter': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+  'case-converter': '<path d="M4 7V5h16v2M9 19h6M12 5v14"/>',
+  'json-formatter': '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1M16 3h1a2 2 0 0 1 2 2v5a2 2 0 0 0 2 2 2 2 0 0 0-2 2v5a2 2 0 0 1-2 2h-1"/>',
+  'age-calculator': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/>',
+  'percentage-calculator': '<path d="M19 5L5 19"/><circle cx="6.5" cy="6.5" r="2.5"/><circle cx="17.5" cy="17.5" r="2.5"/>',
+  'loan-calculator': '<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M12 3l9 5H3z"/>',
+  'bmi-calculator': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
+  'unit-converter': '<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>',
+  shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
+  zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
+  check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
+  search: '<circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/>',
+  arrow: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  theme: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
+  logo: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>'
+};
+const icon = k => svg(ICON[k]);
+// Hue per category, used to tint icon tiles and card hovers.
+const HUE = { 'Image tools': 262, 'Generators': 160, 'Text tools': 32, 'Developer tools': 205, 'Calculators': 340 };
+const tile = t => `<span class="tile" style="--h:${HUE[t.cat]}">${icon(t.slug)}</span>`;
+
 function write(rel, content) {
   const file = path.join(ROOT, rel);
   fs.mkdirSync(path.dirname(file), { recursive: true });
@@ -26,7 +55,7 @@ function ad(slot) {
 }
 
 // rel = path prefix back to the site root ('' for root pages, '../' for tool pages)
-function layout({ rel, urlPath, title, desc, body, head = '', noindex = false }) {
+function layout({ rel, urlPath, title, desc, body, band = '', head = '', noindex = false }) {
   const canonical = SITE + '/' + urlPath;
   return `<!doctype html>
 <html lang="en">
@@ -53,20 +82,25 @@ ${head}
 </head>
 <body>
 <header class="site-header"><div class="wrap">
-  <a class="logo" href="${rel || './'}">Tool<span>Nest</span></a>
+  ${logo(rel)}
   <nav class="nav">
     <a href="${rel || './'}">All tools</a>
     <a class="hide-s" href="${rel}about/">About</a>
     <a class="hide-s" href="${rel}contact/">Contact</a>
-    <button class="theme-btn" id="themeBtn" aria-label="Switch light or dark theme">◐</button>
+    <button class="theme-btn" id="themeBtn" aria-label="Switch light or dark theme">${icon('theme')}</button>
   </nav>
 </div></header>
+${band ? `<div class="band"><div class="wrap">${band}</div></div>` : ''}
 <main class="wrap">
 ${body}
 </main>
 <footer class="site-footer"><div class="wrap">
-  <div>© ${YEAR} ${esc(cfg.siteName)}. Free tools that run in your browser.</div>
-  <div><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
+  <div class="foot-grid">
+    <div>${logo(rel)}<p>${tools.length} free tools for images, text and everyday maths. Everything runs in your browser.</p></div>
+    ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
+    <div><h2>Site</h2><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
+  </div>
+  <div class="foot-bottom">© ${YEAR} ${esc(cfg.siteName)}. All tools are free to use.</div>
 </div></footer>
 </body>
 </html>
@@ -74,7 +108,14 @@ ${body}
 }
 
 const cats = [...new Set(tools.map(t => t.cat))];
-const card = (t, rel) => `<a class="tool-card" href="${rel}${t.slug}/"><span class="ico" aria-hidden="true">${t.icon}</span><b>${esc(t.name)}</b><small>${esc(t.card)}</small></a>`;
+const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mark">${icon('logo')}</span><span>Tool<em>Nest</em></span></a>`;
+const footCols = [
+  { title: 'Image & generators', items: tools.filter(t => ['Image tools', 'Generators'].includes(t.cat)) },
+  { title: 'Text & developer', items: tools.filter(t => ['Text tools', 'Developer tools'].includes(t.cat)) }
+].concat([{ title: 'Calculators', items: tools.filter(t => t.cat === 'Calculators') }]);
+const card = (t, rel) => `<a class="tool-card" style="--h:${HUE[t.cat]}" href="${rel}${t.slug}/">${tile(t)}<b>${esc(t.name)}</b><small>${esc(t.card)}</small><span class="go">${icon('arrow')}</span></a>`;
+const bySlug = s => tools.find(t => t.slug === s);
+const popular = ['image-compressor', 'qr-code-generator', 'password-generator', 'loan-calculator'].map(bySlug);
 
 // ---------- home ----------
 write('index.html', layout({
@@ -82,27 +123,33 @@ write('index.html', layout({
   title: `${cfg.siteName} - Free Online Tools: Image, Text, Calculators`,
   desc: `${tools.length} free online tools: image compressor, QR code generator, password generator, word counter, loan calculator and more. No sign-up. Files never leave your device.`,
   head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }),
-  body: `<section class="hero">
-  <h1>Free online tools that just work</h1>
-  <p>${tools.length} fast tools for images, text and everyday maths. No sign-up, and your files never leave your device.</p>
-  <input type="search" id="toolSearch" class="search" placeholder="Search tools, e.g. compress image" aria-label="Search tools">
-</section>
+  band: `<section class="hero">
+  <span class="badge"><i></i>${tools.length} tools · 100% free · No sign-up</span>
+  <h1>Free online tools that <span class="grad">just work</span></h1>
+  <p>Compress images, make QR codes, count words and run the numbers. Fast, private and free, right in your browser.</p>
+  <div class="search-box">${icon('search')}<input type="search" id="toolSearch" placeholder="Search tools, e.g. compress image" aria-label="Search tools"></div>
+  <div class="chips">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div>
+  <div class="trust"><span>${icon('check')}Files never leave your device</span><span>${icon('check')}No account needed</span><span>${icon('check')}Works on phone and desktop</span></div>
+</section>`,
+  body: `<div class="pills" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}
-${cats.map(c => `<section class="cat"><h2 class="cat-title">${esc(c)}</h2><div class="grid">${tools.filter(t => t.cat === c).map(t => card(t, '')).join('')}</div></section>`).join('\n')}
+${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)} <small>${list.length}</small></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
 <p class="msg" id="noResults" hidden>No tools match your search.</p>
 ${ad(cfg.adSlotBottom)}
-<section class="prose">
-  <h2>Why use ${esc(cfg.siteName)}?</h2>
-  <p><b>Private by design.</b> Every tool runs inside your browser. Images, text and numbers you enter are processed on your own device and are not uploaded to us.</p>
-  <p><b>Free, with no account.</b> There is nothing to install and nothing to sign up for. Open a tool and use it.</p>
-  <p><b>Works on any device.</b> The tools are built for phones first and work just as well on a laptop.</p>
-</section>`
+<h2 class="section-title">Why people use ${esc(cfg.siteName)}</h2>
+<p class="section-sub">Simple tools without the usual catches.</p>
+<div class="features">
+  <div class="feature"><span class="tile" style="--h:160">${icon('shield')}</span><h3>Private by design</h3><p>Every tool runs inside your browser. Your images, text and numbers are processed on your own device and are not uploaded to us.</p></div>
+  <div class="feature"><span class="tile" style="--h:262">${icon('zap')}</span><h3>Instant results</h3><p>Nothing to install and no waiting for uploads. Open a tool and the answer appears as you type.</p></div>
+  <div class="feature"><span class="tile" style="--h:32">${icon('phone')}</span><h3>Works everywhere</h3><p>Built for phones first, and just as comfortable on a tablet or laptop, in light or dark mode.</p></div>
+</div>
+<section class="cta"><h2>Need a tool that is not here yet?</h2><p>Tell us what would save you time and we will consider building it.</p><a class="btn" href="contact/">Suggest a tool ${icon('arrow')}</a></section>`
 }));
 
 // ---------- tool pages ----------
 for (const t of tools) {
   const body = fs.readFileSync(path.join(ROOT, 'src/tools', t.slug + '.html'), 'utf8');
-  const related = tools.filter(o => o !== t).sort((a, b) => (b.cat === t.cat) - (a.cat === t.cat)).slice(0, 4);
+  const related = tools.filter(o => o !== t).sort((a, b) => (b.cat === t.cat) - (a.cat === t.cat)).slice(0, 6);
   write(`${t.slug}/index.html`, layout({
     rel: '../', urlPath: t.slug + '/',
     title: `${t.title} | ${cfg.siteName}`, desc: t.desc,
@@ -119,22 +166,26 @@ for (const t of tools) {
         { '@type': 'ListItem', position: 2, name: t.name, item: `${SITE}/${t.slug}/` }
       ]
     }),
-    body: `<p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)} › ${esc(t.name)}</p>
-<h1 class="page-title">${esc(t.name)}</h1>
-<p class="lead">${esc(t.intro)}</p>
+    band: `<div class="tool-head">
+  <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)} › ${esc(t.name)}</p>
+  <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
+  <p class="lead">${esc(t.intro)}</p>
+  <div class="tags"><span>${icon('check')}Free</span><span>${icon('check')}No sign-up</span><span>${icon('check')}Runs in your browser</span></div>
+</div>`,
+    body: `<div class="cols">
+<div class="content">
 ${ad(cfg.adSlotTop)}
 <section class="card">
 ${body}
 </section>
 ${ad(cfg.adSlotBottom)}
-<section class="prose">
-  <h2>How to use the ${esc(t.name.toLowerCase())}</h2>
-  <ol>${t.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
-  <h2>Frequently asked questions</h2>
-  ${t.faq.map(([q, a]) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join('\n  ')}
-</section>
-<h2 class="cat-title">More free tools</h2>
-<div class="grid">${related.map(o => card(o, '../')).join('')}</div>`
+<h2>How to use the ${esc(t.name.toLowerCase())}</h2>
+<ol class="steps">${t.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}</ol>
+<h2>Frequently asked questions</h2>
+<div class="faq">${t.faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
+</div>
+<aside class="side"><div class="side-box"><h2>More free tools</h2>${related.map(o => `<a class="side-link" href="../${o.slug}/">${tile(o)}${esc(o.name)}</a>`).join('')}</div></aside>
+</div>`
   }));
 }
 
@@ -190,7 +241,8 @@ ${contact}` },
 for (const p of pages) {
   write(`${p.slug}/index.html`, layout({
     rel: '../', urlPath: p.slug + '/', title: `${p.title} | ${cfg.siteName}`, desc: p.desc,
-    body: `<p class="crumbs"><a href="../">Home</a> › ${esc(p.title)}</p><h1 class="page-title">${esc(p.title)}</h1><section class="prose">${p.html}</section>`
+    band: `<div class="tool-head"><p class="crumbs"><a href="../">Home</a> › ${esc(p.title)}</p><h1 class="page-title">${esc(p.title)}</h1></div>`,
+    body: `<section class="prose">${p.html}</section>`
   }));
 }
 
@@ -198,7 +250,7 @@ for (const p of pages) {
 const base = new URL(SITE + '/').pathname;
 write('404.html', layout({
   rel: base, urlPath: '404.html', title: `Page not found | ${cfg.siteName}`, desc: 'This page does not exist.', noindex: true,
-  body: `<section class="hero"><h1>Page not found</h1><p>That page does not exist. All the tools are on the home page.</p><a class="btn" href="${base}">See all tools</a></section>`
+  body: '', band: `<section class="hero"><h1>Page not found</h1><p>That page does not exist. All the tools are on the home page.</p><a class="btn" href="${base}">See all tools</a></section>`
 }));
 
 // ---------- crawl files ----------
@@ -213,6 +265,6 @@ if (cfg.adsenseClient) {
   write('ads.txt', `google.com, ${cfg.adsenseClient.replace(/^ca-/, '')}, DIRECT, f08c47fec0942fa0\n`);
 }
 write('.nojekyll', '');
-write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect width="64" height="64" rx="14" fill="#3457f5"/><path d="M16 20h32v8H36v20h-8V28H16z" fill="#fff"/></svg>\n`);
+write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M16 20h32v8H36v20h-8V28H16z" fill="#fff"/></svg>\n`);
 
 console.log(`Built ${urls.length} pages for ${SITE}`);
