@@ -329,7 +329,7 @@ write('index.html', layout({
   <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search for a tool, for example “pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
   <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
-  ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>You are not a customer here, you are family.</b> And for us, family is everything. If a tool could work better, or you need a new tool on the website, just send us an email and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
+  ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>You are not a customer here, you are family.</b> And for us, family is everything. Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
   <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
 <section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
@@ -473,6 +473,7 @@ for (const t of tools) {
 ${body}
 </section>
 <p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded.</p>
+${cfg.contactEmail ? `<div class="ask ask-tool"><span class="ask-ic" aria-hidden="true">💌</span><p><b>Want something new added to ${esc(t.name)}?</b> You are family here, not a customer. Email us your idea and we will add it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">Email us</a></div>` : ''}
 ${ad(cfg.adSlotTop)}
 ${guideHtml(t, g)}
 ${ad(cfg.adSlotBottom)}
