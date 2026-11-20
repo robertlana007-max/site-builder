@@ -1504,5 +1504,85 @@ module.exports = [
         ['Can I print the words?', 'Yes. After a test, Print this list prints the words with their meanings and space to practise writing them.']
       ],
       icon: '<path d="M4 20h4L18.5 9.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14 8l3 3M3 6h6M3 10h3"/>'
+  },
+  {
+      slug: 'instagram-grid-maker', cat: 'Social media tools', name: 'Instagram Grid Maker',
+      title: 'Instagram Grid Maker - Split a Photo into 3x3 Tiles Free',
+      desc: 'Split one photo into 3, 6, 9 or 12 portrait 4:5 or square tiles for your Instagram profile grid. Numbered in posting order, ZIP download, no upload.',
+      card: 'Split a photo into a 3×3 profile grid.',
+      intro: 'Cut one picture into 3, 6, 9 or 12 tiles for a big seamless image on your Instagram profile. Drag and zoom to choose what goes in the grid, preview it, and download high quality JPG tiles numbered in posting order.',
+      steps: ['Choose or drop a photo.', 'Pick the grid size (3 × 1 to 3 × 4) and the tile shape: portrait 4:5 or square.', 'Drag and zoom the photo, and check the profile preview.', 'Click Make tiles, download the ZIP, and post tile 1 (bottom right) first.'],
+      faq: [
+        ['In which order do I post the tiles?', 'Post tile 1 first: it is the bottom-right one. The top-left tile is posted last, because each new post appears at the top-left of your profile. The file names are numbered for you.'],
+        ['Should I use 4:5 or square tiles?', 'Portrait 4:5 tiles (1080 × 1350) fill more of the screen in the feed and suit the taller profile grid. Square 1:1 tiles (1080 × 1080) are the classic look.'],
+        ['What does "Line up for the profile grid" do?', 'Profiles show 4:5 posts as slightly narrower 3:4 thumbnails, hiding about 34 px at each side. This option makes neighbouring tiles share those hidden strips, so the picture joins up without breaks.'],
+        ['Is my photo uploaded?', 'No. The photo is cut into tiles in your browser and never leaves your device.'],
+        ['Is this an official Instagram tool?', 'No. It is an independent free tool that makes images for Instagram; it is not affiliated with or endorsed by Instagram or Meta.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'
+  },
+  {
+      slug: 'no-crop-image', cat: 'Social media tools', name: 'No Crop for Instagram',
+      title: 'No Crop for Instagram - Fit Whole Photo, Blur Background',
+      desc: 'Fit your whole photo into a 1:1, 4:5, 9:16 or 16:9 frame without cropping. Blurred, colour, gradient or white background. Batch ZIP, free, private.',
+      card: 'Post whole photos with a blurred or colour frame.',
+      intro: 'Fit the whole photo into a square, portrait, story or landscape frame so nothing gets cut off. Fill the space with a blurred copy of the photo, a colour, a gradient or white, and download 1080 px wide images, one at a time or as a ZIP.',
+      steps: ['Choose or drop one or more photos.', 'Pick the shape: 1:1, 4:5, 9:16 or 16:9.', 'Choose a background and padding.', 'Click Download, or Download all as ZIP for several photos.'],
+      faq: [
+        ['What sizes are the images?', 'All are 1080 px wide: 1080 × 1080 for 1:1, 1080 × 1350 for 4:5, 1080 × 1920 for 9:16 and 1080 × 608 for 16:9.'],
+        ['Can I do many photos at once?', 'Yes. Add as many photos as you like; they all get the same shape and background and download together in one ZIP.'],
+        ['Will my photo lose quality?', 'Photos are scaled to fit 1080 px wide and saved as high quality JPG (92%) or PNG. Large photos stay sharp.'],
+        ['Are my photos uploaded?', 'No. Everything is done in your browser and your photos never leave your device.'],
+        ['Is this made by Instagram?', 'No. It is an independent tool for preparing photos for Instagram and other apps, and is not affiliated with Instagram or Meta.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><rect x="6" y="8" width="12" height="8" rx="1"/><path d="M9 14l2-2 2 2 1-1 2 2"/>'
+  },
+  {
+      slug: 'social-media-image-resizer', cat: 'Social media tools', name: 'Social Media Image Resizer',
+      title: 'Social Media Image Resizer - All Sizes in One Click',
+      desc: 'Resize photos for Instagram, TikTok, YouTube, Facebook, X, LinkedIn, Pinterest and WhatsApp at once. Focus point, no-crop mode, batch ZIP. Free.',
+      card: 'Every social media size from one photo.',
+      intro: 'Turn one photo, or a batch, into the right size for every platform at once: posts, stories, covers, banners, thumbnails and profile pictures. Drag a focus point to keep faces in every crop, or show the whole photo with a background.',
+      steps: ['Choose or drop one or more photos.', 'Tick the sizes you need, or use the quick buttons.', 'Choose fill or show-whole-photo, and drag the focus dot onto the important part.', 'Click Download to get one image or a ZIP of all of them.'],
+      faq: [
+        ['Which sizes are included?', 'Instagram post, portrait, story, reel cover and profile; TikTok cover and profile; YouTube thumbnail, banner and profile; Facebook posts, cover, profile and event; X post, header and profile; LinkedIn post, banner and profile; Pinterest pin; WhatsApp profile and status.'],
+        ['Are these sizes up to date?', 'They are the commonly recommended sizes as of 2026. Platforms change them from time to time and usually accept other sizes too.'],
+        ['What is the focus point?', 'A dot you drag onto the most important part of the photo. When a size has to crop the photo, the crop is moved so that point stays in view.'],
+        ['Can I avoid cropping?', 'Yes. Choose "Show the whole photo" and the empty space is filled with a blurred copy of the photo, a colour or white.'],
+        ['Are my photos uploaded?', 'No. All resizing happens in your browser. This tool is not affiliated with any of the platforms.']
+      ],
+      icon: '<rect x="2" y="7" width="9" height="14" rx="1.5"/><rect x="13" y="3" width="9" height="9" rx="1.5"/><rect x="13" y="15" width="9" height="6" rx="1.5"/>'
+  },
+  {
+      slug: 'youtube-thumbnail-maker', cat: 'Social media tools', name: 'YouTube Thumbnail Maker',
+      title: 'YouTube Thumbnail Maker - Free 1280x720 Editor, No Watermark',
+      desc: 'Make 1280×720 YouTube thumbnails with bold text, photos, arrows, emoji and 6 layouts. Drag, resize, rotate. JPG under 2 MB. Free, no sign-up.',
+      card: 'Design 1280×720 thumbnails with bold text.',
+      intro: 'Design a click-worthy 1280 × 720 video thumbnail in your browser. Start from a layout, add your photos, big outlined text, arrows, circles and emoji, then download a JPG that is always under YouTube\'s 2 MB limit.',
+      steps: ['Pick one of the six starter layouts.', 'Add a background photo or colour, your own photos, and stickers.', 'Tap text to edit it; drag, resize and rotate any layer.', 'Check the video length corner, then click Download JPG.'],
+      faq: [
+        ['What size is the thumbnail?', '1280 × 720 pixels (16:9), the size YouTube recommends. The JPG is always kept under the 2 MB upload limit.'],
+        ['Is there a watermark?', 'No. The thumbnail is entirely yours, with no watermark and no sign-up.'],
+        ['Can I use my own photos?', 'Yes. Use one as the background and add more with "+ Photo". PNG cut-outs with a transparent background look best.'],
+        ['What is the video length area?', 'YouTube shows the video duration in a small badge at the bottom-right of the thumbnail. The overlay shows roughly where it sits so you keep text out of it. It is not part of the download.'],
+        ['Is this an official YouTube tool?', 'No. It is an independent free tool and is not affiliated with YouTube or Google. Your images never leave your device.']
+      ],
+      icon: '<rect x="2" y="5" width="20" height="14" rx="3"/><path d="M10 9.5v5l4.5-2.5z"/><path d="M5 16h4"/>'
+  },
+  {
+      slug: 'profile-picture-maker', cat: 'Social media tools', name: 'Profile Picture Maker',
+      title: 'Profile Picture Maker - Circle PFP with Ring & Curved Text',
+      desc: 'Make a round profile picture with a gradient ring border, colour background and your own curved text badge. 1024 px PNG, transparent or square. Free.',
+      card: 'Round avatar with ring border and curved text.',
+      intro: 'Turn any photo into a round profile picture. Position and zoom your photo, add a colour or gradient background, a ring border and optional curved text on a band, then download a 1024 px PNG.',
+      steps: ['Choose or drop your photo.', 'Drag and zoom to centre your face in the circle.', 'Pick a background, ring colours and width, and optional curved text.', 'Choose circle or square and click Download PNG.'],
+      faq: [
+        ['What size is the picture?', '1024 × 1024 pixels as a PNG. Every platform can shrink it without losing sharpness.'],
+        ['Circle or square: which should I download?', 'Most apps crop profile pictures into a circle themselves, so the square works everywhere. The circle has transparent corners for places that show the image as it is.'],
+        ['Can I add text like a hiring badge?', 'Yes. Type your own short text, up to 40 characters, and it follows the circle on a coloured band at the bottom, the sides or the top.'],
+        ['Does it remove the background of my photo?', 'No. Background removal is not included, so a photo with a plain background works best. Zoom below 100% to show the colour background around your photo.'],
+        ['Is my photo uploaded?', 'No. Everything is drawn in your browser and your photo never leaves your device.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5a6.5 6.5 0 0 1 11 0"/>'
   }
 ];
