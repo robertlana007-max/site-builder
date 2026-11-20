@@ -1809,5 +1809,131 @@ module.exports = [
         ['Does it work offline?', 'Yes, after the page has loaded once. The emoji list is part of the site.']
       ],
       icon: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>'
+  },
+  {
+      slug: 'sleep-calculator', cat: 'Calculators', name: 'Sleep Calculator',
+      title: 'Sleep Calculator - Best Bedtime & Wake-Up Times (Cycles)',
+      desc: 'Find the best time to go to bed or wake up using 90-minute sleep cycles, plus a nap guide. Free, simple and private.',
+      card: 'Best bedtimes and wake-up times by sleep cycles.',
+      intro: 'Enter when you need to wake up to see the best bedtimes, or when you go to bed to see the best wake-up times. Each result fits whole 90-minute sleep cycles plus time to fall asleep.',
+      steps: ['Choose whether you know your wake-up time or your bedtime.', 'Enter the time, or press Now.', 'Adjust the minutes it takes you to fall asleep if needed.', 'Pick one of the recommended times.'],
+      faq: [
+        ['How does the sleep calculator work?', 'It counts in sleep cycles of about 90 minutes and adds the time it takes you to fall asleep (15 minutes by default), so you wake up at the end of a cycle instead of in deep sleep.'],
+        ['How many sleep cycles do I need?', 'Most adults do best with 5 or 6 cycles a night, which is 7.5 to 9 hours. These options are marked as recommended.'],
+        ['What is the best nap length?', 'A 20-minute power nap boosts alertness without grogginess. A 90-minute nap gives a full cycle. Naps of 30 to 60 minutes can leave you groggy for a while.'],
+        ['Are sleep cycles always 90 minutes?', 'No. They range from about 70 to 120 minutes and change through the night, so treat the times as general guidance.'],
+        ['Is this medical advice?', 'No. If you often feel tired or have trouble sleeping, talk to a doctor.']
+      ],
+      icon: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/><path d="M15 4h4l-4 4h4"/>'
+  },
+  {
+      slug: 'water-intake-calculator', cat: 'Calculators', name: 'Water Intake Calculator',
+      title: 'Water Intake Calculator - How Much Water Should I Drink?',
+      desc: 'Work out how much water to drink per day from your weight, exercise, weather and pregnancy, in litres or glasses, with a daily tracker.',
+      card: 'Daily water goal in litres or glasses.',
+      intro: 'Enter your weight and a few details to get a daily water goal in litres, fluid ounces and glasses, then tap glasses in the tracker as you drink.',
+      steps: ['Choose metric or imperial and enter your weight.', 'Add exercise minutes, hot weather or pregnancy if they apply.', 'Read your daily total and number of glasses.', 'Tap a glass in the tracker each time you drink.'],
+      faq: [
+        ['How much water should I drink a day?', 'A common rule is about 35 ml per kg of body weight, so about 2.5 litres for a 70 kg adult, plus more for exercise, heat, pregnancy or breastfeeding.'],
+        ['How much extra for exercise?', 'This calculator adds about 350 ml (12 fl oz) for every 30 minutes of exercise.'],
+        ['Do other drinks and food count?', 'Yes. Tea, coffee, milk, soup, fruit and vegetables all provide water.'],
+        ['Is the tracker saved?', 'Yes, in this browser only, and only for today. It starts again at zero tomorrow and is never uploaded.'],
+        ['Is this medical advice?', 'No. People with heart or kidney conditions, or who have been told to limit fluids, should follow their doctor.']
+      ],
+      icon: '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/><path d="M9.5 15a2.5 2.5 0 0 0 2.5 2.5"/>'
+  },
+  {
+      slug: 'ideal-weight-calculator', cat: 'Calculators', name: 'Ideal Weight Calculator',
+      title: 'Ideal Weight Calculator - Devine, Robinson, Miller, Hamwi',
+      desc: 'Find your ideal body weight from height and sex with the Devine, Robinson, Miller and Hamwi formulas, plus the healthy BMI weight range.',
+      card: 'Ideal weight by 4 formulas and healthy BMI range.',
+      intro: 'Enter your height and sex to compare four ideal weight formulas and see the weight range that gives a healthy BMI for your height.',
+      steps: ['Choose metric or imperial units.', 'Choose your sex and enter your height.', 'Compare the four formulas and the healthy BMI range.'],
+      faq: [
+        ['What is the most accurate ideal weight formula?', 'None is perfect. They only use height and sex. The average of the four and the healthy BMI range give a more balanced picture.'],
+        ['What is the Devine formula?', 'Men: 50 kg plus 2.3 kg per inch over 5 feet. Women: 45.5 kg plus 2.3 kg per inch over 5 feet. It is widely used for medicine doses.'],
+        ['What is a healthy BMI weight range?', 'The weights that give a BMI from 18.5 to 24.9 for your height.'],
+        ['Does it work for people under 5 feet?', 'The formulas were designed for 5 feet and taller. Results below that are extended and marked as less reliable.'],
+        ['Does it consider muscle or age?', 'No. Muscular people can be healthy above these numbers. Talk to a doctor for personal advice.']
+      ],
+      icon: '<path d="M5 20h14l-1.5-11h-11z"/><circle cx="12" cy="5.5" r="2.5"/><path d="M12 13l2-2"/>'
+  },
+  {
+      slug: 'body-fat-calculator', cat: 'Calculators', name: 'Body Fat Calculator',
+      title: 'Body Fat Calculator - US Navy Method & BMI Estimate',
+      desc: 'Estimate body fat percentage with the US Navy tape measure method or from BMI, with ACE categories, fat mass and lean mass. Metric or imperial.',
+      card: 'Body fat % by US Navy tape measure method.',
+      intro: 'Measure your neck and waist (and hips for women) to estimate body fat with the US Navy method, or get a quick estimate from your BMI and age.',
+      steps: ['Choose units and sex, then enter height, weight and age.', 'Measure and enter your neck and waist (and hips for women).', 'Read your body fat, ACE category, fat mass and lean mass.', 'Compare with the BMI-based estimate.'],
+      faq: [
+        ['How accurate is the US Navy method?', 'With careful measuring it is usually within about 3 to 4 percentage points of lab methods.'],
+        ['Where should I measure?', 'Neck just below the voice box. Waist at the navel for men and at the narrowest point for women. Hips at the widest point.'],
+        ['What is a healthy body fat percentage?', 'By ACE ranges, fitness level is 14 to 17% for men and 21 to 24% for women; average is 18 to 24% for men and 25 to 31% for women.'],
+        ['What is the BMI-based estimate?', 'The Deurenberg formula: 1.2 × BMI + 0.23 × age − 10.8 × sex − 5.4 (sex is 1 for men, 0 for women). It is a rough estimate for adults.'],
+        ['Is this medical advice?', 'No. The results are estimates for general information.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6.4 6.4"/>'
+  },
+  {
+      slug: 'love-calculator', cat: 'Generators', name: 'Love Calculator',
+      title: 'Love Calculator - Test Your Love Match Percentage (Fun)',
+      desc: 'Type two names to get a playful love match percentage with a fun message and animated heart. Just for fun; names stay on your device.',
+      card: 'Playful love match % for two names.',
+      intro: 'Type two names and press Calculate love to get a fun love percentage. It is just a game: the same names always give the same result, and nothing is saved.',
+      steps: ['Type your name and their name.', 'Press Calculate love.', 'Read the score and message, then copy or share it.'],
+      faq: [
+        ['Is the love calculator real?', 'No, it is just for fun. The score comes from the letters of the names, not from any science.'],
+        ['Why do I always get the same result?', 'The names are turned into a number with a hash, so the same pair always gives the same score, in either order.'],
+        ['Do capitals or spaces change the result?', 'No. Capitals, spaces and punctuation are ignored.'],
+        ['Are the names saved or sent?', 'No. The names stay in your browser and are not saved.']
+      ],
+      icon: '<path d="M12 20s-7-4.4-7-10a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 5.6-7 10-7 10z"/><path d="M9 11h6M12 8v6"/>'
+  },
+  {
+      slug: 'random-team-generator', cat: 'Generators', name: 'Random Team Generator',
+      title: 'Random Team Generator - Split Names into Fair Teams',
+      desc: 'Split a list of names into random teams by number of teams or team size, with optional skill balancing, team colours, copy and print.',
+      card: 'Split names into fair random teams.',
+      intro: 'Paste a list of names and split them into fair random teams. Add skill numbers to balance the teams, then copy or print them.',
+      steps: ['Enter names, one per line (add ", 8" for skill if you like).', 'Choose number of teams or people per team.', 'Press Make teams.', 'Copy or print the teams.'],
+      faq: [
+        ['Is it really random?', 'Yes. Names are shuffled with your browser\'s cryptographic random generator, so every arrangement is equally likely.'],
+        ['How does skill balancing work?', 'Add a number after a comma, like "Alice, 8". The strongest players are placed first, each into the weakest team among those with the fewest players.'],
+        ['What if the names do not divide evenly?', 'Team sizes never differ by more than one.'],
+        ['Is my list saved?', 'Only in this browser, while "Remember my list on this device" is ticked. It is never uploaded.'],
+        ['How many names can I use?', 'Up to 2,000 names.']
+      ],
+      icon: '<circle cx="8" cy="8" r="3"/><circle cx="16" cy="8" r="3"/><path d="M2.5 19a5.5 5.5 0 0 1 11 0M10.5 19a5.5 5.5 0 0 1 11 0"/>'
+  },
+  {
+      slug: 'text-repeater', cat: 'Text tools', name: 'Text Repeater',
+      title: 'Text Repeater - Repeat Text or Emoji Many Times Online',
+      desc: 'Repeat any text, word or emoji up to millions of times with new line, space, comma or custom separators and numbering. Copy or download.',
+      card: 'Repeat text many times with any separator.',
+      intro: 'Type some text, choose how many times to repeat it and what goes between each copy, then copy the result or download it as a text file.',
+      steps: ['Type the text to repeat.', 'Enter how many times and choose a separator.', 'Tick numbering if you want it.', 'Copy the result or download it as .txt.'],
+      faq: [
+        ['How many times can I repeat text?', 'Results up to 100,000 characters appear instantly. Larger results, up to 5,000,000 characters, are made after you confirm.'],
+        ['Can I use my own separator?', 'Yes. Choose Custom and type it; \\n adds a new line and \\t a tab.'],
+        ['Can I number each copy?', 'Yes. Tick "Number each copy" to get 1., 2., 3. and so on.'],
+        ['Is my text uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<rect x="4" y="3" width="11" height="5" rx="1"/><rect x="4" y="10" width="11" height="5" rx="1"/><path d="M4 17h11M18 6v12l2-2M18 18l-2-2"/>'
+  },
+  {
+      slug: 'password-strength-checker', cat: 'Generators', name: 'Password Strength Checker',
+      title: 'Password Strength Checker - Test How Secure It Is',
+      desc: 'Check password strength privately in your browser: common passwords, words, keyboard patterns, dates and crack time estimates. Nothing is sent.',
+      card: 'See how strong a password is, privately.',
+      intro: 'Type a password to see how hard it is to guess and how long it would take to crack. The check runs only on your device; your password is never sent or saved.',
+      steps: ['Type a password into the box.', 'Read the strength meter and crack times.', 'See which patterns were found.', 'Follow the tips to make it stronger.'],
+      faq: [
+        ['Is it safe to type my password here?', 'Yes. The check runs entirely in your browser. Nothing is sent, saved or logged, and the page works offline. Even so, consider testing a similar password rather than your real one.'],
+        ['How is strength measured?', 'It looks for common passwords, words, names, keyboard patterns, repeats, sequences, dates and look-alike swaps, then estimates how many guesses an attacker would need.'],
+        ['What is the difference between raw and real-world entropy?', 'Raw entropy assumes every character is random. Real-world entropy accounts for the patterns found, which is what attackers exploit.'],
+        ['Why is P@ssw0rd weak?', 'It is the common password "password" with well-known swaps. Cracking tools try these first.'],
+        ['What makes a strong password?', 'Length and unpredictability: 4 or more random words, or 16+ random characters from a password manager. Use a different password for every site.']
+      ],
+      icon: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M9 16l2 2 4-4"/>'
   }
 ];
