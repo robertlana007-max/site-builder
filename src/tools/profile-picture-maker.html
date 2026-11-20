@@ -1,0 +1,227 @@
+<style>
+.pp-wrap { display: grid; grid-template-columns: minmax(0, 340px) minmax(0, 1fr); gap: 18px; align-items: start; margin-bottom: 8px; }
+@media (max-width: 700px) { .pp-wrap { grid-template-columns: minmax(0, 1fr); } }
+.pp-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 50% / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.pp-stage canvas { display: block; width: 100%; max-width: 316px; height: auto; margin: 0 auto; touch-action: none; cursor: grab; border-radius: 4px; }
+.pp-stage canvas.grabbing { cursor: grabbing; }
+.pp-stage canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pp-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; text-align: center; }
+.pp-sec { font-size: 15px; margin: 4px 0 10px; }
+.pp-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+.pp-wrap .fields { grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.pp-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
+.pp-presets button { width: 36px; height: 36px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.pp-presets button:hover { border-color: var(--accent); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop your photo here</b>Or paste one with Ctrl+V. Your photo never leaves your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="pp-wrap">
+  <div>
+    <div class="pp-stage">
+      <canvas id="ppCv" width="1024" height="1024" tabindex="0" aria-label="Profile picture preview. Drag to move your photo, use two fingers or the zoom slider to zoom. Arrow keys move it too."></canvas>
+    </div>
+    <p class="pp-hint">Drag the photo to position it. Pinch or use the slider to zoom.</p>
+    <div style="margin-top:10px"><label for="ppZoom">Zoom: <span id="ppZoomV">100</span>%</label><input type="range" id="ppZoom" min="50" max="400" value="100" data-nomemo></div>
+  </div>
+  <div>
+    <h3 class="pp-sec">Background</h3>
+    <div class="fields">
+      <div><label for="ppBg">Type</label><select id="ppBg"><option value="grad">Gradient</option><option value="color">Solid colour</option></select></div>
+      <div class="pp-col"><label for="ppC1">Colour 1</label><input type="color" id="ppC1" value="#a5f3fc"></div>
+      <div class="pp-col" id="ppC2Box"><label for="ppC2">Colour 2</label><input type="color" id="ppC2" value="#6366f1"></div>
+    </div>
+    <h3 class="pp-sec">Ring border</h3>
+    <div class="pp-presets" id="ppPresets" aria-label="Ring colour ideas"></div>
+    <div class="fields">
+      <div><label for="ppRingW">Width: <span id="ppRingWV">40</span> px</label><input type="range" id="ppRingW" min="0" max="140" value="40"></div>
+      <div><label for="ppRing">Colours</label><select id="ppRing"><option value="grad">Gradient (2 colours)</option><option value="solid">Solid</option><option value="rainbow">Rainbow</option></select></div>
+      <div class="pp-col"><label for="ppR1">Ring colour 1</label><input type="color" id="ppR1" value="#f59e0b"></div>
+      <div class="pp-col" id="ppR2Box"><label for="ppR2">Ring colour 2</label><input type="color" id="ppR2" value="#db2777"></div>
+      <div><label for="ppGap">Gap: <span id="ppGapV">12</span> px</label><input type="range" id="ppGap" min="0" max="60" value="12"></div>
+      <div class="pp-col"><label for="ppGapCol">Gap colour</label><input type="color" id="ppGapCol" value="#ffffff"></div>
+    </div>
+    <h3 class="pp-sec">Curved text (optional)</h3>
+    <div class="fields">
+      <div style="grid-column:1/-1"><label for="ppText">Text</label><input type="text" id="ppText" maxlength="40" placeholder="e.g. #HIRING or #AVAILABLE" autocomplete="off"></div>
+      <div><label for="ppPos">Position</label><select id="ppPos"><option value="135">Bottom left</option><option value="90">Bottom</option><option value="45">Bottom right</option><option value="-90">Top</option></select></div>
+      <div><label for="ppTSize">Text size: <span id="ppTSizeV">62</span></label><input type="range" id="ppTSize" min="30" max="100" value="62"></div>
+      <div class="pp-col"><label for="ppTCol">Text colour</label><input type="color" id="ppTCol" value="#ffffff"></div>
+      <div class="pp-col"><label for="ppBand">Band colour</label><input type="color" id="ppBand" value="#16a34a"></div>
+    </div>
+    <div class="checks"><label><input type="checkbox" id="ppBandOn" checked> Coloured band behind the text</label></div>
+    <div class="fields">
+      <div><label for="ppShape">Download shape</label><select id="ppShape"><option value="circle">Circle on transparent background</option><option value="square">Square</option></select></div>
+    </div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" type="button" disabled>Download PNG</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var S = 1024, C = S / 2, R = S / 2, cv = $('ppCv'), ctx = cv.getContext('2d');
+  var img = null, name = 'profile', zoom = 1, ox = 0, oy = 0;
+  var PRESETS = [['#f59e0b', '#db2777', 'grad'], ['#22c55e', '#0ea5e9', 'grad'], ['#6366f1', '#a855f7', 'grad'], ['#111111', '#111111', 'solid'], ['#ffffff', '#ffffff', 'solid'], ['#ef4444', '#ef4444', 'rainbow']];
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function v(id) { return $(id).value; }
+
+  function geo() { var rw = +v('ppRingW'), gap = rw ? +v('ppGap') : 0; return { rw: rw, gap: gap, rp: R - rw - gap }; }
+  function photoRect(g) {
+    var s = Math.max(2 * g.rp / img.width, 2 * g.rp / img.height) * zoom, w = img.width * s, h = img.height * s;
+    var lx = Math.abs(w / 2 - g.rp), ly = Math.abs(h / 2 - g.rp);
+    ox = Math.max(-lx, Math.min(lx, ox)); oy = Math.max(-ly, Math.min(ly, oy));
+    return { x: C - w / 2 + ox, y: C - h / 2 + oy, w: w, h: h };
+  }
+  function ringPaint(c) {
+    var mode = v('ppRing');
+    if (mode === 'solid') return v('ppR1');
+    if (mode === 'rainbow') {
+      var cols = ['#ff004c', '#ff8a00', '#ffe600', '#22c55e', '#06b6d4', '#6366f1', '#d946ef', '#ff004c'], g;
+      if (c.createConicGradient) g = c.createConicGradient(-Math.PI / 2, C, C);
+      else g = c.createLinearGradient(0, 0, S, S);
+      cols.forEach(function (k, i) { g.addColorStop(i / (cols.length - 1), k); });
+      return g;
+    }
+    var lg = c.createLinearGradient(0, 0, S, S); lg.addColorStop(0, v('ppR1')); lg.addColorStop(1, v('ppR2')); return lg;
+  }
+  function bgPaint(c) {
+    if (v('ppBg') === 'color') return v('ppC1');
+    var g = c.createLinearGradient(0, 0, 0, S); g.addColorStop(0, v('ppC1')); g.addColorStop(1, v('ppC2')); return g;
+  }
+  // Text along the circle. Characters are placed one by one so they follow the curve.
+  function curvedText(c, g) {
+    var t = v('ppText').trim(); if (!t) return;
+    var size = +v('ppTSize'), bt = size * 1.55, rb = g.rp - bt / 2, mid = +v('ppPos') * Math.PI / 180, top = Math.sin(mid) < 0;
+    c.font = '800 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+    var sp = size * 0.06, widths = Array.from(t).map(function (ch) { return c.measureText(ch).width + sp; });
+    var total = widths.reduce(function (a, b) { return a + b; }, 0) - sp, span = total / rb;
+    if (span > Math.PI * 1.6) { // too long for the circle: shrink to fit
+      var k = Math.PI * 1.6 / span; size *= k; bt = size * 1.55; rb = g.rp - bt / 2;
+      c.font = '800 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+      widths = Array.from(t).map(function (ch) { return c.measureText(ch).width + size * 0.06; });
+      total = widths.reduce(function (a, b) { return a + b; }, 0) - size * 0.06; span = total / rb;
+    }
+    if ($('ppBandOn').checked) {
+      var pad = Math.min(0.35, 0.12 + bt / rb * 0.4), a0 = mid - span / 2 - pad, a1 = mid + span / 2 + pad;
+      c.save(); c.beginPath(); c.arc(C, C, g.rp, 0, Math.PI * 2); c.clip();
+      c.strokeStyle = v('ppBand'); c.lineWidth = bt; c.lineCap = 'round';
+      c.beginPath(); c.arc(C, C, rb, a0, a1); c.stroke(); c.restore();
+    }
+    c.save(); c.fillStyle = v('ppTCol'); c.textAlign = 'center'; c.textBaseline = 'middle';
+    var a = top ? mid - span / 2 : mid + span / 2;
+    Array.from(t).forEach(function (ch, i) {
+      var w = widths[i] - (i === widths.length - 1 ? 0 : 0), half = (widths[i] - size * 0.06) / 2 / rb;
+      var at = top ? a + half : a - half;
+      c.save(); c.translate(C + Math.cos(at) * rb, C + Math.sin(at) * rb); c.rotate(top ? at + Math.PI / 2 : at - Math.PI / 2);
+      c.fillText(ch, 0, size * 0.04); c.restore();
+      a = top ? a + w / rb : a - w / rb;
+    });
+    c.restore();
+  }
+  function silhouette(c, g) {
+    c.fillStyle = 'rgba(255,255,255,.75)';
+    c.beginPath(); c.arc(C, C - g.rp * 0.18, g.rp * 0.32, 0, Math.PI * 2); c.fill();
+    c.beginPath(); c.ellipse(C, C + g.rp * 0.72, g.rp * 0.62, g.rp * 0.5, 0, Math.PI, 0); c.fill();
+  }
+  function render(c, square, preview) {
+    var g = geo();
+    c.clearRect(0, 0, S, S);
+    if (square) { c.fillStyle = bgPaint(c); c.fillRect(0, 0, S, S); }
+    c.save(); c.beginPath(); c.arc(C, C, g.rp, 0, Math.PI * 2); c.clip();
+    c.fillStyle = bgPaint(c); c.fillRect(0, 0, S, S);
+    if (img) { var p = photoRect(g); c.imageSmoothingQuality = 'high'; c.drawImage(img, p.x, p.y, p.w, p.h); }
+    else if (preview) silhouette(c, g);
+    c.restore();
+    curvedText(c, g);
+    if (g.rw) {
+      if (g.gap) { c.strokeStyle = v('ppGapCol'); c.lineWidth = g.gap + 1; c.beginPath(); c.arc(C, C, g.rp + g.gap / 2, 0, Math.PI * 2); c.stroke(); }
+      c.strokeStyle = ringPaint(c); c.lineWidth = g.rw; c.beginPath(); c.arc(C, C, R - g.rw / 2, 0, Math.PI * 2); c.stroke();
+    }
+  }
+  function draw() {
+    $('ppC2Box').hidden = v('ppBg') !== 'grad'; $('ppR2Box').hidden = v('ppRing') !== 'grad';
+    ['ppRingW', 'ppGap', 'ppTSize', 'ppZoom'].forEach(function (id) { $(id + 'V').textContent = v(id); });
+    render(ctx, v('ppShape') === 'square', true);
+    $('dl').hidden = true;
+  }
+
+  function take(f) {
+    if (!f || !/^image\//.test(f.type)) { say('bad', 'Please choose an image file (JPG, PNG, WebP or GIF).'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read that image. HEIC photos from an iPhone must be converted to JPG first.'); return; }
+      // keep a copy no bigger than needed, so dragging stays smooth on phones
+      var k = Math.min(1, 2400 / Math.max(im.naturalWidth, im.naturalHeight)), c = document.createElement('canvas');
+      c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      var x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, c.width, c.height);
+      img = c; name = (f.name || 'profile').replace(/\.[^.]+$/, '') || 'profile';
+      zoom = 1; ox = oy = 0; $('ppZoom').value = 100; $('go').disabled = false;
+      say('', Math.min(im.naturalWidth, im.naturalHeight) < 500 ? 'Your photo is quite small (' + im.naturalWidth + ' × ' + im.naturalHeight + ' px), so the 1024 px result may look a little soft.' : 'Drag the photo to centre your face, then pick a ring and text.');
+      draw();
+    });
+  }
+  setupDrop('drop', 'file', function (f) { $('file').value = ''; take(f); });
+  document.addEventListener('paste', function (e) {
+    var f = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (f && /^image\//.test(f.type)) take(f);
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.pp-wrap input, .pp-wrap select'), function (el) {
+    el.addEventListener('input', draw); el.addEventListener('change', draw);
+  });
+  $('ppZoom').addEventListener('input', function () { zoom = v('ppZoom') / 100; draw(); });
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.type = 'button';
+    b.style.background = p[2] === 'rainbow' ? 'conic-gradient(#ff004c, #ff8a00, #ffe600, #22c55e, #06b6d4, #6366f1, #d946ef, #ff004c)' : 'linear-gradient(135deg,' + p[0] + ',' + p[1] + ')';
+    b.setAttribute('aria-label', p[2] === 'rainbow' ? 'Rainbow ring' : 'Ring ' + p[0] + (p[0] !== p[1] ? ' to ' + p[1] : ''));
+    b.addEventListener('click', function () {
+      $('ppRing').value = p[2]; $('ppR1').value = p[0]; $('ppR2').value = p[1];
+      if (!+v('ppRingW')) $('ppRingW').value = 40;
+      ['ppRing', 'ppR1', 'ppR2', 'ppRingW'].forEach(function (id) { $(id).dispatchEvent(new Event('change', { bubbles: true })); });
+    });
+    $('ppPresets').appendChild(b);
+  });
+
+  // drag and pinch
+  var pts = {}, pinch = null;
+  cv.addEventListener('pointerdown', function (e) {
+    if (!img) return;
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    cv.classList.add('grabbing');
+    var ids = Object.keys(pts);
+    if (ids.length === 2) { var a = pts[ids[0]], b = pts[ids[1]]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom }; }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    var q = pts[e.pointerId]; if (!q) return;
+    var k = S / cv.getBoundingClientRect().width, dx = (e.clientX - q.x) * k, dy = (e.clientY - q.y) * k;
+    q.x = e.clientX; q.y = e.clientY;
+    var ids = Object.keys(pts);
+    if (ids.length >= 2 && pinch) {
+      var a = pts[ids[0]], b = pts[ids[1]];
+      zoom = Math.min(4, Math.max(0.5, pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d)); $('ppZoom').value = Math.round(zoom * 100);
+    } else { ox += dx; oy += dy; }
+    draw();
+  });
+  function up(e) { if (!pts[e.pointerId]) return; delete pts[e.pointerId]; pinch = null; if (!Object.keys(pts).length) cv.classList.remove('grabbing'); }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('keydown', function (e) {
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || !img) return; e.preventDefault();
+    var s = e.shiftKey ? 40 : 8; ox += d[0] * s; oy += d[1] * s; draw();
+  });
+
+  $('go').addEventListener('click', function () {
+    if (!img) return;
+    var c = document.createElement('canvas'); c.width = c.height = S;
+    var sq = v('ppShape') === 'square';
+    render(c.getContext('2d'), sq, false);
+    $('go').disabled = true;
+    PT.blob(c, 'image/png').then(function (b) {
+      if (!b) throw new Error('Your browser could not create the PNG.');
+      var fn = name + '-profile-' + (sq ? 'square' : 'circle') + '.png';
+      PT.done(b, fn, 'image/png', '1024 × 1024 PNG' + (sq ? '' : ' with a transparent corner area'));
+      $('dl').textContent = 'Save ' + fn; $('dl').click(); burst($('go'));
+    }).catch(function (e) { say('bad', e.message || 'Something went wrong.'); }).then(function () { $('go').disabled = false; });
+  });
+  draw();
+})();
+</script>

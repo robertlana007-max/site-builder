@@ -1,0 +1,293 @@
+<style>
+.cm-tray { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 12px; }
+.cm-tray:empty { display: none; }
+.cm-th { position: relative; flex: none; width: 68px; height: 68px; border: 2px solid var(--line); border-radius: 10px; padding: 0; background: var(--bg) center / cover no-repeat; cursor: grab; }
+.cm-th[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.cm-th.used::before { content: '✓'; position: absolute; bottom: 2px; inset-inline-start: 2px; width: 20px; height: 20px; border-radius: 99px; background: var(--accent); color: var(--on-accent); font-size: 12px; line-height: 20px; text-align: center; }
+.cm-th span { position: absolute; top: 2px; inset-inline-end: 2px; width: 24px; height: 24px; border-radius: 99px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 24px; text-align: center; cursor: pointer; }
+.cm-lays { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 8px; margin-bottom: 16px; }
+.cm-lays button { aspect-ratio: 1; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); padding: 6px; cursor: pointer; }
+.cm-lays button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.cm-lays svg { width: 100%; height: 100%; display: block; }
+.cm-lays rect { fill: var(--muted); opacity: .55; }
+.cm-lays button[aria-pressed="true"] rect { fill: var(--accent); opacity: .8; }
+.cm-stage { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 12px; user-select: none; -webkit-user-select: none; }
+.cm-stage canvas { display: block; margin: 0 auto; max-width: 100%; max-height: 70vh; touch-action: none; cursor: grab; }
+.cm-cell { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin-bottom: 14px; }
+.cm-cell .btns { margin: 0 0 12px; }
+.cm-cell .btn { min-height: 40px; padding: 6px 12px; }
+.cm-tip { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+.cm-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop 2 to 9 photos here</b>JPG, PNG or WebP. Everything stays on your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="cm-tray" id="tray" aria-label="Your photos"></div>
+<div id="editor" hidden>
+  <div class="fields"><div><label for="cnt">Layouts for</label><select id="cnt" data-nomemo><option value="2">2 photos</option><option value="3">3 photos</option><option value="4">4 photos</option><option value="5">5 photos</option><option value="6">6 photos</option><option value="7">7 photos</option><option value="8">8 photos</option><option value="9">9 photos</option><option value="all">All layouts</option></select></div></div>
+  <div class="cm-lays" id="lays" role="group" aria-label="Layouts"></div>
+  <p class="cm-tip" id="tip">Drag a photo to move it inside its frame. Use the zoom slider, the mouse wheel or two fingers to zoom. Drag a thumbnail onto a frame to put it there.</p>
+  <div class="cm-stage"><canvas id="cv" aria-label="Collage preview. Click a frame to select it."></canvas></div>
+  <div class="cm-cell" id="cellPanel" hidden>
+    <div class="fields"><div><label for="zoom">Zoom selected photo: <span id="zoomV">100</span>%</label><input type="range" id="zoom" min="100" max="400" value="100" data-nomemo></div></div>
+    <div class="btns"><button class="btn ghost" id="swap" type="button">⇄ Swap with another frame</button><button class="btn ghost" id="resetCell" type="button">Reset position</button><button class="btn ghost" id="clearCell" type="button">Empty this frame</button></div>
+  </div>
+  <div class="fields cm-col">
+    <div><label for="ratio">Canvas shape</label><select id="ratio"><option value="1">Square 1:1</option><option value="0.8">Instagram portrait 4:5</option><option value="0.5625">Story 9:16</option><option value="1.7777778">Wide 16:9</option><option value="1.5">Photo 3:2</option><option value="0.7070707">A4 portrait</option><option value="1.4142857">A4 landscape</option></select></div>
+    <div><label for="gap">Spacing: <span id="gapV">2</span>%</label><input type="range" id="gap" min="0" max="8" step="0.25" value="2"></div>
+    <div><label for="rad">Corner rounding: <span id="radV">0</span>%</label><input type="range" id="rad" min="0" max="20" step="0.5" value="0"></div>
+    <div><label for="bgc">Background colour</label><input type="color" id="bgc" value="#ffffff"></div>
+    <div><label for="size">Export size (long side)</label><select id="size"><option value="1080">1080 px (social media)</option><option value="2000" selected>2000 px</option><option value="3000">3000 px (print)</option></select></div>
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option></select></div>
+    <div id="qRow"><label for="q">Quality: <span id="qv">92</span>%</label><input type="range" id="q" min="50" max="100" value="92"></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="border" checked> Spacing around the outside edge too</label></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download collage</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  // Layouts on a grid: "cols rows | x y w h, ..." in grid units.
+  var RAW = [
+    '2 1|0 0 1 1,1 0 1 1', '1 2|0 0 1 1,0 1 1 1', '3 1|0 0 2 1,2 0 1 1', '1 3|0 0 1 2,0 2 1 1',
+    '3 1|0 0 1 1,1 0 1 1,2 0 1 1', '1 3|0 0 1 1,0 1 1 1,0 2 1 1', '2 2|0 0 1 2,1 0 1 1,1 1 1 1', '2 2|0 0 2 1,0 1 1 1,1 1 1 1', '2 2|0 0 1 1,1 0 1 1,0 1 2 1', '3 2|0 0 2 2,2 0 1 1,2 1 1 1',
+    '2 2|0 0 1 1,1 0 1 1,0 1 1 1,1 1 1 1', '3 3|0 0 2 3,2 0 1 1,2 1 1 1,2 2 1 1', '3 3|0 0 3 2,0 2 1 1,1 2 1 1,2 2 1 1', '4 1|0 0 1 1,1 0 1 1,2 0 1 1,3 0 1 1', '3 2|0 0 2 1,2 0 1 1,0 1 1 1,1 1 2 1',
+    '6 2|0 0 3 1,3 0 3 1,0 1 2 1,2 1 2 1,4 1 2 1', '2 4|0 0 1 4,1 0 1 1,1 1 1 1,1 2 1 1,1 3 1 1', '3 3|0 0 2 2,2 0 1 1,2 1 1 1,0 2 1 1,1 2 2 1', '4 2|0 0 2 2,2 0 1 1,3 0 1 1,2 1 1 1,3 1 1 1',
+    '3 2|0 0 1 1,1 0 1 1,2 0 1 1,0 1 1 1,1 1 1 1,2 1 1 1', '2 3|0 0 1 1,1 0 1 1,0 1 1 1,1 1 1 1,0 2 1 1,1 2 1 1', '3 3|0 0 2 2,2 0 1 1,2 1 1 1,0 2 1 1,1 2 1 1,2 2 1 1', '4 3|0 0 2 2,2 0 2 1,2 1 2 1,0 2 1 1,1 2 1 1,2 2 2 1',
+    '12 2|0 0 4 1,4 0 4 1,8 0 4 1,0 1 3 1,3 1 3 1,6 1 3 1,9 1 3 1', '3 3|0 0 2 2,2 0 1 1,2 1 1 1,0 2 1 1,1 2 1 1,2 2 1 1', '4 3|0 0 2 2,2 0 1 1,3 0 1 1,2 1 1 1,3 1 1 1,0 2 2 1,2 2 2 1',
+    '4 2|0 0 1 1,1 0 1 1,2 0 1 1,3 0 1 1,0 1 1 1,1 1 1 1,2 1 1 1,3 1 1 1', '4 4|0 0 2 2,2 0 1 1,3 0 1 1,2 1 1 1,3 1 1 1,0 2 2 2,2 2 1 2,3 2 1 2', '4 3|0 0 4 1,0 1 1 1,1 1 1 1,2 1 1 1,3 1 1 1,0 2 2 1,2 2 1 1,3 2 1 1',
+    '3 3|0 0 1 1,1 0 1 1,2 0 1 1,0 1 1 1,1 1 1 1,2 1 1 1,0 2 1 1,1 2 1 1,2 2 1 1', '4 4|0 0 2 2,2 0 1 1,3 0 1 1,2 1 1 1,3 1 1 1,0 2 1 1,1 2 1 1,0 3 1 1,1 3 1 1', '4 4|1 1 2 2,0 0 2 1,2 0 2 1,0 1 1 2,3 1 1 2,0 3 1 1,1 3 1 1,2 3 1 1,3 3 1 1'
+  ];
+  // the '3 3' with 6 frames appears twice above by design? no: keep the list unique
+  var LAYOUTS = [], seen = {};
+  RAW.forEach(function (s) {
+    if (seen[s]) return; seen[s] = 1;
+    var p = s.split('|'), g = p[0].split(' ').map(Number);
+    LAYOUTS.push(p[1].split(',').map(function (c) { var v = c.split(' ').map(Number); return [v[0] / g[0], v[1] / g[1], v[2] / g[0], v[3] / g[1]]; }));
+  });
+
+  var photos = [], cells = [], lay = null, sel = -1, swapping = false, pickPhoto = -1, busy = false, cv = $('cv');
+  function say(c, t) { PT.say(c, t); }
+
+  // ---------- layout picker ----------
+  function laysUi() {
+    var box = $('lays'), want = $('cnt').value; box.innerHTML = '';
+    LAYOUTS.forEach(function (L, k) {
+      if (want !== 'all' && L.length !== +want) return;
+      var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-pressed', L === lay);
+      b.setAttribute('aria-label', 'Layout with ' + L.length + ' photos, option ' + (k + 1));
+      b.innerHTML = '<svg viewBox="0 0 100 100" aria-hidden="true">' + L.map(function (c) { return '<rect x="' + (c[0] * 100 + 2) + '" y="' + (c[1] * 100 + 2) + '" width="' + (c[2] * 100 - 4) + '" height="' + (c[3] * 100 - 4) + '" rx="3"/>'; }).join('') + '</svg>';
+      b.addEventListener('click', function () { setLayout(L); });
+      box.appendChild(b);
+    });
+  }
+  function setLayout(L) {
+    var old = cells; lay = L; sel = -1; swapping = false;
+    // keep the photos already placed, in order, then fill the rest with unused photos
+    var keep = old.filter(function (c) { return c.p >= 0 && photos[c.p]; }), used = {};
+    cells = L.map(function (r, i) { var c = keep[i] ? { p: keep[i].p, z: keep[i].z, ox: keep[i].ox, oy: keep[i].oy } : { p: -1, z: 1, ox: 0, oy: 0 }; if (c.p >= 0) used[c.p] = 1; return c; });
+    cells.forEach(function (c) { if (c.p >= 0) return; for (var i = 0; i < photos.length; i++) if (!used[i]) { c.p = i; used[i] = 1; break; } });
+    laysUi(); tray(); panel(); draw();
+  }
+
+  // ---------- geometry ----------
+  function dims(longSide) {
+    var r = +$('ratio').value; return r >= 1 ? { W: longSide, H: Math.round(longSide / r) } : { W: Math.round(longSide * r), H: longSide };
+  }
+  function rects(W, H) {
+    var g = Math.min(W, H) * $('gap').value / 100, pad = $('border').checked ? g : 0, CW = W - 2 * pad, CH = H - 2 * pad;
+    return lay.map(function (c) {
+      var x0 = pad + c[0] * CW, y0 = pad + c[1] * CH, x1 = pad + (c[0] + c[2]) * CW, y1 = pad + (c[1] + c[3]) * CH;
+      if (c[0] > 0.001) x0 += g / 2; if (c[0] + c[2] < 0.999) x1 -= g / 2; if (c[1] > 0.001) y0 += g / 2; if (c[1] + c[3] < 0.999) y1 -= g / 2;
+      return { x: x0, y: y0, w: Math.max(1, x1 - x0), h: Math.max(1, y1 - y0) };
+    });
+  }
+  function rr(c, x, y, w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  function place(cell, r, src) { // where the photo is drawn so it covers the frame, then zoomed and panned
+    var iw = src.naturalWidth || src.width, ih = src.naturalHeight || src.height, s = Math.max(r.w / iw, r.h / ih) * cell.z, dw = iw * s, dh = ih * s;
+    return { x: r.x + (r.w - dw) / 2 - cell.ox * (dw - r.w) / 2, y: r.y + (r.h - dh) / 2 - cell.oy * (dh - r.h) / 2, w: dw, h: dh };
+  }
+  function render(c, W, H, preview) {
+    c.fillStyle = $('bgc').value; c.fillRect(0, 0, W, H);
+    var R = rects(W, H), rad = Math.min(W, H) * $('rad').value / 100;
+    R.forEach(function (r, i) {
+      var cell = cells[i], ph = photos[cell.p];
+      c.save(); rr(c, r.x, r.y, r.w, r.h, Math.min(rad, Math.min(r.w, r.h) / 2)); c.clip();
+      if (ph) { var src = preview ? ph.small : ph.img, d = place(cell, r, src); c.imageSmoothingQuality = 'high'; c.drawImage(src, d.x, d.y, d.w, d.h); }
+      else if (preview) {
+        c.fillStyle = 'rgba(128,128,128,.18)'; c.fillRect(r.x, r.y, r.w, r.h);
+        c.fillStyle = 'rgba(100,100,100,.8)'; c.font = Math.max(12, Math.min(r.w, r.h) * 0.12) + 'px system-ui, sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('+ Add photo', r.x + r.w / 2, r.y + r.h / 2);
+      }
+      c.restore();
+    });
+    return R;
+  }
+
+  var raf = 0, PR = null;
+  function draw() {
+    sync(); $('dl').hidden = true;
+    if (!lay || raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0;
+      var d = dims(Math.round(Math.min(1400, 900 * Math.min(2, window.devicePixelRatio || 1))));
+      cv.width = d.W; cv.height = d.H;
+      var c = cv.getContext('2d'); PR = render(c, d.W, d.H, true);
+      var u = d.W / (cv.getBoundingClientRect().width || d.W);
+      PR.forEach(function (r, i) {
+        if (i !== sel && !(swapping && i !== sel)) return;
+        c.save(); c.lineWidth = 3 * u; c.strokeStyle = i === sel ? '#2563eb' : 'rgba(37,99,235,.55)'; c.setLineDash(i === sel ? [] : [8 * u, 6 * u]);
+        c.strokeRect(r.x + 1.5 * u, r.y + 1.5 * u, r.w - 3 * u, r.h - 3 * u); c.restore();
+      });
+    });
+  }
+  function sync() {
+    ['gap', 'rad', 'q'].forEach(function (id) { $(id === 'q' ? 'qv' : id + 'V').textContent = $(id).value; });
+    $('qRow').hidden = $('fmt').value === 'image/png';
+    $('go').disabled = !lay || busy || !cells.some(function (c) { return c.p >= 0; });
+  }
+  function panel() {
+    var c = cells[sel];
+    $('cellPanel').hidden = !c;
+    if (c) { $('zoom').value = Math.round(c.z * 100); $('zoomV').textContent = $('zoom').value; $('zoom').disabled = c.p < 0; $('resetCell').disabled = $('clearCell').disabled = c.p < 0; }
+    $('swap').textContent = swapping ? 'Tap the frame to swap with (or tap here to cancel)' : '⇄ Swap with another frame';
+    $('swap').setAttribute('aria-pressed', swapping);
+  }
+
+  // ---------- photo tray ----------
+  function tray() {
+    var t = $('tray'); t.innerHTML = '';
+    photos.forEach(function (ph, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'cm-th' + (cells.some(function (c) { return c.p === i; }) ? ' used' : '');
+      b.style.backgroundImage = 'url("' + ph.url + '")'; b.draggable = true; b.title = ph.name;
+      b.setAttribute('aria-label', 'Photo ' + (i + 1) + ': ' + ph.name + '. Select, then tap a frame to place it.'); b.setAttribute('aria-pressed', pickPhoto === i);
+      b.addEventListener('click', function () { pickPhoto = pickPhoto === i ? -1 : i; tray(); if (pickPhoto >= 0) say('', 'Now tap the frame where this photo should go.'); });
+      b.addEventListener('dragstart', function (e) { e.dataTransfer.setData('text/x-photo', String(i)); e.dataTransfer.effectAllowed = 'copy'; });
+      var x = document.createElement('span'); x.textContent = '✕'; x.setAttribute('role', 'button'); x.tabIndex = 0; x.setAttribute('aria-label', 'Remove ' + ph.name);
+      var rm = function (e) {
+        e.stopPropagation(); URL.revokeObjectURL(ph.url); photos.splice(i, 1);
+        cells.forEach(function (c) { if (c.p === i) c.p = -1; else if (c.p > i) c.p--; });
+        pickPhoto = -1; if (!photos.length) { $('editor').hidden = true; lay = null; cells = []; } tray(); panel(); draw();
+      };
+      x.addEventListener('click', rm); x.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') rm(e); });
+      b.appendChild(x); t.appendChild(b);
+    });
+  }
+
+  // ---------- adding photos ----------
+  function load(f) {
+    return new Promise(function (res) {
+      loadImage(f, function (img) {
+        if (!img || !img.naturalWidth) return res(null);
+        var s = Math.min(1, 900 / Math.max(img.naturalWidth, img.naturalHeight)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+        res({ img: img, small: c, name: f.name, url: URL.createObjectURL(f) });
+      });
+    });
+  }
+  PT.drop(true, async function (list) {
+    var bad = 0, broken = 0, skipped = 0, added = 0;
+    for (var f of list) {
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; continue; }
+      if (photos.length >= 9) { skipped++; continue; }
+      var p = await load(f); if (!p) { broken++; continue; }
+      photos.push(p); added++;
+    }
+    if (photos.length) {
+      $('editor').hidden = false;
+      var empty = cells.filter(function (c) { return c.p < 0; }).length;
+      if (!lay || (added && empty < added && photos.length >= 2)) { // pick a layout with a frame for every photo
+        var n = Math.max(2, Math.min(9, photos.length));
+        $('cnt').value = String(n);
+        setLayout(lay && lay.length === n ? lay : LAYOUTS.find(function (L) { return L.length === n && L !== lay; }));
+      } else setLayout(lay);
+    }
+    var notes = [];
+    if (added) notes.push(photos.length === 1 ? 'Add at least one more photo for a collage.' : photos.length + ' photos. Pick a layout, then drag photos to frame them.');
+    if (bad) notes.push('Skipped ' + bad + ' file' + (bad === 1 ? '' : 's') + ' that ' + (bad === 1 ? 'is' : 'are') + ' not an image.');
+    if (broken) notes.push(broken + ' image' + (broken === 1 ? '' : 's') + ' could not be read.');
+    if (skipped) notes.push('A collage holds up to 9 photos, so ' + skipped + ' were not added.');
+    say(bad || broken || skipped ? 'bad' : '', notes.join(' '));
+  });
+
+  // ---------- canvas interaction ----------
+  function at(e) { var b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * cv.width, y: (e.clientY - b.top) / b.height * cv.height }; }
+  function cellAt(p) { if (!PR) return -1; for (var i = 0; i < PR.length; i++) { var r = PR[i]; if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h) return i; } return -1; }
+  var ptrs = {}, drag = null;
+  cv.addEventListener('pointerdown', function (e) {
+    if (!lay) return;
+    var p = at(e), i = cellAt(p);
+    ptrs[e.pointerId] = p; cv.setPointerCapture(e.pointerId);
+    if (i < 0) return;
+    if (swapping && sel >= 0 && i !== sel) { var t = cells[sel]; cells[sel] = cells[i]; cells[i] = t; swapping = false; sel = i; panel(); draw(); say('ok', 'Swapped.'); return; }
+    if (pickPhoto >= 0) {
+      var prev = cells.findIndex(function (c) { return c.p === pickPhoto; });
+      if (prev >= 0 && prev !== i) cells[prev].p = cells[i].p; // the two frames trade photos
+      cells[i] = { p: pickPhoto, z: 1, ox: 0, oy: 0 }; pickPhoto = -1; sel = i; tray(); panel(); draw(); return;
+    }
+    if (cells[i].p < 0) { sel = i; panel(); draw(); $('file').click(); return; }
+    sel = i; swapping = false; panel(); draw();
+    var keys = Object.keys(ptrs);
+    if (keys.length === 2) { var a = ptrs[keys[0]], b = ptrs[keys[1]]; drag = { pinch: true, d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, z0: cells[i].z }; }
+    else drag = { last: p };
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!(e.pointerId in ptrs)) return;
+    var p = at(e); ptrs[e.pointerId] = p;
+    var c = cells[sel]; if (!drag || !c || c.p < 0) return;
+    if (drag.pinch) {
+      var k = Object.keys(ptrs); if (k.length < 2) return;
+      var a = ptrs[k[0]], b = ptrs[k[1]]; c.z = Math.min(4, Math.max(1, drag.z0 * Math.hypot(a.x - b.x, a.y - b.y) / drag.d0));
+    } else {
+      var r = PR[sel], d = place(c, r, photos[c.p].small), dx = p.x - drag.last.x, dy = p.y - drag.last.y;
+      if (d.w > r.w + 0.5) c.ox = Math.max(-1, Math.min(1, c.ox - 2 * dx / (d.w - r.w)));
+      if (d.h > r.h + 0.5) c.oy = Math.max(-1, Math.min(1, c.oy - 2 * dy / (d.h - r.h)));
+      drag.last = p;
+    }
+    panel(); draw();
+  });
+  function up(e) { delete ptrs[e.pointerId]; if (!Object.keys(ptrs).length) drag = null; else if (drag && drag.pinch) drag = null; }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', function (e) {
+    var i = cellAt(at(e)); if (i < 0 || i !== sel || cells[i].p < 0) return; // only zoom the selected photo, so the page still scrolls normally
+    e.preventDefault(); cells[i].z = Math.min(4, Math.max(1, cells[i].z * Math.exp(-e.deltaY * 0.0015))); panel(); draw();
+  }, { passive: false });
+  cv.addEventListener('dragover', function (e) { if (Array.prototype.indexOf.call(e.dataTransfer.types, 'text/x-photo') >= 0 || Array.prototype.indexOf.call(e.dataTransfer.types, 'Files') >= 0) e.preventDefault(); });
+  cv.addEventListener('drop', function (e) {
+    e.preventDefault();
+    var i = cellAt(at(e)); if (i < 0) return;
+    var v = e.dataTransfer.getData('text/x-photo');
+    if (v !== '') { var n = +v, prev = cells.findIndex(function (c) { return c.p === n; }); if (prev >= 0 && prev !== i) cells[prev].p = cells[i].p; cells[i] = { p: n, z: 1, ox: 0, oy: 0 }; sel = i; tray(); panel(); draw(); return; }
+    var f = e.dataTransfer.files[0]; // a file dropped straight onto a frame
+    if (f && photos.length < 9 && /^image\//.test(f.type)) load(f).then(function (p) { if (!p) { say('bad', 'Could not read that image.'); return; } photos.push(p); cells[i] = { p: photos.length - 1, z: 1, ox: 0, oy: 0 }; sel = i; tray(); panel(); draw(); });
+  });
+
+  $('zoom').addEventListener('input', function () { var c = cells[sel]; if (!c) return; c.z = $('zoom').value / 100; $('zoomV').textContent = $('zoom').value; draw(); });
+  $('swap').addEventListener('click', function () { swapping = !swapping; panel(); draw(); if (swapping) say('', 'Tap the frame to swap with.'); });
+  $('resetCell').addEventListener('click', function () { var c = cells[sel]; if (c) { c.z = 1; c.ox = c.oy = 0; panel(); draw(); } });
+  $('clearCell').addEventListener('click', function () { var c = cells[sel]; if (c) { c.p = -1; c.z = 1; c.ox = c.oy = 0; tray(); panel(); draw(); } });
+  $('cnt').addEventListener('change', function () { var n = $('cnt').value; laysUi(); if (n !== 'all' && (!lay || lay.length !== +n)) setLayout(LAYOUTS.find(function (L) { return L.length === +n; })); });
+  ['ratio', 'gap', 'rad', 'bgc', 'border', 'fmt', 'q', 'size'].forEach(function (id) { $(id).addEventListener('input', draw); $(id).addEventListener('change', draw); });
+  window.addEventListener('resize', draw);
+
+  // ---------- export ----------
+  $('go').addEventListener('click', function () {
+    if (!lay || busy) return;
+    var empty = cells.filter(function (c) { return c.p < 0; }).length;
+    busy = true; sync(); say('', 'Creating your collage…');
+    setTimeout(function () {
+      var d = dims(+$('size').value), c = document.createElement('canvas'); c.width = d.W; c.height = d.H;
+      render(c.getContext('2d'), d.W, d.H, false);
+      var type = $('fmt').value;
+      PT.blob(c, type, $('q').value / 100).then(function (b) {
+        c.width = c.height = 0; busy = false; sync();
+        if (!b) { say('bad', 'Your browser could not create the image. Try a smaller export size.'); return; }
+        var name = 'collage-' + d.W + 'x' + d.H + '.' + (type === 'image/png' ? 'png' : 'jpg');
+        PT.done(b, name, type, 'Saved ' + name + (empty ? '. Note: ' + empty + ' empty frame' + (empty === 1 ? ' shows' : 's show') + ' the background colour' : ''));
+        $('dl').textContent = 'Download ' + name; $('dl').click();
+      });
+    }, 20);
+  });
+  laysUi(); sync();
+})();
+</script>
