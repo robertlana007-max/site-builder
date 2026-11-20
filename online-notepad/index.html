@@ -474,13 +474,18 @@
     find(false);
   }
   function replaceAll() {
+    // one change for the whole document: replacing match by match takes minutes on big files
     var re = query(); if (!re) return;
-    var n = 0, rep = $('npR').value;
-    cm.operation(function () {
-      var c = cm.getSearchCursor(re);
-      while (c.findNext()) { var m = cm.getRange(c.from(), c.to()); c.replace($('npRe').checked ? m.replace(new RegExp(re.source, re.flags.replace('g', '')), rep) : rep); n++; if (n >= 1000000) break; }
+    var g = new RegExp(re.source, re.flags + 'm'), rep = $('npR').value, text = cm.getValue(), n = (text.match(g) || []).length;
+    if (!n) { $('npFindMsg').textContent = 'Nothing to replace.'; return; }
+    var out = text.replace(g, $('npRe').checked ? rep : function () { return rep; });
+    var doc = cm.getDoc(), bm = bmLines(doc), lc = doc.lineCount(), at = doc.getCursor();
+    if (out !== text) cm.operation(function () {
+      doc.replaceRange(out, { line: 0, ch: 0 }, { line: doc.lastLine(), ch: doc.getLine(doc.lastLine()).length }, '+replace');
+      if (doc.lineCount() === lc) bm.forEach(function (l) { setBm(doc, l, true); }); // keep bookmarks when the lines stay the same
+      doc.setCursor(at);
     });
-    $('npFindMsg').textContent = n >= 1000000 ? 'Replaced the first 1,000,000 matches. Click “Replace all” again for the rest.' : n ? 'Replaced ' + fmtNum(n) + (n === 1 ? ' match.' : ' matches.') : 'Nothing to replace.';
+    $('npFindMsg').textContent = 'Replaced ' + fmtNum(n) + (n === 1 ? ' match.' : ' matches.');
   }
   function openFind(withReplace) {
     $('npFind').hidden = false; $('npRepRow').hidden = !withReplace;
@@ -685,10 +690,17 @@
   // ---------- menus ----------
   $('npLangs').innerHTML = LANGS.map(function (L) { return '<button data-cmd="lang:' + L[0] + '">' + L[0] + '</button>'; }).join('');
   var openMenu = null;
+  // the editor box clips what sticks out of it, so on narrow screens pull a menu back to the left
+  function place(m) {
+    var d = m.querySelector('.np-drop'); d.style.left = '';
+    if (document.documentElement.dir === 'rtl') return;
+    var r = d.getBoundingClientRect(), box = $('np').getBoundingClientRect(), over = r.right - (box.right - 4);
+    if (over > 0) d.style.left = -Math.min(over, r.left - box.left - 4) + 'px';
+  }
   function closeMenus() { document.querySelectorAll('#np .np-m.open').forEach(function (m) { m.classList.remove('open'); }); openMenu = null; }
   document.querySelectorAll('#np .np-mb').forEach(function (b) {
-    b.addEventListener('click', function (e) { e.stopPropagation(); var m = b.parentNode, was = m.classList.contains('open'); closeMenus(); if (!was) { m.classList.add('open'); openMenu = m; } });
-    b.addEventListener('mouseenter', function () { if (openMenu && openMenu !== b.parentNode) { closeMenus(); b.parentNode.classList.add('open'); openMenu = b.parentNode; } });
+    b.addEventListener('click', function (e) { e.stopPropagation(); var m = b.parentNode, was = m.classList.contains('open'); closeMenus(); if (!was) { m.classList.add('open'); openMenu = m; place(m); } });
+    b.addEventListener('mouseenter', function () { if (openMenu && openMenu !== b.parentNode) { closeMenus(); b.parentNode.classList.add('open'); openMenu = b.parentNode; place(openMenu); } });
   });
   document.addEventListener('click', function (e) { if (!e.target.closest || !e.target.closest('#np .np-drop')) closeMenus(); });
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeMenus(); });

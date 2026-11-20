@@ -85,7 +85,7 @@ const ICON = {
 };
 const icon = k => svg(ICON[k] || (tools.find(t => t.slug === k) || {}).icon || ICON.star);
 // One flat colour per category. Key order here is also the order of sections on the home page.
-const COLOR = { 'PDF tools': '#e5484d', 'Image tools': '#8b5cf6', 'Finance calculators': '#12a150', 'Calculators': '#d6409f', 'Time tools': '#d98e00', 'Generators': '#0e9fb5', 'Text tools': '#e86a17', 'Media tools': '#0891b2', 'Developer tools': '#2563eb' };
+const COLOR = { 'PDF tools': '#e5484d', 'Image tools': '#8b5cf6', 'Finance calculators': '#12a150', 'Calculators': '#d6409f', 'Time tools': '#d98e00', 'Generators': '#0e9fb5', 'Text tools': '#e86a17', 'Study tools': '#4f46e5', 'Media tools': '#0891b2', 'Developer tools': '#2563eb' };
 // What each category is for, shown on the home page.
 const CATINFO = {
   'PDF tools': ['Merge, split, compress, edit and sign PDF files', 'Join reports into one file, shrink a scan so it fits an email, change text inside a PDF in its original font, add page numbers or a watermark, and turn pages into pictures.'],
@@ -95,6 +95,7 @@ const CATINFO = {
   'Time tools': ['Timers, stopwatch, clocks and dates', 'A countdown timer with an alarm, a stopwatch with laps, time zone converter and day counters for deadlines and birthdays.'],
   'Generators': ['Passwords, QR codes, random numbers and names', 'Strong passwords, QR codes for links or Wi-Fi, fair random picks, UUIDs and placeholder text, made on your device.'],
   'Text tools': ['Write, count, clean and edit text', 'A full notepad with tabs, word and character counter, case changer, remove duplicate lines, compare two texts and more.'],
+  'Study tools': ['CGPA, marks, equations, graphs, citations and more', 'Work out your CGPA and percentage, see what you need in the final exam, solve equations and draw graphs, make citations for assignments, and study with flashcards and a Pomodoro timer.'],
   'Media tools': ['Record your screen and voice, turn video into MP3, text into speech', 'Make a screen recording with sound, record your voice and save it as MP3, pull the audio out of a video, and have any text read out loud.'],
   'Developer tools': ['JSON, Base64, hashes, regex and more', 'Format and check JSON, encode and decode Base64 and URLs, make hashes, test regular expressions and convert colours.']
 };

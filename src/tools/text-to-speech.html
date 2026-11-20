@@ -1,0 +1,217 @@
+<style>
+.tts-read { min-height: 200px; max-height: 360px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; font-size: 16px; line-height: 1.7; }
+.tts-read span { cursor: pointer; border-radius: 4px; }
+.tts-read span:hover { background: var(--bg); }
+.tts-read span.cur { background: var(--accent-soft); }
+.tts-read mark { background: var(--accent); color: var(--on-accent); border-radius: 3px; padding: 0 1px; }
+.tts-hint { font-size: 13px; color: var(--muted); margin: 6px 0 14px; }
+.tts-note { font-size: 14px; color: var(--muted); background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; margin: 16px 0 0; }
+</style>
+<div class="notice bad" id="none" hidden><p id="noneText"></p></div>
+<label for="txt">Text to read aloud</label>
+<textarea id="txt" class="plain" data-nomemo style="min-height:200px" placeholder="Type or paste the text you want to hear..."></textarea>
+<div class="tts-read" id="read" hidden translate="no"></div>
+<p class="tts-hint" id="hint">Tip: while it reads, click any sentence to jump to it.</p>
+<div class="fields">
+  <div><label for="voice">Voice</label><select id="voice" data-nomemo><option value="">Loading voices…</option></select></div>
+  <div><label for="rate">Speed: <span id="rateV">1</span>×</label><input type="range" id="rate" min="0.5" max="2" step="0.1" value="1"></div>
+  <div><label for="pitch">Pitch: <span id="pitchV">1</span></label><input type="range" id="pitch" min="0" max="2" step="0.1" value="1"></div>
+  <div><label for="vol">Volume: <span id="volV">100</span>%</label><input type="range" id="vol" min="0" max="1" step="0.05" value="1"></div>
+</div>
+<div class="btns"><button class="btn" id="go">▶ Play</button><button class="btn ghost" id="pause" disabled>Pause</button><button class="btn ghost" id="stop" disabled>■ Stop</button></div>
+<div class="stats">
+  <div class="stat"><span>Words</span><b id="words">0</b></div>
+  <div class="stat"><span>Listening time</span><b id="mins">0 min</b></div>
+</div>
+<p class="msg" id="msg"></p>
+<p class="tts-note"><b>Why is there no download button?</b> Browsers play these voices through your device's own speech system and do not let websites record them, so the speech cannot be saved as an MP3 or other audio file here. Any site that offers it from your browser's voices would have to send your text to a server.</p>
+<script>
+(function () {
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  var synth = window.speechSynthesis, Utt = window.SpeechSynthesisUtterance;
+  var voices = [], chunks = [], at = 0, token = 0, state = 'idle', utt = null, spans = [], heard = false, resumeCheck = null;
+  var KEY = 'gtn-tts-voice';
+  function store(v) { try { if (v == null) return localStorage.getItem(KEY); localStorage.setItem(KEY, v); } catch (e) { return null; } }
+
+  function noVoices(text) { $('none').hidden = false; $('noneText').textContent = text; $('go').disabled = true; }
+  if (!synth || !Utt) { noVoices('This browser cannot read text aloud. Use a current version of Chrome, Edge, Safari or Firefox.'); $('voice').innerHTML = '<option value="">No voices</option>'; }
+
+  // ---------- voices, grouped by language ----------
+  var names = window.Intl && Intl.DisplayNames ? new Intl.DisplayNames(['en'], { type: 'language' }) : null;
+  function langName(code) { try { return (names && names.of(code)) || code; } catch (e) { return code || 'Other'; } }
+  function loadVoices() {
+    if (!synth) return;
+    var list = synth.getVoices() || [];
+    if (!list.length) return;
+    voices = list;
+    $('none').hidden = true; if (state === 'idle') $('go').disabled = false;
+    var sel = $('voice'), keep = sel.value || store(), mine = (navigator.language || 'en').toLowerCase(), base = mine.split('-')[0], groups = {};
+    list.forEach(function (v, i) { var code = (v.lang || '').replace('_', '-'); (groups[code] = groups[code] || []).push(i); });
+    var codes = Object.keys(groups).sort(function (a, b) {
+      var ra = a.toLowerCase() === mine ? 0 : a.toLowerCase().split('-')[0] === base ? 1 : 2, rb = b.toLowerCase() === mine ? 0 : b.toLowerCase().split('-')[0] === base ? 1 : 2;
+      return ra - rb || langName(a).localeCompare(langName(b));
+    });
+    sel.innerHTML = '';
+    codes.forEach(function (code) {
+      var g = document.createElement('optgroup'); g.label = code ? langName(code) + ' (' + code + ')' : 'Other';
+      groups[code].sort(function (a, b) { return list[a].name.localeCompare(list[b].name); }).forEach(function (i) {
+        var o = document.createElement('option'), v = list[i];
+        o.value = v.voiceURI || v.name; o.textContent = v.name.replace(/^(Microsoft|Google) /, '') + (v.localService === false ? ' (online)' : '') + (v.default ? ' (default)' : '');
+        g.appendChild(o);
+      });
+      sel.appendChild(g);
+    });
+    var pick = keep && list.filter(function (v) { return (v.voiceURI || v.name) === keep; })[0];
+    if (!pick) pick = list.filter(function (v) { return v.default && (v.lang || '').toLowerCase().indexOf(base) === 0; })[0]
+      || list.filter(function (v) { return (v.lang || '').toLowerCase().replace('_', '-') === mine; })[0]
+      || list.filter(function (v) { return (v.lang || '').toLowerCase().indexOf(base) === 0; })[0]
+      || list.filter(function (v) { return v.default; })[0] || list[0];
+    sel.value = pick.voiceURI || pick.name;
+  }
+  function voice() { var id = $('voice').value; return voices.filter(function (v) { return (v.voiceURI || v.name) === id; })[0] || null; }
+  if (synth) {
+    loadVoices();
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', loadVoices); else synth.onvoiceschanged = loadVoices;
+    setTimeout(function () { // voices arrive late in some browsers; if none ever come, say so
+      if (voices.length) return;
+      loadVoices();
+      if (!voices.length) {
+        $('voice').innerHTML = '<option value="">No voices found</option>';
+        noVoices('Your browser has no text-to-speech voices installed. On Windows, add voices in Settings › Time & language › Speech. On Android, install or update "Speech Services by Google". On Linux, install speech-dispatcher and espeak-ng, or use Chrome or Edge, which include voices.');
+      }
+    }, 2500);
+  }
+  $('voice').addEventListener('change', function () { store($('voice').value); });
+
+  // ---------- text -> chunks short enough to dodge Chrome's ~15 second cut-off ----------
+  function split(text) {
+    var out = [], MAX = 200, seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'sentence' }) : null, parts = [];
+    if (seg) { for (var s of seg.segment(text)) parts.push({ i: s.index, t: s.segment }); }
+    else { var re = /[^.!?。！？\n]*(?:[.!?。！？]+["'”’)\]]*|\n+|$)\s*/g, m; while ((m = re.exec(text)) && m[0]) parts.push({ i: m.index, t: m[0] }); }
+    parts.forEach(function (p) {
+      // a sentence that runs over several lines is read line by line
+      var lines = p.t.split(/(\n+)/), off = p.i;
+      lines.forEach(function (ln) {
+        var i = off; off += ln.length;
+        while (ln.trim()) {
+          var lead = ln.length - ln.replace(/^\s+/, '').length; i += lead; ln = ln.slice(lead);
+          var cut = ln.length;
+          if (cut > MAX) { // break a long sentence at a comma, then at a space
+            var w = ln.slice(0, MAX), c = Math.max(w.lastIndexOf(', '), w.lastIndexOf('; '), w.lastIndexOf(': '), w.lastIndexOf(' – '), w.lastIndexOf(' - '));
+            cut = c > MAX * 0.4 ? c + 1 : (w.lastIndexOf(' ') > MAX * 0.4 ? w.lastIndexOf(' ') : MAX);
+          }
+          var piece = ln.slice(0, cut);
+          if (piece.trim()) out.push({ s: i, e: i + piece.replace(/\s+$/, '').length, t: piece.trim() });
+          i += cut; ln = ln.slice(cut);
+        }
+      });
+    });
+    return out;
+  }
+
+  // ---------- the read-along view ----------
+  function build(text) {
+    var box = $('read'); box.innerHTML = ''; spans = [];
+    var pos = 0;
+    chunks.forEach(function (c, k) {
+      if (c.s > pos) box.appendChild(document.createTextNode(text.slice(pos, c.s)));
+      var sp = document.createElement('span'); sp.textContent = text.slice(c.s, c.e); sp.dataset.k = k;
+      box.appendChild(sp); spans.push(sp); pos = c.e;
+    });
+    if (pos < text.length) box.appendChild(document.createTextNode(text.slice(pos)));
+  }
+  function mark(k, from, len) {
+    var sp = spans[k]; if (!sp) return;
+    var t = text0.slice(chunks[k].s, chunks[k].e);
+    sp.textContent = '';
+    if (from == null) { sp.textContent = t; return; }
+    var m = document.createElement('mark'); m.textContent = t.substr(from, len);
+    sp.appendChild(document.createTextNode(t.slice(0, from))); sp.appendChild(m); sp.appendChild(document.createTextNode(t.slice(from + len)));
+    var box = $('read'), r = m.getBoundingClientRect(), b = box.getBoundingClientRect();
+    if (r.top < b.top || r.bottom > b.bottom) box.scrollTop += r.top - b.top - box.clientHeight / 3;
+  }
+  function current(k) {
+    spans.forEach(function (sp, i) { if (i !== k && sp.className) { sp.className = ''; mark(i, null); } });
+    if (spans[k]) {
+      spans[k].className = 'cur';
+      var box = $('read'), r = spans[k].getBoundingClientRect(), b = box.getBoundingClientRect();
+      if (r.top < b.top || r.bottom > b.bottom) box.scrollTop += r.top - b.top - 20;
+    }
+  }
+
+  // ---------- playback ----------
+  var text0 = '';
+  function ui(s) {
+    state = s;
+    var on = s !== 'idle';
+    $('txt').hidden = on; $('read').hidden = !on;
+    $('go').disabled = on || !voices.length; $('pause').disabled = !on; $('stop').disabled = !on;
+    $('pause').textContent = s === 'paused' ? '▶ Resume' : 'Pause';
+    if (!on) { clearTimeout(resumeCheck); utt = null; }
+  }
+  function speak(k) {
+    var mine = ++token;
+    at = k;
+    if (k >= chunks.length) { ui('idle'); current(-1); say('ok', heard ? 'Finished reading.' : ''); return; }
+    current(k);
+    var u = new Utt(chunks[k].t), v = voice(); // chunk text equals text0.slice(s, e), so boundary positions map straight onto it
+    if (v) { u.voice = v; u.lang = v.lang; }
+    u.rate = +$('rate').value; u.pitch = +$('pitch').value; u.volume = +$('vol').value;
+    u.onstart = function () { heard = true; };
+    u.onboundary = function (e) {
+      if (mine !== token || (e.name && e.name !== 'word')) return;
+      var i = e.charIndex, len = e.charLength || ((chunks[k].t.slice(i).match(/^\S+/) || [''])[0].length);
+      if (len) mark(k, i, len);
+    };
+    u.onend = function () { if (mine !== token) return; mark(k, null); speak(k + 1); };
+    u.onerror = function (e) {
+      if (mine !== token) return;
+      if (e.error === 'interrupted' || e.error === 'canceled') return;
+      ui('idle'); current(-1);
+      say('bad', e.error === 'not-allowed' ? 'Your browser blocked the speech. Press Play again.' : e.error === 'language-unavailable' || e.error === 'voice-unavailable' ? 'That voice is not available right now. Choose another voice and press Play.' : 'The voice stopped with an error (' + (e.error || 'unknown') + '). Try another voice.');
+    };
+    utt = u; // keep a reference, or Chrome may forget the utterance and never say it ended
+    synth.speak(u);
+  }
+  function start(k) {
+    token++; synth.cancel();
+    ui('playing'); say('', '');
+    setTimeout(function () { speak(k); }, 60); // give cancel() a moment in Safari and Chrome
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!synth || state !== 'idle') return;
+    text0 = $('txt').value;
+    if (!text0.trim()) { say('bad', 'Type or paste some text first.'); $('txt').focus(); return; }
+    if (!voices.length) loadVoices();
+    chunks = split(text0); heard = false;
+    build(text0); start(0);
+  });
+  $('pause').addEventListener('click', function () {
+    if (state === 'playing') { synth.pause(); ui('paused'); }
+    else if (state === 'paused') {
+      ui('playing'); synth.resume();
+      // Some browsers (Chrome on Android) drop the speech on pause; start the sentence again if nothing is playing.
+      clearTimeout(resumeCheck);
+      resumeCheck = setTimeout(function () { if (state === 'playing' && !synth.speaking) start(at); }, 400);
+    }
+  });
+  $('stop').addEventListener('click', function () { token++; synth.cancel(); ui('idle'); current(-1); say('', ''); });
+  $('read').addEventListener('click', function (e) {
+    var sp = e.target.closest('span[data-k]'); if (!sp || state === 'idle') return;
+    start(+sp.dataset.k);
+  });
+  window.addEventListener('pagehide', function () { if (synth) synth.cancel(); });
+
+  // ---------- sliders and counters ----------
+  function labels() { $('rateV').textContent = (+$('rate').value).toFixed(1).replace(/\.0$/, ''); $('pitchV').textContent = (+$('pitch').value).toFixed(1).replace(/\.0$/, ''); $('volV').textContent = Math.round($('vol').value * 100); count(); }
+  function count() {
+    var t = $('txt').value.trim(), w = t ? t.split(/\s+/).length : 0, mins = w / (160 * +$('rate').value);
+    $('words').textContent = fmtNum(w, 0);
+    $('mins').textContent = !w ? '0 min' : mins < 1 ? Math.max(1, Math.round(mins * 60)) + ' sec' : Math.round(mins) + ' min';
+  }
+  ['rate', 'pitch', 'vol'].forEach(function (id) { $(id).addEventListener('input', labels); });
+  $('txt').addEventListener('input', count);
+  labels();
+})();
+</script>

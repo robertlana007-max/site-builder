@@ -1,0 +1,217 @@
+<style>
+.rx-pat { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; background: var(--field); overflow: hidden; }
+.rx-pat:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rx-pat span { display: flex; align-items: center; padding: 0 8px; color: var(--muted); font-family: var(--mono); font-size: 18px; background: var(--bg); }
+.rx-pat input[type=text] { border: 0; border-radius: 0; box-shadow: none !important; font-family: var(--mono); font-size: 15px; min-width: 0; flex: 1; }
+.rx-pat .rx-fl { min-width: 2.5em; justify-content: flex-start; font-size: 15px; }
+.rx-flags { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 10px 0 16px; }
+.rx-flags label { font-weight: 400; font-size: 14px; margin: 0; white-space: nowrap; }
+.rx-flags code { font-weight: 700; }
+.rx-hl { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--mono); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 360px; overflow: auto; min-height: 46px; margin: 0; }
+.rx-hl mark { background: color-mix(in srgb, #facc15 55%, transparent); color: inherit; border-radius: 3px; box-shadow: 0 0 0 1px color-mix(in srgb, #ca8a04 60%, transparent); }
+.rx-hl mark.alt { background: color-mix(in srgb, #38bdf8 45%, transparent); box-shadow: 0 0 0 1px color-mix(in srgb, #0284c7 60%, transparent); }
+.rx-hl mark.zero { display: inline-block; width: 2px; height: 1.1em; vertical-align: text-bottom; background: #ea580c; box-shadow: none; }
+.rx-ml { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; max-height: 420px; overflow: auto; }
+.rx-ml li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.rx-ml li > b { font-family: var(--mono); overflow-wrap: anywhere; white-space: pre-wrap; }
+.rx-ml small { color: var(--muted); margin-inline-start: 6px; }
+.rx-g { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 2px 10px; margin-top: 4px; font-size: 13px; }
+.rx-g span { color: var(--muted); font-weight: 600; }
+.rx-g code { font-family: var(--mono); overflow-wrap: anywhere; white-space: pre-wrap; }
+.rx-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 18px; }
+.rx-h b { font-size: 15px; }
+</style>
+<div class="fields" style="grid-template-columns:1fr;margin-bottom:0">
+  <div><label for="rxLib">Common patterns</label>
+    <select id="rxLib" data-nomemo><option value="">Choose a ready-made pattern…</option></select></div>
+  <div><label for="rxPat">Regular expression</label>
+    <div class="rx-pat"><span>/</span><input type="text" id="rxPat" data-nomemo autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. (\d{4})-(\d{2})-(\d{2})"><span class="rx-fl" id="rxFlShow">/g</span></div></div>
+</div>
+<div class="rx-flags" id="rxFlags"></div>
+<label for="rxText">Test text</label>
+<textarea id="rxText" data-nomemo spellcheck="false" style="min-height:150px" placeholder="Paste or type the text to search here."></textarea>
+<p class="msg" id="rxMsg"></p>
+<div class="rx-h"><b>Matches highlighted</b><span class="msg" id="rxCount" style="margin:0"></span></div>
+<pre class="rx-hl" id="rxHl" aria-live="polite"></pre>
+<div class="rx-h"><b>Match details</b></div>
+<ul class="rx-ml" id="rxList"></ul>
+<div class="rx-h"><label for="rxRep" style="margin:0"><b>Replace with</b> <span class="msg" style="font-size:13px">use $1, $&lt;name&gt;, $&amp; or $$</span></label></div>
+<input type="text" id="rxRep" data-nomemo autocomplete="off" spellcheck="false" placeholder="e.g. $3/$2/$1" style="font-family:var(--mono);margin-top:6px">
+<pre class="rx-hl" id="rxOut" style="margin-top:10px"></pre>
+<div class="btns">
+  <button class="btn ghost" id="rxCopyRe">Copy regex</button>
+  <button class="btn ghost" id="rxCopyOut">Copy replaced text</button>
+  <button class="btn ghost" id="rxClear">Clear</button>
+</div>
+<script>
+(function () {
+  var LIB = [
+    ['Email address', '[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}', 'g', 'Write to ali.khan@example.com or support+help@mail.example.co.uk.\nNot an email: name@localhost, @example.com'],
+    ['Web address (URL)', 'https?:\\/\\/[^\\s/$.?#][^\\s]*', 'gi', 'Visit https://gettoolnest.com/regex-tester/ or http://example.com?q=1 today.\nftp://files.example.com is not matched.'],
+    ['Phone number (international)', '\\+?\\d{1,3}[\\s.-]?\\(?\\d{2,4}\\)?[\\s.-]?\\d{3,4}[\\s.-]?\\d{3,4}', 'g', 'Call +92 300 1234567, +1 (555) 123-4567 or 020 7946 0958.'],
+    ['Date YYYY-MM-DD (named groups)', '(?<year>\\d{4})-(?<month>0[1-9]|1[0-2])-(?<day>0[1-9]|[12]\\d|3[01])', 'g', 'Invoices: 2026-01-15, 2026-12-31 and 2026-13-01 (invalid month).'],
+    ['Date DD/MM/YYYY', '\\b(0?[1-9]|[12]\\d|3[01])\\/(0?[1-9]|1[0-2])\\/(\\d{4})\\b', 'g', 'Born 14/08/1995, joined 1/2/2020, ends 31/12/2026.'],
+    ['Time 24-hour HH:MM', '\\b([01]\\d|2[0-3]):([0-5]\\d)\\b', 'g', 'Open 09:00 to 17:30. Not valid: 24:10 or 7:65.'],
+    ['IPv4 address', '\\b(?:(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\.){3}(?:25[0-5]|2[0-4]\\d|1?\\d?\\d)\\b', 'g', 'Router 192.168.1.1, DNS 8.8.8.8, bad 256.1.1.1'],
+    ['Hex colour', '#(?:[0-9a-fA-F]{3}){1,2}\\b', 'g', 'Colours: #fff, #2563EB, #12345 (not valid) and #ea580c.'],
+    ['Whole number or decimal', '-?\\d+(?:\\.\\d+)?', 'g', 'Totals: 42, -7, 3.14 and 1000.50'],
+    ['UK postcode', '\\b[A-Z]{1,2}\\d[A-Z\\d]?\\s*\\d[A-Z]{2}\\b', 'gi', 'Send to SW1A 1AA or M1 1AE, not 12345.'],
+    ['US ZIP code', '\\b\\d{5}(?:-\\d{4})?\\b', 'g', 'Beverly Hills 90210, New York 10001-1234.'],
+    ['Pakistan mobile number', '(?:\\+92|0092|0)3\\d{2}[\\s-]?\\d{7}', 'g', 'Numbers: 0300-1234567, +923211234567, 0092 345 1234567'],
+    ['HTML tag', '<\\/?([a-zA-Z][a-zA-Z0-9-]*)\\b[^>]*>', 'g', '<p class="lead">Hello <b>world</b></p>'],
+    ['Repeated word', '\\b(\\w+)\\s+\\1\\b', 'gi', 'This is is a test of the the repeated word finder.'],
+    ['Strong password check', '^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[^\\w\\s]).{8,}$', 'gm', 'weakpass\nStr0ng!Pass\nNoDigits!!\nGood#Pass9'],
+    ['UUID', '\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b', 'gi', 'id=3f2504e0-4f89-41d3-9a0c-0305e82c3301 and 123e4567-e89b-12d3-a456-426614174000'],
+    ['Leading or trailing spaces', '^[ \\t]+|[ \\t]+$', 'gm', '   indented line\ntrailing spaces   \n  both  '],
+    ['Hashtag', '#[\\p{L}\\p{N}_]+', 'gu', 'Loving #Lahore and #café life #2026'],
+    ['Emoji', '\\p{Extended_Pictographic}', 'gu', 'Good morning ☀️ have a great day 🎉👍']
+  ];
+  var FLAGS = [['g', 'global', 'find all matches'], ['i', 'ignore case', ''], ['m', 'multiline', '^ and $ match at line breaks'], ['s', 'dotAll', '. matches line breaks'], ['u', 'unicode', ''], ['y', 'sticky', ''], ['d', 'indices', 'group positions']];
+  if (supports('v')) FLAGS.push(['v', 'unicodeSets', '']);
+  function supports(f) { try { new RegExp('', f); return true; } catch (e) { return false; } }
+  var box = $('rxFlags');
+  FLAGS.forEach(function (f) {
+    if (f[0] === 'd' && !supports('d')) return;
+    var l = document.createElement('label'), c = document.createElement('input');
+    c.type = 'checkbox'; c.id = 'rxF' + f[0]; c.checked = f[0] === 'g'; c.setAttribute('data-nomemo', '');
+    l.title = f[2] || f[1]; l.appendChild(c);
+    var code = document.createElement('code'); code.textContent = f[0]; l.appendChild(code);
+    l.appendChild(document.createTextNode(' ' + f[1])); box.appendChild(l);
+    c.addEventListener('change', function () { if (f[0] === 'u' && c.checked && $('rxFv')) $('rxFv').checked = false; if (f[0] === 'v' && c.checked && $('rxFu')) $('rxFu').checked = false; schedule(); });
+  });
+  LIB.forEach(function (p, i) { var o = document.createElement('option'); o.value = i; o.textContent = p[0]; $('rxLib').appendChild(o); });
+  function flags() { return FLAGS.map(function (f) { var c = $('rxF' + f[0]); return c && c.checked ? f[0] : ''; }).join(''); }
+  function setFlags(s) { FLAGS.forEach(function (f) { var c = $('rxF' + f[0]); if (c) c.checked = s.indexOf(f[0]) !== -1; }); }
+
+  // ---------- the matching runs in a Web Worker, so a runaway pattern cannot freeze the page ----------
+  var WORKER_SRC = '(' + function () {
+    onmessage = function (e) {
+      var d = e.data, re, out = { id: d.id };
+      try { re = new RegExp(d.pat, d.flags); } catch (err) { out.error = String(err.message || err); postMessage(out); return; }
+      var list = [], m, text = d.text, max = d.max, total = 0, uni = /[uv]/.test(d.flags);
+      var keep = function (m) {
+        total++;
+        if (list.length >= max) return;
+        var g = [], named = null, ind = null;
+        for (var i = 1; i < m.length; i++) g.push(m[i] === undefined ? null : m[i]);
+        if (m.groups) { named = {}; for (var k in m.groups) named[k] = m.groups[k] === undefined ? null : m.groups[k]; }
+        if (m.indices) ind = Array.prototype.map.call(m.indices, function (x) { return x ? [x[0], x[1]] : null; });
+        list.push({ i: m.index, s: m[0], g: g, n: named, ind: ind });
+      };
+      if (re.global || re.sticky) {
+        re.lastIndex = 0;
+        while ((m = re.exec(text)) !== null) {
+          keep(m);
+          if (m[0] === '') {
+            if (!re.global) break; // sticky without g: one match only, like String.match
+            var cp = uni ? text.codePointAt(re.lastIndex) : 0;
+            re.lastIndex += cp > 0xffff ? 2 : 1;
+            if (re.lastIndex > text.length) break;
+          }
+          if (!re.global) break;
+          if (total >= 100000) { out.capped = true; break; }
+        }
+      } else if ((m = re.exec(text)) !== null) keep(m);
+      out.list = list; out.total = total;
+      if (d.rep !== null) { try { out.rep = text.replace(re, d.rep); } catch (err) { out.repError = String(err.message || err); } }
+      postMessage(out);
+    };
+  } + ')()';
+  var workerUrl = URL.createObjectURL(new Blob([WORKER_SRC], { type: 'text/javascript' }));
+  var worker = null, jobId = 0, pending = null, timer = null, debounce = null, TIMEOUT = 2000, MAX = 2000, lastRep = '';
+  function fresh() { if (worker) worker.terminate(); worker = new Worker(workerUrl); worker.onmessage = got; worker.onerror = function (e) { e.preventDefault(); clearTimeout(timer); pending = null; fail('The pattern could not be run: ' + (e.message || 'unknown error')); }; }
+  function say(cls, t) { $('rxMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('rxMsg').textContent = t; }
+  function fail(t) { say('bad', t); $('rxCount').textContent = ''; $('rxList').textContent = ''; plain($('rxHl'), $('rxText').value); plain($('rxOut'), ''); lastRep = ''; }
+  function plain(el, t) { el.textContent = t; }
+  function schedule() { clearTimeout(debounce); debounce = setTimeout(run, 120); $('rxFlShow').textContent = '/' + flags(); }
+  function run() {
+    var pat = $('rxPat').value, text = $('rxText').value;
+    var lit = /^\/([\s\S]+)\/([a-z]*)$/.exec(pat);
+    if (lit && /^[dgimsuvy]*$/.test(lit[2])) { $('rxPat').value = pat = lit[1]; setFlags(lit[2]); $('rxFlShow').textContent = '/' + flags(); toast('Split the pattern and flags for you'); }
+    if (!pat) { say('', 'Type a pattern above, or choose one from Common patterns.'); $('rxCount').textContent = ''; $('rxList').textContent = ''; plain($('rxHl'), text); plain($('rxOut'), ''); lastRep = ''; return; }
+    if (pending !== null || !worker) fresh(); // a job still running may be stuck: replace the worker
+    var id = ++jobId; pending = id;
+    worker.postMessage({ id: id, pat: pat, flags: flags(), text: text, rep: $('rxRep').value === '' ? null : $('rxRep').value, max: MAX });
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (pending !== id) return;
+      pending = null; worker.terminate(); worker = null;
+      fail('Stopped: this pattern took more than ' + TIMEOUT / 1000 + ' seconds on your text, so it was cancelled to keep the page working. This usually means "catastrophic backtracking", for example nested repeats like (a+)+ or (.*)*. Make the repeats more specific, or remove the nesting.');
+    }, TIMEOUT);
+  }
+  function got(e) {
+    var d = e.data;
+    if (d.id !== jobId) return;
+    clearTimeout(timer); pending = null;
+    if (d.error) { fail('Invalid pattern: ' + d.error.replace(/^Invalid regular expression: \/[\s\S]*\/[a-z]*: /, '').replace(/^Invalid flags supplied to RegExp constructor '([^']*)'/, 'invalid flags "$1"') + '.'); return; }
+    groupNames = readGroups($('rxPat').value);
+    var text = $('rxText').value, hl = $('rxHl'), list = $('rxList'), frag = document.createDocumentFragment(), pos = 0;
+    d.list.forEach(function (m, k) {
+      if (m.i > pos) frag.appendChild(document.createTextNode(text.slice(pos, m.i)));
+      var mk = document.createElement('mark');
+      if (m.s === '') mk.className = 'zero'; else { mk.className = k % 2 ? 'alt' : ''; mk.textContent = m.s; }
+      mk.title = 'Match ' + (k + 1) + ' at ' + m.i;
+      frag.appendChild(mk); pos = Math.max(pos, m.i + m.s.length);
+    });
+    if (pos < text.length) frag.appendChild(document.createTextNode(text.slice(pos)));
+    hl.textContent = ''; hl.appendChild(frag);
+    $('rxCount').textContent = d.total === 0 ? 'No matches' : fmtNum(d.total, 0) + (d.capped ? '+' : '') + (d.total === 1 ? ' match' : ' matches') + (d.total > d.list.length ? ' (showing the first ' + fmtNum(d.list.length, 0) + ')' : '');
+    list.textContent = '';
+    d.list.slice(0, 300).forEach(function (m, k) {
+      var li = document.createElement('li'), b = document.createElement('b'), sm = document.createElement('small');
+      li.appendChild(document.createTextNode((k + 1) + '. '));
+      b.textContent = m.s === '' ? '(empty match)' : m.s; li.appendChild(b);
+      sm.textContent = 'index ' + m.i + '–' + (m.i + m.s.length) + ', length ' + m.s.length; li.appendChild(sm);
+      if (m.g.length) {
+        var g = document.createElement('div'); g.className = 'rx-g';
+        m.g.forEach(function (v, j) {
+          var s = document.createElement('span'), c = document.createElement('code');
+          s.textContent = 'Group ' + (j + 1) + (groupNames[j] ? ' <' + groupNames[j] + '>' : '');
+          c.textContent = v === null ? '(did not take part)' : JSON.stringify(v).slice(1, -1) || '(empty)';
+          if (m.ind && m.ind[j + 1]) c.textContent += '  @ ' + m.ind[j + 1][0] + '–' + m.ind[j + 1][1];
+          g.appendChild(s); g.appendChild(c);
+        });
+        li.appendChild(g);
+      }
+      list.appendChild(li);
+    });
+    if (d.list.length > 300) { var more = document.createElement('li'); more.textContent = 'Plus ' + fmtNum(d.total - 300, 0) + ' more matches (all are highlighted above' + (d.total > d.list.length ? ' up to ' + fmtNum(d.list.length, 0) : '') + ').'; list.appendChild(more); }
+    if (d.repError) plain($('rxOut'), 'Replace failed: ' + d.repError);
+    else if (d.rep !== undefined) { plain($('rxOut'), d.rep); lastRep = d.rep; }
+    else { $('rxOut').textContent = ''; lastRep = ''; var hint = document.createElement('span'); hint.className = 'msg'; hint.textContent = 'Type a replacement above to preview the result.'; $('rxOut').appendChild(hint); }
+    say(d.total ? 'ok' : '', d.total ? (flags().indexOf('g') === -1 && !/y/.test(flags()) ? 'Found the first match. Tick g (global) to find all of them.' : '') : (text ? 'The pattern is valid but does not match the text.' : 'The pattern is valid. Add some test text.'));
+  }
+  // names of the capture groups, in group order, read from the pattern (skipping escapes and character classes)
+  var groupNames = [];
+  function readGroups(p) {
+    var out = [], inCls = false;
+    for (var i = 0; i < p.length; i++) {
+      var c = p[i];
+      if (c === '\\') { i++; continue; }
+      if (inCls) { if (c === ']') inCls = false; continue; }
+      if (c === '[') { inCls = true; continue; }
+      if (c === '(') {
+        if (p[i + 1] !== '?') out.push('');
+        else { var m = /^\?<([A-Za-z_$][\w$]*)>/.exec(p.slice(i + 1)); if (m) out.push(m[1]); }
+      }
+    }
+    return out;
+  }
+  $('rxPat').addEventListener('input', function () { groupNames = readGroups($('rxPat').value); $('rxLib').value = ''; schedule(); });
+  ['rxText', 'rxRep'].forEach(function (id) { $(id).addEventListener('input', schedule); });
+  var lastSample = '';
+  $('rxLib').addEventListener('change', function () {
+    var p = LIB[$('rxLib').value]; if (!p) return;
+    $('rxPat').value = p[1]; groupNames = readGroups(p[1]); setFlags(p[2]);
+    if (!$('rxText').value.trim() || $('rxText').value === lastSample) { $('rxText').value = p[3]; lastSample = p[3]; }
+    schedule();
+  });
+  $('rxCopyRe').addEventListener('click', function () {
+    var p = $('rxPat').value; if (!p) return;
+    copyText('/' + p.replace(/(\\.)|\//g, function (a, esc) { return esc || '\\/'; }) + '/' + flags(), $('rxCopyRe'));
+  });
+  $('rxCopyOut').addEventListener('click', function () { if (lastRep) copyText(lastRep, $('rxCopyOut')); else say('', 'Type a replacement first to get replaced text.'); });
+  $('rxClear').addEventListener('click', function () { $('rxPat').value = ''; $('rxText').value = ''; $('rxRep').value = ''; $('rxLib').value = ''; lastSample = ''; groupNames = []; setFlags('g'); schedule(); $('rxPat').focus(); });
+  schedule();
+})();
+</script>
