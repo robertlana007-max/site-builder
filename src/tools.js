@@ -1211,5 +1211,53 @@ module.exports = [
       ['Is my timetable saved?', 'Yes, in this browser. It is there when you come back, until you clear the site’s data.']
     ],
     icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 4v17M15 4v17M3 15h18"/>'
+  },
+  {
+      slug: 'currency-converter', cat: 'Finance calculators', name: 'Currency Converter',
+      title: 'Currency Converter - USD to PKR, INR, AED & 170+ Rates',
+      desc: 'Convert 170+ currencies, including PKR, INR, AED, SAR and Bitcoin, with daily mid-market rates, a rate history chart and offline use.',
+      card: 'Convert 170+ currencies with daily rates and charts.',
+      intro: 'Type an amount to convert it instantly between more than 170 currencies, see the rate history for any pair and compare several currencies at once.',
+      steps: ['Pick the currency you have in From and the one you want in To. Search by code, name or country.', 'Type the amount. You can also type in the To box to work backwards.', 'Check the rate history chart, or add more currencies to see the same amount in each.'],
+      faq: [
+        ['Where do the exchange rates come from?', 'Daily mid-market reference rates from ExchangeRate-API, with the free currency-api project as a backup and for crypto, gold and the history chart. The page shows when the rates were last updated.'],
+        ['Are these live market rates?', 'No. They are reference rates published about once a day. The page checks for new rates every 10 minutes while it is open, but the rates themselves change once a day.'],
+        ['Why does my bank give a different rate?', 'Banks, exchange companies and card providers add a margin to the mid-market rate, and some charge fees. Use this converter to see how big their margin is.'],
+        ['Does it work offline?', 'Yes. The last rates you downloaded are saved on your device and used when you are offline, with a clear note showing their date.'],
+        ['Is Pakistani rupee (PKR) included?', 'Yes. PKR, INR, AED, SAR, BDT and about 160 other currencies are included, plus Bitcoin, Ethereum and gold. You can also add your own rate for a currency that is missing.']
+      ],
+      icon: '<circle cx="8" cy="8" r="5"/><path d="M16.5 11a5 5 0 1 1-5.5 5.5M8 6v4M6.5 7h2.2a1 1 0 0 1 0 2H7"/><path d="M14 3l3 3-3 3M17 6h-4"/>'
+  },
+  {
+      slug: 'alarm-clock', cat: 'Time tools', name: 'Online Alarm Clock',
+      title: 'Online Alarm Clock - Free Alarm with Sounds & Snooze',
+      desc: 'Set free online alarms with labels, repeat days, six sounds, volume, gentle wake-up and snooze. A big live clock in 12 or 24-hour time.',
+      card: 'Set alarms with sounds, repeat days and snooze.',
+      intro: 'Set one or more alarms in your browser with a label, repeat days and a choice of sounds. Keep the tab open and the alarm rings on time.',
+      steps: ['Pick a time, add a label if you like, and choose a sound.', 'Tick repeat days, or leave them empty for a one-time alarm.', 'Click Add alarm and keep this tab open with your computer awake.', 'When it rings, click Snooze or Stop.'],
+      faq: [
+        ['Will the alarm ring if I close the tab?', 'No. The alarm runs in this page, so the tab must stay open and the computer must stay awake. If it was asleep, the alarm rings when it wakes if less than 10 minutes late, or shows as missed.'],
+        ['Does it work when the tab is in the background?', 'Yes. The alarm checks the time four times a second using a background timer that browsers do not slow down, and the tab title flashes when it rings.'],
+        ['Why is there no sound?', 'Browsers block sound until you click the page once. Click anywhere on the page after opening it, check your volume, and use Test sound.'],
+        ['Are my alarms saved?', 'Yes. Alarms and settings are saved in your browser on this device and come back when you open the page again.'],
+        ['Can I use it on my phone?', 'Yes, but phones often pause web pages when the screen locks. For important alarms on a phone, use the phone’s own clock app.']
+      ],
+      icon: '<circle cx="12" cy="13" r="7"/><path d="M12 10v3l2 2M5 4L2.5 6.5M19 4l2.5 2.5M8 20l-1.5 2M16 20l1.5 2"/>'
+  },
+  {
+      slug: 'coin-flip', cat: 'Generators', name: 'Coin Flip & Dice Roller',
+      title: 'Coin Flip & Dice Roller - Fair Online Heads or Tails',
+      desc: 'Flip a coin or roll 1 to 10 dice (d4, d6, d8, d10, d12, d20, d100) with fair, secure randomness, history and heads or tails statistics.',
+      card: 'Flip a coin or roll dice, fair and random.',
+      intro: 'Flip a coin for heads or tails, or roll up to 10 dice of any common type. Every result uses your browser’s secure random generator.',
+      steps: ['Choose Coin flip or Dice roller.', 'Click Flip the coin, or pick the number and type of dice and click Roll.', 'See the result, the totals and the statistics below.'],
+      faq: [
+        ['Is the coin flip really 50/50?', 'Yes. It uses the browser’s cryptographic random number generator with rejection sampling, so heads and tails are exactly equally likely.'],
+        ['Which dice can I roll?', 'd4, d6, d8, d10, d12, d20 and d100, from 1 to 10 dice at once. The total is added up for you.'],
+        ['Why did I get heads five times in a row?', 'Streaks are normal in random results. In 100 flips, a run of 5 or more of the same side happens most of the time.'],
+        ['Can I turn off the animation or sound?', 'Yes. Untick Sound effects for silence. The animation is skipped if your device asks for reduced motion or you turn animations off in Settings.'],
+        ['Is my history saved?', 'Your last 50 results and the statistics are kept in this browser until you click Clear history and statistics.']
+      ],
+      icon: '<circle cx="8.5" cy="8.5" r="5.5"/><path d="M8.5 6v5"/><rect x="12" y="12" width="9" height="9" rx="2"/><path d="M15 15h.01M18 18h.01"/>'
   }
 ];

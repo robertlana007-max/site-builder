@@ -1,0 +1,251 @@
+<style>
+.sr-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.sr-thumbs > span { position: relative; }
+.sr-thumbs button.pick { width: 64px; height: 64px; padding: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; display: block; }
+.sr-thumbs button.pick.on { border-color: var(--accent); }
+.sr-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sr-thumbs button.x { position: absolute; top: -6px; right: -6px; width: 24px; height: 24px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; font-size: 14px; line-height: 1; padding: 0; }
+.sr-groups { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; margin-bottom: 16px; }
+.sr-groups fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px 8px; margin: 0; min-width: 0; }
+.sr-groups legend { font-weight: 700; font-size: 14px; padding: 0 4px; }
+.sr-groups label { font-weight: 400; font-size: 14.5px; margin: 0 0 6px; display: flex; gap: 2px; align-items: baseline; }
+.sr-groups small { color: var(--muted); margin-inline-start: auto; padding-inline-start: 8px; white-space: nowrap; font-size: 12.5px; }
+.sr-quick { display: flex; flex-wrap: wrap; gap: 8px; margin: -4px 0 16px; }
+.sr-quick .btn { padding: 6px 12px; min-height: 36px; font-size: 14px; }
+.sr-focus { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 16px; }
+.sr-focus canvas { display: block; max-width: 100%; max-height: 50vh; width: auto; height: auto; margin: 0 auto; touch-action: none; cursor: crosshair; border-radius: 4px; }
+.sr-focus canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sr-focus p { font-size: 13px; color: var(--muted); margin: 8px 0 0; text-align: center; }
+.sr-prev { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin-bottom: 8px; align-items: end; }
+.sr-prev figure { margin: 0; text-align: center; font-size: 12.5px; color: var(--muted); }
+.sr-prev canvas { max-width: 100%; max-height: 180px; width: auto; height: auto; display: block; margin: 0 auto 4px; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+.sr-prev b { display: block; color: var(--ink); font-size: 13px; }
+.sr-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+.sr-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop photos here</b>Add one photo or many. Your photos never leave your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="sr-thumbs" id="srThumbs"></div>
+<label>Sizes to make <span id="srCount" style="font-weight:400;color:var(--muted)"></span></label>
+<div class="sr-quick"><button type="button" class="btn ghost" id="srAllProfiles">All profile pictures</button><button type="button" class="btn ghost" id="srAllStories">All 9:16 stories</button><button type="button" class="btn ghost" id="srNone">Clear selection</button></div>
+<div class="sr-groups" id="srGroups"></div>
+<p class="sr-note">Sizes are the commonly recommended ones as of 2026. Platforms change them from time to time, and most accept slightly different sizes too.</p>
+<div class="fields">
+  <div><label for="srFit">Fit</label><select id="srFit"><option value="cover">Fill the frame (crop to fit)</option><option value="contain">Show the whole photo (add background)</option></select></div>
+  <div id="srBgBox" hidden><label for="srBg">Background</label><select id="srBg"><option value="blur">Blurred photo</option><option value="color">Solid colour</option><option value="white">White</option></select></div>
+  <div class="sr-col" id="srColBox" hidden><label for="srCol">Colour</label><input type="color" id="srCol" value="#111111"></div>
+  <div><label for="fmt">Download as</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option></select></div>
+</div>
+<div class="sr-focus" id="srFocusBox" hidden>
+  <canvas id="srFocus" tabindex="0" aria-label="Focus point. Drag the dot or tap the part of the photo that must stay in every crop. Arrow keys move it too."></canvas>
+  <p>Drag the dot (or tap) onto the most important part of the photo, such as a face. Every crop keeps it in view.</p>
+</div>
+<div class="sr-prev" id="srPrev"></div>
+<div class="btns"><button class="btn" id="go" type="button" disabled>Download</button><a class="btn" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  // [id, platform, label, width, height, kind]  kind: p = profile picture (shown as a circle), b = banner with a safe area
+  var P = [
+    ['igPost', 'Instagram', 'Post (square)', 1080, 1080], ['igPortrait', 'Instagram', 'Post (portrait 4:5)', 1080, 1350], ['igStory', 'Instagram', 'Story', 1080, 1920],
+    ['igReel', 'Instagram', 'Reel cover', 1080, 1920], ['igProfile', 'Instagram', 'Profile picture', 320, 320, 'p'],
+    ['ttCover', 'TikTok', 'Video cover', 1080, 1920], ['ttProfile', 'TikTok', 'Profile picture', 200, 200, 'p'],
+    ['ytThumb', 'YouTube', 'Thumbnail', 1280, 720], ['ytBanner', 'YouTube', 'Channel banner', 2560, 1440, 'b'], ['ytProfile', 'YouTube', 'Profile picture', 800, 800, 'p'],
+    ['fbPost', 'Facebook', 'Post (portrait)', 1080, 1350], ['fbLink', 'Facebook', 'Post (landscape)', 1200, 630], ['fbCover', 'Facebook', 'Cover photo', 851, 315],
+    ['fbProfile', 'Facebook', 'Profile picture', 320, 320, 'p'], ['fbEvent', 'Facebook', 'Event cover', 1920, 1005],
+    ['xPost', 'X (Twitter)', 'Post image', 1600, 900], ['xHeader', 'X (Twitter)', 'Header', 1500, 500], ['xProfile', 'X (Twitter)', 'Profile picture', 400, 400, 'p'],
+    ['liPost', 'LinkedIn', 'Post image', 1200, 627], ['liBanner', 'LinkedIn', 'Profile banner', 1584, 396], ['liProfile', 'LinkedIn', 'Profile picture', 400, 400, 'p'],
+    ['pinPin', 'Pinterest', 'Pin', 1000, 1500],
+    ['waProfile', 'WhatsApp', 'Profile picture (DP)', 500, 500, 'p'], ['waStatus', 'WhatsApp', 'Status', 1080, 1920]
+  ];
+  var items = [], cur = 0, job = 0;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+
+  // Build the checkbox groups.
+  var groups = {};
+  P.forEach(function (p) {
+    if (!groups[p[1]]) { var fs = document.createElement('fieldset'), lg = document.createElement('legend'); lg.textContent = p[1]; fs.appendChild(lg); groups[p[1]] = fs; $('srGroups').appendChild(fs); }
+    var lb = document.createElement('label'), cb = document.createElement('input'), sm = document.createElement('small');
+    cb.type = 'checkbox'; cb.id = 'sr_' + p[0]; cb.checked = p[0] === 'igPost';
+    sm.textContent = p[3] + ' × ' + p[4];
+    lb.appendChild(cb); lb.appendChild(document.createTextNode(p[2])); lb.appendChild(sm);
+    groups[p[1]].appendChild(lb);
+  });
+  function chosen() { return P.filter(function (p) { return $('sr_' + p[0]).checked; }); }
+  function setAll(fn) {
+    P.forEach(function (p) { var cb = $('sr_' + p[0]), v = fn(p); if (cb.checked !== v) { cb.checked = v; cb.dispatchEvent(new Event('change', { bubbles: true })); } });
+  }
+  $('srAllProfiles').addEventListener('click', function () { setAll(function (p) { return p[5] === 'p'; }); });
+  $('srAllStories').addEventListener('click', function () { setAll(function (p) { return p[3] === 1080 && p[4] === 1920; }); });
+  $('srNone').addEventListener('click', function () { setAll(function () { return false; }); });
+
+  function blurred(img, w, h) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'), s = Math.max(w / img.naturalWidth, h / img.naturalHeight), dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+    var amount = Math.max(8, Math.round(Math.max(w, h) / 40));
+    if (typeof x.filter === 'string') {
+      x.filter = 'blur(' + amount + 'px)'; var o = amount * 2;
+      x.drawImage(img, (w - dw) / 2 - o, (h - dh) / 2 - o, dw + 2 * o, dh + 2 * o); x.filter = 'none';
+    } else { // no canvas filters (older Safari): shrink, then grow back
+      var f = amount / 2, t = document.createElement('canvas'); t.width = Math.max(2, Math.round(w / f)); t.height = Math.max(2, Math.round(h / f));
+      var tx = t.getContext('2d'); tx.drawImage(img, (t.width - dw / f) / 2, (t.height - dh / f) / 2, dw / f, dh / f);
+      x.imageSmoothingQuality = 'high'; x.drawImage(t, 0, 0, w, h);
+    }
+    x.fillStyle = 'rgba(0,0,0,.12)'; x.fillRect(0, 0, w, h);
+    return c;
+  }
+  // Draw item it at w x h into canvas out (k scales the drawing, for small previews).
+  function render(it, w, h, out, k) {
+    k = k || 1;
+    out.width = Math.max(1, Math.round(w * k)); out.height = Math.max(1, Math.round(h * k));
+    var x = out.getContext('2d'), img = it.img, iw = img.naturalWidth, ih = img.naturalHeight, ow = out.width, oh = out.height;
+    x.imageSmoothingQuality = 'high';
+    if ($('srFit').value === 'cover') {
+      var s = Math.max(ow / iw, oh / ih), cw = ow / s, ch = oh / s; // crop size in photo pixels
+      var sx = Math.min(iw - cw, Math.max(0, it.fx * iw - cw / 2)), sy = Math.min(ih - ch, Math.max(0, it.fy * ih - ch / 2));
+      x.drawImage(img, sx, sy, cw, ch, 0, 0, ow, oh);
+    } else {
+      var bg = $('srBg').value;
+      if (bg === 'blur') x.drawImage(blurred(img, ow, oh), 0, 0);
+      else { x.fillStyle = bg === 'color' ? $('srCol').value : '#ffffff'; x.fillRect(0, 0, ow, oh); }
+      var t = Math.min(ow / iw, oh / ih), dw = Math.round(iw * t), dh = Math.round(ih * t);
+      x.drawImage(img, Math.round((ow - dw) / 2), Math.round((oh - dh) / 2), dw, dh);
+    }
+    return out;
+  }
+
+  // Focus editor: the photo with a draggable dot.
+  var fc = $('srFocus'), fx = fc.getContext('2d');
+  function drawFocus() {
+    if (!items.length) return;
+    var it = items[cur], img = it.img, k = Math.min(1, 800 / Math.max(img.naturalWidth, img.naturalHeight));
+    fc.width = Math.round(img.naturalWidth * k); fc.height = Math.round(img.naturalHeight * k);
+    fx.drawImage(img, 0, 0, fc.width, fc.height);
+    var cx = it.fx * fc.width, cy = it.fy * fc.height, r = Math.max(10, Math.min(fc.width, fc.height) * 0.035);
+    fx.lineWidth = Math.max(2, r / 4);
+    fx.strokeStyle = 'rgba(0,0,0,.55)'; fx.beginPath(); fx.arc(cx, cy, r + fx.lineWidth, 0, Math.PI * 2); fx.stroke();
+    fx.strokeStyle = '#fff'; fx.beginPath(); fx.arc(cx, cy, r, 0, Math.PI * 2); fx.moveTo(cx - r * 1.8, cy); fx.lineTo(cx - r * 0.4, cy); fx.moveTo(cx + r * 0.4, cy); fx.lineTo(cx + r * 1.8, cy); fx.moveTo(cx, cy - r * 1.8); fx.lineTo(cx, cy - r * 0.4); fx.moveTo(cx, cy + r * 0.4); fx.lineTo(cx, cy + r * 1.8); fx.stroke();
+  }
+  var dragId = null, prevTimer = null;
+  function setFocus(e) {
+    var r = fc.getBoundingClientRect(), it = items[cur];
+    it.fx = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)); it.fy = Math.min(1, Math.max(0, (e.clientY - r.top) / r.height));
+    drawFocus(); stale();
+    clearTimeout(prevTimer); prevTimer = setTimeout(previews, 30);
+  }
+  fc.addEventListener('pointerdown', function (e) { if (!items.length) return; dragId = e.pointerId; try { fc.setPointerCapture(dragId); } catch (er) {} setFocus(e); });
+  fc.addEventListener('pointermove', function (e) { if (e.pointerId === dragId) setFocus(e); });
+  function up(e) { if (e.pointerId === dragId) { dragId = null; previews(); } }
+  fc.addEventListener('pointerup', up); fc.addEventListener('pointercancel', up);
+  fc.addEventListener('keydown', function (e) {
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || !items.length) return; e.preventDefault();
+    var it = items[cur], s = e.shiftKey ? 0.1 : 0.02;
+    it.fx = Math.min(1, Math.max(0, it.fx + d[0] * s)); it.fy = Math.min(1, Math.max(0, it.fy + d[1] * s));
+    drawFocus(); stale(); previews();
+  });
+
+  function previews() {
+    var box = $('srPrev'); box.innerHTML = '';
+    var list = chosen();
+    $('srCount').textContent = '(' + list.length + ' selected)';
+    $('go').disabled = !items.length || !list.length;
+    var n = items.length * list.length;
+    $('go').textContent = n > 1 ? 'Download ' + n + ' images as ZIP' : 'Download';
+    if (!items.length) return;
+    var it = items[cur];
+    list.forEach(function (p) {
+      var f = document.createElement('figure'), c = document.createElement('canvas'), cap = document.createElement('figcaption'), b = document.createElement('b');
+      var k = Math.min(300 / p[3], 200 / p[4]);
+      render(it, p[3], p[4], c, k);
+      var x = c.getContext('2d');
+      if (p[5] === 'p') { // dim outside the circle that profile pictures are shown in
+        x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.rect(0, 0, c.width, c.height); x.arc(c.width / 2, c.height / 2, c.width / 2, 0, Math.PI * 2, true); x.fill();
+      } else if (p[5] === 'b') { // YouTube banner: the 1546 x 423 middle part shows on every device
+        var sw = 1546 * k, sh = 423 * k; x.strokeStyle = '#fff'; x.setLineDash([4, 3]); x.lineWidth = 1.5; x.strokeRect((c.width - sw) / 2, (c.height - sh) / 2, sw, sh);
+      }
+      b.textContent = p[1] + ': ' + p[2];
+      cap.appendChild(b);
+      var small = it.img.naturalWidth < p[3] && it.img.naturalHeight < p[4];
+      cap.appendChild(document.createTextNode(p[3] + ' × ' + p[4] + (p[5] === 'p' ? ' · shown as a circle' : p[5] === 'b' ? ' · keep text inside the dashed safe area' : '') + (small ? ' · photo is smaller, will look soft' : '')));
+      f.appendChild(c); f.appendChild(cap); box.appendChild(f);
+    });
+    if (!list.length) say('', 'Tick at least one size above.');
+    else say('', items.length > 1 ? 'Previews show photo ' + (cur + 1) + ' of ' + items.length + '. Each photo has its own focus point: tap a thumbnail to set it.' : '');
+  }
+  function stale() { job++; $('dl').hidden = true; }
+  function refresh() {
+    stale();
+    $('srBgBox').hidden = $('srFit').value !== 'contain';
+    $('srColBox').hidden = $('srFit').value !== 'contain' || $('srBg').value !== 'color';
+    $('srFocusBox').hidden = !items.length || $('srFit').value !== 'cover';
+    drawFocus(); previews();
+  }
+  function thumbs() {
+    var box = $('srThumbs'); box.innerHTML = '';
+    items.forEach(function (it, i) {
+      var w = document.createElement('span'), b = document.createElement('button'), im = document.createElement('img'), x = document.createElement('button');
+      b.type = x.type = 'button'; b.className = 'pick' + (i === cur ? ' on' : ''); b.title = it.name; b.setAttribute('aria-label', 'Show ' + it.name);
+      x.className = 'x'; x.textContent = '×'; x.setAttribute('aria-label', 'Remove ' + it.name);
+      im.src = it.url; im.alt = ''; b.appendChild(im); w.appendChild(b); w.appendChild(x); box.appendChild(w);
+      b.addEventListener('click', function () { cur = i; thumbs(); refresh(); });
+      x.addEventListener('click', function () { URL.revokeObjectURL(it.url); items.splice(i, 1); cur = Math.min(cur, Math.max(0, items.length - 1)); thumbs(); refresh(); });
+    });
+  }
+  PT.drop(true, function (files) {
+    var imgs = files.filter(function (f) { return /^image\//.test(f.type); }), bad = files.length - imgs.length, left = imgs.length, start = items.length, got = [];
+    if (!imgs.length) { say('bad', 'Please choose image files (JPG, PNG, WebP or GIF).'); return; }
+    imgs.forEach(function (f, k) {
+      loadImage(f, function (im) {
+        if (im && im.naturalWidth) got[k] = { img: im, name: f.name.replace(/\.[^.]+$/, '') || 'photo', url: URL.createObjectURL(f), fx: 0.5, fy: 0.5 };
+        else bad++;
+        if (--left) return;
+        got.forEach(function (g) { if (g) items.push(g); });
+        if (items.length > start) cur = start;
+        thumbs(); refresh();
+        if (bad) say('bad', bad + ' file(s) could not be opened as images and were skipped. HEIC photos must be converted to JPG first.');
+      });
+    });
+  });
+  $('srGroups').addEventListener('change', refresh);
+  ['srFit', 'srBg', 'srCol', 'fmt'].forEach(function (id) { $(id).addEventListener('change', refresh); $(id).addEventListener('input', refresh); });
+  refresh();
+
+  function slug(s) { return s.toLowerCase().replace(/\(twitter\)/, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''); }
+  $('go').addEventListener('click', function () {
+    var list = chosen(); if (!items.length || !list.length) return;
+    var mine = ++job, type = $('fmt').value, ext = type === 'image/png' ? 'png' : 'jpg', out = [], c = document.createElement('canvas'), used = {}, total = items.length * list.length, done = 0;
+    PT.run(function () {
+      var chain = Promise.resolve();
+      items.forEach(function (it) {
+        list.forEach(function (p) {
+          chain = chain.then(function () {
+            if (mine !== job) return;
+            say('', 'Making image ' + (++done) + ' of ' + total + '…');
+            render(it, p[3], p[4], c);
+            return PT.blob(c, type, 0.92).then(function (b) {
+              if (!b) throw new Error('Your browser could not create the image file.');
+              var n = it.name + '-' + slug(p[1] + ' ' + p[2]) + '-' + p[3] + 'x' + p[4], k = 2, base = n;
+              while (used[n]) n = base + '-' + k++; used[n] = 1;
+              out.push({ name: n + '.' + ext, blob: b });
+            });
+          });
+        });
+      });
+      return chain.then(function () {
+        if (mine !== job) return;
+        if (out.length === 1) return PT.done(out[0].blob, out[0].name, type, list[0][3] + ' × ' + list[0][4] + ' px');
+        return Promise.all(out.map(function (o) { return o.blob.arrayBuffer(); })).then(function (bufs) {
+          var zip = PT.zip(out.map(function (o, i) { return { name: o.name, data: new Uint8Array(bufs[i]) }; }));
+          return PT.done(zip, (items.length === 1 ? items[0].name : 'social') + '-resized.zip', 'application/zip', out.length + ' images in one ZIP');
+        });
+      }).then(function () {
+        if (mine !== job || $('dl').hidden) return;
+        $('dl').textContent = out.length === 1 ? 'Save ' + out[0].name : 'Save ZIP (' + out.length + ' images)';
+        $('dl').click(); burst($('dl'));
+      });
+    });
+  });
+})();
+</script>

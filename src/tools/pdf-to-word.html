@@ -1,0 +1,419 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>It is turned into an editable Word file on your device and never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="checks">
+  <label><input type="checkbox" id="pics" checked> Keep pictures</label>
+  <label><input type="checkbox" id="breaks" checked> Start each PDF page on a new page in Word</label>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Convert to Word</button><a class="btn ghost" id="dl" hidden>Download Word file</a></div>
+<p class="msg" id="msg"></p>
+<div class="notice" id="scanNote" hidden><p>Some pages had no text, probably because they are scans or photos, so they were added to the Word file as pictures. To turn a picture of text into editable words, use <a href="../image-to-text/">Image to Text (OCR)</a>.</p></div>
+<div class="stats" id="stats" hidden>
+  <div class="stat"><span>Pages</span><b id="sPages">0</b></div>
+  <div class="stat"><span>Paragraphs</span><b id="sParas">0</b></div>
+  <div class="stat"><span>Headings</span><b id="sHeads">0</b></div>
+  <div class="stat"><span>Pictures</span><b id="sPics">0</b></div>
+</div>
+<p class="msg">Text, headings, bold and italic, simple lists and pictures are kept. Complex layouts such as tables, columns, text boxes and exact fonts may not come out exactly like the PDF, so check the result before you send it.</p>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/vendor/docx/docx.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, D = window.docx;
+  PT.drop(false, function (f) {
+    $('dl').hidden = true; $('stats').hidden = true; $('scanNote').hidden = true;
+    if (!PT.isPdf(f)) { file = null; $('go').disabled = true; PT.say('bad', '"' + f.name + '" is not a PDF. Choose a .pdf file.'); return; }
+    file = f; $('go').disabled = false;
+    PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Press Convert to Word.');
+  });
+  ['pics', 'breaks'].forEach(function (id) { $(id).addEventListener('change', function () { $('dl').hidden = true; }); });
+
+  var LIG = { 'ﬀ': 'ff', 'ﬁ': 'fi', 'ﬂ': 'fl', 'ﬃ': 'ffi', 'ﬄ': 'ffl', 'ﬅ': 'st', 'ﬆ': 'st' };
+  function clean(s) { // text Word can store: no control characters or broken surrogate pairs
+    return s.replace(/[ﬀ-ﬆ]/g, function (c) { return LIG[c]; }).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f￾￿]/g, '').replace(/[\ud800-\udbff](?![\udc00-\udfff])|(^|[^\ud800-\udbff])[\udc00-\udfff]/g, '$1');
+  }
+  var KNOWN = ['Arial', 'Calibri', 'Cambria', 'Candara', 'Consolas', 'Constantia', 'Corbel', 'Courier New', 'Georgia', 'Garamond', 'Helvetica', 'Segoe UI', 'Tahoma', 'Times New Roman', 'Trebuchet MS', 'Verdana', 'Book Antiqua', 'Century Gothic', 'Palatino Linotype', 'Liberation Sans', 'Liberation Serif', 'DejaVu Sans', 'Roboto', 'Open Sans', 'Noto Sans', 'Noto Serif', 'Lato', 'Aptos'];
+  function family(name) {
+    var n = (name || '').replace(/^[A-Z]{6}\+/, '').replace(/[-,](Bold|Italic|Oblique|Regular|Roman|Medium|Light|Semibold|SemiBold|Black|Heavy|Book|Demi|BoldItalic|BoldOblique|It|Bd|BdIt).*$/i, '').replace(/(PS)?MT$|PSMT$|PS$/, '');
+    var flat = n.replace(/[\s_-]/g, '').toLowerCase();
+    if (/^times/.test(flat)) return 'Times New Roman';
+    if (/^courier/.test(flat)) return 'Courier New';
+    if (/^(helvetica|arial)/.test(flat)) return 'Arial';
+    for (var i = 0; i < KNOWN.length; i++) if (KNOWN[i].replace(/\s/g, '').toLowerCase() === flat) return KNOWN[i];
+    var spaced = n.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/[_-]/g, ' ').trim();
+    return /^[A-Za-z][A-Za-z ]{1,30}$/.test(spaced) ? spaced : '';
+  }
+  var BULLET = /^\s*([•●▪■◦‣⁃∙·○□–—➢➔*-])\s*/;
+  var NUMBERED = /^\s*(\(?(\d{1,3}|[a-zA-Z]|[ivxIVX]{1,5})[.)]|\d{1,3}(\.\d{1,3})+\.?)\s+/;
+
+  // ---------- reading one page ----------
+  function objGet(page, id) {
+    var store = id.indexOf('g_') === 0 ? page.commonObjs : page.objs;
+    return new Promise(function (res) {
+      var t = setTimeout(function () { res(null); }, 3000);
+      try { store.get(id, function (o) { clearTimeout(t); res(o); }); } catch (e) { clearTimeout(t); res(null); }
+    });
+  }
+  function imgCanvas(o) {
+    if (!o || !o.width || !o.height) return null;
+    var c = document.createElement('canvas'); c.width = o.width; c.height = o.height;
+    var g = c.getContext('2d');
+    if (o.bitmap) { g.drawImage(o.bitmap, 0, 0); return c; }
+    if (!o.data) return null;
+    var id = g.createImageData(o.width, o.height), d = id.data, s = o.data, n = o.width * o.height, i, j;
+    if (o.kind === 3) d.set(s.subarray(0, d.length));
+    else if (o.kind === 2) { for (i = 0, j = 0; i < n; i++, j += 3) { d[i * 4] = s[j]; d[i * 4 + 1] = s[j + 1]; d[i * 4 + 2] = s[j + 2]; d[i * 4 + 3] = 255; } }
+    else if (o.kind === 1) {
+      var rowBytes = (o.width + 7) >> 3;
+      for (var y = 0; y < o.height; y++) for (var x = 0; x < o.width; x++) { var bit = (s[y * rowBytes + (x >> 3)] >> (7 - (x & 7))) & 1, v = bit ? 255 : 0, k = (y * o.width + x) * 4; d[k] = d[k + 1] = d[k + 2] = v; d[k + 3] = 255; }
+    } else return null;
+    g.putImageData(id, 0, 0);
+    return c;
+  }
+  function encode(c, alpha) {
+    var max = 2000, w = c.width, h = c.height;
+    if (w > max || h > max) { var k = max / Math.max(w, h), s = document.createElement('canvas'); s.width = Math.round(w * k); s.height = Math.round(h * k); s.getContext('2d').drawImage(c, 0, 0, s.width, s.height); c = s; }
+    if (!alpha) { var o = document.createElement('canvas'); o.width = c.width; o.height = c.height; var g = o.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, o.width, o.height); g.drawImage(c, 0, 0); c = o; }
+    return PT.blob(c, alpha ? 'image/png' : 'image/jpeg', 0.88).then(function (b) { return b.arrayBuffer(); }).then(function (buf) { return { data: new Uint8Array(buf), type: alpha ? 'png' : 'jpg', pw: c.width, ph: c.height }; });
+  }
+  function hasAlpha(c) {
+    var d = c.getContext('2d').getImageData(0, 0, c.width, c.height).data;
+    for (var i = 3; i < d.length; i += 16) if (d[i] < 250) return true;
+    return false;
+  }
+
+  async function readPage(pdf, num, wantPics) {
+    var page = await pdf.getPage(num), vp = page.getViewport({ scale: 1 }), U = pdfjsLib.Util, OPS = pdfjsLib.OPS;
+    var ops = await page.getOperatorList(), tc = await page.getTextContent();
+    var out = { w: vp.width, h: vp.height, lines: [], images: [], chars: 0, drawing: false, num: num };
+    // text pieces with their position on the upright page (y grows downwards)
+    var pieces = [];
+    tc.items.forEach(function (it) {
+      if (!it.str || !('transform' in it)) return;
+      var t = U.transform(vp.transform, it.transform), size = Math.hypot(t[2], t[3]) || Math.hypot(t[0], t[1]);
+      if (size < 1) return;
+      var f = page.commonObjs.has(it.fontName) ? page.commonObjs.get(it.fontName) : null, fname = f && f.name || '';
+      var st = tc.styles[it.fontName] || {};
+      var w = it.width * (Math.hypot(t[0], t[1]) / (Math.hypot(it.transform[0], it.transform[1]) || 1));
+      pieces.push({
+        str: clean(it.str), x: t[4], y: t[5], size: size, w: w || it.str.length * size * 0.5,
+        bold: !!(f && (f.bold || f.black)) || /bold|black|heavy|semibold|demi|,B(d)?\b/i.test(fname),
+        italic: !!(f && f.italic) || /italic|oblique|-It\b|,I\b/i.test(fname),
+        font: family(fname) || (st.fontFamily === 'serif' ? 'Times New Roman' : st.fontFamily === 'monospace' ? 'Courier New' : '')
+      });
+      out.chars += it.str.replace(/\s/g, '').length;
+    });
+    // pieces -> lines. Lines keep the order the PDF stores them in (usually reading order), but a piece
+    // that belongs to an earlier line on the same baseline (text in another font is often stored later) joins it.
+    pieces.forEach(function (p) {
+      if (!p.str) return;
+      var target = null, L = out.lines;
+      for (var k = L.length - 1; k >= 0 && k >= L.length - 12; k--) {
+        var l = L[k], tol = Math.max(p.size, l.size) * 0.45;
+        if (Math.abs(p.y - l.y) >= tol) continue;
+        if (k === L.length - 1 ? p.x > l.left - l.size * 0.6 : p.x > l.left - l.size * 3 && p.x < l.right + l.size * 3) { target = l; break; }
+      }
+      if (!target) { target = { y: p.y, left: p.x, right: p.x + p.w, size: p.size, pieces: [] }; L.push(target); }
+      target.pieces.push(p);
+      target.left = Math.min(target.left, p.x); target.right = Math.max(target.right, p.x + p.w);
+      if (p.str.trim() && p.size > target.size) target.size = p.size;
+    });
+    out.lines = out.lines.map(function (l) {
+      var ps = l.pieces.slice().sort(function (a, b) { return a.x - b.x; }), line = { y: l.y, size: l.size, runs: [], text: '', x: null, right: l.right };
+      var prev = null, wide = false, space = false;
+      ps.forEach(function (p) {
+        if (!p.str.trim()) { // spaces: PDF readers often add one wide space item for a gap such as a table column
+          if (p.w > line.size * 1.8) wide = true; else space = true;
+          return;
+        }
+        if (prev) {
+          var gap = p.x - (prev.x + prev.w);
+          if (wide || gap > line.size * 1.8) { line.runs.push({ tab: true, x: p.x }); line.text += '\t'; }
+          else if ((space || gap > p.size * 0.16) && !/\s$/.test(line.text) && !/^\s/.test(p.str)) add(line, ' ', prev);
+        }
+        if (line.x === null) line.x = p.x + (p.str.length - p.str.replace(/^\s+/, '').length) * p.size * 0.25;
+        add(line, p.str, p);
+        prev = p; wide = space = false;
+      });
+      if (line.x === null) line.x = l.left;
+      line.text = line.text.replace(/\s+$/, '');
+      var r = line.runs[line.runs.length - 1]; if (r && !r.tab) r.text = r.text.replace(/\s+$/, '');
+      return line;
+    }).filter(function (l) { return l.text.trim(); });
+    function add(line, str, p) {
+      var last = line.runs[line.runs.length - 1];
+      if (last && !last.tab && last.bold === p.bold && last.italic === p.italic && Math.abs(last.size - p.size) < 0.6 && last.font === p.font) last.text += str;
+      else if (last && !last.tab && !str.trim()) last.text += str;
+      else line.runs.push({ text: str, bold: p.bold, italic: p.italic, size: p.size, font: p.font });
+      line.text += str;
+    }
+
+    // pictures and drawings
+    var ctm = [1, 0, 0, 1, 0, 0], stack = [], found = [];
+    for (var i = 0; i < ops.fnArray.length; i++) {
+      var fn = ops.fnArray[i], a = ops.argsArray[i];
+      if (fn === OPS.save) stack.push(ctm.slice());
+      else if (fn === OPS.restore) ctm = stack.pop() || ctm;
+      else if (fn === OPS.transform) ctm = U.transform(ctm, a);
+      else if (fn === OPS.paintFormXObjectBegin) { stack.push(ctm.slice()); if (a[0]) ctm = U.transform(ctm, a[0]); }
+      else if (fn === OPS.paintFormXObjectEnd) ctm = stack.pop() || ctm;
+      else if (fn === OPS.constructPath || fn === OPS.fill || fn === OPS.stroke || fn === OPS.eoFill || fn === OPS.shadingFill) out.drawing = true;
+      else if (fn === OPS.paintImageXObject || fn === OPS.paintInlineImageXObject || fn === OPS.paintImageMaskXObject) {
+        out.drawing = true;
+        if (fn === OPS.paintImageMaskXObject) continue;
+        var m = U.transform(vp.transform, ctm), xs = [], ys = [];
+        [[0, 0], [1, 0], [0, 1], [1, 1]].forEach(function (pt) { var q = U.applyTransform(pt, m); xs.push(q[0]); ys.push(q[1]); });
+        var box = { x: Math.min.apply(0, xs), y: Math.min.apply(0, ys), r: Math.max.apply(0, xs), b: Math.max.apply(0, ys) };
+        box.w = box.r - box.x; box.h = box.b - box.y;
+        if (box.w * box.h > vp.width * vp.height * 0.3) out.bigImage = true;
+        found.push({ box: box, id: fn === OPS.paintImageXObject ? a[0] : null, inline: fn === OPS.paintInlineImageXObject ? a[0] : null });
+      }
+    }
+    if (wantPics && out.chars >= 20) {
+      var seen = {};
+      for (var j = 0; j < found.length; j++) {
+        var f = found[j], b = f.box;
+        if (b.w < 16 || b.h < 16) continue; // lines, dots and tiny icons
+        if (b.w * b.h > vp.width * vp.height * 0.8) continue; // a full-page background or scan under real text
+        var key = Math.round(b.x) + ',' + Math.round(b.y) + ',' + Math.round(b.w);
+        if (seen[key]) continue; seen[key] = 1;
+        var o = f.inline || (f.id ? await objGet(page, f.id) : null), c = imgCanvas(o);
+        if (!c) continue;
+        var enc = await encode(c, hasAlpha(c));
+        out.images.push({ y: b.y, x: b.x, w: b.w, h: b.h, img: enc });
+      }
+    }
+    page.cleanup();
+    return out;
+  }
+
+  // ---------- lines -> paragraphs ----------
+  function paragraphs(pg, body, lead) {
+    var paras = [], p = null, xs = pg.lines.map(function (l) { return l.x; }).sort(function (a, b) { return a - b; });
+    var rights = pg.lines.map(function (l) { return l.right; }).sort(function (a, b) { return a - b; });
+    var left = xs.length ? xs[Math.floor(xs.length * 0.1)] : 72, right = rights.length ? rights[Math.floor(rights.length * 0.9)] : pg.w - 72;
+    pg.left = left; pg.right = right;
+    pg.lines.forEach(function (l) {
+      var bullet = BULLET.exec(l.text), number = !bullet && NUMBERED.exec(l.text);
+      var allBold = l.runs.every(function (r) { return r.tab || !r.text.trim() || r.bold; });
+      var start = !p;
+      if (p) {
+        var prev = p.lines[p.lines.length - 1], gap = l.y - prev.y, sz = Math.max(l.size, prev.size);
+        if (gap < -sz * 0.5 || gap > Math.max(lead * 1.4, sz * 1.5) || gap > sz * 2.6) start = true;
+        else if (Math.abs(l.size - prev.size) > 0.9) start = true;
+        else if (bullet || number) start = true;
+        else if (p.allBold !== allBold && (p.allBold || p.lines.length === 1 && prev.text.length < 90)) start = true;
+        else if (p.list && Math.abs(l.x - p.textX) < sz * 1.2) start = false;
+        else if (l.x > prev.x + sz * 1.2 && !p.center) start = true; // first-line indent of a new paragraph
+        else if (l.x < prev.x - sz * 1.2 && !(p.lines.length === 1 && p.firstIndent)) start = true;
+        else if (prev.right < right - sz * 4 && !/[-­]$/.test(prev.text) && Math.abs((prev.x + prev.right) / 2 - pg.w / 2) > sz * 1.5) start = true; // the line before ended early
+      }
+      if (start) {
+        p = { lines: [], x: l.x, size: l.size, list: bullet ? 'bullet' : number ? 'number' : '', allBold: allBold, textX: l.x, firstIndent: false };
+        if (bullet) { // drop the bullet character; Word draws its own
+          var cut = bullet[0].length;
+          l = Object.assign({}, l, { runs: trimStart(l.runs, cut), text: l.text.slice(cut) });
+          p.textX = l.x + cut * l.size * 0.5;
+        } else if (number) p.textX = l.x + number[0].length * l.size * 0.5;
+        paras.push(p);
+      } else if (p.lines.length === 1 && Math.abs(l.x - p.x) > 1 && l.x < p.x) p.firstIndent = true;
+      p.lines.push(l); p.allBold = p.allBold && allBold;
+    });
+    paras.forEach(function (q) {
+      var first = q.lines[0], cx = q.lines.map(function (l) { return (l.x + l.right) / 2; }), wid = Math.max.apply(0, q.lines.map(function (l) { return l.right - l.x; }));
+      var centred = cx.every(function (c) { return Math.abs(c - pg.w / 2) < q.size * 1.2; }) && first.x > left + q.size * 2 && wid < (right - left) * 0.9;
+      var rightAl = !centred && q.lines.every(function (l) { return Math.abs(l.right - right) < q.size; }) && first.x > pg.w / 2;
+      q.align = centred ? 'center' : rightAl ? 'right' : '';
+      q.y = first.y - first.size;
+      q.indent = q.list || q.align ? 0 : Math.max(0, Math.min.apply(0, q.lines.map(function (l) { return l.x; })) - left);
+      q.firstLine = q.lines.length > 1 && !q.list && !q.align ? first.x - Math.min.apply(0, q.lines.slice(1).map(function (l) { return l.x; })) : 0;
+      // join the lines; a hyphen at a line end that splits a word is removed
+      var runs = [];
+      q.lines.forEach(function (l, i) {
+        var rs = l.runs.map(function (r) { return Object.assign({}, r); });
+        if (i) {
+          var last = runs[runs.length - 1];
+          if (last && !last.tab && /[a-zß-ÿ]-$/.test(last.text) && /^[a-zß-ÿ]/.test(l.text)) last.text = last.text.slice(0, -1);
+          else if (last && !last.tab && !/\s$/.test(last.text)) last.text += ' ';
+        }
+        rs.forEach(function (r) {
+          var lr = runs[runs.length - 1];
+          if (lr && !lr.tab && !r.tab && lr.bold === r.bold && lr.italic === r.italic && Math.abs(lr.size - r.size) < 0.6 && lr.font === r.font) lr.text += r.text;
+          else runs.push(r);
+        });
+      });
+      q.runs = runs;
+      q.text = runs.map(function (r) { return r.tab ? '\t' : r.text; }).join('');
+      if (q.list === 'number') q.textX = q.textX || first.x;
+    });
+    return paras;
+  }
+  function trimStart(runs, n) {
+    var out = [], left = n;
+    runs.forEach(function (r) {
+      if (left <= 0 || r.tab) { out.push(r); return; }
+      var take = Math.min(left, r.text.length); left -= take;
+      var rest = r.text.slice(take).replace(/^\s+/, '');
+      if (rest) out.push(Object.assign({}, r, { text: rest }));
+    });
+    return out;
+  }
+
+  // ---------- build the Word file ----------
+  function tw(pt) { return Math.max(0, Math.round(pt * 20)); }
+  $('go').addEventListener('click', function () {
+    if (!file) return;
+    PT.run(async function () {
+      if (!D || !D.Document) throw new Error('The Word maker could not load. Reload the page and try again.');
+      $('stats').hidden = true; $('scanNote').hidden = true;
+      var pdf = await PT.render(file), n = pdf.numPages, pages = [], wantPics = $('pics').checked;
+      $('bar').hidden = false;
+      for (var i = 1; i <= n; i++) {
+        PT.say('', 'Reading page ' + i + ' of ' + n + '…'); $('fill').style.width = (i - 1) / n * 85 + '%';
+        var pg = await readPage(pdf, i, wantPics);
+        if ((pg.chars === 0 && pg.drawing) || (pg.chars < 20 && pg.bigImage)) { // a scan, a photo or a drawing with no real text: keep the look as a picture
+          var r = await PT.pageCanvas(pdf, i, Math.min(2, 2400 / Math.max(pg.w, pg.h)));
+          pg.scan = await encode(r.canvas, false);
+          pg.lines = [];
+        }
+        pages.push(pg);
+      }
+      PT.say('', 'Building the Word file…'); $('fill').style.width = '90%';
+
+      // document-wide measurements: the usual text size, the usual line spacing and the main font
+      var sizeCount = {}, fontCount = {}, gaps = [];
+      pages.forEach(function (pg) {
+        pg.lines.forEach(function (l, k) {
+          l.runs.forEach(function (r) { if (r.tab) return; var s = Math.round(r.size * 2) / 2; sizeCount[s] = (sizeCount[s] || 0) + r.text.length; if (r.font) fontCount[r.font] = (fontCount[r.font] || 0) + r.text.length; });
+          var nx = pg.lines[k + 1];
+          if (nx && Math.abs(nx.size - l.size) < 0.6) { var g = nx.y - l.y; if (g > l.size * 0.9 && g < l.size * 2.2) gaps.push(g / l.size); }
+        });
+      });
+      function top(o) { var best = null; Object.keys(o).forEach(function (k) { if (best === null || o[k] > o[best]) best = k; }); return best; }
+      var body = +(top(sizeCount) || 11), mainFont = top(fontCount) || 'Calibri';
+      gaps.sort(function (a, b) { return a - b; });
+      var lead = (gaps.length ? gaps[Math.floor(gaps.length / 2)] : 1.2) * body;
+
+      // Running headers and footers: the same line near the top or bottom of most pages (page numbers may change).
+      var hf = {}, textPages = pages.filter(function (pg) { return pg.lines.length; }).length;
+      if (textPages >= 2) {
+        var seen = {};
+        pages.forEach(function (pg, pi) {
+          var here = {};
+          pg.lines.forEach(function (l) {
+            var zone = l.y < pg.h * 0.12 ? 'top' : l.y > pg.h * 0.88 ? 'bottom' : '';
+            if (!zone) return;
+            var key = zone + '|' + Math.round(l.y / 8) + '|' + l.text.replace(/\d+/g, '#').replace(/\s+/g, ' ');
+            if (here[key]) return; here[key] = 1;
+            (seen[key] = seen[key] || []).push({ pi: pi, line: l, zone: zone, pg: pg });
+          });
+        });
+        Object.keys(seen).forEach(function (key) {
+          var list = seen[key];
+          if (list.length < Math.max(2, Math.ceil(textPages * 0.6))) return;
+          list.forEach(function (o) { o.line.drop = true; });
+          (hf[list[0].zone] = hf[list[0].zone] || []).push(list[0]);
+        });
+        pages.forEach(function (pg) { pg.lines = pg.lines.filter(function (l) { return !l.drop; }); });
+      }
+      function hfPara(o) {
+        var kids = [], num = String(o.pi + 1), l = o.line, mid = (l.x + l.right) / 2;
+        l.text.split(/(\t|\d+)/).forEach(function (t) {
+          if (!t) return;
+          if (t === '\t') kids.push(new D.Tab());
+          else if (t === num) kids.push(D.PageNumber.CURRENT);
+          else kids.push(t);
+        });
+        return new D.Paragraph({ children: [new D.TextRun({ children: kids, size: Math.round(l.size * 2) })], alignment: Math.abs(mid - o.pg.w / 2) < l.size * 2 ? D.AlignmentType.CENTER : l.x > o.pg.w / 2 ? D.AlignmentType.RIGHT : D.AlignmentType.LEFT });
+      }
+
+      var all = [];
+      pages.forEach(function (pg) { pg.paras = paragraphs(pg, body, lead); });
+      if (!$('breaks').checked) { // a paragraph cut by the end of a page continues on the next one
+        for (var pi = 1; pi < pages.length; pi++) {
+          var prevPg = null;
+          for (var k = pi - 1; k >= 0 && !prevPg; k--) if (pages[k].paras.length && !pages[k].scan) prevPg = pages[k];
+          var a = prevPg && prevPg.paras[prevPg.paras.length - 1], bq = pages[pi].paras[0];
+          if (a && bq && !pages[pi].scan && !a.list && !bq.list && Math.abs(a.size - bq.size) < 0.6 && !/[.!?:;"\u201d)\]]$/.test(a.text) && /^[a-z\u00df-\u00ff]/.test(bq.text)) {
+            var lr = a.runs[a.runs.length - 1];
+            if (lr && !lr.tab && /[a-z]-$/.test(lr.text)) lr.text = lr.text.slice(0, -1); else if (lr && !lr.tab) lr.text += ' ';
+            a.runs = a.runs.concat(bq.runs); a.text += ' ' + bq.text; a.lines = a.lines.concat(bq.lines);
+            pages[pi].paras.shift();
+          }
+        }
+      }
+      // heading levels from the sizes used for headings, biggest first
+      var hs = {};
+      pages.forEach(function (pg) { pg.paras.forEach(function (q) { if (q.size >= body * 1.18 && q.text.length < 160 && q.lines.length <= 3 && q.list !== 'bullet') { q.head = Math.round(q.size); q.list = ''; hs[q.head] = 1; } }); });
+      var levels = Object.keys(hs).map(Number).sort(function (a, b) { return b - a; });
+      var HL = [D.HeadingLevel.HEADING_1, D.HeadingLevel.HEADING_2, D.HeadingLevel.HEADING_3];
+
+      var first = pages[0], left = Math.min.apply(0, pages.map(function (pg) { return pg.lines.length ? pg.left : 72; })), right = Math.max.apply(0, pages.map(function (pg) { return pg.lines.length ? pg.right : first.w - 72; }));
+      var mL = Math.max(36, Math.min(108, left)), mR = Math.max(36, Math.min(108, first.w - right)), content = first.w - mL - mR;
+      var nParas = 0, nHeads = 0, nPics = 0, nScans = 0;
+
+      function runsOf(q, isHead) {
+        return q.runs.map(function (r) {
+          if (r.tab) return new D.TextRun({ children: [new D.Tab()] });
+          var o = { text: r.text, size: Math.round(r.size * 2) };
+          if (r.bold) o.bold = true; else if (isHead) o.bold = false;
+          if (r.italic) o.italics = true;
+          if (r.font && r.font !== mainFont) o.font = r.font;
+          return new D.TextRun(o);
+        });
+      }
+      function picture(img, wPt) {
+        var w = Math.min(wPt, content), h = w * img.ph / img.pw, maxH = first.h - 108;
+        if (h > maxH) { w = w * maxH / h; h = maxH; }
+        nPics++;
+        return { children: [new D.ImageRun({ type: img.type, data: img.data, transformation: { width: Math.round(w * 96 / 72), height: Math.round(h * 96 / 72) } })], spacing: { after: tw(body * 0.6) } };
+      }
+      pages.forEach(function (pg, pi) {
+        var items = [];
+        if (pg.scan) { items.push(picture(pg.scan, content)); nScans++; nPics--; }
+        var imgs = pg.images.slice().sort(function (a, b) { return a.y - b.y; }), ii = 0;
+        pg.paras.forEach(function (q) {
+          while (ii < imgs.length && imgs[ii].y < q.y) { items.push(picture(imgs[ii].img, imgs[ii].w)); ii++; }
+          var opts = { children: runsOf(q, !!q.head), spacing: { after: tw(Math.max(2, body * 0.55)) } };
+          if (q.head) { opts.heading = HL[Math.min(2, levels.indexOf(q.head))]; opts.spacing = { before: tw(body * 0.8), after: tw(body * 0.4) }; nHeads++; }
+          if (q.align) opts.alignment = q.align === 'center' ? D.AlignmentType.CENTER : D.AlignmentType.RIGHT;
+          if (q.list === 'bullet') { opts.bullet = { level: Math.max(0, Math.min(3, Math.round((q.x - left) / 18))) }; opts.spacing = { after: tw(body * 0.2) }; }
+          else if (q.list === 'number') { opts.indent = { left: tw(Math.max(18, q.textX - left)), hanging: tw(Math.max(14, q.textX - q.x)) }; opts.spacing = { after: tw(body * 0.2) }; }
+          else if (q.indent > body * 0.8 || q.firstLine) { opts.indent = {}; if (q.indent > body * 0.8) opts.indent.left = tw(Math.min(q.indent, content / 2)); if (q.firstLine > body * 0.8) opts.indent.firstLine = tw(Math.min(q.firstLine, content / 3)); else if (q.firstLine < -body * 0.8) opts.indent.hanging = tw(Math.min(-q.firstLine, content / 3)); }
+          var stops = q.runs.filter(function (r) { return r.tab && r.x > mL; }).map(function (r) { return Math.round(r.x - mL); }).filter(function (x, i, arr) { return arr.indexOf(x) === i && x < content; }).sort(function (a, b) { return a - b; });
+          if (stops.length) opts.tabStops = stops.map(function (x) { return { type: D.TabStopType.LEFT, position: tw(x) }; });
+          items.push(opts); nParas++;
+        });
+        while (ii < imgs.length) { items.push(picture(imgs[ii].img, imgs[ii].w)); ii++; }
+        if (!items.length) items.push({});
+        if (pi && $('breaks').checked) items[0].pageBreakBefore = true;
+        all = all.concat(items.map(function (o) { return new D.Paragraph(o); }));
+      });
+      var doc = new D.Document({
+        creator: 'GetToolNest PDF to Word', title: PT.base(file.name),
+        styles: {
+          default: {
+            document: { run: { font: mainFont, size: Math.round(body * 2) } },
+            heading1: { run: { bold: true, color: '000000', font: mainFont }, paragraph: { keepNext: true, keepLines: true } },
+            heading2: { run: { bold: true, color: '000000', font: mainFont }, paragraph: { keepNext: true, keepLines: true } },
+            heading3: { run: { bold: true, color: '000000', font: mainFont }, paragraph: { keepNext: true, keepLines: true } }
+          }
+        },
+        sections: [{
+          headers: hf.top ? { default: new D.Header({ children: hf.top.sort(function (a, b) { return a.line.y - b.line.y; }).map(hfPara) }) } : undefined,
+          footers: hf.bottom ? { default: new D.Footer({ children: hf.bottom.sort(function (a, b) { return a.line.y - b.line.y; }).map(hfPara) }) } : undefined,
+          properties: { page: { size: { width: tw(first.w), height: tw(first.h) }, margin: { top: tw(54), bottom: tw(54), left: tw(mL), right: tw(mR) } } }, children: all }]
+      });
+      var blob = await D.Packer.toBlob(doc);
+      $('fill').style.width = '100%';
+      $('sPages').textContent = n; $('sParas').textContent = nParas; $('sHeads').textContent = nHeads; $('sPics').textContent = nPics + nScans; $('stats').hidden = false;
+      $('scanNote').hidden = !nScans;
+      var note = 'Converted ' + n + (n === 1 ? ' page' : ' pages');
+      if (!nParas && !nScans) note = 'This PDF has no text or pictures that could be read. The Word file is empty';
+      PT.done(blob, PT.base(file.name) + '.docx', blob.type, note);
+      burst($('dl'));
+    }).then(function () { $('bar').hidden = true; });
+  });
+})();
+</script>

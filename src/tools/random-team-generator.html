@@ -1,0 +1,143 @@
+<style>
+.rt-teams { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; margin-top: 16px; }
+.rt-team { border: 1px solid var(--line); border-top: 5px solid var(--tc); border-radius: 12px; background: var(--bg); padding: 12px 14px; min-width: 0; }
+.rt-team h3 { font-size: 17px; margin: 0 0 2px; display: flex; align-items: center; gap: 8px; }
+.rt-team h3 i { width: 12px; height: 12px; border-radius: 50%; background: var(--tc); flex: none; }
+.rt-team p { margin: 0 0 8px; font-size: 13px; color: var(--muted); }
+.rt-team ol { margin: 0; padding-left: 22px; }
+.rt-team li { padding: 2px 0; overflow-wrap: anywhere; }
+.rt-team li small { color: var(--muted); margin-inline-start: 6px; }
+.rt-hint { font-size: 13px; color: var(--muted); margin: 6px 0 14px; }
+@media print {
+  html.rt-printing body * { visibility: hidden !important; }
+  html.rt-printing #rtOut, html.rt-printing #rtOut * { visibility: visible !important; }
+  html.rt-printing #rtOut { position: absolute; left: 0; top: 0; width: 100%; }
+  html.rt-printing .rt-team { break-inside: avoid; }
+}
+</style>
+<label for="rtList">Names, one per line</label>
+<textarea id="rtList" class="plain" data-nomemo placeholder="Alice&#10;Bob&#10;Carol&#10;Dan&#10;…"></textarea>
+<p class="rt-hint">To balance teams by skill, add a number after a comma, for example <b>Alice, 8</b>. Higher numbers mean stronger players.</p>
+<div class="fields">
+  <div><label for="rtMode">Split by</label><select id="rtMode"><option value="teams">Number of teams</option><option value="size">People per team</option></select></div>
+  <div><label for="rtNum" id="rtNumL">Number of teams</label><input type="number" id="rtNum" min="1" max="500" step="1" value="2"></div>
+  <div><label for="rtNames">Team names</label><select id="rtNames"><option value="colour">Colours (Team Red, Team Blue…)</option><option value="number">Numbers (Team 1, Team 2…)</option><option value="animal">Animals (Lions, Tigers…)</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="rtBal">Balance teams by skill numbers</label>
+  <label><input type="checkbox" id="rtRemember" checked>Remember my list on this device</label>
+</div>
+<div class="btns"><button type="button" class="btn" id="rtGo">Make teams</button><button type="button" class="btn ghost" id="rtCopy" disabled>Copy</button><button type="button" class="btn ghost" id="rtPrint" disabled>Print</button><button type="button" class="btn ghost" id="rtClear">Clear list</button></div>
+<p class="msg" id="rtMsg" aria-live="polite"></p>
+<div id="rtOut"><div class="rt-teams" id="rtTeams"></div></div>
+<script>
+(function () {
+  // core-start
+  function rand(n) { // unbiased random integer in [0, n) from the browser's cryptographic generator
+    var max = Math.floor(4294967296 / n) * n, a = new Uint32Array(1);
+    do { crypto.getRandomValues(a); } while (a[0] >= max);
+    return a[0] % n;
+  }
+  function shuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = rand(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  // "Alice, 8" or "Alice: 8" or "Alice | 8" gives a skill number. Everything else is just a name.
+  function parse(text) {
+    return String(text || '').split(/\r?\n/).map(function (l) { return l.trim(); }).filter(Boolean).map(function (l) {
+      var m = /^(.*\S)\s*[,:|]\s*(-?\d+(?:\.\d+)?)$/.exec(l);
+      return m ? { name: m[1], skill: +m[2] } : { name: l, skill: null };
+    });
+  }
+  function teamCount(n, mode, num) { return mode === 'size' ? Math.ceil(n / num) : num; }
+  // Shuffle, then either deal the cards round the table, or (balanced) give each player, strongest first,
+  // to the weakest team among those with the fewest players so sizes never differ by more than one.
+  function makeTeams(people, k, balance) {
+    var teams = [], i;
+    for (i = 0; i < k; i++) teams.push({ members: [], total: 0 });
+    var list = shuffle(people);
+    if (!balance) { list.forEach(function (p, i) { teams[i % k].members.push(p); teams[i % k].total += p.skill || 0; }); return teams; }
+    var known = list.filter(function (p) { return p.skill != null; }), avg = known.length ? known.reduce(function (s, p) { return s + p.skill; }, 0) / known.length : 0;
+    list = list.map(function (p, i) { return { p: p, s: p.skill == null ? avg : p.skill, i: i }; }).sort(function (a, b) { return b.s - a.s || a.i - b.i; });
+    var order = shuffle(teams.map(function (t, i) { return i; })); // random tie-break between equal teams
+    list.forEach(function (x) {
+      var best = -1;
+      order.forEach(function (t) {
+        var T = teams[t];
+        if (best === -1) { best = t; return; }
+        var B = teams[best];
+        if (T.members.length < B.members.length || (T.members.length === B.members.length && T.total < B.total)) best = t;
+      });
+      teams[best].members.push(x.p); teams[best].total += x.s;
+    });
+    return teams;
+  }
+  // core-end
+  var COLOURS = [['Red', '#dc2626'], ['Blue', '#2563eb'], ['Green', '#16a34a'], ['Yellow', '#eab308'], ['Purple', '#9333ea'], ['Orange', '#ea580c'], ['Pink', '#db2777'], ['Teal', '#0d9488'], ['Brown', '#92400e'], ['Grey', '#64748b'], ['Navy', '#1e3a8a'], ['Lime', '#65a30d'], ['Maroon', '#7f1d1d'], ['Cyan', '#0891b2'], ['Gold', '#ca8a04'], ['Indigo', '#4f46e5']];
+  var ANIMALS = ['Lions', 'Tigers', 'Eagles', 'Sharks', 'Wolves', 'Bears', 'Falcons', 'Panthers', 'Dolphins', 'Foxes', 'Hawks', 'Owls', 'Rhinos', 'Cobras', 'Jaguars', 'Bulls'];
+  var KEY = 'gtnTeamList', last = null;
+  function nameOf(i) {
+    var s = $('rtNames').value;
+    if (s === 'colour' && i < COLOURS.length) return 'Team ' + COLOURS[i][0];
+    if (s === 'animal' && i < ANIMALS.length) return 'The ' + ANIMALS[i];
+    return 'Team ' + (i + 1);
+  }
+  function colourOf(i) { return i < COLOURS.length ? COLOURS[i][1] : 'hsl(' + Math.round(i * 137.5 % 360) + ' 65% 45%)'; }
+  function say(cls, t) { $('rtMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('rtMsg').textContent = t; }
+  function fmtS(n) { return Math.round(n * 10) / 10; }
+  function render() {
+    var box = $('rtTeams'); box.innerHTML = '';
+    if (!last) { $('rtCopy').disabled = $('rtPrint').disabled = true; return; }
+    last.teams.forEach(function (t, i) {
+      var d = document.createElement('div'), h = document.createElement('h3'), dot = document.createElement('i'), p = document.createElement('p'), ol = document.createElement('ol');
+      d.className = 'rt-team'; d.style.setProperty('--tc', colourOf(i));
+      h.appendChild(dot); h.appendChild(document.createTextNode(nameOf(i)));
+      p.textContent = t.members.length + (t.members.length === 1 ? ' player' : ' players') + (last.balance ? ' · total skill ' + fmtS(t.total) : '');
+      t.members.forEach(function (m) { var li = document.createElement('li'); li.textContent = m.name; if (last.balance && m.skill != null) { var s = document.createElement('small'); s.textContent = '(' + m.skill + ')'; li.appendChild(s); } ol.appendChild(li); });
+      d.appendChild(h); d.appendChild(p); d.appendChild(ol); box.appendChild(d);
+    });
+    $('rtCopy').disabled = $('rtPrint').disabled = false;
+  }
+  function go() {
+    var people = parse($('rtList').value), num = Math.floor(+$('rtNum').value), mode = $('rtMode').value;
+    if (people.length > 2000) return say('bad', 'That is more than 2,000 names. Please use a shorter list.');
+    if (people.length < 2) { last = null; render(); return say('bad', 'Add at least 2 names, one per line.'); }
+    if (!(num >= 1)) return say('bad', mode === 'size' ? 'Enter how many people you want in each team.' : 'Enter how many teams you want.');
+    var k = teamCount(people.length, mode, num);
+    if (k < 2) return say('bad', mode === 'size' ? 'With ' + people.length + ' names and ' + num + ' per team you would get only one team. Use a smaller team size.' : 'Choose at least 2 teams.');
+    if (k > people.length) return say('bad', 'You asked for ' + k + ' teams but there are only ' + people.length + ' names. Use fewer teams.');
+    var bal = $('rtBal').checked, withSkill = people.filter(function (p) { return p.skill != null; }).length;
+    last = { teams: makeTeams(people, k, bal), balance: bal };
+    render();
+    var sizes = last.teams.map(function (t) { return t.members.length; }), lo = Math.min.apply(null, sizes), hi = Math.max.apply(null, sizes);
+    var note = people.length + ' names in ' + k + ' teams of ' + (lo === hi ? lo : lo + ' or ' + hi) + '.';
+    if (bal && !withSkill) note += ' No skill numbers were found, so the teams are simply random. Add them like "Alice, 8".';
+    else if (bal && withSkill < people.length) note += ' ' + (people.length - withSkill) + ' name' + (people.length - withSkill === 1 ? ' has' : 's have') + ' no skill number and count as average.';
+    else if (bal) { var tot = last.teams.map(function (t) { return t.total; }); note += ' Skill totals range from ' + fmtS(Math.min.apply(null, tot)) + ' to ' + fmtS(Math.max.apply(null, tot)) + '.'; }
+    say('ok', note);
+    if (window.burst) burst($('rtGo'));
+  }
+  function text() {
+    return last.teams.map(function (t, i) {
+      return nameOf(i) + ' (' + t.members.length + (last.balance ? ', skill ' + fmtS(t.total) : '') + ')\n' + t.members.map(function (m, j) { return (j + 1) + '. ' + m.name; }).join('\n');
+    }).join('\n\n');
+  }
+  function remember() {
+    try { if ($('rtRemember').checked) localStorage.setItem(KEY, $('rtList').value); else localStorage.removeItem(KEY); } catch (e) {}
+  }
+  function label() { $('rtNumL').textContent = $('rtMode').value === 'size' ? 'People per team' : 'Number of teams'; }
+  try { var saved = localStorage.getItem(KEY); if (saved) $('rtList').value = saved; } catch (e) {}
+  var t;
+  $('rtList').addEventListener('input', function () { clearTimeout(t); t = setTimeout(remember, 300); });
+  $('rtRemember').addEventListener('change', remember);
+  $('rtMode').addEventListener('change', label);
+  $('rtNames').addEventListener('change', render);
+  $('rtGo').addEventListener('click', go);
+  $('rtCopy').addEventListener('click', function () { if (last) copyText(text(), $('rtCopy')); });
+  $('rtPrint').addEventListener('click', function () {
+    if (!last) return;
+    var root = document.documentElement; root.classList.add('rt-printing');
+    var done = function () { root.classList.remove('rt-printing'); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done); window.print();
+  });
+  $('rtClear').addEventListener('click', function () { if ($('rtList').value && !confirm('Clear the list of names?')) return; $('rtList').value = ''; remember(); last = null; render(); say('', ''); $('rtList').focus(); });
+  label();
+})();
+</script>

@@ -1,0 +1,204 @@
+<style>
+.wa-num { display: grid; grid-template-columns: minmax(0, 200px) minmax(0, 1fr); gap: 10px; }
+@media (max-width: 520px) { .wa-num { grid-template-columns: 1fr; } }
+.wa-out { display: flex; gap: 10px; align-items: center; margin-top: 14px; }
+.wa-out code { flex: 1; min-width: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 11px 13px; font-family: var(--mono); font-size: 14px; overflow-wrap: anywhere; min-height: 44px; }
+.wa-qr { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 16px; }
+.wa-qr canvas { width: 180px; height: 180px; border-radius: 10px; border: 1px solid var(--line); background: #fff; }
+.wa-qr .btns { margin: 0; }
+.wa-bar { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.wa-bar button { font: 600 14px/1 inherit; font-family: inherit; min-width: 44px; height: 40px; padding: 0 12px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; cursor: pointer; }
+.wa-bar button:hover { border-color: var(--accent); color: var(--accent); }
+.wa-prev { background: #e7f6dd; color: #111b21; border-radius: 12px; padding: 12px 14px; margin-top: 12px; font-size: 15.5px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; min-height: 48px; max-width: 520px; }
+[data-theme="dark"] .wa-prev { background: #144d37; color: #e9edef; }
+.wa-prev code { font-family: var(--mono); font-size: 14px; }
+.wa-prev .wa-ic { background: rgba(0, 0, 0, .08); border-radius: 4px; padding: 0 3px; }
+.wa-prev .wa-q { display: block; border-left: 4px solid rgba(0, 0, 0, .25); padding-left: 8px; color: inherit; opacity: .85; }
+.wa-sec { margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--line); }
+.wa-sec h2 { font-size: 19px; margin: 0 0 4px; }
+</style>
+<div class="wa-num">
+  <div><label for="waCc">Country code</label><select id="waCc"></select></div>
+  <div><label for="waNum">Phone number</label><input type="tel" id="waNum" data-nomemo inputmode="tel" autocomplete="off" placeholder="e.g. 0300 1234567 or +92 300 1234567"></div>
+</div>
+<p class="msg" id="waNumMsg" aria-live="polite">Type the number as you would dial it in that country. Spaces, dashes, brackets and a leading 0 are handled for you.</p>
+<label for="waMsg" style="margin-top:12px">Message that appears ready to send (optional)</label>
+<textarea id="waMsg" class="plain" data-nomemo style="min-height:90px" maxlength="4000" placeholder="Hi! I saw your ad and would like to know more."></textarea>
+<div class="wa-out"><code id="waLink" aria-live="polite">Enter a phone number or a message to make your link.</code></div>
+<div class="btns">
+  <button class="btn" id="waCopy" type="button" disabled>Copy link</button>
+  <a class="btn ghost" id="waOpen" target="_blank" rel="noopener" aria-disabled="true">Open to test</a>
+</div>
+<div class="wa-qr">
+  <canvas id="waQr" width="540" height="540" aria-label="QR code for the link"></canvas>
+  <div>
+    <p class="msg" style="margin:0 0 10px;max-width:320px">Scanning this QR code opens the same chat. Print it on a card, menu or shop counter.</p>
+    <div class="btns"><a class="btn ghost" id="waDl" download="whatsapp-chat-qr.png">Download QR (PNG)</a></div>
+  </div>
+</div>
+
+<div class="wa-sec">
+  <h2>Text formatter</h2>
+  <p class="msg" style="margin-top:0">Select some text and tap a style. The preview shows how it looks in the chat.</p>
+  <div class="wa-bar" role="toolbar" aria-label="Formatting">
+    <button type="button" data-f="*" title="Bold"><b>B</b></button>
+    <button type="button" data-f="_" title="Italic"><i>I</i></button>
+    <button type="button" data-f="~" title="Strikethrough"><s>S</s></button>
+    <button type="button" data-f="```" title="Monospace"><code>Mono</code></button>
+    <button type="button" data-f="`" title="Inline code"><code>`code`</code></button>
+    <button type="button" data-l="- " title="Bulleted list">• List</button>
+    <button type="button" data-l="1. " title="Numbered list">1. List</button>
+    <button type="button" data-l="> " title="Quote">“ Quote</button>
+  </div>
+  <label for="waFmt">Text to format</label>
+  <textarea id="waFmt" class="plain" data-nomemo style="min-height:120px" placeholder="*Weekend sale* on _all_ shoes&#10;- 20% off&#10;- Free delivery&#10;> Offer ends Sunday"></textarea>
+  <div class="wa-prev" id="waPrev" aria-live="polite"></div>
+  <div class="btns">
+    <button class="btn" id="waFmtCopy" type="button">Copy formatted text</button>
+    <button class="btn ghost" id="waUse" type="button">Use as the link message</button>
+  </div>
+  <p class="msg" id="waFmtMsg" aria-live="polite"></p>
+</div>
+<p class="msg">This is an independent tool and is not made by or affiliated with WhatsApp or Meta. Links follow the public click-to-chat format (wa.me), and everything is built in your browser.</p>
+<script src="../assets/vendor/qrcode.js"></script>
+<script>
+(function () {
+  qrcode.stringToBytes = function (s) { return Array.from(new TextEncoder().encode(s)); };
+  var C = 'Afghanistan|93|AF;Albania|355|AL;Algeria|213|DZ;Argentina|54|AR;Australia|61|AU;Austria|43|AT;Azerbaijan|994|AZ;Bahrain|973|BH;Bangladesh|880|BD;Belgium|32|BE;Bhutan|975|BT;Brazil|55|BR;Canada|1|CA;Chile|56|CL;China|86|CN;Colombia|57|CO;Czechia|420|CZ;Denmark|45|DK;Egypt|20|EG;Ethiopia|251|ET;Finland|358|FI;France|33|FR;Germany|49|DE;Ghana|233|GH;Greece|30|GR;Hong Kong|852|HK;Hungary|36|HU;India|91|IN;Indonesia|62|ID;Iran|98|IR;Iraq|964|IQ;Ireland|353|IE;Israel|972|IL;Italy|39|IT;Japan|81|JP;Jordan|962|JO;Kazakhstan|7|KZ;Kenya|254|KE;Kuwait|965|KW;Lebanon|961|LB;Malaysia|60|MY;Maldives|960|MV;Mexico|52|MX;Morocco|212|MA;Nepal|977|NP;Netherlands|31|NL;New Zealand|64|NZ;Nigeria|234|NG;Norway|47|NO;Oman|968|OM;Pakistan|92|PK;Peru|51|PE;Philippines|63|PH;Poland|48|PL;Portugal|351|PT;Qatar|974|QA;Romania|40|RO;Russia|7|RU;Saudi Arabia|966|SA;Singapore|65|SG;South Africa|27|ZA;South Korea|82|KR;Spain|34|ES;Sri Lanka|94|LK;Sweden|46|SE;Switzerland|41|CH;Taiwan|886|TW;Tanzania|255|TZ;Thailand|66|TH;Turkey|90|TR;Uganda|256|UG;Ukraine|380|UA;United Arab Emirates|971|AE;United Kingdom|44|GB;United States|1|US;Uzbekistan|998|UZ;Vietnam|84|VN;Yemen|967|YE;Zimbabwe|263|ZW'.split(';').map(function (s) { return s.split('|'); });
+  var TZ = { 'Asia/Karachi': 'PK', 'Asia/Kolkata': 'IN', 'Asia/Calcutta': 'IN', 'Asia/Dhaka': 'BD', 'Asia/Dubai': 'AE', 'Asia/Riyadh': 'SA', 'Europe/London': 'GB', 'Asia/Kathmandu': 'NP', 'Asia/Colombo': 'LK', 'Africa/Lagos': 'NG', 'Africa/Nairobi': 'KE', 'Asia/Jakarta': 'ID', 'Asia/Manila': 'PH', 'Asia/Kuala_Lumpur': 'MY', 'Asia/Qatar': 'QA', 'Africa/Cairo': 'EG', 'Europe/Istanbul': 'TR', 'Australia/Sydney': 'AU', 'America/Toronto': 'CA', 'America/New_York': 'US', 'America/Chicago': 'US', 'America/Los_Angeles': 'US', 'America/Denver': 'US' };
+  var sel = $('waCc'), guess = '';
+  try { guess = TZ[Intl.DateTimeFormat().resolvedOptions().timeZone] || ''; } catch (e) {}
+  var o0 = document.createElement('option'); o0.value = ''; o0.textContent = 'Number already has the code'; sel.appendChild(o0);
+  C.forEach(function (c) { var o = document.createElement('option'); o.value = c[2]; o.textContent = c[0] + ' (+' + c[1] + ')'; if (c[2] === guess) o.selected = true; sel.appendChild(o); });
+  function cc() { var v = sel.value; for (var i = 0; i < C.length; i++) if (C[i][2] === v) return C[i][1]; return ''; }
+
+  // Turn what the visitor typed into the digits wa.me wants: country code + national number, no +, no spaces, no trunk 0.
+  function normalize(raw) {
+    var s = String(raw).trim().replace(/[٠-٩]/g, function (d) { return d.charCodeAt(0) - 0x660; }).replace(/[۰-۹]/g, function (d) { return d.charCodeAt(0) - 0x6F0; });
+    if (!s) return { empty: true };
+    if (/[a-z]/i.test(s.replace(/\b(ext|x)\.?\s*\d+$/i, ''))) return { err: 'A phone number can only have digits, spaces, dashes, brackets and a leading +.' };
+    s = s.replace(/\b(ext|x)\.?\s*\d+$/i, '');
+    var intl = /^\s*(\+|00)/.test(s), d = s.replace(/\D/g, ''), code = cc(), note = '';
+    if (/^00/.test(d) && !/^\s*\+/.test(s)) d = d.slice(2);
+    if (!intl) {
+      if (!code) {
+        d = d.replace(/^0+/, '');
+        note = 'No country picked, so the number is used as it is. Make sure it starts with the country code.';
+      } else if (d.indexOf(code) === 0 && d[0] !== '0' && d.length >= code.length + 9) {
+        note = 'This number already starts with ' + code + ', so it was not added again.';
+      } else {
+        // Italy keeps the leading 0 of landline numbers; everywhere else a leading 0 is the domestic trunk prefix.
+        if (code !== '39') d = d.replace(/^0+/, '');
+        d = code + d;
+      }
+    } else if (code && d.indexOf(code) !== 0) {
+      note = 'The number starts with +' + d.slice(0, 3) + '…, so it was used as typed and the country picker was ignored.';
+    }
+    if (intl || !code) {
+      // people often keep the domestic 0 after the country code, e.g. +92 0300...; drop it (not for Italy)
+      var pc = '';
+      C.forEach(function (c) { if (d.indexOf(c[1]) === 0 && c[1].length > pc.length) pc = c[1]; });
+      if (pc && pc !== '39' && d[pc.length] === '0') { d = pc + d.slice(pc.length).replace(/^0+/, ''); note = 'Removed the 0 after the country code, which is only used for calls inside the country.'; }
+    }
+    if (d.length < 8) return { err: 'That number looks too short. Include the full number with area or mobile code.' };
+    if (d.length > 15) return { err: 'That number has ' + d.length + ' digits. International numbers have at most 15, including the country code.' };
+    if (/^0/.test(d)) return { err: 'Pick a country, or start the number with + and the country code.' };
+    return { d: d, note: note };
+  }
+  function link() {
+    var n = normalize($('waNum').value), msg = $('waMsg').value, m = $('waNumMsg');
+    var text = msg.trim() ? '?text=' + encodeURIComponent(msg) : '', url = '';
+    if (n.err) { m.className = 'msg bad'; m.textContent = n.err; }
+    else if (n.empty) { m.className = 'msg'; m.textContent = msg.trim() ? 'No number: the link will let the person choose who to send your message to.' : 'Type the number as you would dial it in that country. Spaces, dashes, brackets and a leading 0 are handled for you.'; if (msg.trim()) url = 'https://wa.me/' + text; }
+    else { m.className = 'msg ok'; m.textContent = 'Number used: +' + n.d + (n.note ? '. ' + n.note : ''); url = 'https://wa.me/' + n.d + text; }
+    $('waLink').textContent = url || (n.err ? 'Fix the number above to make your link.' : 'Enter a phone number or a message to make your link.');
+    $('waCopy').disabled = !url;
+    if (url) { $('waOpen').href = url; $('waOpen').removeAttribute('aria-disabled'); } else { $('waOpen').removeAttribute('href'); $('waOpen').setAttribute('aria-disabled', 'true'); }
+    drawQr(url);
+    return url;
+  }
+  function drawQr(url) {
+    var cv = $('waQr'), size = cv.width, ctx = cv.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+    $('waDl').removeAttribute('href'); $('waDl').setAttribute('aria-disabled', 'true');
+    if (!url) { ctx.fillStyle = '#9aa3af'; ctx.font = '28px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('QR code appears here', size / 2, size / 2); return; }
+    var qr;
+    try { qr = qrcode(0, 'M'); qr.addData(url, 'Byte'); qr.make(); }
+    catch (e) { ctx.fillStyle = '#b91c1c'; ctx.font = '26px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.fillText('Message too long for a QR code', size / 2, size / 2); return; }
+    var n = qr.getModuleCount(), cell = Math.floor(size / (n + 8)), off = Math.floor((size - cell * n) / 2);
+    ctx.fillStyle = '#000';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(off + c * cell, off + r * cell, cell, cell);
+    $('waDl').href = cv.toDataURL('image/png'); $('waDl').removeAttribute('aria-disabled');
+  }
+  ['waCc', 'waNum', 'waMsg'].forEach(function (id) { $(id).addEventListener('input', link); $(id).addEventListener('change', link); });
+  $('waCopy').addEventListener('click', function () { var u = link(); if (u) copyText(u, $('waCopy')); });
+  $('waOpen').addEventListener('click', function (e) { if (!this.getAttribute('href')) e.preventDefault(); });
+  $('waDl').addEventListener('click', function (e) { if (!this.getAttribute('href')) e.preventDefault(); });
+
+  // ---- formatter ----
+  var F = $('waFmt');
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function inline(s) {
+    var codes = [];
+    s = s.replace(/`([^`\n]+)`/g, function (m, a) { codes.push('<code class="wa-ic">' + a + '</code>'); return '\u0000' + (codes.length - 1) + '\u0000'; });
+    // a marker only counts when it touches text on the inside and is not glued to a letter on the outside
+    [['\\*', 'b'], ['_', 'i'], ['~', 's']].forEach(function (p) {
+      var re = new RegExp('(^|[^\\p{L}\\p{N}])' + p[0] + '(?=\\S)([^\\n]*?\\S)' + p[0] + '(?![\\p{L}\\p{N}])', 'gu');
+      s = s.replace(re, '$1<' + p[1] + '>$2</' + p[1] + '>');
+    });
+    return s.replace(/\u0000(\d+)\u0000/g, function (m, i) { return codes[+i]; });
+  }
+  function render(t) {
+    var blocks = [];
+    t = esc(t).replace(/```([\s\S]+?)```/g, function (m, a) { blocks.push('<code>' + a + '</code>'); return '\u0001' + (blocks.length - 1) + '\u0001'; });
+    var html = t.split('\n').map(function (l) {
+      var q = /^&gt; ?(.*)$/.exec(l);
+      if (q) return '<span class="wa-q">' + inline(q[1]) + '</span>';
+      var b = /^([-*•]) (.*)$/.exec(l);
+      if (b) return '• ' + inline(b[2]);
+      return inline(l);
+    }).join('\n').replace(/<\/span>\n/g, '</span>');
+    return html.replace(/\u0001(\d+)\u0001/g, function (m, i) { return blocks[+i]; });
+  }
+  function preview() {
+    var t = F.value;
+    if (!t) { $('waPrev').innerHTML = '<span style="opacity:.6">Your formatted message preview appears here.</span>'; return; }
+    $('waPrev').innerHTML = render(t);
+  }
+  function wrap(mk) {
+    var a = F.selectionStart, b = F.selectionEnd, v = F.value;
+    if (a === b) { F.setRangeText(mk + 'text' + mk, a, b, 'end'); F.setSelectionRange(a + mk.length, a + mk.length + 4); }
+    else {
+      var s = v.slice(a, b), lead = s.match(/^\s*/)[0], trail = s.match(/\s*$/)[0], core = s.trim();
+      if (!core) return;
+      // already wrapped: unwrap
+      if (core.length > mk.length * 2 && core.slice(0, mk.length) === mk && core.slice(-mk.length) === mk) F.setRangeText(lead + core.slice(mk.length, -mk.length) + trail, a, b, 'select');
+      else if (mk !== '```' && core.indexOf('\n') !== -1) F.setRangeText(lead + core.split('\n').map(function (l) { return l.trim() ? l.replace(/^(\s*)(.*?)(\s*)$/, '$1' + mk + '$2' + mk + '$3') : l; }).join('\n') + trail, a, b, 'select');
+      else F.setRangeText(lead + mk + core + mk + trail, a, b, 'select');
+    }
+    F.focus(); preview();
+  }
+  function lines(pre) {
+    var v = F.value, a = v.lastIndexOf('\n', F.selectionStart - 1) + 1, e = v.indexOf('\n', Math.max(F.selectionEnd - (F.selectionEnd > F.selectionStart && v[F.selectionEnd - 1] === '\n' ? 1 : 0), F.selectionStart));
+    if (e === -1) e = v.length;
+    var ls = v.slice(a, e).split('\n'), k = 0, strip = /^(- |\* |• |\d+\. |> )/;
+    var all = ls.every(function (l) { return !l.trim() || (pre === '1. ' ? /^\d+\. /.test(l) : l.indexOf(pre) === 0); });
+    var out = ls.map(function (l) {
+      if (!l.trim()) return l;
+      if (all) return l.replace(strip, '');
+      l = l.replace(strip, '');
+      return (pre === '1. ' ? (++k) + '. ' : pre) + l;
+    }).join('\n');
+    F.setRangeText(out, a, e, 'select'); F.focus(); preview();
+  }
+  document.querySelectorAll('.wa-bar button').forEach(function (b) {
+    b.addEventListener('mousedown', function (e) { e.preventDefault(); }); // keep the selection in the box
+    b.addEventListener('click', function () { if (b.dataset.f) wrap(b.dataset.f); else lines(b.dataset.l); });
+  });
+  F.addEventListener('input', preview);
+  function fsay(c, t) { $('waFmtMsg').className = 'msg' + (c ? ' ' + c : ''); $('waFmtMsg').textContent = t; }
+  $('waFmtCopy').addEventListener('click', function () { if (!F.value) { fsay('bad', 'Type a message first.'); return; } copyText(F.value, $('waFmtCopy')); fsay('ok', 'Copied. Paste it into a chat to send it with the styles.'); });
+  $('waUse').addEventListener('click', function () { if (!F.value) { fsay('bad', 'Type a message first.'); return; } $('waMsg').value = F.value; link(); fsay('ok', 'Added to the link message above.'); $('waMsg').scrollIntoView({ block: 'center', behavior: 'smooth' }); });
+  preview(); link();
+})();
+</script>

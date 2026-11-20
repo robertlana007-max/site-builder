@@ -1,0 +1,335 @@
+<style>
+.bl-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.bl-bar .btn { min-height: 40px; padding: 6px 12px; }
+.bl-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 12px; user-select: none; -webkit-user-select: none; }
+.bl-stage canvas { max-width: 100%; max-height: 70vh; display: block; margin: 0 auto; touch-action: none; cursor: crosshair; }
+.bl-stage canvas.mv { cursor: move; }
+.bl-list { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 12px; padding: 0; list-style: none; }
+.bl-list li { display: inline-flex; align-items: center; gap: 2px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); font-size: 14px; }
+.bl-list li[aria-current="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.bl-list button { font: inherit; background: none; border: 0; color: inherit; cursor: pointer; padding: 6px 4px 6px 12px; min-height: 36px; }
+.bl-list button.x { padding: 6px 12px 6px 6px; color: var(--muted); }
+.bl-list button.x:hover { color: var(--bad); }
+.bl-tip { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+.bl-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>JPG, PNG or WebP. Blurred on your device, never uploaded. You can also paste with Ctrl+V.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div id="editor" hidden>
+  <div class="bl-bar" role="group" aria-label="Drawing tool">
+    <button class="btn ghost" type="button" data-mode="rect" aria-pressed="true">▭ Rectangle</button>
+    <button class="btn ghost" type="button" data-mode="ellipse" aria-pressed="false">◯ Ellipse</button>
+    <button class="btn ghost" type="button" data-mode="brush" aria-pressed="false">✎ Brush</button>
+    <button class="btn ghost" type="button" data-mode="move" aria-pressed="false">✥ Select and move</button>
+    <button class="btn ghost" type="button" id="faces" hidden>Find faces</button>
+  </div>
+  <p class="bl-tip" id="tip">Drag on the picture to cover an area. Drag an existing area to move it, or its corner squares to resize it.</p>
+  <div class="bl-stage"><canvas id="cv" aria-label="Your image with blurred areas. Drag to add an area."></canvas></div>
+  <ul class="bl-list" id="list" aria-label="Covered areas"></ul>
+  <div class="fields bl-col">
+    <div><label for="fx">Effect</label><select id="fx"><option value="blur">Blur</option><option value="pixel">Pixelate (mosaic)</option><option value="bar">Solid bar (safest)</option></select></div>
+    <div id="amtRow"><label for="amt">Strength: <span id="amtV">50</span>%</label><input type="range" id="amt" min="5" max="100" value="50"></div>
+    <div id="colRow" hidden><label for="barCol">Bar colour</label><input type="color" id="barCol" value="#000000"></div>
+    <div id="brushRow"><label for="bsz">Brush size: <span id="bszV">5</span>%</label><input type="range" id="bsz" min="1" max="20" step="0.5" value="5"></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="whole" data-nomemo> Blur the whole image</label></div>
+  <div class="fields" id="wholeRow" hidden><div><label for="wamt">Whole image blur: <span id="wamtV">30</span>%</label><input type="range" id="wamt" min="2" max="100" value="30"></div></div>
+  <div class="fields">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="keep">Same as original</option><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+    <div id="qRow"><label for="q">Quality (JPG, WebP): <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download image</button><button class="btn ghost" id="clearAll" hidden>Remove all areas</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var img = null, file = null, regions = [], sel = -1, mode = 'rect', busy = false;
+  var cv = $('cv'), ctx = cv.getContext('2d'), baseCache = null;
+  var EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  var FXN = { blur: 'Blur', pixel: 'Pixelate', bar: 'Bar' }, KN = { rect: 'Rectangle', ellipse: 'Ellipse', brush: 'Brush' };
+  function say(c, t) { PT.say(c, t); }
+
+  // ---------- pixel effects (plain JavaScript so every browser, Safari included, gives the same result) ----------
+  function boxBlur(d, w, h, r) { // 3 passes of a horizontal + vertical box blur ≈ Gaussian
+    r = Math.max(1, Math.round(r));
+    var tmp = new Uint8ClampedArray(d.length);
+    for (var pass = 0; pass < 3; pass++) { blurDir(d, tmp, w, h, r, 1); blurDir(tmp, d, w, h, r, 0); }
+  }
+  function blurDir(src, dst, w, h, r, horiz) {
+    var len = horiz ? w : h, lines = horiz ? h : w, step = horiz ? 4 : w * 4, inv = 1 / (2 * r + 1);
+    for (var l = 0; l < lines; l++) {
+      var start = horiz ? l * w * 4 : l * 4;
+      for (var c = 0; c < 4; c++) {
+        var o = start + c, sum = src[o] * (r + 1), i;
+        for (i = 1; i <= r; i++) sum += src[o + Math.min(i, len - 1) * step];
+        for (i = 0; i < len; i++) {
+          dst[o + i * step] = sum * inv;
+          sum += src[o + Math.min(i + r + 1, len - 1) * step] - src[o + Math.max(i - r, 0) * step];
+        }
+      }
+    }
+  }
+  function pixelate(d, w, h, b) {
+    b = Math.max(2, Math.round(b));
+    for (var by = 0; by < h; by += b) for (var bx = 0; bx < w; bx += b) {
+      var ey = Math.min(by + b, h), ex = Math.min(bx + b, w), s = [0, 0, 0, 0], n = 0, x, y, i;
+      for (y = by; y < ey; y++) for (x = bx; x < ex; x++) { i = (y * w + x) * 4; s[0] += d[i]; s[1] += d[i + 1]; s[2] += d[i + 2]; s[3] += d[i + 3]; n++; }
+      for (y = by; y < ey; y++) for (x = bx; x < ex; x++) { i = (y * w + x) * 4; d[i] = s[0] / n; d[i + 1] = s[1] / n; d[i + 2] = s[2] / n; d[i + 3] = s[3] / n; }
+    }
+  }
+
+  // ---------- geometry: regions are stored as fractions of the image, so the preview and the full-size export match ----------
+  function bbox(r, W, H) {
+    var base = Math.max(W, H);
+    if (r.kind === 'brush') {
+      var half = r.size * base / 2, x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      r.pts.forEach(function (p) { x0 = Math.min(x0, p[0] * W); y0 = Math.min(y0, p[1] * H); x1 = Math.max(x1, p[0] * W); y1 = Math.max(y1, p[1] * H); });
+      return { x: x0 - half, y: y0 - half, w: x1 - x0 + 2 * half, h: y1 - y0 + 2 * half };
+    }
+    return { x: r.x * W, y: r.y * H, w: r.w * W, h: r.h * H };
+  }
+  function shape(c, r, W, H, ox, oy) { // draw the region's shape filled, offset by (ox, oy)
+    c.beginPath();
+    if (r.kind === 'rect') c.rect(r.x * W - ox, r.y * H - oy, r.w * W, r.h * H);
+    else if (r.kind === 'ellipse') c.ellipse((r.x + r.w / 2) * W - ox, (r.y + r.h / 2) * H - oy, Math.max(0.5, r.w * W / 2), Math.max(0.5, r.h * H / 2), 0, 0, Math.PI * 2);
+    if (r.kind !== 'brush') { c.fill(); return; }
+    var lw = r.size * Math.max(W, H);
+    c.lineWidth = lw; c.lineCap = 'round'; c.lineJoin = 'round';
+    r.pts.forEach(function (p, k) { var x = p[0] * W - ox, y = p[1] * H - oy; if (k) c.lineTo(x, y); else c.moveTo(x, y); });
+    c.stroke();
+    r.pts.forEach(function (p) { c.beginPath(); c.arc(p[0] * W - ox, p[1] * H - oy, lw / 2, 0, Math.PI * 2); c.fill(); }); // round ends everywhere, even on a single tap
+  }
+  function applyRegion(c, r, W, H) {
+    var b = bbox(r, W, H), base = Math.max(W, H);
+    var x0 = Math.max(0, Math.floor(b.x)), y0 = Math.max(0, Math.floor(b.y)), x1 = Math.min(W, Math.ceil(b.x + b.w)), y1 = Math.min(H, Math.ceil(b.y + b.h));
+    if (x1 - x0 < 1 || y1 - y0 < 1) return;
+    var w = x1 - x0, h = y1 - y0, layer = document.createElement('canvas'); layer.width = w; layer.height = h;
+    var lc = layer.getContext('2d');
+    if (r.fx === 'bar') { lc.fillStyle = r.color; shape(lc, r, W, H, x0, y0); c.drawImage(layer, x0, y0); return; }
+    // sample a margin around the area too, so a blur near its edge still mixes in the real neighbouring pixels
+    var rad = r.fx === 'blur' ? Math.max(1, r.amt / 100 * base * 0.03) : 0, pad = Math.ceil(rad * 2);
+    var px0 = Math.max(0, x0 - pad), py0 = Math.max(0, y0 - pad), px1 = Math.min(W, x1 + pad), py1 = Math.min(H, y1 + pad);
+    var id = c.getImageData(px0, py0, px1 - px0, py1 - py0);
+    if (r.fx === 'blur') boxBlur(id.data, id.width, id.height, rad);
+    else pixelate(id.data, id.width, id.height, Math.max(3, r.amt / 100 * base * 0.05));
+    var fxc = document.createElement('canvas'); fxc.width = id.width; fxc.height = id.height; fxc.getContext('2d').putImageData(id, 0, 0);
+    lc.fillStyle = '#000'; shape(lc, r, W, H, x0, y0);
+    lc.globalCompositeOperation = 'source-in'; lc.drawImage(fxc, px0 - x0, py0 - y0);
+    c.drawImage(layer, x0, y0);
+    fxc.width = layer.width = 0;
+  }
+  function drawBase(c, W, H) {
+    c.clearRect(0, 0, W, H); c.drawImage(img, 0, 0, W, H);
+    if ($('whole').checked) {
+      var id = c.getImageData(0, 0, W, H);
+      boxBlur(id.data, W, H, Math.max(1, $('wamt').value / 100 * Math.max(W, H) * 0.03));
+      c.putImageData(id, 0, 0);
+    }
+  }
+  function render(c, W, H, skipBase) {
+    if (!skipBase) drawBase(c, W, H);
+    regions.forEach(function (r) { applyRegion(c, r, W, H); });
+  }
+
+  // ---------- preview ----------
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true;
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; if (!img) return;
+      var W = cv.width, H = cv.height, key = $('whole').checked + ':' + $('wamt').value;
+      if (!baseCache || baseCache.key !== key) {
+        baseCache = baseCache || { c: document.createElement('canvas') }; baseCache.c.width = W; baseCache.c.height = H;
+        drawBase(baseCache.c.getContext('2d'), W, H); baseCache.key = key;
+      }
+      ctx.clearRect(0, 0, W, H); ctx.drawImage(baseCache.c, 0, 0);
+      render(ctx, W, H, true);
+      // outlines and handles (preview only, never in the saved file)
+      var u = W / cv.getBoundingClientRect().width || 1;
+      regions.forEach(function (r, k) {
+        var b = bbox(r, W, H);
+        ctx.save(); ctx.lineWidth = 1.5 * u;
+        ctx.setLineDash([6 * u, 4 * u]); ctx.strokeStyle = k === sel ? '#2563eb' : 'rgba(255,255,255,.9)';
+        ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.lineDashOffset = 6 * u; ctx.strokeStyle = k === sel ? '#fff' : 'rgba(0,0,0,.6)'; ctx.strokeRect(b.x, b.y, b.w, b.h);
+        ctx.restore();
+        if (k === sel && r.kind !== 'brush') corners(b).forEach(function (p) {
+          ctx.fillStyle = '#fff'; ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2 * u;
+          ctx.fillRect(p[0] - 6 * u, p[1] - 6 * u, 12 * u, 12 * u); ctx.strokeRect(p[0] - 6 * u, p[1] - 6 * u, 12 * u, 12 * u);
+        });
+      });
+    });
+  }
+  function corners(b) { return [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]]; }
+
+  function list() {
+    var ul = $('list'); ul.innerHTML = '';
+    regions.forEach(function (r, k) {
+      var li = document.createElement('li'); li.setAttribute('aria-current', k === sel);
+      var a = document.createElement('button'); a.type = 'button'; a.textContent = (k + 1) + '. ' + KN[r.kind] + ' · ' + FXN[r.fx];
+      a.addEventListener('click', function () { select(k); });
+      var x = document.createElement('button'); x.type = 'button'; x.className = 'x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove area ' + (k + 1));
+      x.addEventListener('click', function () { remove(k); });
+      li.appendChild(a); li.appendChild(x); ul.appendChild(li);
+    });
+    $('clearAll').hidden = regions.length < 2;
+    $('go').disabled = !img || busy;
+  }
+  function select(k) {
+    sel = k; var r = regions[k];
+    if (r) { $('fx').value = r.fx; $('amt').value = r.amt; $('barCol').value = r.color; if (r.kind === 'brush') $('bsz').value = Math.round(r.size * 200) / 2; syncUi(); }
+    list(); draw();
+  }
+  function remove(k) { regions.splice(k, 1); if (sel === k) sel = -1; else if (sel > k) sel--; list(); draw(); }
+
+  function syncUi() {
+    var fx = $('fx').value;
+    $('amtRow').hidden = fx === 'bar'; $('colRow').hidden = fx !== 'bar';
+    $('brushRow').hidden = mode !== 'brush' && !(regions[sel] && regions[sel].kind === 'brush');
+    $('wholeRow').hidden = !$('whole').checked;
+    $('amtV').textContent = $('amt').value; $('wamtV').textContent = $('wamt').value; $('bszV').textContent = $('bsz').value; $('qv').textContent = $('q').value;
+    var t = outType(); $('qRow').hidden = t === 'image/png';
+  }
+  function outType() { var f = $('fmt').value; if (f !== 'keep') return f; return file && EXT[file.type] ? file.type : 'image/png'; }
+
+  // settings edit the selected area and become the default for new ones
+  ['fx', 'amt', 'barCol', 'bsz'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      var r = regions[sel];
+      if (r) { r.fx = $('fx').value; r.amt = +$('amt').value; r.color = $('barCol').value; if (r.kind === 'brush') r.size = $('bsz').value / 100; list(); }
+      syncUi(); draw();
+    });
+  });
+  ['whole', 'wamt', 'fmt', 'q'].forEach(function (id) { $(id).addEventListener('input', function () { syncUi(); draw(); }); $(id).addEventListener('change', function () { syncUi(); draw(); }); });
+
+  document.querySelectorAll('[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      mode = b.dataset.mode;
+      if (mode !== 'move' && sel >= 0) { sel = -1; list(); draw(); } // the next settings are for the next area, not the last one
+      document.querySelectorAll('[data-mode]').forEach(function (o) { o.setAttribute('aria-pressed', o === b); });
+      $('tip').textContent = mode === 'brush' ? 'Paint over the areas to hide. Each stroke becomes its own area you can remove.' : mode === 'move' ? 'Tap an area to select it, then drag to move it or drag a corner square to resize. Press Delete to remove it.' : 'Drag on the picture to cover an area. Drag an existing area to move it, or its corner squares to resize it.';
+      cv.classList.toggle('mv', mode === 'move');
+      syncUi();
+    });
+  });
+
+  // ---------- pointer editing ----------
+  var drag = null;
+  function pt(e) { var b = cv.getBoundingClientRect(); return { x: (e.clientX - b.left) / b.width * cv.width, y: (e.clientY - b.top) / b.height * cv.height, u: cv.width / b.width }; }
+  function hit(p) { // topmost area under the point
+    for (var k = regions.length - 1; k >= 0; k--) { var b = bbox(regions[k], cv.width, cv.height); if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return k; }
+    return -1;
+  }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!img || busy) return;
+    e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    var p = pt(e), W = cv.width, H = cv.height, r = regions[sel];
+    if (r && r.kind !== 'brush') { // a corner handle of the selected area?
+      var b = bbox(r, W, H), cs = corners(b);
+      for (var i = 0; i < 4; i++) if (Math.abs(p.x - cs[i][0]) < 14 * p.u && Math.abs(p.y - cs[i][1]) < 14 * p.u) {
+        var opp = cs[3 - i]; drag = { kind: 'size', ax: opp[0] / W, ay: opp[1] / H }; return;
+      }
+    }
+    var k = mode === 'brush' ? -1 : hit(p);
+    if (k >= 0) { select(k); var rr = regions[k]; drag = { kind: 'move', sx: p.x / W, sy: p.y / H, orig: JSON.parse(JSON.stringify(rr)) }; return; }
+    if (mode === 'move') { sel = -1; list(); draw(); return; }
+    var nr = { kind: mode, fx: $('fx').value, amt: +$('amt').value, color: $('barCol').value };
+    if (mode === 'brush') { nr.size = $('bsz').value / 100; nr.pts = [[p.x / W, p.y / H]]; }
+    else { nr.x = p.x / W; nr.y = p.y / H; nr.w = 0; nr.h = 0; }
+    regions.push(nr); sel = regions.length - 1;
+    drag = { kind: mode === 'brush' ? 'paint' : 'size', ax: p.x / W, ay: p.y / H, fresh: true };
+    list(); draw();
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var p = pt(e), W = cv.width, H = cv.height, r = regions[sel]; if (!r) return;
+    var x = Math.min(1, Math.max(0, p.x / W)), y = Math.min(1, Math.max(0, p.y / H));
+    if (drag.kind === 'paint') { var last = r.pts[r.pts.length - 1]; if (Math.hypot((x - last[0]) * W, (y - last[1]) * H) > 3 * p.u) r.pts.push([x, y]); }
+    else if (drag.kind === 'size') { r.x = Math.min(drag.ax, x); r.y = Math.min(drag.ay, y); r.w = Math.abs(x - drag.ax); r.h = Math.abs(y - drag.ay); }
+    else {
+      var dx = p.x / W - drag.sx, dy = p.y / H - drag.sy, o = drag.orig;
+      if (r.kind === 'brush') r.pts = o.pts.map(function (q) { return [q[0] + dx, q[1] + dy]; });
+      else { r.x = Math.min(1 - o.w, Math.max(0, o.x + dx)); r.y = Math.min(1 - o.h, Math.max(0, o.y + dy)); }
+    }
+    draw();
+  });
+  function end() {
+    if (!drag) return;
+    var r = regions[sel], W = cv.width, H = cv.height;
+    // a click without a drag on an empty spot should not leave an invisible area behind
+    if (drag.fresh && r && r.kind !== 'brush' && (r.w * W < 4 || r.h * H < 4)) { regions.splice(sel, 1); sel = -1; say('', 'Drag across the picture to draw an area.'); }
+    else if (drag.fresh) say('', regions.length + (regions.length === 1 ? ' area' : ' areas') + ' covered. Download when ready.');
+    drag = null; list(); draw();
+  }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  document.addEventListener('keydown', function (e) {
+    if (sel < 0 || !img || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remove(sel); }
+  });
+  $('clearAll').addEventListener('click', function () { regions = []; sel = -1; list(); draw(); });
+
+  // optional: the browser's own face detector (Chrome with experimental features). Never guessed.
+  if ('FaceDetector' in window) {
+    $('faces').hidden = false;
+    $('faces').addEventListener('click', function () {
+      if (!img) return;
+      say('', 'Looking for faces…');
+      new window.FaceDetector({ fastMode: false, maxDetectedFaces: 30 }).detect(baseCache ? cv : img).then(function (found) {
+        if (!found.length) { say('', 'No faces found. Draw over them by hand instead.'); return; }
+        found.forEach(function (f) {
+          var b = f.boundingBox, W = cv.width, H = cv.height, m = 0.15;
+          regions.push({ kind: 'ellipse', x: Math.max(0, (b.x - b.width * m) / W), y: Math.max(0, (b.y - b.height * m * 1.4) / H), w: Math.min(1, b.width * (1 + 2 * m) / W), h: Math.min(1, b.height * (1 + 2.8 * m) / H), fx: $('fx').value, amt: +$('amt').value, color: $('barCol').value });
+        });
+        sel = regions.length - 1; list(); draw();
+        say('ok', 'Found ' + found.length + (found.length === 1 ? ' face' : ' faces') + '. Check each one: automatic detection can miss faces, so cover any it missed by hand.');
+      }, function () { say('bad', 'Face detection is not available in this browser. Draw over faces by hand.'); });
+    });
+  }
+
+  // ---------- loading ----------
+  function take(f) {
+    if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name || '')) { say('bad', 'Please choose an image file (JPG, PNG or WebP).'); return; }
+    say('', 'Opening…');
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read that image. It may be damaged or in a format your browser cannot open.'); return; }
+      img = im; file = f; regions = []; sel = -1; baseCache = null;
+      var s = Math.min(1, 1400 / Math.max(im.naturalWidth, im.naturalHeight));
+      cv.width = Math.max(1, Math.round(im.naturalWidth * s)); cv.height = Math.max(1, Math.round(im.naturalHeight * s));
+      $('editor').hidden = false; $('drop').querySelector('b').textContent = 'Choose a different image';
+      syncUi(); list(); draw();
+      say('', im.naturalWidth + ' × ' + im.naturalHeight + ' px. Drag on the picture to cover a face, a number plate or any private detail.');
+    });
+  }
+  PT.drop(false, take);
+  document.addEventListener('paste', function (e) {
+    var it = Array.prototype.find.call((e.clipboardData || {}).items || [], function (i) { return i.type.indexOf('image/') === 0; });
+    if (it) take(it.getAsFile());
+  });
+
+  // ---------- export at full resolution ----------
+  $('go').addEventListener('click', function () {
+    if (!img || busy) return;
+    busy = true; list(); say('', 'Saving at full size…');
+    setTimeout(function () {
+      var W = img.naturalWidth, H = img.naturalHeight, c = document.createElement('canvas'); c.width = W; c.height = H;
+      var type = outType(), x = c.getContext('2d');
+      try {
+        render(x, W, H);
+        // JPG has no transparency: put a white backing under it
+        if (type === 'image/jpeg') { x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
+      } catch (e) { busy = false; list(); say('bad', 'This image is too large for your browser\'s memory. Try a smaller copy.'); return; }
+      PT.blob(c, type, $('q').value / 100).then(function (b) {
+        c.width = c.height = 0; busy = false; list();
+        if (!b) { say('bad', 'Your browser could not save in this format. Try JPG or PNG.'); return; }
+        var name = PT.base(file.name || 'image') + '-blurred.' + (EXT[b.type] || 'png');
+        PT.done(b, name, b.type, 'Saved ' + name + ' at ' + W + ' × ' + H + ' px');
+        $('dl').textContent = 'Download ' + name; $('dl').click();
+      });
+    }, 30);
+  });
+  syncUi();
+})();
+</script>

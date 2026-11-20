@@ -1,0 +1,83 @@
+<style>
+.lc-fun { text-align: center; font-size: 14px; font-weight: 700; color: #be185d; background: color-mix(in srgb, #ec4899 12%, var(--surface)); border: 1px solid color-mix(in srgb, #ec4899 45%, var(--line)); border-radius: 999px; padding: 6px 14px; width: fit-content; margin: 0 auto 16px; }
+[data-theme="dark"] .lc-fun { color: #f9a8d4; }
+.lc-names { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; }
+.lc-and { font-size: 26px; color: #e11d48; padding-bottom: 6px; line-height: 1; }
+@media (max-width: 560px) { .lc-names { grid-template-columns: 1fr; } .lc-and { text-align: center; padding: 0; } }
+.lc-stage { display: flex; flex-direction: column; align-items: center; margin: 18px 0 6px; }
+.lc-heart { position: relative; width: 190px; height: 176px; }
+.lc-heart svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 6px 14px rgba(225, 29, 72, .25)); }
+.lc-heart .bg { fill: color-mix(in srgb, #f43f5e 14%, var(--surface)); stroke: #f43f5e; stroke-width: 2; }
+.lc-heart .lv { fill: #f43f5e; }
+.lc-pct { position: absolute; inset: 0 0 14% 0; display: flex; align-items: center; justify-content: center; font-size: 40px; font-weight: 800; color: #fff; text-shadow: 0 1px 3px rgba(0, 0, 0, .35); font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.lc-pct.empty { color: #e11d48; text-shadow: none; }
+.lc-beat { animation: lcBeat 1.1s ease-in-out infinite; }
+@keyframes lcBeat { 0%, 100% { transform: scale(1); } 14% { transform: scale(1.09); } 28% { transform: scale(1); } 42% { transform: scale(1.06); } 70% { transform: scale(1); } }
+.lc-msg { text-align: center; font-size: 19px; font-weight: 700; margin: 10px 0 0; min-height: 1.4em; }
+.lc-sub { text-align: center; color: var(--muted); margin: 4px 0 0; }
+.lc-share { margin-top: 18px; }
+.lc-share .out { font-family: inherit; font-size: 15px; font-weight: 500; }
+@media (prefers-reduced-motion: reduce) { .lc-beat { animation: none; } }
+</style>
+<p class="lc-fun">Just for fun · not science · names never leave your device</p>
+<div class="lc-names">
+  <div><label for="lcA">Your name</label><input type="text" id="lcA" maxlength="60" autocomplete="off" data-nomemo placeholder="e.g. Romeo"></div>
+  <div class="lc-and" aria-hidden="true">♥</div>
+  <div><label for="lcB">Their name</label><input type="text" id="lcB" maxlength="60" autocomplete="off" data-nomemo placeholder="e.g. Juliet"></div>
+</div>
+<div class="btns" style="justify-content:center"><button type="button" class="btn" id="lcGo">Calculate love</button><button type="button" class="btn ghost" id="lcClr">Clear</button></div>
+<div class="lc-stage">
+  <div class="lc-heart" id="lcHeart" aria-hidden="true">
+    <svg viewBox="0 0 100 92"><defs><clipPath id="lcClip"><path d="M50 88C22 68 4 52 4 30 4 15 15 4 29 4c9 0 16 5 21 12C55 9 62 4 71 4c14 0 25 11 25 26 0 22-18 38-46 58z"/></clipPath></defs>
+      <path class="bg" d="M50 88C22 68 4 52 4 30 4 15 15 4 29 4c9 0 16 5 21 12C55 9 62 4 71 4c14 0 25 11 25 26 0 22-18 38-46 58z"/>
+      <rect class="lv" id="lcLevel" x="0" y="92" width="100" height="0" clip-path="url(#lcClip)"/></svg>
+    <div class="lc-pct empty" id="lcPct">?</div>
+  </div>
+  <p class="lc-msg" id="lcMsg" aria-live="polite">Type two names and press Calculate love.</p>
+  <p class="lc-sub" id="lcSub"></p>
+</div>
+<div class="lc-share" id="lcShareBox" hidden>
+  <label for="lcShareTxt">Share text</label>
+  <div class="out" id="lcShareTxt"></div>
+  <div class="btns"><button type="button" class="btn ghost" id="lcCopy">Copy</button><button type="button" class="btn ghost" id="lcShare" hidden>Share</button></div>
+</div>
+<script>
+(function () {
+  // core-start
+  function norm(s) { return String(s || '').normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ''); }
+  // FNV-1a with a final mix, over both names sorted so the order does not matter.
+  function lovePct(a, b) {
+    var x = norm(a), y = norm(b);
+    if (!x || !y) return null;
+    var s = x < y ? x + '|' + y : y + '|' + x, h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 0x01000193) >>> 0; }
+    h ^= h >>> 16; h = Math.imul(h, 0x85ebca6b) >>> 0; h ^= h >>> 13; h = Math.imul(h, 0xc2b2ae35) >>> 0; h ^= h >>> 16;
+    return (h >>> 0) % 100 + 1;
+  }
+  var MSGS = [[95, 'A match made in the stars!', 'Wedding bells may be ringing.'], [85, 'True love!', 'You two just click.'], [70, 'A great match.', 'There is real chemistry here.'], [55, 'Something is there.', 'Give it a little time to grow.'], [40, 'Could go either way.', 'Friendship first, maybe?'], [25, 'Not the strongest spark.', 'Opposites sometimes attract!'], [0, 'Better as friends.', 'But who listens to a calculator anyway?']];
+  function message(p) { for (var i = 0; i < MSGS.length; i++) if (p >= MSGS[i][0]) return MSGS[i]; return MSGS[MSGS.length - 1]; }
+  // core-end
+  var calm = function () { return document.documentElement.hasAttribute('data-calm') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches); };
+  var anim = 0, shareText = '';
+  function show(p) { $('lcPct').textContent = p + '%'; $('lcLevel').setAttribute('y', 92 - 88 * p / 100); $('lcLevel').setAttribute('height', 88 * p / 100 + 4); }
+  function go() {
+    var a = $('lcA').value.trim(), b = $('lcB').value.trim(), p = lovePct(a, b);
+    cancelAnimationFrame(anim); $('lcHeart').classList.remove('lc-beat');
+    if (p == null) { $('lcMsg').textContent = !a && !b ? 'Type two names first.' : 'Type a name in both boxes.'; $('lcSub').textContent = ''; ($('lcA').value.trim() ? $('lcB') : $('lcA')).focus(); return; }
+    var m = message(p);
+    $('lcPct').classList.remove('empty');
+    shareText = a + ' + ' + b + ' = ' + p + '% love match on the GetToolNest Love Calculator (just for fun!) ' + (document.querySelector('link[rel=canonical]') || location).href;
+    var finish = function () { show(p); $('lcMsg').textContent = m[1]; $('lcSub').textContent = m[2]; $('lcShareTxt').textContent = shareText; $('lcShareBox').hidden = false; if (!calm()) $('lcHeart').classList.add('lc-beat'); };
+    if (calm()) return finish();
+    $('lcMsg').textContent = 'Calculating…'; $('lcSub').textContent = '';
+    var t0 = performance.now(), dur = 1200;
+    (function step(t) { var k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3); show(Math.round(p * e)); if (k < 1) anim = requestAnimationFrame(step); else finish(); })(t0);
+  }
+  $('lcGo').addEventListener('click', go);
+  ['lcA', 'lcB'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); go(); } }); });
+  $('lcClr').addEventListener('click', function () { cancelAnimationFrame(anim); $('lcA').value = $('lcB').value = ''; $('lcHeart').classList.remove('lc-beat'); $('lcPct').textContent = '?'; $('lcPct').classList.add('empty'); show0(); $('lcMsg').textContent = 'Type two names and press Calculate love.'; $('lcSub').textContent = ''; $('lcShareBox').hidden = true; $('lcA').focus(); });
+  function show0() { $('lcLevel').setAttribute('y', 92); $('lcLevel').setAttribute('height', 0); }
+  $('lcCopy').addEventListener('click', function () { copyText(shareText, $('lcCopy')); });
+  if (navigator.share) { $('lcShare').hidden = false; $('lcShare').addEventListener('click', function () { navigator.share({ title: 'Love Calculator', text: shareText }).catch(function () {}); }); }
+})();
+</script>

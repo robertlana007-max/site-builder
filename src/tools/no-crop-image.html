@@ -1,0 +1,166 @@
+<style>
+.nc-stage { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 16px; text-align: center; }
+.nc-stage canvas { max-width: 100%; max-height: 60vh; width: auto; height: auto; display: block; margin: 0 auto; border-radius: 4px; box-shadow: 0 1px 4px rgba(0,0,0,.15); }
+.nc-thumbs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.nc-thumbs button { position: relative; width: 64px; height: 64px; padding: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; }
+.nc-thumbs button.on { border-color: var(--accent); }
+.nc-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nc-thumbs b { position: absolute; top: 2px; right: 2px; width: 20px; height: 20px; line-height: 18px; border-radius: 50%; background: rgba(0,0,0,.6); color: #fff; font-size: 13px; font-weight: 400; }
+.nc-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+.nc-ratios { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.nc-ratios .btn { padding: 8px 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop photos here</b>Add one photo or many at once. Your photos never leave your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="nc-thumbs" id="ncThumbs"></div>
+<label>Shape</label>
+<div class="nc-ratios" id="ncRatios" role="group" aria-label="Shape">
+  <button type="button" class="btn ghost" data-r="1:1" aria-pressed="true">Square 1:1</button>
+  <button type="button" class="btn ghost" data-r="4:5" aria-pressed="false">Portrait 4:5</button>
+  <button type="button" class="btn ghost" data-r="9:16" aria-pressed="false">Story 9:16</button>
+  <button type="button" class="btn ghost" data-r="16:9" aria-pressed="false">Landscape 16:9</button>
+</div>
+<input type="hidden" id="ncRatio" value="1:1">
+<div class="fields">
+  <div><label for="ncBg">Background</label><select id="ncBg"><option value="blur">Blurred photo</option><option value="color">Solid colour</option><option value="grad">Gradient</option><option value="white">White</option></select></div>
+  <div class="nc-col" id="ncColBox" hidden><label for="ncCol">Colour</label><input type="color" id="ncCol" value="#111111"></div>
+  <div class="nc-col" id="ncG1Box" hidden><label for="ncG1">Gradient top</label><input type="color" id="ncG1" value="#f97316"></div>
+  <div class="nc-col" id="ncG2Box" hidden><label for="ncG2">Gradient bottom</label><input type="color" id="ncG2" value="#7c3aed"></div>
+  <div id="ncBlurBox"><label for="ncBlur">Blur: <span id="ncBlurV">30</span></label><input type="range" id="ncBlur" min="5" max="80" value="30"></div>
+  <div><label for="ncPad">Padding: <span id="ncPadV">0</span>%</label><input type="range" id="ncPad" min="0" max="30" value="0"></div>
+  <div><label for="fmt">Download as</label><select id="fmt"><option value="image/jpeg">JPG (best for photos)</option><option value="image/png">PNG</option></select></div>
+</div>
+<div class="nc-stage" id="ncStage" hidden><canvas id="ncCv" aria-label="Preview of the selected photo on its new canvas"></canvas></div>
+<div class="btns"><button class="btn" id="go" type="button" disabled>Download</button><a class="btn" id="dl" hidden>Download</a><button class="btn ghost" id="ncClear" type="button" hidden>Remove all</button></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var W = 1080, RATIOS = { '1:1': 1080, '4:5': 1350, '9:16': 1920, '16:9': 608 };
+  var items = [], cur = 0, zipUrl = null, job = 0;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function H() { return RATIOS[$('ncRatio').value] || 1080; }
+
+  // Blur that also works where canvas filters are missing (older Safari): shrink a lot, then grow back in steps.
+  function blurred(img, w, h, amount) {
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d'), s = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    var dw = img.naturalWidth * s, dh = img.naturalHeight * s;
+    if (typeof x.filter === 'string' && 'filter' in x) {
+      x.filter = 'blur(' + amount + 'px)';
+      var o = amount * 2; // draw a little larger so the soft edges stay outside the canvas
+      x.drawImage(img, (w - dw) / 2 - o, (h - dh) / 2 - o, dw + 2 * o, dh + 2 * o);
+      x.filter = 'none';
+      if (x.getImageData(w >> 1, h >> 1, 1, 1).data[3]) return c; // the filter really worked
+    }
+    var f = Math.max(2, amount / 2), sw = Math.max(2, Math.round(w / f)), sh = Math.max(2, Math.round(h / f));
+    var t = document.createElement('canvas'); t.width = sw; t.height = sh;
+    var tx = t.getContext('2d'); tx.imageSmoothingQuality = 'high';
+    tx.drawImage(img, (sw - dw / f) / 2, (sh - dh / f) / 2, dw / f, dh / f);
+    var m = document.createElement('canvas'); m.width = Math.min(w, sw * 4); m.height = Math.min(h, sh * 4);
+    var mx = m.getContext('2d'); mx.imageSmoothingQuality = 'high'; mx.drawImage(t, 0, 0, m.width, m.height);
+    x.imageSmoothingQuality = 'high'; x.drawImage(m, 0, 0, w, h);
+    return c;
+  }
+  function render(img, out) {
+    var w = W, h = H(); out.width = w; out.height = h;
+    var x = out.getContext('2d'), bg = $('ncBg').value;
+    if (bg === 'blur') {
+      x.drawImage(blurred(img, w, h, +$('ncBlur').value), 0, 0);
+      x.fillStyle = 'rgba(0,0,0,.12)'; x.fillRect(0, 0, w, h);
+    } else if (bg === 'grad') {
+      var g = x.createLinearGradient(0, 0, 0, h); g.addColorStop(0, $('ncG1').value); g.addColorStop(1, $('ncG2').value);
+      x.fillStyle = g; x.fillRect(0, 0, w, h);
+    } else { x.fillStyle = bg === 'color' ? $('ncCol').value : '#ffffff'; x.fillRect(0, 0, w, h); }
+    var pad = Math.round(Math.min(w, h) * $('ncPad').value / 100);
+    var s = Math.min((w - 2 * pad) / img.naturalWidth, (h - 2 * pad) / img.naturalHeight);
+    var dw = Math.round(img.naturalWidth * s), dh = Math.round(img.naturalHeight * s);
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, Math.round((w - dw) / 2), Math.round((h - dh) / 2), dw, dh);
+    return out;
+  }
+  function stale() { job++; $('dl').hidden = true; if (zipUrl) { URL.revokeObjectURL(zipUrl); zipUrl = null; } }
+  function preview() {
+    stale();
+    $('ncColBox').hidden = $('ncBg').value !== 'color';
+    $('ncG1Box').hidden = $('ncG2Box').hidden = $('ncBg').value !== 'grad';
+    $('ncBlurBox').hidden = $('ncBg').value !== 'blur';
+    $('ncBlurV').textContent = $('ncBlur').value; $('ncPadV').textContent = $('ncPad').value;
+    $('ncStage').hidden = !items.length; $('go').disabled = !items.length; $('ncClear').hidden = !items.length;
+    $('go').textContent = items.length > 1 ? 'Download all ' + items.length + ' as ZIP' : 'Download';
+    if (!items.length) return;
+    render(items[cur].img, $('ncCv'));
+    say('', W + ' × ' + H() + ' px · ' + (items.length > 1 ? 'showing photo ' + (cur + 1) + ' of ' + items.length + '. Tap a thumbnail to preview another.' : 'nothing is cropped.'));
+  }
+  function thumbs() {
+    var box = $('ncThumbs'); box.innerHTML = '';
+    items.forEach(function (it, i) {
+      var b = document.createElement('button'), im = document.createElement('img'), x = document.createElement('b');
+      b.type = 'button'; b.className = i === cur ? 'on' : ''; b.title = it.name; b.setAttribute('aria-label', 'Preview ' + it.name);
+      im.src = it.url; im.alt = ''; x.textContent = '×'; x.setAttribute('role', 'button'); x.setAttribute('aria-label', 'Remove ' + it.name);
+      b.appendChild(im); b.appendChild(x); box.appendChild(b);
+      b.addEventListener('click', function (e) {
+        if (e.target === x) { URL.revokeObjectURL(it.url); items.splice(i, 1); if (cur >= items.length) cur = Math.max(0, items.length - 1); }
+        else cur = i;
+        thumbs(); preview();
+      });
+    });
+  }
+  PT.drop(true, function (files) {
+    var imgs = files.filter(function (f) { return /^image\//.test(f.type); }), bad = files.length - imgs.length, left = imgs.length, failed = 0;
+    if (!imgs.length) { say('bad', 'Please choose image files (JPG, PNG, WebP or GIF).'); return; }
+    say('', 'Opening ' + imgs.length + (imgs.length === 1 ? ' photo…' : ' photos…'));
+    var start = items.length;
+    imgs.forEach(function (f, k) {
+      loadImage(f, function (im) {
+        if (im && im.naturalWidth) items.push({ img: im, name: f.name.replace(/\.[^.]+$/, '') || 'photo', url: URL.createObjectURL(f), order: start + k });
+        else failed++;
+        if (--left) return;
+        items.sort(function (a, b) { return a.order - b.order; });
+        cur = Math.min(cur, Math.max(0, items.length - 1)); if (start < items.length) cur = start;
+        thumbs(); preview();
+        if (failed + bad) say('bad', (failed + bad) + ' file(s) could not be opened as images and were skipped. HEIC photos must be converted to JPG first.');
+      });
+    });
+  });
+  $('ncRatios').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    $('ncRatio').value = b.dataset.r;
+    Array.prototype.forEach.call(this.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    preview();
+  });
+  ['ncBg', 'ncCol', 'ncG1', 'ncG2', 'ncBlur', 'ncPad', 'fmt'].forEach(function (id) { $(id).addEventListener('input', preview); $(id).addEventListener('change', preview); });
+  $('ncClear').addEventListener('click', function () { items.forEach(function (it) { URL.revokeObjectURL(it.url); }); items = []; cur = 0; thumbs(); preview(); say('', ''); });
+
+  $('go').addEventListener('click', function () {
+    if (!items.length) return;
+    var mine = ++job, type = $('fmt').value, ext = type === 'image/png' ? 'png' : 'jpg', tag = $('ncRatio').value.replace(':', 'x');
+    var c = document.createElement('canvas'), out = [], used = {};
+    PT.run(function () {
+      return items.reduce(function (chain, it, i) {
+        return chain.then(function () {
+          if (mine !== job) return;
+          say('', 'Making image ' + (i + 1) + ' of ' + items.length + '…');
+          render(it.img, c);
+          return PT.blob(c, type, 0.92).then(function (b) {
+            if (!b) throw new Error('Your browser could not create the image file.');
+            var n = it.name + '-' + tag, k = 2; while (used[n]) n = it.name + '-' + tag + '-' + k++; used[n] = 1;
+            out.push({ name: n + '.' + ext, blob: b });
+          });
+        });
+      }, Promise.resolve()).then(function () {
+        if (mine !== job) return;
+        if (out.length === 1) { PT.done(out[0].blob, out[0].name, type, W + ' × ' + H() + ' px'); }
+        else return Promise.all(out.map(function (o) { return o.blob.arrayBuffer(); })).then(function (bufs) {
+          var zip = PT.zip(out.map(function (o, i) { return { name: o.name, data: new Uint8Array(bufs[i]) }; }));
+          PT.done(zip, 'no-crop-' + tag + '.zip', 'application/zip', out.length + ' images, ' + W + ' × ' + H() + ' px');
+        });
+      }).then(function () {
+        if (mine !== job || $('dl').hidden) return;
+        $('dl').textContent = out.length === 1 ? 'Save ' + out[0].name : 'Save ZIP (' + out.length + ' images)';
+        $('dl').click(); burst($('dl'));
+      });
+    });
+  });
+})();
+</script>

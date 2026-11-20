@@ -72,7 +72,7 @@
     <button type="button" class="btn" id="dlpng">Download PNG</button>
     <button type="button" class="btn ghost" id="dljpg">Download JPG</button>
   </div>
-  <p class="bgr-sub" id="jpgNote">PNG keeps the see-through background. JPG cannot be see-through, so it gets your background colour (white unless you pick one).</p>
+  <p class="bgr-sub" id="jpgNote">PNG keeps the see-through background. JPG cannot be see-through, so a transparent background becomes white. For another colour, choose Background: Solid colour.</p>
 </div>
 <p class="msg" id="msg"></p>
 <script>
@@ -86,7 +86,7 @@
   var MAX_AREA = 16000000, WORK = 1024, PREV = 1100;
   var ortP = null, useGpu = false, sessions = {}, modelKey = 'fast', brush = '', job = 0, busy = false;
   var src = null, W = 0, H = 0, name = 'photo', low = null, LW = 0, LH = 0; // low = refined mask (0..1) at work size
-  var strokes = [], cur = null, bgImg = null;
+  var strokes = [], cur = null, bgImg = null, scaledNote = '';
   var pv = null; // preview cache: { w, h, s, pix (ImageData of original), mask (Uint8 base), edit canvas }
   var cv = $('cv'), ctx = cv.getContext('2d');
 
@@ -257,10 +257,10 @@
   var canFilter = (function () { try { var x = canvas(1, 1).getContext('2d'); x.filter = 'blur(2px)'; return x.filter === 'blur(2px)'; } catch (e) { return false; } })();
   function drawBg(x, w, h, forJpg) {
     var mode = $('bgmode').value;
-    if (mode === 'color' || (forJpg && (mode === 'none' || (mode === 'image' && !bgImg)))) { x.fillStyle = $('bgcol').value; x.fillRect(0, 0, w, h); }
+    if (mode === 'color' || (forJpg && (mode === 'none' || (mode === 'image' && !bgImg)))) { x.fillStyle = mode === 'color' ? $('bgcol').value : '#ffffff'; x.fillRect(0, 0, w, h); }
     else if (mode === 'blur') {
       var r = +$('blur').value * Math.max(w, h) / 1000;
-      if (canFilter) { x.save(); x.filter = 'blur(' + r + 'px)'; x.drawImage(src, -2 * r, -2 * r, w + 4 * r, h + 4 * r); x.restore(); }
+      if (canFilter) { x.drawImage(src, 0, 0, w, h); x.save(); x.filter = 'blur(' + r + 'px)'; x.drawImage(src, -2 * r, -2 * r, w + 4 * r, h + 4 * r); x.restore(); }
       else { // older Safari: shrink and stretch back up, which blurs
         var f = Math.max(2, r / 2), sw = Math.max(1, Math.round(w / f)), sh = Math.max(1, Math.round(h / f)), t = canvas(sw, sh), tx = t.getContext('2d');
         tx.imageSmoothingQuality = 'high'; tx.drawImage(src, 0, 0, sw, sh); x.imageSmoothingQuality = 'high'; x.drawImage(t, 0, 0, w, h);
@@ -276,6 +276,7 @@
     var s = Math.min(1, PREV / Math.max(W, H)), w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s)), c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
     x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h);
     pv = { w: w, h: h, s: s, pix: x.getImageData(0, 0, w, h), orig: c, edit: canvas(w, h), cut: canvas(w, h), bg: canvas(w, h) };
+    pv.edit.getContext('2d', { willReadFrequently: true });
     cv.width = w; cv.height = h; cv.style.width = '';
     remask(); redrawEdits(); drawBgPreview();
   }
@@ -391,11 +392,13 @@
         if (mine !== job) return;
         var t1 = performance.now();
         refine(prob, m.size);
+        var first = $('work').hidden;
         $('work').hidden = false; buildPreview();
+        if (first && $('stage').scrollIntoView) $('stage').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
         busy = false; $('notice').hidden = true;
         var ms = Math.round(t1 - t0);
         window.__bgr = { ms: ms, total: Math.round(performance.now() - t0), ep: s.ep, model: modelKey, w: W, h: H };
-        say('ok', 'Background removed (' + W + ' × ' + H + ' px, ' + (ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1) + ' s') + ' using ' + s.ep + '). Check the edges, then download.');
+        say('ok', 'Background removed (' + W + ' × ' + H + ' px, ' + (ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1) + ' s') + ' using ' + s.ep + '). Check the edges, then download.' + scaledNote);
       });
     }).catch(function (e) {
       clearInterval(timer);
@@ -418,10 +421,10 @@
       if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (HEIC photos from iPhone may need converting to JPG first).'); return; }
       var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, Math.sqrt(MAX_AREA / (w * h)), 8000 / Math.max(w, h));
       W = Math.max(1, Math.round(w * s)); H = Math.max(1, Math.round(h * s));
-      var c = canvas(W, H); c.getContext('2d').drawImage(im, 0, 0, W, H); src = c;
+      var c = canvas(W, H); c.getContext('2d', { willReadFrequently: true }).drawImage(im, 0, 0, W, H); src = c; scaledNote = s < 1 ? ' Your photo was very large, so it was scaled to ' + W + ' × ' + H + ' px.' : '';
       name = f.name.replace(/\.[^.]+$/, '') || 'photo';
       $('cmp').value = 0;
-      run().then(function () { if (mine === job && s < 1 && src) say('ok', $('msg').textContent + ' Your photo was very large, so it was scaled to ' + W + ' × ' + H + ' px.'); });
+      run();
     });
   }
   PT_drop();
@@ -443,7 +446,7 @@
     setTimeout(function () {
       try {
         var x0 = src.getContext('2d', { willReadFrequently: true }), pix = x0.getImageData(0, 0, W, H), edit = null;
-        if (strokes.length) { edit = canvas(W, H); var ex = edit.getContext('2d'); strokes.forEach(function (st) { paint(ex, st, 1); }); }
+        if (strokes.length) { edit = canvas(W, H); var ex = edit.getContext('2d', { willReadFrequently: true }); strokes.forEach(function (st) { paint(ex, st, 1); }); }
         var cut = canvas(W, H); cut.getContext('2d').putImageData(cutout(W, H, pix, maskAt(W, H), edit), 0, 0);
         var out = canvas(W, H), ox = out.getContext('2d');
         drawBg(ox, W, H, type === 'image/jpeg'); ox.drawImage(cut, 0, 0);

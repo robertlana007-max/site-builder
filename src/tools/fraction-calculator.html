@@ -1,0 +1,349 @@
+<style>
+.fc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 10px; align-items: end; }
+.fc-row input[type=text] { font-family: var(--mono); font-size: 18px; text-align: center; }
+.fc-row select { width: auto; font-size: 20px; font-weight: 700; text-align: center; min-width: 64px; }
+.fc-pane[hidden] { display: none; }
+.fc-pane input[type=text] { font-family: var(--mono); font-size: 18px; }
+.fc-hint { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+.fc-ans { margin-top: 18px; background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 14px 16px; display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; font-size: 22px; font-weight: 600; overflow-x: auto; }
+.fc-ans > div { min-width: 0; max-width: 100%; overflow-wrap: anywhere; word-break: break-all; }
+.fc-ans small { display: block; font-size: 13px; font-weight: 500; color: var(--muted); }
+.fc-ans .fc-dec { font-family: var(--mono); font-size: 17px; overflow-wrap: anywhere; word-break: break-all; }
+.fc-fr { display: inline-flex; flex-direction: column; vertical-align: middle; text-align: center; line-height: 1.15; margin: 0 2px; }
+.fc-fr > span:first-child { border-bottom: 2px solid currentColor; padding: 0 4px; }
+.fc-fr > span:last-child { padding: 0 4px; }
+.fc-fr span { overflow-wrap: anywhere; word-break: break-all; }
+.fc-steps { margin: 14px 0 0; padding-inline-start: 22px; display: grid; gap: 10px; }
+.fc-steps li { overflow-x: auto; line-height: 1.9; }
+.fc-steps b { display: block; font-size: 15px; }
+.fc-ol { text-decoration: overline; }
+</style>
+<div class="seg" role="group" aria-label="What to do" id="modes" style="margin-bottom:16px;flex-wrap:wrap">
+  <button type="button" data-m="calc" aria-pressed="true">Calculate</button>
+  <button type="button" data-m="simp" aria-pressed="false">Simplify &amp; convert</button>
+  <button type="button" data-m="dec" aria-pressed="false">Decimal to fraction</button>
+</div>
+<div class="fc-pane" data-p="calc">
+  <div class="fc-row">
+    <div><label for="a">First fraction</label><input type="text" id="a" value="1 1/2" autocomplete="off" spellcheck="false"></div>
+    <div><label for="op" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Operation</label><select id="op"><option value="+">+</option><option value="-">−</option><option value="*">×</option><option value="/">÷</option></select></div>
+    <div><label for="b">Second fraction</label><input type="text" id="b" value="2/3" autocomplete="off" spellcheck="false"></div>
+  </div>
+  <p class="fc-hint">Type fractions like 3/4, mixed numbers like 2 1/3 (a space between the whole number and the fraction), whole numbers, or decimals like 0.25.</p>
+</div>
+<div class="fc-pane" data-p="simp" hidden>
+  <label for="s">Fraction to simplify</label><input type="text" id="s" value="84/120" autocomplete="off" spellcheck="false">
+  <p class="fc-hint">Proper, improper or mixed. Very large numbers are fine, like 123456789012345678/987654321098765432.</p>
+</div>
+<div class="fc-pane" data-p="dec" hidden>
+  <label for="d">Decimal number</label><input type="text" id="d" value="0.1(6)" autocomplete="off" spellcheck="false">
+  <p class="fc-hint">Put repeating digits in brackets: 0.(3) is 0.333…, 0.1(6) is 0.1666…, 1.(142857) repeats 142857. You can also type 0.1666... with dots.</p>
+</div>
+<p class="msg" id="msg"></p>
+<div id="out" aria-live="polite"></div>
+<div class="btns"><button type="button" class="btn ghost" id="copy" hidden>Copy answer</button></div>
+<script>
+(function () {
+  function MathError(msg) { this.message = msg; }
+  // ---------- exact fractions with BigInt (shared by the Study tools) ----------
+  function bAbs(a) { return a < 0n ? -a : a; }
+  function bGcd(a, b) { a = bAbs(a); b = bAbs(b); while (b) { var t = a % b; a = b; b = t; } return a; }
+  function Q(n, d) {
+    if (!(this instanceof Q)) return new Q(n, d);
+    n = BigInt(n); d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new MathError('You cannot divide by zero.');
+    if (d < 0n) { n = -n; d = -d; }
+    var g = bGcd(n, d) || 1n;
+    this.n = n / g; this.d = d / g;
+  }
+  Q.prototype.add = function (o) { return new Q(this.n * o.d + o.n * this.d, this.d * o.d); };
+  Q.prototype.sub = function (o) { return new Q(this.n * o.d - o.n * this.d, this.d * o.d); };
+  Q.prototype.mul = function (o) { return new Q(this.n * o.n, this.d * o.d); };
+  Q.prototype.div = function (o) { if (o.n === 0n) throw new MathError('You cannot divide by zero.'); return new Q(this.n * o.d, this.d * o.n); };
+  Q.prototype.neg = function () { return new Q(-this.n, this.d); };
+  Q.prototype.inv = function () { return new Q(1n, 1n).div(this); };
+  Q.prototype.isZero = function () { return this.n === 0n; };
+  Q.prototype.isInt = function () { return this.d === 1n; };
+  Q.prototype.sign = function () { return this.n > 0n ? 1 : this.n < 0n ? -1 : 0; };
+  Q.prototype.cmp = function (o) { var a = this.n * o.d, b = o.n * this.d; return a < b ? -1 : a > b ? 1 : 0; };
+  Q.prototype.eq = function (o) { return this.n === o.n && this.d === o.d; };
+  Q.prototype.pow = function (k) { // k: a whole JS number
+    if (k < 0) return this.inv().pow(-k);
+    if (k > 10000) throw new MathError('That power is too large to work out exactly.');
+    var e = BigInt(k); return new Q(this.n ** e, this.d ** e);
+  };
+  Q.prototype.toNumber = function () {
+    var a = Number(this.n), b = Number(this.d);
+    if (isFinite(a) && isFinite(b)) return a / b;
+    var shift = BigInt(Math.max(0, this.d.toString().length - 17)), s2 = BigInt(Math.max(0, this.n.toString().length - 17));
+    return Number(this.n / 10n ** s2) / Number(this.d / 10n ** shift) * Math.pow(10, Number(s2 - shift));
+  };
+  Q.prototype.toString = function () { return this.d === 1n ? this.n.toString() : this.n.toString() + '/' + this.d.toString(); };
+  // Reads "3", "-2.75", "4/6", "1e3" exactly. Returns null when the text is not a plain number or fraction.
+  Q.parse = function (str) {
+    var s = String(str).trim().replace(/[−–]/g, '-').replace(/\s+/g, ''), m;
+    if ((m = /^([+-]?)(\d+)\/(\d+)$/.exec(s))) return new Q(BigInt(m[1] + m[2]), BigInt(m[3]));
+    if ((m = /^([+-]?)(\d*)\.?(\d*)(?:e([+-]?\d+))?$/i.exec(s)) && (m[2] || m[3])) {
+      var q = new Q(BigInt(m[1] + (m[2] || '0') + m[3]), 10n ** BigInt(m[3].length));
+      if (m[4]) { var ex = parseInt(m[4], 10); if (Math.abs(ex) > 5000) return null; q = q.mul(new Q(10n).pow(ex)); }
+      return q;
+    }
+    return null;
+  };
+  // ---------- numbers that stay exact while they can: a Q, or a JS float once something irrational (pi, sqrt 2) appears ----------
+  function nAdd(a, b) { return a instanceof Q && b instanceof Q ? a.add(b) : nF(a) + nF(b); }
+  function nSub(a, b) { return a instanceof Q && b instanceof Q ? a.sub(b) : nF(a) - nF(b); }
+  function nMul(a, b) { return a instanceof Q && b instanceof Q ? a.mul(b) : nF(a) * nF(b); }
+  function nDiv(a, b) {
+    if (nIsZero(b)) throw new MathError('You cannot divide by zero.');
+    return a instanceof Q && b instanceof Q ? a.div(b) : nF(a) / nF(b);
+  }
+  function nNeg(a) { return a instanceof Q ? a.neg() : -a; }
+  function nF(a) { return a instanceof Q ? a.toNumber() : a; }
+  function nIsZero(a, tol) { return a instanceof Q ? a.isZero() : Math.abs(a) <= (tol || 0); }
+  // Evaluates a parsed tree exactly where possible. scope maps variable names to values.
+  function nEval(t, scope) {
+    switch (t.t) {
+      case 'num': return Q.parse(t.s);
+      case 'flt': return t.v; // a float placed in a tree by a tool
+      case 'const': return t.n === 'pi' ? Math.PI : Math.E;
+      case 'var': if (!scope || !(t.n in scope)) throw new MathError('"' + t.n + '" is not allowed here.'); return scope[t.n];
+      case 'neg': return nNeg(nEval(t.a, scope));
+      case 'fn':
+        var a = nEval(t.a, scope), r;
+        if (a instanceof Q && t.n === 'abs') return a.sign() < 0 ? a.neg() : a;
+        if (a instanceof Q && t.n === 'sqrt' && a.sign() >= 0) { var sn = bSqrt(a.n), sd = bSqrt(a.d); if (sn * sn === a.n && sd * sd === a.d) return new Q(sn, sd); }
+        if (a instanceof Q && t.n === 'fact' && a.isInt() && a.sign() >= 0 && a.n <= 1000n) { var f = 1n; for (var i = 2n; i <= a.n; i++) f *= i; return new Q(f); }
+        r = MF[t.n](nF(a));
+        if (!isFinite(r)) throw new MathError(t.n + '(' + fmtPlain(nF(a)) + ') is not defined.');
+        return r;
+      case 'op':
+        var x = nEval(t.a, scope), y = nEval(t.b, scope);
+        if (t.o === '+') return nAdd(x, y);
+        if (t.o === '-') return nSub(x, y);
+        if (t.o === '*') return nMul(x, y);
+        if (t.o === '/') return nDiv(x, y);
+        if (y instanceof Q && y.isInt() && x instanceof Q && bAbs(y.n) <= 4096n) { if (x.isZero() && y.sign() < 0) throw new MathError('You cannot divide by zero.'); return x.pow(Number(y.n)); }
+        var pw = mPow(nF(x), nF(y));
+        if (!isFinite(pw)) throw new MathError(isNaN(pw) ? 'A negative number cannot be raised to that power.' : 'The result is too large.');
+        return pw;
+    }
+  }
+  function bSqrt(n) { // floor square root of a BigInt >= 0
+    if (n < 2n) return n;
+    var x = 1n << BigInt((n.toString(2).length >> 1) + 1), y = (x + n / x) >> 1n;
+    while (y < x) { x = y; y = (x + n / x) >> 1n; }
+    return x;
+  }
+  function fmtPlain(v) { var r = parseFloat(Number(v).toPrecision(12)); return String(r === 0 ? 0 : r); }
+  // ---------- reading numbers ----------
+  function bLcm(a, b) { return a / bGcd(a, b) * b; }
+  function fromRepeating(sign, I, A, R) { // I.A(R) as an exact fraction
+    var a = BigInt(A.length), r = BigInt(R.length), p10a = 10n ** a;
+    var num = BigInt((I || '0') + A + R) - BigInt((I || '0') + A), den = p10a * (10n ** r - 1n);
+    var q = Q(num, den); return sign === '-' ? q.neg() : q;
+  }
+  function read(raw, label) { // returns { q, kind, text }
+    var s = String(raw).trim().replace(/[−–]/g, '-').replace(/\s+/g, ' ').replace(/\s*\/\s*/g, '/'), m;
+    if (!s) throw new MathError('Type the ' + label + '.');
+    if ((m = /^([+-]?)(\d+)[ _](\d+)\/(\d+)$/.exec(s))) {
+      if (BigInt(m[4]) === 0n) throw new MathError('The ' + label + ' has 0 at the bottom. A fraction cannot have a denominator of 0.');
+      var w = BigInt(m[2]), n = BigInt(m[3]), d = BigInt(m[4]), q = Q(w * d + n, d);
+      return { q: m[1] === '-' ? q.neg() : q, kind: 'mixed', w: w, n: n, d: d, neg: m[1] === '-', text: s };
+    }
+    if ((m = /^([+-]?\d+)\/([+-]?\d+)$/.exec(s))) {
+      if (BigInt(m[2]) === 0n) throw new MathError('The ' + label + ' has 0 at the bottom. A fraction cannot have a denominator of 0.');
+      return { q: Q(BigInt(m[1]), BigInt(m[2])), kind: 'frac', text: s };
+    }
+    if (/^[+-]?\d+$/.test(s)) return { q: Q(BigInt(s)), kind: 'int', text: s };
+    var d2 = readDecimal(s);
+    if (d2) return { q: d2.q, kind: 'dec', text: s, rep: d2 };
+    throw new MathError('"' + raw + '" is not a fraction I can read. Try 3/4, 2 1/3, 5 or 0.75.');
+  }
+  function readDecimal(str) {
+    var s = String(str).trim().replace(/[−–]/g, '-').replace(/\s+/g, '').replace(/…/g, '...'), m;
+    if ((m = /^([+-]?)(\d*)\.(\d*)\((\d+)\)$/.exec(s)) && (m[2] || m[3] || m[4])) return { q: fromRepeating(m[1], m[2], m[3], m[4]), I: m[2] || '0', A: m[3], R: m[4], sign: m[1] };
+    if ((m = /^([+-]?)(\d*)\.(\d+)\.\.\.$/.exec(s))) { // 0.1666... : find the shortest block that repeats at the end
+      var digits = m[3], best = null;
+      for (var p = 1; p * 2 <= digits.length && !best; p++) if (digits.slice(-p) === digits.slice(-2 * p, -p)) best = p;
+      if (!best) best = 1; // 0.3... means the 3 repeats
+      var head = digits.slice(0, digits.length - best), R = digits.slice(-best);
+      while (head.length >= best && head.slice(-best) === R) head = head.slice(0, -best); // 0.1666 -> head 1, block 6
+      return { q: fromRepeating(m[1], m[2], head, R), I: m[2] || '0', A: head, R: R, sign: m[1], dots: true };
+    }
+    if (/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(s)) { var q = Q.parse(s); return q ? { q: q, I: null } : null; }
+    if ((m = /^([+-]?\d*\.?\d+)%$/.exec(s))) { var q2 = Q.parse(m[1]); return q2 ? { q: q2.div(Q(100)), pct: true } : null; }
+    return null;
+  }
+
+  // ---------- showing numbers ----------
+  function ms(n) { return n.toString().replace('-', '−'); }
+  function fr(n, d) { return '<span class="fc-fr"><span>' + n + '</span><span>' + d + '</span></span>'; }
+  function F(q) { return q.d === 1n ? ms(q.n) : (q.n < 0n ? '−' : '') + fr(bAbs(q.n).toString(), q.d.toString()); }
+  function FP(q) { return q.sign() < 0 ? '(' + F(q) + ')' : F(q); }
+  function raw(n, d) { return (n < 0n ? '−' : '') + fr(bAbs(n).toString(), d.toString()); } // a fraction exactly as given, not reduced
+  function mixed(q) {
+    if (q.d === 1n || bAbs(q.n) < q.d) return F(q);
+    var a = bAbs(q.n), w = a / q.d, r = a % q.d;
+    return (q.n < 0n ? '−' : '') + w + (r ? ' ' + fr(r.toString(), q.d.toString()) : '');
+  }
+  function mixedText(q) { if (q.d === 1n || bAbs(q.n) < q.d) return q.toString().replace('-', '−'); var a = bAbs(q.n); return (q.n < 0n ? '−' : '') + (a / q.d) + ' ' + (a % q.d) + '/' + q.d; }
+  // Long division: exact decimal digits, with the repeating block found by watching remainders.
+  function decimal(q, maxDigits) {
+    maxDigits = maxDigits || 1500;
+    var neg = q.n < 0n, n = bAbs(q.n), d = q.d, ip = n / d, r = n % d, digits = '', seen = new Map(), start = -1;
+    while (r !== 0n && digits.length < maxDigits) {
+      var key = r.toString();
+      if (seen.has(key)) { start = seen.get(key); break; }
+      seen.set(key, digits.length); r *= 10n; digits += (r / d).toString(); r %= d;
+    }
+    var sign = neg && (ip !== 0n || digits) ? '−' : '';
+    if (r === 0n) return { text: sign + ip + (digits ? '.' + digits : ''), html: sign + ip + (digits ? '.' + digits : ''), exact: true };
+    if (start < 0) return { text: sign + ip + '.' + digits.slice(0, 60) + '…', html: sign + ip + '.' + digits.slice(0, 60) + '…', long: true };
+    var A = digits.slice(0, start), R = digits.slice(start);
+    var shownR = R.length > 120 ? R.slice(0, 120) + '…' : R;
+    return { text: sign + ip + '.' + A + '(' + shownR + ')', html: sign + ip + '.' + A + '<span class="fc-ol">' + shownR + '</span>', period: R.length, A: A, R: R };
+  }
+  function approx(q) { var x = q.toNumber(); return parseFloat(x.toPrecision(12)).toString().replace('-', '−'); }
+  function step(t, b) { return '<li><b>' + t + '</b>' + (b || '') + '</li>'; }
+
+  // ---------- steps for converting an input to a fraction ----------
+  function toImproper(v, name) {
+    if (v.kind === 'mixed') {
+      var top = v.w * v.d + v.n;
+      return step('Write ' + name + ' as an improper fraction', (v.neg ? '−' : '') + v.w + ' ' + fr(v.n, v.d) + ' = ' + (v.neg ? '−' : '') + fr('(' + v.w + ' × ' + v.d + ' + ' + v.n + ')', v.d) + ' = ' + (v.neg ? '−' : '') + fr(top, v.d));
+    }
+    if (v.kind === 'dec' && v.rep && v.rep.I !== undefined && v.rep.R) return step('Write ' + name + ' as a fraction', ms(v.text) + ' = ' + F(v.q) + ' (a repeating decimal; see Decimal to fraction for the working)');
+    if (v.kind === 'dec' && (v.rep.pct || /e/i.test(v.text))) return step('Write ' + name + ' as a fraction', ms(v.text) + ' = ' + F(v.q));
+    if (v.kind === 'dec') { var s = v.text.replace(/^[+-]/, ''), places = (s.split('.')[1] || '').length; return step('Write ' + name + ' as a fraction', ms(v.text) + ' = ' + raw(BigInt(v.text.replace('.', '').replace(/^\+/, '')), 10n ** BigInt(places)) + (places ? ' = ' + F(v.q) : '')); }
+    if (v.kind === 'int') return step('Write ' + name + ' as a fraction', ms(v.text) + ' = ' + fr(ms(v.q.n), '1'));
+    return '';
+  }
+  function asGiven(v) { // the fraction exactly as typed (not reduced), with a positive denominator
+    if (v.kind === 'frac') { var p = v.text.split('/'), n = BigInt(p[0]), d = BigInt(p[1]); if (d < 0n) { n = -n; d = -d; } return { n: n, d: d }; }
+    if (v.kind === 'mixed') { var top = v.w * v.d + v.n; return { n: v.neg ? -top : top, d: v.d }; }
+    return { n: v.q.n, d: v.q.d };
+  }
+  function simplifySteps(n, d) {
+    var g = bGcd(n, d);
+    if (d < 0n) { n = -n; d = -d; }
+    if (g <= 1n) return step('Simplify', raw(n, d) + ' is already in lowest terms, because the top and bottom have no common factor except 1.');
+    return step('Simplify by dividing top and bottom by ' + g + ' (their greatest common factor)', raw(n, d) + ' = ' + fr(ms(n) + ' ÷ ' + g, d + ' ÷ ' + g) + ' = ' + raw(n / g, d / g));
+  }
+
+  // ---------- the three tools ----------
+  function calc() {
+    var A = read($('a').value, 'first fraction'), B = read($('b').value, 'second fraction'), op = $('op').value, st = '', r;
+    st += toImproper(A, 'the first number') + toImproper(B, 'the second number');
+    var a = asGiven(A), b = asGiven(B), n, d;
+    if (op === '+' || op === '-') {
+      var sym = op === '+' ? ' + ' : ' − ';
+      if (a.d === b.d) {
+        n = op === '+' ? a.n + b.n : a.n - b.n; d = a.d;
+        st += step('The denominators are the same, so ' + (op === '+' ? 'add' : 'subtract') + ' the numerators', raw(a.n, a.d) + sym + raw(b.n, b.d) + ' = ' + fr(ms(a.n) + sym + (b.n < 0n ? '(' + ms(b.n) + ')' : b.n), a.d) + ' = ' + raw(n, d));
+      } else {
+        var L = bLcm(a.d, b.d), ka = L / a.d, kb = L / b.d;
+        st += step('Find the lowest common denominator (LCD)', 'The LCD of ' + a.d + ' and ' + b.d + ' is ' + L + (L === a.d * b.d ? ' (they share no common factor, so it is ' + a.d + ' × ' + b.d + ')' : ', the smallest number both divide into.'));
+        st += step('Rewrite both fractions with denominator ' + L,
+          (ka === 1n ? raw(a.n, a.d) + ' stays the same' : raw(a.n, a.d) + ' = ' + fr(ms(a.n) + ' × ' + ka, a.d + ' × ' + ka) + ' = ' + raw(a.n * ka, L)) + '<br>' +
+          (kb === 1n ? raw(b.n, b.d) + ' stays the same' : raw(b.n, b.d) + ' = ' + fr(ms(b.n) + ' × ' + kb, b.d + ' × ' + kb) + ' = ' + raw(b.n * kb, L)));
+        n = op === '+' ? a.n * ka + b.n * kb : a.n * ka - b.n * kb; d = L;
+        st += step((op === '+' ? 'Add' : 'Subtract') + ' the numerators', raw(a.n * ka, L) + sym + raw(b.n * kb, L) + ' = ' + raw(n, d));
+      }
+    } else if (op === '*') {
+      n = a.n * b.n; d = a.d * b.d;
+      st += step('Multiply the tops together and the bottoms together', raw(a.n, a.d) + ' × ' + raw(b.n, b.d) + ' = ' + fr(ms(a.n) + ' × ' + (b.n < 0n ? '(' + ms(b.n) + ')' : b.n), a.d + ' × ' + b.d) + ' = ' + raw(n, d));
+    } else {
+      if (b.n === 0n) throw new MathError('You cannot divide by zero. The second fraction is 0.');
+      var bn = b.d, bd = b.n; if (bd < 0n) { bn = -bn; bd = -bd; }
+      st += step('Dividing is multiplying by the reciprocal: flip the second fraction', raw(a.n, a.d) + ' ÷ ' + raw(b.n, b.d) + ' = ' + raw(a.n, a.d) + ' × ' + raw(bn, bd));
+      n = a.n * bn; d = a.d * bd;
+      st += step('Multiply the tops together and the bottoms together', fr(ms(a.n) + ' × ' + (bn < 0n ? '(' + ms(bn) + ')' : bn), a.d + ' × ' + bd) + ' = ' + raw(n, d));
+    }
+    st += simplifySteps(n, d);
+    r = Q(n, d);
+    if (r.d !== 1n && bAbs(r.n) > r.d) st += step('Write it as a mixed number', F(r) + ' = ' + bAbs(r.n) + ' ÷ ' + r.d + ' = ' + (bAbs(r.n) / r.d) + ' remainder ' + (bAbs(r.n) % r.d) + ', so ' + F(r) + ' = ' + mixed(r));
+    var sym2 = { '+': '+', '-': '−', '*': '×', '/': '÷' }[op];
+    return result(r, st, mixedText(A.q) + ' ' + sym2 + ' ' + mixedText(B.q));
+  }
+  function simp() {
+    var v = read($('s').value, 'fraction'), st = toImproper(v, 'it'), g0 = asGiven(v), n = bAbs(g0.n), d = g0.d;
+    if (v.kind === 'frac' || v.kind === 'mixed') {
+      if (n !== 0n && d !== 0n) { // Euclid's algorithm, shown
+        var x = n > d ? n : d, y = n > d ? d : n, lines = [], k = 0;
+        while (y && k < 40) { lines.push(x + ' = ' + (x / y) + ' × ' + y + ' + ' + (x % y)); var t = x % y; x = y; y = t; k++; }
+        st += step('Find the greatest common factor with Euclid\'s algorithm', lines.join('<br>') + (k >= 40 ? '<br>…' : '') + '<br>The last non-zero remainder is the GCF: ' + bGcd(n, d));
+      }
+      st += simplifySteps(g0.n, g0.d);
+    }
+    var r = v.q;
+    if (r.d !== 1n && bAbs(r.n) > r.d) st += step('Write it as a mixed number', F(r) + ' = ' + mixed(r));
+    return result(r, st, null);
+  }
+  function dec() {
+    var s = $('d').value.trim(); if (!s) throw new MathError('Type a decimal number.');
+    var v = readDecimal(s);
+    if (!v) { if (/^[+-]?\d+$/.test(s.replace(/\s/g, ''))) v = { q: Q(BigInt(s.replace(/\s/g, ''))), I: null }; else throw new MathError('"' + s + '" is not a decimal I can read. Try 0.75, 0.(3) or 0.1666...'); }
+    var st = '', q = v.q;
+    if (v.R) {
+      var I = v.I, A = v.A, R = v.R, a = A.length, r = R.length, x = (v.sign === '-' ? '−' : '') + I + '.' + A + '<span class="fc-ol">' + R + '</span>';
+      if (v.dots) st += step('Read the repeating part', s + ' means ' + x + ': the digits ' + R + ' repeat forever.');
+      var big = BigInt(I + A + R), small = BigInt(I + A), m1 = 10n ** BigInt(a + r), m2 = 10n ** BigInt(a);
+      st += step('Call the number x and shift the decimal point', 'x = ' + x + '<br>' + m1 + 'x = ' + big + '.' + '<span class="fc-ol">' + R + '</span>' + (a ? '<br>' + m2 + 'x = ' + small + '.<span class="fc-ol">' + R + '</span>' : '<br>' + '1x = ' + I + '.<span class="fc-ol">' + R + '</span>'));
+      st += step('Subtract to remove the repeating part', (m1 - m2) + 'x = ' + big + ' − ' + small + ' = ' + (big - small));
+      st += step('Divide', 'x = ' + raw((v.sign === '-' ? -1n : 1n) * (big - small), m1 - m2));
+      st += simplifySteps((v.sign === '-' ? -1n : 1n) * (big - small), m1 - m2);
+    } else if (v.pct) {
+      st += step('A percent means "out of 100"', s + ' = ' + ms(s.replace('%', '')) + ' ÷ 100 = ' + F(q));
+    } else {
+      var t = s.replace(/\s/g, '').replace(/^\+/, ''), neg = t[0] === '-', body = t.replace(/^-/, '');
+      if (/e/i.test(body) || body.indexOf('.') < 0) st += step('Write it as a fraction', ms(s) + ' = ' + F(q));
+      else {
+        var places = body.split('.')[1].length, top = BigInt((neg ? '-' : '') + body.replace('.', '')), den = 10n ** BigInt(places);
+        st += step('Count the decimal places', ms(s) + ' has ' + places + ' decimal place' + (places === 1 ? '' : 's') + ', so put it over 1' + '0'.repeat(places) + ': ' + raw(top, den));
+        st += simplifySteps(top, den);
+      }
+    }
+    if (q.d !== 1n && bAbs(q.n) > q.d) st += step('As a mixed number', F(q) + ' = ' + mixed(q));
+    return result(q, st, null);
+  }
+  var copyTxt = '';
+  function result(r, st, expr) {
+    var dd = decimal(r), pct = decimal(r.mul(Q(100)));
+    var h = '<div class="fc-ans">' +
+      '<div><small>' + (expr ? 'Answer' : 'Simplest form') + '</small>' + F(r) + '</div>' +
+      (r.d !== 1n && bAbs(r.n) > r.d ? '<div><small>Mixed number</small>' + mixed(r) + '</div>' : '') +
+      '<div><small>Decimal' + (dd.period ? ' (the marked digits repeat)' : '') + '</small><span class="fc-dec">' + dd.html + '</span></div>' +
+      '<div><small>Percent</small><span class="fc-dec">' + (pct.exact ? pct.text : pct.period && pct.period <= 120 ? pct.html : '≈ ' + parseFloat((r.toNumber() * 100).toPrecision(10))) + '%</span></div></div>';
+    if (dd.period > 120) h += '<p class="fc-hint">The repeating block is ' + fmtNum(dd.period, 0) + ' digits long; only the first 120 are shown.</p>';
+    if (dd.long) h += '<p class="fc-hint">The decimal repeats with a block longer than 1,500 digits, so only the start is shown (≈ ' + approx(r) + ').</p>';
+    h += '<h3>Step-by-step working</h3><ol class="fc-steps">' + st + '</ol>';
+    $('out').innerHTML = h;
+    copyTxt = (expr ? expr + ' = ' : '') + r.toString().replace('-', '−') + (r.d !== 1n && bAbs(r.n) > r.d ? ' = ' + mixedText(r) : '') + (r.d === 1n ? '' : ' = ' + dd.text);
+    $('out').setAttribute('data-answer', copyTxt);
+    $('copy').hidden = false;
+  }
+  var mode = 'calc';
+  function go() {
+    $('msg').className = 'msg'; $('msg').textContent = '';
+    try { ({ calc: calc, simp: simp, dec: dec })[mode](); }
+    catch (e) {
+      if (!(e instanceof MathError)) throw e;
+      $('out').innerHTML = ''; $('out').removeAttribute('data-answer'); $('copy').hidden = true;
+      $('msg').className = 'msg bad'; $('msg').textContent = e.message;
+    }
+  }
+  $('modes').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    mode = b.dataset.m;
+    [].forEach.call(this.children, function (x) { x.setAttribute('aria-pressed', x === b); });
+    [].forEach.call(document.querySelectorAll('.fc-pane'), function (p) { p.hidden = p.dataset.p !== mode; });
+    go();
+  });
+  var t;
+  ['a', 'b', 's', 'd'].forEach(function (id) { $(id).addEventListener('input', function () { clearTimeout(t); t = setTimeout(go, 150); }); });
+  $('op').addEventListener('change', go);
+  $('copy').addEventListener('click', function () { copyText(copyTxt, this); });
+  go();
+})();
+</script>

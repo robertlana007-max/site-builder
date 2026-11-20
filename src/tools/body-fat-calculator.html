@@ -1,0 +1,106 @@
+<style>
+.bf-h { font-size: 17px; margin: 22px 0 4px; }
+.bf-tab { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
+.bf-tab th, .bf-tab td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--line); }
+.bf-tab th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.bf-tab td:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.bf-tab tr.on td { background: var(--accent-soft); font-weight: 700; }
+.bf-note { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+</style>
+<div class="fields">
+  <div><label for="unit">Units</label><select id="unit"><option value="m">Metric (kg, cm)</option><option value="i">Imperial (lb, in)</option></select></div>
+  <div><label for="bfSex">Sex</label><select id="bfSex"><option value="m">Male</option><option value="f">Female</option></select></div>
+  <div><label for="bfAge">Age (years)</label><input type="number" id="bfAge" min="18" max="100" step="1"></div>
+  <div><label for="bfW" id="bfWL">Weight (kg)</label><input type="number" id="bfW" min="0" step="any" inputmode="decimal"></div>
+  <div id="bfCmBox"><label for="bfCm">Height (cm)</label><input type="number" id="bfCm" min="0" step="any" inputmode="decimal"></div>
+  <div id="bfFtBox" hidden><label for="bfFt">Height (ft)</label><input type="number" id="bfFt" min="0" step="1"></div>
+  <div id="bfInBox" hidden><label for="bfIn">Height (in)</label><input type="number" id="bfIn" min="0" step="any"></div>
+  <div><label for="bfNeck" id="bfNeckL">Neck (cm)</label><input type="number" id="bfNeck" min="0" step="any" inputmode="decimal"></div>
+  <div><label for="bfWaist" id="bfWaistL">Waist (cm)</label><input type="number" id="bfWaist" min="0" step="any" inputmode="decimal"></div>
+  <div id="bfHipBox" hidden><label for="bfHip" id="bfHipL">Hips (cm)</label><input type="number" id="bfHip" min="0" step="any" inputmode="decimal"></div>
+</div>
+<p class="bf-note" id="bfHow">Measure the neck just below the voice box, and the waist at the navel for men (at the narrowest point for women). Keep the tape level and snug, without pressing into the skin.</p>
+
+<h3 class="bf-h">US Navy method (tape measure)</h3>
+<div class="stats">
+  <div class="stat"><span>Body fat</span><b id="bfPct">–</b></div>
+  <div class="stat"><span>Category (ACE)</span><b id="bfCat">–</b></div>
+  <div class="stat"><span>Fat mass</span><b id="bfFat">–</b></div>
+  <div class="stat"><span>Lean mass</span><b id="bfLean">–</b></div>
+</div>
+<p class="msg" id="bfMsg">Enter your height, neck and waist (and hips for women).</p>
+
+<h3 class="bf-h">BMI-based estimate (Deurenberg formula)</h3>
+<div class="stats">
+  <div class="stat"><span>BMI</span><b id="bfBmi">–</b></div>
+  <div class="stat"><span>Estimated body fat from BMI</span><b id="bfDeu">–</b></div>
+</div>
+<p class="msg" id="bfDeuMsg">Needs your age, weight and height. This is a rough estimate from BMI only and is less accurate than the tape measure method, especially for muscular people.</p>
+
+<h3 class="bf-h">Body fat categories (American Council on Exercise)</h3>
+<table class="bf-tab"><thead><tr><th>Category</th><th id="bfTabSex">Men</th></tr></thead><tbody id="bfRows"></tbody></table>
+<p class="msg">All results are estimates. The US Navy method is usually within 3 to 4 percentage points of lab tests when you measure carefully. This tool is for general information, not medical advice.</p>
+<script>
+(function () {
+  // core-start
+  // US Navy (Hodgdon and Beckett) formulas. Imperial versions take inches, metric versions take cm.
+  function navy(sex, height, neck, waist, hip, metric) {
+    var L = Math.log10, v = sex === 'f' ? waist + hip - neck : waist - neck;
+    if (!(v > 0) || !(height > 0)) return NaN;
+    if (metric) return sex === 'f' ? 495 / (1.29579 - 0.35004 * L(v) + 0.22100 * L(height)) - 450 : 495 / (1.0324 - 0.19077 * L(v) + 0.15456 * L(height)) - 450;
+    return sex === 'f' ? 163.205 * L(v) - 97.684 * L(height) - 78.387 : 86.010 * L(v) - 70.041 * L(height) + 36.76;
+  }
+  // Deurenberg et al. (1991), adults: 1.20 x BMI + 0.23 x age - 10.8 x sex - 5.4 (sex: 1 = male, 0 = female)
+  function deurenberg(bmi, age, sex) { return 1.2 * bmi + 0.23 * age - 10.8 * (sex === 'm' ? 1 : 0) - 5.4; }
+  // ACE categories: [name, lower bound]. Below the first bound is below essential fat.
+  var ACE = { f: [['Essential fat', 10, '10 – 13%'], ['Athletes', 14, '14 – 20%'], ['Fitness', 21, '21 – 24%'], ['Average', 25, '25 – 31%'], ['Obese', 32, '32% or more']],
+    m: [['Essential fat', 2, '2 – 5%'], ['Athletes', 6, '6 – 13%'], ['Fitness', 14, '14 – 17%'], ['Average', 18, '18 – 24%'], ['Obese', 25, '25% or more']] };
+  function category(pct, sex) { var t = ACE[sex], i = -1; for (var k = 0; k < t.length; k++) if (pct >= t[k][1]) i = k; return i; }
+  // core-end
+  var LB = 0.45359237;
+  function rows(sex, on) {
+    var tb = $('bfRows'); tb.innerHTML = ''; $('bfTabSex').textContent = sex === 'f' ? 'Women' : 'Men';
+    ACE[sex].forEach(function (r, i) { var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td'); a.textContent = r[0]; b.textContent = r[2]; if (i === on) tr.className = 'on'; tr.appendChild(a); tr.appendChild(b); tb.appendChild(tr); });
+  }
+  function calc() {
+    var imp = $('unit').value === 'i', sex = $('bfSex').value, u = imp ? 'in' : 'cm';
+    $('bfWL').textContent = 'Weight (' + (imp ? 'lb' : 'kg') + ')';
+    $('bfNeckL').textContent = 'Neck (' + u + ')'; $('bfWaistL').textContent = 'Waist (' + u + ')'; $('bfHipL').textContent = 'Hips (' + u + ')';
+    $('bfCmBox').hidden = imp; $('bfFtBox').hidden = !imp; $('bfInBox').hidden = !imp; $('bfHipBox').hidden = sex !== 'f';
+    $('bfHow').textContent = sex === 'f' ? 'Measure the neck just below the voice box, the waist at its narrowest point and the hips at their widest point. Keep the tape level and snug, without pressing into the skin.' : 'Measure the neck just below the voice box and the waist level with your navel. Keep the tape level and snug, without pressing into the skin.';
+    var h = imp ? (+$('bfFt').value || 0) * 12 + (+$('bfIn').value || 0) : +$('bfCm').value; // in inches or cm
+    var hcm = imp ? h * 2.54 : h, neck = +$('bfNeck').value, waist = +$('bfWaist').value, hip = +$('bfHip').value;
+    var wt = +$('bfW').value, kg = imp ? wt * LB : wt, age = +$('bfAge').value;
+    var on = -1, pct = NaN, msg = $('bfMsg');
+    $('bfPct').textContent = $('bfCat').textContent = $('bfFat').textContent = $('bfLean').textContent = '–'; msg.className = 'msg';
+    if (!(h > 0 && neck > 0 && waist > 0 && (sex === 'm' || hip > 0))) msg.textContent = sex === 'f' ? 'Enter your height, neck, waist and hips.' : 'Enter your height, neck and waist.';
+    else if (hcm < 120 || hcm > 230) { msg.textContent = 'Check your height. It should be between 120 and 230 cm (47 to 90 in).'; msg.className = 'msg bad'; }
+    else if (sex === 'm' && waist <= neck) { msg.textContent = 'Your waist must be larger than your neck for this formula. Check the measurements.'; msg.className = 'msg bad'; }
+    else if (sex === 'f' && waist + hip <= neck) { msg.textContent = 'Check the measurements: waist plus hips must be larger than the neck.'; msg.className = 'msg bad'; }
+    else {
+      pct = navy(sex, h, neck, waist, hip, !imp);
+      if (!(pct >= 1 && pct <= 75)) { msg.textContent = 'The result is outside the possible range. Check that every measurement uses ' + (imp ? 'inches' : 'centimetres') + '.'; msg.className = 'msg bad'; pct = NaN; }
+      else {
+        pct = +pct.toFixed(1); on = category(pct, sex);
+        $('bfPct').textContent = pct.toFixed(1) + '%';
+        $('bfCat').textContent = on < 0 ? 'Below essential fat' : ACE[sex][on][0];
+        if (kg > 0) { $('bfFat').textContent = imp ? fmtNum(wt * pct / 100, 1) + ' lb' : fmtNum(kg * pct / 100, 1) + ' kg'; $('bfLean').textContent = imp ? fmtNum(wt * (1 - pct / 100), 1) + ' lb' : fmtNum(kg * (1 - pct / 100), 1) + ' kg'; }
+        msg.textContent = on < 0 ? 'This is below the essential fat level, which is not healthy. Check your measurements, and talk to a doctor if it is right.' : kg > 0 ? 'Calculated with the US Navy ' + (imp ? 'imperial (inches)' : 'metric (centimetres)') + ' formula.' : 'Add your weight to see fat mass and lean mass.';
+      }
+    }
+    rows(sex, on);
+    var dm = $('bfDeuMsg');
+    $('bfBmi').textContent = $('bfDeu').textContent = '–';
+    if (kg > 0 && hcm >= 120 && hcm <= 230) {
+      var bmi = kg / Math.pow(hcm / 100, 2); $('bfBmi').textContent = bmi.toFixed(1);
+      if (age >= 18 && age <= 100) {
+        var d = deurenberg(+bmi.toFixed(1), age, sex);
+        $('bfDeu').textContent = d > 0 ? d.toFixed(1) + '%' : '–';
+        dm.textContent = 'Rough estimate from BMI and age only. It is less accurate than the tape measure method, especially for muscular people, and is not meant for children.';
+      } else dm.textContent = age > 0 ? 'The BMI-based estimate is for adults aged 18 to 100.' : 'Enter your age to see the BMI-based estimate.';
+    } else dm.textContent = 'Needs your age, weight and height. This is a rough estimate from BMI only and is less accurate than the tape measure method, especially for muscular people.';
+  }
+  ['unit', 'bfSex', 'bfAge', 'bfW', 'bfCm', 'bfFt', 'bfIn', 'bfNeck', 'bfWaist', 'bfHip'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  calc();
+})();
+</script>

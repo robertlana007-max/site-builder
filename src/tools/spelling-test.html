@@ -1,0 +1,378 @@
+<style>
+.spt .spt-card { border: 2px solid var(--line); border-radius: 16px; padding: 16px; background: var(--surface); margin-top: 14px; text-align: center; }
+.spt .spt-card.ok { border-color: var(--ok); } .spt .spt-card.no { border-color: var(--bad); }
+.spt .spt-top { display: flex; justify-content: space-between; gap: 10px; font-weight: 600; color: var(--muted); font-variant-numeric: tabular-nums; flex-wrap: wrap; }
+.spt .spt-play { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 14px 0; }
+.spt .spt-big { font-size: 18px; padding: 12px 22px; min-height: 52px; }
+.spt .spt-hint { margin: 10px auto 12px; max-width: 520px; padding: 10px 12px; border-radius: 10px; background: var(--bg); text-align: start; }
+.spt .spt-hint p { margin: 0 0 4px; }
+.spt .spt-in { max-width: 360px; margin: 0 auto; text-align: center; font: 600 24px var(--mono); min-height: 54px; }
+.spt .spt-fb { min-height: 30px; margin: 12px 0 0; font-weight: 600; overflow-wrap: anywhere; }
+.spt .spt-fb.good { color: var(--ok); } .spt .spt-fb.bad { color: var(--bad); }
+.spt .spt-word { font: 700 26px var(--mono); letter-spacing: .04em; overflow-wrap: anywhere; }
+.spt .spt-word .x { color: var(--bad); text-decoration: underline 3px; text-underline-offset: 4px; }
+.spt .spt-res { border: 2px solid var(--accent); border-radius: 14px; padding: 16px; margin-top: 14px; background: var(--surface); }
+.spt .spt-res h3 { margin: 0 0 6px; }
+.spt .spt-res ul { margin: 8px 0 0; padding-inline-start: 20px; }
+.spt .spt-res li { margin: 0 0 4px; overflow-wrap: anywhere; }
+#sptPrint { display: none; }
+@media print {
+  @page { margin: 14mm; }
+  html.spt-printing body > *:not(#sptPrint) { display: none !important; }
+  html.spt-printing, html.spt-printing body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #sptPrint { display: block !important; color: #000; font: 12pt/1.4 Arial, sans-serif; }
+  #sptPrint h1 { font-size: 17pt; margin: 0 0 10pt; }
+  #sptPrint li { margin: 0 0 12pt; break-inside: avoid; }
+  #sptPrint .line { border-bottom: 1px solid #999; height: 18pt; width: 80%; }
+}
+</style>
+<div class="spt" id="spt">
+<div class="notice bad" id="sptNoAudio" hidden><p id="sptNoAudioText">Audio is not available in this browser, so each word is shown as a definition hint and a sentence with a gap instead. For spoken words, try a current version of Chrome, Edge or Safari, or check that your device has a text-to-speech voice installed.</p></div>
+<div id="sptSetup">
+  <div class="fields">
+    <div><label for="sptList">Word list</label><select id="sptList"></select></div>
+    <div><label for="sptCount">Number of words</label><select id="sptCount"><option value="10">10 words</option><option value="15">15 words</option><option value="20">20 words</option><option value="0">All words in the list</option></select></div>
+    <div><label for="sptSpeed">Speaking speed</label><select id="sptSpeed"><option value="0.85">Normal</option><option value="0.65">Slow</option><option value="1">Fast</option></select></div>
+  </div>
+  <div id="sptOwnBox" hidden>
+    <label for="sptOwn">Your words, one per line</label>
+    <textarea id="sptOwn" class="plain" data-nomemo style="min-height:150px" placeholder="necessary&#10;rhythm | Clap to the rhythm of the music.&#10;island | We swam to the island. | land with water all around it"></textarea>
+    <p class="msg" style="margin-top:6px">Optional: after the word, add <b>|</b> and an example sentence, then another <b>|</b> and a short meaning. Your list is saved in this browser.</p>
+  </div>
+  <div class="checks" style="margin-top:12px">
+    <label><input type="checkbox" id="sptShuffle" checked>Mix up the order</label>
+    <label><input type="checkbox" id="sptAlwaysHint">Always show the meaning hint</label>
+  </div>
+  <div class="btns" style="margin:0"><button type="button" class="btn" id="sptStart">Start test</button></div>
+  <p class="msg" id="sptMsg" aria-live="polite"></p>
+</div>
+
+<div class="spt-card" id="sptCard" hidden>
+  <div class="spt-top"><span id="sptProg"></span><span id="sptScore"></span></div>
+  <div class="spt-play" id="sptPlayBox">
+    <button type="button" class="btn spt-big" id="sptSay">🔊 Say the word</button>
+    <button type="button" class="btn ghost" id="sptSent">Say it in a sentence</button>
+    <button type="button" class="btn ghost" id="sptHintBtn">Show a hint</button>
+  </div>
+  <div class="spt-hint" id="sptHint" hidden aria-live="polite"></div>
+  <label for="sptIn" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Type the word you hear</label>
+  <input type="text" id="sptIn" class="spt-in" data-nomemo autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" enterkeyhint="go" maxlength="60" placeholder="Type the word">
+  <div class="spt-fb" id="sptFb" aria-live="assertive"></div>
+  <div class="btns" style="justify-content:center"><button type="button" class="btn" id="sptCheck">Check</button><button type="button" class="btn ghost" id="sptSkip">Skip</button><button type="button" class="btn ghost" id="sptQuit">End test</button></div>
+</div>
+
+<div class="spt-res" id="sptRes" hidden aria-live="polite">
+  <h3 id="sptResT"></h3>
+  <p id="sptResP" style="margin:0"></p>
+  <div id="sptWrongBox" hidden><h4 style="margin:14px 0 0">Words to practise</h4><ul id="sptWrong"></ul></div>
+  <div class="btns"><button type="button" class="btn" id="sptRetry" hidden>Retry the words I missed</button><button type="button" class="btn" id="sptAgain">New test</button><button type="button" class="btn ghost" id="sptPrintBtn">Print this list</button></div>
+</div>
+</div>
+<script type="text/plain" id="sptData">
+#1|Level 1 (ages 5 to 7)
+cat|The cat is asleep on the chair.|a small furry pet that says meow
+dog|My dog loves to run in the park.|a pet that barks
+sun|The sun is hot today.|the bright star we see in the day sky
+red|She has a red coat.|the colour of a ripe tomato
+big|An elephant is a big animal.|large; not small
+hat|Put on your hat, it is cold.|you wear it on your head
+fish|A fish swims in the pond.|it lives in water and has fins
+jump|Can you jump over the puddle?|to push yourself up into the air with your legs
+ship|The ship sailed across the sea.|a large boat
+frog|The frog sat on a green leaf.|a small green animal that hops and says ribbit
+milk|I drink milk with my breakfast.|a white drink that comes from cows
+tree|A bird made a nest in the tree.|a tall plant with a trunk and branches
+book|Let us read a book together.|pages with a story or facts that you read
+play|The children play in the garden.|to have fun with toys or games
+rain|Take an umbrella in case of rain.|water that falls from clouds
+blue|The sky is blue.|the colour of a clear sky
+green|Grass is green.|the colour of grass and leaves
+small|A mouse is a small animal.|little; not big
+said|"Hello," said the teacher.|the past of say
+come|Please come to my party.|to move towards someone or a place
+was|It was sunny yesterday.|the past of is
+they|They are my best friends.|those people
+home|We walked home after school.|the place where you live
+night|The stars shine at night.|the dark time when people sleep
+duck|The duck swam across the lake.|a water bird that quacks
+#2|Level 2 (ages 7 to 9)
+friend|My friend lives next door.|a person you like and trust
+because|I stayed in because it was raining.|for the reason that
+school|We go to school five days a week.|the place where children learn
+people|Many people came to the show.|men, women and children
+would|I would like a glass of water, please.|a polite way to say want or will
+water|Plants need water to grow.|the clear liquid in rivers and rain
+again|Can you say that again?|one more time
+answer|Do you know the answer?|what you say or write back to a question
+light|Turn on the light, please.|it lets you see in the dark
+write|Write your name at the top.|to put words on paper
+knee|He fell and hurt his knee.|the joint in the middle of your leg
+thumb|He hurt his thumb in the door.|the short thick finger on your hand
+watch|Let us watch the film tonight.|to look at something for a while
+caught|The goalkeeper caught the ball.|the past of catch
+laugh|The joke made everyone laugh.|the sound you make when something is funny
+money|I saved my money for a bike.|coins and notes you use to buy things
+busy|The shop is busy on Saturdays.|having a lot to do
+build|Let us build a sandcastle.|to make something by putting parts together
+whole|He ate the whole pizza.|all of something
+heard|I heard a strange noise.|the past of hear
+early|We woke up early for the trip.|before the usual time
+juice|Would you like some orange juice?|a drink made from fruit
+island|They sailed to a small island.|land with water all around it
+eight|Spiders have eight legs.|the number after seven
+clothes|Put your clothes in the drawer.|things you wear, such as shirts and trousers
+#3|Level 3 (ages 9 to 11)
+believe|I believe you are telling the truth.|to think that something is true
+different|Every snowflake is different.|not the same
+favourite|Blue is my favourite colour.|the one you like best
+February|My birthday is in February.|the second month of the year
+library|I borrowed this book from the library.|a place where you can borrow books
+surprise|We planned a surprise party for Mum.|something you did not expect
+special|Today is a special day.|not ordinary; important
+straight|Draw a straight line with a ruler.|not bent or curved
+experience|Travelling is a great experience.|something that happens to you
+guard|A guard stands at the gate.|a person who protects a place
+height|What is the height of that wall?|how tall something is
+breathe|Breathe in slowly through your nose.|to take air into your body and let it out
+calendar|Write the date on the calendar.|a chart that shows the days and months
+certain|Are you certain the door is locked?|sure
+continue|Please continue reading.|to keep doing something
+disappear|The rabbit seemed to disappear into the hat.|to go out of sight
+exercise|Exercise keeps your body healthy.|activity that keeps you fit
+famous|She wants to be a famous singer.|known by many people
+grammar|Check the grammar in your sentences.|the rules of a language
+important|It is important to drink water.|mattering a lot
+knowledge|Reading increases your knowledge.|what you know
+minute|Wait a minute, please.|sixty seconds
+probably|It will probably rain later.|very likely
+remember|Remember to bring your lunch.|to keep something in your mind
+weight|The weight of the box is five kilograms.|how heavy something is
+#4|Level 4 (ages 11 to 14)
+accommodation|The hotel offers cheap accommodation.|a place to stay or live
+achieve|Work hard and you will achieve your goals.|to succeed in doing something
+apparent|It was apparent that he was tired.|clear and easy to see
+conscience|My conscience told me to apologise.|the inner sense of right and wrong
+conscious|She was conscious of being watched.|awake and aware
+definite|We need a definite answer by Friday.|certain and clear
+embarrass|Please do not embarrass me in front of my friends.|to make someone feel awkward or ashamed
+environment|We must protect the environment.|the natural world around us
+existence|Scientists debate the existence of life on Mars.|the state of being real
+foreign|She speaks two foreign languages.|from another country
+government|The government announced a new law.|the group of people who run a country
+immediately|Come here immediately!|at once; right now
+independent|He became independent after leaving home.|not needing help from others
+interrupt|It is rude to interrupt someone speaking.|to stop someone while they are talking
+necessary|Is it necessary to bring a passport?|needed
+occasion|A wedding is a special occasion.|an important event or time
+parliament|Parliament voted on the new law.|the group that makes laws in some countries
+persuade|Can I persuade you to stay?|to make someone agree by giving reasons
+privilege|It is a privilege to meet you.|a special right or advantage
+recommend|I recommend the chocolate cake.|to suggest something as good
+rhythm|Clap along to the rhythm of the song.|a regular pattern of beats
+separate|Keep the raw meat separate from the salad.|apart; not joined
+sincerely|Yours sincerely, Anna.|honestly; used to end a formal letter
+twelfth|Today is the twelfth of May.|number 12 in order
+vehicle|Park your vehicle in the car park.|a car, bus, truck or similar
+#5|Level 5 (often misspelled)
+acknowledge|Please acknowledge that you received my email.|to accept or admit something
+acquaintance|He is an acquaintance from work, not a close friend.|someone you know a little
+address|Write your address on the envelope.|where someone lives
+argument|They had an argument about money.|a disagreement
+beginning|The beginning of the film was exciting.|the start
+bureaucracy|The project was slowed down by bureaucracy.|too many official rules and forms
+committee|The committee meets every Tuesday.|a group chosen to make decisions
+conscientious|She is a conscientious student who never misses a deadline.|careful and hard-working
+correspondence|Keep all correspondence about the contract.|letters and emails between people
+definitely|I will definitely be there.|certainly
+discipline|Learning an instrument takes discipline.|control of your behaviour
+fluorescent|The office had bright fluorescent lights.|giving off a very bright light
+gauge|The fuel gauge shows the tank is empty.|a tool that measures something
+harass|It is wrong to harass people online.|to keep annoying or upsetting someone
+hierarchy|The company has a strict hierarchy.|a ranking of people by importance
+humorous|He gave a humorous speech at the wedding.|funny
+liaison|She works as a liaison between the two teams.|a person who connects two groups
+maintenance|The lift is closed for maintenance.|keeping something in good condition
+mischievous|The mischievous puppy chewed my shoe.|playfully naughty
+millennium|A millennium is a thousand years.|a period of one thousand years
+noticeable|There is a noticeable change in the weather.|easy to see
+occurrence|Snow is a rare occurrence here.|something that happens
+playwright|Shakespeare was a famous playwright.|a person who writes plays
+possession|The ring is her most precious possession.|something you own
+questionnaire|Please fill in this short questionnaire.|a list of written questions
+receive|Did you receive my message?|to get something that is given or sent
+restaurant|We booked a table at a new restaurant.|a place where you buy and eat meals
+supersede|The new rules supersede the old ones.|to replace something older
+threshold|She paused at the threshold of the room.|the entrance to a room, or a limit
+unnecessary|Do not buy unnecessary things.|not needed
+</script>
+<script>
+(function () {
+  var LISTS = [], cur = null;
+  $('sptData').textContent.trim().split('\n').forEach(function (l) {
+    if (l.charAt(0) === '#') { var p = l.slice(1).split('|'); cur = { id: p[0], name: p[1], words: [] }; LISTS.push(cur); return; }
+    var q = l.split('|'); cur.words.push({ w: q[0], s: q[1], d: q[2] });
+  });
+  LISTS.forEach(function (L) { var o = document.createElement('option'); o.value = L.id; o.textContent = L.name + ' · ' + L.words.length + ' words'; $('sptList').appendChild(o); });
+  var own = document.createElement('option'); own.value = 'own'; own.textContent = 'My own word list'; $('sptList').appendChild(own);
+  var KEY = 'gtn-spelling-own';
+  try { var saved = localStorage.getItem(KEY); if (saved) $('sptOwn').value = saved; } catch (e) {}
+  $('sptOwn').addEventListener('input', function () { try { localStorage.setItem(KEY, this.value.slice(0, 20000)); } catch (e) {} });
+  function say(cls, t) { $('sptMsg').className = 'msg ' + (cls || ''); $('sptMsg').textContent = t || ''; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function syncOwn() { $('sptOwnBox').hidden = $('sptList').value !== 'own'; }
+  $('sptList').addEventListener('change', function () { syncOwn(); say('', ''); });
+  syncOwn();
+
+  // ---------- speech: find an English voice; if there is none, fall back to written hints ----------
+  var synth = window.speechSynthesis, Utt = window.SpeechSynthesisUtterance, voice = null, audio = false, checked = false;
+  function pick() {
+    if (!synth || !Utt) return;
+    var v = synth.getVoices() || [], en = v.filter(function (x) { return /^en(?:[-_]|$)/i.test(x.lang); });
+    voice = en.filter(function (x) { return /^en[-_](GB|US)/i.test(x.lang) && x.localService; })[0] || en[0] || null;
+    audio = !!voice; if (audio) checked = true;
+    paintAudio();
+  }
+  function paintAudio() {
+    var show = checked && !audio;
+    $('sptNoAudio').hidden = !show;
+    $('sptSay').hidden = !audio; $('sptSent').hidden = !audio; $('sptSpeed').disabled = !audio;
+    $('sptHintBtn').hidden = !audio;
+    if (T && !$('sptCard').hidden) showHint(!audio || $('sptAlwaysHint').checked || T.hinted);
+  }
+  if (synth && Utt) {
+    pick();
+    if (synth.addEventListener) synth.addEventListener('voiceschanged', pick); else synth.onvoiceschanged = pick;
+    setTimeout(function () { checked = true; pick(); }, 1500); // some browsers load voices late; after this we decide
+  } else { checked = true; }
+  function speak(t) {
+    if (!audio) return;
+    try {
+      synth.cancel();
+      var u = new Utt(t); u.voice = voice; u.lang = voice.lang; u.rate = +$('sptSpeed').value || .85;
+      u.onerror = function (e) { if (e && (e.error === 'synthesis-failed' || e.error === 'audio-hardware' || e.error === 'not-allowed' && false)) { audio = false; checked = true; paintAudio(); } };
+      setTimeout(function () { synth.speak(u); }, 60); // Chrome can drop speech queued right after cancel()
+    } catch (e) { audio = false; checked = true; paintAudio(); }
+  }
+
+  // ---------- test ----------
+  var T = null;
+  function rnd(n) { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function ownWords() {
+    var seen = {}, out = [];
+    $('sptOwn').value.split('\n').forEach(function (l) {
+      var p = l.split('|').map(function (x) { return x.trim(); }), w = (p[0] || '').replace(/\s+/g, ' ');
+      if (!w || w.length > 60 || seen[w.toLowerCase()]) return; seen[w.toLowerCase()] = 1;
+      out.push({ w: w, s: p[1] || '', d: p[2] || '' });
+    });
+    return out.slice(0, 300);
+  }
+  function begin(list, retry) {
+    var words = list;
+    if (!words) {
+      if ($('sptList').value === 'own') { words = ownWords(); if (!words.length) { say('bad', 'Type at least one word into your list, one per line.'); $('sptOwn').focus(); return; } }
+      else words = LISTS.filter(function (L) { return L.id === $('sptList').value; })[0].words;
+      if ($('sptShuffle').checked) words = shuffle(words);
+      var n = +$('sptCount').value; if (n) words = words.slice(0, n);
+    } else if ($('sptShuffle').checked) words = shuffle(words);
+    say('', '');
+    T = { words: words, at: 0, right: 0, wrong: [], retry: !!retry, answered: 0 };
+    $('sptSetup').hidden = true; $('sptRes').hidden = true; $('sptCard').hidden = false;
+    show(true);
+  }
+  function blank(w, s) { var re = new RegExp('(^|[^A-Za-z])' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(?=$|[^A-Za-z])', 'gi'), out = s.replace(re, '$1_____'); return out === s ? '' : out; }
+  function showHint(on) {
+    var x = T.words[T.at], h = $('sptHint'); h.textContent = '';
+    if (!on) { h.hidden = true; return; }
+    if (x.d) h.appendChild(el('p', null, 'Meaning: ' + x.d));
+    var b = x.s ? blank(x.w, x.s) : '';
+    if (b) h.appendChild(el('p', null, 'Sentence: ' + b));
+    var letters = x.w.replace(/[^A-Za-z]/g, '').length;
+    h.appendChild(el('p', 'msg', (!x.d && !b ? 'Starts with "' + x.w.charAt(0) + '". ' : '') + letters + ' letters' + (/\s/.test(x.w) ? ', more than one word' : '') + '.'));
+    h.hidden = false;
+  }
+  function show(first) {
+    var x = T.words[T.at];
+    $('sptProg').textContent = 'Word ' + (T.at + 1) + ' of ' + T.words.length;
+    $('sptScore').textContent = '✓ ' + T.right;
+    $('sptIn').value = ''; $('sptIn').disabled = false; $('sptFb').textContent = ''; $('sptFb').className = 'spt-fb'; $('sptCard').className = 'spt-card';
+    $('sptCheck').textContent = 'Check'; $('sptSkip').hidden = false; T.state = 'ask'; T.hinted = false;
+    $('sptSent').disabled = !x.s;
+    showHint(!audio || $('sptAlwaysHint').checked);
+    $('sptIn').focus({ preventScroll: true });
+    if (audio) setTimeout(function () { if (T && T.words[T.at] === x) speak(x.w); }, first ? 250 : 150);
+  }
+  function norm(s) { return s.trim().replace(/[‘’ʼ]/g, "'").replace(/\s+/g, ' ').toLowerCase(); }
+  function diff(want, got) { // mark the letters of the right spelling that were wrong or missing
+    var w = $('sptFbWord'); if (!w) return;
+    var a = want, b = got.trim(), n = a.length, m = b.length, D = [];
+    for (var i = 0; i <= n; i++) { D[i] = [i]; for (var j = 1; j <= m; j++) D[i][j] = i ? 0 : j; }
+    for (i = 1; i <= n; i++) for (j = 1; j <= m; j++) D[i][j] = Math.min(D[i - 1][j] + 1, D[i][j - 1] + 1, D[i - 1][j - 1] + (a[i - 1].toLowerCase() === b[j - 1].toLowerCase() ? 0 : 1));
+    var mark = [], i2 = n, j2 = m;
+    while (i2 > 0) {
+      if (j2 > 0 && D[i2][j2] === D[i2 - 1][j2 - 1] + (a[i2 - 1].toLowerCase() === b[j2 - 1].toLowerCase() ? 0 : 1)) { mark[i2 - 1] = a[i2 - 1].toLowerCase() !== b[j2 - 1].toLowerCase(); i2--; j2--; }
+      else if (D[i2][j2] === D[i2 - 1][j2] + 1) { mark[i2 - 1] = true; i2--; }
+      else j2--;
+    }
+    w.textContent = '';
+    for (i = 0; i < n; i++) { if (mark[i]) w.appendChild(el('span', 'x', a[i])); else w.appendChild(document.createTextNode(a[i])); }
+  }
+  function check(skip) {
+    if (!T) return;
+    if (T.state === 'done') return next();
+    var x = T.words[T.at], v = $('sptIn').value;
+    if (!skip && !v.trim()) { $('sptFb').className = 'spt-fb'; $('sptFb').textContent = audio ? 'Type the word you heard, then press Check.' : 'Type the word, then press Check.'; $('sptIn').focus(); return; }
+    var ok = !skip && norm(v) === norm(x.w);
+    T.answered++; T.state = 'done';
+    var fb = $('sptFb'); fb.textContent = '';
+    if (ok) { T.right++; fb.className = 'spt-fb good'; fb.textContent = '✓ Correct: ' + x.w; $('sptCard').className = 'spt-card ok'; }
+    else {
+      T.wrong.push({ x: x, got: skip ? '' : v.trim() });
+      fb.className = 'spt-fb bad'; $('sptCard').className = 'spt-card no';
+      fb.appendChild(document.createTextNode(skip ? 'Skipped. The spelling is:' : '✗ Not quite. The correct spelling is:'));
+      var wd = el('div', 'spt-word'); wd.id = 'sptFbWord'; wd.textContent = x.w; fb.appendChild(wd);
+      if (!skip) { diff(x.w, v); fb.appendChild(el('div', 'msg', 'You wrote: ' + v.trim() + '. Underlined letters are the ones to fix.')); }
+    }
+    $('sptScore').textContent = '✓ ' + T.right;
+    $('sptIn').disabled = true; $('sptSkip').hidden = true;
+    $('sptCheck').textContent = T.at + 1 < T.words.length ? 'Next word' : 'See my score'; $('sptCheck').focus();
+  }
+  function next() { T.at++; if (T.at >= T.words.length) finish(); else show(); }
+  $('sptCheck').addEventListener('click', function () { check(false); });
+  $('sptSkip').addEventListener('click', function () { check(true); });
+  $('sptIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); check(false); } });
+  $('sptSay').addEventListener('click', function () { if (T) speak(T.words[T.at].w); $('sptIn').focus({ preventScroll: true }); });
+  $('sptSent').addEventListener('click', function () { if (T && T.words[T.at].s) speak(T.words[T.at].s); $('sptIn').focus({ preventScroll: true }); });
+  $('sptHintBtn').addEventListener('click', function () { if (!T) return; T.hinted = true; showHint(true); $('sptIn').focus({ preventScroll: true }); });
+  $('sptAlwaysHint').addEventListener('change', function () { if (T && !$('sptCard').hidden) showHint(!audio || this.checked || T.hinted); });
+  var lastRes = null;
+  function finish() {
+    var t = T; T = null; if (synth) try { synth.cancel(); } catch (e) {}
+    $('sptCard').hidden = true; $('sptRes').hidden = false;
+    var n = t.answered, pct = n ? Math.round(t.right / n * 100) : 0;
+    $('sptResT').textContent = 'Score: ' + t.right + ' / ' + n + (n ? ' (' + pct + '%)' : '');
+    $('sptResP').textContent = !n ? 'No words answered.' : pct === 100 ? 'Perfect spelling! Try a harder list next.' : pct >= 80 ? 'Great work. Practise the few words below.' : 'Keep practising. Copy each word below three times, then retry them.';
+    var ul = $('sptWrong'); ul.textContent = '';
+    t.wrong.forEach(function (m) { var li = el('li'); li.appendChild(el('b', null, m.x.w)); li.appendChild(document.createTextNode(m.got ? ' (you wrote "' + m.got + '")' : ' (skipped)')); if (m.x.d) li.appendChild(document.createTextNode(': ' + m.x.d)); ul.appendChild(li); });
+    $('sptWrongBox').hidden = !t.wrong.length; $('sptRetry').hidden = !t.wrong.length;
+    lastRes = t;
+    if (n && pct === 100) burst($('sptResT'));
+    $('sptRes').scrollIntoView({ block: 'nearest' }); $(t.wrong.length ? 'sptRetry' : 'sptAgain').focus({ preventScroll: true });
+  }
+  $('sptQuit').addEventListener('click', function () { if (!T) return; if (!T.answered) { T = null; $('sptCard').hidden = true; $('sptSetup').hidden = false; return; } finish(); });
+  $('sptRetry').addEventListener('click', function () { if (lastRes && lastRes.wrong.length) begin(lastRes.wrong.map(function (m) { return m.x; }), true); });
+  $('sptAgain').addEventListener('click', function () { $('sptRes').hidden = true; $('sptSetup').hidden = false; $('sptStart').focus(); });
+  $('sptStart').addEventListener('click', function () { begin(); });
+
+  // ---------- print the list for practice at home ----------
+  $('sptPrintBtn').addEventListener('click', function () {
+    if (!lastRes) return;
+    var box = $('sptPrint'); if (!box) { box = el('div'); box.id = 'sptPrint'; document.body.appendChild(box); }
+    box.textContent = ''; document.documentElement.classList.add('spt-printing');
+    box.appendChild(el('h1', null, 'Spelling words'));
+    var ol = el('ol'); lastRes.words.forEach(function (x) { var li = el('li'); li.appendChild(el('b', null, x.w)); if (x.d) li.appendChild(document.createTextNode(' - ' + x.d)); li.appendChild(el('div', 'line')); ol.appendChild(li); });
+    box.appendChild(ol); window.print();
+  });
+  window.addEventListener('afterprint', function () { var b = $('sptPrint'); if (b) b.textContent = ''; document.documentElement.classList.remove('spt-printing'); });
+})();
+</script>

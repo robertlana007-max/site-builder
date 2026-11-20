@@ -1,0 +1,80 @@
+<style>
+.tr-big { margin: 12px 0 0; }
+.tr-big .btns { margin-top: 10px; }
+</style>
+<label for="trTxt">Text to repeat</label>
+<textarea id="trTxt" class="plain" style="min-height:110px" data-nomemo placeholder="Type the word, sentence or emoji you want to repeat..."></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="trN">Repeat how many times</label><input type="number" id="trN" min="1" max="5000000" step="1" value="10"></div>
+  <div><label for="trSep">Put between each copy</label><select id="trSep"><option value="nl">New line</option><option value="space">Space</option><option value="comma">Comma and space</option><option value="commaonly">Comma only</option><option value="none">Nothing</option><option value="custom">Custom…</option></select></div>
+  <div id="trCustomBox" hidden><label for="trCustom">Custom separator</label><input type="text" id="trCustom" value=" | " placeholder="e.g. - or \n"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="trNumber">Number each copy (1. 2. 3. …)</label></div>
+<div class="notice tr-big" id="trBig" hidden><p id="trBigTxt"></p><div class="btns"><button type="button" class="btn" id="trBigGo">Generate anyway</button></div></div>
+<p class="msg" id="trMsg" aria-live="polite"></p>
+<label for="trOut" style="margin-top:14px">Result</label>
+<textarea id="trOut" readonly data-nomemo placeholder="Your repeated text appears here."></textarea>
+<div class="stats">
+  <div class="stat"><span>Copies</span><b id="trCopies">0</b></div>
+  <div class="stat"><span>Characters</span><b id="trChars">0</b></div>
+  <div class="stat"><span>Size</span><b id="trSize">0 B</b></div>
+</div>
+<div class="btns"><button type="button" class="btn" id="trCopy" disabled>Copy</button><button type="button" class="btn ghost" id="trDl" disabled>Download .txt</button><button type="button" class="btn ghost" id="trClr">Clear</button></div>
+<script>
+(function () {
+  // core-start
+  var SAFE = 100000, MAX = 5000000;
+  var SEPS = { nl: '\n', space: ' ', comma: ', ', commaonly: ',', none: '' };
+  function sepOf(kind, custom) { return kind === 'custom' ? String(custom || '').replace(/\\n/g, '\n').replace(/\\t/g, '\t') : (SEPS[kind] != null ? SEPS[kind] : '\n'); }
+  function digitsUpTo(n) { var s = 0, p = 1, d = 1; while (p <= n) { var hi = Math.min(n, p * 10 - 1); s += (hi - p + 1) * d; p *= 10; d++; } return s; } // digits in 1..n
+  // Length of the output in UTF-16 code units, worked out without building it.
+  function totalLen(text, n, sep, numbered) { if (!(n >= 1) || !text) return 0; return n * text.length + (n - 1) * sep.length + (numbered ? digitsUpTo(n) + 2 * n : 0); }
+  function build(text, n, sep, numbered) {
+    if (!(n >= 1) || !text) return '';
+    if (!numbered) return (text + sep).repeat(n - 1) + text;
+    var out = new Array(n);
+    for (var i = 0; i < n; i++) out[i] = (i + 1) + '. ' + text;
+    return out.join(sep);
+  }
+  // core-end
+  var result = '';
+  function enc(s) { return new Blob([s]).size; }
+  function setOut(s, n) {
+    result = s; $('trOut').value = s;
+    $('trCopies').textContent = fmtNum(s ? n : 0); $('trChars').textContent = fmtNum(s.length);
+    $('trSize').textContent = fmtBytes(s.length > 2000000 ? s.length : enc(s)); // count bytes exactly unless it is huge
+    $('trCopy').disabled = $('trDl').disabled = !s;
+  }
+  function say(cls, t) { $('trMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('trMsg').textContent = t; }
+  function params() { var n = Math.floor(+$('trN').value); return { text: $('trTxt').value, n: n, sep: sepOf($('trSep').value, $('trCustom').value), num: $('trNumber').checked }; }
+  function run(force) {
+    $('trCustomBox').hidden = $('trSep').value !== 'custom';
+    var p = params(); $('trBig').hidden = true;
+    if (!p.text) { setOut('', 0); return say('', 'Type some text to repeat.'); }
+    if (!(p.n >= 1)) { setOut('', 0); return say('bad', 'Enter how many times to repeat it (1 or more).'); }
+    var len = totalLen(p.text, p.n, p.sep, p.num);
+    if (len > MAX || p.n > MAX) { setOut('', 0); return say('bad', 'That would be ' + fmtNum(len) + ' characters. The limit is ' + fmtNum(MAX) + ' characters, so please use fewer copies or shorter text.'); }
+    if (len > SAFE && !force) {
+      setOut('', 0); say('', '');
+      $('trBigTxt').textContent = 'This makes ' + fmtNum(len) + ' characters. Very long text can make your browser slow, and many apps will not accept it. Continue?';
+      $('trBig').hidden = false; return;
+    }
+    setOut(build(p.text, p.n, p.sep, p.num), p.n);
+    say('', len > SAFE ? 'Done. Large results are easier to handle with Download .txt than with Copy.' : '');
+  }
+  var timer;
+  function soon() { clearTimeout(timer); timer = setTimeout(function () { run(false); }, 120); }
+  ['trTxt', 'trN', 'trCustom'].forEach(function (id) { $(id).addEventListener('input', soon); });
+  ['trSep', 'trNumber'].forEach(function (id) { $(id).addEventListener('change', function () { run(false); }); });
+  $('trBigGo').addEventListener('click', function () { var b = $('trBigGo'); b.disabled = true; b.textContent = 'Working…'; setTimeout(function () { try { run(true); } catch (e) { setOut('', 0); say('bad', 'Your browser ran out of memory. Try fewer copies.'); } b.disabled = false; b.textContent = 'Generate anyway'; }, 30); });
+  $('trCopy').addEventListener('click', function () { if (result) copyText(result, $('trCopy')); });
+  $('trDl').addEventListener('click', function () {
+    if (!result) return;
+    var url = URL.createObjectURL(new Blob([result], { type: 'text/plain;charset=utf-8' })), a = document.createElement('a');
+    a.href = url; a.download = 'repeated-text.txt'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  });
+  $('trClr').addEventListener('click', function () { $('trTxt').value = ''; run(false); $('trTxt').focus(); });
+  run(false);
+})();
+</script>

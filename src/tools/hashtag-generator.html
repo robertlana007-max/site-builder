@@ -1,0 +1,253 @@
+<style>
+.hg-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: end; }
+.hg-top > div { flex: 1 1 220px; }
+.hg-topics { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 4px; max-height: 172px; overflow-y: auto; padding: 2px; }
+.hg-topics button, .hg-tag { font: 500 14px/1.2 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 12px; cursor: pointer; min-height: 36px; }
+.hg-topics button:hover, .hg-tag:hover { border-color: var(--accent); }
+.hg-topics button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.hg-group { margin-top: 14px; }
+.hg-group h3 { font-size: 14px; margin: 0 0 6px; color: var(--muted); font-weight: 600; }
+.hg-group h3 small { font-weight: 400; }
+.hg-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.hg-tag { overflow-wrap: anywhere; }
+.hg-tag[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.hg-sel { margin-top: 18px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.hg-head { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; }
+.hg-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.hg-count.full { color: var(--bad); }
+.hg-chosen { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; min-height: 36px; }
+.hg-chip { display: inline-flex; align-items: center; gap: 2px; background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 3px 4px 3px 12px; font-size: 14px; max-width: 100%; overflow-wrap: anywhere; }
+.hg-chip button { border: 0; background: none; color: var(--muted); font-size: 18px; line-height: 1; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; flex: none; }
+.hg-chip button:hover { background: var(--line); color: var(--ink); }
+.hg-add { display: flex; gap: 8px; margin-top: 12px; }
+.hg-add input { flex: 1; min-width: 0; }
+.hg-empty { color: var(--muted); font-size: 14px; margin: 6px 0; }
+</style>
+<div class="hg-top">
+  <div><label for="hgFind">Find a topic</label><input type="search" id="hgFind" data-nomemo placeholder="e.g. travel, biryani, cricket, Lahore" autocomplete="off"></div>
+  <div style="flex:0 1 170px"><label for="hgMixN">Hashtags to pick</label><select id="hgMixN"><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30" selected>30 (Instagram max)</option></select></div>
+</div>
+<div class="hg-topics" id="hgTopics" role="group" aria-label="Topics"></div>
+<p class="msg" id="hgNoTopic" hidden>No topic matches that search. Try a broader word, or add your own hashtags below.</p>
+<div id="hgPanel" hidden>
+  <div class="btns" style="margin-top:8px">
+    <button class="btn" id="hgMix" type="button">Mix broad, medium and niche</button>
+    <button class="btn ghost" id="hgAll" type="button">Add all from this topic</button>
+  </div>
+  <div class="hg-group"><h3>Broad <small>very common, huge and fast-moving feeds</small></h3><div class="hg-tags" id="hgB"></div></div>
+  <div class="hg-group"><h3>Medium <small>popular within the topic</small></h3><div class="hg-tags" id="hgM"></div></div>
+  <div class="hg-group"><h3>Niche <small>specific, smaller audiences that are easier to stand out in</small></h3><div class="hg-tags" id="hgN"></div></div>
+</div>
+<div class="hg-sel">
+  <div class="hg-head">
+    <b>Your hashtags</b>
+    <span class="hg-count" id="hgCount" aria-live="polite">0 / 30</span>
+  </div>
+  <div class="hg-chosen" id="hgChosen"><p class="hg-empty">Pick a topic above, tap hashtags, or add your own.</p></div>
+  <div class="hg-add">
+    <input type="text" id="hgOwn" data-nomemo placeholder="Add your own, e.g. mybrandname" aria-label="Add your own hashtag" maxlength="120" autocomplete="off">
+    <button class="btn ghost" id="hgAddBtn" type="button">Add</button>
+  </div>
+  <div class="fields" style="margin:12px 0 0">
+    <div><label for="hgSep">Copy as</label><select id="hgSep"><option value="space">One line, spaces between</option><option value="line">One hashtag per line</option><option value="gap">Spaced below the caption (dots)</option></select></div>
+  </div>
+  <div class="btns">
+    <button class="btn" id="hgCopy" type="button">Copy all</button>
+    <button class="btn ghost" id="hgShuffle" type="button">Shuffle</button>
+    <button class="btn ghost" id="hgClear" type="button">Clear</button>
+  </div>
+  <p class="msg" id="hgMsg" aria-live="polite"></p>
+</div>
+<p class="msg">These sets are hand-picked starting points, not live data. This tool cannot see how many posts a hashtag has today or whether it is trending, so check a few in the app before you rely on them, and always prefer tags that truly describe your post.</p>
+<script>
+(function () {
+  // [topic, extra search words, broad, medium, niche]. Original curated lists, written for this tool.
+  var T = [
+    ['Travel', 'trip holiday vacation tourism wanderlust journey', 'travel travelgram wanderlust instatravel travelphotography vacation', 'travelblogger traveltheworld travelholic exploremore travelling adventuretime passportready traveldiaries', 'slowtravel hiddengems offthebeatentrack travelonabudget solofemaletravel backpackinglife weekendgetaway travelnotes'],
+    ['Food', 'eat meal dinner lunch restaurant foodie cooking', 'food foodie foodporn instafood yummy delicious', 'foodstagram foodlover homecooking foodphotography eeeeeats foodblogger tasty homemade', 'eatlocal comfortfood weeknightdinner foodiesofinstagram platinggoals mealideas cookingathome foodstyling'],
+    ['Fitness', 'gym workout exercise training muscle bodybuilding', 'fitness gym workout fit motivation fitnessmotivation', 'gymlife training fitfam healthylifestyle personaltrainer strengthtraining legday fitnessjourney', 'homeworkout progressnotperfection gymprogress liftheavy workoutroutine fitover30 transformationtuesday mobilitytraining'],
+    ['Yoga', 'meditation mindfulness asana stretching pilates', 'yoga meditation mindfulness yogi namaste wellness', 'yogapractice yogaeveryday yogalife yogainspiration selfcare innerpeace breathwork yogaflow', 'morningyoga yogaforbeginners slowflow yinyoga yogaathome mindfulmoments yogateacher grounding'],
+    ['Fashion', 'style outfit clothes dress ootd', 'fashion style ootd outfit instafashion fashionista', 'outfitoftheday streetstyle fashionblogger whatiwore lookbook styleinspo fashionstyle outfitinspo', 'everydaystyle capsulewardrobe thriftedstyle modestfashion styletips outfitideas slowfashion minimaliststyle'],
+    ['Streetwear', 'sneakers hype kicks urban', 'streetwear sneakers streetstyle hypebeast kicks urbanstyle', 'sneakerhead streetwearfashion streetfashion sneakersaddict outfitgrid kicksoftheday drip menswear', 'streetwearbrand vintagestreetwear sneakercollection streetwearstyle fitpic layering oversizedfit streetwearculture'],
+    ['Modest fashion', 'hijab abaya modest', 'modestfashion hijab hijabfashion modeststyle modest abaya', 'hijabstyle hijabistyle modestwear modestoutfit hijabootd modestlook hijabinspiration abayafashion', 'modestfashionblogger hijabtutorial everydaymodest modeststreetstyle hijabmodern modestfashionista hijabchic abayastyle'],
+    ['Photography', 'photo camera photographer shoot pictures', 'photography photooftheday photo picoftheday photographer instagood', 'photographylovers canonphotography nikonphotography photographyeveryday mobilephotography portraitphotography landscapephotography streetphotography', 'shotoniphone lightandshadow goldenhourphotography moodygrams visualsoflife photographyislife captureoftheday filmphotography'],
+    ['Nature', 'outdoors landscape trees forest earth', 'nature naturephotography naturelovers landscape outdoors earth', 'beautifulnature natureaddict naturelover forest naturegram wildlife greenery naturebeauty', 'intothewild forestbathing earthpix naturewalk mothernature wildflowers fieldsofgold outdoorlife'],
+    ['Sunset & sky', 'sunrise clouds golden hour evening', 'sunset sky sunsetlovers clouds sunrise skyporn', 'sunsetphotography goldenhour sunset_pics skylovers cloudporn eveningsky sunsetsky skyonfire', 'sunsetchasers chasingsunsets cottoncandysky skyscape skyviews sunsetvibes pastelsky bluehour'],
+    ['Beach', 'sea ocean coast summer sand', 'beach sea ocean summer beachlife sand', 'beachvibes oceanview beachday seaside islandlife coastal beachlover summervibes', 'saltyhair sandytoes coastalliving beachwalk turquoisewater shorelines tidepools seashells'],
+    ['Mountains & hiking', 'hike trek trekking climbing camping', 'mountains hiking adventure outdoors trekking camping', 'hikingadventures mountainlife naturehike getoutside trailrunning mountainview campinglife hikingtrail', 'summitview trekkinglife northernareas mountaintops campfirenights trailtherapy hikingwithfriends peakbagging'],
+    ['Business', 'company startup work corporate career', 'business entrepreneur success motivation smallbusiness marketing', 'entrepreneurlife businessowner startup leadership businessgrowth hustle mindset branding', 'startuplife businesstips solopreneur bootstrapped founderstory sidehustle growthmindset businesscoach'],
+    ['Small business', 'shop store handmade seller online shop brand', 'smallbusiness shopsmall supportsmallbusiness shoplocal handmade smallbiz', 'smallbusinessowner onlineshop shopsmallbusiness smallbusinesslove womeninbusiness instashop newarrivals ordernow', 'packingorders behindthebusiness smallbatch supportlocalbusiness shopsmallshoplocal smallshop dmtoorder smallbusinesstips'],
+    ['Marketing', 'social media digital ads seo content', 'marketing digitalmarketing socialmedia socialmediamarketing branding seo', 'contentmarketing marketingtips contentcreator marketingstrategy onlinemarketing brandstrategy instagrammarketing growthhacking', 'contentstrategy marketingagency smallbusinessmarketing emailmarketing copywriting socialmediatips personalbranding marketing101'],
+    ['Real estate', 'property house home sale rent realtor', 'realestate property home realtor househunting forsale', 'realestateagent dreamhome newhome luxuryrealestate homeforsale realestateinvesting propertyforsale investment', 'firsttimehomebuyer justlisted openhouse realestatetips propertyinvestment homebuying listingalert realestatelife'],
+    ['Wedding', 'marriage bride groom shaadi nikah barat', 'wedding bride love weddingday bridal marriage', 'weddingphotography weddinginspiration weddingdress bridetobe groom weddingideas weddingdecor weddingvibes', 'shaadiseason desiwedding baraat nikahceremony walima weddingmoments weddingplanning bridalportrait'],
+    ['Mehndi & henna', 'henna mehendi mehndi design hands', 'mehndi henna mehndidesign hennaart hennadesign mehendi', 'bridalmehndi hennatattoo mehndiartist hennaartist arabicmehndi mehndiart hennainspire hennalove', 'mehndinight simplemehndi fingermehndi hennapractice mehndiforeid organichenna hennaonhands minimalhenna'],
+    ['Study', 'studygram notes exam school college university', 'study studygram student studying studymotivation education', 'studytips studyblr notes studyinspo exams studywithme productivity studentlife', 'aestheticnotes studyroutine examseason studyhacks studydesk handwrittennotes pomodoro studydiary'],
+    ['Students & university', 'college campus uni graduation', 'student university college campuslife studentlife graduation', 'unilife collegelife freshers campus graduate gradschool students universitylife', 'dormlife campusvibes graduationday studentbudget lecturehall finalyear semesterbreak studentjourney'],
+    ['Books', 'reading bookstagram novel library', 'books bookstagram reading booklover bookworm read', 'bookish booknerd bookaddict currentlyreading readingtime bookrecommendations booksofinstagram bookreview', 'tbrpile booktok bookcommunity readersofinstagram cosyreads bookshelfie readmorebooks shelfie'],
+    ['Tech', 'technology gadgets phone smartphone innovation', 'technology tech gadgets innovation smartphone ai', 'techie gadget techtips techreview futuretech techlover artificialintelligence techtrends', 'gadgetreview techsetup desksetup unboxing techgear smarthome wfhsetup techtalk'],
+    ['Coding', 'programming developer software code web', 'coding programming developer code programmer webdevelopment', 'javascript python softwaredeveloper webdeveloper codinglife 100daysofcode softwareengineer frontend', 'codenewbie learntocode devlife buildinpublic codingbootcamp fullstackdeveloper debugging codersofinstagram'],
+    ['Gaming', 'games gamer esports console pc stream', 'gaming gamer games videogames gamers esports', 'pcgaming gamingcommunity gamingsetup twitchstreamer gamerlife consolegaming gameplay gamingclips', 'gamingroom streamersetup indiegames retrogaming gamingmemes mobilegaming cozygames gamenight'],
+    ['Dogs', 'dog puppy pet pup', 'dog dogs dogsofinstagram puppy doglover pets', 'dogstagram puppylove dogoftheday instadog doglife puppiesofinstagram dogmom doggo', 'rescuedog adoptdontshop dogwalk goodboy puppytraining dogtricks dogsmile happydog'],
+    ['Cats', 'cat kitten kitty pet', 'cat cats catsofinstagram kitten catlover pets', 'catstagram instacat catoftheday kittens catlife meow catlovers cutecat', 'catnap rescuecat adoptacat kittylove catmom whiskers catloaf sleepycat'],
+    ['Pets', 'pet animals birds rabbit parrot', 'pets pet animals petsofinstagram cute petlover', 'petstagram instapet animallovers petlife furbaby petphotography adoptdontshop furryfriends', 'petcare birdsofinstagram rabbitsofinstagram parrotlove petparent smallpets exoticpets petsmile'],
+    ['Beauty & makeup', 'makeup cosmetics mua glam', 'beauty makeup makeuptutorial mua makeupartist cosmetics', 'makeuplook glam makeupaddict beautyblogger makeupoftheday eyemakeup lipstick makeuplover', 'everydaymakeup softglam naturalmakeup makeupforbeginners bridalmakeup eyelinerwings makeupreview nomakeupmakeup'],
+    ['Skincare', 'skin glow routine serum', 'skincare beauty skin glowingskin skincareroutine selfcare', 'healthyskin skincareaddict skincaretips clearskin skincarecommunity glowup sunscreen acnetreatment', 'skincarejunkie dewyskin barrierrepair slowbeauty skincareproducts nightroutine sensitiveskin spfeveryday'],
+    ['Hair', 'hairstyle haircut salon braids', 'hair hairstyle haircut hairstyles hairgoals salon', 'hairstylist hairoftheday hairtransformation haircolor longhair curlyhair hairinspo balayage', 'haircare naturalhair braidstyles hairtutorial healthyhair hairroutine bobhaircut curlyhairroutine'],
+    ['Nails', 'manicure nail art polish', 'nails nailart manicure nailsofinstagram naildesign nailpolish', 'nailsoftheday gelnails nailinspo naildesigns nailtech acrylicnails nailartist nailstagram', 'minimalnails frenchnails nailartideas shortnails nailsalon pressonnails nailtrends chromenails'],
+    ['Quotes & motivation', 'quote inspiration positive thoughts words', 'quotes motivation inspiration quoteoftheday motivationalquotes life', 'positivevibes inspirationalquotes lifequotes mindset success positivity wordsofwisdom selflove', 'dailyquotes goodvibesonly mondaymotivation keepgoing thoughtoftheday quotestoliveby believeinyourself smallsteps'],
+    ['Mental health', 'wellbeing anxiety selfcare therapy', 'mentalhealth selfcare wellbeing mentalhealthawareness selflove mindfulness', 'mentalhealthmatters selfcarematters anxietyrelief healing therapy wellness innerwork positivemindset', 'itsokaynottobeokay gentlereminder breathe slowliving boundaries journaling healingjourney selfcompassion'],
+    ['Cars', 'car auto automotive drift jdm', 'cars car carsofinstagram auto automotive carlifestyle', 'carporn carlovers supercars carspotting instacars carphotography jdm luxurycars', 'carmeet modifiedcars stancenation carculture classiccars carenthusiast cardetailing projectcar'],
+    ['Bikes & motorcycles', 'motorbike motorcycle rider biker', 'motorcycle bike biker bikelife moto motorbike', 'bikersofinstagram motorcyclelife ridetolive bikestagram twowheels superbike motolife riders', 'longride bikertrip motovlog ridesafe touringbike roadtrip cafe_racer weekendride'],
+    ['Cricket', 'bat ball wicket psl ipl test match', 'cricket cricketlovers cricketfans cricketer t20 sports', 'cricketlover cricketworld cricketmatch cricketnews cricketteam cricketfever cricketpractice cricketlife', 'gullycricket streetcricket cricketacademy fastbowling coverdrive nets cricketmemes cricketkit'],
+    ['Football', 'soccer goal match club', 'football soccer futbol footballer goal sports', 'footballlife footballfans footballskills soccerlife matchday footballplayer footballtraining soccerplayer', 'sundayleague futsal freestylefootball footballdrills grassroots football5aside youthfootball goalkeeper'],
+    ['Sports & running', 'run running marathon athlete', 'sports running run athlete marathon runner', 'runnersofinstagram instarunners runningcommunity runhappy trailrunning fitnessgoals sportslife training', 'morningrun 5k couchto5k runningmotivation halfmarathon runstreak longrun parkrun'],
+    ['Cycling', 'bicycle bike cyclist ride', 'cycling bike bicycle cyclist ride roadbike', 'cyclinglife mtb mountainbike bikelife cyclingphotos instacycling bikeride cyclingculture', 'commutebybike gravelbike bikepacking cityride ridemore cyclingadventures sundayride cyclingclub'],
+    ['Art', 'drawing painting illustration sketch artist', 'art artist drawing painting artwork illustration', 'artistsoninstagram sketch digitalart instaart artoftheday sketchbook contemporaryart creative', 'artprocess wip artjournal watercolorart inkdrawing dailysketch artstudio traditionalart'],
+    ['Calligraphy', 'lettering handwriting arabic urdu', 'calligraphy lettering handlettering typography handwriting art', 'moderncalligraphy arabiccalligraphy calligraphyart brushlettering calligraphymasters islamicart letteringart penmanship', 'urducalligraphy calligraphypractice calligraphyvideo lettering_daily brushpen calligrapher inkandpaper scriptlettering'],
+    ['Graphic design', 'designer logo branding poster', 'graphicdesign design designer logo branding illustrator', 'graphicdesigner logodesign typography branddesign creative designinspiration posterdesign visualdesign', 'logodesigner brandidentity designprocess freelancedesigner minimaldesign canva layoutdesign designstudio'],
+    ['Music', 'song singer guitar band musician', 'music musician singer song guitar musica', 'musicproducer newmusic singing hiphop livemusic musicislife instamusic songwriter', 'acousticcover coversong guitarcover homestudio beatmaker originalmusic musicvideo singersongwriter'],
+    ['Dance', 'dancer choreography moves', 'dance dancer dancing choreography dancelife moves', 'dancevideo dancers dancechallenge hiphopdance dancepractice ballet dancefloor dancersofinstagram', 'freestyledance dancecover bollywooddance dancecommunity dancetutorial contemporarydance kathak dancestudio'],
+    ['Baby & parenting', 'kids children mom dad newborn family', 'baby family kids parenting mom love', 'momlife babyboy babygirl newborn motherhood dadlife toddler parenthood', 'toddlerlife babyfirsts momhacks gentleparenting babymilestones newmom raisingkids familytime'],
+    ['Love & couples', 'couple relationship romance', 'love couple relationship romance together forever', 'couplegoals lovestory soulmate lovequotes couples relationshipgoals inlove partnerincrime', 'datenight anniversary loveyou happilyeverafter weekendwithyou longdistance couplephotography littlemoments'],
+    ['Selfie & portraits', 'selfie portrait face me', 'selfie portrait me smile instagood photooftheday', 'selfietime portraitphotography portraitmood selfiegame mirrorselfie selfieoftheday faces portraiture', 'naturallight candid portraitvision goldenhourportrait moodyportrait portraitsociety selfportrait faceoftheday'],
+    ['Coffee', 'cafe latte espresso tea', 'coffee coffeetime cafe coffeelover latte espresso', 'coffeeaddict coffeeshop coffeegram latteart coffeebreak barista coffeeholic butfirstcoffee', 'specialtycoffee homebarista pourover coffeeandbooks morningcoffee cafehopping chai coldbrew'],
+    ['Baking & desserts', 'cake dessert sweet bake cookies', 'baking cake dessert sweet homemade bakery', 'cakedecorating desserts cakes cupcakes bakingfromscratch sweettooth cookies chocolate', 'homebaker bakingtherapy cakeart sourdough bakingday bentocake customcakes bakedwithlove'],
+    ['Healthy eating', 'healthy diet vegan salad nutrition', 'healthyfood healthy nutrition vegan healthyeating diet', 'eatclean plantbased healthyrecipes mealprep cleaneating veganfood wholefoods healthychoices', 'mealprepideas highprotein glutenfree saladbowl healthybreakfast eatyourgreens balanceddiet plantpower'],
+    ['Pakistani food', 'biryani nihari karahi desi food pakistan', 'pakistanifood desifood foodpakistan biryani pakistanicuisine desi', 'karahi nihari foodiesofpakistan streetfoodpakistan haleem chickenbiryani desikhana pakistanistreetfood', 'homemadebiryani kababs chaiandparatha bbqnight desibreakfast lahorifood karachifood foodstreet'],
+    ['Indian food', 'curry dosa desi food india', 'indianfood desifood foodindia curry indiancuisine desi', 'streetfoodindia indianfoodie dosa paneer thali biryani foodiesofindia northindianfood', 'southindianfood homemadecurry chaitime indianstreetfood masala dal mumbaifood delhifood'],
+    ['Ramadan', 'ramzan ramadhan iftar sehri suhoor fasting islam', 'ramadan ramadankareem ramadanmubarak ramzan iftar islam', 'ramadanspecial iftartime sehri suhoor ramzanmubarak fasting ramadanvibes muslim', 'iftarideas ramadanrecipes lastashra ramadandecor ramadanreminders iftarparty quranjournal ramadanprep'],
+    ['Eid', 'eid ul fitr adha celebration', 'eid eidmubarak eidulfitr eidaladha celebration festival', 'eidvibes eidoutfit eidcelebration eidspecial eidmood eidfashion eidulazha happyeid', 'chandraat eidgifts eiddecor eidwithfamily eididi eidsweets eidmehndi eidlook'],
+    ['Diwali', 'deepavali festival lights india', 'diwali happydiwali festival festivaloflights deepavali celebration', 'diwalivibes diwalidecor diwalilights diwalicelebration diwalispecial diya rangoli festivevibes', 'diwalisweets rangolidesign diwalioutfit diwaliwithfamily diwalinights diyadecoration festiveseason lightsandcolors'],
+    ['Christmas', 'xmas holidays santa winter', 'christmas merrychristmas xmas holidays winter festive', 'christmastree christmasdecor christmasvibes holidayseason christmastime santa christmasspirit giftideas', 'christmasbaking cozychristmas christmaslights christmasmarket holidayhome christmasmorning wrappinggifts christmascountdown'],
+    ['Birthday', 'party celebration cake bday', 'birthday happybirthday party celebration birthdaygirl birthdayboy', 'birthdaycake birthdayparty bday birthdaycelebration partytime birthdayvibes celebrate birthdaygift', 'birthdaydecor birthdayideas birthdayweek partydecor surpriseparty kidsbirthday birthdaymood candlewish'],
+    ['Home decor', 'interior design house room', 'homedecor interiordesign home interior decor homesweethome', 'interiorstyling homedesign decorinspo livingroom homeinspo cozyhome interiors myhome', 'smallspaceliving apartmenttherapy shelfstyling rentersdecor bedroomdecor cornerofmyhome homemakeover diyhomedecor'],
+    ['Gardening & plants', 'plants garden flowers houseplants', 'gardening garden plants plantsofinstagram houseplants flowers', 'plantlover urbanjungle gardenlife growyourown indoorplants plantparent greenthumb gardeninspiration', 'balconygarden kitchengarden plantcare succulents seedstarting rooftopgarden plantshelf containergarden'],
+    ['Flowers', 'flower roses blossom bloom', 'flowers flower nature roses floral flowerstagram', 'flowerphotography bloom blossom flowerlover flowerpower spring roseslover flowersofinstagram', 'wildflower floraldesign flowerarrangement bouquet springblooms flowershop gardenroses petals'],
+    ['DIY & crafts', 'handmade craft diy make', 'diy crafts handmade craft creative diyproject', 'handmadewithlove crafting diyideas diycrafts makersgonnamake upcycling crochet knitting', 'diyhomedecor crafttutorial easycrafts kidscrafts craftroom resinart paperart sewingproject'],
+    ['Architecture', 'building city design', 'architecture building design architect city architecturephotography', 'architecturelovers archilovers buildings urban archdaily architecturedesign modernarchitecture streetphotography', 'lookingup minimalarchitecture brutalism oldbuildings mosquearchitecture architecturedetails historicbuildings symmetry'],
+    ['Pakistan', 'pakistani pk', 'pakistan pakistani beautifulpakistan pakistanzindabad lovepakistan pk', 'travelpakistan pakistanicuisine pakistaniculture explorepakistan visitpakistan pakistantourism pakistanfashion northpakistan', 'hunzavalley skardu swatvalley naranvalley fairymeadows neelumvalley gilgitbaltistan pakistantravel'],
+    ['Karachi', 'khi sindh', 'karachi karachites karachidiaries pakistan sindh karachicity', 'karachifood karachistreetfood karachiblogger karachifashion karachiphotography karachilife seaviewkarachi karachiweather', 'karachifoodies karachieats burnsroad clifton dha_karachi karachinights karachivibes saddarkarachi'],
+    ['Lahore', 'lhr punjab', 'lahore lahoredairies lahoreblogger pakistan punjab lahorecity', 'lahorefood lahorifood lahorefoodies lahorefashion lahorephotography lahoreeats lahorelife walledcitylahore', 'badshahimosque lahorefort foodstreetlahore lahorivibes androonlahore lahorinights lahorestreets gulberg'],
+    ['Islamabad', 'isb rawalpindi capital', 'islamabad islamabaddiaries pakistan rawalpindi capitalcity islamabadcity', 'islamabadfood islamabadblogger islamabadfoodies faisalmosque margalla islamabadlife twincities islamabadphotography', 'margallahills daman_e_koh monalislamabad trail5 islamabadeats islamabadvibes islamabadcafes rawalpindifood'],
+    ['India', 'indian bharat in', 'india incredibleindia indian travelindia indiapictures desi', 'indiaclicks indiatravel indianculture indiagram streetsofindia indianphotography indiatourism mypixeldiary', 'indiatravelgram northeastindia rajasthandiaries keralatourism himachal ladakh goatravel indiavibes'],
+    ['Mumbai', 'bombay maharashtra', 'mumbai mumbaikar mumbaidiaries bombay india mumbaicity', 'mumbaifood mumbaifoodie mumbaiblogger mumbaistreetfood marinedrive mumbailife mumbaiphotography mumbaimerijaan', 'mumbaimonsoon vadapav mumbaieats bandra gatewayofindia mumbainights colaba localtrain'],
+    ['Delhi', 'new delhi ncr', 'delhi newdelhi delhidiaries india delhincr delhigram', 'delhifood delhifoodie delhistreetfood delhiblogger olddelhi delhilife delhiphotography dillidiaries', 'chandnichowk delhieats delhicafes hauzkhas delhiwinters indiagate delhimetro delhivibes'],
+    ['Bangalore', 'bengaluru karnataka', 'bangalore bengaluru nammabengaluru bangalorediaries india karnataka', 'bangalorefood bangalorefoodie bangaloreblogger bengalurufoodies bangalorecafes bangalorelife bengalurudiaries bangalorephotography', 'bangaloreweather cubbonpark bangaloreeats indiranagar koramangala bangalorevibes bangaloreweekends techcity'],
+    ['Dubai', 'uae emirates abu dhabi', 'dubai uae mydubai dubailife abudhabi emirates', 'dubaifood dubaiblogger visitdubai dubaifashion dubaimarina dubaiphotography dubaicity mydubaiview', 'dubaieats dubaiweekend dubaidesert burjkhalifa dubaicreek dubaicafes jumeirah dubaivibes'],
+    ['London', 'uk england britain', 'london uk england londonlife visitlondon londoncity', 'londonfood londonphotography londonblogger londoneats thisislondon londonstreet timeoutlondon londonlove', 'londonweekend secretlondon londoncafes southbank londonbridge eastlondon londonnights londonwalks'],
+    ['New York', 'nyc usa manhattan', 'newyork nyc newyorkcity usa manhattan bigapple', 'nycfood nyclife nycphotography brooklyn newyorker nycblogger timessquare centralpark', 'nyceats nycstreetstyle nycweekend nycstreets brooklynbridge nyccafe westvillage nycskyline'],
+    ['Vlog & YouTube', 'video youtuber content creator channel', 'youtube youtuber vlog contentcreator video subscribe', 'vlogger newvideo youtubechannel creator dailyvlog videography youtubers vlogging', 'smallyoutuber youtubegrowth vlogsquad behindthescenes newvideoalert creatorcommunity linkinbio filmmaking'],
+    ['Reels & short video', 'reel short video trending viral', 'reels reelsinstagram reelitfeelit instareels reel viral', 'reelsvideo trendingreels explorepage reelsviral reelkarofeelkaro instagramreels shortvideo trending', 'reelideas reeltips transitionreel reelsdaily reelcreator reelsofinstagram behindthereel contentideas'],
+    ['Podcast', 'audio show episode talk', 'podcast podcasting podcasts podcaster newepisode listen', 'podcastlife podcastersofinstagram podcastlove podcastshow interview conversation spotifypodcast storytelling', 'podcastclips indiepodcast podcasthost podcastrecording episodedrop podcastguest podcastcommunity listennow'],
+    ['Teacher & education', 'teaching classroom school learning', 'education teacher learning school teaching students', 'teachersofinstagram classroom teacherlife iteachtoo elearning onlinelearning teachingideas edtech', 'classroomdecor teachertips teacherresources lessonplanning onlineteacher teachingonline studentsuccess learningisfun'],
+    ['Islamic', 'islam muslim deen quran', 'islam muslim allah quran islamic deen', 'islamicquotes muslimah sunnah islamicreminders alhamdulillah dua islamicart jummahmubarak', 'dailyreminder quranverses islamicposts duaoftheday muslimahlife hadithoftheday seekknowledge islamicknowledge'],
+    ['Memes & funny', 'meme humor jokes lol comedy', 'memes funny meme lol humor comedy', 'funnymemes dankmemes relatable memesdaily funnyvideos jokes lmao memepage', 'relatablememes officehumor studentmemes desimemes momlifehumor petmemes wholesomememes memesfordays'],
+    ['Jewelry & accessories', 'jewellery earrings rings necklace', 'jewelry jewellery accessories earrings necklace rings', 'handmadejewelry jewelrydesign jewelrylover jewelryaddict goldjewelry silverjewelry fashionjewelry jewelryoftheday', 'minimaljewelry bridaljewellery kundan oxidisedjewellery layerednecklace stackingrings jewelrygifts statementearrings']
+  ];
+  var MAX = 30, chosen = [], cur = -1, msgT;
+  function norm(s) { return String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); }
+  function clean(t) { return String(t).replace(/^#+/, '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}_]/gu, ''); }
+  function key(t) { return t.toLowerCase(); }
+  function has(t) { var k = key(t); return chosen.some(function (x) { return key(x) === k; }); }
+  function say(cls, t) { var m = $('hgMsg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = t; clearTimeout(msgT); if (t && cls !== 'bad') msgT = setTimeout(function () { m.textContent = ''; }, 3500); }
+
+  function topicsUI() {
+    var q = norm($('hgFind').value), box = $('hgTopics'), n = 0;
+    box.innerHTML = '';
+    T.forEach(function (t, i) {
+      if (q) {
+        var hay = ' ' + norm(t[0] + ' ' + t[1] + ' ' + t[2] + ' ' + t[3] + ' ' + t[4]) + ' ';
+        if (!q.split(' ').every(function (w) { return hay.indexOf(w) !== -1; })) return;
+      }
+      var b = document.createElement('button');
+      b.type = 'button'; b.textContent = t[0]; b.setAttribute('aria-pressed', i === cur);
+      b.addEventListener('click', function () { pick(i); });
+      box.appendChild(b); n++;
+    });
+    $('hgNoTopic').hidden = n > 0;
+  }
+  function pick(i) {
+    cur = i;
+    $('hgPanel').hidden = false;
+    [['hgB', 2], ['hgM', 3], ['hgN', 4]].forEach(function (g) {
+      var box = $(g[0]); box.innerHTML = '';
+      T[i][g[1]].split(' ').forEach(function (tag) {
+        var b = document.createElement('button');
+        b.type = 'button'; b.className = 'hg-tag'; b.textContent = '#' + tag; b.dataset.tag = tag;
+        b.setAttribute('aria-pressed', has(tag));
+        b.addEventListener('click', function () { if (has(tag)) remove(tag); else add(tag); });
+        box.appendChild(b);
+      });
+    });
+    $('hgTopics').querySelectorAll('button').forEach(function (b) { b.setAttribute('aria-pressed', b.textContent === T[i][0]); });
+  }
+  function add(t, quiet) {
+    t = clean(t);
+    if (!t) { if (!quiet) say('bad', 'A hashtag needs letters or numbers. Spaces and symbols are removed.'); return false; }
+    if (/^\d+$/.test(t)) { if (!quiet) say('bad', 'A hashtag made only of numbers does not work on most apps. Add a letter.'); return false; }
+    if (has(t)) { if (!quiet) say('', '#' + t + ' is already in your list.'); return false; }
+    if (chosen.length >= MAX) { if (!quiet) say('bad', 'You already have 30 hashtags, the most Instagram allows on one post. Remove one first.'); return false; }
+    chosen.push(t); render(); return true;
+  }
+  function remove(t) { var k = key(t); chosen = chosen.filter(function (x) { return key(x) !== k; }); render(); }
+  function render() {
+    var box = $('hgChosen'), c = $('hgCount');
+    box.innerHTML = '';
+    if (!chosen.length) { var p = document.createElement('p'); p.className = 'hg-empty'; p.textContent = 'Pick a topic above, tap hashtags, or add your own.'; box.appendChild(p); }
+    chosen.forEach(function (t) {
+      var s = document.createElement('span'), x = document.createElement('button');
+      s.className = 'hg-chip'; s.appendChild(document.createTextNode('#' + t));
+      x.type = 'button'; x.textContent = '×'; x.setAttribute('aria-label', 'Remove #' + t);
+      x.addEventListener('click', function () { remove(t); });
+      s.appendChild(x); box.appendChild(s);
+    });
+    c.textContent = chosen.length + ' / ' + MAX; c.classList.toggle('full', chosen.length >= MAX);
+    document.querySelectorAll('.hg-tag').forEach(function (b) { b.setAttribute('aria-pressed', has(b.dataset.tag)); });
+  }
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
+  function mix() {
+    if (cur < 0) return;
+    var want = Math.min(+$('hgMixN').value, MAX), room = MAX - chosen.length;
+    if (room <= 0) { say('bad', 'Your list is full (30). Remove some hashtags or click Clear first.'); return; }
+    var target = Math.min(want, room);
+    // About 20% broad, 40% medium, 40% niche: a few big tags for reach, more specific ones to be found.
+    var nb = Math.max(1, Math.round(target * 0.2)), nm = Math.round(target * 0.4), nn = target - nb - nm, added = 0;
+    var pools = [shuffle(T[cur][2].split(' ')), shuffle(T[cur][3].split(' ')), shuffle(T[cur][4].split(' '))];
+    [nb, nm, nn].forEach(function (n, gi) { var k = 0; pools[gi].forEach(function (t) { if (k < n && added < target && add(t, true)) { k++; added++; } }); });
+    // fill up from any tier if one ran short
+    pools.forEach(function (p) { p.forEach(function (t) { if (added < target && add(t, true)) added++; }); });
+    say(added ? 'ok' : '', added ? 'Added ' + added + ' hashtags from ' + T[cur][0] + '.' : 'All hashtags from this topic are already in your list.');
+  }
+  $('hgFind').addEventListener('input', topicsUI);
+  $('hgFind').addEventListener('keydown', function (e) { if (e.key === 'Enter') { var b = $('hgTopics').querySelector('button'); if (b) b.click(); } });
+  $('hgMix').addEventListener('click', mix);
+  $('hgAll').addEventListener('click', function () {
+    if (cur < 0) return;
+    var n = 0, all = (T[cur][2] + ' ' + T[cur][3] + ' ' + T[cur][4]).split(' ');
+    all.forEach(function (t) { if (add(t, true)) n++; });
+    var left = all.filter(function (t) { return !has(t); }).length;
+    say(left ? 'bad' : 'ok', 'Added ' + n + ' hashtags.' + (left ? ' ' + left + ' did not fit because 30 is the limit.' : ''));
+  });
+  function addOwn() {
+    var raw = $('hgOwn').value.trim();
+    if (!raw) { say('bad', 'Type a hashtag to add.'); return; }
+    var parts = raw.split(/[\s,]+/).filter(Boolean), ok = 0;
+    if (parts.length === 1) { if (add(parts[0])) ok = 1; }
+    else parts.forEach(function (p) { if (add(p, true)) ok++; });
+    if (ok) { $('hgOwn').value = ''; if (parts.length > 1) say(ok < parts.length ? 'bad' : 'ok', 'Added ' + ok + ' of ' + parts.length + ' hashtags.' + (ok < parts.length ? ' The rest were repeats, invalid or over the limit.' : '')); }
+    else if (parts.length > 1) say('bad', 'None of those could be added. They may be repeats, only numbers, or over the 30 limit.');
+  }
+  $('hgAddBtn').addEventListener('click', addOwn);
+  $('hgOwn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addOwn(); } });
+  $('hgCopy').addEventListener('click', function () {
+    if (!chosen.length) { say('bad', 'Nothing to copy yet. Pick some hashtags first.'); return; }
+    var tags = chosen.map(function (t) { return '#' + t; }), sep = $('hgSep').value;
+    var text = sep === 'line' ? tags.join('\n') : sep === 'gap' ? '.\n.\n.\n.\n.\n' + tags.join(' ') : tags.join(' ');
+    copyText(text, $('hgCopy'));
+    say('ok', 'Copied ' + chosen.length + ' hashtag' + (chosen.length === 1 ? '' : 's') + '.');
+  });
+  $('hgShuffle').addEventListener('click', function () { if (chosen.length < 2) { say('', 'Add at least two hashtags to shuffle.'); return; } shuffle(chosen); render(); say('ok', 'Order shuffled.'); });
+  $('hgClear').addEventListener('click', function () { chosen = []; render(); say('', 'List cleared.'); });
+  topicsUI(); render();
+})();
+</script>

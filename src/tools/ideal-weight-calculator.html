@@ -1,0 +1,65 @@
+<style>
+.iw-tab { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 15px; }
+.iw-tab th, .iw-tab td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.iw-tab th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.iw-tab td:nth-child(2) { font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.iw-tab td small { display: block; color: var(--muted); font-size: 12.5px; }
+</style>
+<div class="fields">
+  <div><label for="unit">Units</label><select id="unit"><option value="m">Metric (kg, cm)</option><option value="i">Imperial (lb, ft, in)</option></select></div>
+  <div><label for="iwSex">Sex</label><select id="iwSex"><option value="m">Male</option><option value="f">Female</option></select></div>
+  <div id="iwCmBox"><label for="iwCm">Height (cm)</label><input type="number" id="iwCm" min="0" step="any" inputmode="decimal"></div>
+  <div id="iwFtBox" hidden><label for="iwFt">Height (ft)</label><input type="number" id="iwFt" min="0" step="1"></div>
+  <div id="iwInBox" hidden><label for="iwIn">Height (in)</label><input type="number" id="iwIn" min="0" step="any"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Ideal weight (average of 4 formulas)</span><b id="iwAvg">–</b></div>
+  <div class="stat"><span>Range of the formulas</span><b id="iwSpan">–</b></div>
+  <div class="stat"><span>Healthy BMI range (18.5 – 24.9)</span><b id="iwBmi">–</b></div>
+</div>
+<table class="iw-tab" id="iwTab" hidden>
+  <thead><tr><th>Formula</th><th>Ideal weight</th></tr></thead>
+  <tbody id="iwRows"></tbody>
+</table>
+<p class="msg" id="iwMsg">Enter your height to see the results.</p>
+<p class="msg">These formulas were made decades ago, mainly to work out medicine doses, and only use height and sex. They do not consider age, muscle or body frame, so treat the results as a rough guide, not a target. For advice about your weight, talk to a doctor.</p>
+<script>
+(function () {
+  // core-start
+  // Each formula: kg at 5 ft (60 in) plus kg for every inch above 5 ft. [male, female]
+  var F = [
+    ['Devine (1974)', [50, 2.3], [45.5, 2.3]],
+    ['Robinson (1983)', [52, 1.9], [49, 1.7]],
+    ['Miller (1983)', [56.2, 1.41], [53.1, 1.36]],
+    ['Hamwi (1964)', [48, 2.7], [45.5, 2.2]]
+  ];
+  function ideal(cm, sex) {
+    var inch = cm / 2.54, over = inch - 60;
+    return F.map(function (f) { var p = sex === 'f' ? f[2] : f[1]; return { name: f[0], kg: p[0] + p[1] * over }; });
+  }
+  function bmiRange(cm) { var m = cm / 100; return [18.5 * m * m, 24.9 * m * m]; }
+  // core-end
+  var LB = 0.45359237;
+  function w(kg, imp) { return imp ? fmtNum(kg / LB, 0) + ' lb' : fmtNum(kg, 1) + ' kg'; }
+  function wr(a, b, imp) { return imp ? fmtNum(a / LB, 0) + ' – ' + fmtNum(b / LB, 0) + ' lb' : fmtNum(a, 1) + ' – ' + fmtNum(b, 1) + ' kg'; }
+  function calc() {
+    var imp = $('unit').value === 'i';
+    $('iwCmBox').hidden = imp; $('iwFtBox').hidden = !imp; $('iwInBox').hidden = !imp;
+    var cm = imp ? ((+$('iwFt').value || 0) * 12 + (+$('iwIn').value || 0)) * 2.54 : +$('iwCm').value;
+    var none = function (msg, bad) { $('iwAvg').textContent = $('iwSpan').textContent = $('iwBmi').textContent = '–'; $('iwTab').hidden = true; $('iwMsg').textContent = msg; $('iwMsg').className = bad ? 'msg bad' : 'msg'; };
+    if (!(cm > 0)) return none('Enter your height to see the results.');
+    if (cm < 120 || cm > 230) return none('Enter a height between 120 and 230 cm (3 ft 11 in to 7 ft 6 in).', true);
+    var r = ideal(cm, $('iwSex').value), kgs = r.map(function (x) { return x.kg; });
+    var avg = kgs.reduce(function (a, b) { return a + b; }, 0) / kgs.length, lo = Math.min.apply(null, kgs), hi = Math.max.apply(null, kgs), b = bmiRange(cm);
+    $('iwAvg').textContent = w(avg, imp); $('iwSpan').textContent = wr(lo, hi, imp); $('iwBmi').textContent = wr(b[0], b[1], imp);
+    var tb = $('iwRows'); tb.innerHTML = '';
+    r.forEach(function (x) { var tr = document.createElement('tr'), a = document.createElement('td'), c = document.createElement('td'); a.textContent = x.name; c.textContent = w(x.kg, imp); tr.appendChild(a); tr.appendChild(c); tb.appendChild(tr); });
+    $('iwTab').hidden = false;
+    var ft = Math.floor(Math.round(cm / 2.54) / 12), inch = Math.round(cm / 2.54) - ft * 12;
+    $('iwMsg').textContent = cm < 152.4 ? 'These formulas were designed for people 5 ft (152.4 cm) or taller. Below that the results are extended downwards and are less reliable; the BMI range is a better guide.' : 'Height used: ' + fmtNum(cm, 1) + ' cm (' + ft + ' ft ' + inch + ' in).';
+    $('iwMsg').className = 'msg';
+  }
+  ['unit', 'iwSex', 'iwCm', 'iwFt', 'iwIn'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  calc();
+})();
+</script>

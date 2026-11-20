@@ -1,0 +1,119 @@
+<style>
+.yt-in { display: flex; gap: 10px; }
+.yt-in input { flex: 1; min-width: 0; }
+@media (max-width: 520px) { .yt-in { flex-direction: column; } }
+.yt-grid { display: grid; gap: 14px; margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
+.yt-card { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.yt-card.big { grid-column: 1 / -1; }
+.yt-card img { width: 100%; height: auto; border-radius: 8px; display: block; background: var(--line); aspect-ratio: 16 / 9; object-fit: cover; }
+.yt-card.r43 img { aspect-ratio: 4 / 3; }
+.yt-card.loaded img { aspect-ratio: auto; }
+.yt-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; font-size: 14px; }
+.yt-head b { font-size: 15px; }
+.yt-head span { color: var(--muted); font-variant-numeric: tabular-nums; }
+.yt-card .btns { margin: 0; }
+.yt-card .btn { min-height: 40px; padding: 7px 14px; }
+.yt-card .msg { margin: 0; font-size: 13.5px; }
+</style>
+<label for="ytUrl">YouTube video link or ID</label>
+<div class="yt-in">
+  <input type="text" id="ytUrl" data-nomemo inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…">
+  <button class="btn" id="ytGo" type="button">Get thumbnails</button>
+</div>
+<p class="msg" id="ytMsg" aria-live="polite">Works with normal, short (youtu.be), Shorts, embed and live links, links with extra bits like &amp;t= or &amp;list=, or just the 11-character video ID.</p>
+<div class="yt-grid" id="ytGrid"></div>
+<p class="msg">Thumbnails are the creator's work and are usually protected by copyright. Use them for personal reference, commentary or with permission, and credit the channel. This tool is not affiliated with YouTube or Google; the images load directly from YouTube's public image server.</p>
+<script>
+(function () {
+  var ID = /^[A-Za-z0-9_-]{11}$/;
+  // Pull the 11-character video ID out of anything a visitor might paste.
+  function videoId(input) {
+    var s = String(input || '').trim().replace(/^[<"'(\[]+|[>"')\].,;]+$/g, '');
+    if (!s) return '';
+    if (ID.test(s)) return s;
+    var u = null;
+    try { u = new URL(/^[a-z][a-z0-9+.-]*:\/\//i.test(s) ? s : 'https://' + s.replace(/^\/+/, '')); } catch (e) {}
+    if (u) {
+      var host = u.hostname.toLowerCase().replace(/^(www|m|music|gaming)\./, ''), parts = u.pathname.split('/').filter(Boolean), q = u.searchParams;
+      if (host === 'youtu.be' && parts[0] && ID.test(parts[0])) return parts[0];
+      if (/(^|\.)(youtube\.com|youtube-nocookie\.com|ytimg\.com|youtube\.googleapis\.com)$/.test(host)) {
+        if (q.get('v') && ID.test(q.get('v'))) return q.get('v');
+        if (q.get('vi') && ID.test(q.get('vi'))) return q.get('vi');
+        if (parts.length >= 2 && /^(shorts|embed|live|v|e|vi|vi_webp|watch)$/.test(parts[0]) && ID.test(parts[1])) return parts[1];
+        // attribution and oembed links carry the real link inside a parameter
+        var inner = q.get('u') || q.get('url') || q.get('continue') || q.get('next');
+        if (inner) { var r = videoId(inner.charAt(0) === '/' ? 'https://www.youtube.com' + inner : inner); if (r) return r; }
+        var f = u.hash.match(/[?&]v=([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/); if (f) return f[1];
+      }
+    }
+    var m = s.match(/(?:[?&#]v=|\/(?:shorts|embed|live|v|e|vi)\/|youtu\.be\/)([A-Za-z0-9_-]{11})(?![A-Za-z0-9_-])/);
+    return m ? m[1] : '';
+  }
+
+  var SIZES = [
+    ['maxresdefault', 'Maximum resolution', '1280 × 720', true],
+    ['sddefault', 'Standard', '640 × 480', false, true],
+    ['hqdefault', 'High quality', '480 × 360', false, true],
+    ['mqdefault', 'Medium quality', '320 × 180'],
+    ['default', 'Small', '120 × 90', false, true]
+  ];
+  function say(c, t) { $('ytMsg').className = 'msg' + (c ? ' ' + c : ''); $('ytMsg').textContent = t; }
+  var current = '';
+  function show(force) {
+    var raw = $('ytUrl').value, id = videoId(raw), grid = $('ytGrid');
+    if (!raw.trim()) { current = ''; grid.innerHTML = ''; say('', 'Paste a YouTube link or video ID above.'); return; }
+    if (!id) { current = ''; grid.innerHTML = ''; say('bad', 'Could not find a YouTube video ID in that. Paste the full link from the address bar or the Share button.'); return; }
+    if (id === current && !force) return;
+    current = id; grid.innerHTML = '';
+    say('', 'Video ID: ' + id + '. Loading thumbnails…');
+    var pending = SIZES.length, shown = 0;
+    SIZES.forEach(function (s) {
+      var url = 'https://i.ytimg.com/vi/' + id + '/' + s[0] + '.jpg', card = document.createElement('div');
+      card.className = 'yt-card' + (s[3] ? ' big' : '') + (s[4] ? ' r43' : '');
+      card.innerHTML = '<div class="yt-head"><b></b><span></span></div><img alt="" loading="lazy" decoding="async"><div class="btns"><a class="btn ghost" target="_blank" rel="noopener">Open full size</a><button class="btn" type="button">Download</button></div><p class="msg" aria-live="polite"></p>';
+      card.querySelector('b').textContent = s[1];
+      card.querySelector('.yt-head span').textContent = s[2];
+      var img = card.querySelector('img');
+      img.alt = s[1] + ' thumbnail of video ' + id;
+      card.querySelector('a').href = url;
+      card.querySelector('button').addEventListener('click', function () { download(url, id + '-' + s[0] + '.jpg', card); });
+      function done(ok) {
+        if (current !== id) return;
+        // YouTube answers a missing size with a 120 × 90 grey placeholder instead of an error
+        var real = ok && img.naturalWidth > 0 && (s[0] === 'default' || img.naturalWidth > 120);
+        if (real) { card.classList.add('loaded'); card.querySelector('.yt-head span').textContent = img.naturalWidth + ' × ' + img.naturalHeight; shown++; }
+        else card.remove();
+        if (--pending === 0) {
+          if (shown <= 1) { grid.innerHTML = ''; say('bad', 'No thumbnails found for ID ' + id + '. Check the link: the video may be private, deleted, or the ID may be mistyped. If you are offline, the images cannot load.'); }
+          else say('ok', 'Video ID: ' + id + '. ' + shown + ' sizes available' + (shown < SIZES.length ? ' (this video has no ' + SIZES.filter(function (z) { return !grid.querySelector('[data-k="' + z[0] + '"]'); }).map(function (z) { return z[1].toLowerCase(); }).join(' or ') + ' version)' : '') + '.');
+        }
+      }
+      card.dataset.k = s[0];
+      img.onload = function () { done(true); };
+      img.onerror = function () { done(false); };
+      img.src = url;
+      grid.appendChild(card);
+    });
+  }
+  function download(url, name, card) {
+    var m = card.querySelector('.msg'), btn = card.querySelector('button');
+    btn.disabled = true; m.className = 'msg'; m.textContent = 'Downloading…';
+    fetch(url, { mode: 'cors', credentials: 'omit' }).then(function (r) {
+      if (!r.ok) throw new Error('status ' + r.status);
+      return r.blob();
+    }).then(function (b) {
+      var a = document.createElement('a'), u = URL.createObjectURL(b);
+      a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+      m.className = 'msg ok'; m.textContent = 'Saved as ' + name + ' (' + fmtBytes(b.size) + ').';
+    }).catch(function () {
+      // the image server may refuse a direct download from another site; let the browser save it instead
+      window.open(url, '_blank', 'noopener');
+      m.className = 'msg'; m.textContent = 'Your browser blocked a direct download, so the image opened in a new tab. Right-click it (or long-press on a phone) and choose "Save image".';
+    }).then(function () { btn.disabled = false; });
+  }
+  $('ytGo').addEventListener('click', function () { show(true); });
+  $('ytUrl').addEventListener('input', function () { show(false); });
+  $('ytUrl').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); show(true); } });
+})();
+</script>

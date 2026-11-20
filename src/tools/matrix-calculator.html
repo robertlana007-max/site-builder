@@ -1,0 +1,478 @@
+<style>
+.mc-mats { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; }
+.mc-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+.mc-head h3 { margin: 0 8px 0 0; font-size: 18px; }
+.mc-head select { width: auto; min-height: 38px; padding: 4px 8px; }
+.mc-head span { color: var(--muted); }
+.mc-grid { display: inline-grid; gap: 6px; padding: 8px 10px; border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); border-radius: 8px; }
+.mc-grid input { width: 58px; min-height: 40px; padding: 6px 4px; text-align: center; font-family: var(--mono); font-size: 15px; }
+.mc-grid input.bad { border-color: var(--bad); }
+.mc-tools { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.mc-tools button { font-size: 13.5px; padding: 6px 10px; min-height: 36px; }
+.mc-ops { margin-top: 18px; }
+.mc-ops .btns { margin-top: 8px; }
+.mc-ops .btn { padding: 8px 14px; min-height: 42px; }
+.mc-k { display: inline-flex; align-items: center; gap: 6px; }
+.mc-k input { width: 80px; min-height: 42px; text-align: center; font-family: var(--mono); }
+.mc-out { margin-top: 18px; }
+.mc-res { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; overflow-x: auto; }
+.mc-res .big { font-size: 26px; font-weight: 700; font-family: var(--mono); overflow-wrap: anywhere; }
+.mc-res p { margin: 4px 0; }
+.mx-t { border-collapse: separate; border-spacing: 0; margin: 6px 0; font-family: var(--mono); font-size: 14.5px; border-left: 2px solid var(--ink); border-right: 2px solid var(--ink); border-radius: 6px; font-variant-numeric: tabular-nums; }
+.mx-t td { padding: 3px 10px; text-align: end; white-space: nowrap; }
+.mx-t td.bar { border-left: 1.5px dashed var(--muted); }
+.mc-steps { margin: 10px 0 0; padding-inline-start: 22px; display: grid; gap: 8px; }
+.mc-steps li { overflow-x: auto; }
+.mc-steps b { display: block; font-size: 15px; }
+.mc-sw { margin-top: 10px; }
+@media (max-width: 480px) { .mc-grid { gap: 4px; padding: 6px; } .mc-grid input { width: 44px; font-size: 14px; padding: 4px 2px; } }
+</style>
+<div class="mc-mats">
+  <div>
+    <div class="mc-head"><h3>Matrix A</h3><select id="ar" data-nomemo aria-label="Rows of A"></select><span>×</span><select id="ac" data-nomemo aria-label="Columns of A"></select></div>
+    <div class="scroll-x"><div class="mc-grid" id="gA"></div></div>
+    <div class="mc-tools"><button type="button" class="btn ghost" data-t="A" data-a="clear">Clear</button><button type="button" class="btn ghost" data-t="A" data-a="id">Identity</button><button type="button" class="btn ghost" data-t="A" data-a="rand">Random</button></div>
+  </div>
+  <div>
+    <div class="mc-head"><h3>Matrix B</h3><select id="br" data-nomemo aria-label="Rows of B"></select><span>×</span><select id="bc" data-nomemo aria-label="Columns of B"></select></div>
+    <div class="scroll-x"><div class="mc-grid" id="gB"></div></div>
+    <div class="mc-tools"><button type="button" class="btn ghost" data-t="B" data-a="clear">Clear</button><button type="button" class="btn ghost" data-t="B" data-a="id">Identity</button><button type="button" class="btn ghost" data-t="B" data-a="rand">Random</button><button type="button" class="btn ghost" id="swap">Swap A ↔ B</button></div>
+  </div>
+</div>
+<p class="msg" style="font-size:14px">Cells take whole numbers, fractions like 3/4, decimals, or expressions like sqrt(2). An empty cell counts as 0.</p>
+<div class="mc-ops">
+  <b>Two matrices</b>
+  <div class="btns"><button type="button" class="btn" data-op="add">A + B</button><button type="button" class="btn" data-op="sub">A − B</button><button type="button" class="btn" data-op="mul">A × B</button><button type="button" class="btn ghost" data-op="mulBA">B × A</button>
+    <span class="mc-k"><button type="button" class="btn ghost" data-op="scal">k × A</button><label for="k" style="margin:0">k =</label><input type="text" id="k" value="2"></span></div>
+  <div style="margin-top:14px"><b>One matrix</b> &nbsp;<span class="seg" role="group" aria-label="Which matrix"><button type="button" id="onA" aria-pressed="true">A</button><button type="button" id="onB" aria-pressed="false">B</button></span></div>
+  <div class="btns"><button type="button" class="btn" data-op="det">Determinant</button><button type="button" class="btn" data-op="inv">Inverse</button><button type="button" class="btn" data-op="rref">RREF (steps)</button><button type="button" class="btn ghost" data-op="rank">Rank</button><button type="button" class="btn ghost" data-op="tr">Transpose</button><button type="button" class="btn ghost" data-op="sq">Square</button></div>
+</div>
+<p class="msg" id="msg"></p>
+<div class="mc-out" id="out" aria-live="polite"></div>
+<div class="btns" id="resBtns" hidden><button type="button" class="btn ghost" id="copy">Copy result</button><button type="button" class="btn ghost" id="toA">Use as A</button><button type="button" class="btn ghost" id="toB">Use as B</button></div>
+<script>
+(function () {
+  // ---------- shared maths parser (the same code is copied into each Study tool; no eval or Function) ----------
+  function MathError(msg) { this.message = msg; }
+  var MFN = ['asinh', 'acosh', 'atanh', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'sqrt', 'cbrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'abs', 'exp', 'log', 'ln', 'floor', 'ceil', 'round', 'sign'];
+  // Turns text into a tree: {t:'num',s:'2.5'} {t:'const',n:'pi'|'e'} {t:'var',n:'x'} {t:'neg',a} {t:'op',o:'+',a,b} {t:'fn',n:'sin',a}
+  function mParse(src, vars) {
+    vars = vars || [];
+    var s = String(src).replace(/[−–—]/g, '-').replace(/[×·∙⋅]/g, '*').replace(/[÷∕]/g, '/').replace(/\*\*/g, '^').replace(/π/g, 'pi');
+    var toks = [], i = 0, m, names = MFN.concat(['pi', 'e'], vars).sort(function (a, b) { return b.length - a.length; });
+    while (i < s.length) {
+      var c = s[i], rest = s.slice(i);
+      if (/\s/.test(c)) { i++; continue; }
+      if ((m = /^(\d+\.?\d*|\.\d+)/.exec(rest))) {
+        if (s[i + m[0].length] === '.') throw new MathError('A decimal point is in the wrong place.');
+        toks.push({ k: 'num', s: m[0] }); i += m[0].length; continue;
+      }
+      if ((m = /^[a-zA-Z]+/.exec(rest))) {
+        var w = m[0], j = 0;
+        while (j < w.length) { // split a run of letters into known names: "2xsinx" -> x, sin, x
+          var hit = null;
+          for (var n = 0; n < names.length; n++) if (names[n].length > 1 ? w.substr(j, names[n].length).toLowerCase() === names[n] : w[j] === names[n]) { hit = names[n]; break; }
+          if (!hit) {
+            var bad = w.slice(j).match(/^[a-zA-Z]+/)[0];
+            throw new MathError(vars.length ? '"' + bad + '" is not a function or variable I know. Use ' + vars.join(', ') + ' as the variable.' : '"' + bad + '" is not a function I know.');
+          }
+          if (hit === 'pi' || hit === 'e') toks.push({ k: 'const', n: hit });
+          else if (vars.indexOf(hit) !== -1) toks.push({ k: 'var', n: hit });
+          else toks.push({ k: 'fn', n: hit });
+          j += hit.length;
+        }
+        i += w.length; continue;
+      }
+      if (c === '√') { toks.push({ k: 'fn', n: 'sqrt' }); i++; continue; }
+      if (c === '²' || c === '³') { toks.push({ k: '^' }, { k: 'num', s: c === '²' ? '2' : '3' }); i++; continue; }
+      if (c === '[' || c === '{') { toks.push({ k: '(' }); i++; continue; }
+      if (c === ']' || c === '}') { toks.push({ k: ')' }); i++; continue; }
+      if ('+-*/^()!'.indexOf(c) !== -1) { toks.push({ k: c }); i++; continue; }
+      if (c === ',') throw new MathError('Use a dot for decimals, like 2.5, not a comma.');
+      throw new MathError('"' + c + '" is not something I understand.');
+    }
+    var open = 0;
+    toks.forEach(function (x) { if (x.k === '(') open++; else if (x.k === ')') open--; });
+    if (open < 0) throw new MathError('There is a ")" without a matching "(".');
+    while (open-- > 0) toks.push({ k: ')' }); // forgive missing closing brackets at the end
+    if (!toks.length) throw new MathError('Nothing to work out yet.');
+    var p = 0;
+    function peek() { return toks[p]; }
+    function starts(x) { return x && (x.k === 'num' || x.k === 'const' || x.k === 'var' || x.k === 'fn' || x.k === '('); }
+    function expr() {
+      var v = term();
+      while (peek() && (peek().k === '+' || peek().k === '-')) { var o = toks[p++].k; v = { t: 'op', o: o, a: v, b: term() }; }
+      return v;
+    }
+    function term() {
+      var v = unary();
+      for (;;) {
+        var x = peek();
+        if (x && (x.k === '*' || x.k === '/')) { p++; v = { t: 'op', o: x.k, a: v, b: unary() }; }
+        else if (starts(x)) { // implicit multiplication: 2x, 3(x+1), (x+1)(x-1), 2sin(x)
+          if (x.k === 'num' && toks[p - 1].k === 'num') throw new MathError('Two numbers need an operator between them.');
+          v = { t: 'op', o: '*', a: v, b: power() };
+        } else return v;
+      }
+    }
+    function unary() {
+      var x = peek();
+      if (x && x.k === '-') { p++; return { t: 'neg', a: unary() }; }
+      if (x && x.k === '+') { p++; return unary(); }
+      return power();
+    }
+    function power() {
+      var b = postfix();
+      if (peek() && peek().k === '^') { p++; return { t: 'op', o: '^', a: b, b: unary() }; } // right-associative; -x^2 means -(x^2)
+      return b;
+    }
+    function postfix() {
+      var v = primary();
+      while (peek() && peek().k === '!') { p++; v = { t: 'fn', n: 'fact', a: v }; }
+      return v;
+    }
+    function primary() {
+      var x = toks[p++];
+      if (!x) throw new MathError('The expression ends too early.');
+      if (x.k === 'num') return { t: 'num', s: x.s };
+      if (x.k === 'const') return { t: 'const', n: x.n };
+      if (x.k === 'var') return { t: 'var', n: x.n };
+      if (x.k === '(') {
+        if (peek() && peek().k === ')') throw new MathError('There are empty brackets.');
+        var v = expr();
+        if (!peek() || peek().k !== ')') throw new MathError('Check your brackets.');
+        p++; return v;
+      }
+      if (x.k === 'fn') {
+        if (peek() && peek().k === '^') throw new MathError('Write powers of functions with brackets, like (sin(x))^2 or sin(x)^2.');
+        if (!peek()) throw new MathError(x.n + ' needs something after it, like ' + x.n + '(2).');
+        return { t: 'fn', n: x.n, a: peek().k === '(' ? primary() : power() };
+      }
+      if (x.k === ')') throw new MathError('Check your brackets.');
+      if (x.k === '!') throw new MathError('"!" needs a number before it.');
+      throw new MathError('"' + x.k + '" is missing a number.');
+    }
+    var tree = expr();
+    if (p < toks.length) throw new MathError(toks[p].k === ')' ? 'Check your brackets.' : 'There is something extra at the end.');
+    return tree;
+  }
+  function mFact(n) { if (n < 0 || Math.floor(n) !== n) return NaN; if (n > 170) return Infinity; var r = 1; for (var i = 2; i <= n; i++) r *= i; return r; }
+  var MF = {
+    sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+    asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh, sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10,
+    floor: Math.floor, ceil: Math.ceil, round: Math.round, sign: Math.sign, fact: mFact,
+    sec: function (v) { return 1 / Math.cos(v); }, csc: function (v) { return 1 / Math.sin(v); }, cot: function (v) { return 1 / Math.tan(v); }
+  };
+  function mPow(a, b) {
+    if (a < 0 && Math.floor(b) !== b) { // odd roots of negatives are real: (-8)^(1/3) = -2
+      var q = 1 / b, r = Math.round(q);
+      if (Math.abs(q - r) < 1e-9 && r % 2 !== 0) return -Math.pow(-a, b);
+    }
+    return Math.pow(a, b);
+  }
+  // Compiles a tree into a fast JavaScript closure: f(scope) -> number (NaN where undefined).
+  function mCompile(n) {
+    switch (n.t) {
+      case 'num': var v = parseFloat(n.s); return function () { return v; };
+      case 'const': var k = n.n === 'pi' ? Math.PI : Math.E; return function () { return k; };
+      case 'var': var nm = n.n; return function (s) { return s[nm]; };
+      case 'neg': var a0 = mCompile(n.a); return function (s) { return -a0(s); };
+      case 'fn': var f = MF[n.n], a1 = mCompile(n.a); return function (s) { return f(a1(s)); };
+      case 'op':
+        var A = mCompile(n.a), B = mCompile(n.b);
+        if (n.o === '+') return function (s) { return A(s) + B(s); };
+        if (n.o === '-') return function (s) { return A(s) - B(s); };
+        if (n.o === '*') return function (s) { return A(s) * B(s); };
+        if (n.o === '/') return function (s) { return A(s) / B(s); };
+        return function (s) { return mPow(A(s), B(s)); };
+    }
+  }
+  // ---------- exact fractions with BigInt (shared by the Study tools) ----------
+  function bAbs(a) { return a < 0n ? -a : a; }
+  function bGcd(a, b) { a = bAbs(a); b = bAbs(b); while (b) { var t = a % b; a = b; b = t; } return a; }
+  function Q(n, d) {
+    if (!(this instanceof Q)) return new Q(n, d);
+    n = BigInt(n); d = d === undefined ? 1n : BigInt(d);
+    if (d === 0n) throw new MathError('You cannot divide by zero.');
+    if (d < 0n) { n = -n; d = -d; }
+    var g = bGcd(n, d) || 1n;
+    this.n = n / g; this.d = d / g;
+  }
+  Q.prototype.add = function (o) { return new Q(this.n * o.d + o.n * this.d, this.d * o.d); };
+  Q.prototype.sub = function (o) { return new Q(this.n * o.d - o.n * this.d, this.d * o.d); };
+  Q.prototype.mul = function (o) { return new Q(this.n * o.n, this.d * o.d); };
+  Q.prototype.div = function (o) { if (o.n === 0n) throw new MathError('You cannot divide by zero.'); return new Q(this.n * o.d, this.d * o.n); };
+  Q.prototype.neg = function () { return new Q(-this.n, this.d); };
+  Q.prototype.inv = function () { return new Q(1n, 1n).div(this); };
+  Q.prototype.isZero = function () { return this.n === 0n; };
+  Q.prototype.isInt = function () { return this.d === 1n; };
+  Q.prototype.sign = function () { return this.n > 0n ? 1 : this.n < 0n ? -1 : 0; };
+  Q.prototype.cmp = function (o) { var a = this.n * o.d, b = o.n * this.d; return a < b ? -1 : a > b ? 1 : 0; };
+  Q.prototype.eq = function (o) { return this.n === o.n && this.d === o.d; };
+  Q.prototype.pow = function (k) { // k: a whole JS number
+    if (k < 0) return this.inv().pow(-k);
+    if (k > 10000) throw new MathError('That power is too large to work out exactly.');
+    var e = BigInt(k); return new Q(this.n ** e, this.d ** e);
+  };
+  Q.prototype.toNumber = function () {
+    var a = Number(this.n), b = Number(this.d);
+    if (isFinite(a) && isFinite(b)) return a / b;
+    var shift = BigInt(Math.max(0, this.d.toString().length - 17)), s2 = BigInt(Math.max(0, this.n.toString().length - 17));
+    return Number(this.n / 10n ** s2) / Number(this.d / 10n ** shift) * Math.pow(10, Number(s2 - shift));
+  };
+  Q.prototype.toString = function () { return this.d === 1n ? this.n.toString() : this.n.toString() + '/' + this.d.toString(); };
+  // Reads "3", "-2.75", "4/6", "1e3" exactly. Returns null when the text is not a plain number or fraction.
+  Q.parse = function (str) {
+    var s = String(str).trim().replace(/[−–]/g, '-').replace(/\s+/g, ''), m;
+    if ((m = /^([+-]?)(\d+)\/(\d+)$/.exec(s))) return new Q(BigInt(m[1] + m[2]), BigInt(m[3]));
+    if ((m = /^([+-]?)(\d*)\.?(\d*)(?:e([+-]?\d+))?$/i.exec(s)) && (m[2] || m[3])) {
+      var q = new Q(BigInt(m[1] + (m[2] || '0') + m[3]), 10n ** BigInt(m[3].length));
+      if (m[4]) { var ex = parseInt(m[4], 10); if (Math.abs(ex) > 5000) return null; q = q.mul(new Q(10n).pow(ex)); }
+      return q;
+    }
+    return null;
+  };
+  // ---------- numbers that stay exact while they can: a Q, or a JS float once something irrational (pi, sqrt 2) appears ----------
+  function nAdd(a, b) { return a instanceof Q && b instanceof Q ? a.add(b) : nF(a) + nF(b); }
+  function nSub(a, b) { return a instanceof Q && b instanceof Q ? a.sub(b) : nF(a) - nF(b); }
+  function nMul(a, b) { return a instanceof Q && b instanceof Q ? a.mul(b) : nF(a) * nF(b); }
+  function nDiv(a, b) {
+    if (nIsZero(b)) throw new MathError('You cannot divide by zero.');
+    return a instanceof Q && b instanceof Q ? a.div(b) : nF(a) / nF(b);
+  }
+  function nNeg(a) { return a instanceof Q ? a.neg() : -a; }
+  function nF(a) { return a instanceof Q ? a.toNumber() : a; }
+  function nIsZero(a, tol) { return a instanceof Q ? a.isZero() : Math.abs(a) <= (tol || 0); }
+  // Evaluates a parsed tree exactly where possible. scope maps variable names to values.
+  function nEval(t, scope) {
+    switch (t.t) {
+      case 'num': return Q.parse(t.s);
+      case 'flt': return t.v; // a float placed in a tree by a tool
+      case 'const': return t.n === 'pi' ? Math.PI : Math.E;
+      case 'var': if (!scope || !(t.n in scope)) throw new MathError('"' + t.n + '" is not allowed here.'); return scope[t.n];
+      case 'neg': return nNeg(nEval(t.a, scope));
+      case 'fn':
+        var a = nEval(t.a, scope), r;
+        if (a instanceof Q && t.n === 'abs') return a.sign() < 0 ? a.neg() : a;
+        if (a instanceof Q && t.n === 'sqrt' && a.sign() >= 0) { var sn = bSqrt(a.n), sd = bSqrt(a.d); if (sn * sn === a.n && sd * sd === a.d) return new Q(sn, sd); }
+        if (a instanceof Q && t.n === 'fact' && a.isInt() && a.sign() >= 0 && a.n <= 1000n) { var f = 1n; for (var i = 2n; i <= a.n; i++) f *= i; return new Q(f); }
+        r = MF[t.n](nF(a));
+        if (!isFinite(r)) throw new MathError(t.n + '(' + fmtPlain(nF(a)) + ') is not defined.');
+        return r;
+      case 'op':
+        var x = nEval(t.a, scope), y = nEval(t.b, scope);
+        if (t.o === '+') return nAdd(x, y);
+        if (t.o === '-') return nSub(x, y);
+        if (t.o === '*') return nMul(x, y);
+        if (t.o === '/') return nDiv(x, y);
+        if (y instanceof Q && y.isInt() && x instanceof Q && bAbs(y.n) <= 4096n) { if (x.isZero() && y.sign() < 0) throw new MathError('You cannot divide by zero.'); return x.pow(Number(y.n)); }
+        var pw = mPow(nF(x), nF(y));
+        if (!isFinite(pw)) throw new MathError(isNaN(pw) ? 'A negative number cannot be raised to that power.' : 'The result is too large.');
+        return pw;
+    }
+  }
+  function bSqrt(n) { // floor square root of a BigInt >= 0
+    if (n < 2n) return n;
+    var x = 1n << BigInt((n.toString(2).length >> 1) + 1), y = (x + n / x) >> 1n;
+    while (y < x) { x = y; y = (x + n / x) >> 1n; }
+    return x;
+  }
+  function fmtPlain(v) { var r = parseFloat(Number(v).toPrecision(12)); return String(r === 0 ? 0 : r); }
+  // ---------- row reduction with steps (shared by the Study tools) ----------
+  // M: rows of numbers (Q or float). aug: how many columns on the right are never used as pivots.
+  // Returns { R, pivots, rank, steps: [{ op, M }], swaps, exact }.
+  function mExact(M) { return M.every(function (r) { return r.every(function (v) { return v instanceof Q; }); }); }
+  function mTol(M) { var m = 0; M.forEach(function (r) { r.forEach(function (v) { m = Math.max(m, Math.abs(nF(v))); }); }); return 1e-10 * Math.max(1, m); }
+  function rowReduce(M, aug, fmtv, full) {
+    var A = M.map(function (r) { return r.slice(); }), rows = A.length, cols = A[0].length, lim = cols - (aug || 0);
+    var exact = mExact(A), tol = exact ? 0 : mTol(A), r = 0, piv = [], steps = [], swaps = 0;
+    function snap() { return A.map(function (x) { return x.slice(); }); }
+    function z(v) { return nIsZero(v, tol); }
+    function clean(row) { return row.map(function (v) { return !exact && Math.abs(v) <= tol ? 0 : v; }); }
+    for (var c = 0; c < lim && r < rows; c++) {
+      var p = -1, best = 0;
+      for (var i = r; i < rows; i++) {
+        if (z(A[i][c])) continue;
+        if (exact) { p = i; break; }
+        if (Math.abs(A[i][c]) > best) { best = Math.abs(A[i][c]); p = i; } // partial pivoting keeps decimals accurate
+      }
+      if (p < 0) continue;
+      if (p !== r) { var t = A[p]; A[p] = A[r]; A[r] = t; swaps++; steps.push({ op: 'Swap R' + (r + 1) + ' and R' + (p + 1), M: snap() }); }
+      var pv = A[r][c];
+      if (full !== false && !(pv instanceof Q && pv.eq(Q(1)))) {
+        A[r] = clean(A[r].map(function (v) { return nDiv(v, pv); }));
+        A[r][c] = exact ? Q(1) : 1;
+        steps.push({ op: 'R' + (r + 1) + ' → R' + (r + 1) + ' ÷ ' + paren(fmtv(pv)), M: snap() });
+      }
+      for (i = full === false ? r + 1 : 0; i < rows; i++) {
+        if (i === r || z(A[i][c])) continue;
+        var f = full === false ? nDiv(A[i][c], A[r][c]) : A[i][c], neg = nF(f) < 0, fa = neg ? nNeg(f) : f;
+        A[i] = clean(A[i].map(function (v, k) { return nSub(v, nMul(f, A[r][k])); }));
+        A[i][c] = exact ? Q(0) : 0;
+        steps.push({ op: 'R' + (i + 1) + ' → R' + (i + 1) + (neg ? ' + ' : ' − ') + (isOne(fa) ? '' : paren(fmtv(fa)) + '·') + 'R' + (r + 1), M: snap() });
+      }
+      piv.push(c); r++;
+    }
+    return { R: A, pivots: piv, rank: piv.length, steps: steps, swaps: swaps, exact: exact, tol: tol };
+  }
+  function isOne(v) { return v instanceof Q ? v.eq(Q(1)) : Math.abs(v - 1) < 1e-12; }
+  function paren(s) { return /^[−-]|[\/ ]/.test(s) ? '(' + s + ')' : s; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  // A matrix as an HTML table with bracket sides; bar = column index where a dividing line goes (augmented matrices).
+  function matHtml(M, fmtv, bar) {
+    var h = '<table class="mx-t' + (bar != null ? ' aug' : '') + '"><tbody>';
+    M.forEach(function (r) { h += '<tr>' + r.map(function (v, k) { return '<td' + (k === bar ? ' class="bar"' : '') + '>' + esc(fmtv(v)) + '</td>'; }).join('') + '</tr>'; });
+    return h + '</tbody></table>';
+  }
+  var MAX = 6, size = { A: [3, 3], B: [3, 3] }, one = 'A', lastM = null;
+  var start = { A: [['2', '1', '-1'], ['-3', '-1', '2'], ['-2', '1', '2']], B: [['1', '0', '2'], ['0', '1', '0'], ['3', '0', '1']] };
+  ['ar', 'ac', 'br', 'bc'].forEach(function (id) { for (var i = 1; i <= MAX; i++) { var o = document.createElement('option'); o.value = o.textContent = i; $(id).appendChild(o); } $(id).value = 3; });
+  function cells(t) { return [].slice.call($('g' + t).querySelectorAll('input')); }
+  function current(t) { var r = size[t][0], c = size[t][1], cs = cells(t), out = []; for (var i = 0; i < r; i++) { out.push([]); for (var j = 0; j < c; j++) out[i].push(cs[i * c + j].value); } return out; }
+  function build(t, vals) {
+    var r = size[t][0], c = size[t][1], g = $('g' + t); g.innerHTML = ''; g.style.gridTemplateColumns = 'repeat(' + c + ', auto)';
+    for (var i = 0; i < r; i++) for (var j = 0; j < c; j++) {
+      var inp = document.createElement('input'); inp.type = 'text'; inp.setAttribute('data-nomemo', ''); inp.autocomplete = 'off'; inp.spellcheck = false; inp.inputMode = 'text';
+      inp.setAttribute('aria-label', t + ' row ' + (i + 1) + ' column ' + (j + 1));
+      inp.value = vals && vals[i] && vals[i][j] != null ? vals[i][j] : '';
+      g.appendChild(inp);
+    }
+  }
+  function resize(t) { var old = current(t); size[t] = [+$(t.toLowerCase() + 'r').value, +$(t.toLowerCase() + 'c').value]; build(t, old); }
+  ['A', 'B'].forEach(function (t) {
+    $(t.toLowerCase() + 'r').addEventListener('change', function () { resize(t); });
+    $(t.toLowerCase() + 'c').addEventListener('change', function () { resize(t); });
+  });
+  // Arrow keys and Enter move between cells
+  ['gA', 'gB'].forEach(function (id) {
+    $(id).addEventListener('keydown', function (e) {
+      var t = id.slice(1), cs = cells(t), i = cs.indexOf(e.target), c = size[t][1], to = -1;
+      if (i < 0) return;
+      if (e.key === 'Enter' || (e.key === 'ArrowDown' && !e.altKey)) to = i + c; else if (e.key === 'ArrowUp') to = i - c;
+      else if (e.key === 'ArrowRight' && e.target.selectionStart === e.target.value.length) to = i + 1; else if (e.key === 'ArrowLeft' && e.target.selectionStart === 0) to = i - 1;
+      if (to >= 0 && to < cs.length) { e.preventDefault(); cs[to].focus(); cs[to].select(); }
+    });
+    $(id).addEventListener('input', function (e) { e.target.classList.remove('bad'); });
+  });
+  function setMatrix(t, rows) { size[t] = [rows.length, rows[0].length]; $(t.toLowerCase() + 'r').value = rows.length; $(t.toLowerCase() + 'c').value = rows[0].length; build(t, rows); }
+  document.querySelectorAll('[data-a]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var t = b.dataset.t, r = size[t][0], c = size[t][1], v = [];
+      for (var i = 0; i < r; i++) { v.push([]); for (var j = 0; j < c; j++) v[i].push(b.dataset.a === 'clear' ? '' : b.dataset.a === 'id' ? (i === j ? '1' : '0') : String(Math.floor(Math.random() * 19) - 9)); }
+      build(t, v);
+    });
+  });
+  $('swap').addEventListener('click', function () { var a = current('A'), b = current('B'); setMatrix('A', b); setMatrix('B', a); });
+  function pick(t) { one = t; $('onA').setAttribute('aria-pressed', t === 'A'); $('onB').setAttribute('aria-pressed', t === 'B'); }
+  $('onA').addEventListener('click', function () { pick('A'); }); $('onB').addEventListener('click', function () { pick('B'); });
+
+  // ---------- reading and showing values ----------
+  var decimalMode = false;
+  function read(t) {
+    var cs = cells(t), c = size[t][1], M = [], bad = null;
+    cs.forEach(function (inp, k) {
+      var i = Math.floor(k / c), s = inp.value.trim(), v;
+      if (!M[i]) M[i] = [];
+      if (!s) v = Q(0);
+      else {
+        try { v = nEval(mParse(s, [])); } catch (e) { if (!(e instanceof MathError)) throw e; inp.classList.add('bad'); if (!bad) bad = t + ' row ' + (i + 1) + ', column ' + (k % c + 1) + ': ' + e.message; v = Q(0); }
+        if (/[.e]/i.test(s.replace(/sec|exp/gi, '')) || !(v instanceof Q)) decimalMode = true;
+      }
+      M[i].push(v);
+    });
+    if (bad) throw new MathError(bad);
+    return M;
+  }
+  function fmtF(x) { if (!isFinite(x)) return '∞'; var r = parseFloat(x.toPrecision(8)); if (Math.abs(r) < 1e-12) return '0'; var a = Math.abs(r); return (a >= 1e10 || a < 1e-6 ? r.toExponential(5).replace(/\.?0+e/, 'e') : String(r)).replace('-', '−'); }
+  function fv(v) { return !decimalMode && v instanceof Q ? v.toString().replace('-', '−') : fmtF(nF(v)); }
+  function dims(M) { return M.length + '×' + M[0].length; }
+  function show(main, steps, M, open) {
+    var h = '<div class="mc-res">' + main + '</div>';
+    if (steps && steps.length) h += '<details class="mc-sw"' + (open ? ' open' : '') + '><summary><b>Show the steps (' + steps.length + ')</b></summary><ol class="mc-steps">' + steps.join('') + '</ol></details>';
+    $('out').innerHTML = h; lastM = M || null; $('resBtns').hidden = !M;
+    $('out').setAttribute('data-answer', M ? M.map(function (r) { return r.map(fv).join('\t'); }).join('\n') : $('out').querySelector('.mc-res').textContent);
+  }
+  function st(op, M, bar) { return '<li><b>' + op + '</b>' + (M ? '<div class="scroll-x">' + matHtml(M, fv, bar) + '</div>' : '') + '</li>'; }
+  function same(A, B, word) { if (A.length !== B.length || A[0].length !== B[0].length) throw new MathError(word + ' needs A and B to be the same size, but A is ' + dims(A) + ' and B is ' + dims(B) + '.'); }
+  function mul(A, B) { return A.map(function (r) { return B[0].map(function (x, j) { return r.reduce(function (s, v, k) { return nAdd(s, nMul(v, B[k][j])); }, Q(0)); }); }); }
+  function square(M, what) { if (M.length !== M[0].length) throw new MathError(what + ' only exists for square matrices, but ' + one + ' is ' + dims(M) + '.'); }
+
+  // ---------- operations ----------
+  var OPS = {
+    add: function () { var A = read('A'), B = read('B'); same(A, B, 'A + B'); var R = A.map(function (r, i) { return r.map(function (v, j) { return nAdd(v, B[i][j]); }); }); show('<p>A + B =</p>' + matHtml(R, fv), ['<li>Add the entries in the same position: (A + B)ᵢⱼ = Aᵢⱼ + Bᵢⱼ</li>'], R); },
+    sub: function () { var A = read('A'), B = read('B'); same(A, B, 'A − B'); var R = A.map(function (r, i) { return r.map(function (v, j) { return nSub(v, B[i][j]); }); }); show('<p>A − B =</p>' + matHtml(R, fv), ['<li>Subtract the entries in the same position: (A − B)ᵢⱼ = Aᵢⱼ − Bᵢⱼ</li>'], R); },
+    mul: function () { prod(read('A'), read('B'), 'A', 'B'); },
+    mulBA: function () { prod(read('B'), read('A'), 'B', 'A'); },
+    scal: function () {
+      var A = read('A'), ks = $('k').value.trim(), k;
+      if (!ks) throw new MathError('Type a number for k.');
+      try { k = nEval(mParse(ks, [])); } catch (e) { if (e instanceof MathError) throw new MathError('k: ' + e.message); throw e; }
+      if (/[.e]/i.test(ks) || !(k instanceof Q)) decimalMode = true;
+      var R = A.map(function (r) { return r.map(function (v) { return nMul(k, v); }); });
+      show('<p>' + fv(k) + ' × A =</p>' + matHtml(R, fv), ['<li>Multiply every entry of A by ' + fv(k) + '.</li>'], R);
+    },
+    tr: function () { var M = read(one), R = M[0].map(function (x, j) { return M.map(function (r) { return r[j]; }); }); show('<p>' + one + 'ᵀ (' + dims(R) + ') =</p>' + matHtml(R, fv), ['<li>Rows become columns: (' + one + 'ᵀ)ᵢⱼ = ' + one + 'ⱼᵢ</li>'], R); },
+    sq: function () { var M = read(one); square(M, one + '²'); var R = mul(M, M); show('<p>' + one + '² = ' + one + ' × ' + one + ' =</p>' + matHtml(R, fv), null, R); },
+    det: function () {
+      var M = read(one); square(M, 'A determinant'); var n = M.length, steps = [];
+      if (n === 1) { show('<p>det(' + one + ') =</p><p class="big">' + fv(M[0][0]) + '</p>', null, null); return; }
+      if (n === 2) steps.push('<li><b>For a 2×2 matrix, det = ad − bc</b>(' + fv(M[0][0]) + ')(' + fv(M[1][1]) + ') − (' + fv(M[0][1]) + ')(' + fv(M[1][0]) + ')</li>');
+      var red = rowReduce(M, 0, fv, false), R = red.R, d = red.swaps % 2 ? Q(-1) : Q(1);
+      steps.push(st('Start with ' + one, M));
+      red.steps.forEach(function (s) { steps.push(st(s.op, s.M)); });
+      if (red.rank < n) { steps.push('<li><b>A column has no pivot, so the matrix is singular</b>det = 0</li>'); d = Q(0); }
+      else {
+        for (var i = 0; i < n; i++) d = nMul(d, R[i][i]);
+        steps.push('<li><b>Multiply the numbers on the diagonal' + (red.swaps ? ' and change the sign once for each row swap (' + red.swaps + ')' : '') + '</b>det = ' + (red.swaps % 2 ? '−' : '') + R.map(function (r, i) { return '(' + fv(r[i]) + ')'; }).join(' × ') + ' = ' + fv(d) + '</li>');
+        steps.push('<li>Adding a multiple of one row to another does not change the determinant; swapping two rows flips its sign.</li>');
+      }
+      var dz = nIsZero(d, red.tol * 10);
+      show('<p>det(' + one + ') =</p><p class="big">' + fv(dz ? 0 : d) + '</p>' + (!decimalMode && d instanceof Q && !d.isInt() ? '<p>≈ ' + fmtF(nF(d)) + '</p>' : '') + (dz ? '<p>The determinant is 0, so ' + one + ' has no inverse.</p>' : ''), steps, null);
+    },
+    inv: function () {
+      var M = read(one); square(M, 'An inverse'); var n = M.length;
+      var aug = M.map(function (r, i) { return r.concat(M.map(function (x, j) { return i === j ? Q(1) : Q(0); })); });
+      var red = rowReduce(aug, n, fv), steps = [st('Write [' + one + ' | I]', aug, n)];
+      red.steps.forEach(function (s) { steps.push(st(s.op, s.M, n)); });
+      if (red.rank < n) { steps.push('<li><b>The left side cannot become I</b>A row of zeros appeared, so the matrix is singular.</li>'); show('<p><b>' + one + ' has no inverse.</b> It is singular: its determinant is 0 and its rank is ' + red.rank + ', less than ' + n + '.</p>', steps, null); return; }
+      var R = red.R.map(function (r) { return r.slice(n); });
+      steps.push('<li><b>The left side is now I, so the right side is ' + one + '⁻¹</b></li>');
+      show('<p>' + one + '⁻¹ =</p>' + matHtml(R, fv) + '<p style="font-size:14px;color:var(--muted)">Check: ' + one + ' × ' + one + '⁻¹ = I.</p>', steps, R);
+    },
+    rref: function () {
+      var M = read(one), red = rowReduce(M, 0, fv), steps = [st('Start with ' + one, M)];
+      red.steps.forEach(function (s) { steps.push(st(s.op, s.M)); });
+      if (!red.steps.length) steps.push('<li>No row operations are needed.</li>');
+      show('<p>RREF(' + one + ') =</p>' + matHtml(red.R, fv) + '<p>Rank ' + red.rank + ' · pivot columns: ' + (red.pivots.length ? red.pivots.map(function (c) { return c + 1; }).join(', ') : 'none') + '</p>', steps, red.R, true);
+    },
+    rank: function () {
+      var M = read(one), red = rowReduce(M, 0, fv), steps = [st('Start with ' + one, M)];
+      red.steps.forEach(function (s) { steps.push(st(s.op, s.M)); });
+      steps.push('<li><b>Count the rows that are not all zero</b>rank = ' + red.rank + '</li>');
+      show('<p>rank(' + one + ') =</p><p class="big">' + red.rank + '</p><p>' + (red.rank === Math.min(M.length, M[0].length) ? 'Full rank.' : 'Not full rank (the most possible for ' + dims(M) + ' is ' + Math.min(M.length, M[0].length) + ').') + '</p>', steps, null);
+    }
+  };
+  function prod(A, B, a, b) {
+    if (A[0].length !== B.length) throw new MathError(a + ' × ' + b + ' needs the number of columns of ' + a + ' (' + A[0].length + ') to equal the number of rows of ' + b + ' (' + B.length + '). ' + a + ' is ' + dims(A) + ' and ' + b + ' is ' + dims(B) + '.');
+    var R = mul(A, B), ex = A[0].map(function (v, k) { return '(' + fv(v) + ')(' + fv(B[k][0]) + ')'; }).join(' + ');
+    show('<p>' + a + ' × ' + b + ' (' + dims(R) + ') =</p>' + matHtml(R, fv), ['<li>Each entry is a row of ' + a + ' times a column of ' + b + ', multiplied entry by entry and added up.</li>', '<li><b>For example, row 1 · column 1</b>' + ex + ' = ' + fv(R[0][0]) + '</li>'], R);
+  }
+  document.querySelectorAll('[data-op]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      $('msg').className = 'msg'; $('msg').textContent = ''; decimalMode = false;
+      document.querySelectorAll('.mc-grid input.bad').forEach(function (x) { x.classList.remove('bad'); });
+      try { OPS[b.dataset.op](); }
+      catch (e) {
+        if (!(e instanceof MathError)) throw e;
+        $('out').innerHTML = ''; $('out').removeAttribute('data-answer'); $('resBtns').hidden = true; lastM = null;
+        $('msg').className = 'msg bad'; $('msg').textContent = e.message;
+      }
+    });
+  });
+  function asText(M) { return M.map(function (r) { return r.map(function (v) { return fv(v).replace('−', '-'); }); }); }
+  $('copy').addEventListener('click', function () { if (lastM) copyText(asText(lastM).map(function (r) { return r.join('\t'); }).join('\n'), this); });
+  $('toA').addEventListener('click', function () { if (lastM && lastM.length <= MAX && lastM[0].length <= MAX) setMatrix('A', asText(lastM)); });
+  $('toB').addEventListener('click', function () { if (lastM && lastM.length <= MAX && lastM[0].length <= MAX) setMatrix('B', asText(lastM)); });
+  build('A', start.A); build('B', start.B);
+})();
+</script>

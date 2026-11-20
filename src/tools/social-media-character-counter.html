@@ -1,0 +1,147 @@
+<style>
+.scc-list { display: grid; gap: 8px; margin-top: 16px; }
+.scc-row { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.scc-top { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 12px; align-items: baseline; }
+.scc-top b { font-size: 15px; }
+.scc-num { font-variant-numeric: tabular-nums; font-size: 14px; color: var(--muted); }
+.scc-num strong { color: var(--ink); font-size: 16px; }
+.scc-row .meter { margin-top: 8px; }
+.scc-row.warn .meter i { background: #d97706; }
+.scc-row.over .meter i { background: var(--bad); }
+.scc-row.over .scc-left { color: var(--bad); font-weight: 600; }
+.scc-left { font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.scc-note { font-size: 13px; color: var(--muted); margin-top: 2px; }
+.scc-note.bad { color: var(--bad); }
+</style>
+<label for="sccTxt">Your post or caption</label>
+<textarea id="sccTxt" class="plain" data-nomemo style="min-height:200px" placeholder="Type or paste your post here. Counts update as you type."></textarea>
+<div class="stats">
+  <div class="stat"><span>Characters</span><b id="sccChars">0</b></div>
+  <div class="stat"><span>Words</span><b id="sccWords">0</b></div>
+  <div class="stat"><span>Hashtags</span><b id="sccTags">0</b></div>
+  <div class="stat"><span>Mentions</span><b id="sccAts">0</b></div>
+  <div class="stat"><span>Links</span><b id="sccLinks">0</b></div>
+  <div class="stat"><span>Lines</span><b id="sccLines">0</b></div>
+</div>
+<div class="btns">
+  <button class="btn" id="sccCopy" type="button">Copy text</button>
+  <button class="btn ghost" id="sccIg" type="button">Copy for Instagram (keep blank lines)</button>
+  <button class="btn ghost" id="sccClr" type="button">Clear</button>
+</div>
+<p class="msg" id="sccMsg" aria-live="polite"></p>
+<div class="scc-list" id="sccList"></div>
+<p class="msg">Characters are counted the way people see them, so a flag or a family emoji counts as one. X uses its own weighting (explained under the X row). Limits are the published ones at the time of writing and apps change them now and then.</p>
+<script>
+(function () {
+  var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+  function graphemes(t) { if (!seg) return Array.from(t); var a = []; for (var x of seg.segment(t)) a.push(x.segment); return a; }
+
+  // ---- X (Twitter) weighting, following the open-source twitter-text v3 rules ----
+  // Code points in these ranges weigh 1, everything else weighs 2; each emoji sequence weighs 2; each link counts as 23.
+  var LIGHT = [[0, 4351], [8192, 8205], [8208, 8223], [8242, 8247]];
+  function light(cp) { for (var i = 0; i < LIGHT.length; i++) if (cp >= LIGHT[i][0] && cp <= LIGHT[i][1]) return true; return false; }
+  var TLD = 'com|net|org|io|co|ai|app|dev|me|info|biz|edu|gov|tv|ly|gl|gg|xyz|online|site|store|shop|blog|news|pk|in|uk|us|ca|au|de|fr|es|it|nl|ae|sa|bd|lk|np|ng|za|ke|tr|ru|br|mx|jp|cn|kr|id|my|sg|ph|nz|ie|ch|se|no|dk|fi|pl|eu|asia';
+  var URL_RE = new RegExp('(?:https?:\\/\\/[^\\s<>"]+|(?:www\\.)?(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\\.)+(?:' + TLD + ')(?![a-z0-9-])(?::\\d{1,5})?(?:\\/[^\\s<>"]*)?)', 'gi');
+  function urls(t) {
+    var out = [], m;
+    URL_RE.lastIndex = 0;
+    while ((m = URL_RE.exec(t))) {
+      var s = m.index, u = m[0];
+      // not part of an email address or a word, and drop trailing punctuation the way most apps do
+      if (s > 0 && /[\w@.\-]/.test(t[s - 1])) continue;
+      u = u.replace(/[.,:;!?'")\]]+$/, '');
+      if (u) out.push([s, s + u.length]);
+    }
+    return out;
+  }
+  function isEmoji(g) {
+    if (/️|⃣|[\u{1F1E6}-\u{1F1FF}]|\p{Emoji_Presentation}|\p{Emoji_Modifier}/u.test(g)) return true;
+    for (var ch of g) { var cp = ch.codePointAt(0); if (cp >= 0x2000 && /\p{Extended_Pictographic}/u.test(ch)) return true; }
+    return false;
+  }
+  function weightOf(t) {
+    t = t.normalize('NFC');
+    var u = urls(t), w = 0, last = 0;
+    function plain(s) {
+      graphemes(s).forEach(function (g) {
+        if (isEmoji(g)) { w += 2; return; }
+        for (var ch of g) w += light(ch.codePointAt(0)) ? 1 : 2;
+      });
+    }
+    u.forEach(function (r) { plain(t.slice(last, r[0])); w += 23; last = r[1]; });
+    plain(t.slice(last));
+    return { w: w, links: u.length };
+  }
+
+  var HASH_RE = /(^|[^\p{L}\p{N}_&\/])[#＃]([\p{L}\p{M}\p{N}_]*[\p{L}\p{M}_][\p{L}\p{M}\p{N}_]*)/gu;
+  var AT_RE = /(^|[^\p{L}\p{N}_.\/])[@＠]([A-Za-z0-9_](?:[A-Za-z0-9_.]{0,29}))/g;
+  function countRe(re, t) { var n = 0; re.lastIndex = 0; while (re.exec(t)) n++; return n; }
+
+  // name, limit, how to count, extra checks, note
+  var P = [
+    { id: 'x', name: 'X post', limit: 280, x: true, note: 'X counts most letters as 1 but Chinese, Japanese and Korean characters and every emoji as 2, and any link as 23. Premium accounts can post longer.' },
+    { id: 'ig', name: 'Instagram caption', limit: 2200, tags: 30, ats: 20, fold: 125, note: 'Up to 30 hashtags and 20 @mentions. About the first 125 characters show before "more".' },
+    { id: 'tt', name: 'TikTok caption', limit: 4000, note: 'Hashtags and mentions count toward the limit.' },
+    { id: 'ytt', name: 'YouTube title', limit: 100, angle: true, note: 'Titles are often cut after about 70 characters in search results. < and > are not allowed.' },
+    { id: 'ytd', name: 'YouTube description', limit: 5000, angle: true, fold: 157, note: 'About the first 150 characters show above "more". < and > are not allowed.' },
+    { id: 'fb', name: 'Facebook post', limit: 63206, fold: 477, note: 'Long posts are folded behind "See more" after a few lines.' },
+    { id: 'li', name: 'LinkedIn post', limit: 3000, fold: 210, note: 'About the first 210 characters show before "see more".' },
+    { id: 'pt', name: 'Pinterest pin title', limit: 100, note: 'Around the first 40 characters show in the feed.' },
+    { id: 'pd', name: 'Pinterest pin description', limit: 800, note: 'The first 50 to 60 characters matter most, as they often show in the feed.' },
+    { id: 'th', name: 'Threads post', limit: 500, note: 'A link counts toward the limit.' }
+  ];
+  var list = $('sccList');
+  P.forEach(function (p) {
+    var r = document.createElement('div');
+    r.className = 'scc-row'; r.id = 'scc-' + p.id;
+    r.innerHTML = '<div class="scc-top"><b></b><span class="scc-num"><strong>0</strong> / ' + fmtNum(p.limit) + '</span></div><div class="meter"><i></i></div><div class="scc-left"></div><div class="scc-extra"></div><div class="scc-note"></div>';
+    r.querySelector('b').textContent = p.name;
+    r.querySelector('.scc-note').textContent = p.note;
+    p.el = r; list.appendChild(r);
+  });
+
+  function update() {
+    var t = $('sccTxt').value, g = graphemes(t).length, tags = countRe(HASH_RE, t), ats = countRe(AT_RE, t), X = weightOf(t);
+    $('sccChars').textContent = fmtNum(g);
+    $('sccWords').textContent = fmtNum(t.trim() ? t.trim().split(/\s+/).length : 0);
+    $('sccTags').textContent = fmtNum(tags);
+    $('sccAts').textContent = fmtNum(ats);
+    $('sccLinks').textContent = fmtNum(X.links);
+    $('sccLines').textContent = fmtNum(t ? t.split('\n').length : 0);
+    P.forEach(function (p) {
+      var used = p.x ? X.w : g, left = p.limit - used, pct = Math.min(100, used / p.limit * 100), probs = [];
+      if (p.tags && tags > p.tags) probs.push(tags + ' hashtags: the limit is ' + p.tags + '.');
+      if (p.ats && ats > p.ats) probs.push(ats + ' mentions: the limit is ' + p.ats + '.');
+      if (p.angle && /[<>]/.test(t)) probs.push('Remove the < and > characters. YouTube does not accept them.');
+      var over = left < 0 || probs.length > 0;
+      p.el.classList.toggle('over', over);
+      p.el.classList.toggle('warn', !over && pct >= 90);
+      p.el.querySelector('strong').textContent = fmtNum(used);
+      p.el.querySelector('.meter i').style.width = pct + '%';
+      var lt = left >= 0 ? fmtNum(left) + ' left' : fmtNum(-left) + ' over the limit';
+      if (p.x && X.links) lt += ' (' + X.links + ' link' + (X.links > 1 ? 's' : '') + ' counted as 23 each)';
+      if (p.fold && g > p.fold) lt += ' · folds after about ' + p.fold;
+      p.el.querySelector('.scc-left').textContent = lt;
+      var ex = p.el.querySelector('.scc-extra'); ex.className = 'scc-extra scc-note bad'; ex.textContent = probs.join(' ');
+    });
+  }
+  function say(cls, t) { $('sccMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('sccMsg').textContent = t; }
+  // Instagram drops empty lines and trailing spaces. An invisible Braille blank (U+2800) on each empty line keeps the gap.
+  function igText(t) {
+    return t.replace(/\r\n?/g, '\n').split('\n').map(function (l) { l = l.replace(/[ \t ]+$/, ''); return l.trim() === '' ? '⠀' : l; }).join('\n').replace(/^(⠀\n)+|(\n⠀)+$/g, '');
+  }
+  $('sccTxt').addEventListener('input', function () { say('', ''); update(); });
+  $('sccCopy').addEventListener('click', function () {
+    var t = $('sccTxt').value; if (!t) { say('bad', 'There is nothing to copy yet.'); return; }
+    copyText(t, $('sccCopy')); say('ok', 'Copied.');
+  });
+  $('sccIg').addEventListener('click', function () {
+    var t = $('sccTxt').value; if (!t.trim()) { say('bad', 'There is nothing to copy yet.'); return; }
+    var out = igText(t), n = (out.match(/⠀/g) || []).length;
+    copyText(out, $('sccIg'));
+    say('ok', n ? 'Copied with ' + n + ' invisible spacer' + (n > 1 ? 's' : '') + ' so your blank lines stay when you paste into Instagram.' : 'Copied. Your text has no blank lines, so nothing needed changing.');
+  });
+  $('sccClr').addEventListener('click', function () { $('sccTxt').value = ''; say('', ''); update(); $('sccTxt').focus(); });
+  update();
+})();
+</script>

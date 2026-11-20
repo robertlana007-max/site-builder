@@ -1,0 +1,106 @@
+<style>
+.wi-break { list-style: none; padding: 0; margin: 12px 0 0; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.wi-break li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 14px; border-bottom: 1px solid var(--line); font-size: 15px; }
+.wi-break li:last-child { border-bottom: 0; font-weight: 700; }
+.wi-break li span:last-child { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wi-h { font-size: 17px; margin: 22px 0 4px; }
+.wi-glasses { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+.wi-g { width: 34px; height: 42px; padding: 0; border: 0; background: none; cursor: pointer; color: var(--muted); border-radius: 6px; }
+.wi-g svg { width: 100%; height: 100%; display: block; }
+.wi-g .fill { fill: transparent; transition: fill .2s; }
+.wi-g.on { color: #0284c7; }
+.wi-g.on .fill { fill: #38bdf8; }
+.wi-g:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.wi-count { font-size: 20px; font-weight: 700; margin-top: 10px; font-variant-numeric: tabular-nums; }
+@media (prefers-reduced-motion: reduce) { .wi-g .fill { transition: none; } }
+</style>
+<div class="fields">
+  <div><label for="unit">Units</label><select id="unit"><option value="m">Metric (kg, litres)</option><option value="i">Imperial (lb, fl oz)</option></select></div>
+  <div><label for="wiW" id="wiWL">Body weight (kg)</label><input type="number" id="wiW" min="0" step="any" inputmode="decimal"></div>
+  <div><label for="wiAct">Exercise today (minutes)</label><input type="number" id="wiAct" min="0" max="600" step="5" value="0"></div>
+  <div><label for="wiClim">Weather</label><select id="wiClim"><option value="normal">Normal or cool</option><option value="hot">Hot or humid</option></select></div>
+  <div><label for="wiLife">Pregnancy</label><select id="wiLife"><option value="none">Not pregnant or breastfeeding</option><option value="preg">Pregnant</option><option value="bf">Breastfeeding</option></select></div>
+  <div><label for="wiGlass">Glass size</label><select id="wiGlass"><option value="200">Small glass (200 ml)</option><option value="237">Cup (8 fl oz, 237 ml)</option><option value="250" selected>Glass (250 ml)</option><option value="355">Large glass (12 fl oz, 355 ml)</option><option value="500">Bottle (500 ml)</option></select></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Water per day</span><b id="wiTot">–</b></div>
+  <div class="stat"><span>Glasses per day</span><b id="wiGl">–</b></div>
+  <div class="stat"><span id="wiAltL">In fluid ounces</span><b id="wiAlt">–</b></div>
+</div>
+<ul class="wi-break" id="wiBreak" hidden></ul>
+<p class="msg" id="wiMsg">Enter your weight to see your daily amount.</p>
+<p class="msg">How it works: about 35 ml of water per kg of body weight (about 0.54 fl oz per lb), plus about 350 ml (12 fl oz) for every 30 minutes of exercise, 500 ml extra in hot weather, 300 ml extra when pregnant and 700 ml extra when breastfeeding. This is a common rule of thumb, not medical advice. Food, tea, coffee and milk count too. People with heart or kidney conditions, or who are told to limit fluids, should follow their doctor's advice.</p>
+
+<h3 class="wi-h">Today's tracker</h3>
+<p class="msg" style="margin-top:0">Tap a glass each time you drink one. The count is saved in this browser for today only and starts again tomorrow.</p>
+<div class="wi-glasses" id="wiGlasses" role="group" aria-label="Glasses drunk today"></div>
+<div class="wi-count" id="wiCount" aria-live="polite">0 glasses</div>
+<div class="meter"><i id="wiBar"></i></div>
+<div class="btns"><button type="button" class="btn" id="wiAdd">+ 1 glass</button><button type="button" class="btn ghost" id="wiSub">− 1 glass</button><button type="button" class="btn ghost" id="wiReset">Reset today</button></div>
+<script>
+(function () {
+  // core-start
+  var LB = 0.45359237, FLOZ = 29.5735295625;
+  // Daily water in ml from weight (kg), exercise minutes, hot weather and pregnancy status.
+  function intake(kg, mins, hot, life) {
+    var base = 35 * kg, act = 350 * Math.max(0, mins) / 30, heat = hot ? 500 : 0, extra = life === 'preg' ? 300 : life === 'bf' ? 700 : 0;
+    return { base: base, act: act, heat: heat, extra: extra, total: base + act + heat + extra };
+  }
+  function glasses(ml, size) { return Math.ceil(ml / size - 1e-9); }
+  // core-end
+
+  var KEY = 'gtnWaterToday';
+  function today() { var d = new Date(); return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate(); }
+  function load() { try { var o = JSON.parse(localStorage.getItem(KEY)); if (o && o.d === today() && o.n >= 0) return Math.min(99, Math.floor(o.n)); } catch (e) {} return 0; }
+  function save(n) { try { localStorage.setItem(KEY, JSON.stringify({ d: today(), n: n })); } catch (e) {} }
+  var drunk = load(), goal = 8;
+  function vol(ml, imp) { return imp ? fmtNum(ml / FLOZ, 0) + ' fl oz' : fmtNum(ml / 1000, 1) + ' L'; }
+
+  function calc() {
+    var imp = $('unit').value === 'i';
+    $('wiWL').textContent = imp ? 'Body weight (lb)' : 'Body weight (kg)';
+    $('wiAltL').textContent = imp ? 'In litres' : 'In fluid ounces';
+    var w = +$('wiW').value, kg = imp ? w * LB : w, mins = Math.min(600, Math.max(0, +$('wiAct').value || 0)), size = +$('wiGlass').value;
+    var br = $('wiBreak');
+    if (!($('wiW').value !== '' && kg > 0)) { $('wiTot').textContent = $('wiGl').textContent = $('wiAlt').textContent = '–'; br.hidden = true; $('wiMsg').textContent = 'Enter your weight to see your daily amount.'; $('wiMsg').className = 'msg'; goal = 8; paint(); return; }
+    if (kg < 20 || kg > 300) { $('wiTot').textContent = $('wiGl').textContent = $('wiAlt').textContent = '–'; br.hidden = true; $('wiMsg').textContent = 'Check your weight. This calculator is for adults between 20 and 300 kg (45 to 660 lb).'; $('wiMsg').className = 'msg bad'; paint(); return; }
+    var r = intake(kg, mins, $('wiClim').value === 'hot', $('wiLife').value);
+    $('wiTot').textContent = vol(r.total, imp);
+    goal = glasses(r.total, size);
+    $('wiGl').textContent = fmtNum(goal) + ' × ' + (imp ? fmtNum(size / FLOZ, 0) + ' oz' : size + ' ml');
+    $('wiAlt').textContent = imp ? fmtNum(r.total / 1000, 1) + ' L' : fmtNum(r.total / FLOZ, 0) + ' fl oz';
+    br.innerHTML = '';
+    var rows = [['Body weight (' + (imp ? fmtNum(w, 1) + ' lb' : fmtNum(w, 1) + ' kg') + ')', r.base]];
+    if (r.act) rows.push(['Exercise (' + fmtNum(mins) + ' min)', r.act]);
+    if (r.heat) rows.push(['Hot weather', r.heat]);
+    if (r.extra) rows.push([$('wiLife').value === 'preg' ? 'Pregnancy' : 'Breastfeeding', r.extra]);
+    rows.push(['Total per day', r.total]);
+    rows.forEach(function (x) { var li = document.createElement('li'), a = document.createElement('span'), b = document.createElement('span'); a.textContent = x[0]; b.textContent = (x === rows[rows.length - 1] ? '' : '+ ') + (imp ? fmtNum(x[1] / FLOZ, 0) + ' fl oz' : fmtNum(Math.round(x[1] / 10) * 10, 0) + ' ml'); li.appendChild(a); li.appendChild(b); br.appendChild(li); });
+    br.hidden = false;
+    $('wiMsg').textContent = 'Spread it through the day. Drink more if you feel thirsty or your urine is dark yellow.'; $('wiMsg').className = 'msg';
+    paint();
+  }
+  var GLASS = '<svg viewBox="0 0 24 30" aria-hidden="true"><path class="fill" d="M5.6 9h12.8l-1.3 17.2a1.6 1.6 0 0 1-1.6 1.5H8.5a1.6 1.6 0 0 1-1.6-1.5z"/><path d="M3.5 2.5h17l-2 24a2 2 0 0 1-2 1.8H7.5a2 2 0 0 1-2-1.8z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  function paint() {
+    var box = $('wiGlasses'), show = Math.min(40, Math.max(goal, drunk + 1));
+    box.innerHTML = '';
+    for (var i = 1; i <= show; i++) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'wi-g' + (i <= drunk ? ' on' : ''); b.innerHTML = GLASS;
+      b.setAttribute('aria-label', 'Glass ' + i + (i <= drunk ? ', drunk' : '')); b.setAttribute('aria-pressed', i <= drunk);
+      b.dataset.n = i; box.appendChild(b);
+    }
+    $('wiCount').textContent = drunk + ' of ' + goal + ' glasses' + (drunk >= goal ? ' · goal reached!' : '');
+    $('wiBar').style.width = Math.min(100, goal ? drunk / goal * 100 : 0) + '%';
+    $('wiSub').disabled = drunk === 0;
+  }
+  function set(n, btn) { var was = drunk; drunk = Math.max(0, Math.min(99, n)); save(drunk); paint(); if (drunk >= goal && was < goal && window.burst) burst(btn || $('wiAdd')); }
+  $('wiGlasses').addEventListener('click', function (e) { var b = e.target.closest('.wi-g'); if (!b) return; var n = +b.dataset.n; set(n === drunk ? n - 1 : n, b); });
+  $('wiAdd').addEventListener('click', function () { set(drunk + 1); });
+  $('wiSub').addEventListener('click', function () { set(drunk - 1); });
+  $('wiReset').addEventListener('click', function () { set(0); });
+  // a new day while the page is open starts a fresh count
+  setInterval(function () { var n = load(); if (n !== drunk) { drunk = n; paint(); } }, 60000);
+  ['unit', 'wiW', 'wiAct', 'wiClim', 'wiLife', 'wiGlass'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  calc();
+})();
+</script>
