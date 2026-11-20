@@ -274,6 +274,7 @@
       document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('#acctMenu')) { menu.hidden = true; authBtn.setAttribute('aria-expanded', 'false'); } });
       menu.addEventListener('click', function (e) {
         var b = e.target.closest('[data-auth]'); if (!b) return;
+        if (b.dataset.auth === 'app') { e.stopPropagation(); menu.hidden = true; openApp(); return; }
         if (b.dataset.auth === 'set') { e.stopPropagation(); menu.hidden = true; openSettings(); return; }
         if (b.dataset.auth === 'lang') { e.stopPropagation(); menu.hidden = true; $('langMenu').hidden = false; return; }
         if (b.dataset.auth === 'out') { menu.hidden = true; var a = A(); if (a) a.signOut().then(function () { toast('Signed out. Your tools stay saved on this device.'); }); }
@@ -309,6 +310,34 @@
       window.GTNAuth.onChange = show;
       if (A() && A().user()) show(A().user());
     }
+
+    // ---------- the app: offline support and installing to the home screen ----------
+    var standalone = (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    var deferred = null, appBox = $('appBox');
+    if ('serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) {
+      window.addEventListener('load', function () { navigator.serviceWorker.register(REL + 'sw.js').catch(function () {}); });
+    }
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); deferred = e; appUi(); });
+    window.addEventListener('appinstalled', function () { deferred = null; toast('Installed. Find GetToolNest on your home screen.'); appUi(); });
+    var appUi = function () {
+      if (!appBox) return;
+      $('appDone').hidden = !standalone;
+      $('appAndroid').hidden = standalone || !deferred;
+      $('appIos').hidden = standalone || !ios;
+      $('appOther').hidden = standalone || ios || !!deferred;
+      var st = $('appState');
+      if (st) st.textContent = standalone ? 'You are using the app right now.' : deferred ? 'This device can install the app in one tap.' : ios ? 'On iPhone and iPad, add it from Safari’s Share menu.' : 'Install it from your browser menu.';
+    };
+    window.openApp = function () { appUi(); if (appBox && appBox.showModal) appBox.showModal(); };
+    document.addEventListener('click', function (e) {
+      if (!e.target.closest('[data-install]')) return;
+      if (deferred) { deferred.prompt(); deferred.userChoice.then(function () { deferred = null; appUi(); }); }
+      else openApp();
+    });
+    if (appBox) { $('appClose').addEventListener('click', function () { appBox.close(); }); appBox.addEventListener('click', function (e) { if (e.target === appBox) appBox.close(); }); }
+    if (standalone) root.setAttribute('data-app', '');
+    appUi();
 
     // ---------- settings dialog ----------
     var setBox = $('setBox');
