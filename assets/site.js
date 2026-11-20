@@ -327,6 +327,8 @@
       $('appIos').hidden = standalone || !ios;
       $('appOther').hidden = standalone || ios || !!deferred;
       var st = $('appState');
+      var st2 = $('appState2');
+      if (st2) st2.textContent = standalone ? 'You are using the app right now. 🎉' : deferred ? 'Your device can install the app in one tap.' : ios ? 'On iPhone and iPad: tap Share, then Add to Home Screen.' : '';
       if (st) st.textContent = standalone ? 'You are using the app right now.' : deferred ? 'This device can install the app in one tap.' : ios ? 'On iPhone and iPad, add it from Safari’s Share menu.' : 'Install it from your browser menu.';
     };
     window.openApp = function () { appUi(); if (appBox && appBox.showModal) appBox.showModal(); };
@@ -338,6 +340,14 @@
     if (appBox) { $('appClose').addEventListener('click', function () { appBox.close(); }); appBox.addEventListener('click', function (e) { if (e.target === appBox) appBox.close(); }); }
     if (standalone) root.setAttribute('data-app', '');
     appUi();
+    // a small banner on phones, once, until the visitor installs or closes it
+    var bar = $('appBar'), hush = 0;
+    try { hush = +localStorage.getItem('appBarHush') || 0; } catch (e) {}
+    var phone = window.matchMedia && matchMedia('(max-width: 760px)').matches;
+    if (bar && phone && !standalone && Date.now() > hush && !/\/app\/$/.test(location.pathname)) {
+      setTimeout(function () { bar.hidden = false; }, 2500);
+      $('appBarX').addEventListener('click', function () { bar.hidden = true; try { localStorage.setItem('appBarHush', Date.now() + 14 * 864e5); } catch (e) {} });
+    }
 
     // ---------- settings dialog ----------
     var setBox = $('setBox');

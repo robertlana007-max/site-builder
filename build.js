@@ -148,7 +148,7 @@ ${head}
 <body>
 <header class="site-header"><div class="wrap">
   <a class="logo" href="${rel || './'}"><b></b><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
-  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}about/">About</a></nav>
+  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}about/">About</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
   <span class="sp"></span>
   <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
   <button class="hbtn" id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
@@ -214,6 +214,7 @@ ${head}
   </ol>
   <p class="setnote" id="appDone" hidden>You are already using the app. 🎉</p>
 </dialog>
+<div class="appbar" id="appBar" hidden><img src="${rel}assets/icon-192.png" alt="" width="40" height="40"><span><b>${esc(cfg.siteName)} app</b><small>Free · works offline</small></span><a class="btn" href="${rel}app/">Get</a><button class="x" id="appBarX" aria-label="Not now">×</button></div>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <main class="wrap">
 ${body}
@@ -221,7 +222,7 @@ ${body}
 <footer class="site-footer"><div class="wrap">
   <div class="foot-grid">
     ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
-    <div><h2>Site</h2><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
+    <div><h2>Site</h2><a href="${rel}app/">Get the app</a><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
   </div>
   <div class="foot-bottom">© ${YEAR} ${esc(cfg.siteName)}. ${tools.length} free tools that run in your browser.</div>
 </div></footer>
@@ -430,7 +431,35 @@ ${contact}` },
 <h2>Your content</h2>
 <p>You keep all rights to anything you create with the tools, including compressed images and QR codes.</p>
 <h2>Changes</h2>
-<p>We may update the tools and these terms from time to time. Continued use of the site means you accept the current terms.</p>` }
+<p>We may update the tools and these terms from time to time. Continued use of the site means you accept the current terms.</p>` },
+  { slug: 'app', title: 'Get the app', desc: `Install the free ${cfg.siteName} app on Android, iPhone, iPad or your computer. ${tools.length} tools that work offline.`, html: `
+<div class="apphero">
+  <img src="../assets/icon-512.png" alt="${esc(cfg.siteName)} app icon" width="96" height="96">
+  <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, works without internet, and updates by itself.</p></div>
+</div>
+<div class="stores">
+  <button class="btn big" type="button" data-install>${icon('phone')}Install now</button>
+  ${cfg.playStoreUrl ? `<a class="store" href="${esc(cfg.playStoreUrl)}" rel="noopener"><small>GET IT ON</small><b>Google Play</b></a>` : `<span class="store soon" title="Coming soon"><small>COMING SOON TO</small><b>Google Play</b></span>`}
+  ${cfg.appStoreUrl ? `<a class="store" href="${esc(cfg.appStoreUrl)}" rel="noopener"><small>DOWNLOAD ON THE</small><b>App Store</b></a>` : `<span class="store soon" title="Coming soon"><small>COMING SOON TO</small><b>App Store</b></span>`}
+</div>
+<p class="appstate" id="appState2"></p>
+<h2>Install on Android</h2>
+<ol><li>Open ${esc(cfg.siteName)} in Chrome.</li><li>Tap <b>Install now</b> above, or open the menu <b>⋮</b> and choose <b>Install app</b>.</li><li>The app appears on your home screen.</li></ol>
+<h2>Install on iPhone or iPad</h2>
+<ol><li>Open ${esc(cfg.siteName)} in <b>Safari</b>.</li><li>Tap the <b>Share</b> button.</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>
+<h2>Install on a computer</h2>
+<ol><li>Open ${esc(cfg.siteName)} in Chrome or Edge.</li><li>Click the install icon in the address bar, or <b>Install now</b> above.</li></ol>
+<h2>Why use the app</h2>
+<ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },
+  { slug: 'delete-account', title: 'Delete your account', desc: `How to delete your ${cfg.siteName} account and the data stored with it.`, html: `
+<p>You can delete your ${esc(cfg.siteName)} account at any time, from the website or the app.</p>
+<h2>Delete it yourself</h2>
+<ol><li>Sign in.</li><li>Open the menu with your name at the top, then <b>Settings</b>.</li><li>Go to <b>Account and data</b> and press <b>Delete my account</b>.</li></ol>
+<p>This removes your account (name, email address and sign-in details) and the pinned tools, history, saved entries and settings stored with it. It happens straight away and cannot be undone.</p>
+<h2>Ask us to delete it</h2>
+<p>If you cannot sign in, email <a href="mailto:${esc(cfg.contactEmail)}">${esc(cfg.contactEmail)}</a> from the address you signed up with and ask us to delete your account. We do this within 30 days.</p>
+<h2>What is not affected</h2>
+<p>Files you open in the tools are never uploaded, so there is nothing of them to delete. Data saved in your browser on a device stays there until you clear it under Settings, Account and data, <b>Delete everything on this device</b>.</p>` }
 ];
 for (const p of pages) {
   write(`${p.slug}/index.html`, layout({
