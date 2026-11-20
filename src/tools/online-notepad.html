@@ -385,19 +385,20 @@
     });
     // read them all, then add the tabs in the order the files were chosen
     Promise.all(files.map(function (f) { return f.arrayBuffer().then(decodeFile, function () { return undefined; }); })).then(function (res) {
-      var notes = [], opened = 0;
+      var notes = [], opened = [], bad = false;
       res.forEach(function (r, i) {
         var f = files[i];
-        if (r === undefined) { notes.push('“' + f.name + '” could not be read.'); return; }
-        if (r === null) { notes.push('“' + f.name + '” is not a text file, so it was not opened.'); return; }
+        if (r === undefined) { notes.push('“' + f.name + '” could not be read.'); bad = true; return; }
+        if (r === null) { notes.push('“' + f.name + '” is not a text file, so it was not opened.'); bad = true; return; }
         var text = r.text, eol = /\r\n/.test(text) ? '\r\n' : /\r/.test(text) ? '\r' : '\n';
         var empty = tabs.length === 1 && !tabs[0].doc.getValue() && /^new \d+$/.test(tabs[0].name);
         var t = makeTab(f.name, text.replace(/\r\n?/g, '\n'), null, eol);
         if (empty) tabs.splice(0, 1);
-        add(t); opened++;
-        notes.unshift('Opened ' + f.name + ' · ' + t.lang + ' · ' + fmtBytes(f.size) + (r.enc ? ' · read as ' + r.enc + ', will be saved as UTF-8' : '') + '.');
+        add(t); opened.push(f.name + ' · ' + t.lang + ' · ' + fmtBytes(f.size));
+        if (r.enc) notes.push('“' + f.name + '” was read as ' + r.enc + ' and will be saved as UTF-8.');
       });
-      if (notes.length) say(notes.join(' '), opened && notes.length === opened ? 'ok' : 'bad');
+      var head = opened.length === 1 ? 'Opened ' + opened[0] + '.' : opened.length ? 'Opened ' + opened.length + ' files.' : '';
+      if (head || notes.length) say((head ? head + ' ' : '') + notes.join(' '), bad ? 'bad' : 'ok');
     });
   }
   $('npOpen').addEventListener('change', function () { openFiles(this.files); this.value = ''; });
