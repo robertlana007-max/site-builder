@@ -461,9 +461,10 @@
     var s = bSqrt(x); if (s * s === x) k *= s; else m *= x;
     return [k, m];
   }
-  function surd(P0, R, m, imag) { // HTML for P0 ± R·√m (·i)
-    var root = (m === 1n ? '' : '√' + m) + (imag ? 'i' : ''), rr = isOne(R) && root ? '' : H(R);
-    return (nIsZero(P0) ? '' : H(P0) + ' ± ') + (nIsZero(P0) ? '±' : '') + rr + root;
+  function surd(P0, R, m, imag) { // HTML for P0 ± R·√m (·i), written as a single fraction like √13/2
+    var num = (R.n === 1n && m !== 1n ? '' : R.n.toString()) + (m === 1n ? '' : '√' + m), part = R.d === 1n ? num : fr(num, R.d.toString());
+    if (imag) part = (part === '1' ? '' : part) + 'i';
+    return nIsZero(P0) ? '±' + part : H(P0) + ' ± ' + part;
   }
   function solveQuadratic(a, b, c, opt) {
     opt = opt || {};
@@ -575,7 +576,7 @@
     var pf = nF(p), qf = nF(q), sh = nF(shift), ts = [], cplx = null;
     if (ds > 0) {
       var sd = Math.sqrt(nF(disc)), u = Math.cbrt(-qf / 2 + sd), v = Math.cbrt(-qf / 2 - sd);
-      st += step('Δ > 0: one real root (Cardano\'s formula)', 't = ∛(−q/2 + √Δ) + ∛(−q/2 − √Δ) = ' + fmtF(u) + ' + ' + P(fmtF(v)) + ' = ' + fmtF(u + v));
+      st += step('Δ > 0: one real root (Cardano\'s formula)', 't = ∛(−q/2 + √Δ) + ∛(−q/2 − √Δ) = ' + fmtF(u) + ' + ' + (v < 0 ? '(' + fmtF(v) + ')' : fmtF(v)) + ' = ' + fmtF(u + v));
       ts = [u + v]; cplx = { re: -(u + v) / 2 - sh, im: Math.sqrt(3) / 2 * Math.abs(u - v) };
       st += step('The other two roots are complex', 't = −(u + v)/2 ± i·(√3/2)(u − v)');
     } else if (ds === 0) {
@@ -625,13 +626,13 @@
     });
     var fv = function (v) { return txt(v); };
     var st = step('Write the system as an augmented matrix [A | b]', matHtml(rows, fv, vars.length));
-    var red = rowReduce(rows, 1, fv);
+    var red = rowReduce(rows, 1, fv), n = vars.length;
     red.steps.forEach(function (s) { st += step(s.op, matHtml(s.M, fv, vars.length)); });
-    var R = red.R, n = vars.length, tol = red.tol;
+    var R = red.R, tol = red.tol;
     var bad = R.some(function (r) { return r.slice(0, n).every(function (v) { return nIsZero(v, tol); }) && !nIsZero(r[n], tol); });
     if (bad) {
       st += step('A row says 0 = a non-zero number', 'That is impossible, so the equations contradict each other.');
-      return { ans: '<p>No solution. The equations are inconsistent (for 2 equations: parallel lines that never meet).</p>', steps: st, text: 'No solution' };
+      return { ans: '<p>No solution. The equations are inconsistent' + (n === 2 ? ' (their lines are parallel and never meet).' : ': no point fits all three.') + '</p>', steps: st, text: 'No solution' };
     }
     if (red.rank < n) {
       var free = vars.map(function (v, i) { return i; }).filter(function (i) { return red.pivots.indexOf(i) < 0; }), names = ['t', 's', 'u'], par = {};
@@ -666,7 +667,7 @@
     return r;
   }
 
-  function plain(h) { return h.replace(/<span class="es-fr"><span>(.*?)<\/span><span>(.*?)<\/span><\/span>/g, '($1/$2)').replace(/<\/p>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/[ \t]+/g, ' ').trim(); }
+  function plain(h) { return h.replace(/<span class="es-fr"><span>(.*?)<\/span><span>(.*?)<\/span><\/span>/g, '$1/$2').replace(/<\/p>/g, '\n').replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/[ \t]+/g, ' ').trim(); }
   // ---------- interface ----------
   var mode = 'type', last = '';
   function show(r) {
@@ -684,7 +685,7 @@
       else show(solveSystem(['s31', 's32', 's33'], ['x', 'y', 'z']));
     } catch (e) {
       if (!(e instanceof MathError)) throw e;
-      $('out').innerHTML = ''; $('copy').hidden = true; last = '';
+      $('out').innerHTML = ''; $('out').removeAttribute('data-answer'); $('copy').hidden = true; last = '';
       $('msg').className = 'msg bad'; $('msg').textContent = e.message;
     }
   }

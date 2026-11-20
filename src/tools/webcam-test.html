@@ -1,0 +1,176 @@
+<style>
+.wc-stage { position: relative; background: #000; border-radius: 12px; overflow: hidden; aspect-ratio: 16 / 9; display: flex; align-items: center; justify-content: center; margin-bottom: 12px; }
+.wc-stage video { width: 100%; height: 100%; object-fit: contain; display: block; }
+.wc-stage video.wc-mirror { transform: scaleX(-1); }
+.wc-empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; color: #cbd5e1; font-size: 15px; padding: 16px; }
+.wc-fps { position: absolute; top: 8px; left: 8px; background: rgba(0, 0, 0, .6); color: #fff; font: 600 12.5px/1 var(--mono); padding: 6px 8px; border-radius: 8px; }
+.wc-shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 14px; }
+.wc-shots a { display: block; font-size: 12px; color: var(--muted); text-decoration: none; text-align: center; }
+.wc-shots img { width: 100%; border-radius: 8px; border: 1px solid var(--line); display: block; margin-bottom: 4px; }
+.wc-shots a:hover img { border-color: var(--accent); }
+.st-info .stat b, .wc-info .stat b { font-size: 18px; }
+</style>
+<div class="notice bad" id="unsup" hidden><p id="unsupText"></p></div>
+<div class="fields">
+  <div><label for="cam">Camera</label><select id="cam" data-nomemo><option value="">Default camera</option></select></div>
+  <div><label for="res">Ask for resolution</label><select id="res"><option value="max" selected>Highest the camera offers</option><option value="3840x2160">4K (3840 × 2160)</option><option value="1920x1080">Full HD (1920 × 1080)</option><option value="1280x720">HD (1280 × 720)</option><option value="640x480">VGA (640 × 480)</option></select></div>
+  <div><label for="fps">Ask for frame rate</label><select id="fps"><option value="" selected>Camera default</option><option value="60">60 frames a second</option><option value="30">30 frames a second</option><option value="15">15 frames a second</option></select></div>
+</div>
+<div class="wc-stage" id="stage">
+  <video id="vid" class="wc-mirror" autoplay playsinline muted></video>
+  <div class="wc-empty" id="empty">Press Start camera and allow access when your browser asks.</div>
+  <div class="wc-fps" id="fpsTag" hidden></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="mirror" checked> Mirror the picture (like a mirror, the way video calls show you)</label></div>
+<div class="btns"><button class="btn" id="go">▶ Start camera</button><button class="btn ghost" id="snap" disabled>📷 Take snapshot</button><button class="btn ghost" id="full" disabled>Full screen</button><button class="btn ghost" id="stop" disabled>■ Stop</button></div>
+<p class="msg" id="msg"></p>
+<div class="stats wc-info" id="info" hidden>
+  <div class="stat"><span>Camera</span><b id="iName">–</b></div>
+  <div class="stat"><span>Resolution you get</span><b id="iRes">–</b></div>
+  <div class="stat"><span>Frame rate you get</span><b id="iFps">–</b></div>
+  <div class="stat"><span>Frame rate reported</span><b id="iFpsSet">–</b></div>
+  <div class="stat"><span>Aspect ratio</span><b id="iAspect">–</b></div>
+  <div class="stat"><span>Camera maximum</span><b id="iMax">–</b></div>
+  <div class="stat"><span>Facing</span><b id="iFacing">–</b></div>
+  <div class="stat"><span>Cameras found</span><b id="iCount">–</b></div>
+</div>
+<div class="wc-shots" id="shots"></div>
+<p class="msg">Your camera picture stays on your device. Nothing is recorded or uploaded; snapshots are only saved if you download them.</p>
+<script>
+(function () {
+  var md = navigator.mediaDevices, stream = null, vid = $('vid'), frames = 0, fpsT = 0, fpsTimer = 0, cbId = 0, lastTime = -1, shotN = 0, starting = false;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function unsupported(text) { $('unsup').hidden = false; $('unsupText').textContent = text; $('go').disabled = true; $('empty').textContent = 'Camera not available in this browser.'; }
+  if (!window.isSecureContext) unsupported('The camera only works on a secure (https) page. Open this tool from its https:// address.');
+  else if (!md || !md.getUserMedia) unsupported('This browser cannot use a camera. Update it, or try Chrome, Edge, Firefox or Safari.');
+
+  function why(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Camera access was blocked. Click the camera or lock icon next to the web address, allow the camera, then press Start camera again. On a phone, also check that your browser is allowed to use the camera in the phone settings.';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No camera was found. Plug in a webcam or check that it is switched on (some laptops have a camera switch or a key such as F8 or F10), then try again.';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'The camera is busy or could not start. Close other apps or tabs that use it (Zoom, Teams, Skype, the Camera app), then try again.';
+    if (n === 'OverconstrainedError') return 'This camera cannot give the resolution or frame rate you asked for. Choose a lower setting and try again.';
+    return 'The camera could not start' + (e && e.message ? ': ' + e.message : '.');
+  }
+  function listCams(currentId) {
+    if (!md || !md.enumerateDevices) return Promise.resolve();
+    return md.enumerateDevices().then(function (all) {
+      var cams = all.filter(function (d) { return d.kind === 'videoinput'; }), sel = $('cam'), keep = currentId || sel.value;
+      $('iCount').textContent = cams.length;
+      if (!cams.length || !cams[0].label) return; // names are hidden until access is allowed
+      sel.innerHTML = '';
+      cams.forEach(function (d, i) { var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Camera ' + (i + 1); sel.appendChild(o); });
+      if (keep && sel.querySelector('option[value="' + CSS.escape(keep) + '"]')) sel.value = keep;
+    }).catch(function () {});
+  }
+  if (md && md.addEventListener) md.addEventListener('devicechange', function () { listCams(); });
+  listCams();
+
+  function constraints() {
+    var v = {}, r = $('res').value, f = +$('fps').value, id = $('cam').value;
+    if (id) v.deviceId = { exact: id };
+    if (r === 'max') { v.width = { ideal: 4096 }; v.height = { ideal: 2160 }; }
+    else { var p = r.split('x'); v.width = { ideal: +p[0] }; v.height = { ideal: +p[1] }; }
+    if (f) v.frameRate = { ideal: f };
+    return { video: v, audio: false };
+  }
+  function stopAll() {
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; vid.srcObject = null;
+    clearInterval(fpsTimer); if (cbId && vid.cancelVideoFrameCallback) vid.cancelVideoFrameCallback(cbId); cbId = 0;
+    $('snap').disabled = $('stop').disabled = $('full').disabled = true; $('fpsTag').hidden = true;
+    $('empty').hidden = false; $('go').textContent = '▶ Start camera';
+  }
+  function countFrames() {
+    frames = 0; fpsT = performance.now(); lastTime = -1;
+    if (vid.requestVideoFrameCallback) {
+      var onFrame = function () { frames++; cbId = vid.requestVideoFrameCallback(onFrame); };
+      cbId = vid.requestVideoFrameCallback(onFrame);
+    } else {
+      (function poll() { if (!stream) return; if (vid.currentTime !== lastTime) { frames++; lastTime = vid.currentTime; } requestAnimationFrame(poll); })();
+    }
+    clearInterval(fpsTimer);
+    fpsTimer = setInterval(function () {
+      var now = performance.now(), fps = frames * 1000 / (now - fpsT);
+      frames = 0; fpsT = now;
+      var txt = fps ? fps.toFixed(1) + ' fps' : 'no frames';
+      $('iFps').textContent = txt;
+      $('fpsTag').textContent = (vid.videoWidth || 0) + '×' + (vid.videoHeight || 0) + ' · ' + txt; $('fpsTag').hidden = false;
+      $('iRes').textContent = vid.videoWidth ? vid.videoWidth + ' × ' + vid.videoHeight : '–';
+    }, 1000);
+  }
+  function gcd(a, b) { return b ? gcd(b, a % b) : a; }
+  function showInfo() {
+    var tr = stream && stream.getVideoTracks()[0]; if (!tr) return;
+    var s = tr.getSettings ? tr.getSettings() : {}, c = tr.getCapabilities ? tr.getCapabilities() : {};
+    var w = s.width || vid.videoWidth, h = s.height || vid.videoHeight;
+    $('info').hidden = false;
+    $('iName').textContent = tr.label || 'Camera';
+    $('iRes').textContent = w && h ? w + ' × ' + h : '–';
+    $('iFpsSet').textContent = s.frameRate ? (Math.round(s.frameRate * 10) / 10) + ' fps' : 'Not reported';
+    if (w && h) { var g = gcd(w, h), a = w / g + ':' + h / g; $('iAspect').textContent = Math.abs(w / h - 16 / 9) < .02 ? '16:9' : Math.abs(w / h - 4 / 3) < .02 ? '4:3' : a.length > 9 ? (w / h).toFixed(2) + ':1' : a; }
+    $('iMax').textContent = c.width && c.width.max ? c.width.max + ' × ' + c.height.max + (c.frameRate && c.frameRate.max ? ' · ' + Math.round(c.frameRate.max) + ' fps' : '') : 'Not reported';
+    $('iFacing').textContent = { user: 'Front (selfie)', environment: 'Back', left: 'Left', right: 'Right' }[s.facingMode] || 'Not reported';
+    $('stage').style.aspectRatio = w && h ? w + ' / ' + h : '';
+  }
+  function start() {
+    if (starting) return;
+    starting = true; $('go').disabled = true;
+    stopAll(); say('', 'Starting the camera…');
+    md.getUserMedia(constraints()).catch(function (e) {
+      // A camera that refuses the exact settings: try again with plain defaults.
+      if (e && e.name === 'OverconstrainedError') { $('cam').value = ''; return md.getUserMedia({ video: true, audio: false }); }
+      throw e;
+    }).then(function (s) {
+      stream = s;
+      var tr = s.getVideoTracks()[0];
+      tr.addEventListener('ended', function () { stopAll(); say('bad', 'The camera stopped. It may have been unplugged or taken over by another app.'); });
+      vid.srcObject = s;
+      return vid.play().catch(function () {}).then(function () {
+        $('empty').hidden = true;
+        $('snap').disabled = $('stop').disabled = false; $('full').disabled = !(vid.requestFullscreen || vid.webkitEnterFullscreen || $('stage').requestFullscreen);
+        $('go').textContent = '↻ Restart camera';
+        var settings = tr.getSettings ? tr.getSettings() : {};
+        return listCams(settings.deviceId);
+      }).then(function () {
+        say('ok', 'Your camera works. Check the picture, then look at the numbers below.');
+        showInfo(); countFrames();
+        vid.addEventListener('resize', showInfo);
+      });
+    }).catch(function (e) { stopAll(); say('bad', why(e)); }).then(function () { starting = false; $('go').disabled = false; });
+  }
+  $('go').addEventListener('click', start);
+  $('stop').addEventListener('click', function () { stopAll(); $('empty').textContent = 'Camera stopped.'; say('', 'The camera is off.'); });
+  ['cam', 'res', 'fps'].forEach(function (id) { $(id).addEventListener('change', function () { if (stream) start(); }); });
+  function mirror() { vid.classList.toggle('wc-mirror', $('mirror').checked); }
+  $('mirror').addEventListener('change', mirror); mirror();
+  $('full').addEventListener('click', function () {
+    var st = $('stage');
+    if (st.requestFullscreen) st.requestFullscreen().catch(function () {});
+    else if (st.webkitRequestFullscreen) st.webkitRequestFullscreen();
+    else if (vid.webkitEnterFullscreen) vid.webkitEnterFullscreen();
+  });
+  $('snap').addEventListener('click', function () {
+    var w = vid.videoWidth, h = vid.videoHeight;
+    if (!w || !h) { say('bad', 'The camera has not sent a picture yet. Wait a moment and try again.'); return; }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var x = c.getContext('2d');
+    if ($('mirror').checked) { x.translate(w, 0); x.scale(-1, 1); }
+    x.drawImage(vid, 0, 0, w, h);
+    c.toBlob(function (b) {
+      if (!b) { say('bad', 'Your browser could not save the snapshot.'); return; }
+      var url = URL.createObjectURL(b), a = document.createElement('a'), img = document.createElement('img');
+      var d = new Date(), p = function (n) { return String(n).padStart(2, '0'); };
+      shotN++;
+      a.href = url; a.download = 'webcam-' + d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()) + p(d.getSeconds()) + '.png';
+      img.src = url; img.alt = 'Snapshot ' + shotN;
+      a.appendChild(img); a.appendChild(document.createTextNode('Download PNG · ' + w + '×' + h + ' · ' + fmtBytes(b.size)));
+      $('shots').insertBefore(a, $('shots').firstChild);
+      say('ok', 'Snapshot taken. Click it to download the PNG.');
+      burst($('snap'));
+    }, 'image/png');
+  });
+  addEventListener('pagehide', stopAll);
+  document.addEventListener('visibilitychange', function () { if (document.hidden && stream) { /* keep running: some people test while switching tabs */ } });
+})();
+</script>

@@ -675,5 +675,428 @@ module.exports = [
       ['Is there a limit on lines or file size?', 'No fixed limit. You can write or paste as many lines as you like; only lines on screen are drawn, so long files stay smooth. Files over 50 MB ask before opening because very large files can slow a phone down.'],
       ['How do bookmarks work?', 'Click a line number or press Ctrl+F2 to put a blue dot on that line. F2 jumps to the next bookmark. In the Search menu you can bookmark every line that matches a search, then copy or remove those lines.']
     ]
+  },
+  {
+      slug: 'invoice-generator', cat: 'Finance calculators', name: 'Invoice Generator',
+      title: 'Free Invoice Generator - Make a PDF Invoice Online',
+      desc: 'Create a professional invoice with your logo, items, discount, tax and balance due, then download a real PDF or print it. Free and private.',
+      card: 'Make a professional PDF invoice in minutes.',
+      intro: 'Fill in your business, client and items to build a clean invoice with a live preview, then download it as a PDF or print it.',
+      steps: ['Add your business details, logo and the client you are billing.', 'Enter your items with quantity and unit price, plus any discount, tax, shipping or amount paid.', 'Check the live preview, then press Download PDF or Print.', 'Press New invoice for the next one: your details stay and the number goes up.'],
+      faq: [
+        ['Is this invoice generator free?', 'Yes. It is free with no sign-up, no watermark and no limit on how many invoices you make.'],
+        ['Are my invoices uploaded anywhere?', 'No. Everything runs in your browser. Your draft, logo and last invoice number are saved only on this device.'],
+        ['Can I use rupees, euros or pounds?', 'Yes. Choose USD, EUR, GBP, PKR, INR, AED, SAR, CAD or AUD, or type your own currency symbol. Symbols such as ₨, ₹, € and £ appear correctly in the PDF.'],
+        ['How are tax and discount calculated?', 'The discount is taken off the subtotal first, then each tax is worked out on the discounted amount. Shipping is added after tax, and any amount paid is subtracted to give the balance due.'],
+        ['Is the PDF text real or a picture?', 'Real text. The PDF is small and sharp, and the amounts and names can be searched and copied.'],
+        ['Can an invoice have many items?', 'Yes. Long invoices continue onto extra pages, with the table header repeated and page numbers on every page.']
+      ],
+      icon: '<path d="M6 2h9l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v6h6M8 13h8M8 17h5"/><path d="M10 9.5H8"/>'
+  },
+  {
+      slug: 'image-to-text', cat: 'Image tools', name: 'Image to Text (OCR)',
+      title: 'Image to Text Converter - Free OCR Online, No Upload',
+      desc: 'Copy text from photos, screenshots and scans. Paste with Ctrl+V or drop several images, then copy or download the text. Free OCR that runs on your device.',
+      card: 'Copy the text out of photos and screenshots.',
+      intro: 'Turn the words in a picture into text you can copy and edit. Drop images or paste a screenshot, and the text appears in seconds. The reading happens on your device, so your pictures stay private.',
+      steps: ['Drop one or more images on the box, or press Ctrl+V to paste a screenshot.', 'Wait while each image is read. The bar shows the progress.', 'Choose whether to keep line breaks or join lines into paragraphs, and correct any mistakes.', 'Press Copy text or Download .txt.'],
+      faq: [
+        ['Are my images uploaded?', 'No. The text is read by your own browser. The text reader downloads its English data from this site the first time (about 7 MB) and then works offline.'],
+        ['Which languages can it read?', 'English. Other languages that use the Latin alphabet may partly work, but accented letters are often misread, and scripts such as Arabic, Chinese or Hindi are not supported yet.'],
+        ['Can it read handwriting?', 'Only very neat printed handwriting, and not reliably. It is made for printed text, screenshots and scans.'],
+        ['What if my picture is sideways or upside down?', 'With Orientation set to Automatic, the tool tries the picture turned 90, 180 and 270 degrees when the upright reading looks poor, and keeps the best result. You can also set the orientation by hand.'],
+        ['How accurate is it?', 'On clear screenshots and flat, sharp scans it is usually close to perfect. Blurry, angled or low-contrast photos produce more mistakes, so always check names and numbers.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 9h10M7 12h10M7 15h6"/><path d="M3 8V6a2 2 0 0 1 2-2h2M21 8V6a2 2 0 0 0-2-2h-2"/>'
+  },
+  {
+      slug: 'crop-image', cat: 'Image tools', name: 'Crop Image',
+      title: 'Crop Image Online - Free Photo Cropper for 1:1, 4:5, 16:9',
+      desc: 'Crop photos by dragging a box or typing exact pixels. Presets for square, Instagram 4:5, 16:9, Story 9:16 and passport size. Rotate, flip, no upload.',
+      card: 'Cut photos to any size or shape, on any device.',
+      intro: 'Crop a picture to exactly the part you want. Drag the box, pick a ready-made shape for Instagram, YouTube or a passport photo, or type exact pixel sizes. Your picture never leaves your device.',
+      steps: ['Choose or drop an image.', 'Pick a shape, such as Square 1:1 or Story 9:16, or keep Free.', 'Drag the box and its handles, or type the exact width, height and position.', 'Choose JPG, PNG or WebP, press Crop image, then Download.'],
+      faq: [
+        ['Does cropping reduce the quality?', 'No. The crop is cut from your original picture at full resolution. Saving as PNG keeps every pixel exactly; JPG and WebP use the quality you choose.'],
+        ['Can I crop on my phone?', 'Yes. The crop box and its handles work with your finger, and the page does not scroll while you drag.'],
+        ['What size is the passport photo?', 'The passport shape is 35 × 45 mm. With the resize option ticked, the result is 413 × 531 pixels, which prints at exactly 35 × 45 mm at 300 dpi. Check your country\'s rules for head size and background.'],
+        ['Can I rotate or mirror the picture?', 'Yes. Rotate it left or right by 90 degrees, or flip it horizontally or vertically, before you crop.'],
+        ['Is my image uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>'
+  },
+  {
+      slug: 'sign-pdf', cat: 'PDF tools', name: 'Sign PDF',
+      title: 'Sign PDF Online Free - Add Signature, Date & Text, No Upload',
+      desc: 'Draw, type or upload your signature and place it on any PDF page. Add the date and text, move and resize, then download. Free, private, no sign-up.',
+      card: 'Draw or type your signature and add it to a PDF.',
+      intro: 'Sign a PDF without printing it. Draw your signature, type it in a handwriting style or upload a photo of it, then tap where it goes. Add the date or any text, and download the signed file. Nothing is uploaded.',
+      steps: ['Choose your PDF.', 'Draw, type or upload your signature and press Use this signature.', 'Tap the page where it goes, then drag to move and use the round handle to resize. Add a date or text if needed.', 'Press Save signed PDF, then Download.'],
+      faq: [
+        ['Is my document or signature uploaded?', 'No. The PDF is opened and saved by your browser, and your signature is never stored or sent anywhere.'],
+        ['Can I sign on my phone?', 'Yes. Draw your signature with your finger, tap the page to place it, and drag or resize it by touch.'],
+        ['Does signing change the rest of the PDF?', 'No. Your signature, date and text are drawn on top of the pages you chose. The original text, pages and page sizes are kept as they were.'],
+        ['Can I add the same signature to several pages?', 'Yes. Tap your signature button above the page to place it again, or select an item and press Put on every page.'],
+        ['Is this a legally valid electronic signature?', 'Many countries accept a drawn or typed signature for everyday agreements, but some documents require a certified digital signature. If in doubt, ask the person who will receive the document.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8 17c1.5-2 2.5-3 3-2s-.5 2 .5 2 1.5-1.5 2.5-1.5 1 1 2 1"/>'
+  },
+  {
+      slug: 'organize-pdf', cat: 'PDF tools', name: 'Organize PDF',
+      title: 'Organize PDF - Reorder, Rotate & Delete PDF Pages Free',
+      desc: 'Drag PDF pages into a new order, rotate or delete pages, add blank pages and combine several PDFs. Runs in your browser, no upload.',
+      card: 'Drag pages into order, rotate or delete them.',
+      intro: 'See every page of your PDF as a thumbnail, then drag them into the right order, turn or remove pages and save a new PDF.',
+      steps: ['Choose one or more PDFs. Every page appears as a thumbnail.', 'Drag pages to reorder them, or use the arrow buttons under each page.', 'Rotate, delete or add blank pages. Tick pages to change several at once.', 'Click Save PDF, then Download PDF.'],
+      faq: [
+        ['Is my PDF uploaded anywhere?', 'No. The pages are shown and rearranged by your own browser, and the new PDF is made on your device.'],
+        ['Does it lower the quality of my pages?', 'No. Each page is copied as it is, with its text, images and links. Only the order and direction change.'],
+        ['Can I combine pages from different PDFs?', 'Yes. Add several PDFs and their pages appear together. Mix them in any order before saving.'],
+        ['How do I move pages on a phone?', 'Hold the ⠿ handle in the corner of a page and drag it, or tap the arrow buttons under the page.'],
+        ['I deleted the wrong page. Can I get it back?', 'Yes. Press Undo (or Ctrl+Z) to step back through your changes.'],
+        ['Can I open a password-protected PDF?', 'Not directly. Remove the password in a PDF reader that knows it, then add the unlocked copy.']
+      ],
+      icon: '<rect x="3" y="3" width="7" height="9" rx="1"/><rect x="14" y="3" width="7" height="9" rx="1"/><rect x="3" y="15" width="7" height="6" rx="1"/><path d="M14 18h7M18 15l3 3-3 3"/>'
+  },
+  {
+      slug: 'watermark-image', cat: 'Image tools', name: 'Watermark Image',
+      title: 'Watermark Image - Add Text or Logo to Photos Free',
+      desc: 'Add a text or logo watermark to one photo or a whole batch. Set size, colour, opacity, angle and position, or tile it. No upload.',
+      card: 'Stamp your name or logo on photos, in bulk.',
+      intro: 'Protect your photos with a text or logo watermark. Style it once and it is scaled to fit every image in the batch.',
+      steps: ['Choose one or more images.', 'Type your watermark text and pick its size, colour, opacity, angle and position, or turn on tiling.', 'Optionally add a logo image and place it.', 'Download the current image, or all of them as a ZIP.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. The watermark is drawn by your own browser and your photos never leave your device.'],
+        ['Will my watermark look the same on big and small photos?', 'Yes. Sizes are set as a share of each image, so a large and a small photo get a watermark of the same relative size.'],
+        ['Does it keep my image format?', 'Yes. With "Same as original", JPG stays JPG, PNG stays PNG and WebP stays WebP. You can also convert to another format.'],
+        ['Which logo file works best?', 'A PNG with a transparent background. A JPG logo works too but shows its rectangle background.'],
+        ['Can a watermark be removed?', 'A tiled, semi-transparent watermark is much harder to remove than a small one in a corner, but no watermark is impossible to remove.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 16l5-5 4 4 3-3 6 6"/><path d="M13 9h5"/><circle cx="8" cy="8.5" r="1.5"/>'
+  },
+  {
+      slug: 'meme-generator', cat: 'Image tools', name: 'Meme Generator',
+      title: 'Meme Generator - Add Top & Bottom Text to Any Picture',
+      desc: 'Make a meme from your own picture with classic bold top and bottom text. Add extra text boxes, drag them anywhere and download PNG or JPG.',
+      card: 'Classic top and bottom text on your picture.',
+      intro: 'Turn any picture into a meme with big white outlined text. Add more captions, drag them into place and download.',
+      steps: ['Choose or paste a picture, or start with a plain background.', 'Type the top and bottom text.', 'Add more text boxes if you like and drag any text to move it.', 'Pick the size and colours, then click Download meme.'],
+      faq: [
+        ['Is my picture uploaded?', 'No. The meme is made in your browser and your picture stays on your device.'],
+        ['Are there ready-made meme templates?', 'No. Use your own picture or one you are allowed to use, or start from a plain coloured background.'],
+        ['Why does the font look different on my phone?', 'The tool uses Impact when your device has it. Phones without Impact get the closest bold font they have.'],
+        ['Long text does not fit. What can I do?', 'Text wraps onto new lines on its own and long captions shrink a little. You can also lower the text size.'],
+        ['Will there be a watermark on my meme?', 'No. The downloaded image has only your picture and your text.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 7h10M7 17h10"/><circle cx="9.5" cy="12" r="1"/><circle cx="14.5" cy="12" r="1"/>'
+  },
+  {
+      slug: 'color-picker', cat: 'Image tools', name: 'Color Picker from Image',
+      title: 'Color Picker from Image - Get HEX, RGB & HSL Online',
+      desc: 'Click any pixel of an image to get its HEX, RGB and HSL colour codes, with a zoom loupe. Also extracts the main colour palette. No upload.',
+      card: 'Get the HEX code of any colour in a picture.',
+      intro: 'Pick exact colours from any image or screenshot with a magnifying loupe, and get its main colour palette in one click.',
+      steps: ['Choose, drop or paste an image.', 'Move over the image and click, or tap, the colour you want.', 'Copy the HEX, RGB or HSL code.', 'Use the main colours list to grab the whole palette.'],
+      faq: [
+        ['Is my image uploaded?', 'No. The colours are read by your own browser and the image never leaves your device.'],
+        ['How do I pick a colour on a phone?', 'Touch the image and slide your finger. A loupe above your finger shows the exact pixel, and the colour is picked when you lift your finger.'],
+        ['Why is the colour slightly different from my design file?', 'Images saved as JPG change colours a little when compressed. Use the 3 × 3 average setting for a steadier reading of photos.'],
+        ['How are the main colours found?', 'The tool groups similar pixels together (k-means clustering) and lists the groups from most to least common, with the share of the image each covers.'],
+        ['Can I pick a colour from outside the browser?', 'In Chrome and Edge on a computer, the Pick from screen button lets you pick from anywhere on your screen.']
+      ],
+      icon: '<path d="M14.5 4.5l5 5M17 2.5a2.1 2.1 0 0 1 3 3L9 16.5l-4 1 1-4z"/><path d="M4 21h4"/>'
+  },
+  {
+    slug: 'time-zone-converter', cat: 'Time tools', name: 'Time Zone Converter',
+    title: 'Time Zone Converter - Compare Times Around the World',
+    desc: 'Convert a date and time to many time zones at once: Pakistan, India, UAE, UK, US and more. Handles daylight saving correctly. Free and private.',
+    card: 'See one time in many time zones at once.',
+    intro: 'Pick a date, a time and a time zone, and see the same moment in Pakistan, India, the UAE, the UK, the US and any other zone you add. Daylight saving is handled for you.',
+    steps: ['Press Now for the current time, or pick a date and time.', 'Choose the time zone that time is in.', 'Read the time in every zone in the list. +1 day means it is already the next day there.', 'Search to add more zones, remove the ones you do not need, then click Copy summary.'],
+    faq: [
+      ['Does it handle daylight saving time?', 'Yes. The converter uses the time zone rules built into your browser, so changes like the US clocks moving in March and November or Europe in March and October are applied for the exact date you pick.'],
+      ['What happens with a time that does not exist?', 'When the clocks jump forward, an hour is skipped, for example 2:30 AM in New York on the second Sunday of March. The tool tells you and shows the same moment on the new clock time.'],
+      ['What about a time that happens twice?', 'When the clocks go back, one hour happens twice. The tool shows the first one and lets you switch to the second.'],
+      ['What does +1 day mean?', 'It means that in that zone it is already the next calendar day. −1 day means it is still the previous day.'],
+      ['Is my zone list saved?', 'Yes. The zones you add or remove are remembered in this browser on this device, so the list is ready next time.']
+    ],
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/><path d="M16.5 16.5L19 19"/>'
+  },
+  {
+    slug: 'pregnancy-due-date-calculator', cat: 'Calculators', name: 'Pregnancy Due Date Calculator',
+    title: 'Pregnancy Due Date Calculator - Week by Week',
+    desc: 'Estimate your due date from your last period, conception date, IVF transfer or ultrasound. See your week, trimester and key milestones. Free and private.',
+    card: 'Estimate your due date, pregnancy week and trimester.',
+    intro: 'Find your estimated due date, how many weeks pregnant you are today, your trimester and the dates of key scans and tests. Use your last period, conception date, IVF transfer or an ultrasound.',
+    steps: ['Choose what you know: your last period, the conception date, an IVF transfer or a scan.', 'Enter the date. For a last period, set your usual cycle length if it is not 28 days.', 'Read your due date, pregnancy week, trimester and milestone dates.', 'Click Copy summary to keep the dates.'],
+    faq: [
+      ['How is the due date calculated?', "From the first day of your last period, the due date is 280 days (40 weeks) later. This is Naegele's rule. If your cycle is longer or shorter than 28 days, the date moves by the difference."],
+      ['How accurate is the due date?', 'It is an estimate. Only about 1 in 20 babies are born on the due date itself. Most arrive within two weeks before or after it.'],
+      ['How do I calculate the due date after IVF?', 'Choose IVF embryo transfer, enter the transfer date and pick day 3 or day 5. The due date is 263 days after a day 3 transfer and 261 days after a day 5 transfer.'],
+      ['Which date should I trust if my scan disagrees?', 'An early ultrasound is usually more accurate than the period date. Your doctor or midwife decides your official due date, so always follow their advice.'],
+      ['Is my information saved or sent anywhere?', 'No. Everything is calculated in your browser, and the dates you type are not saved or sent.']
+    ],
+    icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M12 18.5l-2.6-2.5a1.6 1.6 0 0 1 2.6-1.9 1.6 1.6 0 0 1 2.6 1.9z"/>'
+  },
+  {
+    slug: 'qr-code-scanner', cat: 'Generators', name: 'QR Code Scanner',
+    title: 'QR Code Scanner - Scan QR Codes Online with Camera',
+    desc: 'Scan a QR code with your camera or from a screenshot or photo. See links before opening them, read Wi-Fi passwords and contacts. Free and private.',
+    card: 'Scan QR codes from your camera or an image.',
+    intro: 'Scan a QR code with your phone or laptop camera, or upload or paste a picture of one. You see the full content before anything opens, and Wi-Fi codes, contacts, phone numbers and emails are shown clearly.',
+    steps: ['Click Scan with camera and allow camera access, or drop, choose or paste an image.', 'Hold the QR code inside the frame until it is found.', 'Check the result. For links, read the full address shown before opening it.', 'Copy the text, open the link, or use the Wi-Fi password or contact.'],
+    faq: [
+      ['Is the image or camera feed uploaded?', 'No. The code is decoded on your device. Nothing from your camera or your images is sent to a server.'],
+      ['Why does the camera not start?', 'Your browser needs permission to use the camera. If you blocked it, allow it in the site settings next to the address bar. You can always upload a screenshot or photo instead.'],
+      ['Is it safe to open links from QR codes?', 'The scanner never opens a link by itself. It shows the full address and warns about tricks such as look-alike letters, so you can decide. Only http and https links can be opened from here.'],
+      ['Can it read Wi-Fi QR codes?', 'Yes. It shows the network name, password and security type, with a button to copy the password.'],
+      ['Where is my scan history kept?', 'Only in this browser on this device. You can clear it at any time with Clear history.']
+    ],
+    icon: '<path d="M3 8V5a2 2 0 0 1 2-2h3M16 3h3a2 2 0 0 1 2 2v3M21 16v3a2 2 0 0 1-2 2h-3M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M3 12h18"/>'
+  },
+  {
+    slug: 'regex-tester', cat: 'Developer tools', name: 'Regex Tester',
+    title: 'Regex Tester - Test JavaScript Regular Expressions',
+    desc: 'Test regular expressions with live match highlighting, capture groups, named groups and a replace preview. Ready-made patterns included. Runs in your browser.',
+    card: 'Test regular expressions with live highlighting.',
+    intro: 'Write a regular expression and see every match highlighted in your text as you type, with capture groups, positions and a live replace preview. It uses the JavaScript regex engine in your browser.',
+    steps: ['Type a pattern, or pick one from Common patterns.', 'Tick the flags you need, such as g for all matches or i to ignore case.', 'Paste your test text and check the highlighted matches and group details.', 'Optionally type a replacement like $1 to preview the replaced text, then copy it.'],
+    faq: [
+      ['Which regex flavour does this use?', 'JavaScript (ECMAScript), the same engine your browser uses. Most patterns also work in other languages, but features like lookbehind or named groups can differ.'],
+      ['Why does it say my pattern took too long?', 'Some patterns, such as (a+)+ on a long text, can take an extremely long time. The tester runs each pattern in the background and stops it after 2 seconds so the page never freezes.'],
+      ['How do I use groups in the replacement?', 'Use $1, $2 and so on for numbered groups, $<name> for named groups, $& for the whole match and $$ for a dollar sign.'],
+      ['Why is only one match found?', 'Without the g (global) flag JavaScript stops at the first match. Tick g to find all of them.'],
+      ['Is my text sent anywhere?', 'No. The pattern and text never leave your browser.']
+    ],
+    icon: '<path d="M17 3v10M12.7 5.5l8.6 5M12.7 10.5l8.6-5"/><rect x="3" y="15" width="6" height="6" rx="1"/>'
+  },
+  {
+    slug: 'markdown-to-html', cat: 'Developer tools', name: 'Markdown to HTML',
+    title: 'Markdown to HTML Converter - Live Preview, Free',
+    desc: 'Convert Markdown to clean HTML with a live preview. Supports GitHub tables, task lists and code blocks. Copy the HTML or download .html and .md files.',
+    card: 'Convert Markdown to HTML with a live preview.',
+    intro: 'Write or paste Markdown and see the formatted result instantly. Copy the HTML, or download a complete .html page or the .md file. Unsafe code is always removed.',
+    steps: ['Type or paste Markdown, open a .md file, or press Load sample.', 'Check the formatted result in the Preview tab.', 'Switch to HTML source to see the generated code.', 'Click Copy HTML, or download the .html page or the .md file.'],
+    faq: [
+      ['Which Markdown features are supported?', 'Headings, bold, italic, links, images, lists, quotes, code, and the GitHub extras: tables, task lists, strikethrough, fenced code blocks and automatic links.'],
+      ['Can I use HTML inside my Markdown?', 'Yes. Normal HTML is kept, but scripts, event handlers like onclick, javascript: links, iframes, forms and style blocks are removed for safety.'],
+      ['What is in the downloaded .html file?', 'A complete web page with a title from your first heading and simple, readable styling. It opens in any browser.'],
+      ['Is my text uploaded?', 'No. The conversion runs in your browser and your text is not saved or sent anywhere.']
+    ],
+    icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 15V9l2.5 3L11 9v6M17 9v6M14.5 12.5L17 15l2.5-2.5"/>'
+  },
+  {
+      slug: 'screen-recorder', cat: 'Media tools', name: 'Screen Recorder',
+      title: 'Free Online Screen Recorder - Record Screen with Audio',
+      desc: 'Record your screen, a window or a browser tab with sound and microphone, then save it as MP4 or WebM. No install, no watermark, nothing uploaded.',
+      card: 'Record your screen, a window or a tab with sound.',
+      intro: 'Record your whole screen, one window or a browser tab, with computer sound and your microphone, right in your browser. Watch it back and download the video. Nothing is uploaded.',
+      steps: ['Choose what to start with, the video format and whether to record sound and your microphone.', 'Press Start recording and pick the screen, window or tab in the box your browser shows, then press Share.', 'Use Pause and Resume as needed, and press Stop (or Stop sharing) when you are done.', 'Watch the recording and press Download.'],
+      faq: [
+        ['Is this screen recorder free?', 'Yes. There is no time limit, no watermark and no sign-up.'],
+        ['Is my recording uploaded?', 'No. The video is recorded and kept by your browser on your device until you download it or close the page.'],
+        ['Can it record on iPhone or Android?', 'No. Phone browsers do not let websites capture the screen. Use the built-in recorder: Screen Recording in Control Centre on iPhone and iPad, or the Screen recorder quick setting on Android.'],
+        ['Why is there no computer sound in my video?', 'Tick "Share audio" (or "Share tab audio") in the sharing box. Chrome and Edge can share the sound of a tab on every system and the whole computer sound on Windows and ChromeOS. Firefox and Safari do not share computer sound.'],
+        ['MP4 or WebM?', 'MP4 is offered when your browser can record it (recent Chrome, Edge and Safari) and opens almost everywhere. WebM files are smaller and play in browsers, VLC and most editors.'],
+        ['How long can I record?', 'There is no fixed limit. The video is held in memory until you download it, so for very long recordings make sure your device has free memory and disk space.']
+      ],
+      icon: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><circle cx="12" cy="10.5" r="2.5"/>'
+  },
+  {
+      slug: 'voice-recorder', cat: 'Media tools', name: 'Voice Recorder',
+      title: 'Online Voice Recorder - Record Audio and Save as MP3',
+      desc: 'Record your voice with your microphone, pause and resume, listen back, then download MP3, WAV or the original file. Free, private, no upload.',
+      card: 'Record your voice and save it as MP3 or WAV.',
+      intro: 'Record your voice or any sound from your microphone, with a live level meter and timer. Listen back, then download it as MP3, WAV or the original recording. Nothing is uploaded.',
+      steps: ['Press Record and allow your browser to use the microphone.', 'Speak while the timer runs; use Pause and Resume if you need a break.', 'Press Stop, then listen to the recording.', 'Download it as MP3, WAV or the original file.'],
+      faq: [
+        ['Is my recording uploaded?', 'No. The sound is recorded and turned into MP3 by your browser, on your device. It is never sent to a server.'],
+        ['Which formats can I download?', 'MP3 (choose 96 to 320 kbps), WAV (uncompressed) and the original recording, which is WebM or OGG in Chrome, Edge and Firefox and M4A in Safari.'],
+        ['Does it work on iPhone and Android?', 'Yes, in Safari (iOS 14.5 or newer), Chrome and other current browsers. Keep the page open while you record.'],
+        ['The browser says the microphone is blocked. What now?', 'Click the lock or camera icon next to the web address, allow the microphone and press Record again. On a phone, also allow microphone access for the browser in the phone settings.'],
+        ['How do I choose a different microphone?', 'After your first recording, a Microphone menu appears whenever more than one microphone is connected. Pick one there and record again.'],
+        ['Is there a time limit?', 'No. Long recordings use more memory, so on a phone keep them under about an hour.']
+      ],
+      icon: '<rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/>'
+  },
+  {
+      slug: 'video-to-mp3', cat: 'Media tools', name: 'Video to MP3',
+      title: 'Video to MP3 Converter - Extract Audio Free, No Upload',
+      desc: 'Extract the sound from an MP4, MOV, WebM or MKV video and save it as MP3 or WAV. Trim the start and end, pick 128 to 320 kbps. Nothing is uploaded.',
+      card: 'Extract the audio from a video as MP3 or WAV.',
+      intro: 'Pull the soundtrack out of a video file and save it as an MP3 or WAV. Trim it to the part you want and choose the quality. The file is converted on your own device.',
+      steps: ['Click the box or drop a video or audio file onto it.', 'Optionally set a start and end time, and press Play selection to check it.', 'Choose MP3 or WAV, the quality and stereo or mono.', 'Press Convert, then Download.'],
+      faq: [
+        ['Is my video uploaded?', 'No. Your browser reads and converts the file on your device, so even private or large videos never leave it.'],
+        ['Which video formats work?', 'MP4, MOV, M4V, WebM and MKV usually work in Chrome and Edge, as long as the sound is AAC, MP3, Opus, Vorbis or FLAC. Firefox and Safari read most MP4 and MOV files. Audio files such as M4A, WAV and OGG work too.'],
+        ['Why does it say it could not read the sound?', 'The file has no sound track, or its sound uses a format browsers cannot decode, such as AC-3 (Dolby), DTS or WMA, which are common in movie MKV files.'],
+        ['Which MP3 quality should I pick?', '192 kbps sounds very good for music and is the default. 128 kbps is fine for speech and podcasts. 320 kbps is the highest MP3 quality.'],
+        ['Can I convert only part of a video?', 'Yes. Type the start and end time, or play the video and press Use player time at the right moment.'],
+        ['Is there a size limit?', 'Files up to 1.5 GB are accepted, but the whole sound track is held in memory, so long movies may be too much for a phone.']
+      ],
+      icon: '<path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/>'
+  },
+  {
+      slug: 'text-to-speech', cat: 'Media tools', name: 'Text to Speech',
+      title: 'Text to Speech Online - Read Text Aloud Free',
+      desc: 'Paste any text and hear it read aloud with your choice of voice, language, speed and pitch. Words are highlighted as they are spoken. Free, no sign-up.',
+      card: 'Hear any text read aloud, with words highlighted.',
+      intro: 'Paste text and hear it read aloud by the voices on your device, in many languages. Change the speed, pitch and volume, and follow along as each word is highlighted.',
+      steps: ['Type or paste your text into the box.', 'Choose a voice and set the speed, pitch and volume.', 'Press Play. Use Pause, Resume and Stop, or click a sentence to jump to it.'],
+      faq: [
+        ['Can I download the speech as an MP3?', 'No. Browsers play these voices through your device\'s speech system and do not let websites record them, so no browser tool can save them as a file. Sites that offer a download make the audio on their own servers from your text.'],
+        ['Why are the voices different on each device?', 'The voices come from your browser and operating system. Chrome includes Google voices, Edge includes Microsoft voices, and Safari uses the voices of your Mac, iPhone or iPad.'],
+        ['Which languages are supported?', 'Any language your device has a voice for. The voice menu is grouped by language, with your own language first.'],
+        ['Is my text sent anywhere?', 'Voices marked (online) are made by Google or Microsoft, so the browser sends the text to them to speak it. Other voices run fully on your device.'],
+        ['Why does the highlight not move with some voices?', 'Some voices, especially online ones, do not report which word they are saying. The current sentence is still highlighted.'],
+        ['Is there a length limit?', 'No. Long text is read sentence by sentence, which also avoids the cut-off some browsers have after about 15 seconds.']
+      ],
+      icon: '<path d="M11 5L6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M19 5a10 10 0 0 1 0 14"/>'
+  },
+  {
+      slug: 'spin-the-wheel', cat: 'Generators', name: 'Spin the Wheel',
+      title: 'Spin the Wheel - Random Name Picker Wheel Online Free',
+      desc: 'Type names or options, spin a colourful wheel and get a fair random winner. Remove winners, shuffle, full screen and sound. No sign-up.',
+      card: 'Spin a wheel of names to pick a random winner.',
+      intro: 'Add names, prizes or choices, one per line, and spin the wheel to pick one fairly. Great for classrooms, giveaways, team picks and decisions.',
+      steps: ['Type or paste your entries, one per line.', 'Click the wheel or the Spin button.', 'See the winner, then remove it or spin again.', 'Use Full screen to show the wheel on a projector or stream.'],
+      faq: [
+        ['Is the wheel really random?', 'Yes. The winner is chosen with your browser\'s cryptographic random generator, every entry has exactly the same chance, and the wheel is then turned to stop on that entry.'],
+        ['How many entries can I add?', 'Up to 200. With many entries the labels get small, so the wheel hides them when slices are too thin to read; the winner is always shown in full.'],
+        ['Can I give one entry a bigger chance?', 'Yes. Add the same line more than once. Each line is its own slice, so a name listed twice is twice as likely to win.'],
+        ['Are my entries saved?', 'Your list is kept in this browser so it is there next time. It is never uploaded.'],
+        ['Can I turn off the animation or sound?', 'Untick Sound to spin silently. If your device or the site settings ask for reduced motion, the wheel jumps straight to the result.']
+      ],
+      icon: '<circle cx="12" cy="13" r="8"/><path d="M12 13V5M12 13l6.9 4M12 13l-6.9 4M10 2h4l-2 3z"/>'
+  },
+  {
+      slug: 'typing-speed-test', cat: 'Text tools', name: 'Typing Speed Test',
+      title: 'Typing Speed Test - Check Your WPM and Accuracy Free',
+      desc: 'Test your typing speed in 30, 60 or 120 seconds. Live net WPM, accuracy and errors, highlighted mistakes and your best score saved.',
+      card: 'Measure your typing speed in words per minute.',
+      intro: 'Type the passage as quickly and accurately as you can. The timer starts with your first key, and you see your net words per minute and accuracy live.',
+      steps: ['Choose 30, 60 or 120 seconds.', 'Tap the passage and start typing. The timer starts on your first key.', 'Fix mistakes with Backspace or keep going.', 'Read your result card, then press Tab and Enter to try again.'],
+      faq: [
+        ['How is WPM calculated?', 'Every 5 typed characters, including spaces, count as one word. Net WPM is the words typed minus the mistakes you left uncorrected, divided by the minutes of the test.'],
+        ['How is accuracy worked out?', 'It is the share of all the characters you typed that were right when you typed them. Fixing a mistake removes it from your WPM, but it still lowers your accuracy.'],
+        ['What is a good typing speed?', 'Around 40 WPM is average. 60 to 80 WPM is fast for everyday typing, and professional typists often reach 90 or more.'],
+        ['Does it work on a phone or tablet?', 'Yes. Tap the passage to open your keyboard. Autocorrect is turned off for the box, and curly quotes from phone keyboards count as normal ones.'],
+        ['Is my best score saved?', 'Yes, one best score for each test length, kept only in this browser. Use Reset best scores to start over.']
+      ],
+      icon: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 14h10"/>'
+  },
+  {
+      slug: 'fancy-text-generator', cat: 'Text tools', name: 'Fancy Text Generator',
+      title: 'Fancy Text Generator - Copy and Paste Cool Fonts',
+      desc: 'Turn text into 36 fancy styles: bold, italic, cursive script, gothic, bubble, small caps, upside down and more. One tap to copy.',
+      card: 'Cool copy-and-paste fonts for bios and posts.',
+      intro: 'Type your text once and get it in 36 fancy styles made from Unicode characters. Copy any style with one tap and paste it into your bio, posts, games or messages.',
+      steps: ['Type or paste your text.', 'Scroll through the styles, or filter them by name.', 'Tap Copy next to the style you like.', 'Paste it into your profile, post or chat.'],
+      faq: [
+        ['How does this work without fonts?', 'Each style uses real Unicode characters, such as the mathematical bold letters, so the look travels with the text and no font needs to be installed.'],
+        ['Where can I use these fonts?', 'Most apps accept them, including Instagram, TikTok, X, Facebook, WhatsApp and Discord bios, names and posts.'],
+        ['Why do some styles show boxes or question marks?', 'Some apps, fonts or older phones do not include every character. If a style looks broken where you paste it, choose another one.'],
+        ['Why are some numbers or symbols unchanged?', 'Unicode only has styled versions of some characters. Letters A to Z work in nearly every style, digits only in some, and other symbols stay as they are.'],
+        ['Are fancy letters bad for accessibility?', 'Screen readers may read them oddly or skip them, and search engines may not find them. Use them for decoration and keep important words in plain text.']
+      ],
+      icon: '<path d="M4 20l5-14h2l5 14M6.5 14h7"/><path d="M18 3l.9 2.1L21 6l-2.1.9L18 9l-.9-2.1L15 6l2.1-.9z"/>'
+  },
+  {
+      slug: 'scientific-calculator', cat: 'Calculators', name: 'Scientific Calculator',
+      title: 'Scientific Calculator Online - Trig, Logs, Powers, Memory',
+      desc: 'Free online scientific calculator with sin, cos, tan, logs, powers, roots, factorials, memory and history. Works with your keyboard.',
+      card: 'Trig, logs, powers and roots, with history.',
+      intro: 'Type or tap full expressions like 2π, 3(4+5) or sin(30)^2 and get exact-looking answers. Switch between degrees and radians, store numbers in memory and reuse past calculations.',
+      steps: ['Type an expression with your keyboard or tap the keys.', 'Choose DEG or RAD for trigonometry.', 'Press = or Enter to see the answer.', 'Click a line in the history to use it again.'],
+      faq: [
+        ['In what order are operations done?', 'Brackets first, then powers (right to left, so 2^3^2 is 2^9), then multiplication and division, then addition and subtraction, all left to right. A minus sign in front applies after powers, so −2^2 is −4.'],
+        ['Why does 0.1 + 0.2 show 0.3?', 'Computers store decimals in binary, which creates tiny errors like 0.30000000000000004. Answers are rounded to 12 significant digits to hide that noise.'],
+        ['How do I enter numbers like 3 × 10⁵?', 'Press EXP and type the power: 3E5 means 300,000 and 1.5E-3 means 0.0015. A lowercase e is Euler\'s number 2.718…'],
+        ['Can I leave out the multiplication sign?', 'Yes. 2π, 3(4+5), (1+2)(3+4) and 2sin(30) all multiply. Missing closing brackets at the end are added for you.'],
+        ['What does % do?', 'It divides the number before it by 100, so 50% is 0.5 and 200×15% is 30.'],
+        ['Is my history saved?', 'The last 50 calculations, the memory value and the angle mode are kept in this browser only. Clear history removes them.']
+      ],
+      icon: '<rect x="4" y="2" width="16" height="20" rx="2"/><path d="M8 6h8M8 11h.01M12 11h.01M16 11h.01M8 15h.01M12 15h.01M16 15v4M8 19h4"/>'
+  },
+  {
+      slug: 'cgpa-calculator', cat: 'Study tools', name: 'CGPA Calculator',
+      title: 'CGPA Calculator - Semester GPA, Cumulative CGPA & Target',
+      desc: 'Calculate your semester GPA and cumulative CGPA on a 4.0, 5.0 or 10-point scale, and find the GPA you need next semester to reach your target.',
+      card: 'Semester GPA, cumulative CGPA and target.',
+      intro: 'Add your semesters by course grades or by semester GPA to get your cumulative CGPA, then plan the GPA you need to reach your target.',
+      steps: ['Pick your grading scale and check the grade points table.', 'Add each semester: list its courses and grades, or type its GPA and credit hours.', 'Read your cumulative CGPA and the semester breakdown.', 'Enter a target CGPA to see the GPA you need in the semesters left.'],
+      faq: [
+        ['How is CGPA calculated?', 'Each semester GPA is multiplied by its credit hours, the results are added up, and the total is divided by all credit hours. Semesters with more credit hours count more.'],
+        ['Which grade points does the 4.0 scale use?', 'A = 4.00, A- = 3.67, B+ = 3.33, B = 3.00, B- = 2.67, C+ = 2.33, C = 2.00, C- = 1.67, D+ = 1.33, D = 1.00 and F = 0, as used by many universities in Pakistan and the US. You can edit any value.'],
+        ['Does it work for the Indian 10-point CBCS system?', 'Yes. Choose the 10-point scale: O = 10, A+ = 9, A = 8, B+ = 7, B = 6, C = 5, P = 4 and F = 0 by default, and change them to match your university.'],
+        ['Can I enter a semester GPA instead of every course?', 'Yes. Click Known GPA on a semester and type its GPA and credit hours from your result card.'],
+        ['How does the target planner work?', 'It works out the GPA you need over the credit hours left so that your final CGPA reaches the target, and says if the target is already secured or no longer reachable.'],
+        ['Is my data saved?', 'Your semesters are saved automatically in this browser only. Nothing is uploaded.']
+      ],
+      icon: '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c2 2 10 2 12 0v-4.5"/><path d="M19 17v4M17 19h4"/>'
+  },
+  {
+      slug: 'cgpa-to-percentage', cat: 'Study tools', name: 'CGPA to Percentage Converter',
+      title: 'CGPA to Percentage Converter - CBSE, VTU, Mumbai, Pakistan',
+      desc: 'Convert CGPA to percentage or percentage to CGPA with labelled formulas: 4.0 proportional, CBSE × 9.5, VTU, Mumbai University, Anna University or custom.',
+      card: 'CGPA to percentage and back, by formula.',
+      intro: 'Convert a CGPA to a percentage, or a percentage to a CGPA, with the formula for your board or university written out next to the result.',
+      steps: ['Choose CGPA → Percentage or Percentage → CGPA.', 'Pick the formula for your board or university, or enter a custom one.', 'Type your CGPA or percentage.', 'Read the result and the note about that formula.'],
+      faq: [
+        ['Is there one official formula for every university?', 'No. Each board and university sets its own rule or equivalence table. This tool shows common formulas for a quick estimate; the figure your university gives is the one that counts.'],
+        ['How do I convert a 4.0 CGPA to a percentage in Pakistan?', 'There is no single formula for every university. The simple proportional estimate is CGPA ÷ 4 × 100, but universities publish their own equivalence tables, so check yours before using the number on a form.'],
+        ['What is the CBSE formula?', 'Multiply the CGPA by 9.5. CBSE gave this for its CGPA grades, so 8.4 becomes 79.8%.'],
+        ['What are the VTU and Mumbai University formulas?', 'The commonly quoted VTU formula is (CGPA − 0.75) × 10, and the Mumbai University one is 7.1 × CGPA + 11. Rules can differ by scheme and year, so confirm yours.'],
+        ['Can I use my own university formula?', 'Yes. Choose Custom and enter the multiplier, the offset and the highest CGPA on your scale.']
+      ],
+      icon: '<path d="M4 7h7M4 12h4"/><path d="M14 17l6-10"/><circle cx="14.5" cy="8.5" r="1.5"/><circle cx="19.5" cy="15.5" r="1.5"/><path d="M4 17h7"/>'
+  },
+  {
+      slug: 'marks-percentage-calculator', cat: 'Study tools', name: 'Marks Percentage Calculator',
+      title: 'Marks Percentage Calculator - Total & Subject-Wise with Grade',
+      desc: 'Find your marks percentage from total or subject-wise marks, with Pakistan board grades (A1 to E), Indian divisions or your own grade cut-offs.',
+      card: 'Marks to percentage, grade and division.',
+      intro: 'Turn your marks into a percentage, overall or subject by subject, and see your grade or division.',
+      steps: ['Choose Total marks or Subject-wise.', 'Pick a grade or division scheme.', 'Enter marks obtained and total marks.', 'Read your percentage and grade.'],
+      faq: [
+        ['How do I calculate marks percentage?', 'Divide the marks you got by the total marks and multiply by 100. For example, 912 out of 1100 is 912 ÷ 1100 × 100 = 82.91%.'],
+        ['What are the Pakistan board grades?', 'A1 for 80% or more, A for 70%, B for 60%, C for 50%, D for 40% and E for 33%. Below 33% is a fail.'],
+        ['What are the Indian divisions?', 'First Division for 60% or more, Second Division for 45% and Third Division for 33%. Below 33% is a fail.'],
+        ['Can I use my own grade cut-offs?', 'Yes. Choose Custom grades and set each grade name and lowest percentage. They are saved for next time.'],
+        ['Is the overall percentage the average of subject percentages?', 'No. It is total marks obtained divided by total marks, which is what result cards use. Subjects with more marks count more.']
+      ],
+      icon: '<rect x="5" y="3" width="14" height="18" rx="2"/><path d="M9 3v2h6V3"/><path d="M14.5 10l-5 7"/><circle cx="9.5" cy="10.5" r="1"/><circle cx="14.5" cy="16.5" r="1"/>'
+  },
+  {
+      slug: 'final-grade-calculator', cat: 'Study tools', name: 'Final Grade Calculator',
+      title: 'Final Grade Calculator - What Do I Need on My Final Exam?',
+      desc: 'Find the score you need on your final exam to get the grade you want, from your current grade or from weighted categories. Shows when it is impossible.',
+      card: 'Score you need on the final exam.',
+      intro: 'Work out the score you need on your final exam to reach the overall grade you want, or track a whole course by weighted categories.',
+      steps: ['Choose Current grade + final or By category.', 'Enter your current grade and the final exam weight, or each category with its weight and score.', 'Type the overall grade you want.', 'Read the score you need, or whether it is impossible or already secured.'],
+      faq: [
+        ['How is the needed final score calculated?', 'Needed = (goal − current grade × (1 − final weight)) ÷ final weight. With 80% now, a final worth 40% and a goal of 85%, you need 92.5%.'],
+        ['What if I need more than 100%?', 'The tool says the goal is not possible and shows the highest overall grade you can still reach.'],
+        ['What does already secured mean?', 'Even a 0 on what is left keeps your overall grade at or above your goal.'],
+        ['Can I enter scores as marks, like 17/20?', 'Yes. In category mode a score can be a percentage such as 85 or marks such as 17/20.'],
+        ['What if my category weights do not add up to 100%?', 'The tool warns you and treats the weights you entered as the whole course.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="12" cy="14" r="3"/><circle cx="12" cy="14" r=".5"/>'
+  },
+  {
+      slug: 'attendance-calculator', cat: 'Study tools', name: 'Attendance Calculator',
+      title: 'Attendance Calculator - Classes to Attend or Skip for 75%',
+      desc: 'Check your attendance percentage and find how many classes you can skip, or must attend in a row, to stay above 75% or any required attendance.',
+      card: 'Classes you can skip or must attend.',
+      intro: 'Enter the classes held and attended to see your attendance, how many classes you can skip, or how many you must attend to reach the required percentage.',
+      steps: ['Enter the classes held so far and the classes you attended.', 'Set the required attendance, 75% by default.', 'Read how many classes you can skip or must attend in a row.', 'Optionally enter the classes left in the semester to plan ahead.'],
+      faq: [
+        ['How is attendance percentage calculated?', 'Classes attended ÷ classes held × 100. For example, 28 of 40 classes is 70%.'],
+        ['How many classes do I need to attend to reach 75%?', 'The tool finds the smallest number of classes in a row that brings (attended + x) ÷ (held + x) up to 75%. For 28 of 40 that is 8 classes.'],
+        ['How many classes can I skip and stay above 75%?', 'It finds the largest number of classes you can miss so that attended ÷ (held + missed) is still at least 75%.'],
+        ['Can I plan for the whole semester?', 'Yes. Enter the classes still to come to see how many you must attend, how many you can miss and the best final percentage possible.'],
+        ['Does it work for 80% or 85% rules?', 'Yes. Change the required attendance to any value from 0 to 100%.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8.5 15.5l2 2 4.5-4.5"/>'
   }
 ];

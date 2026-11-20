@@ -1,0 +1,455 @@
+<style>
+.bgr-stage { position: relative; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; line-height: 0; text-align: center;
+  background-color: #fff; background-image: linear-gradient(45deg, #d9dde3 25%, transparent 25%, transparent 75%, #d9dde3 75%), linear-gradient(45deg, #d9dde3 25%, transparent 25%, transparent 75%, #d9dde3 75%);
+  background-size: 20px 20px; background-position: 0 0, 10px 10px; }
+.bgr-stage canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; touch-action: pan-y; cursor: ew-resize; }
+.bgr-stage.brush canvas { touch-action: none; cursor: crosshair; }
+.bgr-tag { position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(17, 24, 39, .72); color: #fff; font: 600 12px/1.4 system-ui, sans-serif; pointer-events: none; }
+.bgr-tag.l { left: 8px; } .bgr-tag.r { right: 8px; }
+.bgr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 14px 0 0; }
+.bgr-row > label { margin: 0; }
+.bgr-row .seg { flex-wrap: wrap; }
+.bgr-cmp { display: flex; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; color: var(--muted); }
+.bgr-cmp input { flex: 1; min-width: 0; }
+.bgr-sub { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+.bgr-sw { display: inline-flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.bgr-sw button { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.bgr-sw input[type=color] { width: 44px; height: 32px; padding: 2px; border-radius: 8px; border: 1px solid var(--line); background: var(--field); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a photo here</b>JPG, PNG or WebP. The background is removed on your device. Your photo is never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="bgr-row" style="margin-top:12px">
+  <span style="font-size:14px;font-weight:600">Detail</span>
+  <div class="seg" role="group" aria-label="Model quality">
+    <button type="button" data-model="fast" aria-pressed="true">Fast (5 MB)</button>
+    <button type="button" data-model="best" aria-pressed="false">Best quality (47 MB)</button>
+  </div>
+</div>
+<p class="bgr-sub" id="modelNote">Fast suits people, products and pets on simple backgrounds. Best quality is slower but handles busy backgrounds and fine edges better. The AI model downloads once, then works offline.</p>
+<div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat">Getting ready…</p></div>
+<div id="work" hidden>
+  <div class="bgr-stage" id="stage"><canvas id="cv" aria-label="Photo with the background removed"></canvas><span class="bgr-tag l" id="tagB" hidden>Before</span><span class="bgr-tag r" id="tagA" hidden>After</span></div>
+  <div class="bgr-cmp" id="cmpRow"><span>Before</span><input type="range" id="cmp" min="0" max="100" value="0" aria-label="Compare with the original photo" data-nomemo><span>After</span></div>
+  <div class="bgr-row">
+    <span style="font-size:14px;font-weight:600">Fine-tune</span>
+    <div class="seg" role="group" aria-label="Fine-tune brush">
+      <button type="button" data-brush="" aria-pressed="true">Off</button>
+      <button type="button" data-brush="keep" aria-pressed="false">Restore</button>
+      <button type="button" data-brush="erase" aria-pressed="false">Erase</button>
+    </div>
+    <button type="button" class="btn ghost" id="undo" disabled style="min-height:38px;padding:6px 13px">Undo</button>
+    <button type="button" class="btn ghost" id="reset" disabled style="min-height:38px;padding:6px 13px">Clear edits</button>
+  </div>
+  <div class="fields" id="brushOpts" hidden style="margin-top:12px">
+    <div><label for="bsize">Brush size: <span id="bsv">30</span> px</label><input type="range" id="bsize" min="4" max="120" value="30"></div>
+  </div>
+  <p class="bgr-sub" id="brushHint" hidden>Paint over the picture. Restore brings back parts that were removed by mistake (they show faded). Erase removes leftovers.</p>
+  <div class="fields" style="margin-top:14px">
+    <div><label for="soft">Edge softness: <span id="softv">3</span></label><input type="range" id="soft" min="0" max="10" value="3"></div>
+    <div><label for="bgmode">Background</label><select id="bgmode"><option value="none">Transparent</option><option value="color">Solid colour</option><option value="blur">Blurred original</option><option value="image">My own picture</option></select></div>
+  </div>
+  <div class="bgr-row" id="colorRow" hidden>
+    <label for="bgcol" style="font-size:14px">Colour</label>
+    <span class="bgr-sw"><input type="color" id="bgcol" value="#ffffff">
+      <button type="button" data-c="#ffffff" style="background:#ffffff" aria-label="White"></button>
+      <button type="button" data-c="#000000" style="background:#000000" aria-label="Black"></button>
+      <button type="button" data-c="#e5e7eb" style="background:#e5e7eb" aria-label="Light grey"></button>
+      <button type="button" data-c="#2563eb" style="background:#2563eb" aria-label="Blue"></button>
+      <button type="button" data-c="#dc2626" style="background:#dc2626" aria-label="Red"></button>
+      <button type="button" data-c="#16a34a" style="background:#16a34a" aria-label="Green"></button>
+      <button type="button" data-c="#fde68a" style="background:#fde68a" aria-label="Yellow"></button>
+    </span>
+  </div>
+  <div class="fields" id="blurRow" hidden style="margin-top:12px">
+    <div><label for="blur">Blur strength: <span id="blurv">12</span></label><input type="range" id="blur" min="2" max="40" value="12"></div>
+  </div>
+  <div class="bgr-row" id="imgRow" hidden>
+    <button type="button" class="btn ghost" id="bgpick" style="min-height:38px;padding:6px 13px">Choose background picture</button>
+    <span class="bgr-sub" id="bgname" style="margin:0">No picture chosen</span>
+    <input type="file" id="bgfile" accept="image/*" hidden data-nomemo>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn" id="dlpng">Download PNG</button>
+    <button type="button" class="btn ghost" id="dljpg">Download JPG</button>
+  </div>
+  <p class="bgr-sub" id="jpgNote">PNG keeps the see-through background. JPG cannot be see-through, so it gets your background colour (white unless you pick one).</p>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var BASE = '../assets/vendor/onnx/';
+  var MODELS = {
+    fast: { file: 'u2netp.onnx', bytes: 4574861, size: 320, mean: [0.485, 0.456, 0.406], std: [0.229, 0.224, 0.225] },
+    best: { file: 'isnet-general-w8.onnx', bytes: 46732529, size: 1024, mean: [0.5, 0.5, 0.5], std: [1, 1, 1] }
+  };
+  var WASM = { gpu: ['ort.webgpu.min.js', 'ort-wasm-simd-threaded.asyncify.wasm', 28747738], cpu: ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852] };
+  var MAX_AREA = 16000000, WORK = 1024, PREV = 1100;
+  var ortP = null, useGpu = false, sessions = {}, modelKey = 'fast', brush = '', job = 0, busy = false;
+  var src = null, W = 0, H = 0, name = 'photo', low = null, LW = 0, LH = 0; // low = refined mask (0..1) at work size
+  var strokes = [], cur = null, bgImg = null;
+  var pv = null; // preview cache: { w, h, s, pix (ImageData of original), mask (Uint8 base), edit canvas }
+  var cv = $('cv'), ctx = cv.getContext('2d');
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function progress(frac, text) {
+    $('notice').hidden = false; $('notice').className = 'notice';
+    $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%';
+    $('stat').textContent = text;
+  }
+  function loadScript(url) {
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = url; s.onload = res;
+      s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s);
+    });
+  }
+  // Download with progress. Sizes are known up front because a gzipped response has no useful length.
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (d) {
+          if (d.done) { var out = new Uint8Array(got), o = 0; parts.forEach(function (p) { out.set(p, o); o += p.length; }); return out.buffer; }
+          parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump();
+        });
+      }
+      return pump();
+    });
+  }
+
+  // ---------- model ----------
+  function getOrt(onProg) {
+    if (ortP) return ortP;
+    ortP = (navigator.gpu ? navigator.gpu.requestAdapter().catch(function () { return null; }) : Promise.resolve(null)).then(function (ad) {
+      useGpu = !!ad;
+      var w = WASM[useGpu ? 'gpu' : 'cpu'];
+      return Promise.all([loadScript(BASE + w[0]), fetchBuf(BASE + w[1], w[2], onProg)]).then(function (r) {
+        ort.env.wasm.wasmPaths = new URL(BASE, location.href).href;
+        ort.env.wasm.wasmBinary = r[1];
+        ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+        ort.env.logLevel = 'error';
+        return ort;
+      });
+    });
+    ortP.catch(function () { ortP = null; });
+    return ortP;
+  }
+  function getSession(key, report) {
+    if (sessions[key]) return Promise.resolve(sessions[key]);
+    var m = MODELS[key], wasmBytes = ortP ? 0 : WASM[navigator.gpu ? 'gpu' : 'cpu'][2], a = 0, b = 0;
+    function tell() { report((a + b) / (wasmBytes + m.bytes), 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(wasmBytes + m.bytes) + '). This happens only once.'); }
+    tell();
+    var p = sessions[key + 'P'] || (sessions[key + 'P'] = Promise.all([
+      getOrt(function (n) { a = n; tell(); }),
+      fetchBuf(BASE + m.file, m.bytes, function (n) { b = n; tell(); })
+    ]).then(function (r) {
+      report(null, 'Starting the AI model…');
+      var buf = new Uint8Array(r[1]), opts = { graphOptimizationLevel: 'all' };
+      var tryGpu = useGpu ? ort.InferenceSession.create(buf.slice(), Object.assign({ executionProviders: ['webgpu'] }, opts)).then(function (s) { s.ep = 'WebGPU'; return s; }, function () { return null; }) : Promise.resolve(null);
+      return tryGpu.then(function (s) {
+        return s || ort.InferenceSession.create(buf, Object.assign({ executionProviders: ['wasm'] }, opts)).then(function (s2) { s2.ep = 'WebAssembly'; return s2; });
+      });
+    }).then(function (s) { sessions[key] = s; return s; }));
+    p.catch(function () { delete sessions[key + 'P']; });
+    return p;
+  }
+  function infer(s, m) {
+    var S = m.size, c = canvas(S, S), x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#fff'; x.fillRect(0, 0, S, S); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, S, S);
+    var d = x.getImageData(0, 0, S, S).data, n = S * S, t = new Float32Array(3 * n), mx = 1, i, k;
+    for (i = 0; i < d.length; i += 4) { if (d[i] > mx) mx = d[i]; if (d[i + 1] > mx) mx = d[i + 1]; if (d[i + 2] > mx) mx = d[i + 2]; }
+    for (k = 0; k < 3; k++) for (i = 0; i < n; i++) t[k * n + i] = (d[i * 4 + k] / mx - m.mean[k]) / m.std[k];
+    var feeds = {}; feeds[s.inputNames[0]] = new ort.Tensor('float32', t, [1, 3, S, S]);
+    return s.run(feeds).then(function (out) {
+      var o = out[s.outputNames[0]], p = o.data, lo = Infinity, hi = -Infinity, r = new Float32Array(n);
+      for (i = 0; i < n; i++) { if (p[i] < lo) lo = p[i]; if (p[i] > hi) hi = p[i]; }
+      var sc = hi > lo ? 1 / (hi - lo) : 0;
+      for (i = 0; i < n; i++) r[i] = (p[i] - lo) * sc;
+      Object.keys(out).forEach(function (k2) { if (out[k2].dispose) out[k2].dispose(); });
+      return r;
+    });
+  }
+
+  // ---------- mask maths ----------
+  // Bilinear resize of a float map (sw x sh) to (dw x dh), pixel centres aligned.
+  function resize(a, sw, sh, dw, dh) {
+    var out = new Float32Array(dw * dh), fx = sw / dw, fy = sh / dh, x0 = new Int32Array(dw), x1 = new Int32Array(dw), wx = new Float32Array(dw), x, y;
+    for (x = 0; x < dw; x++) { var u = Math.min(sw - 1, Math.max(0, (x + 0.5) * fx - 0.5)); x0[x] = u | 0; x1[x] = Math.min(sw - 1, x0[x] + 1); wx[x] = u - x0[x]; }
+    for (y = 0; y < dh; y++) {
+      var v = Math.min(sh - 1, Math.max(0, (y + 0.5) * fy - 0.5)), y0 = v | 0, y1 = Math.min(sh - 1, y0 + 1), wy = v - y0, r0 = y0 * sw, r1 = y1 * sw, o = y * dw;
+      for (x = 0; x < dw; x++) {
+        var t = a[r0 + x0[x]] + (a[r0 + x1[x]] - a[r0 + x0[x]]) * wx[x], b = a[r1 + x0[x]] + (a[r1 + x1[x]] - a[r1 + x0[x]]) * wx[x];
+        out[o + x] = t + (b - t) * wy;
+      }
+    }
+    return out;
+  }
+  // Mean over a (2r+1)^2 window, edges clamped. Two running-sum passes.
+  function box(a, w, h, r) {
+    var t = new Float32Array(w * h), o = new Float32Array(w * h), n = 2 * r + 1, x, y, s, i;
+    for (y = 0; y < h; y++) {
+      var row = y * w; s = a[row] * (r + 1); for (i = 1; i <= r; i++) s += a[row + Math.min(w - 1, i)];
+      for (x = 0; x < w; x++) { t[row + x] = s / n; s += a[row + Math.min(w - 1, x + r + 1)] - a[row + Math.max(0, x - r)]; }
+    }
+    for (x = 0; x < w; x++) {
+      s = t[x] * (r + 1); for (i = 1; i <= r; i++) s += t[Math.min(h - 1, i) * w + x];
+      for (y = 0; y < h; y++) { o[y * w + x] = s / n; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; }
+    }
+    return o;
+  }
+  // Guided filter (He et al.): pulls the soft, low-resolution mask edge onto the real edges of the photo.
+  function guided(I, p, w, h, r, eps) {
+    var n = w * h, Ip = new Float32Array(n), II = new Float32Array(n), i;
+    for (i = 0; i < n; i++) { Ip[i] = I[i] * p[i]; II[i] = I[i] * I[i]; }
+    var mI = box(I, w, h, r), mp = box(p, w, h, r), mIp = box(Ip, w, h, r), mII = box(II, w, h, r);
+    for (i = 0; i < n; i++) { var a = (mIp[i] - mI[i] * mp[i]) / (mII[i] - mI[i] * mI[i] + eps); Ip[i] = a; II[i] = mp[i] - a * mI[i]; }
+    var ma = box(Ip, w, h, r), mb = box(II, w, h, r);
+    for (i = 0; i < n; i++) { var q = ma[i] * I[i] + mb[i]; p[i] = q < 0 ? 0 : q > 1 ? 1 : q; }
+    return p;
+  }
+  function refine(prob, S) {
+    var sc = Math.min(1, WORK / Math.max(W, H)); LW = Math.max(1, Math.round(W * sc)); LH = Math.max(1, Math.round(H * sc));
+    var p = resize(prob, S, S, LW, LH), c = canvas(LW, LH), x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, LW, LH);
+    var d = x.getImageData(0, 0, LW, LH).data, I = new Float32Array(LW * LH);
+    for (var i = 0; i < I.length; i++) I[i] = (0.299 * d[i * 4] + 0.587 * d[i * 4 + 1] + 0.114 * d[i * 4 + 2]) / 255;
+    low = guided(I, p, LW, LH, Math.max(2, Math.round(4 * Math.max(LW, LH) / 1024)), 1e-3);
+  }
+  // Final mask at any size: upsample, tidy the haze with a soft threshold, then feather.
+  function maskAt(w, h) {
+    var a = resize(low, LW, LH, w, h), soft = +$('soft').value, k = 0.06 + 0.044 * soft, lo = 0.5 - k, inv = 1 / (2 * k), i, n = w * h;
+    for (i = 0; i < n; i++) { var t = (a[i] - lo) * inv; t = t < 0 ? 0 : t > 1 ? 1 : t; a[i] = t * t * (3 - 2 * t); }
+    var r = Math.round(soft * 0.0006 * Math.max(w, h));
+    if (r > 0) a = box(box(a, w, h, r), w, h, Math.max(1, r >> 1));
+    var out = new Uint8ClampedArray(n);
+    for (i = 0; i < n; i++) out[i] = a[i] * 255 + 0.5;
+    return out;
+  }
+
+  // ---------- brush strokes (stored in full-size pixels, replayed at any size) ----------
+  function paint(x, st, s, from) {
+    x.save(); x.lineCap = x.lineJoin = 'round'; x.strokeStyle = x.fillStyle = st.mode === 'keep' ? '#fff' : '#000';
+    x.lineWidth = st.r * 2 * s; x.globalCompositeOperation = 'source-over';
+    var p = st.pts, i = Math.max(0, from || 0);
+    if (p.length === 1 || i === p.length - 1) { x.beginPath(); x.arc(p[p.length - 1][0] * s, p[p.length - 1][1] * s, st.r * s, 0, 7); x.fill(); }
+    if (p.length > 1) { x.beginPath(); x.moveTo(p[Math.max(0, i - 1)][0] * s, p[Math.max(0, i - 1)][1] * s); for (var j = Math.max(1, i); j < p.length; j++) x.lineTo(p[j][0] * s, p[j][1] * s); x.stroke(); }
+    x.restore();
+  }
+  // Cut-out of the photo at w x h: original pixels with the mask (and hand edits) as alpha.
+  function cutout(w, h, pix, mask, edit) {
+    var out = new ImageData(w, h), o = out.data, d = pix.data, e = edit ? edit.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data : null;
+    for (var i = 0, n = w * h; i < n; i++) {
+      var j = i * 4, m = mask[i];
+      if (e && e[j + 3]) { var ea = e[j + 3] / 255; m = m * (1 - ea) + e[j] * ea; }
+      o[j] = d[j]; o[j + 1] = d[j + 1]; o[j + 2] = d[j + 2]; o[j + 3] = d[j + 3] * m / 255;
+    }
+    return out;
+  }
+  var canFilter = (function () { try { var x = canvas(1, 1).getContext('2d'); x.filter = 'blur(2px)'; return x.filter === 'blur(2px)'; } catch (e) { return false; } })();
+  function drawBg(x, w, h, forJpg) {
+    var mode = $('bgmode').value;
+    if (mode === 'color' || (forJpg && (mode === 'none' || (mode === 'image' && !bgImg)))) { x.fillStyle = $('bgcol').value; x.fillRect(0, 0, w, h); }
+    else if (mode === 'blur') {
+      var r = +$('blur').value * Math.max(w, h) / 1000;
+      if (canFilter) { x.save(); x.filter = 'blur(' + r + 'px)'; x.drawImage(src, -2 * r, -2 * r, w + 4 * r, h + 4 * r); x.restore(); }
+      else { // older Safari: shrink and stretch back up, which blurs
+        var f = Math.max(2, r / 2), sw = Math.max(1, Math.round(w / f)), sh = Math.max(1, Math.round(h / f)), t = canvas(sw, sh), tx = t.getContext('2d');
+        tx.imageSmoothingQuality = 'high'; tx.drawImage(src, 0, 0, sw, sh); x.imageSmoothingQuality = 'high'; x.drawImage(t, 0, 0, w, h);
+      }
+    } else if (mode === 'image' && bgImg) { // cover the frame, centred
+      var s = Math.max(w / bgImg.naturalWidth, h / bgImg.naturalHeight), iw = bgImg.naturalWidth * s, ih = bgImg.naturalHeight * s;
+      x.imageSmoothingQuality = 'high'; x.drawImage(bgImg, (w - iw) / 2, (h - ih) / 2, iw, ih);
+    }
+  }
+
+  // ---------- preview ----------
+  function buildPreview() {
+    var s = Math.min(1, PREV / Math.max(W, H)), w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s)), c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h);
+    pv = { w: w, h: h, s: s, pix: x.getImageData(0, 0, w, h), orig: c, edit: canvas(w, h), cut: canvas(w, h), bg: canvas(w, h) };
+    cv.width = w; cv.height = h; cv.style.width = '';
+    remask(); redrawEdits(); drawBgPreview();
+  }
+  function remask() { pv.mask = maskAt(pv.w, pv.h); }
+  function redrawEdits() { var x = pv.edit.getContext('2d'); x.clearRect(0, 0, pv.w, pv.h); strokes.forEach(function (st) { paint(x, st, pv.s); }); recut(); }
+  function recut() { pv.cut.getContext('2d').putImageData(cutout(pv.w, pv.h, pv.pix, pv.mask, strokes.length ? pv.edit : null), 0, 0); draw(); }
+  function drawBgPreview() { var x = pv.bg.getContext('2d'); x.clearRect(0, 0, pv.w, pv.h); drawBg(x, pv.w, pv.h, false); draw(); }
+  var hover = null, raf = 0;
+  function draw() {
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; if (!pv) return;
+      var w = pv.w, h = pv.h, split = brush ? 0 : +$('cmp').value / 100 * w;
+      ctx.clearRect(0, 0, w, h);
+      if (brush) { ctx.globalAlpha = 0.3; ctx.drawImage(pv.orig, 0, 0); ctx.globalAlpha = 1; }
+      else ctx.drawImage(pv.bg, 0, 0);
+      ctx.drawImage(pv.cut, 0, 0);
+      if (split > 0) {
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, split, h); ctx.clip(); ctx.drawImage(pv.orig, 0, 0); ctx.restore();
+        ctx.fillStyle = '#fff'; ctx.fillRect(split - 1, 0, 2, h);
+        ctx.beginPath(); ctx.arc(split, h / 2, 14, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.lineWidth = 1; ctx.stroke();
+        ctx.fillStyle = '#111'; ctx.font = '600 13px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('‹ ›', split, h / 2 + 1);
+      }
+      if (brush && hover) {
+        var r = +$('bsize').value / 2 * (cv.width / (cv.clientWidth || cv.width));
+        ctx.beginPath(); ctx.arc(hover[0], hover[1], r, 0, 7); ctx.lineWidth = 2; ctx.strokeStyle = '#fff'; ctx.stroke();
+        ctx.lineWidth = 1; ctx.strokeStyle = brush === 'keep' ? '#16a34a' : '#dc2626'; ctx.stroke();
+      }
+      $('tagB').hidden = !(split > 0); $('tagA').hidden = !(split > 0) || split >= w - 40;
+    });
+  }
+
+  // ---------- pointer: compare slider drag, or brush ----------
+  function pos(e) { var b = cv.getBoundingClientRect(); return [(e.clientX - b.left) * cv.width / b.width, (e.clientY - b.top) * cv.height / b.height]; }
+  var dragging = false;
+  cv.addEventListener('pointerdown', function (e) {
+    if (!pv) return;
+    var p = pos(e); dragging = true; try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    if (brush) {
+      var r = +$('bsize').value / 2 * (cv.width / (cv.clientWidth || cv.width)) / pv.s;
+      cur = { mode: brush, r: r, pts: [[p[0] / pv.s, p[1] / pv.s]] }; strokes.push(cur);
+      paint(pv.edit.getContext('2d'), cur, pv.s); recut(); $('undo').disabled = $('reset').disabled = false;
+    } else { $('cmp').value = Math.round(p[0] / cv.width * 100); draw(); }
+    e.preventDefault();
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!pv) return;
+    var p = pos(e); hover = p;
+    if (dragging && brush && cur) { cur.pts.push([p[0] / pv.s, p[1] / pv.s]); paint(pv.edit.getContext('2d'), cur, pv.s, cur.pts.length - 1); recut(); }
+    else if (dragging && !brush) { $('cmp').value = Math.max(0, Math.min(100, Math.round(p[0] / cv.width * 100))); draw(); }
+    else if (brush) draw();
+  });
+  function up() { dragging = false; cur = null; }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('pointerleave', function () { hover = null; if (brush) draw(); });
+  $('cmp').addEventListener('input', draw);
+
+  // ---------- controls ----------
+  Array.prototype.forEach.call(document.querySelectorAll('[data-brush]'), function (b) {
+    b.addEventListener('click', function () {
+      brush = b.getAttribute('data-brush');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-brush]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      $('stage').classList.toggle('brush', !!brush); $('brushOpts').hidden = $('brushHint').hidden = !brush; $('cmpRow').hidden = !!brush;
+      draw();
+    });
+  });
+  $('bsize').addEventListener('input', function () { $('bsv').textContent = $('bsize').value; draw(); });
+  $('undo').addEventListener('click', function () { strokes.pop(); $('undo').disabled = $('reset').disabled = !strokes.length; if (pv) redrawEdits(); });
+  $('reset').addEventListener('click', function () { strokes = []; $('undo').disabled = $('reset').disabled = true; if (pv) redrawEdits(); });
+  $('soft').addEventListener('input', function () { $('softv').textContent = $('soft').value; if (pv && low) { remask(); recut(); } });
+  function showBgRows() {
+    var m = $('bgmode').value;
+    $('colorRow').hidden = m !== 'color'; $('blurRow').hidden = m !== 'blur'; $('imgRow').hidden = m !== 'image';
+  }
+  $('bgmode').addEventListener('change', function () { showBgRows(); if (pv) drawBgPreview(); });
+  $('bgcol').addEventListener('input', function () { if (pv) drawBgPreview(); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-c]'), function (b) {
+    b.addEventListener('click', function () { $('bgcol').value = b.getAttribute('data-c'); $('bgcol').dispatchEvent(new Event('input', { bubbles: true })); });
+  });
+  $('blur').addEventListener('input', function () { $('blurv').textContent = $('blur').value; if (pv) drawBgPreview(); });
+  $('bgpick').addEventListener('click', function () { $('bgfile').click(); });
+  $('bgfile').addEventListener('change', function () {
+    var f = $('bgfile').files[0]; $('bgfile').value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { say('bad', 'The background must be an image file (JPG, PNG or WebP).'); return; }
+    loadImage(f, function (im) {
+      if (!im) { say('bad', 'Could not read that background picture.'); return; }
+      bgImg = im; $('bgname').textContent = f.name; say('', ''); if (pv) drawBgPreview();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-model]'), function (b) {
+    b.addEventListener('click', function () {
+      var k = b.getAttribute('data-model'); if (k === modelKey) return;
+      modelKey = k;
+      Array.prototype.forEach.call(document.querySelectorAll('[data-model]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      if (src) run();
+    });
+  });
+
+  // ---------- run ----------
+  function run() {
+    var mine = ++job, m = MODELS[modelKey], t0;
+    busy = true; say('', '');
+    function report(f, t) { if (mine === job) progress(f, t); }
+    return getSession(modelKey, report).then(function (s) {
+      if (mine !== job) return;
+      progress(null, 'Finding the subject…');
+      return new Promise(function (r) { setTimeout(r, 30); }).then(function () { t0 = performance.now(); return infer(s, m); }).then(function (prob) {
+        if (mine !== job) return;
+        var t1 = performance.now();
+        refine(prob, m.size);
+        $('work').hidden = false; buildPreview();
+        busy = false; $('notice').hidden = true;
+        var ms = Math.round(t1 - t0);
+        window.__bgr = { ms: ms, ep: s.ep, model: modelKey, w: W, h: H };
+        say('ok', 'Background removed (' + W + ' × ' + H + ' px, ' + (ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1) + ' s') + ' using ' + s.ep + '). Check the edges, then download.');
+      });
+    }).catch(function (e) {
+      if (mine !== job) return;
+      busy = false; $('notice').hidden = true;
+      var net = e && e.message === 'net';
+      say('bad', net ? 'The AI model could not be downloaded. Check your internet connection and pick the photo again.' :
+        (typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which this tool needs. Please update your browser.' :
+        'Something went wrong while removing the background' + (e && e.message ? ' (' + String(e.message).slice(0, 120) + ')' : '') + '. Try the other Detail option or a smaller photo.'));
+    });
+  }
+  function take(f) {
+    job++; src = null; low = null; pv = null; strokes = []; $('undo').disabled = $('reset').disabled = true; $('work').hidden = true; $('notice').hidden = true;
+    if (!f) return;
+    if (!/^image\//.test(f.type) || /svg/.test(f.type)) { say('bad', 'Please choose a photo (JPG, PNG or WebP). "' + f.name + '" is not a supported image.'); return; }
+    say('', 'Opening ' + f.name + '…');
+    var mine = job;
+    loadImage(f, function (im) {
+      if (mine !== job) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (HEIC photos from iPhone may need converting to JPG first).'); return; }
+      var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, Math.sqrt(MAX_AREA / (w * h)), 8000 / Math.max(w, h));
+      W = Math.max(1, Math.round(w * s)); H = Math.max(1, Math.round(h * s));
+      var c = canvas(W, H); c.getContext('2d').drawImage(im, 0, 0, W, H); src = c;
+      name = f.name.replace(/\.[^.]+$/, '') || 'photo';
+      $('cmp').value = 0;
+      run().then(function () { if (mine === job && s < 1 && src) say('ok', $('msg').textContent + ' Your photo was very large, so it was scaled to ' + W + ' × ' + H + ' px.'); });
+    });
+  }
+  PT_drop();
+  function PT_drop() { // like setupDrop, but clears the input so the same photo can be picked again
+    var drop = $('drop'), input = $('file');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; if (f) take(f); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { var f = e.dataTransfer.files[0]; if (f) take(f); });
+  }
+
+  // ---------- download at full size ----------
+  function save(type) {
+    if (!src || !low || busy) return;
+    var btn = $(type === 'image/png' ? 'dlpng' : 'dljpg'), label = btn.textContent;
+    btn.disabled = true; btn.textContent = 'Preparing…';
+    setTimeout(function () {
+      try {
+        var x0 = src.getContext('2d', { willReadFrequently: true }), pix = x0.getImageData(0, 0, W, H), edit = null;
+        if (strokes.length) { edit = canvas(W, H); var ex = edit.getContext('2d'); strokes.forEach(function (st) { paint(ex, st, 1); }); }
+        var cut = canvas(W, H); cut.getContext('2d').putImageData(cutout(W, H, pix, maskAt(W, H), edit), 0, 0);
+        var out = canvas(W, H), ox = out.getContext('2d');
+        drawBg(ox, W, H, type === 'image/jpeg'); ox.drawImage(cut, 0, 0);
+        out.toBlob(function (b) {
+          btn.disabled = false; btn.textContent = label;
+          if (!b) { say('bad', 'Your browser could not save the picture. Try PNG, or a smaller photo.'); return; }
+          var a = document.createElement('a'), url = URL.createObjectURL(b);
+          a.href = url; a.download = name + '-no-background.' + (type === 'image/png' ? 'png' : 'jpg');
+          document.body.appendChild(a); a.click(); a.remove();
+          setTimeout(function () { URL.revokeObjectURL(url); }, 60000);
+          say('ok', 'Saved ' + a.download + ' (' + fmtBytes(b.size) + ').');
+          if (window.burst) burst(btn);
+        }, type, 0.92);
+      } catch (e) { btn.disabled = false; btn.textContent = label; say('bad', 'Not enough memory to save at full size. Try a smaller photo.'); }
+    }, 20);
+  }
+  $('dlpng').addEventListener('click', function () { save('image/png'); });
+  $('dljpg').addEventListener('click', function () { save('image/jpeg'); });
+  showBgRows();
+})();
+</script>
