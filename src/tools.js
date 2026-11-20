@@ -1324,5 +1324,88 @@ module.exports = [
         ['Can I print a formula sheet?', 'Yes. Click Print next to any section heading to print that section as a compact two-column sheet.']
       ],
       icon: '<path d="M18 5H6l6 7-6 7h12"/>'
+  },
+  {
+      slug: 'video-compressor', cat: 'Media tools', name: 'Video Compressor',
+      title: 'Video Compressor - Reduce MP4 & MOV File Size Free',
+      desc: 'Compress MP4, MOV and WebM videos in your browser. Pick a quality or a target size in MB, lower the resolution and download an MP4. No upload.',
+      card: 'Shrink videos to a size you choose, privately.',
+      intro: 'Make a video small enough for email, WhatsApp or an upload form. Choose a quality preset or type the size you need in MB. The video is compressed on your own device and never uploaded.',
+      steps: ['Click the box or drop a video onto it.', 'Choose a quality preset, or switch to Target file size and type the MB you need.', 'Pick a resolution and decide whether to keep the sound.', 'Click Compress video, then Download video.'],
+      faq: [
+        ['Is my video uploaded to a server?', 'No. The video is compressed by your own browser using a built-in copy of FFmpeg. It never leaves your device.'],
+        ['How much smaller will my video get?', 'Phone videos usually shrink by 50 to 90%. Lowering the resolution to 720p or 480p saves the most. The tool shows the original size, the new size and the percentage saved.'],
+        ['How does target size work?', 'The tool divides the size you want by the length of the video to work out a bitrate. The result normally lands within about 10% of your target.'],
+        ['Why is the first video slow to start?', 'The video engine is about 32 MB and is downloaded the first time you use it. After that your browser keeps it, so later videos start quickly.'],
+        ['What is the largest video I can compress?', 'Up to 1 GB. Long or 4K videos take a while because everything runs inside the browser. A computer is much faster than a phone.'],
+        ['Why did I get the original file back?', 'If the compressed copy would be bigger than your original, the tool gives you the original instead. Try Smallest file or a lower resolution.']
+      ],
+      icon: '<rect x="2" y="6" width="14" height="12" rx="2"/><path d="M16 10l6-3v10l-6-3"/><path d="M6 10l3 2 3-2M9 12V8"/>'
+  },
+  {
+      slug: 'video-trimmer', cat: 'Media tools', name: 'Video Trimmer',
+      title: 'Video Trimmer - Cut MP4, MOV & WebM Videos Online Free',
+      desc: 'Trim the start and end of a video in your browser. Set times by playing the video or typing them, cut without quality loss and download. No upload.',
+      card: 'Cut the part of a video you want to keep.',
+      intro: 'Cut a long video down to the part you need. Play the video, mark the start and end, and save the clip. Fast mode keeps the original quality, and nothing is uploaded.',
+      steps: ['Click the box or drop a video onto it.', 'Play the video and press Set start here and Set end here, or type the times.', 'Choose Fast (no quality loss) or Exact frame, and tick Remove sound if you want it silent.', 'Click Trim video, then Download clip.'],
+      faq: [
+        ['Does trimming lower the quality?', 'Not in Fast mode. The video is copied without re-encoding, so the clip looks exactly like the original. Exact frame mode re-encodes at high quality.'],
+        ['Why does my fast clip start a little early?', 'Videos can only be cut cleanly at key frames, which come every 1 to 5 seconds. Fast mode starts at the key frame just before your start time. Use Exact frame mode for a precise cut.'],
+        ['How do I type a time?', 'Use minutes and seconds like 1:05 or 1:05.5, hours like 1:02:30, or just seconds like 65.'],
+        ['Is my video uploaded?', 'No. The video is cut inside your browser and never leaves your device.'],
+        ['Which formats can I trim?', 'MP4, MOV, WebM, MKV, AVI and most phone and camera videos up to 1 GB. Fast mode keeps the same format; Exact frame mode saves an MP4.']
+      ],
+      icon: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>'
+  },
+  {
+      slug: 'video-to-gif', cat: 'Media tools', name: 'Video to GIF',
+      title: 'Video to GIF Converter - Make GIFs from MP4 Free',
+      desc: 'Turn part of an MP4, MOV or WebM video into an animated GIF in your browser. Choose start, length, size and frame rate. High quality colours, no upload.',
+      card: 'Turn a video clip into an animated GIF.',
+      intro: 'Make a looping GIF from any short moment in a video. Pick where it starts, how long it lasts and how big it is. The GIF is made on your device with an optimised colour palette, so it looks sharp and stays small.',
+      steps: ['Click the box or drop a video onto it.', 'Play the video and press Start the GIF here, or type a start time, then set the length (up to 20 seconds).', 'Choose the frames per second, width, colours and whether it loops.', 'Click Make GIF, check the preview, then Download GIF.'],
+      faq: [
+        ['How long can my GIF be?', 'Up to 20 seconds. GIF is an old format with no real compression, so long GIFs quickly become many megabytes. 3 to 6 seconds is ideal for chats and websites.'],
+        ['How do I make the GIF smaller?', 'Lower the width, choose fewer frames per second (8 to 12 is plenty) or a shorter length. Fewer colours also helps a little.'],
+        ['Why do the colours look so good?', 'The tool first builds the best 256-colour palette for your clip, then maps every frame onto it. This avoids the grainy look of simple converters.'],
+        ['Is my video uploaded?', 'No. The GIF is made inside your browser and the video never leaves your device.'],
+        ['Will the GIF have sound?', 'No. The GIF format cannot hold sound. If you need sound, use the Video Trimmer to make a short MP4 clip instead.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M10.5 9.5H8.5a1.5 1.5 0 0 0-1.5 1.5v2a1.5 1.5 0 0 0 1.5 1.5h2v-2.5H9M13 9.5v5M16 14.5v-5h2.5M16 12h2"/>'
+  },
+  {
+      slug: 'video-converter', cat: 'Media tools', name: 'Video Converter',
+      title: 'Video Converter - MOV to MP4, WebM, MP3 Online Free',
+      desc: 'Convert videos to MP4, WebM or MOV, or save the sound as MP3, right in your browser. Rotate or remove sound too. Private, no upload, no sign-up.',
+      card: 'Convert videos to MP4, WebM, MOV or MP3.',
+      intro: 'Change a video into the format you need: MP4 that plays everywhere, WebM for websites, MOV for Apple apps, or just the sound as an MP3. You can also rotate a sideways video or remove its sound. Everything happens on your device.',
+      steps: ['Click the box or drop a video onto it.', 'Choose the format in Convert to.', 'Optionally rotate the video or tick Remove sound.', 'Click Convert, then download the new file.'],
+      faq: [
+        ['How do I convert MOV to MP4?', 'Drop the MOV file, choose MP4 and click Convert. iPhone MOV files that already use H.264 are copied into MP4 without re-encoding, so it takes seconds and keeps full quality.'],
+        ['Can I get just the audio as MP3?', 'Yes. Choose MP3 (sound only). The sound track is saved as a high quality MP3 of about 190 kbps.'],
+        ['How do I fix a sideways video?', 'Choose 90° clockwise, 90° counter-clockwise or 180° in Rotate. The video is turned for real, not just flagged, so it plays the right way up everywhere.'],
+        ['Is my video uploaded?', 'No. The conversion runs in your browser with a built-in copy of FFmpeg. The video never leaves your device.'],
+        ['Which format should I pick?', 'MP4 for phones, social media, email and most apps. WebM for web pages. MOV for Final Cut, iMovie and other Apple apps. MP3 when you only need the sound.'],
+        ['Why is converting slow?', 'Re-encoding video is hard work, and a browser tab uses only one processor core. A one-minute 1080p clip can take a few minutes. Smaller and shorter videos are quicker.']
+      ],
+      icon: '<rect x="2" y="6" width="13" height="12" rx="2"/><path d="M15 10l5-3v10l-5-3"/><path d="M6 10h5l-1.5-1.5M10 14H5l1.5 1.5"/>'
+  },
+  {
+      slug: 'heic-to-jpg', cat: 'Image tools', name: 'HEIC to JPG',
+      title: 'HEIC to JPG Converter - Convert iPhone Photos Free',
+      desc: 'Convert iPhone HEIC and HEIF photos to JPG or PNG in your browser. Batch convert many at once and download a ZIP. Private, no upload, no sign-up.',
+      card: 'Turn iPhone HEIC photos into JPG or PNG.',
+      intro: 'iPhones save photos as HEIC, which many websites, Windows apps and forms cannot open. Convert them to JPG or PNG here, one at a time or in a batch. The photos are converted on your device and never uploaded.',
+      steps: ['Click the box or drop one or more HEIC photos onto it.', 'Choose JPG or PNG and, for JPG, the quality.', 'Click Convert.', 'Save each photo, or click Download all (ZIP) for the whole batch.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. The HEIC decoder runs inside your browser, so your photos never leave your device.'],
+        ['Will the photo be the right way up?', 'Yes. The rotation stored in the HEIC file is applied, so portrait photos stay portrait in the JPG.'],
+        ['JPG or PNG?', 'JPG is smaller and opens everywhere, so it is best for photos. PNG is lossless but often 3 to 5 times bigger.'],
+        ['Can I convert many photos at once?', 'Yes. Select or drop as many as you like. Each one gets its own Save link, and Download all (ZIP) gives you every photo with its original name.'],
+        ['What about Live Photos and bursts?', 'Some HEIC files hold several images. Choose All images to save every one, or Main image only to save just the photo you see in Photos.'],
+        ['Is the photo quality lost?', 'At 90% JPG quality the difference is invisible for normal viewing. Choose 100% or PNG if you need the highest quality.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.5"/><path d="M21 15l-5-5-8 9"/><path d="M14 3h4M18 3l-1.5-1.5M18 3l-1.5 1.5"/>'
   }
 ];

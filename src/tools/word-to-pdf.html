@@ -1,0 +1,363 @@
+<style>
+.w2p-view { margin-top: 14px; border: 1px solid var(--line); border-radius: 10px; background: #8a8f98; overflow: hidden; }
+.w2p-view > div { transform-origin: 0 0; }
+.w2p-view .docx-wrapper { background: transparent !important; padding: 16px !important; }
+.w2p-view section.docx { margin-bottom: 16px !important; }
+.w2p-nomk::before { content: none !important; }
+.w2p-view .docx, #w2pPrint .docx { hyphens: manual !important; -webkit-hyphens: manual !important; }
+.w2p-mk { display: inline-block; white-space: pre; text-indent: 0; }
+#w2pPrint { display: none; }
+@media print {
+  html.w2p-printing body > *:not(#w2pPrint) { display: none !important; }
+  html.w2p-printing #w2pPrint { display: block !important; }
+  html.w2p-printing, html.w2p-printing body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #w2pPrint .docx-wrapper { background: #fff !important; padding: 0 !important; display: block !important; }
+  #w2pPrint section.docx { box-shadow: none !important; margin: 0 !important; padding-top: 0 !important; padding-bottom: 0 !important; min-height: 0 !important; overflow: visible !important; break-after: page; }
+  #w2pPrint section.docx:last-child { break-after: auto; }
+  #w2pPrint section.docx > header, #w2pPrint section.docx > footer { display: none !important; }
+}
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a Word file (.docx) here</b>It is turned into a PDF on your device and never uploaded.</div>
+<input type="file" id="file" accept=".docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document" hidden>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Make PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a><button class="btn ghost" id="print" disabled>Print → Save as PDF</button></div>
+<p class="msg" id="msg"></p>
+<p class="msg" id="note" hidden></p>
+<div class="w2p-view" id="view" hidden><div id="scaler"><div id="host"></div></div></div>
+<p class="msg">Make PDF gives a PDF with real, selectable text, drawn with the Noto Sans font, so letters may look a little different from your document. For the closest match to your fonts, use <b>Print → Save as PDF</b> and pick "Save as PDF" (or "Microsoft Print to PDF") as the printer. Old .doc files are not supported: open them in Word, LibreOffice or Google Docs and save as .docx first.</p>
+<div id="w2pPrint"></div>
+<script src="../assets/vendor/jszip/jszip.min.js"></script>
+<script src="../assets/vendor/docx-preview/docx-preview.min.js"></script>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var DP = window.docx, file = null, ready = false, fontBytes = null, scale = 1;
+  function note(t) { $('note').hidden = !t; $('note').textContent = t || ''; }
+
+  function reset() { ready = false; $('go').disabled = true; $('print').disabled = true; $('dl').hidden = true; $('view').hidden = true; $('host').innerHTML = ''; note(''); }
+  PT.drop(false, function (f) {
+    reset(); file = f;
+    var ext = (f.name.match(/\.([^.]+)$/) || [])[1]; ext = ext ? ext.toLowerCase() : '';
+    if (!f.size) { PT.say('bad', '"' + f.name + '" is empty.'); return; }
+    PT.say('', 'Opening ' + f.name + '…');
+    f.slice(0, 8).arrayBuffer().then(function (head) {
+      var b = new Uint8Array(head);
+      if (b[0] === 0xD0 && b[1] === 0xCF && b[2] === 0x11 && b[3] === 0xE0) throw new Error(ext === 'docx' ? '"' + f.name + '" is password protected. Open it in Word, remove the password (File › Info › Protect Document), save, and try again.' : '"' + f.name + '" is an old Word .doc file, which this tool cannot read. Open it in Word, LibreOffice or Google Docs, save it as .docx, then try again.');
+      if (!(b[0] === 0x50 && b[1] === 0x4B)) throw new Error(/^(pdf)$/.test(ext) ? '"' + f.name + '" is already a PDF.' : '"' + f.name + '" is not a Word .docx file.');
+      if (!DP || !DP.renderAsync || !window.JSZip) throw new Error('The Word reader could not load. Reload the page and try again.');
+      return DP.renderAsync(f, $('host'), null, { className: 'docx', inWrapper: true, breakPages: true, ignoreLastRenderedPageBreak: true, renderHeaders: true, renderFooters: true, renderFootnotes: true, renderEndnotes: true, useBase64URL: true, experimental: true, ignoreWidth: false, ignoreHeight: false });
+    }).then(function () {
+      var secs = $('host').querySelectorAll('section.docx');
+      if (!secs.length) throw new Error('No pages were found in "' + f.name + '".');
+      markers();
+      $('view').hidden = false; fit();
+      return waitImages();
+    }).then(function () {
+      ready = true; $('go').disabled = false; $('print').disabled = false;
+      PT.say('ok', 'Opened ' + f.name + '. Check the preview, then press Make PDF.');
+    }).catch(function (e) {
+      reset();
+      var m = e && e.message || '';
+      PT.say('bad', /^"|^The Word/.test(m) ? m : '"' + f.name + '" could not be read as a Word .docx file. It may be damaged.');
+    });
+  });
+
+  // Fit the preview to the box width (the pages keep their real size inside, which is what gets measured).
+  function fit() {
+    var host = $('host'), sc = $('scaler'), w = host.scrollWidth || 1, box = $('view').clientWidth || 1;
+    scale = Math.min(1, box / w);
+    sc.style.transform = scale < 1 ? 'scale(' + scale + ')' : '';
+    sc.style.width = w + 'px';
+    $('view').style.height = Math.ceil(host.scrollHeight * scale) + 'px';
+  }
+  addEventListener('resize', function () { if (!$('view').hidden) fit(); });
+  function waitImages() {
+    return Promise.all(Array.prototype.map.call($('host').querySelectorAll('img'), function (img) {
+      return img.complete ? null : new Promise(function (r) { img.onload = img.onerror = r; setTimeout(r, 5000); });
+    }));
+  }
+
+  // List numbers and bullets are drawn by CSS counters; turn them into real text so they can be measured and kept.
+  var PUA = { '': '•', '': '▪', '': '❖', '': '➢', '': '✓', '': '◆', '': '■', '': '❑', '': '➔', '': '–', '': '—' };
+  function markers() {
+    var counters = {}, todo = [];
+    function num(n, style) {
+      style = style || 'decimal';
+      if (/roman/.test(style)) { var r = '', v = n, map = [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']]; map.forEach(function (p) { while (v >= p[0]) { r += p[1]; v -= p[0]; } }); return /upper/.test(style) ? r.toUpperCase() : r; }
+      if (/alpha|latin/.test(style)) { var s = ''; while (n > 0) { n--; s = String.fromCharCode(97 + n % 26) + s; n = Math.floor(n / 26); } return /upper/.test(style) ? s.toUpperCase() : s; }
+      if (style === 'decimal-leading-zero') return (n < 10 ? '0' : '') + n;
+      return String(n);
+    }
+    function apply(list, inc) {
+      if (!list || list === 'none') return;
+      var t = list.trim().split(/\s+/);
+      for (var i = 0; i < t.length; i++) {
+        var name = t[i], v = /^-?\d+$/.test(t[i + 1]) ? +t[++i] : (inc ? 1 : 0);
+        counters[name] = inc ? (counters[name] || 0) + v : v;
+      }
+    }
+    var all = $('host').querySelectorAll('section.docx *');
+    for (var i = 0; i < all.length; i++) {
+      var el = all[i], cs = getComputedStyle(el);
+      apply(cs.counterReset, false); apply(cs.counterIncrement, true);
+      var b = getComputedStyle(el, '::before'), c = b.content;
+      if (!c || c === 'none' || c === 'normal') continue;
+      apply(b.counterReset, false); apply(b.counterIncrement, true);
+      var out = '', re = /"((?:[^"\\]|\\.)*)"|counters?\(\s*([\w-]+)\s*(?:,\s*"[^"]*")?\s*(?:,\s*([\w-]+))?\s*\)/g, m;
+      while ((m = re.exec(c))) {
+        if (m[1] !== undefined) out += m[1].replace(/\\([0-9a-fA-F]{1,6})\s?/g, function (x, h) { return String.fromCodePoint(parseInt(h, 16)); }).replace(/\\(.)/g, '$1');
+        else out += num(counters[m[2]] || 0, m[3]);
+      }
+      out = out.replace(/[-]/g, function (ch) { return PUA[ch] || '•'; });
+      var symbolic = /symbol|wingdings/i.test(b.fontFamily);
+      todo.push({ el: el, text: out.replace(/\t/g, ' '), font: symbolic ? '' : b.fontFamily, color: b.color, weight: b.fontWeight, size: b.fontSize, indent: -parseFloat(cs.textIndent) || 0 });
+    }
+    todo.forEach(function (t) {
+      var s = document.createElement('span');
+      s.className = 'w2p-mk'; s.textContent = t.text.replace(/\s+$/, '') + ' ';
+      if (t.font) s.style.fontFamily = t.font;
+      s.style.color = t.color; s.style.fontWeight = t.weight; s.style.fontSize = t.size;
+      if (t.indent > 0) s.style.minWidth = t.indent + 'px';
+      t.el.insertBefore(s, t.el.firstChild);
+      t.el.classList.add('w2p-nomk');
+    });
+  }
+
+  // ---------- measuring the rendered pages ----------
+  function rgb(c) {
+    var m = /rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)(?:,\s*([\d.]+))?\)/.exec(c || '');
+    if (!m) return null;
+    var a = m[4] === undefined ? 1 : +m[4];
+    return a < 0.05 ? null : { r: m[1] / 255, g: m[2] / 255, b: m[3] / 255, a: a };
+  }
+  var metricCache = {}, mctx = document.createElement('canvas').getContext('2d');
+  function ascent(font, size) {
+    if (metricCache[font]) return metricCache[font];
+    mctx.font = font;
+    var m = mctx.measureText('Hgjy'), a = m.fontBoundingBoxAscent, d = m.fontBoundingBoxDescent;
+    if (!(a > 0)) { a = size * 0.8; d = size * 0.2; }
+    return (metricCache[font] = { a: a, d: d });
+  }
+  function decorated(el, kind) {
+    for (var n = el; n && n.tagName !== 'P' && n.tagName !== 'SECTION'; n = n.parentElement) if ((getComputedStyle(n).textDecorationLine || '').indexOf(kind) !== -1) return true;
+    return false;
+  }
+  function collect(sec) {
+    var S = sec.getBoundingClientRect(), k = scale || 1, items = { fills: [], lines: [], imgs: [], text: [] };
+    function box(r) { return { x: (r.left - S.left) / k, y: (r.top - S.top) / k, w: r.width / k, h: r.height / k }; }
+    function zone(el) { var z = el.closest('header,footer'); return z && z.parentElement === sec ? z.tagName.toLowerCase() : 'body'; }
+    sec.querySelectorAll('*').forEach(function (el) {
+      if (el.tagName === 'IMG' || el.tagName === 'svg' || el.tagName === 'SVG') {
+        var r = el.getBoundingClientRect();
+        if (r.width > 1 && r.height > 1) items.imgs.push({ el: el, b: box(r), z: zone(el) });
+        return;
+      }
+      if (el.closest('svg')) return;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none') return;
+      var bg = rgb(cs.backgroundColor), r2 = null;
+      if (bg) { r2 = el.getBoundingClientRect(); if (r2.width && r2.height) items.fills.push({ b: box(r2), c: bg, z: zone(el) }); }
+      ['Top', 'Right', 'Bottom', 'Left'].forEach(function (side) {
+        var w = parseFloat(cs['border' + side + 'Width']), st = cs['border' + side + 'Style'], col = rgb(cs['border' + side + 'Color']);
+        if (!(w > 0) || st === 'none' || st === 'hidden' || !col) return;
+        var b = box(r2 || (r2 = el.getBoundingClientRect())), z = zone(el);
+        if (side === 'Top') items.lines.push({ x1: b.x, y1: b.y + w / 2, x2: b.x + b.w, y2: b.y + w / 2, w: w, c: col, z: z, dash: st === 'dashed' || st === 'dotted' });
+        if (side === 'Bottom') items.lines.push({ x1: b.x, y1: b.y + b.h - w / 2, x2: b.x + b.w, y2: b.y + b.h - w / 2, w: w, c: col, z: z, dash: st === 'dashed' || st === 'dotted' });
+        if (side === 'Left') items.lines.push({ x1: b.x + w / 2, y1: b.y, x2: b.x + w / 2, y2: b.y + b.h, w: w, c: col, z: z, dash: st === 'dashed' || st === 'dotted' });
+        if (side === 'Right') items.lines.push({ x1: b.x + b.w - w / 2, y1: b.y, x2: b.x + b.w - w / 2, y2: b.y + b.h, w: w, c: col, z: z, dash: st === 'dashed' || st === 'dotted' });
+      });
+    });
+    var tw = document.createTreeWalker(sec, NodeFilter.SHOW_TEXT), node, range = document.createRange();
+    while ((node = tw.nextNode())) {
+      var txt = node.nodeValue, el = node.parentElement;
+      if (!txt.trim() || !el || el.closest('svg')) continue;
+      var cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || !rgb(cs.color)) continue;
+      var size = parseFloat(cs.fontSize) || 14, font = cs.fontStyle + ' ' + cs.fontWeight + ' ' + cs.fontSize + ' ' + cs.fontFamily;
+      var style = { size: size, bold: +cs.fontWeight >= 600 || cs.fontWeight === 'bold', italic: cs.fontStyle !== 'normal', c: rgb(cs.color), font: font, under: decorated(el, 'underline'), strike: decorated(el, 'line-through'), justify: cs.textAlign === 'justify' || (el.closest('p') && getComputedStyle(el.closest('p')).textAlign === 'justify') };
+      var met = ascent(font, size), z = zone(el), re = /\S+/g, m, seg = null;
+      var flush = function () { if (seg) { items.text.push(seg); seg = null; } };
+      while ((m = re.exec(txt))) {
+        range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+        var rects = range.getClientRects();
+        if (!rects.length) continue;
+        if (rects.length > 1) { // a word broken over two lines: place each letter
+          flush();
+          for (var ci = 0; ci < m[0].length; ci++) {
+            range.setStart(node, m.index + ci); range.setEnd(node, m.index + ci + 1);
+            var cr = range.getClientRects()[0]; if (!cr || !cr.width) continue;
+            var cb = box(cr);
+            items.text.push({ t: m[0][ci], b: cb, base: cb.y + (cb.h - met.a - met.d) / 2 + met.a, s: style, z: z });
+          }
+          continue;
+        }
+        var b = box(rects[0]), base = b.y + (b.h - met.a - met.d) / 2 + met.a;
+        if (seg && !style.justify && Math.abs(seg.base - base) < 0.5 && b.x >= seg.b.x + seg.b.w - 0.5) { // same line: extend the run
+          seg.t = txt.slice(seg.start, m.index + m[0].length); seg.b.w = b.x + b.w - seg.b.x;
+        } else { flush(); seg = { t: m[0], start: m.index, b: b, base: base, s: style, z: z }; }
+      }
+      flush();
+    }
+    return items;
+  }
+
+  // ---------- drawing the PDF ----------
+  function loadFonts() {
+    if (fontBytes) return Promise.resolve(fontBytes);
+    return Promise.all(['400', '700'].map(function (w) {
+      return fetch('../assets/vendor/fonts/noto-sans-subset-' + w + '.ttf').then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); });
+    })).then(function (f) { fontBytes = f; return f; }).catch(function () { throw new Error('The PDF font could not load. Check your connection and try again.'); });
+  }
+  function imgBytes(el) {
+    return new Promise(function (res) {
+      var draw = function (img, w, h) {
+        try {
+          var c = document.createElement('canvas'), k = Math.min(1, 2400 / Math.max(w, h)); c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          c.toBlob(function (b) { if (!b) return res(null); b.arrayBuffer().then(function (a) { res({ png: new Uint8Array(a) }); }); }, 'image/png');
+        } catch (e) { res(null); }
+      };
+      if (el.tagName === 'IMG') {
+        var src = el.currentSrc || el.src;
+        if (/^data:image\/jpe?g;base64,/i.test(src)) { var bin = atob(src.split(',')[1]), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return res({ jpg: u }); }
+        if (/^data:image\/png;base64,/i.test(src)) { var bin2 = atob(src.split(',')[1]), u2 = new Uint8Array(bin2.length); for (var j = 0; j < bin2.length; j++) u2[j] = bin2.charCodeAt(j); return res({ png: u2 }); }
+        if (!el.naturalWidth) return res(null);
+        return draw(el, el.naturalWidth, el.naturalHeight);
+      }
+      // drawings (shapes) rendered as SVG
+      var r = el.getBoundingClientRect(), xml = new XMLSerializer().serializeToString(el), im = new Image();
+      if (!/xmlns=/.test(xml)) xml = xml.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"');
+      im.onload = function () { draw(im, Math.max(1, r.width / scale * 2), Math.max(1, r.height / scale * 2)); };
+      im.onerror = function () { res(null); };
+      im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
+    });
+  }
+  var rasterCache = {};
+  function rasterText(seg) { // letters the PDF font does not have (Chinese, Arabic, emoji…): keep them as a sharp picture
+    var key = seg.s.font + '|' + seg.t + '|' + seg.s.c.r + seg.s.c.g + seg.s.c.b;
+    if (rasterCache[key]) return rasterCache[key];
+    var k = 4, met = ascent(seg.s.font, seg.s.size), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.ceil(seg.b.w * k) + 4); c.height = Math.max(1, Math.ceil((met.a + met.d) * k) + 4);
+    var g = c.getContext('2d'); g.scale(k, k); g.font = seg.s.font; g.textBaseline = 'alphabetic';
+    g.fillStyle = 'rgb(' + Math.round(seg.s.c.r * 255) + ',' + Math.round(seg.s.c.g * 255) + ',' + Math.round(seg.s.c.b * 255) + ')';
+    g.fillText(seg.t, 0, met.a);
+    return (rasterCache[key] = PT.blob(c, 'image/png').then(function (b) { return b.arrayBuffer(); }).then(function (a) { return { png: new Uint8Array(a), w: c.width / k, h: c.height / k, a: met.a }; }));
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!ready) return;
+    PT.run(async function () {
+      var L = PDFLib, f = await loadFonts();
+      var pdf = await L.PDFDocument.create();
+      pdf.registerFontkit(window.fontkit);
+      var reg = await pdf.embedFont(f[0], { subset: true }), bold = await pdf.embedFont(f[1], { subset: true });
+      var has = function (font, ch) { try { return font.embedder.font.hasGlyphForCodePoint(ch.codePointAt(0)); } catch (e) { return true; } };
+      pdf.setTitle(PT.base(file.name)); pdf.setCreator('GetToolNest Word to PDF'); pdf.setProducer('pdf-lib');
+      var secs = Array.prototype.slice.call($('host').querySelectorAll('section.docx')), PX = 0.75, missing = 0, imgCache = new Map(), pagesOut = 0;
+      $('bar').hidden = false;
+      for (var si = 0; si < secs.length; si++) {
+        PT.say('', 'Laying out part ' + (si + 1) + ' of ' + secs.length + '…'); $('fill').style.width = (si / secs.length * 90) + '%';
+        await new Promise(function (r) { setTimeout(r, 0); });
+        var sec = secs[si], st = sec.style, cs = getComputedStyle(sec);
+        var Wpx = sec.offsetWidth, Hpx = parseFloat(st.minHeight) ? parseFloat(st.minHeight) * (/pt$/.test(st.minHeight) ? 4 / 3 : 1) : Wpx * 297 / 210;
+        var padT = parseFloat(cs.paddingTop) || 0, padB = parseFloat(cs.paddingBottom) || 0, secH = sec.offsetHeight;
+        var art = sec.querySelector(':scope > article') || sec, aTop = art.offsetTop, aBottom = aTop + art.offsetHeight;
+        // the body area of a page: between the top margin (or the header) and the footer (or the bottom margin)
+        var hd = sec.querySelector(':scope > header'), ft = sec.querySelector(':scope > footer');
+        var topRoom = Math.max(padT, hd ? hd.offsetTop + hd.offsetHeight + 6 : 0), bottomRoom = Math.max(padB, ft && ft.offsetHeight ? secH - ft.offsetTop + 6 : 0);
+        var it = collect(sec), avail = Math.max(100, Hpx - topRoom - bottomRoom);
+        // page cuts inside the body, moved up so no line of text or picture is cut in half
+        var atoms = it.text.filter(function (t) { return t.z === 'body'; }).map(function (t) { return [t.b.y, t.b.y + t.b.h]; }).concat(it.imgs.filter(function (t) { return t.z === 'body'; }).map(function (t) { return [t.b.y, t.b.y + t.b.h]; }));
+        var cuts = [aTop], pos = aTop - (aTop - topRoom); // the first page starts where the body really starts
+        var bodyEnd = Math.max(aBottom, Math.max.apply(0, atoms.map(function (a) { return a[1]; }).concat([aTop])));
+        while (pos + avail < bodyEnd - 1) {
+          var lim = pos + avail, best = lim;
+          atoms.forEach(function (a) { if (a[0] < lim && a[1] > lim && a[0] > pos + 20) best = Math.min(best, a[0]); });
+          cuts.push(best); pos = best;
+        }
+        cuts.push(Infinity);
+        for (var pi = 0; pi < cuts.length - 1; pi++) {
+          var page = pdf.addPage([Wpx * PX, Hpx * PX]); pagesOut++;
+          var from = cuts[pi], to = cuts[pi + 1], shift = pi ? topRoom - from : 0;
+          // where an item lands on this page (y in px from the page top), or null if it is not on this page
+          var place = function (z, y, h) {
+            if (z === 'header') return y;
+            if (z === 'footer') return Hpx - (secH - y);
+            return (y >= (pi ? from - 0.5 : -Infinity) && y < to) ? y + shift : null;
+          };
+          var Y = function (y) { return (Hpx - y) * PX; };
+          it.fills.forEach(function (fl) {
+            var y0 = fl.b.y, y1 = fl.b.y + fl.b.h, top, bot;
+            if (fl.z !== 'body') { top = place(fl.z, y0, 0); bot = top + fl.b.h; }
+            else { var a = Math.max(y0, pi ? from : -Infinity), bb = Math.min(y1, to); if (bb <= a) return; top = a + shift; bot = bb + shift; }
+            page.drawRectangle({ x: fl.b.x * PX, y: Y(bot), width: fl.b.w * PX, height: (bot - top) * PX, color: L.rgb(fl.c.r, fl.c.g, fl.c.b), opacity: fl.c.a });
+          });
+          it.lines.forEach(function (ln) {
+            var y0 = Math.min(ln.y1, ln.y2), y1 = Math.max(ln.y1, ln.y2), a, b;
+            if (ln.z !== 'body') { a = place(ln.z, y0, 0); b = a + (y1 - y0); }
+            else {
+              var lo = pi ? from : -Infinity, s0 = Math.max(y0, lo), s1 = Math.min(y1, to);
+              if (y1 - y0 < 0.01 ? !(y0 >= lo && y0 < to) : s1 <= s0) return;
+              a = s0 + shift; b = s1 + shift;
+            }
+            page.drawLine({ start: { x: ln.x1 * PX, y: Y(a) }, end: { x: ln.x2 * PX, y: Y(b) }, thickness: Math.max(0.25, ln.w * PX), color: L.rgb(ln.c.r, ln.c.g, ln.c.b), opacity: ln.c.a, dashArray: ln.dash ? [2, 2] : undefined });
+          });
+          for (var ii = 0; ii < it.imgs.length; ii++) {
+            var im = it.imgs[ii], ty = place(im.z, im.b.y, im.b.h);
+            if (ty === null) continue;
+            var emb = imgCache.get(im.el.currentSrc || im.el);
+            if (emb === undefined) {
+              var bytes = await imgBytes(im.el);
+              emb = null;
+              try { if (bytes && bytes.jpg) emb = await pdf.embedJpg(bytes.jpg); else if (bytes && bytes.png) emb = await pdf.embedPng(bytes.png); } catch (e) { emb = null; } // a picture format the PDF cannot hold is left out
+              imgCache.set(im.el.currentSrc || im.el, emb);
+            }
+            if (emb) page.drawImage(emb, { x: im.b.x * PX, y: Y(ty + im.b.h), width: im.b.w * PX, height: im.b.h * PX });
+          }
+          for (var ti = 0; ti < it.text.length; ti++) {
+            var sg = it.text[ti], top = place(sg.z, sg.b.y, sg.b.h);
+            if (top === null) continue;
+            var base = sg.base + (top - sg.b.y), font = sg.s.bold ? bold : reg, size = sg.s.size * PX, col = L.rgb(sg.s.c.r, sg.s.c.g, sg.s.c.b);
+            var ok = true; for (var ch of sg.t) if (!has(font, ch) && ch.trim()) { ok = false; break; }
+            if (!ok) {
+              missing++;
+              var ras = await rasterText(sg), pimg = await pdf.embedPng(ras.png);
+              page.drawImage(pimg, { x: sg.b.x * PX, y: Y(base - ras.a + ras.h), width: ras.w * PX, height: ras.h * PX });
+            } else {
+              var natural = font.widthOfTextAtSize(sg.t, size), want = sg.b.w * PX, sq = natural > 0 ? Math.max(50, Math.min(200, want / natural * 100)) : 100;
+              page.pushOperators(L.pushGraphicsState(), L.setCharacterSqueeze(sq));
+              page.drawText(sg.t, { x: sg.b.x * PX, y: Y(base), size: size, font: font, color: col, ySkew: sg.s.italic ? L.degrees(12) : undefined });
+              page.pushOperators(L.popGraphicsState());
+            }
+            if (sg.s.under) page.drawLine({ start: { x: sg.b.x * PX, y: Y(base + sg.s.size * 0.12) }, end: { x: (sg.b.x + sg.b.w) * PX, y: Y(base + sg.s.size * 0.12) }, thickness: Math.max(0.4, size * 0.06), color: col });
+            if (sg.s.strike) page.drawLine({ start: { x: sg.b.x * PX, y: Y(base - sg.s.size * 0.3) }, end: { x: (sg.b.x + sg.b.w) * PX, y: Y(base - sg.s.size * 0.3) }, thickness: Math.max(0.4, size * 0.06), color: col });
+          }
+        }
+      }
+      $('fill').style.width = '95%'; PT.say('', 'Saving the PDF…');
+      var bytes = await pdf.save();
+      $('fill').style.width = '100%';
+      note(missing ? 'Some letters (for example Chinese, Japanese, Arabic or emoji) are not in the PDF font, so they were added as small pictures and cannot be selected. For fully selectable text in those languages, use Print → Save as PDF.' : '');
+      PT.done(bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'PDF ready: ' + pagesOut + (pagesOut === 1 ? ' page' : ' pages'));
+      burst($('dl'));
+    }).then(function () { $('bar').hidden = true; });
+  });
+
+  // ---------- printing: the browser lays out the pages with your real fonts ----------
+  $('print').addEventListener('click', function () {
+    if (!ready) return;
+    var box = $('w2pPrint'), first = $('host').querySelector('section.docx'), st = first.style, cs = getComputedStyle(first);
+    box.innerHTML = ''; box.appendChild($('host').firstElementChild.cloneNode(true));
+    Array.prototype.forEach.call($('host').querySelectorAll('style'), function (s) { box.appendChild(s.cloneNode(true)); });
+    var page = document.createElement('style');
+    page.textContent = '@media print { @page { size: ' + (st.width || '210mm') + ' ' + (st.minHeight || '297mm') + '; margin: ' + cs.paddingTop + ' 0 ' + cs.paddingBottom + ' 0; } }';
+    box.appendChild(page);
+    document.documentElement.classList.add('w2p-printing');
+    var done = function () { document.documentElement.classList.remove('w2p-printing'); box.innerHTML = ''; removeEventListener('afterprint', done); };
+    addEventListener('afterprint', done);
+    setTimeout(function () { window.print(); setTimeout(function () { if (!matchMedia('print').matches) done(); }, 1000); }, 50);
+  });
+})();
+</script>

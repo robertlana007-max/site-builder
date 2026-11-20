@@ -154,6 +154,7 @@
   function drawBg(c) {
     if (bg.type === 'image' && bg.img) {
       var s = Math.max(W / bg.img.naturalWidth, H / bg.img.naturalHeight), w = bg.img.naturalWidth * s, h = bg.img.naturalHeight * s;
+      c.fillStyle = '#000000'; c.fillRect(0, 0, W, H); // a see-through photo must not make the thumbnail see-through
       c.imageSmoothingQuality = 'high'; c.drawImage(bg.img, (W - w) / 2, (H - h) / 2, w, h);
       if (bg.dim) { c.fillStyle = 'rgba(0,0,0,' + bg.dim / 100 + ')'; c.fillRect(0, 0, W, H); }
     } else if (bg.type === 'grad') {
@@ -197,7 +198,9 @@
   function handles(L) {
     var u = unit(), cs = Math.cos(L.rot), sn = Math.sin(L.rot);
     function at(lx, ly) { return { x: L.x + lx * cs - ly * sn, y: L.y + lx * sn + ly * cs }; }
-    return { size: at(L.w / 2, L.h / 2), rot: at(0, -L.h / 2 - 34 * u), top: at(0, -L.h / 2), r: 13 * u };
+    var top = at(0, -L.h / 2), rot = at(0, -L.h / 2 - 34 * u);
+    if (rot.y < 14 * u || rot.x < 14 * u || rot.x > W - 14 * u) { top = at(0, L.h / 2); rot = at(0, L.h / 2 + 34 * u); } // keep the handle on the canvas
+    return { size: at(L.w / 2, L.h / 2), rot: rot, top: top, r: 13 * u };
   }
   function draw() {
     layers.forEach(measure);
@@ -384,7 +387,7 @@
     if (sel) {
       var hd = handles(sel);
       if (Math.hypot(p.x - hd.size.x, p.y - hd.size.y) <= hd.r * 1.8) return { mode: 'size', L: sel, d0: Math.hypot(p.x - sel.x, p.y - sel.y) || 1, s0: sel.size, w0: sel.w, h0: sel.h };
-      if (Math.hypot(p.x - hd.rot.x, p.y - hd.rot.y) <= hd.r * 1.8) return { mode: 'rot', L: sel };
+      if (Math.hypot(p.x - hd.rot.x, p.y - hd.rot.y) <= hd.r * 1.8) { var lr = local(sel, hd.rot); return { mode: 'rot', L: sel, below: lr.y > 0 }; }
     }
     var L = hit(p);
     sel = L; refresh();
@@ -425,7 +428,7 @@
       if (L.type === 'shape' && !e.shiftKey) { var q = local(L, p); L.w = Math.max(16, Math.abs(q.x) * 2); L.h = Math.max(16, Math.abs(q.y) * 2); }
       else scaleTo(act, Math.hypot(p.x - L.x, p.y - L.y) / act.d0);
     } else if (act.mode === 'rot') {
-      var ang = Math.atan2(p.y - L.y, p.x - L.x) + Math.PI / 2, step = Math.PI / 2;
+      var ang = Math.atan2(p.y - L.y, p.x - L.x) + (act.below ? -Math.PI / 2 : Math.PI / 2), step = Math.PI / 2;
       var near = Math.round(ang / step) * step; if (Math.abs(ang - near) < 0.07) ang = near; // snap to straight angles
       L.rot = ang;
     }

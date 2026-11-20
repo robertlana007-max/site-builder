@@ -1,0 +1,175 @@
+<style>
+.em-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; }
+.em-bar input[type=search] { flex: 1 1 240px; min-width: 0; }
+.em-tones { display: flex; gap: 4px; flex-wrap: wrap; }
+.em-tones button { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); border-radius: 10px; font-size: 22px; line-height: 1; cursor: pointer; padding: 0; }
+.em-tones button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.em-cats { display: flex; gap: 6px; overflow-x: auto; margin: 12px 0 6px; padding-bottom: 4px; scrollbar-width: thin; }
+.em-cats button { flex: none; font: 500 13.5px/1 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--muted); border-radius: 999px; height: 36px; padding: 0 12px; cursor: pointer; white-space: nowrap; }
+.em-cats button:hover { color: var(--ink); border-color: var(--muted); }
+.em-wrap { max-height: 460px; overflow-y: auto; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 4px 8px 10px; overscroll-behavior: contain; }
+.em-sec h3 { position: sticky; top: -4px; background: var(--bg); margin: 0; padding: 10px 2px 6px; font-size: 13.5px; color: var(--muted); font-weight: 600; z-index: 1; }
+.em-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 2px; }
+.em-grid button { border: 0; background: none; font-size: 28px; line-height: 1; height: 46px; border-radius: 8px; cursor: pointer; padding: 0; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Twemoji Mozilla", sans-serif; }
+.em-grid button:hover, .em-grid button:focus-visible { background: var(--accent-soft); }
+.em-sec { content-visibility: auto; contain-intrinsic-size: auto 300px; }
+.em-info { display: flex; align-items: center; gap: 12px; min-height: 52px; margin-top: 10px; }
+.em-info .em-big { font-size: 38px; line-height: 1; font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", sans-serif; }
+.em-info b { display: block; font-size: 15px; }
+.em-info small { color: var(--muted); font-size: 13px; font-family: var(--mono); overflow-wrap: anywhere; }
+.em-box { font-size: 24px; line-height: 1.4; min-height: 90px; }
+</style>
+<div class="em-bar">
+  <input type="search" id="emFind" data-nomemo placeholder="Search emoji, e.g. heart, laugh, flag pakistan" aria-label="Search emoji" autocomplete="off" disabled>
+  <div class="em-tones" id="emTones" role="group" aria-label="Skin tone"></div>
+</div>
+<div class="em-cats" id="emCats" role="navigation" aria-label="Emoji categories"></div>
+<div class="em-wrap" id="emWrap" aria-live="off"><p class="msg" id="emLoad">Loading emoji…</p></div>
+<div class="em-info" id="emInfo" aria-live="polite"><span class="em-big" id="emBig"></span><div><b id="emName">Click an emoji to copy it.</b><small id="emCode">It is also added to the box below, so you can collect several and copy them together.</small></div></div>
+<label for="emBox" style="margin-top:8px">Your emoji</label>
+<textarea id="emBox" class="plain em-box" data-nomemo placeholder="Emoji you click are added here. You can type here too."></textarea>
+<div class="btns">
+  <button class="btn" id="emCopy" type="button">Copy all</button>
+  <button class="btn ghost" id="emBack" type="button">Remove last</button>
+  <button class="btn ghost" id="emClr" type="button">Clear</button>
+</div>
+<p class="msg" id="emMsg" aria-live="polite"></p>
+<p class="msg">Emoji look different on each phone and computer because every system draws its own. Very new emoji may not show on older devices, so emoji your device cannot draw are hidden. Names and keywords come from the open emojibase data set, based on Unicode.</p>
+<script>
+(function () {
+  var TONES = ['', '\u{1F3FB}', '\u{1F3FC}', '\u{1F3FD}', '\u{1F3FE}', '\u{1F3FF}'], TNAME = ['Default', 'Light', 'Medium-light', 'Medium', 'Medium-dark', 'Dark'];
+  var LS = { tone: 'gtnEmojiTone', recent: 'gtnEmojiRecent' };
+  function get(k, d) { try { var v = JSON.parse(localStorage.getItem(k)); return v == null ? d : v; } catch (e) { return d; } }
+  function put(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) {} }
+  var tone = get(LS.tone, 0); if (!(tone >= 0 && tone <= 5)) tone = 0;
+  var DATA = null, maxVer = 999;
+  var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+
+  TONES.forEach(function (t, i) {
+    var b = document.createElement('button');
+    b.type = 'button'; b.textContent = '\u{1F44B}' + t; b.title = TNAME[i] + ' skin tone'; b.setAttribute('aria-label', TNAME[i] + ' skin tone');
+    b.setAttribute('aria-pressed', i === tone);
+    b.addEventListener('click', function () { tone = i; put(LS.tone, i); $('emTones').querySelectorAll('button').forEach(function (x, j) { x.setAttribute('aria-pressed', j === i); }); retone(); });
+    $('emTones').appendChild(b);
+  });
+  // e = [group, char, name, keywords, version*10, skins (1 = add modifier after first code point, or list of 5)]
+  function withTone(e) {
+    if (!tone || !e[5]) return e[1];
+    if (e[5] !== 1) return e[5][tone - 1];
+    var cps = Array.from(e[1]), rest = cps.slice(1);
+    if (rest[0] === '️') rest.shift();
+    return cps[0] + TONES[tone] + rest.join('');
+  }
+  // Which emoji versions this device can draw: test one emoji per version on a canvas.
+  function detect(list) {
+    try {
+      var cv = document.createElement('canvas'); cv.width = cv.height = 40;
+      var ctx = cv.getContext('2d', { willReadFrequently: true });
+      ctx.font = '28px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textBaseline = 'top';
+      var base = ctx.measureText('\u{1F600}').width;
+      var colour = function (ch) {
+        ctx.clearRect(0, 0, 40, 40); ctx.fillText(ch, 2, 2);
+        var d = ctx.getImageData(0, 0, 40, 40).data;
+        for (var i = 0; i < d.length; i += 4) if (d[i + 3] > 50 && (Math.abs(d[i] - d[i + 1]) > 30 || Math.abs(d[i + 1] - d[i + 2]) > 30)) return true;
+        return false;
+      };
+      if (!colour('\u{1F600}')) return 999; // no colour emoji font to compare against: show everything
+      var vers = {}, order = [];
+      list.forEach(function (e) { var v = e[4]; if (v > 120 && !vers[v]) { vers[v] = e[1]; order.push(v); } else if (v > 120 && Array.from(vers[v]).length > Array.from(e[1]).length) vers[v] = e[1]; });
+      order.sort(function (a, b) { return a - b; });
+      var ok = 120;
+      for (var i = 0; i < order.length; i++) {
+        var ch = vers[order[i]];
+        if (!colour(ch) || ctx.measureText(ch).width > base * 1.6) break;
+        ok = order[i];
+      }
+      return ok;
+    } catch (e) { return 999; }
+  }
+  function btn(e) {
+    var b = document.createElement('button'), ch = withTone(e);
+    b.type = 'button'; b.textContent = ch; b.title = e[2]; b.setAttribute('aria-label', e[2]); b.dataset.i = e.idx;
+    return b;
+  }
+  function section(id, title, items) {
+    var s = document.createElement('section'), h = document.createElement('h3'), g = document.createElement('div');
+    s.className = 'em-sec'; s.id = id; h.textContent = title; g.className = 'em-grid';
+    var f = document.createDocumentFragment();
+    items.forEach(function (e) { f.appendChild(btn(e)); });
+    g.appendChild(f); s.appendChild(h); s.appendChild(g);
+    return s;
+  }
+  function recent() { return get(LS.recent, []).map(function (i) { return DATA.e[i]; }).filter(Boolean); }
+  function draw() {
+    var wrap = $('emWrap'), q = $('emFind').value.trim().toLowerCase(), cats = $('emCats');
+    wrap.innerHTML = ''; cats.innerHTML = '';
+    if (q) {
+      var ws = q.split(/\s+/), hits = DATA.vis.filter(function (e) {
+        var hay = ' ' + e[2].toLowerCase().replace(/[:,]/g, '') + ' ' + e[3] + ' ';
+        return ws.every(function (w) { return hay.indexOf(' ' + w) !== -1 || e[1] === w; });
+      });
+      // names that start with the search come first
+      hits.sort(function (a, b) { return (b[2].toLowerCase().indexOf(q) === 0) - (a[2].toLowerCase().indexOf(q) === 0); });
+      if (hits.length) wrap.appendChild(section('em-s', hits.length + ' result' + (hits.length > 1 ? 's' : '') + ' for "' + q + '"', hits));
+      else { var p = document.createElement('p'); p.className = 'msg'; p.textContent = 'No emoji found for "' + q + '". Try a simpler word, like smile, cat or star.'; wrap.appendChild(p); }
+      return;
+    }
+    var r = recent(), groups = [];
+    if (r.length) groups.push(['em-g-r', 'Recently used', r]);
+    DATA.groups.forEach(function (name, gi) {
+      if (!name) return;
+      var items = DATA.vis.filter(function (e) { return e[0] === gi; });
+      if (items.length) groups.push(['em-g-' + gi, name, items]);
+    });
+    groups.forEach(function (g) {
+      wrap.appendChild(section(g[0], g[1], g[2]));
+      var c = document.createElement('button');
+      c.type = 'button'; c.textContent = g[1];
+      c.addEventListener('click', function () { var t = $(g[0]); wrap.scrollTo({ top: t.offsetTop - wrap.offsetTop, behavior: 'smooth' }); });
+      cats.appendChild(c);
+    });
+  }
+  function retone() { $('emWrap').querySelectorAll('.em-grid button').forEach(function (b) { b.textContent = withTone(DATA.e[+b.dataset.i]); }); }
+  function say(c, t) { $('emMsg').className = 'msg' + (c ? ' ' + c : ''); $('emMsg').textContent = t; }
+  function codes(s) { return Array.from(s).map(function (c) { return 'U+' + c.codePointAt(0).toString(16).toUpperCase(); }).join(' '); }
+  function insert(ch) {
+    var box = $('emBox'), a = box.selectionStart, b = box.selectionEnd;
+    if (document.activeElement !== box) { a = b = box.value.length; }
+    box.setRangeText(ch, a, b, 'end');
+  }
+  $('emWrap').addEventListener('click', function (ev) {
+    var b = ev.target.closest('.em-grid button'); if (!b) return;
+    var e = DATA.e[+b.dataset.i], ch = b.textContent;
+    copyText(ch);
+    insert(ch);
+    $('emBig').textContent = ch; $('emName').textContent = e[2] + ' — copied'; $('emCode').textContent = codes(ch);
+    var r = get(LS.recent, []).filter(function (i) { return i !== e.idx; }); r.unshift(e.idx); put(LS.recent, r.slice(0, 36));
+  });
+  $('emWrap').addEventListener('mouseover', function (ev) {
+    var b = ev.target.closest('.em-grid button'); if (!b) return;
+    $('emBig').textContent = b.textContent; $('emName').textContent = DATA.e[+b.dataset.i][2]; $('emCode').textContent = codes(b.textContent);
+  });
+  var ft;
+  $('emFind').addEventListener('input', function () { clearTimeout(ft); ft = setTimeout(draw, 120); });
+  $('emCopy').addEventListener('click', function () { var v = $('emBox').value; if (!v) { say('bad', 'The box is empty. Click some emoji first.'); return; } copyText(v, $('emCopy')); say('ok', 'Copied everything in the box.'); });
+  $('emBack').addEventListener('click', function () {
+    var v = $('emBox').value; if (!v) return;
+    var parts = seg ? Array.from(seg.segment(v), function (x) { return x.segment; }) : Array.from(v);
+    parts.pop(); $('emBox').value = parts.join(''); say('', '');
+  });
+  $('emClr').addEventListener('click', function () { $('emBox').value = ''; say('', ''); });
+
+  fetch('../assets/vendor/emoji/emoji.json').then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); }).then(function (d) {
+    DATA = d;
+    d.e.forEach(function (e, i) { e.idx = i; });
+    maxVer = detect(d.e);
+    d.vis = d.e.filter(function (e) { return e[4] <= maxVer; });
+    $('emFind').disabled = false;
+    draw();
+    var hidden = d.e.length - d.vis.length;
+    if (hidden) say('', hidden + ' newer emoji are hidden because this device cannot show them yet.');
+  }).catch(function () {
+    $('emWrap').innerHTML = '<p class="msg bad">The emoji list could not load. Check your connection and refresh the page.</p>';
+  });
+})();
+</script>
