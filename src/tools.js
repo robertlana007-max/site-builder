@@ -154,7 +154,7 @@ module.exports = [
     faq: [
       ['Which units are supported?', 'Length, weight, temperature, area, volume, speed, digital data and time, including both metric and imperial units.'],
       ['How accurate are the results?', 'Conversions use the exact official definitions, such as 1 inch = 2.54 cm, and are shown to 10 significant digits.'],
-      ['Is a kilobyte 1000 or 1024 bytes?', 'This converter uses 1024, the convention used by most operating systems.']
+      ['Is a kilobyte 1000 or 1024 bytes?', 'Both are used, so the converter has both: Kilobyte (kB), Megabyte (MB) and so on use 1000, and Kibibyte (KiB), Mebibyte (MiB) and so on use 1024, as Windows does.']
     ]
   },
   {
