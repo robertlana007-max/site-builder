@@ -1,4 +1,4 @@
-# ToolNest
+# GetToolNest
 
 A static site of 12 free browser tools (image compressor, image resizer, QR code generator, password generator, word counter, case converter, JSON formatter, and age, percentage, loan, BMI and unit calculators). Everything runs client-side, so it can be hosted free on GitHub Pages.
 

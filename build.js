@@ -108,7 +108,7 @@ ${body}
 }
 
 const cats = [...new Set(tools.map(t => t.cat))];
-const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mark">${icon('logo')}</span><span>Tool<em>Nest</em></span></a>`;
+const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mark">${icon('logo')}</span><span>Get<em>ToolNest</em></span></a>`;
 const footCols = [
   { title: 'Image & generators', items: tools.filter(t => ['Image tools', 'Generators'].includes(t.cat)) },
   { title: 'Text & developer', items: tools.filter(t => ['Text tools', 'Developer tools'].includes(t.cat)) }
