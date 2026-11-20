@@ -65,6 +65,8 @@ const ICON = {
   'text-to-binary': '<path d="M6 5l2-1v7M6 11h4M15 4h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM6 13h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1zM15 14l2-1v7M15 20h4"/>',
   'countdown-timer': '<path d="M6 3h12M6 21h12M7 3v4l5 5 5-5V3M7 21v-4l5-5 5 5v4"/>',
   'stopwatch': '<circle cx="12" cy="14" r="7"/><path d="M12 14v-3.5M10 3h4M12 3v4"/>',
+  star: '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+  share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
@@ -75,10 +77,9 @@ const ICON = {
   logo: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>'
 };
 const icon = k => svg(ICON[k]);
-// Hue per category, used to tint icon tiles and card hovers.
-// Key order here is also the order of sections on the home page.
-const HUE = { 'PDF tools': 4, 'Image tools': 262, 'Finance calculators': 150, 'Calculators': 325, 'Time tools': 48, 'Generators': 185, 'Text tools': 24, 'Developer tools': 215 };
-const tile = t => `<span class="tile" style="--h:${HUE[t.cat]}">${icon(t.slug)}</span>`;
+// One flat colour per category. Key order here is also the order of sections on the home page.
+const COLOR = { 'PDF tools': '#ff6b4a', 'Image tools': '#a78bfa', 'Finance calculators': '#34d399', 'Calculators': '#ff7ab6', 'Time tools': '#ffc53d', 'Generators': '#2dd4bf', 'Text tools': '#fdba74', 'Developer tools': '#60a5fa' };
+const tile = t => `<span class="tile" style="--c:${COLOR[t.cat]}">${icon(t.slug)}</span>`;
 
 function write(rel, content) {
   const file = path.join(ROOT, rel);
@@ -92,10 +93,10 @@ function ad(slot) {
 }
 
 // rel = path prefix back to the site root ('' for root pages, '../' for tool pages)
-function layout({ rel, urlPath, title, desc, body, band = '', head = '', noindex = false }) {
+function layout({ rel, urlPath, title, desc, body, band = '', bandClass = 'plain', after = '', slug = '', color = '', head = '', noindex = false }) {
   const canonical = SITE + '/' + urlPath;
   return `<!doctype html>
-<html lang="en">
+<html lang="en" data-rel="${rel}"${slug ? ` data-slug="${slug}"` : ''}${color ? ` style="--c:${color}"` : ''}>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -111,8 +112,11 @@ ${noindex ? '<meta name="robots" content="noindex">' : ''}
 <meta name="twitter:card" content="summary">
 ${cfg.googleSiteVerification ? `<meta name="google-site-verification" content="${esc(cfg.googleSiteVerification)}">` : ''}
 <link rel="icon" href="${rel}assets/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="${rel}assets/fonts/bricolage.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="${rel}assets/style.css">
+<script src="${rel}assets/tools-index.js"></script>
 <script src="${rel}assets/site.js"></script>
+${cfg.firebase ? `<script>window.FIREBASE_CONFIG=${JSON.stringify(cfg.firebase).replace(/</g, '\\u003c')};</script><script defer src="${rel}assets/cloud.js"></script>` : ''}
 ${cfg.adsenseClient ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${esc(cfg.adsenseClient)}" crossorigin="anonymous"></script>` : ''}
 ${cfg.googleAnalyticsId ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(cfg.googleAnalyticsId)}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(cfg.googleAnalyticsId)}');</script>` : ''}
 ${head}
@@ -121,13 +125,20 @@ ${head}
 <header class="site-header"><div class="wrap">
   ${logo(rel)}
   <nav class="nav">
-    <a href="${rel || './'}">All tools</a>
-    <a class="hide-s" href="${rel}about/">About</a>
-    <a class="hide-s" href="${rel}contact/">Contact</a>
+    <a class="hide-s" href="${rel || './'}">All tools</a>
+    <button class="nav-find" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span><kbd>Ctrl K</kbd></button>
+    <button class="auth" id="authBtn" hidden>Sign in</button>
     <button class="theme-btn" id="themeBtn" aria-label="Switch light or dark theme">${icon('theme')}</button>
   </nav>
 </div></header>
-${band ? `<div class="band"><div class="wrap">${band}</div></div>` : ''}
+<dialog class="palette" id="palette" aria-label="Search tools">
+  <div class="finder">${icon('search')}<input type="search" id="palInput" data-empty="all" placeholder="Search ${tools.length} tools…" aria-label="Search tools" autocomplete="off"></div>
+  <div class="f-list" id="palResults"></div>
+  <p class="pal-hint">↑ ↓ to move · Enter to open · Esc to close</p>
+</dialog>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+${band ? `<div class="band ${bandClass}"><div class="wrap">${band}</div></div>` : ''}
+${after}
 <main class="wrap">
 ${body}
 </main>
@@ -144,49 +155,74 @@ ${body}
 `;
 }
 
-const cats = Object.keys(HUE);
-for (const t of tools) if (!(t.cat in HUE)) throw new Error('Unknown category: ' + t.cat);
+const cats = Object.keys(COLOR);
+for (const t of tools) if (!(t.cat in COLOR)) throw new Error('Unknown category: ' + t.cat);
+tools.sort((a, b) => cats.indexOf(a.cat) - cats.indexOf(b.cat)); // stable: keeps the order within a category
 const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mark">${icon('logo')}</span><span>Get<em>ToolNest</em></span></a>`;
 const footCols = cats.map(c => ({ title: c, items: tools.filter(t => t.cat === c) }));
-const card = (t, rel) => `<a class="tool-card" style="--h:${HUE[t.cat]}" href="${rel}${t.slug}/">${tile(t)}<b>${esc(t.name)}</b><small>${esc(t.card)}</small><span class="go">${icon('arrow')}</span></a>`;
-const bySlug = s => tools.find(t => t.slug === s);
-const popular = ['merge-pdf', 'compress-pdf', 'image-compressor', 'mortgage-calculator', 'qr-code-generator'].map(bySlug);
+const card = (t, rel) => `<div class="tool-card reveal" style="--c:${COLOR[t.cat]}">${tile(t)}<a class="t-link" href="${rel}${t.slug}/">${esc(t.name)}</a><small>${esc(t.card)}</small><button class="star" data-slug="${t.slug}" aria-label="Pin ${esc(t.name)}" aria-pressed="false">${icon('star')}</button></div>`;
+const bySlug = s => { const t = tools.find(t => t.slug === s); if (!t) throw new Error('No tool ' + s); return t; };
+
+// Search index used by the finder, the palette and the "My tools" lists.
+write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [t.slug, t.name, t.cat, COLOR[t.cat], t.card])) + ';\n');
 
 // ---------- home ----------
+const typed = [['merge two PDFs', 'merge-pdf'], ['shrink a photo', 'image-compressor'], ['work out a mortgage', 'mortgage-calculator'], ['make a QR code', 'qr-code-generator'], ['turn a PDF into images', 'pdf-to-jpg'], ['create a strong password', 'password-generator']];
+typed.forEach(x => bySlug(x[1]));
+// Six tiles on the home page that act out what the tool does.
+const live = (slug, label, scene) => { const t = bySlug(slug); return `<a class="live" style="--c:${COLOR[t.cat]}" href="${slug}/" aria-label="${esc(t.name)}"><span aria-hidden="true">${scene}</span><b>${label}</b></a>`; };
+const bento = [
+  live('merge-pdf', 'Merge PDF', '<span class="scene sc-merge"><i></i><i></i></span>'),
+  live('image-compressor', 'Shrink a photo', '<span class="scene sc-shrink"><u><i></i></u><em><span>4.2 MB</span><span>0.9 MB</span></em></span>'),
+  live('password-generator', 'Password', '<span class="scene sc-pw"><span id="livePw">x7$Kq!9mZp</span></span>'),
+  live('qr-code-generator', 'QR code', `<span class="scene"><span class="qr" id="liveQr">${'<i></i>'.repeat(49)}</span></span>`),
+  live('stopwatch', 'Stopwatch', '<span class="scene sc-sw"><span id="liveSw">00:00.00</span></span>'),
+  live('mortgage-calculator', 'Mortgage', `<span class="scene sc-bars">${[.45, .7, .55, .9, 1].map((h, n) => `<i style="--n:${n};--s:${h}"></i>`).join('')}</span>`)
+].join('');
+const ticker = tools.map(t => `<a href="${t.slug}/">${esc(t.name)}</a><span>✦</span>`).join('');
+
 write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
   desc: `${tools.length} free online tools: merge PDF, compress PDF, image compressor, mortgage calculator, QR code generator and more. No sign-up. Files never leave your device.`,
   head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }),
   band: `<section class="hero">
-  <span class="badge"><i></i>${tools.length} tools · 100% free · No sign-up</span>
-  <h1>Free online tools that <span class="grad">just work</span></h1>
-  <p>Merge PDFs, compress images, work out a mortgage and convert almost anything. Fast, private and free, right in your browser.</p>
-  <div class="search-box">${icon('search')}<input type="search" id="toolSearch" placeholder="Search tools, e.g. merge pdf" aria-label="Search tools"></div>
-  <div class="chips">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div>
-  <div class="trust"><span>${icon('check')}Files never leave your device</span><span>${icon('check')}No account needed</span><span>${icon('check')}Works on phone and desktop</span></div>
+  <div class="hero-copy">
+    <span class="sticker">${tools.length} tools · 100% free</span>
+    <h1>Free online tools that <span class="hl">just work.</span></h1>
+    <p class="typed-line">Right now you could <a id="typed" href="${typed[0][1]}/" data-list="${esc(JSON.stringify(typed))}">${typed[0][0]}</a><i class="caret" aria-hidden="true"></i></p>
+    <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="What do you need to do?" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
+    <ul class="trust"><li>${icon('check')}Files never leave your device</li><li>${icon('check')}No account needed</li><li>${icon('check')}Works on your phone</li></ul>
+  </div>
+  <div class="bento" aria-label="Popular tools">${bento}</div>
 </section>`,
-  body: `<div class="pills" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
+  after: `<div class="marquee"><div><span aria-hidden="true">✦</span>${ticker}<span aria-hidden="true" style="display:contents">${ticker.replace(/<a /g, '<a tabindex="-1" ')}</span></div></div>`,
+  body: `<section class="mine" id="mine" hidden>
+  <h2>My tools</h2>
+  <p id="mineNote">Saved on this device.</p>
+  <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
+  <div id="mineRecentBox"><h3>Recently used</h3><div class="chiprow" id="mineRecent"></div></div>
+</section>
+<div class="pills" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All ${tools.length}</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false" style="--c:${COLOR[c]}"><i></i>${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}
-${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)} <small>${list.length}</small></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
-<p class="msg" id="noResults" hidden>No tools match your search.</p>
+${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}" style="--c:${COLOR[c]}"><h2 class="cat-title"><span>${list.length}</span>${esc(c)}</h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
 ${ad(cfg.adSlotBottom)}
-<h2 class="section-title">Why people use ${esc(cfg.siteName)}</h2>
-<p class="section-sub">Simple tools without the usual catches.</p>
+<h2 class="section-title">No catches. Really.</h2>
 <div class="features">
-  <div class="feature"><span class="tile" style="--h:160">${icon('shield')}</span><h3>Private by design</h3><p>Every tool runs inside your browser. Your images, text and numbers are processed on your own device and are not uploaded to us.</p></div>
-  <div class="feature"><span class="tile" style="--h:262">${icon('zap')}</span><h3>Instant results</h3><p>Nothing to install and no waiting for uploads. Open a tool and the answer appears as you type.</p></div>
-  <div class="feature"><span class="tile" style="--h:32">${icon('phone')}</span><h3>Works everywhere</h3><p>Built for phones first, and just as comfortable on a tablet or laptop, in light or dark mode.</p></div>
+  <div class="feature reveal" style="--c:#34d399"><span class="tile">${icon('shield')}</span><h3>Private by design</h3><p>Every tool runs inside your browser. Your files, text and numbers are processed on your own device and are not uploaded to us.</p></div>
+  <div class="feature reveal" style="--c:#ffc53d"><span class="tile">${icon('zap')}</span><h3>Instant results</h3><p>Nothing to install and no waiting for uploads. Open a tool and the answer appears as you type.</p></div>
+  <div class="feature reveal" style="--c:#a78bfa"><span class="tile">${icon('star')}</span><h3>It remembers you</h3><p>Pin the tools you use most and they wait for you on this page. Calculators keep the settings you used last time.</p></div>
 </div>
-<section class="cta"><h2>Need a tool that is not here yet?</h2><p>Tell us what would save you time and we will consider building it.</p><a class="btn" href="contact/">Suggest a tool ${icon('arrow')}</a></section>`
+<section class="cta reveal"><h2>Need a tool that is not here yet?</h2><p>Tell us what would save you time and we will consider building it.</p><a class="btn" href="contact/">Suggest a tool ${icon('arrow')}</a></section>`
 }));
 
 // ---------- tool pages ----------
 for (const t of tools) {
   const body = fs.readFileSync(path.join(ROOT, 'src/tools', t.slug + '.html'), 'utf8');
-  const related = tools.filter(o => o !== t).sort((a, b) => (b.cat === t.cat) - (a.cat === t.cat)).slice(0, 6);
+  const same = tools.filter(o => o !== t && o.cat === t.cat);
+  const related = same.concat(tools.filter(o => o !== t && o.cat !== t.cat)).slice(0, Math.max(6, Math.min(same.length, 9)));
   write(`${t.slug}/index.html`, layout({
-    rel: '../', urlPath: t.slug + '/',
+    rel: '../', urlPath: t.slug + '/', slug: t.slug, color: COLOR[t.cat], bandClass: 'tint',
     title: `${t.title} | ${cfg.siteName}`, desc: t.desc,
     head: jsonLd({
       '@context': 'https://schema.org', '@type': 'WebApplication', name: t.name, url: `${SITE}/${t.slug}/`,
@@ -202,24 +238,28 @@ for (const t of tools) {
       ]
     }),
     band: `<div class="tool-head">
-  <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)} › ${esc(t.name)}</p>
+  <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)}</p>
   <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
   <p class="lead">${esc(t.intro)}</p>
-  <div class="tags"><span>${icon('check')}Free</span><span>${icon('check')}No sign-up</span><span>${icon('check')}Runs in your browser</span></div>
+  <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button></div>
 </div>`,
     body: `<div class="cols">
 <div class="content">
-${ad(cfg.adSlotTop)}
 <section class="card">
 ${body}
 </section>
-${ad(cfg.adSlotBottom)}
+<p class="safe">${icon('shield')}Runs on your device. Nothing you enter here is uploaded.</p>
+${ad(cfg.adSlotTop)}
 <h2>How to use ${esc(t.name)}</h2>
-<ol class="steps">${t.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}</ol>
-<h2>Frequently asked questions</h2>
+<ol class="steps">${t.steps.map(s => `<li>${esc(s)}</li>`).join('')}</ol>
+${ad(cfg.adSlotBottom)}
+<h2>Questions people ask</h2>
 <div class="faq">${t.faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
 </div>
-<aside class="side"><div class="side-box"><h2>More free tools</h2>${related.map(o => `<a class="side-link" href="../${o.slug}/">${tile(o)}${esc(o.name)}</a>`).join('')}</div></aside>
+<aside class="side">
+  <div class="side-box" id="sidePins" hidden><h2>Your pinned tools</h2><div class="chiprow" id="sidePinsList"></div></div>
+  <div class="side-box"><h2>More tools</h2>${related.map(o => `<a class="side-link" href="../${o.slug}/">${tile(o)}${esc(o.name)}</a>`).join('')}</div>
+</aside>
 </div>`
   }));
 }
@@ -252,7 +292,9 @@ ${contact}` },
 <h2>Data you enter into tools</h2>
 <p>PDFs, images, text, numbers and passwords you enter are processed in your browser. They are not uploaded to or stored by ${esc(cfg.siteName)}.</p>
 <h2>Local storage</h2>
-<p>We save one setting in your browser's local storage: your light or dark theme choice. It never leaves your device.</p>
+<p>To make the site more useful when you come back, your browser's local storage keeps: your light or dark theme, the tools you pin, the tools you opened recently, and the settings of calculators (numbers, sliders, tick boxes and menus). Text you type or paste, files, and generated passwords are never saved. You can erase all of it by clearing this site's data in your browser.</p>
+${cfg.firebase ? `<h2>Optional Google sign-in</h2>
+<p>You can use every tool without an account. If you choose to sign in with Google, we receive your name, email address and a user ID from Google, and we store your pinned tools, recent tools and calculator settings in Google Firebase so they appear on your other devices. Files and text you process in the tools are still never uploaded. To delete this data, sign in and email us from the same address.</p>` : ''}
 <h2>Analytics</h2>
 ${analytics}
 ${adsPolicy}
@@ -276,7 +318,7 @@ ${contact}` },
 for (const p of pages) {
   write(`${p.slug}/index.html`, layout({
     rel: '../', urlPath: p.slug + '/', title: `${p.title} | ${cfg.siteName}`, desc: p.desc,
-    band: `<div class="tool-head"><p class="crumbs"><a href="../">Home</a> › ${esc(p.title)}</p><h1 class="page-title">${esc(p.title)}</h1></div>`,
+    band: `<div class="tool-head"><p class="crumbs"><a href="../">Home</a></p><h1 class="page-title">${esc(p.title)}</h1></div>`,
     body: `<section class="prose">${p.html}</section>`
   }));
 }
@@ -285,7 +327,7 @@ for (const p of pages) {
 const base = new URL(SITE + '/').pathname;
 write('404.html', layout({
   rel: base, urlPath: '404.html', title: `Page not found | ${cfg.siteName}`, desc: 'This page does not exist.', noindex: true,
-  body: '', band: `<section class="hero"><h1>Page not found</h1><p>That page does not exist. All the tools are on the home page.</p><a class="btn" href="${base}">See all tools</a></section>`
+  body: `<section class="center"><h1>404</h1><p>That page does not exist. Every tool is on the home page.</p><p><a class="btn" href="${base}">See all tools</a></p></section>`
 }));
 
 // ---------- crawl files ----------
@@ -303,6 +345,6 @@ write('.nojekyll', '');
 // GitHub Pages reads the custom domain from this file.
 const host = new URL(SITE).hostname;
 if (!host.endsWith('.github.io')) write('CNAME', host + '\n');
-write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#4f46e5"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs><rect width="64" height="64" rx="14" fill="url(#g)"/><path d="M16 20h32v8H36v20h-8V28H16z" fill="#fff"/></svg>\n`);
+write('assets/favicon.svg', `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64"><rect x="5" y="5" width="50" height="50" rx="13" fill="#15120f" transform="translate(5 5)"/><rect x="3" y="3" width="50" height="50" rx="13" fill="#c8f23a" stroke="#15120f" stroke-width="4"/><path d="M17 20h22v7h-7.500v16h-7V27H17z" fill="#15120f"/></svg>\n`.replace('7.500', '7.5'));
 
 console.log(`Built ${urls.length} pages for ${SITE}`);
