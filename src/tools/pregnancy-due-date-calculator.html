@@ -1,0 +1,152 @@
+<style>
+.pg-due { margin-top: 16px; padding: 16px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); text-align: center; }
+.pg-due span { display: block; font-size: 14px; color: var(--muted); }
+.pg-due b { display: block; font-size: 28px; letter-spacing: -.02em; margin: 2px 0; }
+.pg-bar { height: 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--line); overflow: hidden; margin-top: 10px; }
+.pg-bar i { display: block; height: 100%; background: var(--accent); width: 0; }
+.pg-tbl { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 16px; }
+.pg-tbl th, .pg-tbl td { padding: 8px 6px; text-align: start; border-bottom: 1px solid var(--line); vertical-align: top; }
+.pg-tbl th { color: var(--muted); font-size: 13px; font-weight: 600; }
+.pg-tbl td:nth-child(2), .pg-tbl td:nth-child(3) { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pg-tbl tr.done td { color: var(--muted); }
+.pg-tbl tr.now td { font-weight: 600; }
+.pg-tbl tr.now td:first-child::before { content: '▶ '; color: var(--accent); }
+@media (max-width: 520px) { .pg-tbl td:nth-child(3) { white-space: normal; } .pg-tbl th, .pg-tbl td { padding: 7px 4px; } }
+.pg-note { margin-top: 16px; font-size: 14px; color: var(--muted); border-inline-start: 3px solid var(--line); padding-inline-start: 10px; }
+</style>
+<div class="fields">
+  <div><label for="pgMethod">Calculate from</label>
+    <select id="pgMethod">
+      <option value="lmp">First day of last period</option>
+      <option value="conc">Conception date</option>
+      <option value="ivf">IVF embryo transfer</option>
+      <option value="us">Ultrasound scan</option>
+    </select></div>
+  <div data-m="lmp"><label for="pgLmp">First day of your last period</label><input type="date" id="pgLmp" data-nomemo></div>
+  <div data-m="lmp"><label for="pgCycle">Usual cycle length (days)</label><input type="number" id="pgCycle" min="20" max="45" step="1" value="28"></div>
+  <div data-m="conc" hidden><label for="pgConc">Conception date</label><input type="date" id="pgConc" data-nomemo></div>
+  <div data-m="ivf" hidden><label for="pgIvf">Transfer date</label><input type="date" id="pgIvf" data-nomemo></div>
+  <div data-m="ivf" hidden><label for="pgEmb">Embryo age at transfer</label><select id="pgEmb"><option value="5">Day 5 (blastocyst)</option><option value="3">Day 3</option><option value="6">Day 6</option></select></div>
+  <div data-m="us" hidden><label for="pgUs">Date of the scan</label><input type="date" id="pgUs" data-nomemo></div>
+  <div data-m="us" hidden><label for="pgUsW">Pregnancy age on the scan: weeks</label><input type="number" id="pgUsW" min="4" max="42" step="1" placeholder="e.g. 12" data-nomemo></div>
+  <div data-m="us" hidden><label for="pgUsD">and days</label><input type="number" id="pgUsD" min="0" max="6" step="1" value="0" data-nomemo></div>
+</div>
+<p class="msg" id="pgMsg">Enter a date to see your estimated due date.</p>
+<div id="pgOut" hidden>
+  <div class="pg-due"><span>Estimated due date</span><b id="pgDue">–</b><span id="pgDueSub"></span>
+    <div class="pg-bar" aria-hidden="true"><i id="pgBar"></i></div></div>
+  <div class="stats">
+    <div class="stat"><span>Pregnant today</span><b id="pgGa" style="font-size:19px">–</b></div>
+    <div class="stat"><span>Trimester</span><b id="pgTri">–</b></div>
+    <div class="stat"><span>Days to go</span><b id="pgLeft">–</b></div>
+    <div class="stat"><span id="pgConcLbl">Likely conception</span><b id="pgConcOut" style="font-size:18px">–</b></div>
+  </div>
+  <p class="msg" id="pgWin"></p>
+  <div style="overflow-x:auto"><table class="pg-tbl" id="pgTbl"><thead><tr><th>Milestone</th><th>Week</th><th>Date</th></tr></thead><tbody></tbody></table></div>
+  <div class="btns"><button class="btn ghost" id="pgCopy">Copy summary</button></div>
+</div>
+<p class="pg-note"><b>This is an estimate, not medical advice.</b> Only about 1 in 20 babies arrive on the due date; most come within two weeks either side. Your doctor or midwife may change the date after an ultrasound scan. Always follow their advice.</p>
+<script>
+(function () {
+  var DAY = 864e5, MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  // dates are whole days counted in UTC, so daylight saving never shifts them
+  function parse(v) { var m = /^(\d{4})-(\d\d)-(\d\d)$/.exec(v || ''); if (!m) return null; var t = Date.UTC(+m[1], +m[2] - 1, +m[3]); return isNaN(t) ? null : t / DAY; }
+  function today() { var d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()) / DAY; }
+  function show(n, wd) { var d = new Date(n * DAY); return (wd ? WD[d.getUTCDay()] + ' ' : '') + d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + ' ' + d.getUTCFullYear(); }
+  function wk(days) { var w = Math.floor(days / 7), d = days % 7; return w + (w === 1 ? ' week' : ' weeks') + (d ? ' ' + d + (d === 1 ? ' day' : ' days') : ''); }
+  function say(cls, t) { $('pgMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('pgMsg').textContent = t; }
+  var MILES = [
+    [4, 4, 'A home pregnancy test is likely to be positive (around the missed period)'],
+    [6, 9, 'Early or dating scan: heartbeat can usually be seen'],
+    [10, 10, 'Earliest week for the NIPT blood test'],
+    [11, 13, 'First trimester screening (nuchal translucency scan)'],
+    [14, 14, 'Second trimester begins'],
+    [18, 22, 'Anatomy (anomaly) scan'],
+    [24, 24, 'Baby reaches the age of viability'],
+    [24, 28, 'Glucose test for gestational diabetes'],
+    [28, 28, 'Third trimester begins'],
+    [36, 37, 'Group B strep test (in many countries)'],
+    [37, 37, 'Baby counts as full term (early term)'],
+    [40, 40, 'Estimated due date'],
+    [42, 42, 'Post-term: most hospitals offer induction by now']
+  ];
+  var summary = '';
+  function sync() {
+    var m = $('pgMethod').value;
+    document.querySelectorAll('[data-m]').forEach(function (el) { el.hidden = el.getAttribute('data-m') !== m; });
+  }
+  function calc() {
+    sync();
+    var m = $('pgMethod').value, now = today(), start = null, concA, concB, concLbl = 'Likely conception', winTxt = '', base, how;
+    $('pgOut').hidden = true; summary = '';
+    if (m === 'lmp') {
+      var lmp = parse($('pgLmp').value), cyc = +$('pgCycle').value;
+      if (lmp === null) return say('', 'Enter the first day of your last period.');
+      if (!(cyc >= 20 && cyc <= 45) || cyc % 1) return say('bad', 'Cycle length must be a whole number from 20 to 45 days. If you are not sure, use 28.');
+      if (lmp > now) return say('bad', 'That date is in the future. Enter the first day of your most recent period.');
+      start = lmp + (cyc - 28);
+      // ovulation is about 14 days before the next period; the egg can be fertilised by sperm from the 5 days before
+      concA = start + 9; concB = start + 15;
+      winTxt = 'Fertile window: ' + show(concA) + ' to ' + show(concB) + '. Ovulation most likely around ' + show(start + 14) + ' (day ' + (cyc - 14) + ' of your cycle).';
+      how = "Naegele's rule: first day of last period + 280 days" + (cyc !== 28 ? ', ' + (cyc > 28 ? 'plus ' : 'minus ') + Math.abs(cyc - 28) + (Math.abs(cyc - 28) === 1 ? ' day' : ' days') + ' for your ' + cyc + '-day cycle' : '') + '.';
+    } else if (m === 'conc') {
+      var c = parse($('pgConc').value);
+      if (c === null) return say('', 'Enter the conception date.');
+      start = c - 14; concA = concB = c;
+      concLbl = 'Conception date';
+      how = 'Conception date + 266 days (38 weeks).';
+    } else if (m === 'ivf') {
+      var t = parse($('pgIvf').value), e = +$('pgEmb').value;
+      if (t === null) return say('', 'Enter the embryo transfer date.');
+      start = t - 14 - e; concA = concB = t - e;
+      concLbl = 'Egg retrieval / fertilisation';
+      how = 'Transfer date + ' + (266 - e) + ' days for a day ' + e + ' embryo (266 days minus the ' + e + ' days the embryo had already grown).';
+    } else {
+      var u = parse($('pgUs').value), w = $('pgUsW').value, d = $('pgUsD').value || '0';
+      if (u === null || w === '') return say('', 'Enter the scan date and the pregnancy age shown on the scan report.');
+      w = +w; d = +d;
+      if (!(w >= 4 && w <= 42) || w % 1) return say('bad', 'Weeks on the scan must be a whole number from 4 to 42.');
+      if (!(d >= 0 && d <= 6) || d % 1) return say('bad', 'Days must be a whole number from 0 to 6.');
+      if (u > now) return say('bad', 'The scan date is in the future. Enter the date the scan was done.');
+      start = u - (w * 7 + d); concA = start + 9; concB = start + 15;
+      winTxt = 'Likely conception window from the scan: ' + show(concA) + ' to ' + show(concB) + '.';
+      how = 'Scan date − ' + wk(w * 7 + d) + ' gives the pregnancy start; + 280 days gives the due date.';
+    }
+    var due = start + 280, ga = now - start, left = due - now;
+    if (ga > 44 * 7) return say('bad', 'With that date the pregnancy would be ' + wk(ga) + ' today, which is longer than any pregnancy. Please check the date.');
+    if (start < -25000) return say('bad', 'Please check the date.');
+    $('pgOut').hidden = false;
+    $('pgDue').textContent = show(due, true);
+    $('pgDueSub').textContent = how;
+    $('pgBar').style.width = Math.max(0, Math.min(100, ga / 280 * 100)) + '%';
+    var tri = '';
+    if (ga < 0) { $('pgGa').textContent = 'Not yet'; tri = '–'; say('', 'That date is in the future, so these dates are a plan: the pregnancy has not started yet.'); }
+    else {
+      $('pgGa').textContent = wk(ga);
+      tri = ga < 14 * 7 ? '1st' : ga < 28 * 7 ? '2nd' : '3rd';
+      say(ga > 42 * 7 ? 'bad' : 'ok', ga > 42 * 7 ? 'This is past 42 weeks. Please check the date, or talk to your doctor or midwife.' : ga >= 280 ? 'You are past your due date. This is common, especially in a first pregnancy.' : 'You are ' + wk(ga) + ' pregnant today, counted from the first day of the last period (gestational age).');
+    }
+    $('pgTri').textContent = tri;
+    $('pgLeft').textContent = left > 0 ? fmtNum(left, 0) : left === 0 ? 'Today!' : fmtNum(-left, 0) + (left === -1 ? ' day' : ' days') + ' past';
+    $('pgConcLbl').textContent = concLbl;
+    $('pgConcOut').textContent = concA === concB ? show(concA) : show(concA) + ' – ' + show(concB);
+    $('pgWin').textContent = winTxt;
+    var tb = $('pgTbl').tBodies[0]; tb.textContent = '';
+    var lines = ['Estimated due date: ' + show(due, true), ga >= 0 ? 'Pregnant today: ' + wk(ga) + ' (' + tri + ' trimester)' : 'Pregnancy has not started yet', concLbl + ': ' + $('pgConcOut').textContent, '', 'Milestones:'];
+    MILES.forEach(function (x) {
+      // a range like 11-13 means 11 weeks 0 days up to 13 weeks 6 days; a single week means the day it starts
+      var a = start + x[0] * 7, b = x[1] > x[0] ? start + x[1] * 7 + 6 : a, tr = document.createElement('tr');
+      tr.className = ga > (b - start) ? 'done' : ga >= (a - start) ? 'now' : '';
+      var week = x[0] === x[1] ? String(x[0]) : x[0] + '–' + x[1], date = a === b ? show(a) : show(a) + ' – ' + show(b);
+      [x[2], week, date].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+      tb.appendChild(tr);
+      lines.push('Week ' + week + ': ' + x[2] + ' (' + date + ')');
+    });
+    lines.push('', 'This is an estimate, not medical advice.');
+    summary = lines.join('\n');
+  }
+  ['pgMethod', 'pgLmp', 'pgCycle', 'pgConc', 'pgIvf', 'pgEmb', 'pgUs', 'pgUsW', 'pgUsD'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('pgCopy').addEventListener('click', function () { if (summary) copyText(summary, $('pgCopy')); });
+  calc();
+})();
+</script>
