@@ -422,6 +422,7 @@ for (const t of tools) {
   <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)}</p>
   <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
   <p class="lead">${esc(t.intro)}</p>
+  ${cfg.contactEmail ? `<div class="family"><span class="fam-ic" aria-hidden="true">❤️</span><div class="fam-txt"><b>You are not a customer here, you are family.</b><span>Want something new added to ${esc(t.name)}, or need a new tool? Email us and we will make it for you.</span></div><a class="fam-btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">✉ Email us</a></div>` : ''}
   <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>
 <div class="cols${t.wide ? ' wide' : ''}" style="--c:${COLOR[t.cat]}">
@@ -430,7 +431,6 @@ for (const t of tools) {
 ${body}
 </section>
 <p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded.</p>
-${cfg.contactEmail ? `<div class="ask ask-tool"><span class="ask-ic" aria-hidden="true">💌</span><p><b>Want something new added to ${esc(t.name)}?</b> You are family here, not a customer. Email us your idea and we will add it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">Email us</a></div>` : ''}
 ${ad(cfg.adSlotTop)}
 ${guideHtml(t, g)}
 ${ad(cfg.adSlotBottom)}
