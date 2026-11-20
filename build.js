@@ -437,6 +437,12 @@ ${contact}` },
   <img src="../assets/icon-512.png" alt="${esc(cfg.siteName)} app icon" width="96" height="96">
   <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, works without internet, and updates by itself.</p></div>
 </div>
+<div class="dlrow">
+  ${cfg.androidApk ? `<a class="dl-card" data-os="android" href="../${cfg.androidApk}" download="GetToolNest.apk"><b>Download for Android</b><small>APK · version ${esc(cfg.androidApkVersion)} · ${Math.max(1, Math.round(fs.statSync(path.join(ROOT, cfg.androidApk)).size / 1024))} KB · Android 7 and newer</small></a>` : ''}
+  <button class="dl-card" type="button" data-os="windows" data-install><b>Download for Windows</b><small>Installs from Edge or Chrome · Windows 10 and 11</small></button>
+  <button class="dl-card" type="button" data-os="ios" data-install><b>Get it on iPhone or iPad</b><small>Add to Home Screen from Safari</small></button>
+  <button class="dl-card" type="button" data-os="mac" data-install><b>Mac, Linux, Chromebook</b><small>Installs from Chrome or Edge</small></button>
+</div>
 <div class="stores">
   <button class="btn big" type="button" data-install>${icon('phone')}Install now</button>
   ${cfg.playStoreUrl ? `<a class="store" href="${esc(cfg.playStoreUrl)}" rel="noopener"><small>GET IT ON</small><b>Google Play</b></a>` : `<span class="store soon" title="Coming soon"><small>COMING SOON TO</small><b>Google Play</b></span>`}
@@ -444,10 +450,14 @@ ${contact}` },
 </div>
 <p class="appstate" id="appState2"></p>
 <h2>Install on Android</h2>
-<ol><li>Open ${esc(cfg.siteName)} in Chrome.</li><li>Tap <b>Install now</b> above, or open the menu <b>⋮</b> and choose <b>Install app</b>.</li><li>The app appears on your home screen.</li></ol>
+<p><b>Option 1: the APK.</b></p>
+<ol><li>Tap <b>Download for Android</b> above.</li><li>Open the downloaded file. If Android asks, allow your browser to <b>install unknown apps</b> (Android shows this for every app that does not come from Play Store).</li><li>Tap <b>Install</b>. Files you save in the app go to <b>Downloads/GetToolNest</b>.</li></ol>
+<p><b>Option 2: straight from Chrome.</b> Tap <b>Install now</b>, or open the menu <b>⋮</b> and choose <b>Install app</b>. This version also lets you sign in with Google.</p>
 <h2>Install on iPhone or iPad</h2>
 <ol><li>Open ${esc(cfg.siteName)} in <b>Safari</b>.</li><li>Tap the <b>Share</b> button.</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>
-<h2>Install on a computer</h2>
+<h2>Install on Windows</h2>
+<ol><li>Open ${esc(cfg.siteName)} in <b>Microsoft Edge</b> or <b>Google Chrome</b>.</li><li>Click <b>Download for Windows</b> above, then <b>Install</b>. (Or click the install icon at the right of the address bar.)</li><li>${esc(cfg.siteName)} opens in its own window and appears in the Start menu and taskbar. To remove it, use Settings → Apps.</li></ol>
+<h2>Install on Mac, Linux or Chromebook</h2>
 <ol><li>Open ${esc(cfg.siteName)} in Chrome or Edge.</li><li>Click the install icon in the address bar, or <b>Install now</b> above.</li></ol>
 <h2>Why use the app</h2>
 <ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },

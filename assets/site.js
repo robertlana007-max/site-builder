@@ -339,6 +339,13 @@
     });
     if (appBox) { $('appClose').addEventListener('click', function () { appBox.close(); }); appBox.addEventListener('click', function (e) { if (e.target === appBox) appBox.close(); }); }
     if (standalone) root.setAttribute('data-app', '');
+    // inside the Android app (a WebView): Google blocks its sign-in there, the share sheet comes from Android, and there is nothing to install
+    var inApp = /GetToolNestApp/.test(navigator.userAgent);
+    if (inApp) { standalone = true; root.setAttribute('data-app', ''); root.setAttribute('data-android-app', ''); }
+    // put the download that fits this device first
+    var osName = inApp ? '' : /Android/.test(navigator.userAgent) ? 'android' : ios ? 'ios' : /Windows/.test(navigator.userAgent) ? 'windows' : 'mac';
+    var mine = document.querySelector('.dl-card[data-os="' + osName + '"]');
+    if (mine) { mine.classList.add('yours'); mine.parentNode.insertBefore(mine, mine.parentNode.firstChild); }
     appUi();
     // a small banner on phones, once, until the visitor installs or closes it
     var bar = $('appBar'), hush = 0;
@@ -501,7 +508,8 @@
     var share = $('shareBtn');
     if (share) share.addEventListener('click', function () {
       var url = (document.querySelector('link[rel=canonical]') || {}).href || location.href;
-      if (navigator.share) navigator.share({ title: document.title, url: url }).catch(function () {});
+      if (window.GTNAndroid && GTNAndroid.share) GTNAndroid.share(document.title, url);
+      else if (navigator.share) navigator.share({ title: document.title, url: url }).catch(function () {});
       else { copyText(url); toast('Link copied'); burst(share); }
     });
 
