@@ -44,6 +44,7 @@
   <div class="btns"><a class="btn ghost" id="dlRec">Download recording</a></div>
 </div>
 <p class="msg">The sound is analysed on your device. Nothing is uploaded or saved unless you download the recording.</p>
+<script src="../assets/vendor/fix-webm-duration/fix-webm-duration.js"></script>
 <script>
 (function () {
   var md = navigator.mediaDevices, AC = window.AudioContext || window.webkitAudioContext;
@@ -166,7 +167,7 @@
         g.fillRect(b * bw + bw * 0.12, H - h, bw * 0.76, h);
       }
       g.globalAlpha = 1; g.fillStyle = muted; g.font = (11 * d) + 'px system-ui, sans-serif';
-      [100, 1000, 10000].forEach(function (f) { if (f < Math.exp(hi)) { var px = (Math.log(f) - lo) / (hi - lo) * W; g.fillText(f >= 1000 ? f / 1000 + ' kHz' : f + ' Hz', px + 3 * d, 13 * d); g.fillRect(px, 0, d, 6 * d); } });
+      [100, 1000, 10000].forEach(function (f) { if (f < Math.exp(hi)) { var px = (Math.log(f) - lo) / (hi - lo) * W; var lab = f >= 1000 ? f / 1000 + ' kHz' : f + ' Hz', tw = g.measureText(lab).width; g.fillText(lab, px + 3 * d + tw > W ? px - tw - 3 * d : px + 3 * d, 13 * d); g.fillRect(px, 0, d, 6 * d); } });
       raf = requestAnimationFrame(draw);
     })();
   }
@@ -184,8 +185,11 @@
     recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
     recorder.onstop = function () {
       clearInterval(tick); $('rec').textContent = '● Record 5 seconds'; $('rec').disabled = !stream;
-      var type = recorder.mimeType || mime || (chunks[0] && chunks[0].type) || 'audio/webm', blob = new Blob(chunks, { type: type });
-      if (!blob.size) { say('bad', 'The recording came out empty. Try again.'); return; }
+      var type = recorder.mimeType || mime || (chunks[0] && chunks[0].type) || 'audio/webm', raw = new Blob(chunks, { type: type });
+      if (!raw.size) { say('bad', 'The recording came out empty. Try again.'); return; }
+      // WebM from the browser has no length in it, which breaks the play bar; write the length in.
+      var ready = /webm/.test(type) && window.ysFixWebmDuration ? ysFixWebmDuration(raw, Date.now() - recStart, { logger: false }).catch(function () { return raw; }) : Promise.resolve(raw);
+      ready.then(function (blob) {
       if (recUrl) URL.revokeObjectURL(recUrl);
       recUrl = URL.createObjectURL(blob);
       $('play').src = recUrl; $('result').hidden = false;
@@ -193,7 +197,9 @@
       $('dlRec').href = recUrl; $('dlRec').download = 'mic-test.' + ext;
       say('ok', 'Recorded. Press play to hear how you sound (' + fmtBytes(blob.size) + ').');
       var p = $('play').play(); if (p && p.catch) p.catch(function () {});
+      });
     };
+    var recStart = Date.now();
     recorder.start(250);
     $('rec').disabled = true; $('rec').textContent = '● Recording… 5';
     say('', 'Recording… say something, for example count from one to five.');

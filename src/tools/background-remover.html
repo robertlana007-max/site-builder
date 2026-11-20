@@ -25,7 +25,7 @@
     <button type="button" data-model="best" aria-pressed="false">Best quality (47 MB)</button>
   </div>
 </div>
-<p class="bgr-sub" id="modelNote">Fast suits people, products and pets on simple backgrounds. Best quality is slower but handles busy backgrounds and fine edges better. The AI model downloads once, then works offline.</p>
+<p class="bgr-sub" id="modelNote">Fast suits people, products and pets on plain backgrounds. Best quality is slower but copes much better with busy backgrounds and thin parts. The AI files (15 to 30 MB for the engine, plus the model) download once when you pick your first photo, then stay on your device.</p>
 <div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat">Getting ready…</p></div>
 <div id="work" hidden>
   <div class="bgr-stage" id="stage"><canvas id="cv" aria-label="Photo with the background removed"></canvas><span class="bgr-tag l" id="tagB" hidden>Before</span><span class="bgr-tag r" id="tagA" hidden>After</span></div>
@@ -129,6 +129,7 @@
         ort.env.wasm.wasmPaths = new URL(BASE, location.href).href;
         ort.env.wasm.wasmBinary = r[1];
         ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+        ort.env.wasm.proxy = !useGpu; // run on a worker thread so the page stays responsive
         ort.env.logLevel = 'error';
         return ort;
       });
@@ -370,23 +371,28 @@
 
   // ---------- run ----------
   function run() {
-    var mine = ++job, m = MODELS[modelKey], t0;
+    var mine = ++job, m = MODELS[modelKey], t0, timer;
     busy = true; say('', '');
     function report(f, t) { if (mine === job) progress(f, t); }
     return getSession(modelKey, report).then(function (s) {
       if (mine !== job) return;
-      progress(null, 'Finding the subject…');
+      var hint = modelKey === 'best' ? ' Best quality can take 5 to 30 seconds.' : '', tick = 0;
+      progress(null, 'Finding the subject…' + hint);
+      t0 = performance.now();
+      timer = setInterval(function () { if (mine === job && busy) progress(null, 'Finding the subject… ' + (++tick) + ' s.' + hint); }, 1000);
       return new Promise(function (r) { setTimeout(r, 30); }).then(function () { t0 = performance.now(); return infer(s, m); }).then(function (prob) {
+        clearInterval(timer);
         if (mine !== job) return;
         var t1 = performance.now();
         refine(prob, m.size);
         $('work').hidden = false; buildPreview();
         busy = false; $('notice').hidden = true;
         var ms = Math.round(t1 - t0);
-        window.__bgr = { ms: ms, ep: s.ep, model: modelKey, w: W, h: H };
+        window.__bgr = { ms: ms, total: Math.round(performance.now() - t0), ep: s.ep, model: modelKey, w: W, h: H };
         say('ok', 'Background removed (' + W + ' × ' + H + ' px, ' + (ms < 1000 ? ms + ' ms' : (ms / 1000).toFixed(1) + ' s') + ' using ' + s.ep + '). Check the edges, then download.');
       });
     }).catch(function (e) {
+      clearInterval(timer);
       if (mine !== job) return;
       busy = false; $('notice').hidden = true;
       var net = e && e.message === 'net';

@@ -13,7 +13,6 @@
   <div><label for="to">Convert to</label><select id="to">
     <option value="mp4">MP4 (H.264 + AAC) — plays everywhere</option>
     <option value="webm">WebM (VP8 + Opus) — for websites</option>
-    <option value="webm9">WebM (VP9 + Opus) — smaller, much slower</option>
     <option value="mov">MOV (H.264 + AAC) — for Apple and editing apps</option>
     <option value="mp3">MP3 — sound only</option>
   </select></div>
@@ -244,7 +243,7 @@ var VT = (function () {
 })();
 (function () {
   var file = null, info = null;
-  var KIND = { mp4: ['mp4', 'video/mp4'], mov: ['mov', 'video/quicktime'], webm: ['webm', 'video/webm'], webm9: ['webm', 'video/webm'], mp3: ['mp3', 'audio/mpeg'] };
+  var KIND = { mp4: ['mp4', 'video/mp4'], mov: ['mov', 'video/quicktime'], webm: ['webm', 'video/webm'], mp3: ['mp3', 'audio/mpeg'] };
   function reset() { file = null; info = null; $('out').hidden = true; $('out').removeAttribute('src'); hint(); }
   // H.264 in MP4/MOV with no changes can be copied as-is: instant and lossless.
   function canCopy() {
@@ -258,7 +257,6 @@ var VT = (function () {
     var h = '';
     if (info && audioOnly && !info.audio) h = 'This video has no sound, so there is nothing to save as MP3.';
     else if (canCopy()) h = 'Your video is already H.264, so it is copied into the new container without re-encoding: fast and no quality loss.';
-    else if (to === 'webm9') h = 'VP9 gives smaller files but encodes several times slower than VP8 in a browser. Best for short clips.';
     else if (info && info.duration > 600 && !audioOnly) h = 'Long videos take a while to convert in a browser. Keep this tab open.';
     $('hint').textContent = h;
   }
@@ -285,10 +283,9 @@ var VT = (function () {
         if (!mute) a.push('-map', '0:a:0?');
         if (copy) a.push('-c:v', 'copy');
         else if (to === 'webm') a.push('-vf', vf, '-c:v', 'libvpx', '-b:v', vp8k + 'k', '-crf', '10', '-deadline', 'realtime', '-cpu-used', '8', '-pix_fmt', 'yuv420p');
-        else if (to === 'webm9') a.push('-vf', vf, '-c:v', 'libvpx-vp9', '-b:v', '0', '-crf', '33', '-deadline', 'realtime', '-cpu-used', '8', '-pix_fmt', 'yuv420p');
         else a.push('-vf', vf, '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '22', '-pix_fmt', 'yuv420p');
         if (mute) a.push('-an');
-        else if (to === 'webm' || to === 'webm9') a.push('-c:a', 'libopus', '-b:a', '128k', '-ac', '2');
+        else if (to === 'webm') a.push('-c:a', 'opus', '-strict', '-2', '-b:a', '128k', '-ar', '48000', '-ac', '2'); // FFmpeg's own Opus encoder: libopus crashes in the browser build
         else if (copy && i.acodec === 'aac') a.push('-c:a', 'copy');
         else a.push('-c:a', 'aac', '-b:a', '160k', '-ac', '2');
         if (to === 'mp4' || to === 'mov') a.push('-movflags', '+faststart');
