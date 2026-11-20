@@ -1,0 +1,32 @@
+<div class="fields" style="grid-template-columns:1fr">
+  <div><label for="txt">Text or link</label><textarea id="txt" class="plain" style="min-height:90px" placeholder="https://example.com">https://example.com</textarea></div>
+</div>
+<div class="fields">
+  <div><label for="size">Size</label><select id="size"><option value="256">256 px</option><option value="512" selected>512 px</option><option value="1024">1024 px</option></select></div>
+  <div><label for="ec">Error correction</label><select id="ec"><option value="L">Low</option><option value="M" selected>Medium</option><option value="Q">High</option><option value="H">Highest</option></select></div>
+</div>
+<div class="preview"><canvas id="cv" width="512" height="512" style="width:256px;height:256px" aria-label="QR code"></canvas></div>
+<div class="btns" style="justify-content:center"><a class="btn" id="dl" download="qr-code.png">Download PNG</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/qrcode.js"></script>
+<script>
+(function () {
+  qrcode.stringToBytes = function (s) { return Array.from(new TextEncoder().encode(s)); };
+  function draw() {
+    var text = $('txt').value, cv = $('cv'), size = +$('size').value, ctx = cv.getContext('2d');
+    cv.width = cv.height = size;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size);
+    if (!text) { $('msg').className = 'msg'; $('msg').textContent = 'Type something to create a QR code.'; $('dl').removeAttribute('href'); return; }
+    var qr;
+    try { qr = qrcode(0, $('ec').value); qr.addData(text, 'Byte'); qr.make(); }
+    catch (e) { $('msg').className = 'msg bad'; $('msg').textContent = 'That text is too long for a QR code. Shorten it or lower the error correction.'; $('dl').removeAttribute('href'); return; }
+    var n = qr.getModuleCount(), quiet = 4, cell = Math.floor(size / (n + quiet * 2)), off = Math.floor((size - cell * n) / 2);
+    ctx.fillStyle = '#000';
+    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(off + c * cell, off + r * cell, cell, cell);
+    $('dl').href = cv.toDataURL('image/png');
+    $('msg').className = 'msg'; $('msg').textContent = '';
+  }
+  ['txt', 'size', 'ec'].forEach(function (id) { $(id).addEventListener('input', draw); });
+  draw();
+})();
+</script>

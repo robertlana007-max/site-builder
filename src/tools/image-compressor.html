@@ -1,0 +1,52 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>JPG, PNG or WebP. Your file never leaves your device.</div>
+<input type="file" id="file" accept="image/*" hidden>
+<div class="fields">
+  <div><label for="q">Quality: <span id="qv">70</span>%</label><input type="range" id="q" min="10" max="95" value="70"></div>
+  <div><label for="fmt">Output format</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="maxw">Max width (px, optional)</label><input type="number" id="maxw" min="1" placeholder="Keep original"></div>
+</div>
+<div class="stats" id="stats" hidden>
+  <div class="stat"><span>Original</span><b id="s1">–</b></div>
+  <div class="stat"><span>Compressed</span><b id="s2">–</b></div>
+  <div class="stat"><span>Saved</span><b id="s3">–</b></div>
+</div>
+<div class="preview"><img id="prev" alt="Compressed preview" hidden></div>
+<div class="btns"><a class="btn" id="dl" hidden>Download image</a></div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var src = null, orig = 0, name = 'image', lastUrl = null;
+  function run() {
+    if (!src) return;
+    var mw = parseInt($('maxw').value, 10), w = src.naturalWidth, h = src.naturalHeight;
+    if (mw > 0 && mw < w) { h = Math.round(h * mw / w); w = mw; }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d'), type = $('fmt').value;
+    if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+    ctx.drawImage(src, 0, 0, w, h);
+    c.toBlob(function (b) {
+      if (!b) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser could not encode this format.'; return; }
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(b);
+      $('prev').src = lastUrl; $('prev').hidden = false;
+      $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').hidden = false;
+      $('stats').hidden = false;
+      $('s1').textContent = fmtBytes(orig); $('s2').textContent = fmtBytes(b.size);
+      var pct = Math.round((1 - b.size / orig) * 100);
+      $('s3').textContent = pct > 0 ? pct + '%' : '0%';
+      $('msg').className = 'msg'; $('msg').textContent = pct > 0 ? w + ' × ' + h + ' px' : 'This image is already well compressed. Try a lower quality.';
+    }, type, $('q').value / 100);
+  }
+  setupDrop('drop', 'file', function (f) {
+    if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'Please choose an image file.'; return; }
+    orig = f.size; name = f.name.replace(/\.[^.]+$/, '');
+    loadImage(f, function (img) {
+      if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image.'; return; }
+      src = img; run();
+    });
+  });
+  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; run(); });
+  $('fmt').addEventListener('change', run);
+  $('maxw').addEventListener('input', run);
+})();
+</script>
