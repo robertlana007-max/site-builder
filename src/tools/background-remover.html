@@ -120,7 +120,7 @@
   }
 
   // ---------- model ----------
-  var gpuP = null, reporter = function () {};
+  var gpuP = null, reporter = function () {}, repKey = '';
   function detect() {
     return gpuP || (gpuP = Promise.resolve(navigator.gpu ? navigator.gpu.requestAdapter() : null).catch(function () { return null; }).then(function (ad) {
       useGpu = !!ad && !ad.isFallbackAdapter && !(ad.info && ad.info.isFallbackAdapter); // a software GPU is slower than WebAssembly
@@ -145,8 +145,8 @@
   function getSession(key, report) {
     if (sessions[key]) return Promise.resolve(sessions[key]);
     var m = MODELS[key], wasmBytes = 0, a = 0, b = 0;
-    reporter = report; // the latest photo shows the progress of a shared download
-    function tell() { reporter((a + b) / (wasmBytes + m.bytes), 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(wasmBytes + m.bytes) + '). This happens only once.'); }
+    reporter = report; repKey = key; // the latest photo shows the progress of a shared download
+    function tell() { if (repKey === key) reporter((a + b) / (wasmBytes + m.bytes), 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(wasmBytes + m.bytes) + '). This happens only once.'); }
     report(0, 'Getting the AI model ready…');
     var p = sessions[key + 'P'] || (sessions[key + 'P'] = detect().then(function () { wasmBytes = ortP ? 0 : WASM[useGpu ? 'gpu' : 'cpu'][2]; tell(); }).then(function () { return Promise.all([
       getOrt(function (n) { a = n; tell(); }),

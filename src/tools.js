@@ -1146,5 +1146,70 @@ module.exports = [
         ['Is my mix saved?', 'Yes. Your sounds, volumes and master volume are remembered in this browser for next time.']
       ],
       icon: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/>'
+  },
+  {
+    slug: 'citation-generator', cat: 'Study tools', name: 'Citation Generator',
+    title: 'Citation Generator - APA, MLA, Harvard and Chicago, Free',
+    desc: 'Make correct citations in APA 7, MLA 9, Harvard and Chicago for websites, books, journals, news, videos and reports. Italics kept when you copy. Free.',
+    card: 'APA, MLA, Harvard and Chicago citations.',
+    intro: 'Fill in a source and get the reference and in-text citation in APA, MLA, Harvard or Chicago, with italics in the right places. Build a reference list that re-formats itself when you change style.',
+    steps: ['Choose the citation style and the type of source.', 'Add the authors and the title, date, link and other details you have.', 'Copy the reference or the in-text citation, or click Add to my list.', 'Sort the list A to Z, then copy it all or download it for Word.'],
+    faq: [
+      ['Which editions does it follow?', 'APA 7th edition, MLA 9th edition, Harvard as described in Cite Them Right, and the Chicago Manual of Style 18th edition (notes and bibliography, and author-date).'],
+      ['How does it handle many authors?', 'It follows each style: APA lists up to 20 authors, MLA uses et al. for three or more, Harvard lists everyone in the reference list, and Chicago lists up to six before et al. In-text citations use et al. where the style says so.'],
+      ['What if the source has no date or no author?', 'Leave the year empty and the citation uses n.d. (no date in Harvard). With no author, the title moves to the front as each style requires.'],
+      ['Are the italics kept when I paste?', 'Yes. Copying puts formatted text on the clipboard, so Word, Google Docs and Pages keep the italics. Apps that only take plain text get plain text.'],
+      ['Does it change the capitals in my title?', 'No. Titles are kept as you type them. APA and Harvard use sentence case and MLA and Chicago use title case, so type the title the way your style wants.'],
+      ['Is my reference list saved?', 'Yes, in this browser only. Nothing is uploaded. Download the list if you want a copy elsewhere.']
+    ],
+    icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z"/><path d="M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-5"/><path d="M9 7v3M9 7h1.5M14 7v3M14 7h1.5"/>'
+  },
+  {
+    slug: 'pomodoro-timer', cat: 'Study tools', name: 'Pomodoro Study Timer',
+    title: 'Pomodoro Timer Online - Free Study Timer with Tasks',
+    desc: 'A free Pomodoro timer: 25-minute focus sessions with short and long breaks, sound, notifications, a task list and today’s study stats. No sign-up.',
+    card: 'Focus in 25-minute blocks with breaks.',
+    intro: 'Study in focused blocks with planned breaks. Set your own lengths, track pomodoros for each task and see how much you focused today.',
+    steps: ['Add the task you are working on.', 'Click Start and focus until the chime.', 'Take the short break, and a long break after every fourth session.', 'Open Timer settings to change the lengths, sound, notifications and auto-start.'],
+    faq: [
+      ['What is the Pomodoro technique?', 'A way of working in short focused blocks, usually 25 minutes, each followed by a 5-minute break, with a longer break after every four blocks.'],
+      ['Does it keep time in a background tab?', 'Yes. Time is worked out from the clock, not by counting ticks, so it stays exact in a background tab and catches up after your computer sleeps.'],
+      ['Can I change the lengths?', 'Yes. Open Timer settings to set the focus, short break and long break minutes, and how many focus sessions come before the long break.'],
+      ['How do notifications work?', 'Tick Show a notification and your browser asks for permission once. You then get a notification when each session ends. The site never asks unless you tick the box.'],
+      ['Are my tasks and stats saved?', 'Yes, in this browser on this device. Nothing is sent to a server.']
+    ],
+    icon: '<circle cx="12" cy="14" r="7"/><path d="M12 7c0-2 1-3.5 3-4M8.5 7.6 12 9l3.5-1.4M12 11.5V14l2 1.5"/>'
+  },
+  {
+    slug: 'flashcards', cat: 'Study tools', name: 'Flashcards',
+    title: 'Flashcard Maker Online - Free Flashcards with Spaced Repetition',
+    desc: 'Make flashcard decks, import a list or CSV, and study with flip cards and spaced repetition. Works offline on phone and computer. Free, no sign-up.',
+    card: 'Make and study flip cards with spaced repetition.',
+    intro: 'Make decks of flip cards and learn them with spaced repetition. Type cards, paste a list such as term - definition, or open a CSV file.',
+    steps: ['Create a deck and add cards, or paste a list in Import and export.', 'Open Study, read the front and flip the card.', 'Mark it Know it or Still learning, with the buttons, arrow keys or a swipe.', 'Come back each day to review the cards that are due.'],
+    faq: [
+      ['How does the spaced repetition work?', 'It uses five Leitner boxes. A card you know moves up one box and waits 1, 3, 7 or 14 days before it is due again. A card you miss goes back to box 1 and comes back in the same round.'],
+      ['What can I import?', 'Pasted lines like term - definition, rows copied from a spreadsheet, CSV or TSV files, and the JSON files this tool exports. A header row such as term, definition is skipped.'],
+      ['Are there keyboard shortcuts?', 'Yes. Space flips the card, the right arrow means Know it, the left arrow means Still learning and Backspace goes back one card. On touch screens, tap to flip and swipe right or left.'],
+      ['Where are my decks saved?', 'In this browser on your device. Large collections are kept in IndexedDB. Download a backup to move decks to another device.'],
+      ['Can I turn off the flip animation?', 'If your device is set to reduce motion, or animations are off in the site settings, cards switch sides without moving.']
+    ],
+    icon: '<rect x="3" y="7" width="14" height="12" rx="2"/><path d="M7 7V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2h-2"/><path d="M7 13h6"/>'
+  },
+  {
+    slug: 'timetable-maker', cat: 'Study tools', name: 'Timetable Maker',
+    title: 'Timetable Maker - Free School Timetable, PNG and PDF',
+    desc: 'Make a weekly class timetable: pick days, set periods and breaks, add subjects with rooms, teachers and colours, then download PNG or PDF or print.',
+    card: 'Weekly class timetable to PNG, PDF or print.',
+    intro: 'Build a weekly school or college timetable. Set your days, periods and breaks, click the grid to add classes, then download it or print it.',
+    steps: ['Tick the days and set the periods and breaks under Times and periods.', 'Click an empty cell to add a class with its subject, room, teacher and colour.', 'Click a class to change, lengthen or delete it.', 'Download a PNG or PDF, or print.'],
+    faq: [
+      ['Can a class last more than one period?', 'Yes. Choose 2 or more periods when you add a class, for a double or triple lesson. A class stops at the next break.'],
+      ['Can I use my own period times?', 'Yes. Generate periods from a start time, end time and period length, then change any row’s times, rename it, or turn it into a break.'],
+      ['Does it work on a phone?', 'Yes. The table scrolls sideways inside its box on small screens, and the time column stays in view.'],
+      ['Is the PDF made online?', 'No. The PNG and PDF are made on your device, and your timetable is never uploaded.'],
+      ['Is my timetable saved?', 'Yes, in this browser. It is there when you come back, until you clear the site’s data.']
+    ],
+    icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M9 4v17M15 4v17M3 15h18"/>'
   }
 ];

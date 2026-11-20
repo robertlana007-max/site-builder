@@ -1,0 +1,103 @@
+<style>
+.slp-modes { display: flex; justify-content: center; margin-bottom: 18px; }
+.slp-modes .seg { flex-wrap: wrap; justify-content: center; }
+.slp input[type=time] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.slp input[type=time]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.slp-row { display: flex; gap: 8px; align-items: stretch; }
+.slp-row input { flex: 1; min-width: 0; }
+.slp-row .btn { white-space: nowrap; }
+.slp-h { font-size: 17px; margin: 18px 0 4px; }
+.slp-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 10px; }
+.slp-opt { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+.slp-opt b { display: block; font-size: 24px; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.slp-opt span { display: block; font-size: 13px; color: var(--muted); }
+.slp-opt.best { border-color: var(--accent); background: var(--accent-soft); }
+.slp-opt em { display: inline-block; font-style: normal; font-size: 12px; font-weight: 700; color: var(--accent); margin-top: 4px; }
+.slp-nap { width: 100%; border-collapse: collapse; margin-top: 10px; font-size: 15px; }
+.slp-nap th, .slp-nap td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.slp-nap th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.slp-nap td b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+</style>
+<div class="slp">
+<div class="slp-modes"><div class="seg" role="group" aria-label="What do you want to work out?"><button type="button" id="slpModeWake" aria-pressed="true">I need to wake up at</button><button type="button" id="slpModeBed" aria-pressed="false">I am going to bed at</button></div></div>
+
+<div class="fields">
+  <div id="slpWakeBox"><label for="slpWake">Wake-up time</label><input type="time" id="slpWake" value="07:00"></div>
+  <div id="slpBedBox" hidden><label for="slpBed">Bedtime</label><div class="slp-row"><input type="time" id="slpBed" value="23:00"><button type="button" class="btn ghost" id="slpNow">Now</button></div></div>
+  <div><label for="slpLat">Minutes to fall asleep</label><input type="number" id="slpLat" min="0" max="120" step="1" value="15"></div>
+  <div><label for="slpFmt">Time format</label><select id="slpFmt"><option value="auto">Automatic</option><option value="12">12-hour (11:30 PM)</option><option value="24">24-hour (23:30)</option></select></div>
+</div>
+
+<h3 class="slp-h" id="slpHead">Go to sleep at one of these times</h3>
+<div class="slp-list" id="slpList" aria-live="polite"></div>
+<p class="msg" id="slpMsg"></p>
+
+<h3 class="slp-h">Nap guide</h3>
+<p class="msg" style="margin-top:0">If you lie down now, set your alarm for:</p>
+<table class="slp-nap">
+  <thead><tr><th>Nap</th><th>Alarm</th><th>What to expect</th></tr></thead>
+  <tbody id="slpNap"></tbody>
+</table>
+<p class="msg">This is general guidance based on average 90-minute sleep cycles. Real cycles vary from about 70 to 120 minutes and change through the night. Most adults need 7 to 9 hours of sleep. If you often feel tired or have trouble sleeping, talk to a doctor.</p>
+</div>
+<script>
+(function () {
+  // core-start
+  var CYCLE = 90;
+  function mod(m) { return ((Math.round(m) % 1440) + 1440) % 1440; }
+  function parse(v) { var m = /^(\d{1,2}):(\d{2})/.exec(v || ''); if (!m) return null; var h = +m[1], mi = +m[2]; if (h > 23 || mi > 59) return null; return h * 60 + mi; }
+  function fmt(min, h12) {
+    min = mod(min); var h = Math.floor(min / 60), m = min % 60, mm = (m < 10 ? '0' : '') + m;
+    if (!h12) return (h < 10 ? '0' : '') + h + ':' + mm;
+    return ((h % 12) || 12) + ':' + mm + ' ' + (h < 12 ? 'AM' : 'PM');
+  }
+  // Bedtimes for a wake-up time: count back whole cycles plus the time it takes to fall asleep. Earliest first.
+  function bedtimes(wake, lat) { return [6, 5, 4, 3].map(function (c) { return { cycles: c, time: mod(wake - lat - c * CYCLE), sleep: c * CYCLE }; }); }
+  // Wake-up times for a bedtime: fall asleep first, then whole cycles. Earliest first.
+  function waketimes(bed, lat) { return [3, 4, 5, 6].map(function (c) { return { cycles: c, time: mod(bed + lat + c * CYCLE), sleep: c * CYCLE }; }); }
+  function hours(min) { var h = Math.floor(min / 60), m = min % 60; return h + ' h' + (m ? ' ' + m + ' min' : ''); }
+  var NAPS = [[20, 'Power nap', 'Boosts alertness. Short enough that you should wake up without feeling groggy.'], [30, '30 minutes', 'Can leave you groggy for a little while, because you may reach deep sleep.'], [60, '1 hour', 'Helps memory, but you will likely wake from deep sleep and feel slow at first.'], [90, 'Full cycle', 'One complete sleep cycle. You usually wake up in light sleep, feeling refreshed.']];
+  // core-end
+
+  var mode = 'wake';
+  function h12() { var v = $('slpFmt').value; if (v !== 'auto') return v === '12'; try { return !!new Intl.DateTimeFormat(undefined, { hour: 'numeric' }).resolvedOptions().hour12; } catch (e) { return true; } }
+  function nowMin() { var d = new Date(); return d.getHours() * 60 + d.getMinutes(); }
+  function lat() { var v = $('slpLat').value; if (v === '') return 15; v = Math.round(+v); return isFinite(v) ? Math.min(120, Math.max(0, v)) : 15; }
+  function opt(o, best, twelve) {
+    var d = document.createElement('div'); d.className = 'slp-opt' + (best ? ' best' : '');
+    var b = document.createElement('b'); b.textContent = fmt(o.time, twelve);
+    var s = document.createElement('span'); s.textContent = o.cycles + ' cycles · ' + hours(o.sleep) + ' of sleep';
+    d.appendChild(b); d.appendChild(s);
+    if (best) { var e = document.createElement('em'); e.textContent = 'Recommended'; d.appendChild(e); }
+    return d;
+  }
+  function render() {
+    var twelve = h12(), L = lat(), list = $('slpList'), items;
+    $('slpWakeBox').hidden = mode !== 'wake'; $('slpBedBox').hidden = mode !== 'bed';
+    $('slpModeWake').setAttribute('aria-pressed', mode === 'wake'); $('slpModeBed').setAttribute('aria-pressed', mode === 'bed');
+    list.innerHTML = '';
+    var t = parse(mode === 'wake' ? $('slpWake').value : $('slpBed').value);
+    if (t == null) { $('slpHead').textContent = mode === 'wake' ? 'Go to sleep at one of these times' : 'Wake up at one of these times'; $('slpMsg').textContent = 'Enter a time to see the results.'; $('slpMsg').className = 'msg'; }
+    else {
+      items = mode === 'wake' ? bedtimes(t, L) : waketimes(t, L);
+      $('slpHead').textContent = mode === 'wake' ? 'To wake up at ' + fmt(t, twelve) + ', go to bed at one of these times' : 'If you go to bed at ' + fmt(t, twelve) + ', wake up at one of these times';
+      items.forEach(function (o) { list.appendChild(opt(o, o.cycles >= 5, twelve)); });
+      $('slpMsg').textContent = 'Each time includes ' + L + ' minute' + (L === 1 ? '' : 's') + ' to fall asleep. 5 or 6 cycles (7.5 to 9 hours) is best for most adults.';
+      $('slpMsg').className = 'msg';
+    }
+    var now = nowMin(), tb = $('slpNap'); tb.innerHTML = '';
+    NAPS.forEach(function (n) {
+      var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td'), c = document.createElement('td'), bb = document.createElement('b');
+      a.textContent = n[1] + (n[0] !== 30 && n[0] !== 60 ? ' (' + n[0] + ' min)' : '');
+      bb.textContent = fmt(now + L + n[0], twelve); b.appendChild(bb); c.textContent = n[2];
+      tr.appendChild(a); tr.appendChild(b); tr.appendChild(c); tb.appendChild(tr);
+    });
+  }
+  $('slpModeWake').addEventListener('click', function () { mode = 'wake'; render(); });
+  $('slpModeBed').addEventListener('click', function () { mode = 'bed'; render(); });
+  $('slpNow').addEventListener('click', function () { var n = nowMin(); $('slpBed').value = fmt(n, false); mode = 'bed'; render(); });
+  ['slpWake', 'slpBed', 'slpLat', 'slpFmt'].forEach(function (id) { $(id).addEventListener('input', render); $(id).addEventListener('change', render); });
+  setInterval(render, 30000);
+  render();
+})();
+</script>

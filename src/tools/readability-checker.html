@@ -1,0 +1,224 @@
+<style>
+.rdc .rdc-scores { width: 100%; }
+.rdc .rdc-scores td:nth-child(3) { text-align: start; color: var(--muted); font-variant-numeric: normal; }
+.rdc .rdc-scores td b { font-size: 16px; }
+.rdc .rdc-big { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 16px 0 6px; padding: 14px 16px; border: 2px solid var(--accent); border-radius: 14px; background: var(--surface); }
+.rdc .rdc-big b { font-size: 34px; font-variant-numeric: tabular-nums; line-height: 1; }
+.rdc .rdc-big div { flex: 1 1 220px; }
+.rdc .rdc-view { margin-top: 10px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-size: 16px; line-height: 1.8; max-height: 560px; overflow: auto; overflow-wrap: anywhere; }
+.rdc .rdc-view p { margin: 0 0 .9em; }
+.rdc .rdc-legend { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 12px 0 0; }
+.rdc .rdc-legend label { margin: 0; font-weight: 400; font-size: 14.5px; display: flex; align-items: center; gap: 6px; }
+.rdc .rdc-sw { display: inline-block; width: 14px; height: 14px; border-radius: 4px; flex: none; }
+.rdc .rdc-sw.long { background: #fde68a; } .rdc .rdc-sw.vlong { background: #fca5a5; }
+.rdc .rdc-sw.hard { border-bottom: 3px solid #d97706; border-radius: 0; height: 10px; }
+.rdc .rdc-sw.pas { background: #c4b5fd; } .rdc .rdc-sw.adv { background: #93c5fd; }
+.rdc.show-long .s.long { background: color-mix(in srgb, #fde68a 70%, transparent); }
+.rdc.show-long .s.vlong { background: color-mix(in srgb, #fca5a5 60%, transparent); }
+.rdc.show-hard .w.hard { text-decoration: underline 2.5px #d97706; text-underline-offset: 3px; }
+.rdc.show-pas .w.pas { background: color-mix(in srgb, #c4b5fd 75%, transparent); border-radius: 3px; }
+.rdc.show-adv .w.adv { background: color-mix(in srgb, #93c5fd 75%, transparent); border-radius: 3px; }
+:root[data-theme="dark"] .rdc .rdc-view .s.long, :root[data-theme="dark"] .rdc .rdc-view .s.vlong, :root[data-theme="dark"] .rdc .rdc-view .w.pas, :root[data-theme="dark"] .rdc .rdc-view .w.adv { color: #111; }
+.rdc .rdc-tips { margin: 8px 0 0; padding-inline-start: 20px; }
+.rdc .rdc-tips li { margin: 0 0 6px; }
+</style>
+<div class="rdc show-long show-hard show-pas show-adv" id="rdc">
+<label for="rdcTxt">Your essay or text</label>
+<textarea id="rdcTxt" class="plain" data-nomemo style="min-height:220px" placeholder="Paste your essay, article or report here. Scores update as you type."></textarea>
+<div class="btns"><button type="button" class="btn ghost" id="rdcSample">Try a sample text</button><button type="button" class="btn ghost" id="rdcClear">Clear</button></div>
+<p class="msg" id="rdcMsg" aria-live="polite">Paste at least a few sentences. Readability formulas are most reliable with 100 words or more.</p>
+<div id="rdcOut" hidden>
+  <div class="rdc-big">
+    <div><span class="msg" style="margin:0">Flesch Reading Ease</span><br><b id="rdcFre">0</b> <span id="rdcFreLabel"></span></div>
+    <div><span class="msg" style="margin:0">Average grade level</span><br><b id="rdcAvg">0</b> <span id="rdcAvgLabel"></span></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Words</span><b id="rdcW">0</b></div>
+    <div class="stat"><span>Sentences</span><b id="rdcS">0</b></div>
+    <div class="stat"><span>Paragraphs</span><b id="rdcP">0</b></div>
+    <div class="stat"><span>Words per sentence</span><b id="rdcWps">0</b></div>
+    <div class="stat"><span>Syllables per word</span><b id="rdcSpw">0</b></div>
+    <div class="stat"><span>Hard words (3+ syllables)</span><b id="rdcHard">0</b></div>
+  </div>
+  <h3 style="margin:20px 0 6px">Readability scores</h3>
+  <div class="scroll-x"><table class="sched rdc-scores"><thead><tr><th>Formula</th><th>Score</th><th style="text-align:start">What it means</th></tr></thead><tbody id="rdcTable"></tbody></table></div>
+  <h3 style="margin:20px 0 6px">Your text, highlighted</h3>
+  <div class="rdc-legend" role="group" aria-label="Highlights to show">
+    <label><input type="checkbox" data-show="long" checked><i class="rdc-sw long"></i><i class="rdc-sw vlong"></i>Long sentences (<span id="rdcNLong">0</span>)</label>
+    <label><input type="checkbox" data-show="hard" checked><i class="rdc-sw hard"></i>Hard words (<span id="rdcNHard">0</span>)</label>
+    <label><input type="checkbox" data-show="pas" checked><i class="rdc-sw pas"></i>Possible passive voice (<span id="rdcNPas">0</span>)</label>
+    <label><input type="checkbox" data-show="adv" checked><i class="rdc-sw adv"></i>Adverbs (<span id="rdcNAdv">0</span>)</label>
+  </div>
+  <p class="msg" style="margin-top:6px">Yellow: 21 to 30 words. Red: over 30 words. Hover or tap a highlighted sentence to see its length.</p>
+  <div class="rdc-view" id="rdcView"></div>
+  <h3 style="margin:20px 0 6px">Tips to make it clearer</h3>
+  <ul class="rdc-tips" id="rdcTips"></ul>
+</div>
+</div>
+<script>
+(function () {
+  // Count syllables in an English word: vowel groups, then fixes for silent endings and vowel pairs that split.
+  var SYL_EX = { champion: 3, ideal: 3, cereal: 3, reaction: 3, reactions: 3, priest: 1, prayer: 1, something: 2, anyone: 3, fiery: 3, naivety: 4, cooperation: 5, coordination: 5, lifetime: 2, homework: 2, likewise: 2, whereas: 2, nevertheless: 4, nonetheless: 3, the: 1, every: 3, everyone: 4, everything: 4, business: 2, different: 3, family: 3, interest: 3, interesting: 4, evening: 2, several: 3, chocolate: 3, comfortable: 4, vegetable: 4, temperature: 4, camera: 3, general: 3, generally: 4, natural: 3, naturally: 4, separate: 3, average: 3, favourite: 3, favorite: 3, people: 2, area: 3, idea: 3, ideas: 3, real: 1, really: 2, being: 2, doing: 2, going: 2, seeing: 2, create: 2, created: 3, creates: 2, creating: 3, creation: 3, video: 3, radio: 3, poem: 2, poet: 2, poetry: 3, quiet: 2, science: 2, scientist: 3, diet: 2, client: 2, lion: 2, violent: 3, violence: 3, piano: 3, iodine: 3, museum: 3, react: 2, reality: 4, area: 3, ocean: 2, oceans: 2, coincide: 3, cooperate: 4, coordinate: 4, preliminary: 5, recreate: 3, reenter: 3, biology: 4, geography: 4, theory: 3, theories: 3, theatre: 3, theater: 3, cruel: 2, fuel: 2, actual: 3, actually: 4, usual: 3, usually: 4, annual: 3, individual: 5, gradual: 3, gradually: 4, situation: 4, evaluate: 4, graduate: 3, influence: 3, fluent: 2, issue: 2, tissue: 2, rescue: 2, value: 2, continue: 3, argue: 2, queue: 1, someone: 2, sometimes: 2, somewhere: 2, whatever: 3, wherever: 3, however: 3, forever: 3, therefore: 2, more: 1, before: 2, were: 1, where: 1, there: 1, here: 1, fire: 1, hour: 1, our: 1, flower: 2, power: 2, tower: 2, shower: 2, naive: 2, simile: 3, recipe: 3, apostrophe: 4, catastrophe: 4, epitome: 4, acne: 2, anemone: 4, cafe: 2, karate: 3, ukulele: 4, coyote: 3, sesame: 3, hyperbole: 4, maybe: 2, whale: 1, smile: 1, while: 1, little: 2, able: 2, table: 2, simple: 2, cycle: 2, bicycle: 3, wednesday: 2, colonel: 2, choir: 1, buoy: 1, aisle: 1, isle: 1, island: 2, says: 1, said: 1, does: 1, goes: 1, toes: 1, shoes: 1, eyes: 1, lives: 1, gives: 1, clothes: 1, changes: 2, judges: 2, uses: 2, causes: 2, places: 2, houses: 2, horses: 2, boxes: 2, wishes: 2, watches: 2, wanted: 2, needed: 2, ended: 2, started: 2, decided: 3, loved: 1, liked: 1, asked: 1, jumped: 1, walked: 1, changed: 1, named: 1, used: 1, moved: 1, lived: 1, aged: 1, learned: 1, poetic: 3, period: 3, serious: 3, various: 3, previous: 3, obvious: 3, curious: 3, experience: 4, experiment: 4, material: 4, ordinary: 4, library: 3, february: 4, january: 4, dictionary: 4, secretary: 4, necessary: 4, military: 4, literally: 4, literature: 4, vacuum: 3, continuum: 4, genuine: 3, nuclear: 3, behaviour: 3, behavior: 3, saviour: 2, alien: 3, audience: 3, convenient: 4, ingredient: 4, obedient: 4, patient: 2, ancient: 2, efficient: 3, sufficient: 3, quotient: 2, sentient: 2, deity: 3, deities: 3, agreeing: 3, freeing: 2, skiing: 2, eerie: 2, hyena: 3, priority: 4, society: 4, anxiety: 4, variety: 4, notoriety: 5, dialogue: 3, dial: 2, trial: 2, denial: 3, via: 2, triumph: 2, giant: 2, pliant: 2, reliant: 3, lyrics: 2, rhythm: 2, rhythms: 2, prism: 2, tourism: 3, realism: 4, chasm: 2, spasm: 2, sarcasm: 3, enthusiasm: 5, organism: 4, mechanism: 4 };
+  function syl(word) {
+    var w = word.toLowerCase().replace(/[’']s$/, '').replace(/[^a-z]/g, '');
+    if (!w) return 0;
+    if (SYL_EX[w]) return SYL_EX[w];
+    if (w.length <= 3) return 1;
+    var m = /^(.+?)(s|es|ly|ness|ful|fully|less|ment|ments)$/.exec(w);
+    if (m && SYL_EX[m[1]] && m[1].length > 2) return SYL_EX[m[1]] + (m[2] === 's' ? 0 : m[2] === 'fully' ? 2 : 1);
+    // a silent e kept before a suffix: lonely, careful, statement
+    m = /^(.+[^aeiouy]e)(ly|ful|less|ment|ments|ness)$/.exec(w);
+    if (m) return syl(m[1]) + 1;
+    var s = w.replace(/qu/g, 'q').replace(/gu(?=[aeiy])/g, 'g');
+    if (/[^aeiouy]les$/.test(s)) s = s.slice(0, -1); // tables: -les is a syllable
+    else if (/[^aeiouy]es$/.test(s)) { if (!/(?:[cgsxz]|ch|sh)es$/.test(s)) s = s.slice(0, -2); } // makes, but boxes, places
+    else if (/[^aeiou]ed$/.test(s)) { if (!/[td]ed$/.test(s)) s = s.slice(0, -2); } // jumped, but wanted
+    else if (/[^aeiouy]e$/.test(s) && !/[^aeiouy]le$/.test(s)) s = s.slice(0, -1); // make, but table
+    s = s.replace(/^y/, '');
+    var n = (s.match(/[aeiouy]+/g) || []).length;
+    // vowel pairs that are usually two syllables: me-di-a, pi-o-neer, ge-o-gra-phy, so-ci-e-ty, he-ro-ic
+    var split = s.match(/(?:[^cstg]ia|[^cstg]io(?!ns?$)|iu|ii|eo|ua|uo|uu|ie(?=t|r$|st)|oi(?=c|ng|st)|ao|[aeiou]y[aeiou]|ism$|[^aeiouy]ien(?=ce|t))/g);
+    if (split) n += split.length;
+    return Math.max(1, n);
+  }
+  // ---------- splitting text ----------
+  var ABBR = /\b(?:Mr|Mrs|Ms|Dr|Prof|Sr|Jr|St|Mt|vs|etc|e\.g|i\.e|approx|Inc|Ltd|Co|No|Fig|Vol|pp|Jan|Feb|Mar|Apr|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec|U\.S|U\.K|a\.m|p\.m)\.$/i;
+  function sentencesOf(par) {
+    var out = [], re = /[^.!?…]*(?:[.!?…]+["'”’)\]]*|$)/g, m, buf = '';
+    while ((m = re.exec(par)) && m[0]) {
+      buf += m[0];
+      var t = buf.trim(), nextCh = par.charAt(re.lastIndex).trim() === '' ? par.slice(re.lastIndex).trim().charAt(0) : par.charAt(re.lastIndex);
+      // keep going after an abbreviation, an initial (J. Smith) or a decimal number
+      if (re.lastIndex < par.length && (ABBR.test(t) || /\b[A-Z]\.$/.test(t) || /\d\.$/.test(t) && /\d/.test(par.charAt(re.lastIndex)) || /[.!?]$/.test(t) && nextCh && /[a-z]/.test(nextCh))) continue;
+      if (t) out.push(buf); buf = '';
+    }
+    if (buf.trim()) out.push(buf);
+    return out;
+  }
+  var WORD = /[A-Za-zÀ-ÖØ-öø-ÿ0-9]+(?:['’-][A-Za-zÀ-ÖØ-öø-ÿ0-9]+)*/g;
+  var BE = { am: 1, is: 1, are: 1, was: 1, were: 1, be: 1, been: 1, being: 1, "isn't": 1, "aren't": 1, "wasn't": 1, "weren't": 1 };
+  var IRR = 'arisen awoken beaten become begun bent bet bitten bled blown bound broken bred brought built burnt burst bought cast caught chosen clung come cost crept cut dealt done drawn driven drunk dug eaten fallen fed felt fought found fled flung forbidden forecast forgotten forgiven frozen given gone ground grown hung heard hidden hit held hurt kept knelt known laid led leant left lent let lain lit lost made meant met mistaken paid proven put quit read ridden rung risen run said seen sought sold sent set sewn shaken shed shone shot shown shrunk shut sung sunk sat slain slept slid slung spoken spent spun spat split spread sprung stood stolen stuck stung struck strung sworn swept swum swung taken taught torn told thought thrown thrust trodden understood undertaken upheld upset woken worn woven wept won wound withdrawn withheld written overcome overtaken undergone'.split(' ');
+  var IRRS = {}; IRR.forEach(function (w) { IRRS[w] = 1; });
+  var NOT_ADV = { only: 0, family: 1, early: 0, friendly: 1, lovely: 1, likely: 1, unlikely: 1, ugly: 1, silly: 1, holy: 1, jelly: 1, belly: 1, bully: 1, reply: 1, supply: 1, apply: 1, rely: 1, ally: 1, fly: 1, july: 1, italy: 1, sly: 1, lonely: 1, lively: 1, elderly: 1, costly: 1, deadly: 1, orderly: 1, manly: 1, curly: 1, chilly: 1, hilly: 1, oily: 1, wily: 1, burly: 1, surly: 1, assembly: 1, anomaly: 1, monopoly: 1, butterfly: 1, rally: 1, tally: 1, lily: 1, melancholy: 1, homily: 1, comply: 1, imply: 1, multiply: 1, daily: 0, weekly: 0, monthly: 0, yearly: 0, nightly: 0, hourly: 0, emily: 1, kelly: 1, molly: 1, sally: 1, holly: 1, billy: 1, beverly: 1, ely: 1, scully: 1, timely: 1, leisurely: 1, kindly: 0, cowardly: 1, motherly: 1, fatherly: 1, brotherly: 1, sisterly: 1, heavenly: 1, worldly: 1, ghostly: 1, bodily: 1, woolly: 1, gravelly: 1, prickly: 1, wrinkly: 1, smelly: 1, jolly: 1, gully: 1, rely1: 1, panoply: 1, doily: 1, wobbly: 1, bubbly: 1, cuddly: 1, crinkly: 1, sparkly: 1 };
+  function isAdverb(w) { var l = w.toLowerCase(); return l.length > 3 && /ly$/.test(l) && !NOT_ADV[l]; }
+  function isParticiple(w) { var l = w.toLowerCase(); return IRRS[l] || (/[a-z]{2,}ed$/.test(l) && l !== 'need' && l !== 'indeed' && l !== 'seed' && l !== 'feed' && l !== 'bed' && l !== 'red' && l !== 'shed' && l !== 'hundred' && l !== 'speed'); }
+
+  function analyse(text) {
+    var pars = text.split(/\n\s*\n|\n(?=\s*(?:[-•*]|\d+[.)])\s)/).map(function (p) { return p.replace(/\s*\n\s*/g, ' ').trim(); }).filter(Boolean);
+    // a line without end punctuation followed by a line break is a heading or list item: treat it as its own sentence
+    var R = { pars: [], words: 0, sents: 0, syl: 0, letters: 0, hard: 0, poly: 0, fogHard: 0, long: 0, vlong: 0, pas: 0, adv: 0 };
+    text.split(/\n\s*\n/).forEach(function (block) {
+      var lines = block.split('\n'), par = [], cur = '';
+      lines.forEach(function (ln, i) { cur += (cur ? ' ' : '') + ln.trim(); if (!/[.!?…:;,"”'’)\]]$/.test(ln.trim()) && i < lines.length - 1 && ln.trim()) { if (cur.trim()) par.push(cur); cur = ''; } });
+      if (cur.trim()) par.push(cur);
+      var sents = []; par.forEach(function (chunk) { sents = sents.concat(sentencesOf(chunk)); });
+      sents = sents.filter(function (s) { return (s.match(WORD) || []).length; });
+      if (!sents.length) return;
+      var P = [];
+      sents.forEach(function (s) {
+        var toks = [], m, re = new RegExp(WORD.source, 'g'), first = true;
+        while ((m = re.exec(s))) {
+          var w = m[0], n = /^\d+$/.test(w) ? 1 : syl(w), proper = !first && /^[A-Z]/.test(w) && !/^[A-Z]+$/.test(w);
+          toks.push({ w: w, i: m.index, n: n, hard: n >= 3 && !/^\d/.test(w), proper: proper });
+          first = false;
+        }
+        var S = { text: s, toks: toks, words: toks.length };
+        toks.forEach(function (t, k) {
+          R.syl += t.n; R.letters += t.w.replace(/[^A-Za-zÀ-ÖØ-öø-ÿ0-9]/g, '').length;
+          if (t.hard) { R.hard++; R.poly++; }
+          // Gunning Fog leaves out names, hyphenated words and words that only reach 3 syllables with -es, -ed or -ing
+          if (t.hard && !t.proper && t.w.indexOf('-') === -1 && !(/(?:es|ed|ing)$/i.test(t.w) && syl(t.w.replace(/(?:es|ed|ing)$/i, '')) < 3)) R.fogHard++;
+          if (isAdverb(t.w)) { t.adv = 1; R.adv++; }
+          if (BE[t.w.toLowerCase()]) {
+            var j = k + 1;
+            while (j < toks.length && j <= k + 2 && (isAdverb(toks[j].w) || /^(not|never|also|always|often|still|being|been|just|then|now|all|both|usually)$/i.test(toks[j].w)) && !isParticiple(toks[j].w)) j++;
+            if (j < toks.length && isParticiple(toks[j].w) && !t.pasDone) { for (var x = k; x <= j; x++) toks[x].pas = 1; R.pas++; }
+          }
+        });
+        R.words += S.words; R.sents++;
+        if (S.words > 30) { R.vlong++; S.cls = 'vlong'; } else if (S.words > 20) { R.long++; S.cls = 'long'; }
+        P.push(S);
+      });
+      R.pars.push(P);
+    });
+    return R;
+  }
+
+  function grade(g) { if (!isFinite(g)) return '–'; if (g < 1) return 'Kindergarten'; if (g >= 17) return 'Graduate level'; if (g >= 13) return 'College (year ' + Math.min(4, Math.round(g - 12)) + ')'; return 'US grade ' + Math.round(g) + ' (age ' + (Math.round(g) + 5) + '-' + (Math.round(g) + 6) + ')'; }
+  function freLabel(f) { return f >= 90 ? 'Very easy. Clear to an average 11-year-old.' : f >= 80 ? 'Easy.' : f >= 70 ? 'Fairly easy.' : f >= 60 ? 'Plain English. Easy for most 13 to 15-year-olds.' : f >= 50 ? 'Fairly difficult.' : f >= 30 ? 'Difficult. Best for college readers.' : 'Very difficult. Best for university graduates.'; }
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function r1(x) { return isFinite(x) ? fmtNum(x, 1) : '–'; }
+
+  function render() {
+    var text = $('rdcTxt').value, R = analyse(text);
+    if (!R.words) { $('rdcOut').hidden = true; $('rdcMsg').className = 'msg'; $('rdcMsg').textContent = 'Paste at least a few sentences. Readability formulas are most reliable with 100 words or more.'; return; }
+    $('rdcOut').hidden = false;
+    $('rdcMsg').className = 'msg'; $('rdcMsg').textContent = R.words < 100 ? 'Only ' + R.words + ' word' + (R.words === 1 ? '' : 's') + ' so far. Scores become more reliable at 100 words or more' + (R.sents < 30 ? ', and SMOG is designed for 30 sentences.' : '.') : (R.sents < 30 ? 'Note: SMOG is designed for texts of 30 sentences or more, so treat it as an estimate here.' : '');
+    var W = R.words, S = R.sents, wps = W / S, spw = R.syl / W;
+    var fre = 206.835 - 1.015 * wps - 84.6 * spw;
+    var fk = 0.39 * wps + 11.8 * spw - 15.59;
+    var fog = 0.4 * (wps + 100 * R.fogHard / W);
+    var smog = 1.043 * Math.sqrt(R.poly * 30 / S) + 3.1291;
+    var cli = 0.0588 * (R.letters / W * 100) - 0.296 * (S / W * 100) - 15.8;
+    var ari = 4.71 * (R.letters / W) + 0.5 * wps - 21.43;
+    var grades = [fk, fog, smog, cli, ari], avg = grades.reduce(function (a, b) { return a + b; }, 0) / grades.length;
+    $('rdcFre').textContent = r1(Math.max(-50, Math.min(121, fre))); $('rdcFreLabel').textContent = freLabel(fre);
+    $('rdcAvg').textContent = r1(Math.max(0, avg)); $('rdcAvgLabel').textContent = grade(avg);
+    $('rdcW').textContent = fmtNum(W); $('rdcS').textContent = fmtNum(S); $('rdcP').textContent = fmtNum(R.pars.length);
+    $('rdcWps').textContent = r1(wps); $('rdcSpw').textContent = fmtNum(spw, 2); $('rdcHard').textContent = fmtNum(R.hard) + ' (' + Math.round(R.hard / W * 100) + '%)';
+    var rows = [
+      ['Flesch Reading Ease', r1(fre), freLabel(fre) + ' Higher is easier; 60 to 70 suits most readers.'],
+      ['Flesch-Kincaid Grade', r1(fk), grade(fk) + '. Based on sentence length and syllables per word.'],
+      ['Gunning Fog Index', r1(fog), grade(fog) + '. Counts long words; aim for 12 or less for a general audience.'],
+      ['SMOG Index', r1(smog), grade(smog) + '. Often used for health information; based on words of 3+ syllables.'],
+      ['Coleman-Liau Index', r1(cli), grade(cli) + '. Uses letters instead of syllables.'],
+      ['Automated Readability Index', r1(ari), grade(ari) + '. Uses characters per word and words per sentence.']
+    ], tb = $('rdcTable'); tb.textContent = '';
+    rows.forEach(function (r) { var tr = el('tr'), a = el('td', null, r[0]), b = el('td'), c = el('td', null, r[2]); b.appendChild(el('b', null, r[1])); tr.appendChild(a); tr.appendChild(b); tr.appendChild(c); tb.appendChild(tr); });
+    $('rdcNLong').textContent = R.long + R.vlong; $('rdcNHard').textContent = R.hard; $('rdcNPas').textContent = R.pas; $('rdcNAdv').textContent = R.adv;
+    // highlighted view
+    var v = $('rdcView'), frag = document.createDocumentFragment(), MAXV = 20000, shown = 0;
+    R.pars.forEach(function (P) {
+      if (shown > MAXV) return;
+      var p = el('p');
+      P.forEach(function (S, si) {
+        var sp = el('span', 's' + (S.cls ? ' ' + S.cls : '')); if (S.cls) sp.title = S.words + ' words';
+        var at = 0, s = S.text;
+        S.toks.forEach(function (t) {
+          if (t.i > at) sp.appendChild(document.createTextNode(s.slice(at, t.i)));
+          var c = (t.hard ? ' hard' : '') + (t.pas ? ' pas' : '') + (t.adv ? ' adv' : '');
+          if (c) { var w = el('span', 'w' + c, t.w); w.title = t.n + ' syllable' + (t.n === 1 ? '' : 's') + (t.pas ? ' · possible passive' : '') + (t.adv ? ' · adverb' : ''); sp.appendChild(w); }
+          else sp.appendChild(document.createTextNode(t.w));
+          at = t.i + t.w.length; shown++;
+        });
+        if (at < s.length) sp.appendChild(document.createTextNode(s.slice(at)));
+        p.appendChild(sp); if (si < P.length - 1 && !/\s$/.test(S.text)) p.appendChild(document.createTextNode(' '));
+      });
+      frag.appendChild(p);
+    });
+    v.textContent = ''; v.appendChild(frag);
+    if (shown > MAXV) v.appendChild(el('p', 'msg', 'Only the first ' + fmtNum(MAXV) + ' words are highlighted. The scores above cover the whole text.'));
+    // tips
+    var tips = [], tl = $('rdcTips'); tl.textContent = '';
+    if (wps > 20) tips.push('Your sentences average ' + r1(wps) + ' words. Aim for 15 to 20. Split long sentences at "and", "but", "which" or "because".');
+    if (R.vlong) tips.push(R.vlong + ' sentence' + (R.vlong === 1 ? ' has' : 's have') + ' more than 30 words (red). These are the first ones to shorten.');
+    if (R.hard / W > 0.15) tips.push(Math.round(R.hard / W * 100) + '% of your words have 3 or more syllables. Swap some for shorter words: "use" for "utilise", "help" for "facilitate", "start" for "commence".');
+    if (R.pas > Math.max(2, S * 0.1)) tips.push(R.pas + ' possible passive phrases. Active voice is usually clearer: "The team wrote the report" instead of "The report was written by the team". Passive is fine when the doer is unknown or unimportant.');
+    if (R.adv > W * 0.04) tips.push('You use ' + R.adv + ' adverbs. A stronger verb often works better: "sprinted" instead of "ran quickly".');
+    var longPar = R.pars.filter(function (P) { return P.reduce(function (a, s) { return a + s.words; }, 0) > 150; }).length;
+    if (longPar) tips.push(longPar + ' paragraph' + (longPar === 1 ? ' is' : 's are') + ' over 150 words. Breaking them up makes the page easier to scan.');
+    if (fre < 30) tips.push('The Flesch score is very low. Unless you are writing for specialists, explain technical terms and use everyday words where you can.');
+    if (!tips.length) tips.push('Nice work. Your text is clear: sentences are a sensible length and long words are not overused. Read it aloud once to catch anything awkward.');
+    tips.forEach(function (t) { tl.appendChild(el('li', null, t)); });
+  }
+  var tmr = 0;
+  $('rdcTxt').addEventListener('input', function () { clearTimeout(tmr); tmr = setTimeout(render, $('rdcTxt').value.length > 50000 ? 400 : 120); });
+  document.querySelectorAll('#rdc [data-show]').forEach(function (c) { c.addEventListener('change', function () { $('rdc').classList.toggle('show-' + c.getAttribute('data-show'), c.checked); }); });
+  $('rdcClear').addEventListener('click', function () { $('rdcTxt').value = ''; render(); $('rdcTxt').focus(); });
+  $('rdcSample').addEventListener('click', function () {
+    $('rdcTxt').value = 'Many students find it hard to start an essay. The blank page can feel frightening, and it is tempting to wait for the perfect first sentence. That sentence rarely arrives on time.\n\nA better approach is to write a rough plan first. List your main points, put them in a sensible order, and note one piece of evidence for each. Once the plan exists, the first draft becomes much less intimidating, because you already know where every paragraph is going.\n\nIt was found by researchers that students who planned their essays were considerably more likely to finish them before the deadline, and that the quality of their arguments was generally judged to be significantly higher by examiners who did not know which students had used a plan, which suggests that planning is an extremely valuable habit.\n\nFinally, leave time to edit. Read your work aloud. Cut words that add nothing, and split any sentence that makes you run out of breath.';
+    render(); $('rdcTxt').focus();
+  });
+  render();
+})();
+</script>
