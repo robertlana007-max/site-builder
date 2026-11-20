@@ -2033,5 +2033,118 @@ module.exports = [
         ['Are the browser and phone frames images of real devices?', 'No. They are simple generic frames drawn by the tool, not images of any brand of phone or browser.']
       ],
       icon: '<rect x="2" y="3" width="20" height="18" rx="3"/><rect x="6" y="7" width="12" height="10" rx="1.5"/><path d="M6 9.5h12"/>'
+  },
+  {
+    slug: 'pdf-to-word', cat: 'PDF tools', name: 'PDF to Word',
+    title: 'PDF to Word - Convert PDF to Editable DOCX Free',
+    desc: 'Turn a PDF into an editable Word .docx with headings, bold, lists and pictures kept. Runs in your browser, so the file is never uploaded.',
+    card: 'Turn a PDF into an editable Word file.',
+    intro: 'Convert a PDF into a Word document you can edit. Paragraphs, headings, bold and italic text, simple lists and pictures are rebuilt on your own device.',
+    steps: ['Click the box or drop your PDF onto it.', 'Choose whether to keep pictures and page breaks.', 'Click Convert to Word.', 'Click Download Word file and open it in Word, Google Docs or LibreOffice.'],
+    faq: [
+      ['Is my PDF uploaded?', 'No. The PDF is read and the Word file is built inside your browser. It never leaves your device.'],
+      ['Will it look exactly like the PDF?', 'Text, headings, bold, italic, lists and pictures are kept. Tables, columns and complex layouts may need small fixes, because Word flows text while a PDF fixes every letter in place.'],
+      ['What about scanned PDFs?', 'Pages with no real text are added as pictures. Use our Image to Text (OCR) tool to turn them into editable words.'],
+      ['Does it work with password-protected PDFs?', 'No. Remove the password first, then convert.'],
+      ['Which programs open the file?', 'The .docx opens in Microsoft Word, Google Docs, LibreOffice, Apple Pages and WPS Office.']
+    ],
+    icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 12l1.5 6 2.5-4.5 2.5 4.5 1.5-6"/>'
+  },
+  {
+    slug: 'word-to-pdf', cat: 'PDF tools', name: 'Word to PDF',
+    title: 'Word to PDF - Convert DOCX to PDF Free, No Upload',
+    desc: 'Convert a Word .docx file to PDF with selectable text, pictures, tables and lists kept. Works in your browser with no upload and no sign-up.',
+    card: 'Turn a Word .docx file into a PDF.',
+    intro: 'Turn a Word document into a PDF that looks the same everywhere. Preview it first, then save a PDF with real, selectable text, all on your own device.',
+    steps: ['Click the box or drop your .docx file onto it.', 'Check the preview of your pages.', 'Click Make PDF, then Download PDF.', 'For your exact fonts, use Print → Save as PDF instead.'],
+    faq: [
+      ['Is my document uploaded?', 'No. The document is read and the PDF is made inside your browser.'],
+      ['Can I convert old .doc files?', 'No. Open the .doc in Word, LibreOffice or Google Docs, save it as .docx, then convert.'],
+      ['Why do the letters look a little different?', 'Make PDF draws the text with the Noto Sans font. Use Print → Save as PDF to keep the fonts installed on your device.'],
+      ['Can I select and copy text in the PDF?', 'Yes. The PDF holds real text, so it can be searched and copied.'],
+      ['Are pictures and tables kept?', 'Yes. Pictures, table borders, shading, colours, lists, headers and footers are kept. Some Word charts and equations may not appear.']
+    ],
+    icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h3M15 15l2 2 2-2M17 17v-5"/>'
+  },
+  {
+    slug: 'excel-csv-converter', cat: 'Developer tools', name: 'Excel to CSV Converter',
+    title: 'Excel to CSV Converter - XLSX, CSV, TSV, JSON Free',
+    desc: 'Convert Excel .xlsx, .xls and .ods to CSV, TSV or JSON, or CSV back to Excel. Pick the sheet, separator and UTF-8 option. No upload.',
+    card: 'Convert Excel, CSV, TSV and JSON files.',
+    intro: 'Change spreadsheets between Excel, OpenDocument, CSV, TSV and JSON. Choose the sheet, preview the rows and pick the separator, all in your browser.',
+    steps: ['Click the box or drop your spreadsheet, CSV or JSON file onto it.', 'Choose the sheet and check the preview.', 'Pick the format and options, such as the separator and UTF-8 marker.', 'Click Convert, then Download.'],
+    faq: [
+      ['Is my spreadsheet uploaded?', 'No. The file is read and converted in your browser.'],
+      ['Why do accents look wrong when I open the CSV in Excel?', 'Keep "Add a UTF-8 marker (BOM)" ticked. Excel then reads the file as UTF-8 and shows all letters correctly.'],
+      ['Can I convert all sheets at once?', 'Excel and ODS output keep every sheet. CSV, TSV and JSON hold one sheet, so convert the others one by one.'],
+      ['Are formulas kept?', 'Formulas are saved as their last calculated values.'],
+      ['Are leading zeros kept?', 'Yes. Values like 007 or 0042 stay as text when a CSV is read.'],
+      ['Which library does it use?', 'SheetJS Community Edition, an open-source spreadsheet library that runs in your browser.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18"/>'
+  },
+  {
+    slug: 'webcam-test', cat: 'Media tools', name: 'Webcam Test',
+    title: 'Webcam Test - Check Your Camera Online Free',
+    desc: 'Test your webcam in the browser: live preview, camera list, real resolution and frame rate, mirror view and snapshots. Nothing is uploaded.',
+    card: 'Check your camera, resolution and frame rate.',
+    intro: 'Make sure your camera works before a call. See the live picture, the resolution and frame rate you really get, and take a snapshot.',
+    steps: ['Click Start camera and allow access.', 'Check the live picture and choose another camera if you have more than one.', 'Read the resolution and frame rate.', 'Take a snapshot to download it, then click Stop.'],
+    faq: [
+      ['Is my video recorded or uploaded?', 'No. The picture stays on your device and snapshots are saved only if you download them.'],
+      ['Why is the picture black?', 'Another app may be using the camera, or the camera is switched off or covered. Close Zoom, Teams or the Camera app and try again.'],
+      ['How do I allow the camera?', 'Click the camera or lock icon next to the web address and choose Allow, then press Start camera again.'],
+      ['Why is my frame rate low?', 'Most cameras slow down in poor light. Add light in front of you, or choose a lower resolution.'],
+      ['Does it work on phones?', 'Yes. After allowing the camera, use the Camera menu to switch between the front and back camera.']
+    ],
+    icon: '<circle cx="12" cy="10" r="6"/><circle cx="12" cy="10" r="2"/><path d="M8 21h8M12 16v5"/>'
+  },
+  {
+    slug: 'mic-test', cat: 'Media tools', name: 'Mic Test',
+    title: 'Mic Test - Check Your Microphone Online Free',
+    desc: 'Test your microphone with a live level meter, waveform, frequency bars and clipping warning. Record 5 seconds and play it back. No upload.',
+    card: 'Check your microphone and hear yourself.',
+    intro: 'See whether your microphone works and how loud it is. Watch the level meter and waves, check for clipping, and record a short clip to hear yourself.',
+    steps: ['Click Start microphone and allow access.', 'Speak normally and watch the level meter.', 'Choose another microphone if needed.', 'Click Record 5 seconds and listen to the playback.'],
+    faq: [
+      ['Is my voice uploaded?', 'No. The sound is analysed on your device and the recording is only saved if you download it.'],
+      ['What does clipping mean?', 'The sound is so loud that the top of the wave is cut off, which sounds distorted. Lower the input volume or move back.'],
+      ['What level is good?', 'Normal speech should peak around -20 to -10 dB, in the green, without the CLIPPING light.'],
+      ['Why does nothing move?', 'The microphone may be muted, the wrong one may be selected, or its input volume may be at zero in your sound settings.'],
+      ['Should I turn on noise reduction?', 'Leave it off to hear your microphone as it is. Turn it on to hear what a video call does to your voice.']
+    ],
+    icon: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/>'
+  },
+  {
+    slug: 'keyboard-tester', cat: 'Developer tools', name: 'Keyboard Tester',
+    title: 'Keyboard Tester - Test Every Key Online Free',
+    desc: 'Test your keyboard online: keys light up as you press them, with key codes, stuck key and ghosting checks, and a key history.',
+    card: 'Check that every key on your keyboard works.',
+    intro: 'Press each key and watch it light up on a full-size keyboard. See key names and codes, find stuck keys and check how many keys work together.',
+    steps: ['Choose your keyboard layout.', 'Press every key; each one turns green once it works.', 'Hold several keys together to test ghosting.', 'Check the details and history, then press Reset test to start again.'],
+    faq: [
+      ['Is what I type saved or sent anywhere?', 'No. Key presses are shown on this page only and are forgotten when you leave.'],
+      ['Why do some keys not light up?', 'Some keys never reach websites, such as Fn, Ctrl+Alt+Delete, Windows-key shortcuts and media keys. Other keys that stay grey may be faulty.'],
+      ['What is ghosting?', 'Some keyboards cannot report certain keys pressed together. Hold the keys; any that do not light up are not detected.'],
+      ['What is the difference between key and code?', 'key is the character the key types in your layout; code is the physical key position, which stays the same in every language.'],
+      ['Does it work on a phone?', 'Use the "Type here" box to test a keyboard connected to a phone or tablet. On-screen keyboards often report keys as Unidentified.']
+    ],
+    icon: '<rect x="2" y="6" width="20" height="12" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8"/>'
+  },
+  {
+    slug: 'screen-test', cat: 'Media tools', name: 'Dead Pixel & Screen Test',
+    title: 'Dead Pixel Test - Screen Test and Stuck Pixel Fixer',
+    desc: 'Find dead and stuck pixels with full-screen colours, gradients and patterns. Includes a stuck pixel fixer and your screen resolution and refresh rate.',
+    card: 'Find dead pixels and test your screen.',
+    intro: 'Fill your screen with solid colours and patterns to find dead or stuck pixels, backlight bleed and banding, and see your resolution and refresh rate.',
+    steps: ['Click Start full-screen test or a colour tile.', 'Click or press the arrow keys to step through the colours.', 'Look closely for dots that stay dark, bright or coloured.', 'Press Esc to exit, and try the stuck pixel fixer if needed.'],
+    faq: [
+      ['What is the difference between a dead and a stuck pixel?', 'A dead pixel stays black on every colour. A stuck pixel stays one colour, such as red or green, and can sometimes be fixed.'],
+      ['Does the stuck pixel fixer work?', 'Sometimes. Running fast flashing colours over a stuck pixel for 10 to 30 minutes can revive it. It cannot fix dead pixels.'],
+      ['Is the fixer safe?', 'It flashes bright colours quickly, so do not use it if you or anyone watching has photosensitive epilepsy. It only starts after you confirm the warning.'],
+      ['How accurate is the refresh rate?', 'It is an estimate from how often the browser draws. Battery saving or a busy computer can make it read lower.'],
+      ['Does it work on phones?', 'Yes. Tap to change colours. On iPhone the test fills the page instead of using true full screen.']
+    ],
+    icon: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2v2H7z"/>'
   }
 ];
