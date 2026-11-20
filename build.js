@@ -29,6 +29,22 @@ const ICON = {
   'loan-calculator': '<path d="M3 21h18M5 21V10M19 21V10M9 21V10M15 21V10M12 3l9 5H3z"/>',
   'bmi-calculator': '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>',
   'unit-converter': '<path d="M17 2l4 4-4 4M3 11V9a3 3 0 0 1 3-3h15M7 22l-4-4 4-4M21 13v2a3 3 0 0 1-3 3H3"/>',
+  'image-converter': '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9.5" r="1.5"/><path d="M21 16l-5-5-8 9"/>',
+  'mortgage-calculator': '<path d="M3 11l9-8 9 8M5 10v10h14V10M10 20v-6h4v6"/>',
+  'compound-interest-calculator': '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="15 7 21 7 21 13"/>',
+  'salary-calculator': '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  'sales-tax-calculator': '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6M9 15h4"/>',
+  'discount-calculator': '<path d="M20.6 13.4l-7.2 7.2a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>',
+  'tip-calculator': '<circle cx="12" cy="12" r="9"/><path d="M15 9.5c-.5-1-1.6-1.5-3-1.5-1.7 0-3 .8-3 2s1.3 1.7 3 2 3 .8 3 2-1.3 2-3 2c-1.4 0-2.5-.5-3-1.5M12 6v2M12 16v2"/>',
+  'days-between-dates': '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 15h8"/>',
+  'random-number-generator': '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01M12 12h.01"/>',
+  'uuid-generator': '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="12" r="2"/><path d="M14 10h4M14 14h3"/>',
+  'lorem-ipsum-generator': '<path d="M4 6h16M4 10h10M4 14h16M4 18h8"/>',
+  'remove-duplicate-lines': '<path d="M4 6h16M4 12h10M4 18h6M17 14l4 4M21 14l-4 4"/>',
+  'base64-encoder': '<polyline points="8 6 2 12 8 18"/><polyline points="16 6 22 12 16 18"/>',
+  'url-encoder': '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
+  'hash-generator': '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>',
+  'color-converter': '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
@@ -40,7 +56,8 @@ const ICON = {
 };
 const icon = k => svg(ICON[k]);
 // Hue per category, used to tint icon tiles and card hovers.
-const HUE = { 'Image tools': 262, 'Generators': 160, 'Text tools': 32, 'Developer tools': 205, 'Calculators': 340 };
+// Key order here is also the order of sections on the home page.
+const HUE = { 'Image tools': 262, 'Finance calculators': 150, 'Calculators': 340, 'Generators': 185, 'Text tools': 32, 'Developer tools': 215 };
 const tile = t => `<span class="tile" style="--h:${HUE[t.cat]}">${icon(t.slug)}</span>`;
 
 function write(rel, content) {
@@ -96,7 +113,7 @@ ${body}
 </main>
 <footer class="site-footer"><div class="wrap">
   <div class="foot-grid">
-    <div>${logo(rel)}<p>${tools.length} free tools for images, text and everyday maths. Everything runs in your browser.</p></div>
+    <div class="foot-brand">${logo(rel)}<p>${tools.length} free tools for images, money, text and code. Everything runs in your browser.</p></div>
     ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
     <div><h2>Site</h2><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
   </div>
@@ -107,26 +124,24 @@ ${body}
 `;
 }
 
-const cats = [...new Set(tools.map(t => t.cat))];
+const cats = Object.keys(HUE);
+for (const t of tools) if (!(t.cat in HUE)) throw new Error('Unknown category: ' + t.cat);
 const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mark">${icon('logo')}</span><span>Get<em>ToolNest</em></span></a>`;
-const footCols = [
-  { title: 'Image & generators', items: tools.filter(t => ['Image tools', 'Generators'].includes(t.cat)) },
-  { title: 'Text & developer', items: tools.filter(t => ['Text tools', 'Developer tools'].includes(t.cat)) }
-].concat([{ title: 'Calculators', items: tools.filter(t => t.cat === 'Calculators') }]);
+const footCols = cats.map(c => ({ title: c, items: tools.filter(t => t.cat === c) }));
 const card = (t, rel) => `<a class="tool-card" style="--h:${HUE[t.cat]}" href="${rel}${t.slug}/">${tile(t)}<b>${esc(t.name)}</b><small>${esc(t.card)}</small><span class="go">${icon('arrow')}</span></a>`;
 const bySlug = s => tools.find(t => t.slug === s);
-const popular = ['image-compressor', 'qr-code-generator', 'password-generator', 'loan-calculator'].map(bySlug);
+const popular = ['image-compressor', 'mortgage-calculator', 'qr-code-generator', 'password-generator'].map(bySlug);
 
 // ---------- home ----------
 write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: Image, Text, Calculators`,
-  desc: `${tools.length} free online tools: image compressor, QR code generator, password generator, word counter, loan calculator and more. No sign-up. Files never leave your device.`,
+  desc: `${tools.length} free online tools: image compressor, mortgage calculator, QR code generator, password generator, word counter and more. No sign-up. Files never leave your device.`,
   head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }),
   band: `<section class="hero">
   <span class="badge"><i></i>${tools.length} tools · 100% free · No sign-up</span>
   <h1>Free online tools that <span class="grad">just work</span></h1>
-  <p>Compress images, make QR codes, count words and run the numbers. Fast, private and free, right in your browser.</p>
+  <p>Compress images, work out a mortgage, make QR codes and convert almost anything. Fast, private and free, right in your browser.</p>
   <div class="search-box">${icon('search')}<input type="search" id="toolSearch" placeholder="Search tools, e.g. compress image" aria-label="Search tools"></div>
   <div class="chips">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div>
   <div class="trust"><span>${icon('check')}Files never leave your device</span><span>${icon('check')}No account needed</span><span>${icon('check')}Works on phone and desktop</span></div>
@@ -232,7 +247,7 @@ ${contact}` },
 <h2>No warranty</h2>
 <p>The tools are provided "as is", without warranties of any kind. We work to keep results correct, but we cannot guarantee they are free of errors.</p>
 <h2>Not professional advice</h2>
-<p>The loan and BMI calculators give general estimates only. They are not financial or medical advice. Check important decisions with a qualified professional.</p>
+<p>The finance and BMI calculators give general estimates only. They are not financial or medical advice. Check important decisions with a qualified professional.</p>
 <h2>Your content</h2>
 <p>You keep all rights to anything you create with the tools, including compressed images and QR codes.</p>
 <h2>Changes</h2>

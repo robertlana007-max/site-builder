@@ -1,0 +1,41 @@
+<div class="fields">
+  <div><label for="a">Start date</label><input type="date" id="a"></div>
+  <div><label for="b">End date</label><input type="date" id="b"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="inc">Count the end date too</label></div>
+<div class="stats">
+  <div class="stat"><span>Days</span><b id="d">–</b></div>
+  <div class="stat"><span>Weeks</span><b id="w">–</b></div>
+  <div class="stat"><span>Years, months, days</span><b id="ymd">–</b></div>
+  <div class="stat"><span>Weekdays (Mon–Fri)</span><b id="wd">–</b></div>
+  <div class="stat"><span>Weekend days</span><b id="we">–</b></div>
+</div>
+<script>
+(function () {
+  function parse(v) { var p = v.split('-'); return p.length === 3 ? new Date(+p[0], p[1] - 1, +p[2]) : null; }
+  function utc(x) { return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()); }
+  function dim(y, m) { return new Date(y, m + 1, 0).getDate(); }
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  $('a').value = iso(new Date());
+  function calc() {
+    var a = parse($('a').value), b = parse($('b').value), ids = ['d', 'w', 'ymd', 'wd', 'we'];
+    if (!a || !b || isNaN(a) || isNaN(b)) { ids.forEach(function (i) { $(i).textContent = '–'; }); return; }
+    if (a > b) { var t = a; a = b; b = t; }
+    var extra = $('inc').checked ? 1 : 0, days = Math.round((utc(b) - utc(a)) / 86400000) + extra;
+    $('d').textContent = fmtNum(days);
+    $('w').textContent = Math.floor(days / 7) + 'w ' + (days % 7) + 'd';
+    // Calendar difference: whole months first (start day clamped to month length), then leftover days.
+    var plus = function (n) { var k = a.getFullYear() * 12 + a.getMonth() + n, y = Math.floor(k / 12), m = k % 12; return new Date(y, m, Math.min(a.getDate(), dim(y, m))); };
+    var months = (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth();
+    if (plus(months) > b) months--;
+    var rest = Math.round((utc(b) - utc(plus(months))) / 86400000) + extra;
+    $('ymd').textContent = Math.floor(months / 12) + 'y ' + (months % 12) + 'm ' + rest + 'd';
+    // Weekdays: full weeks contribute 5 each, then walk the remaining 0-6 days.
+    var full = Math.floor(days / 7), wk = full * 5, dow = a.getDay();
+    for (var i = 0; i < days % 7; i++) { var x = (dow + i) % 7; if (x !== 0 && x !== 6) wk++; }
+    $('wd').textContent = fmtNum(wk);
+    $('we').textContent = fmtNum(days - wk);
+  }
+  ['a', 'b', 'inc'].forEach(function (id) { $(id).addEventListener('input', calc); });
+})();
+</script>

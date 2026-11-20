@@ -119,7 +119,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'loan-calculator', cat: 'Calculators', name: 'Loan Calculator',
+    slug: 'loan-calculator', cat: 'Finance calculators', name: 'Loan Calculator',
     title: 'Loan & EMI Calculator - Monthly Payment and Interest',
     desc: 'Calculate the monthly payment (EMI), total interest and a yearly breakdown for a mortgage, car loan or personal loan.',
     card: 'Monthly payment, total interest and yearly schedule.',
@@ -155,6 +155,215 @@ module.exports = [
       ['Which units are supported?', 'Length, weight, temperature, area, volume, speed, digital data and time, including both metric and imperial units.'],
       ['How accurate are the results?', 'Conversions use the exact official definitions, such as 1 inch = 2.54 cm, and are shown to 10 significant digits.'],
       ['Is a kilobyte 1000 or 1024 bytes?', 'This converter uses 1024, the convention used by most operating systems.']
+    ]
+  },
+  {
+    slug: 'image-converter', cat: 'Image tools', name: 'Image Converter',
+    title: 'Image Converter - PNG to JPG, JPG to PNG, WebP Free',
+    desc: 'Convert images between PNG, JPG and WebP in your browser. PNG to JPG, JPG to PNG, WebP to JPG and more. No upload, no sign-up.',
+    card: 'Convert between PNG, JPG and WebP.',
+    intro: 'Change an image from one format to another, such as PNG to JPG or WebP to PNG. The conversion happens on your device.',
+    steps: ['Click the box or drop an image onto it.', 'Choose the format you want.', 'For JPG or WebP, set the quality.', 'Click Convert, then Download.'],
+    faq: [
+      ['Which format should I choose?', 'Use JPG for photos, PNG for screenshots, logos and anything with transparency, and WebP when you want the smallest file for a website.'],
+      ['What happens to transparent areas in a JPG?', 'JPG cannot store transparency, so transparent areas become white.'],
+      ['Is the original image changed?', 'No. Your original file is left untouched and a new file is created for download.']
+    ]
+  },
+  {
+    slug: 'mortgage-calculator', cat: 'Finance calculators', name: 'Mortgage Calculator',
+    title: 'Mortgage Calculator - Monthly Payment with Tax & Insurance',
+    desc: 'Estimate your monthly mortgage payment including principal, interest, property tax, home insurance and HOA fees.',
+    card: 'Monthly house payment with tax and insurance.',
+    intro: 'Estimate the full monthly cost of a home loan: principal and interest plus property tax, insurance and HOA fees.',
+    steps: ['Enter the home price and your down payment.', 'Enter the interest rate and choose the loan term.', 'Add yearly property tax and insurance, and monthly HOA fees if any.', 'Read the total monthly payment.'],
+    faq: [
+      ['What is included in the monthly payment?', 'Principal and interest on the loan, plus one twelfth of the yearly property tax and insurance, plus any monthly HOA fee.'],
+      ['Does it include mortgage insurance (PMI)?', 'No. If your down payment is under 20 percent your lender may add PMI, which is not included here.'],
+      ['How much difference does the term make?', 'A shorter term has a higher monthly payment but far less total interest. Switch between 30 and 15 years to compare.'],
+      ['Is this financial advice?', 'No. It is an estimate for comparing options. Ask a lender for an exact quote.']
+    ]
+  },
+  {
+    slug: 'compound-interest-calculator', cat: 'Finance calculators', name: 'Compound Interest Calculator',
+    title: 'Compound Interest Calculator - Savings & Investment Growth',
+    desc: 'See how savings or investments grow with compound interest and monthly contributions, with a year-by-year table.',
+    card: 'How savings grow with interest and monthly deposits.',
+    intro: 'See how money grows over time when interest is earned on interest, with optional monthly contributions.',
+    steps: ['Enter your starting amount and monthly contribution.', 'Enter the yearly interest rate and the number of years.', 'Choose how often interest is compounded.', 'Read the future value and the year-by-year table.'],
+    faq: [
+      ['What is compound interest?', 'It is interest earned on both your original money and the interest already added, so growth speeds up over time.'],
+      ['When are contributions added?', 'At the end of each month.'],
+      ['Does this account for inflation or tax?', 'No. Results are before inflation, fees and taxes, and real investment returns vary from year to year.']
+    ]
+  },
+  {
+    slug: 'salary-calculator', cat: 'Finance calculators', name: 'Salary Calculator',
+    title: 'Salary Calculator - Hourly to Salary & Salary to Hourly',
+    desc: 'Convert an hourly wage to yearly salary or a salary to hourly pay. See hourly, daily, weekly, biweekly, monthly and yearly amounts.',
+    card: 'Convert hourly pay to salary and back.',
+    intro: 'Convert pay between hourly, daily, weekly, biweekly, monthly and yearly amounts.',
+    steps: ['Enter what you are paid and choose per hour, day, week, month or year.', 'Adjust hours per week, days per week and weeks per year if they differ from the defaults.', 'Read every pay period at once.'],
+    faq: [
+      ['How is hourly pay converted to salary?', 'Hourly pay × hours per week × weeks per year. At 40 hours and 52 weeks, 25 an hour is 52,000 a year.'],
+      ['Are these amounts after tax?', 'No. They are gross amounts before tax and deductions.'],
+      ['What if I get unpaid time off?', 'Lower the weeks per year. For example, use 50 if you take two unpaid weeks.']
+    ]
+  },
+  {
+    slug: 'sales-tax-calculator', cat: 'Finance calculators', name: 'Sales Tax Calculator',
+    title: 'Sales Tax & VAT Calculator - Add or Remove Tax',
+    desc: 'Add sales tax or VAT to a price, or remove tax from a total to find the price before tax. Works with any tax rate.',
+    card: 'Add tax to a price or remove it from a total.',
+    intro: 'Add sales tax, VAT or GST to a price, or work backwards from a total to find the price before tax.',
+    steps: ['Enter the amount and the tax rate.', 'Choose whether the amount is before tax or already includes tax.', 'Read the price before tax, the tax and the total.'],
+    faq: [
+      ['How do I remove tax from a total?', 'Divide the total by 1 plus the tax rate as a decimal. For a total of 120 with 20% tax, 120 ÷ 1.20 = 100.'],
+      ['Does this work for VAT and GST?', 'Yes. Sales tax, VAT and GST are all a percentage added to a price, so the maths is the same.'],
+      ['What is my tax rate?', 'Rates depend on your country, state and sometimes city. Check your local tax authority for the current rate.']
+    ]
+  },
+  {
+    slug: 'discount-calculator', cat: 'Finance calculators', name: 'Discount Calculator',
+    title: 'Discount Calculator - Sale Price & Savings',
+    desc: 'Work out the sale price and how much you save from a percent-off discount, with optional sales tax.',
+    card: 'Sale price and savings from a percent off.',
+    intro: 'Find the price after a percent-off discount and how much you save.',
+    steps: ['Enter the original price.', 'Enter the discount percentage.', 'Optionally add sales tax to see the final amount you pay.'],
+    faq: [
+      ['How is the sale price calculated?', 'Multiply the price by the discount percent divided by 100 to get the saving, then subtract it from the price.'],
+      ['Is tax applied before or after the discount?', 'After. Tax is calculated on the discounted price, which is how most shops charge it.'],
+      ['How do I stack two discounts?', 'Apply the first discount, then enter the result as the new original price and apply the second.']
+    ]
+  },
+  {
+    slug: 'tip-calculator', cat: 'Finance calculators', name: 'Tip Calculator',
+    title: 'Tip Calculator - Tip Amount & Bill Split',
+    desc: 'Calculate the tip and total for a bill and split it evenly between any number of people.',
+    card: 'Tip amount, total and split per person.',
+    intro: 'Work out the tip and total for a bill, and split it evenly between friends.',
+    steps: ['Enter the bill amount.', 'Pick a tip percentage or type your own.', 'Enter how many people are splitting the bill.'],
+    faq: [
+      ['How much should I tip?', 'It depends on the country. In the United States 15 to 20 percent is usual at restaurants. In many other countries tipping is smaller or optional.'],
+      ['Is the tip worked out before or after tax?', 'On whatever amount you enter. Enter the pre-tax subtotal if you want to tip on that.'],
+      ['How is the bill split?', 'The total including tip is divided equally by the number of people.']
+    ]
+  },
+  {
+    slug: 'days-between-dates', cat: 'Calculators', name: 'Days Between Dates',
+    title: 'Days Between Dates Calculator - Count Days & Weekdays',
+    desc: 'Count the days, weeks, months and working days between two dates. Optionally include the end date.',
+    card: 'Count days, weeks and weekdays between two dates.',
+    intro: 'Count how many days, weeks and weekdays there are between any two dates.',
+    steps: ['Pick the start date and the end date.', 'Tick the box if the end date should be counted as a full day.', 'Read the totals.'],
+    faq: [
+      ['Is the end date included?', 'Not by default, which matches how most deadlines are counted. Tick the box to include it.'],
+      ['Are public holidays removed from weekdays?', 'No. Weekdays are every Monday to Friday in the range. Holidays differ by country, so subtract them yourself.'],
+      ['Does it handle leap years?', 'Yes. Real calendar dates are used, so 29 February is counted when it exists.']
+    ]
+  },
+  {
+    slug: 'random-number-generator', cat: 'Generators', name: 'Random Number Generator',
+    title: 'Random Number Generator - Pick Numbers in Any Range',
+    desc: 'Generate one or many random numbers in any range, with or without repeats. Good for raffles, games and picking winners.',
+    card: 'Random numbers in any range, with or without repeats.',
+    intro: 'Pick one or many random whole numbers between two values. Useful for draws, games and decisions.',
+    steps: ['Enter the lowest and highest numbers.', 'Choose how many numbers you want.', 'Tick No repeats for a draw where each number can appear once.', 'Click Generate.'],
+    faq: [
+      ['How random are the numbers?', 'They come from your browser\'s cryptographic random source, and every number in the range is equally likely.'],
+      ['Are both end numbers included?', 'Yes. A range of 1 to 10 can return 1, 10 or anything in between.'],
+      ['Can I use it for a giveaway?', 'Yes. Number your entries, set the range to match, and generate the winners with No repeats ticked.']
+    ]
+  },
+  {
+    slug: 'uuid-generator', cat: 'Generators', name: 'UUID Generator',
+    title: 'UUID Generator - Random Version 4 UUIDs / GUIDs',
+    desc: 'Generate random version 4 UUIDs (GUIDs) one at a time or in bulk. Uppercase and no-hyphen options. Created in your browser.',
+    card: 'Random v4 UUIDs, one or in bulk.',
+    intro: 'Create random version 4 UUIDs, also known as GUIDs, for databases, tests and config files.',
+    steps: ['Choose how many UUIDs you need.', 'Tick the options for uppercase or no hyphens if you need them.', 'Click Copy all.'],
+    faq: [
+      ['What is a UUID?', 'A 128-bit identifier written as 32 hexadecimal digits. It is designed to be unique without a central authority handing out numbers.'],
+      ['Can two UUIDs be the same?', 'In theory yes, but version 4 has 122 random bits, so a collision is so unlikely it can be ignored in practice.'],
+      ['Is a GUID the same as a UUID?', 'Yes. GUID is the name Microsoft uses for the same thing.']
+    ]
+  },
+  {
+    slug: 'lorem-ipsum-generator', cat: 'Generators', name: 'Lorem Ipsum Generator',
+    title: 'Lorem Ipsum Generator - Placeholder Text',
+    desc: 'Generate lorem ipsum placeholder text by paragraphs, sentences or words and copy it with one click.',
+    card: 'Placeholder text by paragraph, sentence or word.',
+    intro: 'Generate placeholder text for designs, mock-ups and layouts.',
+    steps: ['Choose how many paragraphs, sentences or words you need.', 'Click Generate for a fresh version.', 'Click Copy.'],
+    faq: [
+      ['What is lorem ipsum?', 'It is scrambled Latin-like text that designers use to fill a layout before the real words are ready.'],
+      ['Why not use real text?', 'Readable text distracts people into reading it. Placeholder text keeps attention on the design.'],
+      ['Can I use the text freely?', 'Yes. Lorem ipsum is not copyrighted.']
+    ]
+  },
+  {
+    slug: 'remove-duplicate-lines', cat: 'Text tools', name: 'Remove Duplicate Lines',
+    title: 'Remove Duplicate Lines - Clean Up Lists Online',
+    desc: 'Remove duplicate lines from a list, with options to ignore case, trim spaces, drop empty lines and sort alphabetically.',
+    card: 'Delete repeated lines from any list.',
+    intro: 'Clean up a list of emails, keywords or names by removing lines that appear more than once.',
+    steps: ['Paste your list with one item on each line.', 'Choose the options you want.', 'Click Remove duplicates, then Copy.'],
+    faq: [
+      ['Which copy of a duplicate is kept?', 'The first one. Later copies are removed and the original order is kept unless you choose to sort.'],
+      ['Are "Apple" and "apple" duplicates?', 'Only when Ignore upper/lower case is ticked.'],
+      ['Is there a limit on list size?', 'There is no fixed limit. Lists with hundreds of thousands of lines work on most devices.']
+    ]
+  },
+  {
+    slug: 'base64-encoder', cat: 'Developer tools', name: 'Base64 Encoder / Decoder',
+    title: 'Base64 Encode & Decode - Free Online Tool',
+    desc: 'Encode text to Base64 or decode Base64 back to text. Full UTF-8 support, including emoji. Runs in your browser.',
+    card: 'Encode text to Base64 and decode it back.',
+    intro: 'Convert text to Base64 and back. Accented letters, non-Latin scripts and emoji are handled correctly.',
+    steps: ['Paste your text or Base64 string.', 'Click Encode or Decode.', 'Click Copy.'],
+    faq: [
+      ['What is Base64 used for?', 'It turns any data into plain letters and digits so it can travel safely in places that only accept text, such as email, JSON and data URLs.'],
+      ['Is Base64 encryption?', 'No. Anyone can decode it. Do not use it to hide passwords or secrets.'],
+      ['Does it support URL-safe Base64?', 'Decoding accepts both the standard and URL-safe alphabets, with or without padding.']
+    ]
+  },
+  {
+    slug: 'url-encoder', cat: 'Developer tools', name: 'URL Encoder / Decoder',
+    title: 'URL Encode & Decode - Percent-Encoding Tool',
+    desc: 'Encode text for safe use in a URL or decode percent-encoded URLs back to readable text.',
+    card: 'Percent-encode and decode URLs.',
+    intro: 'Make text safe to put in a link, or turn an encoded link full of % signs back into readable text.',
+    steps: ['Paste your text or URL.', 'Tick Keep URL structure when encoding a whole link.', 'Click Encode or Decode.'],
+    faq: [
+      ['What is URL encoding?', 'It replaces characters that are not allowed in a URL, such as spaces and symbols, with a % sign followed by a code. A space becomes %20.'],
+      ['When should I keep the URL structure?', 'Tick it for a complete link so that characters like : / ? and & keep their meaning. Leave it unticked for a single value such as a search term.'],
+      ['Why does decoding fail?', 'The text has a % that is not followed by two valid hexadecimal digits.']
+    ]
+  },
+  {
+    slug: 'hash-generator', cat: 'Developer tools', name: 'Hash Generator',
+    title: 'SHA-256 Hash Generator - SHA-1, SHA-384, SHA-512',
+    desc: 'Generate SHA-256, SHA-1, SHA-384 and SHA-512 hashes of any text instantly. Computed in your browser, nothing is uploaded.',
+    card: 'SHA-1, SHA-256, SHA-384 and SHA-512 of any text.',
+    intro: 'Calculate SHA hashes of any text as you type. The text never leaves your browser.',
+    steps: ['Type or paste your text.', 'The four hashes update as you type.', 'Click Copy next to the one you need.'],
+    faq: [
+      ['What is a hash?', 'A fixed-length fingerprint of some data. The same input always gives the same hash, and a tiny change gives a completely different one.'],
+      ['Can a hash be reversed?', 'No. Hashes are one-way. The original text cannot be calculated from the hash.'],
+      ['Which one should I use?', 'SHA-256 is the usual choice. SHA-1 is no longer considered secure and is included only for checking old values.']
+    ]
+  },
+  {
+    slug: 'color-converter', cat: 'Developer tools', name: 'Color Converter',
+    title: 'Color Converter - HEX to RGB, RGB to HEX, HSL',
+    desc: 'Convert colors between HEX, RGB and HSL with a live preview and color picker. Copy any format with one click.',
+    card: 'Convert between HEX, RGB and HSL.',
+    intro: 'Pick a color or type a code to convert between HEX, RGB and HSL.',
+    steps: ['Use the color picker or type a HEX, RGB or HSL value.', 'Check the preview.', 'Click Copy next to the format you need.'],
+    faq: [
+      ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), and HSL such as hsl(243, 75%, 59%).'],
+      ['What is the difference between RGB and HSL?', 'RGB describes a color by its red, green and blue light. HSL describes it by hue, saturation and lightness, which is easier to adjust by eye.'],
+      ['Why does HSL change slightly when converted back?', 'HSL values are rounded to whole numbers, so a round trip can shift a color by one step.']
     ]
   }
 ];

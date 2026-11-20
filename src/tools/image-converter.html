@@ -1,0 +1,40 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>PNG, JPG, WebP, GIF or BMP. Converted on your device.</div>
+<input type="file" id="file" accept="image/*" hidden>
+<div class="fields">
+  <div><label for="fmt">Convert to</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div id="qBox"><label for="q">Quality: <span id="qv">90</span>%</label><input type="range" id="q" min="10" max="100" value="90"></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Convert</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<div class="preview"><img id="prev" alt="Converted preview" hidden></div>
+<script>
+(function () {
+  var src = null, name = 'image', lastUrl = null, EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  function say(cls, t) { $('msg').className = 'msg ' + cls; $('msg').textContent = t; }
+  setupDrop('drop', 'file', function (f) {
+    name = f.name.replace(/\.[^.]+$/, '');
+    loadImage(f, function (img) {
+      if (!img) return say('bad', 'Could not read that image.');
+      src = img; $('go').disabled = false; $('dl').hidden = true;
+      say('', f.name + ' · ' + img.naturalWidth + ' × ' + img.naturalHeight + ' px · ' + fmtBytes(f.size));
+    });
+  });
+  $('fmt').addEventListener('change', function () { $('qBox').hidden = $('fmt').value === 'image/png'; });
+  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; });
+  $('go').addEventListener('click', function () {
+    var c = document.createElement('canvas'), type = $('fmt').value;
+    c.width = src.naturalWidth; c.height = src.naturalHeight;
+    var ctx = c.getContext('2d');
+    if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); } // JPG has no transparency
+    ctx.drawImage(src, 0, 0);
+    c.toBlob(function (b) {
+      if (!b || b.type !== type) return say('bad', 'Your browser cannot save this format. Try another one.');
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(b);
+      $('prev').src = lastUrl; $('prev').hidden = false;
+      $('dl').href = lastUrl; $('dl').download = name + '.' + EXT[type]; $('dl').hidden = false;
+      say('ok', 'Converted to ' + EXT[type].toUpperCase() + ' · ' + fmtBytes(b.size));
+    }, type, $('q').value / 100);
+  });
+})();
+</script>
