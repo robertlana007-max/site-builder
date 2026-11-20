@@ -1,7 +1,7 @@
 <div class="fields">
   <div><label for="unit">Units</label><select id="unit"><option value="m">Metric (kg, cm)</option><option value="i">Imperial (lb, ft, in)</option></select></div>
   <div><label for="sex">Sex</label><select id="sex"><option value="m">Male</option><option value="f">Female</option></select></div>
-  <div><label for="age">Age (years)</label><input type="number" id="age" min="15" max="100" step="1"></div>
+  <div><label for="age">Age (years)</label><input type="number" id="age" min="18" max="100" step="1"></div>
   <div><label for="wt" id="wl">Weight (kg)</label><input type="number" id="wt" min="0" step="any"></div>
   <div id="cmBox"><label for="cm">Height (cm)</label><input type="number" id="cm" min="0" step="any"></div>
   <div id="ftBox" hidden><label for="ft">Height (ft)</label><input type="number" id="ft" min="0" step="1"></div>
@@ -15,23 +15,30 @@
   <div class="stat"><span>Weight gain</span><b id="g1">–</b></div>
   <div class="stat"><span>At rest (BMR)</span><b id="bmr">–</b></div>
 </div>
-<p class="msg" id="msg">Calories per day, for adults. These are estimates, not medical advice. Talk to a doctor before a big change in diet.</p>
+<p class="msg" id="msg"></p>
 <script>
 (function () {
-  var out = ['tdee', 'l1', 'l2', 'g1', 'bmr'];
+  var out = ['tdee', 'l1', 'l2', 'g1', 'bmr'], NOTE = 'Calories per day, for adults aged 18 to 100. These are estimates, not medical advice. Talk to a doctor before a big change in diet.';
+  function say(cls, t) { $('msg').className = 'msg ' + cls; $('msg').textContent = t; }
   function calc() {
     var imp = $('unit').value === 'i';
     $('wl').textContent = imp ? 'Weight (lb)' : 'Weight (kg)';
     $('cmBox').hidden = imp; $('ftBox').hidden = !imp; $('inBox').hidden = !imp;
     var kg = imp ? +$('wt').value * 0.45359237 : +$('wt').value;
     var cm = imp ? ((+$('ft').value) * 12 + (+$('inch').value)) * 2.54 : +$('cm').value, age = +$('age').value;
-    if (!(kg > 0) || !(cm > 0) || !(age >= 15 && age <= 100)) { out.forEach(function (i) { $(i).textContent = '–'; }); return; }
+    var blank = function (cls, t) { out.forEach(function (i) { $(i).textContent = '–'; }); say(cls, t); };
+    if ($('age').value !== '' && !(age >= 18 && age <= 100)) return blank('bad', 'This calculator is for adults. Enter an age from 18 to 100.');
+    if (!(kg > 0) || !(cm > 0) || !(age > 0)) return blank('', NOTE);
+    if (kg > 650 || cm < 50 || cm > 275) return blank('bad', 'Check your height and weight.');
     // Mifflin-St Jeor equation
     var bmr = 10 * kg + 6.25 * cm - 5 * age + ($('sex').value === 'm' ? 5 : -161), t = bmr * +$('act').value;
     var k = function (v) { return fmtNum(Math.round(v), 0); };
     $('bmr').textContent = k(bmr); $('tdee').textContent = k(t);
     $('l1').textContent = k(t - 250); $('l2').textContent = k(t - 500); $('g1').textContent = k(t + 500);
+    var floor = $('sex').value === 'm' ? 1500 : 1200;
+    say(t - 500 < floor ? 'bad' : '', t - 500 < floor ? 'Eating less than about ' + fmtNum(floor, 0) + ' calories a day is not advised without a doctor’s help. ' + NOTE : NOTE);
   }
   ['unit', 'sex', 'age', 'wt', 'cm', 'ft', 'inch', 'act'].forEach(function (id) { $(id).addEventListener('input', calc); });
+  calc();
 })();
 </script>
