@@ -1697,5 +1697,117 @@ module.exports = [
         ['Does it work offline?', 'Yes. All data is built into the page.']
       ],
       icon: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="15" y="11" width="6" height="6" rx="1"/><path d="M6 21h12"/>'
+  },
+  {
+      slug: 'hashtag-generator', cat: 'Social media tools', name: 'Hashtag Generator',
+      title: 'Hashtag Generator - Instagram Hashtags for 75+ Topics',
+      desc: 'Pick ready-made broad, medium and niche hashtags for 75+ topics, add your own, keep within the 30 limit and copy them all in one tap. Free.',
+      card: 'Hashtag sets for 75+ topics, copy in one tap.',
+      intro: 'Choose a topic and tap hashtags, or let the tool mix a balanced set of broad, medium and niche tags. Add your own, stay within Instagram\'s 30-hashtag limit and copy them all at once.',
+      steps: ['Search for a topic, such as travel, food or Lahore, and tap it.', 'Tap hashtags to add them, or click Mix to pick a balanced set.', 'Add your own brand or event hashtags if you like.', 'Click Copy all and paste into your caption.'],
+      faq: [
+        ['How many hashtags can I use on Instagram?', 'Up to 30 on a post or reel. The counter stops you at 30. Many creators get good results with 5 to 15 relevant tags.'],
+        ['What are broad, medium and niche hashtags?', 'Broad tags are very common and move fast, niche tags are specific with smaller audiences, and medium tags sit in between. A mix gives reach and a better chance to stay visible.'],
+        ['Does this show trending or live hashtag counts?', 'No. The sets are hand-picked starting points built into the page. The tool does not connect to Instagram or TikTok, so check tags in the app before you rely on them.'],
+        ['Can I add hashtags in Urdu, Hindi or Arabic?', 'Yes. Letters from any language work. Spaces and symbols are removed because they cannot be part of a hashtag.'],
+        ['Can I use these hashtags on TikTok?', 'Yes. Copy a smaller set of 3 to 6 relevant tags for TikTok, YouTube Shorts or Pinterest.']
+      ],
+      icon: '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/><circle cx="19" cy="19" r="2"/>'
+  },
+  {
+      slug: 'social-media-character-counter', cat: 'Social media tools', name: 'Social Media Character Counter',
+      title: 'Social Media Character Counter - X, Instagram, YouTube',
+      desc: 'Count characters for X, Instagram, TikTok, YouTube, Facebook, LinkedIn, Pinterest and Threads as you type, with X link and emoji rules.',
+      card: 'Live character limits for every social app.',
+      intro: 'Type or paste your post and see how much of each app\'s limit it uses, with X\'s link and emoji weighting, hashtag and mention counts, and a copy button that keeps blank lines in Instagram.',
+      steps: ['Type or paste your post into the box.', 'Check each platform row for characters left or over.', 'Fix anything marked in red, such as too many hashtags.', 'Click Copy text, or Copy for Instagram to keep blank lines.'],
+      faq: [
+        ['How does X count characters?', 'X gives most letters a weight of 1, but emoji and Chinese, Japanese or Korean characters count as 2, and every link counts as 23 whatever its length. The X row uses these rules.'],
+        ['What is the Instagram caption limit?', '2,200 characters, up to 30 hashtags and 20 @mentions. About the first 125 characters show before "more".'],
+        ['How do I keep line breaks in an Instagram caption?', 'Click "Copy for Instagram (keep blank lines)". It puts an invisible character on each empty line so Instagram keeps your paragraphs.'],
+        ['Does an emoji count as one character?', 'Here it counts as one, the way you see it, even for flags and family emoji. On X every emoji counts as 2.'],
+        ['Is my text saved or sent anywhere?', 'No. Counting happens in your browser and the text is not stored.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M7 9h3M7 13h6M15 9l2 4"/>'
+  },
+  {
+      slug: 'whatsapp-link-generator', cat: 'Social media tools', name: 'WhatsApp Link Generator',
+      title: 'WhatsApp Link Generator - wa.me Link, QR Code & Message',
+      desc: 'Make a wa.me click-to-chat link with a prefilled message and a QR code. Cleans the number for you. Includes a WhatsApp text formatter.',
+      card: 'Click-to-chat link and QR code in seconds.',
+      intro: 'Pick the country, type your number as you dial it and add an optional message. You get a wa.me link and a QR code that open a chat with you, plus a formatter for bold, italic and lists.',
+      steps: ['Choose the country and type the phone number.', 'Type a message to prefill, if you want one.', 'Copy the link or click Open to test it.', 'Download the QR code to print or share.'],
+      faq: [
+        ['What is a wa.me link?', 'It is WhatsApp\'s public click-to-chat address. Opening https://wa.me/ followed by a number in international format starts a chat with that number.'],
+        ['Should I include the 0 or the + sign?', 'No. Links use the country code and number only, with no +, spaces or domestic 0. The tool removes them for you, so you can type the number as you normally dial it.'],
+        ['Can I make a link without a phone number?', 'Yes. Leave the number empty and type a message. The link lets the person pick who to send that message to.'],
+        ['How do I write bold or italic text in WhatsApp?', 'Put *stars* around bold text, _underscores_ for italic, ~tildes~ for strikethrough and three backticks for monospace. The formatter does this for you with a live preview.'],
+        ['Is this an official WhatsApp tool?', 'No. It is an independent tool that uses the public link format. It is not made by or affiliated with WhatsApp or Meta.']
+      ],
+      icon: '<path d="M21 11.5a8.5 8.5 0 0 1-12.4 7.6L3 21l1.9-5.4A8.5 8.5 0 1 1 21 11.5z"/><path d="M10 14a5 5 0 0 0 4-4"/>'
+  },
+  {
+      slug: 'youtube-thumbnail-downloader', cat: 'Social media tools', name: 'YouTube Thumbnail Downloader',
+      title: 'YouTube Thumbnail Downloader - HD, Shorts & All Sizes',
+      desc: 'Paste any YouTube or Shorts link to see and save the video thumbnail in every size, from 1280×720 HD down to 120×90. Free, no sign-up.',
+      card: 'Save a video thumbnail in every size.',
+      intro: 'Paste a YouTube link or video ID to see its thumbnail in every available size, from full HD to small. Open or download the one you need. Respect the creator\'s copyright when you use it.',
+      steps: ['Copy the video link from YouTube.', 'Paste it into the box.', 'Click Download or Open full size on the size you want.'],
+      faq: [
+        ['Which links work?', 'Normal watch links, youtu.be short links, Shorts, embed, live and YouTube Music links, links with extra parts like &t= or &list=, and the plain 11-character video ID.'],
+        ['Why is the HD (1280×720) size missing?', 'Some videos, often older or low-resolution ones, have no maximum-resolution thumbnail. The tool hides sizes that do not exist; use the next largest.'],
+        ['Why did the download open a message instead?', 'Some browsers block direct downloads from another site. Open the image, then right-click or long-press and choose Save image.'],
+        ['Can I use someone else\'s thumbnail?', 'Thumbnails are the creator\'s work and usually protected by copyright. Use them for reference or commentary, or ask permission, and credit the channel.'],
+        ['Is this affiliated with YouTube?', 'No. It shows images from YouTube\'s public image server and is not made by YouTube or Google.']
+      ],
+      icon: '<rect x="2" y="4" width="20" height="14" rx="3"/><path d="M10 8.5v5l4-2.5z"/><path d="M12 18v3M9 20l3 1.5 3-1.5"/>'
+  },
+  {
+      slug: 'youtube-timestamp-generator', cat: 'Social media tools', name: 'YouTube Chapters Generator',
+      title: 'YouTube Chapters Generator - Timestamps for Description',
+      desc: 'Build YouTube chapter timestamps that follow the rules: start at 0:00, 3+ chapters, 10 seconds each, in order. Copy for your description.',
+      card: 'Chapter timestamps that YouTube accepts.',
+      intro: 'Add a time and title for each part of your video and get a chapter list ready for your description, checked against the rules YouTube needs before it shows chapters. Also make links that start at a set time.',
+      steps: ['Type the video length, if you know it.', 'Enter a time and title for each chapter, starting at 0:00.', 'Fix anything marked with a red cross.', 'Click Copy chapters and paste into your video description.'],
+      faq: [
+        ['What are the rules for YouTube chapters?', 'The first timestamp must be 0:00, there must be at least three, each chapter must be at least 10 seconds long, and they must be in ascending order.'],
+        ['Where do I paste the chapters?', 'In your video description in YouTube Studio, each on its own line starting with the time. Save the video and the chapters appear in the progress bar.'],
+        ['Why are my chapters not showing?', 'Usually one rule is broken, such as a missing 0:00 or a chapter under 10 seconds. The checks show what to fix. Some videos, such as ones made for kids, may not show chapters.'],
+        ['Can I use hours?', 'Yes. Type times like 1:02:30. Minute-only times like 4:05 work too.'],
+        ['How do I link to a moment in a video?', 'Use the Timestamp link maker: paste the video link and a time, then copy the link with &t= or ?t= added.']
+      ],
+      icon: '<rect x="2" y="4" width="20" height="14" rx="3"/><path d="M6 14h3M11 14h7M6 10h7M15 10h3"/><path d="M8 21h8"/>'
+  },
+  {
+      slug: 'username-generator', cat: 'Social media tools', name: 'Username Generator',
+      title: 'Username Generator - Cool, Cute & Gaming Name Ideas',
+      desc: 'Get 50 username ideas from your name or keywords in cool, cute, gaming, professional or aesthetic style, sized for Instagram, TikTok, X and more.',
+      card: '50 username ideas that fit each app\'s rules.',
+      intro: 'Type your name or a few words you like, choose a style and the app, and get 50 usernames that fit its length and character rules. Tap to copy and star your favourites.',
+      steps: ['Type your name or keywords.', 'Choose a style and the platform.', 'Click Generate 50 names.', 'Tap a name to copy it, or star it to save it.'],
+      faq: [
+        ['Does it check if a username is available?', 'No. It cannot see which names are taken. Search for the name in the app before you set it, and add a number or underscore if it is taken.'],
+        ['What are the username rules for each app?', 'They differ: X allows 4 to 15 letters, numbers and underscores; Instagram up to 30 with dots and underscores; Snapchat 3 to 15 starting with a letter. Pick the platform and the tool follows its rules.'],
+        ['Can I make a name for every app at once?', 'Pick the strictest platform you use, such as X or Snapchat. A name that fits it usually fits everywhere.'],
+        ['Where are my favourites saved?', 'In this browser on this device. Clearing site data or using a private window removes them.'],
+        ['Are the names random?', 'They combine your keywords with style word lists in random patterns, so you get new ideas each time you click Generate.']
+      ],
+      icon: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 11-7.4"/><path d="M18 15l1 2 2 .3-1.5 1.4.4 2.1-1.9-1-1.9 1 .4-2.1L15 17.3l2-.3z"/>'
+  },
+  {
+      slug: 'emoji-picker', cat: 'Social media tools', name: 'Emoji Picker',
+      title: 'Emoji Picker - Search, Copy & Paste Every Emoji',
+      desc: 'Find any emoji by name or keyword, choose a skin tone and copy it in one click. Collect several in a box and copy them together. Free.',
+      card: 'Search and copy any emoji in one click.',
+      intro: 'Browse every emoji by category or search by name or keyword. Click to copy, pick a skin tone, and collect several emoji in a box to copy them together. Your recent emoji stay at the top.',
+      steps: ['Search for an emoji or browse the categories.', 'Choose a skin tone if you like.', 'Click an emoji to copy it and add it to the box.', 'Click Copy all to copy every emoji in the box.'],
+      faq: [
+        ['How do I copy an emoji?', 'Click it. It is copied straight away and also added to the box, so you can collect several and copy them together.'],
+        ['How do I change the skin tone?', 'Tap one of the six hand buttons at the top. Every emoji that supports skin tones changes to that tone.'],
+        ['Why do some emoji look different on my phone?', 'Each system, such as Android, iPhone or Windows, draws emoji in its own style. The emoji is the same; only the picture differs.'],
+        ['Why are some new emoji missing?', 'Emoji your device cannot draw yet are hidden so you do not copy a box. They appear after a system update.'],
+        ['Does it work offline?', 'Yes, after the page has loaded once. The emoji list is part of the site.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/>'
   }
 ];
