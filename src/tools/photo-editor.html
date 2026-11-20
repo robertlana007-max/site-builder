@@ -150,9 +150,12 @@
     worker.onmessage = function (e) { var cb = waiting[e.data.id]; delete waiting[e.data.id]; if (cb) cb(new Uint8ClampedArray(e.data.buf)); };
     worker.onerror = function () { worker = null; Object.keys(waiting).forEach(function (k) { var cb = waiting[k]; delete waiting[k]; cb(null); }); };
   } catch (e) { worker = null; }
-  function processData(id, w, h, P, cb) { // cb(Uint8ClampedArray with the result)
-    if (worker) { var n = ++wid; waiting[n] = function (out) { if (out) cb(out); else { PIPE(id.data, w, h, P); cb(id.data); } }; worker.postMessage({ id: n, buf: id.data.buffer, w: w, h: h, P: P }, [id.data.buffer]); }
-    else setTimeout(function () { PIPE(id.data, w, h, P); cb(id.data); }, 0);
+  function processData(make, P, cb) { // make() returns fresh ImageData; cb(Uint8ClampedArray, w, h) gets the result
+    var id = make(), w = id.width, h = id.height;
+    var local = function () { var d2 = make(); setTimeout(function () { PIPE(d2.data, w, h, P); cb(d2.data, w, h); }, 0); };
+    if (!worker) return local();
+    var n = ++wid; waiting[n] = function (out) { if (out) cb(out, w, h); else local(); }; // the worker failed: do it here instead
+    worker.postMessage({ id: n, buf: id.data.buffer, w: w, h: h, P: P }, [id.data.buffer]);
   }
 
   // ---------- preview at screen size ----------
@@ -165,8 +168,8 @@
     if (key !== srcKey) { var g = geom(st, previewScale(st), !cropMode); src = g.getContext('2d').getImageData(0, 0, g.width, g.height); srcKey = key; }
     if (showOrig) { pv.width = src.width; pv.height = src.height; pv.getContext('2d').putImageData(src, 0, 0); overlay(); return; }
     running = true;
-    var copy = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height), w = src.width, h = src.height;
-    processData(copy, w, h, params(st), function (out) {
+    var w = src.width, h = src.height, from = src;
+    processData(function () { return new ImageData(new Uint8ClampedArray(from.data), w, h); }, params(st), function (out) {
       running = false;
       if (!showOrig) { pv.width = w; pv.height = h; pv.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0); overlay(); }
       if (again) { again = false; refresh(); }
@@ -324,8 +327,8 @@
       var c, x, id;
       try { c = geom(st, 1, true); x = c.getContext('2d'); id = x.getImageData(0, 0, c.width, c.height); }
       catch (e) { busy = false; $('prog').hidden = true; ui(); say('bad', 'This photo is too large for your browser\'s memory. Try a smaller copy.'); return; }
-      var W = c.width, H = c.height, t0 = Date.now();
-      processData(id, W, H, params(st), function (out) {
+      var W = c.width, H = c.height, t0 = Date.now(), first = id;
+      processData(function () { var r = first || x.getImageData(0, 0, W, H); first = null; return r; }, params(st), function (out) {
         x.putImageData(new ImageData(out, W, H), 0, 0);
         var type = $('fmt').value;
         if (type === 'image/jpeg') { x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
