@@ -1,7 +1,40 @@
 <div class="fields">
   <div><label for="dob">Date of birth</label><input type="date" id="dob"></div>
   <div><label for="on">Age on this date</label><input type="date" id="on"></div>
+  <div><label for="tob">Time of birth <small>(optional)</small></label><input type="time" id="tob" step="1"></div>
 </div>
+<div class="live-age" id="live" hidden>
+  <p class="la-head"><span class="la-dot" aria-hidden="true"></span>Your age right now, live</p>
+  <div class="la-grid">
+    <div><b id="lY">0</b><span>years</span></div><div><b id="lM">0</b><span>months</span></div><div><b id="lD">0</b><span>days</span></div>
+    <div><b id="lH">0</b><span>hours</span></div><div><b id="lMi">0</b><span>minutes</span></div><div><b id="lS">0</b><span>seconds</span></div>
+  </div>
+  <p class="la-sub">That is a total of:</p>
+  <div class="la-tot">
+    <div><b id="tMo">0</b><span>months</span></div><div><b id="tWk">0</b><span>weeks</span></div><div><b id="tDy">0</b><span>days</span></div>
+    <div><b id="tHr">0</b><span>hours</span></div><div><b id="tMn">0</b><span>minutes</span></div><div><b id="tSc">0</b><span>seconds</span></div>
+  </div>
+  <p class="la-sub" id="nbHead">Next birthday in:</p>
+  <div class="la-grid la-next">
+    <div><b id="nD">0</b><span>days</span></div><div><b id="nH">0</b><span>hours</span></div><div><b id="nMi">0</b><span>minutes</span></div><div><b id="nS">0</b><span>seconds</span></div>
+  </div>
+</div>
+<style>
+.live-age { margin: 16px 0 6px; padding: 16px; border-radius: 16px; background: linear-gradient(135deg, color-mix(in srgb, var(--accent) 10%, var(--surface)), var(--surface)); border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line)); }
+.la-head { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; font-weight: 700; }
+.la-dot { width: 10px; height: 10px; border-radius: 50%; background: #ef4444; box-shadow: 0 0 0 0 rgba(239, 68, 68, .6); animation: laPulse 1.4s infinite; }
+@keyframes laPulse { 70% { box-shadow: 0 0 0 9px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
+.la-grid, .la-tot { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 8px; }
+.la-tot { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.la-next { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.la-grid > div, .la-tot > div { text-align: center; padding: 10px 4px; border-radius: 12px; background: var(--surface); border: 1px solid var(--line); min-width: 0; }
+.la-grid b { display: block; font: 800 clamp(20px, 3.4vw, 30px)/1.1 var(--mono); color: var(--accent); font-variant-numeric: tabular-nums; }
+.la-tot b { display: block; font: 700 clamp(14px, 2vw, 18px)/1.2 var(--mono); white-space: nowrap; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.la-grid span, .la-tot span { font-size: 12px; color: var(--muted); }
+.la-sub { margin: 14px 0 8px; font-size: 14px; font-weight: 600; color: var(--muted); }
+html[data-calm] .la-dot { animation: none; }
+@media (max-width: 600px) { .la-grid, .la-tot { grid-template-columns: repeat(3, minmax(0, 1fr)); } .la-tot { grid-template-columns: repeat(2, minmax(0, 1fr)); } .la-next { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+</style>
 <div class="stats">
   <div class="stat"><span>Age</span><b id="age">–</b></div>
   <div class="stat"><span>Total months</span><b id="tm">–</b></div>
@@ -42,6 +75,37 @@
     var left = Math.round((utc(next) - utc(b)) / 86400000), turns = next.getFullYear() - a.getFullYear();
     $('nb').textContent = left === 0 ? 'Today! (turns ' + turns + ')' : left + (left === 1 ? ' day' : ' days') + ' (turns ' + turns + ')';
   }
-  $('dob').addEventListener('input', calc); $('on').addEventListener('input', calc);
+  // ---------- live age: ticks every second ----------
+  var liveTimer = null;
+  function birth() {
+    var a = parse($('dob').value); if (!a || isNaN(a)) return null;
+    var t = ($('tob').value || '00:00:00').split(':');
+    a.setHours(+t[0] || 0, +t[1] || 0, +t[2] || 0, 0); return a;
+  }
+  function addMonths(a, n) { var k = a.getFullYear() * 12 + a.getMonth() + n, y = Math.floor(k / 12), m = k % 12, d = new Date(a); d.setFullYear(y, m, Math.min(a.getDate(), dim(y, m))); return d; }
+  function split(ms) { var s = Math.floor(ms / 1000); return [Math.floor(s / 86400), Math.floor(s % 86400 / 3600), Math.floor(s % 3600 / 60), s % 60]; }
+  function tick() {
+    var a = birth(), now = new Date();
+    if (!a || a > now) { $('live').hidden = true; return; }
+    $('live').hidden = false;
+    var months = (now.getFullYear() - a.getFullYear()) * 12 + now.getMonth() - a.getMonth();
+    if (addMonths(a, months) > now) months--;
+    var anchor = addMonths(a, months), days = 0, step = new Date(anchor);
+    while (true) { var nx = new Date(step); nx.setDate(nx.getDate() + 1); if (nx > now) break; step = nx; days++; }
+    var r = split(now - step);
+    $('lY').textContent = fmtNum(Math.floor(months / 12)); $('lM').textContent = months % 12; $('lD').textContent = days;
+    $('lH').textContent = r[1]; $('lMi').textContent = r[2]; $('lS').textContent = r[3];
+    var ms = now - a;
+    $('tMo').textContent = fmtNum(months); $('tWk').textContent = fmtNum(Math.floor(ms / 604800000)); $('tDy').textContent = fmtNum(Math.floor(ms / 86400000));
+    $('tHr').textContent = fmtNum(Math.floor(ms / 3600000)); $('tMn').textContent = fmtNum(Math.floor(ms / 60000)); $('tSc').textContent = fmtNum(Math.floor(ms / 1000));
+    var y = now.getFullYear(), mk = function (yr) { var d = new Date(a); d.setFullYear(yr, a.getMonth(), Math.min(a.getDate(), dim(yr, a.getMonth()))); return d; };
+    var next = mk(y); if (next <= now) next = mk(y + 1);
+    var n = split(next - now);
+    $('nbHead').textContent = 'Next birthday (turns ' + (next.getFullYear() - a.getFullYear()) + ') in:';
+    $('nD').textContent = n[0]; $('nH').textContent = n[1]; $('nMi').textContent = n[2]; $('nS').textContent = n[3];
+  }
+  function startLive() { clearInterval(liveTimer); tick(); liveTimer = setInterval(tick, 1000); }
+  $('dob').addEventListener('input', function () { calc(); startLive(); }); $('on').addEventListener('input', calc); $('tob').addEventListener('input', startLive);
+  setTimeout(function () { calc(); startLive(); }, 0); // after saved inputs are restored
 })();
 </script>

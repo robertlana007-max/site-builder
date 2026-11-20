@@ -1,0 +1,244 @@
+<style>
+.tz-list { list-style: none; padding: 0; margin: 16px 0 0; display: grid; gap: 8px; }
+.tz-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 4px 12px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 8px 10px 14px; }
+.tz-row.src { border-color: var(--accent); background: var(--accent-soft); }
+.tz-name { font-weight: 600; overflow-wrap: anywhere; }
+.tz-name small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+.tz-time { text-align: end; font-variant-numeric: tabular-nums; }
+.tz-time b { display: block; font-size: 21px; letter-spacing: -.02em; white-space: nowrap; }
+.tz-time small { color: var(--muted); font-size: 13px; white-space: nowrap; }
+.tz-day { display: inline-block; margin-inline-start: 4px; padding: 0 6px; border-radius: 6px; font-size: 12px; font-weight: 700; background: var(--accent-soft); color: var(--accent); }
+.tz-x { font: inherit; width: 38px; height: 38px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.tz-x:hover { border-color: var(--bad); color: var(--bad); }
+.tz-x[disabled] { visibility: hidden; }
+.tz-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tz-picks button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; text-align: start; }
+.tz-picks button:hover { border-color: var(--accent); color: var(--accent); }
+.tz-live { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--ok); }
+.tz-live::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); }
+@media (max-width: 480px) { .tz-time b { font-size: 18px; } }
+</style>
+<div class="fields">
+  <div><label for="tzDate">Date</label><input type="date" id="tzDate" data-nomemo></div>
+  <div><label for="tzTime">Time</label><input type="time" id="tzTime" step="60" data-nomemo></div>
+  <div><label for="tzSrc">In this time zone</label><select id="tzSrc"></select></div>
+  <div><label for="tzFmt">Clock</label><select id="tzFmt"><option value="24">24-hour</option><option value="12">12-hour (AM/PM)</option></select></div>
+</div>
+<div class="btns" style="margin-top:0">
+  <button class="btn" id="tzNow">Now</button>
+  <button class="btn ghost" id="tzCopy">Copy summary</button>
+  <button class="btn ghost" id="tzReset">Reset zone list</button>
+  <span class="tz-live" id="tzLive" hidden>Live clock</span>
+</div>
+<p class="msg" id="tzMsg"></p>
+<label style="display:none;margin-top:8px;font-weight:400" id="tzLaterWrap"><input type="checkbox" id="tzLater" data-nomemo> Use the second occurrence of this time (after the clocks go back)</label>
+<ul class="tz-list" id="tzList" aria-live="polite"></ul>
+<div style="margin-top:18px">
+  <label for="tzFind">Add a time zone</label>
+  <input type="text" id="tzFind" data-nomemo autocomplete="off" placeholder="Search a city, country or zone, e.g. Toronto, Brazil, Asia/Kathmandu">
+  <div class="tz-picks" id="tzPicks"></div>
+</div>
+<script>
+(function () {
+  var PRESET = [
+    ['Asia/Karachi', 'Pakistan', 'Karachi, Lahore, Islamabad'],
+    ['Asia/Kolkata', 'India', 'Delhi, Mumbai, Kolkata'],
+    ['Asia/Dubai', 'United Arab Emirates', 'Dubai, Abu Dhabi'],
+    ['Asia/Riyadh', 'Saudi Arabia', 'Riyadh, Jeddah, Mecca'],
+    ['Europe/London', 'United Kingdom', 'London'],
+    ['Europe/Berlin', 'Germany', 'Berlin, Frankfurt'],
+    ['America/New_York', 'US Eastern', 'New York, Washington, Miami'],
+    ['America/Chicago', 'US Central', 'Chicago, Dallas, Houston'],
+    ['America/Los_Angeles', 'US Pacific', 'Los Angeles, San Francisco, Seattle'],
+    ['Asia/Tokyo', 'Japan', 'Tokyo'],
+    ['Australia/Sydney', 'Australia (Sydney)', 'Sydney, Melbourne, Canberra'],
+    ['Asia/Shanghai', 'China', 'Beijing, Shanghai'],
+    ['Europe/Istanbul', 'Turkey', 'Istanbul, Ankara'],
+    ['Asia/Dhaka', 'Bangladesh', 'Dhaka']
+  ];
+  // extra words people search for, mapped to zones
+  var ALIAS = {
+    'Asia/Karachi': 'pakistan pkt', 'Asia/Kolkata': 'india ist calcutta', 'Asia/Calcutta': 'india ist kolkata', 'Asia/Dubai': 'uae emirates gst', 'Asia/Riyadh': 'saudi arabia ksa',
+    'Europe/London': 'uk britain england gmt bst', 'Europe/Berlin': 'germany cet', 'America/New_York': 'usa us eastern est edt', 'America/Chicago': 'usa us central cst cdt',
+    'America/Denver': 'usa us mountain mst mdt', 'America/Phoenix': 'usa arizona', 'America/Los_Angeles': 'usa us pacific pst pdt california', 'Asia/Tokyo': 'japan jst',
+    'Australia/Sydney': 'australia aest aedt', 'Asia/Shanghai': 'china beijing cst', 'Europe/Istanbul': 'turkey turkiye', 'Asia/Dhaka': 'bangladesh', 'America/Toronto': 'canada',
+    'America/Sao_Paulo': 'brazil', 'Europe/Paris': 'france', 'Europe/Madrid': 'spain', 'Europe/Rome': 'italy', 'Asia/Singapore': 'singapore', 'Asia/Kathmandu': 'nepal', 'Asia/Katmandu': 'nepal kathmandu',
+    'Africa/Cairo': 'egypt', 'Africa/Lagos': 'nigeria', 'Africa/Johannesburg': 'south africa', 'Asia/Jakarta': 'indonesia', 'Asia/Manila': 'philippines', 'Asia/Kabul': 'afghanistan',
+    'Asia/Tehran': 'iran', 'Asia/Qatar': 'qatar doha', 'Asia/Kuwait': 'kuwait', 'Asia/Muscat': 'oman', 'Asia/Bahrain': 'bahrain', 'Asia/Colombo': 'sri lanka', 'Asia/Kuala_Lumpur': 'malaysia',
+    'Pacific/Auckland': 'new zealand', 'America/Mexico_City': 'mexico', 'Europe/Moscow': 'russia', 'Asia/Seoul': 'korea', 'Asia/Hong_Kong': 'hong kong', 'Europe/Amsterdam': 'netherlands holland',
+    'Europe/Dublin': 'ireland', 'Asia/Baghdad': 'iraq', 'Asia/Amman': 'jordan', 'Asia/Bangkok': 'thailand', 'Asia/Ho_Chi_Minh': 'vietnam saigon', 'Asia/Saigon': 'vietnam ho chi minh', 'UTC': 'utc gmt zulu coordinated universal'
+  };
+  var NICE = { Calcutta: 'Kolkata', Katmandu: 'Kathmandu', Saigon: 'Ho Chi Minh City', Kiev: 'Kyiv', Rangoon: 'Yangon' };
+  var KEY = 'gtn-tz-zones', local = 'UTC';
+  try { local = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) {}
+  var ALL = [];
+  try { ALL = Intl.supportedValuesOf('timeZone').slice(); } catch (e) {}
+  if (!ALL.length) ALL = PRESET.map(function (p) { return p[0]; }).concat(['America/Denver', 'America/Phoenix', 'America/Toronto', 'America/Sao_Paulo', 'Europe/Paris', 'Europe/Madrid', 'Europe/Rome', 'Europe/Moscow', 'Africa/Cairo', 'Africa/Lagos', 'Asia/Singapore', 'Asia/Kathmandu', 'Asia/Tehran', 'Asia/Seoul', 'Pacific/Auckland']);
+  if (ALL.indexOf('UTC') === -1) ALL.unshift('UTC');
+  if (ALL.indexOf(local) === -1) ALL.push(local);
+
+  var fmts = {};
+  function dtf(z) {
+    if (!fmts[z]) fmts[z] = new Intl.DateTimeFormat('en-US', { timeZone: z, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric', weekday: 'short' });
+    return fmts[z];
+  }
+  function canon(z) { try { return new Intl.DateTimeFormat('en-US', { timeZone: z }).resolvedOptions().timeZone; } catch (e) { return null; } }
+  function valid(z) { return !!canon(z); }
+  // wall-clock parts of instant t in zone z
+  function parts(t, z) {
+    var o = {};
+    dtf(z).formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    var h = +o.hour; if (h === 24) h = 0;
+    return { y: +o.year, mo: +o.month, d: +o.day, h: h, mi: +o.minute, s: +o.second, wd: o.weekday };
+  }
+  function utcOf(y, mo, d, h, mi, s) { var dt = new Date(Date.UTC(2000, mo - 1, d, h, mi, s || 0)); dt.setUTCFullYear(y); return dt.getTime(); }
+  // offset of zone z from UTC at instant t, in ms
+  function off(t, z) { var p = parts(t, z); return utcOf(p.y, p.mo, p.d, p.h, p.mi, p.s) - Math.floor(t / 1000) * 1000; }
+  // turn a wall-clock time in zone z into instants: [] = does not exist, [t] = normal, [t1, t2] = happens twice
+  function fromWall(y, mo, d, h, mi, z) {
+    var g = utcOf(y, mo, d, h, mi, 0), offs = [off(g - 864e5 / 2, z), off(g + 864e5 / 2, z)], out = [];
+    offs.forEach(function (o) { var t = g - o; if (off(t, z) === o && out.indexOf(t) === -1) out.push(t); });
+    return { list: out.sort(function (a, b) { return a - b; }), offsBefore: offs[0], guess: g };
+  }
+  function fmtOff(ms) {
+    var m = Math.round(ms / 60000), s = m < 0 ? '−' : '+'; m = Math.abs(m);
+    return 'UTC' + s + Math.floor(m / 60) + (m % 60 ? ':' + String(m % 60).padStart(2, '0') : '');
+  }
+  function abbr(t, z) {
+    try { var p = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' }).formatToParts(new Date(t)); for (var i = 0; i < p.length; i++) if (p[i].type === 'timeZoneName') return p[i].value; } catch (e) {}
+    return '';
+  }
+  var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function clock(p, secs) {
+    var mm = String(p.mi).padStart(2, '0'), ss = secs ? ':' + String(p.s).padStart(2, '0') : '';
+    if ($('tzFmt').value === '12') return (p.h % 12 || 12) + ':' + mm + ss + (p.h < 12 ? ' AM' : ' PM');
+    return String(p.h).padStart(2, '0') + ':' + mm + ss;
+  }
+  function day(p) { return p.wd + ' ' + p.d + ' ' + MON[p.mo - 1] + ' ' + p.y; }
+  function info(z) {
+    for (var i = 0; i < PRESET.length; i++) if (PRESET[i][0] === z || canon(PRESET[i][0]) === canon(z)) return { name: PRESET[i][1], sub: PRESET[i][2] + ' · ' + z };
+    if (z === 'UTC') return { name: 'UTC', sub: 'Coordinated Universal Time' };
+    var bits = z.split('/'), city = bits[bits.length - 1].replace(/_/g, ' ');
+    return { name: NICE[city] || city, sub: z };
+  }
+
+  // ---------- zone list ----------
+  var zones;
+  function defaults() { return PRESET.map(function (p) { return p[0]; }); }
+  try { zones = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  if (!Array.isArray(zones)) zones = defaults();
+  zones = zones.filter(function (z) { return typeof z === 'string' && valid(z); });
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(zones)); } catch (e) {} }
+  function has(z) { var c = canon(z); return zones.some(function (x) { return canon(x) === c; }); }
+
+  // source select: your zone, the presets, then every zone
+  (function () {
+    var sel = $('tzSrc'), add = function (parent, z, label) { var o = document.createElement('option'); o.value = z; o.textContent = label; parent.appendChild(o); };
+    add(sel, local, 'Your time zone (' + local + ')');
+    var g1 = document.createElement('optgroup'); g1.label = 'Popular';
+    PRESET.forEach(function (p) { add(g1, p[0], p[1] + ' (' + p[0] + ')'); }); add(g1, 'UTC', 'UTC');
+    var g2 = document.createElement('optgroup'); g2.label = 'All time zones';
+    ALL.slice().sort().forEach(function (z) { add(g2, z, z.replace(/_/g, ' ')); });
+    sel.appendChild(g1); sel.appendChild(g2); sel.value = local;
+  })();
+
+  // ---------- state ----------
+  var live = true, timer = null, instant = Date.now(), lastSummary = '';
+  function setInputsFrom(t) {
+    var p = parts(t, $('tzSrc').value);
+    $('tzDate').value = String(p.y).padStart(4, '0') + '-' + String(p.mo).padStart(2, '0') + '-' + String(p.d).padStart(2, '0');
+    $('tzTime').value = String(p.h).padStart(2, '0') + ':' + String(p.mi).padStart(2, '0');
+  }
+  function say(cls, t) { $('tzMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('tzMsg').textContent = t; }
+  function compute() {
+    var src = $('tzSrc').value, dm = /^(\d{4,})-(\d\d)-(\d\d)$/.exec($('tzDate').value), tm = /^(\d\d):(\d\d)/.exec($('tzTime').value);
+    $('tzLaterWrap').style.display = 'none';
+    if (live) { instant = Date.now(); say('', ''); return true; }
+    if (!dm || !tm) { say('bad', 'Pick a date and a time, or press Now.'); return false; }
+    var r = fromWall(+dm[1], +dm[2], +dm[3], +tm[1], +tm[2], src), name = info(src).name;
+    if (!r.list.length) {
+      // the clocks jump forward over this time: use the same moment as the old offset would give (it shows one hour later)
+      instant = r.guess - r.offsBefore;
+      var p = parts(instant, src);
+      say('bad', $('tzTime').value + ' does not exist in ' + name + ' on this date, because the clocks jump forward (daylight saving starts). It is shown as ' + clock(p) + ', the same moment on the new clock time.');
+    } else if (r.list.length === 2) {
+      $('tzLaterWrap').style.display = 'block';
+      var later = $('tzLater').checked;
+      instant = r.list[later ? 1 : 0];
+      say('', $('tzTime').value + ' happens twice in ' + name + ' on this date, because the clocks go back. Showing the ' + (later ? 'second' : 'first') + ' one (' + fmtOff(off(instant, src)) + ').');
+    } else { instant = r.list[0]; say('', ''); }
+    return true;
+  }
+  function render() {
+    var ok = compute(), list = $('tzList'), src = $('tzSrc').value;
+    list.textContent = '';
+    if (!ok) { lastSummary = ''; return; }
+    var sp = parts(instant, src), sday = utcOf(sp.y, sp.mo, sp.d, 0, 0, 0), soff = off(instant, src), lines = [];
+    var show = [src].concat(zones.filter(function (z) { return canon(z) !== canon(src); }));
+    show.forEach(function (z, i) {
+      var p = parts(instant, z), o = off(instant, z), dd = Math.round((utcOf(p.y, p.mo, p.d, 0, 0, 0) - sday) / 864e5), inf = info(z), ab = abbr(instant, z);
+      var li = document.createElement('li'); li.className = 'tz-row' + (i === 0 ? ' src' : '');
+      var a = document.createElement('div'); a.className = 'tz-name';
+      a.appendChild(document.createTextNode(inf.name + (i === 0 ? ' (source)' : '')));
+      var sm = document.createElement('small'); sm.textContent = inf.sub; a.appendChild(sm);
+      var b = document.createElement('div'); b.className = 'tz-time';
+      var big = document.createElement('b'); big.textContent = clock(p, live);
+      if (dd) { var tag = document.createElement('span'); tag.className = 'tz-day'; tag.textContent = (dd > 0 ? '+' : '−') + Math.abs(dd) + (Math.abs(dd) === 1 ? ' day' : ' days'); big.appendChild(tag); }
+      var diff = (o - soff) / 36e5, dtxt = i === 0 ? '' : diff === 0 ? ' · same time' : ' · ' + (diff > 0 ? '+' : '−') + fmtHours(Math.abs(diff));
+      var small = document.createElement('small'); small.textContent = day(p) + ' · ' + fmtOff(o) + (ab && !/^GMT[+-−]/.test(ab) && ab !== 'UTC' ? ' ' + ab : '') + dtxt;
+      b.appendChild(big); b.appendChild(small);
+      var x = document.createElement('button'); x.className = 'tz-x'; x.type = 'button'; x.textContent = '×';
+      x.setAttribute('aria-label', 'Remove ' + inf.name);
+      if (i === 0) x.disabled = true;
+      else x.addEventListener('click', function () { zones = zones.filter(function (q) { return canon(q) !== canon(z); }); save(); render(); picks(); });
+      li.appendChild(a); li.appendChild(b); li.appendChild(x); list.appendChild(li);
+      lines.push(inf.name + ': ' + clock(p) + ', ' + day(p) + ' (' + fmtOff(o) + ')' + (dd ? ' ' + (dd > 0 ? '+' : '−') + Math.abs(dd) + ' day' + (Math.abs(dd) === 1 ? '' : 's') : ''));
+    });
+    lastSummary = lines.join('\n');
+  }
+  function fmtHours(h) { var m = Math.round(h * 60); return Math.floor(m / 60) + 'h' + (m % 60 ? ' ' + (m % 60) + 'm' : ''); }
+  function startLive() {
+    live = true; $('tzLive').hidden = false; clearInterval(timer);
+    var tick = function () { setInputsFrom(Date.now()); render(); };
+    tick(); timer = setInterval(tick, 1000);
+  }
+  function stopLive() { if (!live) return; live = false; clearInterval(timer); $('tzLive').hidden = true; }
+
+  // ---------- add-zone search ----------
+  function picks() {
+    var q = $('tzFind').value.trim().toLowerCase().replace(/\s+/g, ' '), box = $('tzPicks');
+    box.textContent = '';
+    if (!q) return;
+    var words = q.split(' '), hits = [];
+    ALL.forEach(function (z) {
+      var hay = (z + ' ' + z.replace(/_/g, ' ') + ' ' + info(z).name + ' ' + (ALIAS[z] || '')).toLowerCase();
+      if (words.every(function (w) { return hay.indexOf(w) !== -1; })) hits.push(z);
+    });
+    if (!hits.length) { var n = document.createElement('span'); n.className = 'msg'; n.textContent = 'No time zone matches "' + $('tzFind').value.trim() + '". Try the nearest big city.'; box.appendChild(n); return; }
+    hits.slice(0, 24).forEach(function (z) {
+      var b = document.createElement('button'), already = has(z); b.type = 'button';
+      b.textContent = (already ? '✓ ' : '+ ') + info(z).name + ' · ' + z + ' · ' + fmtOff(off(instant, z));
+      b.disabled = already; if (already) b.title = 'Already in your list';
+      b.addEventListener('click', function () { zones.push(z); save(); render(); picks(); toast(info(z).name + ' added'); });
+      box.appendChild(b);
+    });
+    if (hits.length > 24) { var m = document.createElement('span'); m.className = 'msg'; m.style.margin = '6px 0 0'; m.textContent = (hits.length - 24) + ' more. Type more letters to narrow it down.'; box.appendChild(m); }
+  }
+
+  // ---------- events ----------
+  ['tzDate', 'tzTime'].forEach(function (id) { $(id).addEventListener('input', function () { stopLive(); $('tzLater').checked = false; render(); }); });
+  $('tzSrc').addEventListener('change', function () {
+    // keep the same wall-clock time when someone picks a new zone, unless the clock is live
+    if (live) setInputsFrom(Date.now());
+    render();
+  });
+  $('tzFmt').addEventListener('change', render);
+  $('tzLater').addEventListener('change', render);
+  $('tzNow').addEventListener('click', startLive);
+  $('tzFind').addEventListener('input', picks);
+  $('tzCopy').addEventListener('click', function () { if (!lastSummary) { say('bad', 'Nothing to copy yet. Pick a date and time first.'); return; } copyText(lastSummary, $('tzCopy')); });
+  $('tzReset').addEventListener('click', function () { zones = defaults(); save(); render(); picks(); toast('Zone list reset'); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && live) startLive(); });
+  startLive();
+})();
+</script>

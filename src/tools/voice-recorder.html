@@ -1,0 +1,257 @@
+<style>
+.vr-time { font-size: clamp(44px, 12vw, 72px); margin: 4px 0 6px; }
+.vr-level { height: 12px; margin: 0 0 6px; }
+.vr-level i { transition: none; }
+.vr-level.hot i { background: var(--bad); }
+.vr-state { text-align: center; color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.vr-state.rec { color: var(--bad); font-weight: 600; }
+.vr-res audio { width: 100%; margin-top: 16px; }
+.vr-res .meter { margin-bottom: 4px; }
+</style>
+<div class="notice bad" id="unsup" hidden><p id="unsupText"></p></div>
+<div class="fields">
+  <div id="micBox" hidden><label for="mic">Microphone</label><select id="mic" data-nomemo></select></div>
+  <div><label for="kbps">MP3 quality</label><select id="kbps"><option value="96">96 kbps (smaller file)</option><option value="128" selected>128 kbps (good for voice)</option><option value="192">192 kbps (music)</option><option value="320">320 kbps (best)</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="clean" checked> Reduce background noise and echo</label></div>
+<div class="big vr-time" id="time" translate="no">0:00</div>
+<div class="meter vr-level" id="lvlBox" role="meter" aria-label="Microphone level" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><i id="lvl"></i></div>
+<p class="vr-state" id="state">Press Record and allow the microphone.</p>
+<div class="btns"><button class="btn" id="go">● Record</button><button class="btn ghost" id="pause" disabled>Pause</button><button class="btn ghost" id="stop" disabled>■ Stop</button></div>
+<div class="vr-res" id="result" hidden>
+  <audio id="play" controls preload="metadata"></audio>
+  <div class="meter" id="bar" hidden><i id="fill"></i></div>
+  <div class="btns"><a class="btn" id="dl" hidden>Download MP3</a><a class="btn ghost" id="dlWav" hidden>Download WAV</a><a class="btn ghost" id="dlOrig" hidden>Download original</a></div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script src="../assets/vendor/fix-webm-duration/fix-webm-duration.js"></script>
+<script>
+(function () {
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function clock(ms) { var s = Math.floor(ms / 1000), h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60; s = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(s).padStart(2, '0'); }
+  function stamp() { var d = new Date(), p = function (x) { return String(x).padStart(2, '0'); }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); }
+
+  // ---------- MP3 and WAV encoding (shared shape with the Video to MP3 tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      w.postMessage({ ch: ch, rate: rate, kbps: kbps });
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  // Decode any recording into plain samples at 44.1 kHz, the usual MP3 rate.
+  function decode(blob) {
+    return blob.arrayBuffer().then(function (buf) {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      return new Promise(function (res, rej) { var ctx = new OAC(1, 1, 44100), p = ctx.decodeAudioData(buf, res, rej); if (p && p.catch) p.catch(rej); });
+    });
+  }
+
+  // ---------- recording ----------
+  var md = navigator.mediaDevices, AC = window.AudioContext || window.webkitAudioContext;
+  var rec = null, stream = null, chunks = [], mime = '', t0 = 0, spent = 0, paused = false, tick = null, raf = 0, actx = null;
+  var take = null, decoded = null, urls = {}, job = 0;
+
+  function unsupported(text) { $('unsup').hidden = false; $('unsupText').textContent = text; $('go').disabled = true; $('state').textContent = ''; }
+  if (!window.isSecureContext) unsupported('Recording needs a secure (https) page. Open this tool from its https:// address.');
+  else if (!md || !md.getUserMedia) unsupported('This browser cannot use the microphone. Update it, or try Chrome, Edge, Firefox or Safari.');
+  else if (!window.MediaRecorder) unsupported('This browser cannot record sound. Update it (Safari 14.5 or newer on iPhone), or try Chrome, Edge or Firefox.');
+
+  function pickMime() {
+    var list = ['audio/webm;codecs=opus', 'audio/ogg;codecs=opus', 'audio/mp4;codecs=mp4a.40.2', 'audio/mp4', 'audio/webm', 'audio/ogg'];
+    if (!MediaRecorder.isTypeSupported) return '';
+    for (var i = 0; i < list.length; i++) if (MediaRecorder.isTypeSupported(list[i])) return list[i];
+    return '';
+  }
+  function extOf(type) { return /mp4|aac|m4a/.test(type) ? 'm4a' : /ogg/.test(type) ? 'ogg' : 'webm'; }
+  function nameOf(type) { return { m4a: 'M4A', ogg: 'OGG', webm: 'WebM' }[extOf(type)]; }
+
+  function listMics() {
+    if (!md || !md.enumerateDevices) return;
+    md.enumerateDevices().then(function (all) {
+      var mics = all.filter(function (d) { return d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default' && d.deviceId !== 'communications'; });
+      var sel = $('mic'), keep = sel.value;
+      $('micBox').hidden = mics.length < 2 || !mics[0].label; // without permission the names are blank, so wait
+      sel.innerHTML = '';
+      mics.forEach(function (d, i) { var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Microphone ' + (i + 1); sel.appendChild(o); });
+      if (keep && sel.querySelector('option[value="' + CSS.escape(keep) + '"]')) sel.value = keep;
+      else if (stream) { var cur = stream.getAudioTracks()[0], id = cur && cur.getSettings && cur.getSettings().deviceId; if (id && sel.querySelector('option[value="' + CSS.escape(id) + '"]')) sel.value = id; }
+    }).catch(function () {});
+  }
+  if (md && md.addEventListener) md.addEventListener('devicechange', listMics);
+  listMics();
+
+  function why(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Microphone access was blocked. Click the lock or camera icon next to the web address, allow the microphone, then press Record again. On a phone, also check that your browser may use the microphone in the phone settings.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No microphone was found. Plug one in or check that it is switched on, then try again.';
+    if (n === 'NotReadableError' || n === 'AbortError') return 'The microphone is busy or could not start. Close other apps that use it (calls, other tabs), then try again.';
+    return 'The microphone could not start' + (e && e.message ? ': ' + e.message : '.');
+  }
+
+  function meter() {
+    if (!actx || !stream) return;
+    var an = actx.createAnalyser(); an.fftSize = 1024;
+    actx.createMediaStreamSource(stream).connect(an);
+    var data = new Float32Array(an.fftSize), peak = 0;
+    (function draw() {
+      if (!stream) return;
+      an.getFloatTimeDomainData(data);
+      var sum = 0, max = 0;
+      for (var i = 0; i < data.length; i++) { sum += data[i] * data[i]; max = Math.max(max, Math.abs(data[i])); }
+      var db = 20 * Math.log10(Math.sqrt(sum / data.length) || 1e-8), pct = Math.max(0, Math.min(100, (db + 60) / 60 * 100));
+      peak = Math.max(pct, peak - 2);
+      $('lvl').style.width = peak + '%'; $('lvlBox').setAttribute('aria-valuenow', Math.round(peak));
+      $('lvlBox').classList.toggle('hot', max > .98);
+      raf = requestAnimationFrame(draw);
+    })();
+  }
+  function elapsed() { return spent + (paused || !t0 ? 0 : performance.now() - t0); }
+  function setState(text, live) { $('state').textContent = text; $('state').className = 'vr-state' + (live ? ' rec' : ''); }
+  function release() {
+    cancelAnimationFrame(raf); clearInterval(tick);
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null;
+    if (actx) { actx.close().catch(function () {}); actx = null; }
+    $('lvl').style.width = '0'; $('lvlBox').classList.remove('hot');
+    window.removeEventListener('beforeunload', guard);
+  }
+  function guard(e) { e.preventDefault(); e.returnValue = ''; }
+  function setUrl(key, blob) { if (urls[key]) URL.revokeObjectURL(urls[key]); urls[key] = blob ? URL.createObjectURL(blob) : null; return urls[key]; }
+
+  $('go').addEventListener('click', function () {
+    if (rec) return;
+    $('go').disabled = true; say('', '');
+    var c = $('clean').checked, audio = { echoCancellation: c, noiseSuppression: c, autoGainControl: c };
+    if ($('mic').value && !$('micBox').hidden) audio.deviceId = { exact: $('mic').value };
+    md.getUserMedia({ audio: audio }).catch(function (e) {
+      if (audio.deviceId && e && (e.name === 'OverconstrainedError' || e.name === 'NotFoundError')) { delete audio.deviceId; return md.getUserMedia({ audio: audio }); } // the chosen mic was unplugged
+      throw e;
+    }).then(function (s) {
+      stream = s; listMics();
+      mime = pickMime();
+      try { rec = new MediaRecorder(s, mime ? { mimeType: mime } : undefined); } catch (e) { rec = new MediaRecorder(s); }
+      chunks = []; spent = 0; paused = false;
+      rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      rec.onstop = finished;
+      rec.onerror = function () { say('bad', 'Recording stopped because of an error. Whatever was recorded so far is kept below.'); };
+      s.getAudioTracks()[0].onended = function () { if (rec && rec.state !== 'inactive') { say('bad', 'The microphone was disconnected, so the recording stopped.'); rec.stop(); } };
+      rec.start(1000);
+      t0 = performance.now();
+      if (AC) { try { actx = new AC(); meter(); } catch (e) { actx = null; } }
+      tick = setInterval(function () { $('time').textContent = clock(elapsed()); }, 200);
+      $('time').textContent = '0:00';
+      setState('Recording…', true);
+      $('pause').disabled = false; $('pause').textContent = 'Pause'; $('stop').disabled = false;
+      $('result').hidden = true;
+      window.addEventListener('beforeunload', guard);
+    }).catch(function (e) {
+      release(); rec = null; $('go').disabled = false; setState('Press Record and allow the microphone.');
+      say('bad', why(e));
+    });
+  });
+
+  $('pause').addEventListener('click', function () {
+    if (!rec) return;
+    if (!paused) { rec.pause(); spent += performance.now() - t0; paused = true; $('pause').textContent = 'Resume'; setState('Paused. Press Resume to carry on.'); }
+    else { rec.resume(); t0 = performance.now(); paused = false; $('pause').textContent = 'Pause'; setState('Recording…', true); }
+  });
+  $('stop').addEventListener('click', function () { if (rec && rec.state !== 'inactive') { $('stop').disabled = true; rec.stop(); } });
+
+  function finished() {
+    var ms = elapsed(), type = (rec && rec.mimeType) || mime || (chunks[0] && chunks[0].type) || 'audio/webm';
+    release(); rec = null;
+    $('time').textContent = clock(ms);
+    $('go').disabled = false; $('go').textContent = '● Record again'; $('pause').disabled = true; $('pause').textContent = 'Pause'; $('stop').disabled = true;
+    if (!chunks.length) { setState('Nothing was recorded.'); say('bad', 'No sound was captured. Check the microphone and try again.'); return; }
+    var blob = new Blob(chunks, { type: type.split(';')[0] });
+    var ready = /webm/.test(type) && window.ysFixWebmDuration ? ysFixWebmDuration(blob, ms, { logger: false }) : Promise.resolve(blob);
+    ready.then(function (b) {
+      take = { blob: b, ext: extOf(type), name: 'recording-' + stamp(), ms: ms }; decoded = null;
+      setState('Done. Listen below, then download.');
+      $('play').src = setUrl('play', b);
+      var o = $('dlOrig'); o.href = urls.play; o.download = take.name + '.' + take.ext; o.textContent = 'Download ' + nameOf(type); o.hidden = false;
+      $('dl').hidden = true; $('dlWav').hidden = true;
+      $('result').hidden = false;
+      convert();
+    });
+  }
+
+  // Make the MP3 (and WAV) from the finished recording.
+  function convert() {
+    if (!take) return;
+    var mine = ++job;
+    $('dl').hidden = true; $('bar').hidden = false; $('fill').style.width = '0';
+    say('', 'Making the MP3…');
+    var p = decoded ? Promise.resolve(decoded) : decode(take.blob).then(function (buf) {
+      var ch = []; for (var i = 0; i < Math.min(2, buf.numberOfChannels); i++) ch.push(buf.getChannelData(i));
+      decoded = { ch: ch, rate: buf.sampleRate };
+      var w = $('dlWav'); w.href = setUrl('wav', wavBlob(ch, buf.sampleRate)); w.download = take.name + '.wav'; w.hidden = false;
+      return decoded;
+    });
+    p.then(function (d) {
+      if (mine !== job) return;
+      return encodeMp3(d.ch, d.rate, +$('kbps').value, function (f) { if (mine === job) $('fill').style.width = Math.round(f * 100) + '%'; }).then(function (mp3) {
+        if (mine !== job) return;
+        $('bar').hidden = true;
+        var a = $('dl'); a.href = setUrl('mp3', mp3); a.download = take.name + '.mp3'; a.textContent = 'Download MP3 (' + fmtBytes(mp3.size) + ')'; a.hidden = false;
+        say('ok', 'Recorded ' + clock(take.ms) + '. MP3 ' + $('kbps').value + ' kbps is ready.');
+      });
+    }).catch(function () {
+      if (mine !== job) return;
+      $('bar').hidden = true;
+      say('bad', 'This browser could not turn the recording into MP3 or WAV. You can still download the original ' + take.ext.toUpperCase() + ' file.');
+    });
+  }
+  $('kbps').addEventListener('change', function () { if (take && !rec) convert(); });
+})();
+</script>

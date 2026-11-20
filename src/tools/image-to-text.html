@@ -1,0 +1,215 @@
+<style>
+.ocr-q { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
+.ocr-q:empty { display: none; }
+.ocr-q li { display: flex; gap: 10px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-size: 14px; }
+.ocr-q li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ocr-q li small { flex: none; color: var(--muted); }
+.ocr-q li.done small { color: var(--ok); } .ocr-q li.err small { color: var(--bad); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop images here, or paste one with Ctrl+V</b>JPG, PNG, WebP, BMP or GIF, including screenshots. Read on your device, never uploaded.</div>
+<input type="file" id="file" accept="image/*,.bmp,.webp,.gif" multiple hidden>
+<div class="fields">
+  <div><label for="lang">Language of the text</label><select id="lang"></select></div>
+  <div><label for="lines">Line breaks</label><select id="lines"><option value="keep">Keep line breaks as in the image</option><option value="join">Join lines into paragraphs</option></select></div>
+  <div><label for="rot">Orientation</label><select id="rot"><option value="auto">Automatic (try turning if needed)</option><option value="0">Upright</option><option value="90">Turned right (90°)</option><option value="180">Upside down (180°)</option><option value="270">Turned left (270°)</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="names" checked>Put each file name above its text</label>
+  <label><input type="checkbox" id="clean" checked>Clean up the image first (grayscale, contrast, enlarge small text)</label>
+</div>
+<ul class="ocr-q" id="queue"></ul>
+<div class="notice" id="notice" hidden><div class="meter"><i id="bar"></i></div><p id="hint">Starting…</p></div>
+<label for="out">Recognised text</label>
+<textarea id="out" class="plain" data-nomemo style="min-height:240px" placeholder="The text found in your images appears here. You can edit it before copying."></textarea>
+<div class="btns">
+  <button class="btn" id="copy" disabled>Copy text</button>
+  <a class="btn ghost" id="dl" hidden>Download .txt</a>
+  <button class="btn ghost" id="clr" disabled>Clear</button>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/ocr/tesseract.min.js"></script>
+<script>
+(function () {
+  // Only languages whose data is shipped with the site in assets/vendor/ocr.
+  var LANGS = [['eng', 'English']];
+  $('lang').innerHTML = LANGS.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('');
+  var queue = [], results = [], handled = 0, running = false, worker = null, workerLang = '', edited = false, url = null, firstName = '';
+  var MAXPX = 40e6; // larger pictures would run phones out of memory
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function tell(t, pct) { $('notice').hidden = false; $('hint').textContent = t; $('bar').style.width = Math.max(0, Math.min(100, pct)) + '%'; }
+  function isImage(f) { return /^image\//.test(f.type) || /\.(jpe?g|png|webp|bmp|gif)$/i.test(f.name); }
+
+  // ---------- turning the recognised text into the result box ----------
+  function shape(text) {
+    text = text.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    if ($('lines').value !== 'join') return text;
+    return text.split(/\n\s*\n/).map(function (p) {
+      return p.replace(/(\w)-\n(?=[a-z])/g, '$1').replace(/\s*\n\s*/g, ' ');
+    }).join('\n\n');
+  }
+  function render() {
+    var label = $('names').checked && results.length > 1;
+    $('out').value = results.map(function (r) {
+      var t = r.text ? shape(r.text) : '';
+      return label ? '— ' + r.name + ' —\n' + (t || '(no text found)') : t;
+    }).filter(function (t) { return t; }).join('\n\n');
+    edited = false; update();
+  }
+  function update() {
+    var has = !!$('out').value.trim();
+    $('copy').disabled = !has; $('clr').disabled = !has && !results.length;
+    if (url) { URL.revokeObjectURL(url); url = null; }
+    if (has) {
+      url = URL.createObjectURL(new Blob([$('out').value.replace(/\n/g, '\r\n')], { type: 'text/plain;charset=utf-8' }));
+      $('dl').href = url; $('dl').download = (results.length === 1 ? firstName : 'image-text') + '.txt';
+    }
+    $('dl').hidden = !has;
+  }
+  ['lines', 'names'].forEach(function (id) {
+    $(id).addEventListener('change', function () {
+      if (!results.length) return;
+      if (edited && !confirm('Redo the text with this setting? Your own edits in the box will be replaced.')) return;
+      render();
+    });
+  });
+  $('out').addEventListener('input', function () { edited = true; update(); });
+  $('copy').addEventListener('click', function () { copyText($('out').value, $('copy')); });
+  $('clr').addEventListener('click', function () {
+    results = []; $('out').value = ''; edited = false; firstName = '';
+    if (!running) { queue = []; $('queue').innerHTML = ''; $('notice').hidden = true; }
+    say('', ''); update();
+  });
+
+  // ---------- preparing an image so the reader sees it clearly ----------
+  function prepare(img, angle) {
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, k = 1, clean = $('clean').checked;
+    var long = Math.max(w, h);
+    if (clean && long < 1800) k = Math.min(3, 1800 / long); // small text is read far better when enlarged
+    if (long * k > 4200) k = 4200 / long; // and very large pictures are slow without being clearer
+    var sw = Math.round(w * k), sh = Math.round(h * k), side = angle === 90 || angle === 270;
+    var c = document.createElement('canvas'); c.width = side ? sh : sw; c.height = side ? sw : sh;
+    var x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); // transparent parts become white paper
+    x.imageSmoothingQuality = 'high';
+    x.translate(c.width / 2, c.height / 2); x.rotate(angle * Math.PI / 180); x.drawImage(img, -sw / 2, -sh / 2, sw, sh);
+    if (!clean) return c;
+    var d = x.getImageData(0, 0, c.width, c.height), p = d.data, n = p.length / 4, hist = new Uint32Array(256), sum = 0, i, g;
+    for (i = 0; i < p.length; i += 4) { g = (p[i] * 299 + p[i + 1] * 587 + p[i + 2] * 114) / 1000 | 0; p[i] = g; hist[g]++; sum += g; }
+    // stretch the contrast between the darkest and lightest 1% of the picture
+    var lo = 0, hi = 255, acc = 0;
+    for (i = 0; i < 256; i++) { acc += hist[i]; if (acc > n * .01) { lo = i; break; } }
+    acc = 0;
+    for (i = 255; i >= 0; i--) { acc += hist[i]; if (acc > n * .01) { hi = i; break; } }
+    if (hi - lo < 10) { lo = Math.max(0, lo - 5); hi = Math.min(255, hi + 5); }
+    var invert = sum / n < 110; // light text on a dark background: make it dark text on light paper
+    var lut = new Uint8ClampedArray(256);
+    for (i = 0; i < 256; i++) { var v = (i - lo) * 255 / (hi - lo); lut[i] = invert ? 255 - v : v; }
+    for (i = 0; i < p.length; i += 4) { g = lut[p[i]]; p[i] = p[i + 1] = p[i + 2] = g; p[i + 3] = 255; }
+    x.setTransform(1, 0, 0, 1, 0, 0); x.putImageData(d, 0, 0);
+    return c;
+  }
+  // How convincing a reading is: confident words of two or more letters or digits.
+  function score(data) {
+    var s = 0;
+    (data.words || []).forEach(function (w) { if (w.confidence > 50 && /[A-Za-z0-9]{2,}/.test(w.text)) s += w.confidence * Math.min(8, w.text.length); });
+    return s;
+  }
+
+  async function getWorker(lang, onProgress) {
+    if (worker && workerLang === lang) return worker;
+    if (worker) { await worker.terminate(); worker = null; }
+    tell('Loading the text reader (about 7 MB, only the first time)…', 3);
+    worker = await Tesseract.createWorker(lang, 1, {
+      workerPath: '../assets/vendor/ocr/worker.min.js', corePath: '../assets/vendor/ocr', langPath: '../assets/vendor/ocr',
+      logger: function (m) { if (m.status === 'recognizing text') onProgress(m.progress); }
+    });
+    workerLang = lang;
+    return worker;
+  }
+  var progressFn = function () {};
+  function load(f) {
+    return new Promise(function (res) { loadImage(f, res); });
+  }
+
+  async function next() {
+    if (running) return;
+    running = true; $('drop').setAttribute('aria-busy', 'true');
+    while (queue.length) {
+      var job = queue.shift(), li = job.li, idx = ++handled, total = handled + queue.length;
+      li.querySelector('small').textContent = 'Reading…';
+      try {
+        if (!window.Tesseract || !window.WebAssembly) throw new Error('This browser cannot run the text reader. Try an up-to-date Chrome, Edge, Firefox or Safari.');
+        var img = await load(job.file);
+        if (!img || !(img.naturalWidth > 0)) throw new Error('This file could not be opened as a picture. HEIC photos from iPhones need converting to JPG first.');
+        if (img.naturalWidth * img.naturalHeight > MAXPX) throw new Error('This picture is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.');
+        var pre = total > 1 ? 'Image ' + idx + ' of ' + (handled + queue.length) + ': ' : '', base = 0, span = 100;
+        progressFn = function (p) { tell(pre + (base ? 'Trying the picture turned another way… ' : 'Reading text… ') + Math.round(p * 100) + '%', base + p * span); };
+        var w = await getWorker($('lang').value, function (p) { progressFn(p); });
+        var mode = $('rot').value, angles = mode === 'auto' ? [0] : [+mode], best = null, bestScore = -1, bestAngle = 0;
+        for (var a = 0; a < angles.length; a++) {
+          tell(pre + (a ? 'Trying the picture turned ' + angles[a] + '°…' : 'Reading text…'), base);
+          var r = await w.recognize(prepare(img, angles[a]));
+          var s = score(r.data);
+          if (s > bestScore) { best = r.data; bestScore = s; bestAngle = angles[a]; }
+          // Auto: if the upright reading looks poor, try the other three ways round.
+          if (mode === 'auto' && a === 0 && (r.data.confidence < 65 || s < 400)) { angles = [0, 90, 270, 180]; span = 25; base = 25; }
+          else if (angles.length > 1) base += 25;
+        }
+        img = null;
+        var text = (best && best.text || '').trim();
+        results.push({ name: job.file.name, text: text });
+        if (!firstName) firstName = job.file.name.replace(/\.[^.]+$/, '') || 'image';
+        li.className = text ? 'done' : 'err';
+        li.querySelector('small').textContent = text ? 'Done' + (bestAngle ? ', turned ' + bestAngle + '°' : '') + ' · ' + Math.round(best.confidence) + '% sure' : 'No text found';
+        if (!edited) render(); else { $('out').value += ($('out').value ? '\n\n' : '') + (($('names').checked && results.length > 1) ? '— ' + job.file.name + ' —\n' : '') + shape(text); update(); }
+      } catch (e) {
+        li.className = 'err'; li.querySelector('small').textContent = 'Failed';
+        say('bad', job.file.name + ': ' + (e && e.message && !/^\d+$/.test(e.message) ? e.message : 'the text reader could not run on this device.'));
+        if (worker && /abort|memory|terminated/i.test(String(e && e.message))) { try { worker.terminate(); } catch (x) {} worker = null; }
+      }
+    }
+    running = false; handled = 0; $('drop').removeAttribute('aria-busy');
+    $('notice').hidden = true;
+    var ok = results.filter(function (r) { return r.text; }).length;
+    if (results.length && $('msg').className.indexOf('bad') < 0) {
+      if (ok) say('ok', 'Text found in ' + ok + ' of ' + results.length + (results.length === 1 ? ' image' : ' images') + '. Check it for mistakes: reading text from pictures is never perfect.');
+      else say('bad', 'No text was found. Make sure the writing is printed, sharp and in ' + $('lang').options[$('lang').selectedIndex].text + '. Handwriting is rarely read well.');
+    }
+  }
+
+  function add(list) {
+    var good = list.filter(isImage), bad = list.length - good.length;
+    say(bad ? 'bad' : '', bad ? 'Skipped ' + bad + ' file(s) that are not images.' : '');
+    good.forEach(function (f) {
+      var li = document.createElement('li'), s = document.createElement('span'), st = document.createElement('small');
+      s.textContent = f.name + ' (' + fmtBytes(f.size) + ')'; st.textContent = 'Waiting';
+      li.appendChild(s); li.appendChild(st); $('queue').appendChild(li);
+      queue.push({ file: f, li: li });
+    });
+    if (good.length) next();
+  }
+  PT_drop();
+  function PT_drop() {
+    var drop = $('drop'), input = $('file');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var a = Array.prototype.slice.call(input.files); input.value = ''; if (a.length) add(a); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { add(Array.prototype.slice.call(e.dataTransfer.files)); });
+  }
+  // Ctrl+V / Cmd+V anywhere on the page with a picture on the clipboard (for example a screenshot).
+  document.addEventListener('paste', function (e) {
+    var items = e.clipboardData && e.clipboardData.items, files = [];
+    if (!items) return;
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file' && /^image\//.test(items[i].type)) {
+        var f = items[i].getAsFile();
+        if (f) files.push(new File([f], 'pasted-image-' + (results.length + queue.length + files.length + 1) + '.' + (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg'), { type: f.type }));
+      }
+    }
+    if (files.length) { e.preventDefault(); add(files); }
+  });
+})();
+</script>

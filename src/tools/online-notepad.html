@@ -43,7 +43,7 @@
   </div>
   <div class="np-ed" id="npEd"></div>
   <div class="np-status"><span id="npLang">Normal text</span><span id="npPos">Ln 1, Col 1</span><span id="npLen">0 chars · 1 line</span>
-    <select id="npEol" data-nomemo aria-label="Line endings" title="Line endings used when saving"><option value="\n">Unix (LF)</option><option value="\r\n">Windows (CRLF)</option><option value="\r">Old Mac (CR)</option></select><span>UTF-8</span><span id="npMode">INS</span></div>
+    <select id="npEol" data-nomemo aria-label="Line endings" title="Line endings used when saving"><option value="lf">Unix (LF)</option><option value="crlf">Windows (CRLF)</option><option value="cr">Old Mac (CR)</option></select><span>UTF-8</span><span id="npMode">INS</span></div>
 </div>
 <input type="file" id="npOpen" multiple hidden>
 <p class="msg" id="msg">Your tabs are saved in this browser automatically. Drop files anywhere on the editor to open them.</p>
@@ -107,6 +107,8 @@
     ['Dockerfile', 'dockerfile', ['dockerfile'], 'Dockerfile'], ['Nginx', 'nginx', [], 'conf'], ['Diff / Patch', 'diff', ['diff', 'patch'], 'diff']
   ];
   var KEY = 'gtn-notepad', OPT = 'gtn-notepad-view';
+  var EOLS = { lf: '\n', crlf: '\r\n', cr: '\r' };
+  function eolKey(e) { return e === '\r\n' ? 'crlf' : e === '\r' ? 'cr' : 'lf'; }
   var tabs = [], cur = -1, seq = 1, saveTimer = null, marks = [];
   var view = { wrap: false, numbers: true, spaces: false, activeline: true, dark: false, size: 14 };
   try { var v = JSON.parse(localStorage.getItem(OPT)); if (v) for (var k in view) if (k in v) view[k] = v[k]; } catch (e) {}
@@ -167,7 +169,7 @@
       set: function (k, v) { return db().then(function (d) { return new Promise(function (res, rej) { var tx = d.transaction('s', 'readwrite'); tx.objectStore('s').put(v, k); tx.oncomplete = function () { res(); }; tx.onerror = function () { rej(tx.error); }; }); }); }
     };
   })();
-  function snapshot() { return { cur: cur, seq: seq, tabs: tabs.map(function (t) { var c = t.doc.getCursor(); return { name: t.name, lang: t.lang, eol: t.eol, text: t.doc.getValue(), line: c.line, ch: c.ch, bm: bmLines(t.doc) }; }) }; }
+  function snapshot() { return { cur: cur, seq: seq, tabs: tabs.map(function (t) { var c = t.doc.getCursor(); return { name: t.name, lang: t.lang, eol: t.eol, text: t.doc.getValue(), line: c.line, ch: c.ch, bm: bmLines(t.doc), dirty: dirty(t) }; }) }; }
   function title() { var t = tabs[cur]; if (t) $('npTitle').textContent = (dirty(t) ? '*' : '') + t.name + ' - GetToolNest Notepad'; }
 
   // ---------- tabs ----------
@@ -183,7 +185,7 @@
     if (i < 0 || i >= tabs.length) return;
     cur = i; var t = tabs[i];
     cm.swapDoc(t.doc); cm.setOption('mode', lang(t.lang)[1]); applySpaces();
-    $('npEol').value = t.eol; drawTabs(); status(); cm.focus(); clearMarks(); persist();
+    $('npEol').value = eolKey(t.eol); drawTabs(); status(); cm.focus(); clearMarks(); persist();
   }
   function dirty(t) { return !t.doc.isClean(t.clean); }
   function drawTabs() {
@@ -227,7 +229,7 @@
       s = local || s; // a localStorage copy is only written when IndexedDB failed, so it is the newer one
       if (s && s.tabs && s.tabs.length) {
         seq = s.seq || 1;
-        s.tabs.forEach(function (o) { var t = makeTab(o.name, o.text, o.lang, o.eol); t.doc.setCursor({ line: o.line || 0, ch: o.ch || 0 }); (o.bm || []).forEach(function (l) { if (l < t.doc.lineCount()) setBm(t.doc, l, true); }); tabs.push(t); });
+        s.tabs.forEach(function (o) { var t = makeTab(o.name, o.text, o.lang, o.eol); if (o.dirty) t.clean = -1; /* still not saved to a file */ t.doc.setCursor({ line: o.line || 0, ch: o.ch || 0 }); (o.bm || []).forEach(function (l) { if (l < t.doc.lineCount()) setBm(t.doc, l, true); }); tabs.push(t); });
         show(Math.min(Math.max(0, s.cur || 0), tabs.length - 1));
       } else add(makeTab(untitled(), ''));
     });
@@ -243,7 +245,7 @@
   cm.on('cursorActivity', status);
   cm.on('change', function () { status(); persist(); var on = document.querySelector('.np-tab.on'); if (on && tabs[cur]) on.classList.toggle('dirty', dirty(tabs[cur])); title(); });
   cm.on('overwriteToggle', function (c, o) { $('npMode').textContent = o ? 'OVR' : 'INS'; });
-  $('npEol').addEventListener('change', function () { if (tabs[cur]) { tabs[cur].eol = $('npEol').value; persist(); } });
+  $('npEol').addEventListener('change', function () { if (tabs[cur]) { tabs[cur].eol = EOLS[$('npEol').value] || '\n'; persist(); } });
 
   // ---------- view ----------
   function applyView() {
@@ -270,9 +272,24 @@
     });
     say((msg || 'Done') + (r.all ? ' (whole document).' : ' (selected lines).'), 'ok');
   }
-  function onText(fn) { // the selected text, or the whole document
-    if (cm.somethingSelected()) cm.replaceSelections(cm.getSelections().map(fn), 'around');
-    else { var c = cm.getCursor(); cm.setValue(fn(cm.getValue())); cm.setCursor(c); }
+  function onText(fn, msg) { // the selected text, or the whole document
+    var sel = cm.somethingSelected();
+    if (sel) cm.replaceSelections(cm.getSelections().map(fn), 'around');
+    else { var c = cm.getCursor(), v = cm.getValue(), o = fn(v); if (o !== v) { cm.setValue(o); cm.setCursor(c); } }
+    if (msg) say(msg + (sel ? ' (selected text).' : ' (whole document).'), 'ok');
+  }
+  function reprintJSON(t, indent) { // re-print the original tokens, so long numbers keep every digit
+    var out = '', depth = 0, prev = '', m, re = /"(?:[^"\\]|\\.)*"|[{}\[\],:]|[^\s{}\[\],:"]+/g;
+    var pad = function (d) { return indent ? '\n' + Array(indent * d + 1).join(' ') : ''; };
+    while ((m = re.exec(t))) {
+      var k = m[0];
+      if (k === '{' || k === '[') { out += (prev === '{' || prev === '[') ? pad(depth) + k : k; depth++; prev = k; continue; }
+      if (k === '}' || k === ']') { depth--; out += (prev === '{' || prev === '[') ? k : pad(depth) + k; prev = k; continue; }
+      if (prev === '{' || prev === '[') out += pad(depth);
+      out += k === ',' ? ',' + pad(depth) : k === ':' ? (indent ? ': ' : ':') : k;
+      prev = k;
+    }
+    return out;
   }
   function titleCase(s) { return s.toLowerCase().replace(/(^|[\s\-_(\["'])(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); }
   function moveLines(dir) {
@@ -303,7 +320,17 @@
   function find(back) {
     var re = query(); if (!re) return false;
     var from = back ? cm.getCursor('from') : cm.getCursor('to'), c = cm.getSearchCursor(re, from);
-    if (!(back ? c.findPrevious() : c.findNext())) {
+    var hit = function () {
+      var ok = back ? c.findPrevious() : c.findNext();
+      // an empty match (such as ^ or x*) right at the cursor would be found again and again: step past it
+      if (ok && CodeMirror.cmpPos(c.from(), c.to()) === 0 && CodeMirror.cmpPos(c.from(), from) === 0 && !cm.somethingSelected()) {
+        var p = back ? cm.findPosH(from, -1, 'char') : cm.findPosH(from, 1, 'char');
+        if (CodeMirror.cmpPos(p, from) === 0) return false;
+        c = cm.getSearchCursor(re, p); ok = back ? c.findPrevious() : c.findNext();
+      }
+      return ok;
+    };
+    if (!hit()) {
       c = cm.getSearchCursor(re, back ? { line: cm.lastLine(), ch: cm.getLine(cm.lastLine()).length } : { line: 0, ch: 0 });
       if (!(back ? c.findPrevious() : c.findNext())) { $('npFindMsg').textContent = 'Not found.'; return false; }
       $('npFindMsg').textContent = back ? 'Reached the top, continued from the bottom.' : 'Reached the end, continued from the top.';
@@ -344,16 +371,33 @@
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
   }
   function fileName(t) { return t.name.indexOf('.') >= 0 || t.lang === 'Dockerfile' ? t.name : t.name.replace(/\s+/g, '-') + '.' + lang(t.lang)[3]; }
+  function decodeFile(buf) { // -> { text, enc } or null for a binary file
+    var b = new Uint8Array(buf);
+    if (b[0] === 0xff && b[1] === 0xfe) return { text: new TextDecoder('utf-16le').decode(b), enc: 'UTF-16' };
+    if (b[0] === 0xfe && b[1] === 0xff) return { text: new TextDecoder('utf-16be').decode(b), enc: 'UTF-16' };
+    if (b.subarray(0, 8000).indexOf(0) !== -1) return null; // a zero byte: an image, a PDF, a program...
+    try { return { text: new TextDecoder('utf-8', { fatal: true }).decode(b), enc: '' }; }
+    catch (e) { return { text: new TextDecoder('windows-1252').decode(b), enc: 'Latin-1 (Windows-1252)' }; }
+  }
   function openFiles(list) {
-    Array.prototype.slice.call(list).forEach(function (f) {
-      if (f.size > 50 * 1048576 && !confirm('“' + f.name + '” is ' + fmtBytes(f.size) + '. Very large files can make the browser slow. Open it anyway?')) return;
-      f.text().then(function (text) {
-        var eol = /\r\n/.test(text) ? '\r\n' : /\r/.test(text) ? '\r' : '\n';
+    var files = Array.prototype.slice.call(list).filter(function (f) {
+      return !(f.size > 50 * 1048576 && !confirm('“' + f.name + '” is ' + fmtBytes(f.size) + '. Very large files can make the browser slow. Open it anyway?'));
+    });
+    // read them all, then add the tabs in the order the files were chosen
+    Promise.all(files.map(function (f) { return f.arrayBuffer().then(decodeFile, function () { return undefined; }); })).then(function (res) {
+      var notes = [], opened = 0;
+      res.forEach(function (r, i) {
+        var f = files[i];
+        if (r === undefined) { notes.push('“' + f.name + '” could not be read.'); return; }
+        if (r === null) { notes.push('“' + f.name + '” is not a text file, so it was not opened.'); return; }
+        var text = r.text, eol = /\r\n/.test(text) ? '\r\n' : /\r/.test(text) ? '\r' : '\n';
         var empty = tabs.length === 1 && !tabs[0].doc.getValue() && /^new \d+$/.test(tabs[0].name);
         var t = makeTab(f.name, text.replace(/\r\n?/g, '\n'), null, eol);
         if (empty) tabs.splice(0, 1);
-        add(t); say('Opened ' + f.name + ' · ' + t.lang + ' · ' + fmtBytes(f.size), 'ok');
+        add(t); opened++;
+        notes.unshift('Opened ' + f.name + ' · ' + t.lang + ' · ' + fmtBytes(f.size) + (r.enc ? ' · read as ' + r.enc + ', will be saved as UTF-8' : '') + '.');
       });
+      if (notes.length) say(notes.join(' '), opened && notes.length === opened ? 'ok' : 'bad');
     });
   }
   $('npOpen').addEventListener('change', function () { openFiles(this.files); this.value = ''; });
@@ -380,9 +424,17 @@
       case 'closeothers': if (!tabs.some(function (x, i) { return i !== cur && dirty(x) && x.doc.getValue(); }) || confirm('Close all other tabs? Unsaved text in them will be lost.')) { tabs = [t]; show(0); } break;
       case 'closeall': if (!tabs.some(function (x) { return dirty(x) && x.doc.getValue(); }) || confirm('Close all tabs? Unsaved text will be lost.')) { tabs = []; seq = 1; add(makeTab(untitled(), '')); } break;
       case 'print':
-        var w = window.open('', '_blank'); if (!w) { say('Your browser blocked the print window. Allow pop-ups and try again.', 'bad'); break; }
-        var pre = w.document.createElement('pre'); pre.textContent = t.doc.getValue(); pre.style.cssText = 'white-space:pre-wrap;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace';
-        w.document.title = t.name; w.document.body.appendChild(pre); w.focus(); w.print(); break;
+        var w = null; try { w = window.open('', '_blank'); } catch (e) {}
+        var frame = null;
+        if (!w) { // pop-ups blocked: print from a hidden frame on this page instead
+          frame = document.createElement('iframe'); frame.setAttribute('aria-hidden', 'true'); frame.tabIndex = -1;
+          frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;visibility:hidden';
+          document.body.appendChild(frame); w = frame.contentWindow;
+        }
+        var pre = w.document.createElement('pre'); pre.textContent = t.doc.getValue(); pre.style.cssText = 'white-space:pre-wrap;overflow-wrap:anywhere;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace';
+        w.document.title = t.name; w.document.body.appendChild(pre); w.focus(); w.print();
+        if (frame) setTimeout(function () { frame.remove(); }, 60000);
+        break;
       case 'undo': cm.undo(); break;
       case 'redo': cm.redo(); break;
       case 'copyall': copyText(cm.getValue()); say('All text copied.', 'ok'); break;
@@ -396,14 +448,14 @@
       case 'moveup': moveLines(-1); break;
       case 'movedown': moveLines(1); break;
       case 'joinlines': onLines(function (L) { return [L.map(function (s, i) { return i ? s.trim() : s.replace(/\s+$/, ''); }).join(' ')]; }, 'Lines joined'); break;
-      case 'comment': cm.toggleComment({ indent: true }); break;
+      case 'comment': var before = cm.getValue(); cm.toggleComment({ indent: true }); if (cm.getValue() === before) say(t.lang === 'Normal text' ? 'Normal text has no comment sign. Choose a language in the Language menu first.' : 'Nothing to comment here.', 'bad'); break;
       case 'indent': cm.indentSelection('add'); break;
       case 'outdent': cm.indentSelection('subtract'); break;
-      case 'upper': onText(function (s) { return s.toUpperCase(); }); break;
-      case 'lower': onText(function (s) { return s.toLowerCase(); }); break;
-      case 'title': onText(titleCase); break;
-      case 'sentence': onText(function (s) { return s.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); }); break;
-      case 'invert': onText(function (s) { return s.replace(/./g, function (c) { var u = c.toUpperCase(); return c === u ? c.toLowerCase() : u; }); }); break;
+      case 'upper': onText(function (s) { return s.toUpperCase(); }, 'Changed to UPPERCASE'); break;
+      case 'lower': onText(function (s) { return s.toLowerCase(); }, 'Changed to lowercase'); break;
+      case 'title': onText(titleCase, 'Changed to Title Case'); break;
+      case 'sentence': onText(function (s) { return s.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); }, 'Changed to Sentence case'); break;
+      case 'invert': onText(function (s) { return s.replace(/./g, function (c) { var u = c.toUpperCase(); return c === u ? c.toLowerCase() : u; }); }, 'Case inverted'); break;
       case 'trimtrail': onLines(function (L) { return L.map(function (s) { return s.replace(/\s+$/, ''); }); }, 'Trailing spaces removed'); break;
       case 'trimlead': onLines(function (L) { return L.map(function (s) { return s.replace(/^\s+/, ''); }); }, 'Leading spaces removed'); break;
       case 'trimboth': onLines(function (L) { return L.map(function (s) { return s.trim(); }); }, 'Spaces trimmed'); break;
@@ -414,8 +466,8 @@
       case 'replace': openFind(true); break;
       case 'next': if ($('npFind').hidden && !$('npQ').value) openFind(false); else find(false); break;
       case 'prev': if ($('npFind').hidden && !$('npQ').value) openFind(false); else find(true); break;
-      case 'count': var n = count(); $('npFindMsg').textContent = n === 0 && !query() ? '' : fmtNum(n) + (n === 1 ? ' match.' : ' matches.'); break;
-      case 'markall': if ($('npFind').hidden) { openFind(false); break; } var m = markAll(); $('npFindMsg').textContent = fmtNum(m) + ' marked.'; break;
+      case 'count': if (!query()) break; var n = count(); $('npFindMsg').textContent = fmtNum(n) + (n === 1 ? ' match.' : ' matches.'); break;
+      case 'markall': if ($('npFind').hidden) { openFind(false); break; } if (!query()) break; var m = markAll(); $('npFindMsg').textContent = fmtNum(m) + ' marked.'; break;
       case 'unmark': clearMarks(); $('npFindMsg').textContent = ''; break;
       case 'rep': replaceOne(); break;
       case 'repall': replaceAll(); break;
@@ -457,20 +509,42 @@
       case 'full': $('np').classList.toggle('full'); document.documentElement.classList.toggle('np-full', $('np').classList.contains('full')); setTimeout(function () { cm.refresh(); cm.focus(); }, 30); break;
       case 'sortasc': onLines(function (L) { return L.slice().sort(function (a, b) { return a.localeCompare(b); }); }, 'Sorted A to Z'); break;
       case 'sortdesc': onLines(function (L) { return L.slice().sort(function (a, b) { return b.localeCompare(a); }); }, 'Sorted Z to A'); break;
-      case 'sortnum': onLines(function (L) { var n = function (s) { var m = s.match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : Infinity; }; return L.slice().sort(function (a, b) { return n(a) - n(b); }); }, 'Sorted as numbers'); break;
+      case 'sortnum': onLines(function (L) { var n = function (s) { var m = s.match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : Infinity; }; return L.slice().sort(function (a, b) { var x = n(a), y = n(b); return x === y ? 0 : x < y ? -1 : 1; }); }, 'Sorted as numbers'); break;
       case 'sortlen': onLines(function (L) { return L.slice().sort(function (a, b) { return a.length - b.length; }); }, 'Sorted by length'); break;
       case 'shuffle': onLines(function (L) { var a = L.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), x = a[i]; a[i] = a[j]; a[j] = x; } return a; }, 'Lines shuffled'); break;
       case 'reverse': onLines(function (L) { return L.slice().reverse(); }, 'Order reversed'); break;
-      case 'dedupe': var before; onLines(function (L) { before = L.length; var seen = {}; return L.filter(function (s) { if (seen['$' + s]) return false; seen['$' + s] = 1; return true; }); }, 'Duplicate lines removed'); break;
+      case 'dedupe': onLines(function (L) { var seen = {}; return L.filter(function (s) { if (seen['$' + s]) return false; seen['$' + s] = 1; return true; }); }, 'Duplicate lines removed'); break;
       case 'noempty': onLines(function (L) { var o = L.filter(function (s) { return s.trim(); }); return o.length ? o : ['']; }, 'Empty lines removed'); break;
       case 'number': onLines(function (L) { var w = String(L.length).length; return L.map(function (s, i) { return String(i + 1).padStart(w, ' ') + '. ' + s; }); }, 'Lines numbered'); break;
       case 'jsonfmt': case 'jsonmin':
-        try { onText(function (s) { return JSON.stringify(JSON.parse(s), null, cmd === 'jsonfmt' ? 2 : 0); }); if (!cm.somethingSelected()) { t.lang = 'JSON'; cm.setOption('mode', lang('JSON')[1]); status(); } say('JSON ' + (cmd === 'jsonfmt' ? 'formatted.' : 'minified.'), 'ok'); }
+        try { onText(function (s) { JSON.parse(s); return reprintJSON(s.trim(), cmd === 'jsonfmt' ? 2 : 0); }); if (!cm.somethingSelected()) { t.lang = 'JSON'; cm.setOption('mode', lang('JSON')[1]); status(); } say('JSON ' + (cmd === 'jsonfmt' ? 'formatted.' : 'minified.'), 'ok'); }
         catch (e) { say('That is not valid JSON: ' + e.message, 'bad'); } break;
-      case 'b64enc': onText(function (s) { var b = new TextEncoder().encode(s), x = ''; for (var i = 0; i < b.length; i++) x += String.fromCharCode(b[i]); return btoa(x); }); break;
-      case 'b64dec': try { onText(function (s) { var bin = atob(s.replace(/\s+/g, '')), u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i); return new TextDecoder('utf-8', { fatal: true }).decode(u); }); } catch (e) { say('That is not valid Base64 text.', 'bad'); } break;
-      case 'urlenc': onText(encodeURIComponent); break;
-      case 'urldec': try { onText(function (s) { return decodeURIComponent(s.replace(/\+/g, ' ')); }); } catch (e) { say('That text has a broken % code.', 'bad'); } break;
+      case 'b64enc': onText(function (s) { var b = new TextEncoder().encode(s), x = ''; for (var i = 0; i < b.length; i++) x += String.fromCharCode(b[i]); return btoa(x); }, 'Base64 encoded'); break;
+      case 'b64dec':
+        try {
+          onText(function (s) {
+            var bin, u;
+            s = s.trim().replace(/^data:[^,]*;base64,/i, '').replace(/\s+/g, '').replace(/-/g, '+').replace(/_/g, '/');
+            while (s.length % 4) s += '=';
+            try { bin = atob(s); } catch (e) { throw new Error('That is not valid Base64.'); }
+            u = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) u[i] = bin.charCodeAt(i);
+            try { return new TextDecoder('utf-8', { fatal: true }).decode(u); }
+            catch (e) { throw new Error('This is valid Base64, but it holds binary data (such as an image), not text, so it cannot be shown here. Use the Base64 Encoder / Decoder tool to download it as a file.'); }
+          }, 'Base64 decoded');
+        } catch (e) { say(e.message, 'bad'); } break;
+      case 'urlenc': onText(encodeURIComponent, 'URL encoded'); break;
+      case 'urldec':
+        var latin = false;
+        try {
+          onText(function (s) {
+            if (/%(?![0-9a-fA-F]{2})/.test(s)) throw new Error('broken');
+            return s.replace(/\+/g, ' ').replace(/(?:%[0-9a-fA-F]{2})+/g, function (m) {
+              var b = new Uint8Array(m.length / 3); for (var i = 0; i < b.length; i++) b[i] = parseInt(m.substr(i * 3 + 1, 2), 16);
+              try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { latin = true; return new TextDecoder('windows-1252').decode(b); }
+            });
+          }, 'URL decoded');
+          if (latin) say('URL decoded. Some codes (such as %E9) were not valid UTF-8, so they were read as Latin-1 (Windows-1252).', 'ok');
+        } catch (e) { say('That text has a % sign that is not followed by two hexadecimal digits, so it cannot be decoded. A real % sign is written %25.', 'bad'); } break;
       case 'stats':
         var txt = cm.somethingSelected() ? cm.getSelection() : cm.getValue(), words = txt.trim() ? txt.trim().split(/\s+/).length : 0;
         say((cm.somethingSelected() ? 'Selection: ' : 'Document: ') + fmtNum(words) + ' words · ' + fmtNum(Array.from(txt).length) + ' characters · ' + fmtNum(Array.from(txt.replace(/\s/g, '')).length) + ' without spaces · ' + fmtNum(txt.split('\n').length) + ' lines.', 'ok'); break;

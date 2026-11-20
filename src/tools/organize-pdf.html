@@ -1,0 +1,318 @@
+<style>
+.op-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
+.op-bar .btn { min-height: 40px; padding: 6px 12px; font-size: 14px; }
+.op-bar .op-n { font-size: 14px; color: var(--muted); margin-inline-end: auto; }
+.op-grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(146px, 1fr)); gap: 12px; }
+.op-grid:empty { display: none; }
+.op-t { position: relative; background: var(--bg); border: 2px solid var(--line); border-radius: 12px; padding: 6px; user-select: none; -webkit-user-select: none; cursor: grab; outline: none; }
+.op-t:focus-visible { border-color: var(--accent); }
+.op-t.sel { border-color: var(--accent); background: var(--accent-soft); }
+.op-t.drag { opacity: .35; }
+.op-t.before::before, .op-t.after::after { content: ''; position: absolute; top: 4px; bottom: 4px; width: 4px; border-radius: 4px; background: var(--accent); }
+.op-t.before::before { inset-inline-start: -10px; } .op-t.after::after { inset-inline-end: -10px; }
+.op-f { position: relative; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+.op-f canvas { max-width: 100%; max-height: 100%; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); transition: transform .2s; }
+.op-f .op-ph { width: 70%; aspect-ratio: .707; background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.25); display: flex; align-items: center; justify-content: center; color: #888; font-size: 12px; transition: transform .2s; }
+.op-grip { position: absolute; top: 0; inset-inline-start: 0; width: 36px; height: 36px; border: 0; border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 18px; line-height: 1; cursor: grab; touch-action: none; z-index: 1; opacity: .9; }
+.op-chk { display: flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; margin: 6px 2px 2px; cursor: pointer; overflow: hidden; }
+.op-chk small { font-weight: 400; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.op-a { display: flex; gap: 4px; justify-content: space-between; }
+.op-a button { flex: 1; min-width: 0; height: 34px; font: inherit; font-size: 15px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; padding: 0; }
+.op-a button:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.op-a button[disabled] { opacity: .35; cursor: default; }
+.op-ghost { position: fixed; z-index: 1000; pointer-events: none; width: 110px; opacity: .9; transform: translate(-50%, -50%) rotate(3deg); background: var(--surface); border: 2px solid var(--accent); border-radius: 10px; padding: 4px; box-shadow: 0 8px 24px rgba(0,0,0,.25); }
+.op-ghost canvas { width: 100%; display: block; }
+.op-ghost b { position: absolute; top: -10px; inset-inline-end: -10px; background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 2px 8px; font-size: 13px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop PDF files here</b>Add one or more PDFs. Pages are arranged on your device and never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" multiple hidden data-nomemo>
+<div id="work" hidden>
+  <div class="op-bar">
+    <span class="op-n" id="count" aria-live="polite"></span>
+    <button class="btn ghost" id="undo" disabled>↶ Undo</button>
+    <button class="btn ghost" id="selAll">Select all</button>
+  </div>
+  <div class="op-bar">
+    <button class="btn ghost" id="rotL" disabled aria-label="Rotate selected pages left">⟲ Rotate left</button>
+    <button class="btn ghost" id="rotR" disabled aria-label="Rotate selected pages right">⟳ Rotate right</button>
+    <button class="btn ghost" id="del" disabled>✕ Delete</button>
+    <button class="btn ghost" id="blank">+ Blank page</button>
+    <button class="btn ghost" id="clear">Start over</button>
+  </div>
+  <ul class="op-grid" id="grid" aria-label="Pages in their new order"></ul>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Save PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  // srcs: one entry per loaded file. pages: the current order, each {id, s (source index or -1 for blank), i (page index), r (extra rotation), w, h (blank size)}
+  var srcs = [], pages = [], hist = [], sel = {}, tiles = {}, nextId = 1, grid = $('grid'), loading = 0;
+  var A4 = [595.28, 841.89];
+
+  function snap() { hist.push(pages.map(function (p) { return Object.assign({}, p); })); if (hist.length > 60) hist.shift(); }
+  function changed() { $('dl').hidden = true; }
+
+  // ---------- lazy thumbnails: only pages near the screen are drawn, two at a time ----------
+  var queue = [], active = 0;
+  var io = 'IntersectionObserver' in window ? new IntersectionObserver(function (ents) {
+    ents.forEach(function (e) { if (e.isIntersecting) { io.unobserve(e.target); want(e.target._p); } });
+  }, { rootMargin: '400px 0px' }) : null;
+  function want(p) { var t = tiles[p.id]; if (!t || t.drawn || p.s < 0) return; t.drawn = true; queue.push(p); pump(); }
+  function draw(p) {
+    return srcs[p.s].js.getPage(p.i + 1).then(function (pg) {
+      var v1 = pg.getViewport({ scale: 1 }), sc = Math.min(2, 280 / Math.max(v1.width, v1.height)), vp = pg.getViewport({ scale: sc });
+      var c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      return pg.render({ canvasContext: c.getContext('2d'), viewport: vp }).promise.then(function () {
+        pg.cleanup();
+        var t = tiles[p.id]; if (!t) return;
+        c.style.transform = t.face.style.transform;
+        t.face.replaceWith(c); t.face = c;
+      });
+    });
+  }
+  function pump() {
+    while (active < 2 && queue.length) {
+      var p = queue.shift();
+      if (!tiles[p.id] || !srcs[p.s]) continue;
+      active++;
+      draw(p).catch(function () {}).then(function () { active--; pump(); });
+    }
+  }
+
+  // ---------- one tile per page; tiles are kept and re-ordered so their drawings survive ----------
+  function btn(txt, label, fn) { var b = document.createElement('button'); b.type = 'button'; b.textContent = txt; b.setAttribute('aria-label', label); b.addEventListener('click', function (e) { e.stopPropagation(); fn(); }); return b; }
+  function makeTile(p) {
+    var li = document.createElement('li'); li.className = 'op-t'; li.tabIndex = 0; li._p = p;
+    var f = document.createElement('div'); f.className = 'op-f';
+    var ph = document.createElement('div'); ph.className = 'op-ph'; ph.textContent = p.s < 0 ? 'Blank page' : 'Loading…';
+    if (p.s < 0) ph.style.aspectRatio = p.w / p.h;
+    f.appendChild(ph);
+    var grip = document.createElement('button'); grip.type = 'button'; grip.className = 'op-grip'; grip.textContent = '⠿'; grip.setAttribute('aria-label', 'Drag to move'); grip.tabIndex = -1;
+    f.appendChild(grip);
+    var lab = document.createElement('label'); lab.className = 'op-chk';
+    var cb = document.createElement('input'); cb.type = 'checkbox'; cb.setAttribute('data-nomemo', '');
+    var num = document.createElement('span'), from = document.createElement('small');
+    lab.appendChild(cb); lab.appendChild(num); lab.appendChild(from);
+    cb.addEventListener('change', function () { if (cb.checked) sel[li._p.id] = 1; else delete sel[li._p.id]; paint(); });
+    lab.addEventListener('click', function (e) { e.stopPropagation(); });
+    var acts = document.createElement('div'); acts.className = 'op-a';
+    var left = btn('←', 'Move page left', function () { move(li._p.id, -1); });
+    var rot = btn('⟳', 'Rotate page right', function () { snap(); li._p.r = (li._p.r + 90) % 360; changed(); paint(); });
+    var del = btn('✕', 'Delete page', function () { snap(); remove([li._p.id]); });
+    var right = btn('→', 'Move page right', function () { move(li._p.id, 1); });
+    [left, rot, del, right].forEach(function (b) { acts.appendChild(b); });
+    li.appendChild(f); li.appendChild(lab); li.appendChild(acts);
+    li.addEventListener('click', function () { if (justDragged) return; cb.checked = !cb.checked; cb.dispatchEvent(new Event('change')); });
+    li.addEventListener('keydown', function (e) {
+      if (e.target !== li) return;
+      if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); li.click(); }
+      else if (e.key === 'ArrowLeft' && e.altKey) { e.preventDefault(); move(li._p.id, -1); li.focus(); }
+      else if (e.key === 'ArrowRight' && e.altKey) { e.preventDefault(); move(li._p.id, 1); li.focus(); }
+      else if (e.key === 'Delete') { e.preventDefault(); snap(); remove([li._p.id]); }
+    });
+    grip.addEventListener('pointerdown', function (e) { startDrag(e, li, true); });
+    li.addEventListener('pointerdown', function (e) { if (e.pointerType === 'mouse' && e.button === 0 && !e.target.closest('button,label')) startDrag(e, li, false); });
+    tiles[p.id] = { li: li, face: ph, cb: cb, num: num, from: from, left: left, right: right, drawn: false };
+    if (io) io.observe(li); else want(p);
+    return li;
+  }
+  function paint() {
+    var keep = {};
+    pages.forEach(function (p, k) {
+      keep[p.id] = 1;
+      var t = tiles[p.id];
+      if (!t) { makeTile(p); t = tiles[p.id]; }
+      t.li._p = p;
+      if (grid.children[k] !== t.li) grid.insertBefore(t.li, grid.children[k] || null);
+      t.num.textContent = k + 1;
+      t.from.textContent = p.s < 0 ? 'blank' : (srcs.length > 1 ? srcs[p.s].short + ' ' : 'p.') + (p.i + 1);
+      t.from.title = p.s < 0 ? 'Blank page' : srcs[p.s].name + ', page ' + (p.i + 1);
+      t.face.style.transform = 'rotate(' + p.r + 'deg)';
+      t.left.disabled = k === 0; t.right.disabled = k === pages.length - 1;
+      t.cb.checked = !!sel[p.id]; t.li.classList.toggle('sel', !!sel[p.id]);
+      t.li.setAttribute('aria-label', 'Page ' + (k + 1) + ' of ' + pages.length + (p.r ? ', rotated ' + p.r + ' degrees' : '') + (sel[p.id] ? ', selected' : ''));
+    });
+    Object.keys(tiles).forEach(function (id) { if (!keep[id]) { if (io) io.unobserve(tiles[id].li); tiles[id].li.remove(); delete tiles[id]; delete sel[id]; } });
+    var ns = Object.keys(sel).length;
+    $('work').hidden = !srcs.length;
+    $('count').textContent = pages.length + (pages.length === 1 ? ' page' : ' pages') + (ns ? ' · ' + ns + ' selected' : '');
+    $('rotL').disabled = $('rotR').disabled = $('del').disabled = !ns;
+    $('selAll').textContent = ns && ns === pages.length ? 'Select none' : 'Select all';
+    $('undo').disabled = !hist.length;
+    $('go').disabled = !pages.length || loading > 0;
+    if (!pages.length && srcs.length) PT.say('', 'All pages are deleted. Press Undo, add a PDF, or insert a blank page.');
+  }
+  function move(id, d) {
+    var k = pages.findIndex(function (p) { return p.id === id; }), j = k + d;
+    if (k < 0 || j < 0 || j >= pages.length) return;
+    snap(); pages.splice(j, 0, pages.splice(k, 1)[0]); changed(); paint();
+    var t = tiles[id]; if (t) { (d < 0 ? t.left : t.right).disabled ? t.li.focus() : (d < 0 ? t.left : t.right).focus(); }
+    PT.say('', 'Moved to position ' + (j + 1) + '.');
+  }
+  function remove(ids) {
+    var kill = {}; ids.forEach(function (id) { kill[id] = 1; });
+    pages = pages.filter(function (p) { return !kill[p.id]; });
+    changed(); paint();
+    if (pages.length) PT.say('', 'Deleted ' + ids.length + (ids.length === 1 ? ' page.' : ' pages.') + ' Press Undo to bring ' + (ids.length === 1 ? 'it' : 'them') + ' back.');
+  }
+
+  // ---------- drag and drop with pointer events (mouse anywhere on a tile, touch and pen on the ⠿ handle) ----------
+  var drag = null, justDragged = false;
+  function startDrag(e, li, now) {
+    if (drag) return;
+    drag = { id: li._p.id, li: li, x: e.clientX, y: e.clientY, on: false, pid: e.pointerId, at: -1 };
+    if (now) { e.preventDefault(); begin(e); }
+    window.addEventListener('pointermove', onMove, { passive: false });
+    window.addEventListener('pointerup', onUp); window.addEventListener('pointercancel', onCancel);
+  }
+  function begin(e) {
+    drag.on = true;
+    var group = sel[drag.id] && Object.keys(sel).length > 1 ? pages.filter(function (p) { return sel[p.id]; }).map(function (p) { return p.id; }) : [drag.id];
+    drag.group = group;
+    group.forEach(function (id) { tiles[id].li.classList.add('drag'); });
+    var g = document.createElement('div'); g.className = 'op-ghost';
+    var face = tiles[drag.id].face;
+    if (face.tagName === 'CANVAS') { var c = document.createElement('canvas'); c.width = face.width; c.height = face.height; c.getContext('2d').drawImage(face, 0, 0); g.appendChild(c); }
+    else { g.textContent = 'Page'; }
+    if (group.length > 1) { var b = document.createElement('b'); b.textContent = group.length; g.appendChild(b); }
+    document.body.appendChild(g); drag.ghost = g;
+    place(e);
+  }
+  function place(e) {
+    drag.ghost.style.left = e.clientX + 'px'; drag.ghost.style.top = e.clientY + 'px';
+    var x = e.clientX, y = e.clientY, at = pages.length, kids = grid.children;
+    for (var k = 0; k < kids.length; k++) {
+      var r = kids[k].getBoundingClientRect();
+      if (y < r.top || (y <= r.bottom && x < r.left + r.width / 2)) { at = k; break; }
+    }
+    if (at === drag.at) return;
+    drag.at = at;
+    Array.prototype.forEach.call(kids, function (el) { el.classList.remove('before', 'after'); });
+    if (at < kids.length) kids[at].classList.add('before'); else if (kids.length) kids[kids.length - 1].classList.add('after');
+  }
+  var scrollTimer = null, lastEv = null;
+  function edgeScroll() {
+    if (!drag || !drag.on || !lastEv) { scrollTimer = null; return; }
+    var y = lastEv.clientY, h = window.innerHeight, d = y < 60 ? -12 : y > h - 60 ? 12 : 0;
+    if (d) { window.scrollBy(0, d); place(lastEv); }
+    scrollTimer = requestAnimationFrame(edgeScroll);
+  }
+  function onMove(e) {
+    if (!drag || e.pointerId !== drag.pid) return;
+    if (!drag.on) { if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < 8) return; begin(e); }
+    e.preventDefault(); lastEv = e; place(e);
+    if (!scrollTimer) scrollTimer = requestAnimationFrame(edgeScroll);
+  }
+  function finish(drop) {
+    window.removeEventListener('pointermove', onMove); window.removeEventListener('pointerup', onUp); window.removeEventListener('pointercancel', onCancel);
+    if (!drag) return;
+    var d = drag; drag = null;
+    if (!d.on) return;
+    justDragged = true; setTimeout(function () { justDragged = false; }, 50);
+    d.ghost.remove();
+    Array.prototype.forEach.call(grid.children, function (el) { el.classList.remove('before', 'after', 'drag'); });
+    if (!drop || d.at < 0) return;
+    var inG = {}; d.group.forEach(function (id) { inG[id] = 1; });
+    var before = pages.slice(0, d.at).filter(function (p) { return !inG[p.id]; }).length;
+    var moving = pages.filter(function (p) { return inG[p.id]; }), rest = pages.filter(function (p) { return !inG[p.id]; });
+    var next = rest.slice(0, before).concat(moving, rest.slice(before));
+    if (next.every(function (p, k) { return p === pages[k]; })) return;
+    snap(); pages = next; changed(); paint();
+    PT.say('', 'Moved ' + (moving.length === 1 ? 'the page' : moving.length + ' pages') + ' to position ' + (before + 1) + '.');
+  }
+  function onUp(e) { if (drag && e.pointerId === drag.pid) finish(true); }
+  function onCancel(e) { if (drag && e.pointerId === drag.pid) finish(false); }
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && drag) finish(false);
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z' && srcs.length && !/^(INPUT|TEXTAREA|SELECT)$/.test((document.activeElement || {}).tagName || '') ) { if (hist.length) { e.preventDefault(); $('undo').click(); } }
+  });
+
+  // ---------- loading files ----------
+  PT.drop(true, async function (list) {
+    var bad = list.filter(function (f) { return !PT.isPdf(f); }), good = list.filter(PT.isPdf), errs = [];
+    if (!good.length) { PT.say('bad', bad.length ? 'Please choose PDF files. ' + (bad.length === 1 ? '"' + bad[0].name + '" is not a PDF.' : bad.length + ' files were not PDFs.') : ''); return; }
+    loading++; paint(); PT.say('', 'Opening ' + (good.length === 1 ? good[0].name : good.length + ' files') + '…');
+    var added = 0, first = true;
+    for (var f of good) {
+      try {
+        var lib = await PT.open(f), js = await PT.render(f);
+        var s = srcs.length;
+        srcs.push({ name: f.name, short: PT.base(f.name).slice(0, 10) + (PT.base(f.name).length > 10 ? '…' : '') + ' p.', lib: lib, js: js, n: js.numPages });
+        if (first) { snap(); first = false; }
+        for (var i = 0; i < js.numPages; i++) pages.push({ id: nextId++, s: s, i: i, r: 0 });
+        added += js.numPages;
+      } catch (e) { errs.push(e.message); }
+    }
+    loading--; changed(); paint();
+    var note = [];
+    if (added) note.push('Added ' + added + (added === 1 ? ' page' : ' pages') + '. Drag pages, or use the arrows, to change the order.');
+    if (bad.length) note.push('Skipped ' + bad.length + ' file(s) that are not PDFs.');
+    PT.say(errs.length || bad.length ? 'bad' : '', note.concat(errs).join(' '));
+  });
+
+  // ---------- toolbar ----------
+  function selected() { return pages.filter(function (p) { return sel[p.id]; }); }
+  function rotateSel(d) { var s = selected(); if (!s.length) return; snap(); s.forEach(function (p) { p.r = (p.r + d + 360) % 360; }); changed(); paint(); PT.say('', 'Rotated ' + s.length + (s.length === 1 ? ' page.' : ' pages.')); }
+  $('rotL').addEventListener('click', function () { rotateSel(-90); });
+  $('rotR').addEventListener('click', function () { rotateSel(90); });
+  $('del').addEventListener('click', function () { var s = selected(); if (!s.length) return; snap(); remove(s.map(function (p) { return p.id; })); });
+  $('selAll').addEventListener('click', function () {
+    var all = Object.keys(sel).length !== pages.length || !pages.length; sel = {};
+    if (all) pages.forEach(function (p) { sel[p.id] = 1; });
+    paint();
+  });
+  $('undo').addEventListener('click', function () {
+    if (!hist.length) return;
+    // pages from the snapshot are new objects, so tiles are matched by id
+    pages = hist.pop(); changed(); paint(); PT.say('', 'Undone.');
+  });
+  $('blank').addEventListener('click', async function () {
+    // a blank page goes after the last selected page (or at the end) and copies the size of the page before it
+    var s = selected(), at = s.length ? pages.indexOf(s[s.length - 1]) + 1 : pages.length, ref = pages[at - 1], w = A4[0], h = A4[1];
+    if (ref) {
+      if (ref.s < 0) { w = ref.w; h = ref.h; }
+      else { try { var pg = await srcs[ref.s].js.getPage(ref.i + 1), v = pg.getViewport({ scale: 1 }); w = v.width; h = v.height; } catch (e) {} }
+      if (ref.r % 180) { var t = w; w = h; h = t; }
+    }
+    snap(); pages.splice(at, 0, { id: nextId++, s: -1, i: 0, r: 0, w: w, h: h }); changed(); paint();
+    PT.say('', 'Inserted a blank page at position ' + (at + 1) + '.');
+  });
+  $('clear').addEventListener('click', function () {
+    srcs.forEach(function (s) { try { s.js.destroy(); } catch (e) {} });
+    srcs = []; pages = []; hist = []; sel = {}; queue = []; changed(); paint(); PT.say('', '');
+  });
+
+  // ---------- save: copy every page with its content, then apply the rotation ----------
+  $('go').addEventListener('click', function () {
+    if (!pages.length) return;
+    PT.run(async function () {
+      var out = await PDFLib.PDFDocument.create(), copies = {};
+      for (var s = 0; s < srcs.length; s++) {
+        var idx = []; pages.forEach(function (p) { if (p.s === s && idx.indexOf(p.i) < 0) idx.push(p.i); });
+        if (!idx.length) continue;
+        var got = await out.copyPages(srcs[s].lib, idx);
+        idx.forEach(function (i, k) { copies[s + ':' + i] = got[k]; });
+      }
+      var used = {};
+      for (var p of pages) {
+        var page;
+        if (p.s < 0) page = out.addPage([p.w, p.h]);
+        else {
+          var key = p.s + ':' + p.i;
+          // the same page placed twice needs its own copy
+          page = used[key] ? (await out.copyPages(srcs[p.s].lib, [p.i]))[0] : copies[key];
+          used[key] = 1; out.addPage(page);
+        }
+        var base = page.getRotation().angle || 0;
+        page.setRotation(PDFLib.degrees((((base + p.r) % 360) + 360) % 360));
+      }
+      var name = (srcs.length ? PT.base(srcs[0].name) : 'document') + '-organized.pdf';
+      PT.done(await out.save(), name, 'application/pdf', 'Saved ' + pages.length + (pages.length === 1 ? ' page' : ' pages'));
+    });
+  });
+  paint();
+})();
+</script>
