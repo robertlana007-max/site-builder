@@ -38,5 +38,5 @@ Or connect this repository branch under Add theme → Connect from GitHub.
 
 ## Fonts
 
-Fredoka and Plus Jakarta Sans are bundled in `assets/` under the SIL Open Font
+Unbounded and Space Grotesk are bundled in `assets/` under the SIL Open Font
 License 1.1.
