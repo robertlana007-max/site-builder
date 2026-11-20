@@ -6,9 +6,13 @@
     assign sub_title = title_parts.last
   endif
   assign wa = settings.whatsapp_number | remove: '+' | remove: ' '
+  capture tone
+    render 'product-tone', handle: product.handle
+  endcapture
+  assign tone = tone | strip
 -%}
 <div class="g-container">
-  <div class="g-product">
+  <div class="g-product g-tone-{{ tone }}">
     <div
       class="g-gallery{% if product.images.size < 2 %} g-gallery--single{% endif %}"
       data-g-gallery
@@ -34,26 +38,34 @@
         </div>
       {%- endif -%}
 
-      <div class="g-gallery__stage">
-        {%- for image in product.images -%}
-          <div class="g-gallery__slide{% if forloop.first %} is-active{% endif %}" data-g-slide>
-            <img
-              src="{{ image | image_url: width: 1200 }}"
-              srcset="{{ image | image_url: width: 600 }} 600w, {{ image | image_url: width: 900 }} 900w, {{ image | image_url: width: 1200 }} 1200w, {{ image | image_url: width: 1800 }} 1800w"
-              sizes="(min-width: 900px) 48vw, 100vw"
-              alt="{{ image.alt | default: product.title | escape }}"
-              width="{{ image.width }}"
-              height="{{ image.height }}"
-              {% if forloop.first %}
-                fetchpriority="high"
-              {% else %}
-                loading="lazy"
-              {% endif %}
-            >
+      <div class="g-gallery__wrap">
+        {%- if product.compare_at_price > product.price -%}
+          <div class="g-gallery__burst" aria-hidden="true">
+            {% render 'icon', name: 'burst' %}
+            <span>Save<b>{{ product.compare_at_price | minus: product.price | money_without_trailing_zeros }}</b></span>
           </div>
-        {%- else -%}
-          <div class="g-gallery__slide is-active">{{ 'product-1' | placeholder_svg_tag }}</div>
-        {%- endfor -%}
+        {%- endif -%}
+        <div class="g-gallery__stage">
+          {%- for image in product.images -%}
+            <div class="g-gallery__slide{% if forloop.first %} is-active{% endif %}" data-g-slide>
+              <img
+                src="{{ image | image_url: width: 1200 }}"
+                srcset="{{ image | image_url: width: 600 }} 600w, {{ image | image_url: width: 900 }} 900w, {{ image | image_url: width: 1200 }} 1200w, {{ image | image_url: width: 1800 }} 1800w"
+                sizes="(min-width: 900px) 48vw, 100vw"
+                alt="{{ image.alt | default: product.title | escape }}"
+                width="{{ image.width }}"
+                height="{{ image.height }}"
+                {% if forloop.first %}
+                  fetchpriority="high"
+                {% else %}
+                  loading="lazy"
+                {% endif %}
+              >
+            </div>
+          {%- else -%}
+            <div class="g-gallery__slide is-active">{{ 'product-1' | placeholder_svg_tag }}</div>
+          {%- endfor -%}
+        </div>
       </div>
     </div>
 
@@ -64,7 +76,6 @@
         <li aria-current="page">{{ title_parts.first | escape }}</li>
       </ol>
 
-      <p class="g-eyebrow">{{ product.vendor | escape }}</p>
       <h1 class="g-pinfo__title">{{ title_parts.first | escape }}</h1>
       {%- if sub_title != blank -%}
         <p class="g-pinfo__sub">{{ sub_title | escape }}</p>
@@ -136,7 +147,7 @@
         <div class="g-pform__buy">
           <button
             type="submit"
-            class="g-btn g-btn--block"
+            class="g-btn g-btn--block g-wiggle"
             data-g-buy-now
             {% unless product.available %}
               disabled
@@ -147,6 +158,13 @@
           </button>
         </div>
       {%- endform -%}
+
+      {%- if section.settings.mascot_text != blank -%}
+        <div class="g-buddy g-pinfo__buddy">
+          {% render 'mascot', tone: tone %}
+          <p class="g-say" style="margin:0">{{ section.settings.mascot_text | escape }}</p>
+        </div>
+      {%- endif -%}
 
       {%- if section.blocks.size > 0 -%}
         <ul class="g-assure">
@@ -236,6 +254,12 @@
       "id": "buy_label",
       "label": "Buy button label",
       "default": "Order now with Cash on Delivery"
+    },
+    {
+      "type": "text",
+      "id": "mascot_text",
+      "label": "What the mascot says",
+      "default": "Psst... free delivery, and you pay at your door!"
     },
     {
       "type": "checkbox",

@@ -38,5 +38,5 @@ Or connect this repository branch under Add theme → Connect from GitHub.
 
 ## Fonts
 
-Fraunces and Plus Jakarta Sans are bundled in `assets/` under the SIL Open Font
+Fredoka and Plus Jakarta Sans are bundled in `assets/` under the SIL Open Font
 License 1.1.

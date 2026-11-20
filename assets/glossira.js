@@ -134,8 +134,14 @@
 
   function setCount(count) {
     $$('[data-g-cart-count]').forEach(function (el) {
+      var changed = el.textContent.trim() !== String(count);
       el.textContent = count;
       el.hidden = count < 1;
+      if (changed && count > 0) {
+        el.classList.remove('is-pop');
+        void el.offsetWidth;
+        el.classList.add('is-pop');
+      }
     });
   }
 
@@ -218,6 +224,7 @@
     var buyNow = btn && btn.hasAttribute('data-g-buy-now');
     if (btn) btn.classList.add('is-loading');
     trackAdd();
+    confetti(btn || form);
 
     var chain = buyNow
       ? post(routes.cart + '/clear', {}).then(function () {
@@ -231,6 +238,7 @@
           window.location.href = checkoutUrl;
           return;
         }
+        toast('Yay! Added to your cart');
         return refreshCart().then(function () {
           showDrawer('cart');
         });
@@ -328,6 +336,113 @@
       },
       true
     );
+  }
+
+  /* ---------- confetti burst ---------- */
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var HEART = '<svg viewBox="0 0 24 24"><path d="M12 20.5s-7.5-4.6-7.5-10A4.3 4.3 0 0 1 12 8a4.3 4.3 0 0 1 7.5 2.5c0 5.4-7.5 10-7.5 10z" fill="currentColor"/></svg>';
+  var STAR = '<svg viewBox="0 0 24 24"><path d="M12 2l2.4 6.9 7.1.6-5.6 4.3 2 7-5.9-4.1-5.9 4.1 2-7-5.6-4.3 7.1-.6z" fill="currentColor"/></svg>';
+  var COLORS = ['#d4537e', '#ffdd55', '#c4efd0', '#e0d2fb', '#ff9dbb', '#ffffff'];
+
+  function confetti(origin) {
+    if (reduceMotion || !origin || !origin.getBoundingClientRect || !doc.body.animate) return;
+    var rect = origin.getBoundingClientRect();
+    var x = rect.left + rect.width / 2;
+    var y = rect.top + rect.height / 2;
+    for (var i = 0; i < 18; i++) {
+      (function (index) {
+        var bit = doc.createElement('span');
+        bit.className = 'g-confetti';
+        bit.innerHTML = index % 2 ? HEART : STAR;
+        bit.style.left = x + 'px';
+        bit.style.top = y + 'px';
+        bit.style.color = COLORS[index % COLORS.length];
+        var size = 14 + Math.random() * 16;
+        bit.style.width = bit.style.height = size + 'px';
+        doc.body.appendChild(bit);
+        var angle = (Math.PI * 2 * index) / 18 + Math.random() * 0.5;
+        var distance = 70 + Math.random() * 110;
+        var dx = Math.cos(angle) * distance;
+        var dy = Math.sin(angle) * distance - 60;
+        var spin = (Math.random() - 0.5) * 540;
+        bit
+          .animate(
+            [
+              { transform: 'translate(0, 0) scale(0.2) rotate(0deg)', opacity: 1 },
+              { transform: 'translate(' + dx + 'px,' + dy + 'px) scale(1) rotate(' + spin / 2 + 'deg)', opacity: 1, offset: 0.6 },
+              { transform: 'translate(' + dx * 1.15 + 'px,' + (dy + 90) + 'px) scale(0.6) rotate(' + spin + 'deg)', opacity: 0 },
+            ],
+            { duration: 900 + Math.random() * 500, easing: 'cubic-bezier(0.2, 0.8, 0.3, 1)' }
+          )
+          .addEventListener('finish', function () {
+            if (bit.parentNode) bit.parentNode.removeChild(bit);
+          });
+      })(i);
+    }
+  }
+
+  /* ---------- skin mood picker ---------- */
+  $$('[data-g-mood]').forEach(function (root) {
+    var tabs = $$('[data-g-mood-tab]', root);
+    var panels = $$('[data-g-mood-panel]', root);
+    tabs.forEach(function (tab, index) {
+      tab.addEventListener('click', function () {
+        tabs.forEach(function (t, i) {
+          t.setAttribute('aria-selected', i === index ? 'true' : 'false');
+        });
+        panels.forEach(function (panel, i) {
+          panel.hidden = i !== index;
+          panel.classList.remove('is-in');
+          if (i === index) {
+            void panel.offsetWidth;
+            panel.classList.add('is-in');
+          }
+        });
+      });
+    });
+  });
+
+  /* ---------- ingredient bubbles ---------- */
+  $$('[data-g-ingr]').forEach(function (root) {
+    var items = $$('[data-g-ingr-item]', root);
+    var out = $('[data-g-ingr-out]', root);
+    items.forEach(function (item) {
+      item.addEventListener('click', function () {
+        items.forEach(function (other) {
+          other.setAttribute('aria-pressed', other === item ? 'true' : 'false');
+        });
+        if (!out) return;
+        out.textContent = item.getAttribute('data-text');
+        out.classList.remove('is-in');
+        void out.offsetWidth;
+        out.classList.add('is-in');
+      });
+    });
+  });
+
+  /* ---------- hero parallax (pointer devices only) ---------- */
+  var parallaxRoot = $('[data-g-parallax-root]');
+  if (parallaxRoot && !reduceMotion && window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+    var layers = $$('[data-g-depth]', parallaxRoot);
+    var frame = null;
+    parallaxRoot.addEventListener('pointermove', function (event) {
+      if (frame) return;
+      frame = requestAnimationFrame(function () {
+        frame = null;
+        var rect = parallaxRoot.getBoundingClientRect();
+        var px = (event.clientX - rect.left) / rect.width - 0.5;
+        var py = (event.clientY - rect.top) / rect.height - 0.5;
+        layers.forEach(function (layer) {
+          var depth = parseFloat(layer.getAttribute('data-g-depth')) || 0;
+          layer.style.translate = (-px * depth).toFixed(1) + 'px ' + (-py * depth).toFixed(1) + 'px';
+        });
+      });
+    });
+    parallaxRoot.addEventListener('pointerleave', function () {
+      layers.forEach(function (layer) {
+        layer.style.translate = '';
+      });
+    });
   }
 
   /* ---------- reveal on scroll ---------- */
