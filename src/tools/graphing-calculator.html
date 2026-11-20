@@ -273,9 +273,10 @@
         if (pen && i > 0) { var ex = edge(f, prevX, x), ey = f(ex); if (isFinite(ey)) c.lineTo(X(ex), Y(ey)); }
         pen = false;
       } else {
-        if (!pen && i > 0 && !isFinite(prevY)) { var sx2 = edge(f, x, prevX), sy2 = f(sx2); if (isFinite(sy2)) { c.moveTo(X(sx2), Y(sy2)); pen = true; } }
+        var fromEdge = false;
+        if (!pen && i > 0 && !isFinite(prevY)) { var sx2 = edge(f, x, prevX), sy2 = f(sx2); if (isFinite(sy2)) { c.moveTo(X(sx2), Y(sy2)); pen = true; fromEdge = true; } }
         var X1 = X(x), Y1 = Y(y);
-        if (pen && Math.abs(Y1 - py) > 6 && jumps(f, prevX, prevY, x, y, ky)) pen = false;
+        if (pen && !fromEdge && Math.abs(Y1 - py) > 6 && jumps(f, prevX, prevY, x, y, ky)) pen = false;
         if (pen) c.lineTo(X1, Y1); else c.moveTo(X1, Y1);
         pen = true; px = X1; py = Y1;
       }
@@ -435,18 +436,23 @@
     var n = 2000, out = [], xs = [], ys = [], span = b - a, ky = H / (view.y1 - view.y0), tol = 1e-9 * Math.max(1, view.y1 - view.y0);
     for (var i = 0; i <= n; i++) { xs.push(a + span * i / n); ys.push(g(xs[i])); }
     function add(x) { var y = g(x); if (!isFinite(y)) return; if (!out.some(function (r) { return Math.abs(r - x) < span * 1e-7; })) out.push(x); }
+    function cross(lo, flo, hi, fhi) {
+      for (var k = 0; k < 80; k++) { var m = (lo + hi) / 2, fm = g(m); if (!isFinite(fm)) return; if ((fm < 0) === (flo < 0)) { lo = m; flo = fm; } else hi = m; }
+      var r = (lo + hi) / 2, gr = g(r);
+      // a pole like tan(x) at pi/2 changes sign too, but the value there is huge, not zero
+      if (isFinite(gr) && Math.abs(gr) < 1e-6 * Math.max(1, Math.abs(flo), Math.abs(fhi))) add(r);
+    }
     for (i = 0; i <= n; i++) {
       var y = ys[i];
       if (!isFinite(y)) continue;
       if (y === 0) { add(xs[i]); continue; }
-      if (i < n && isFinite(ys[i + 1]) && ys[i + 1] !== 0 && (y < 0) !== (ys[i + 1] < 0)) { // a sign change: bisect it
-        var lo = xs[i], hi = xs[i + 1], flo = y;
-        for (var k = 0; k < 80; k++) { var m = (lo + hi) / 2, fm = g(m); if (!isFinite(fm)) break; if ((fm < 0) === (flo < 0)) { lo = m; flo = fm; } else hi = m; }
-        var r = (lo + hi) / 2;
-        if (isFinite(g(r)) && Math.abs(g(r)) < 1e-6 * Math.max(1, Math.abs(ys[i]), Math.abs(ys[i + 1]))) add(r); // a pole like tan(x) at pi/2 changes sign too, but its value there is huge, not zero
+      if (i < n && isFinite(ys[i + 1]) && Math.abs(ys[i + 1] - y) > view.y1 - view.y0) { // a steep stretch or a pole: look closer
+        for (var j = 0, sa = xs[i], sya = y; j < 200; j++) { var sb = xs[i] + (xs[i + 1] - xs[i]) * (j + 1) / 200, syb = g(sb); if (isFinite(sya) && isFinite(syb) && syb !== 0 && (sya < 0) !== (syb < 0)) cross(sa, sya, sb, syb); else if (syb === 0) add(sb); sa = sb; sya = syb; }
+      } else if (i < n && isFinite(ys[i + 1]) && ys[i + 1] !== 0 && (y < 0) !== (ys[i + 1] < 0)) { // a sign change: bisect it
+        cross(xs[i], y, xs[i + 1], ys[i + 1]);
       } else if (i > 0 && i < n && isFinite(ys[i - 1]) && isFinite(ys[i + 1]) && Math.abs(y) <= Math.abs(ys[i - 1]) && Math.abs(y) < Math.abs(ys[i + 1]) && Math.abs(y) < (view.y1 - view.y0) * 0.02) {
         // the curve touches zero without crossing (like x^2): minimise |g| nearby
-        var l = xs[i - 1], h2 = xs[i + 1], gr = (Math.sqrt(5) - 1) / 2;
+        var l = xs[i - 1], h2 = xs[i + 1], gr = (Math.sqrt(5) - 1) / 2, k;
         for (k = 0; k < 90; k++) { var c1 = h2 - gr * (h2 - l), c2 = l + gr * (h2 - l); if (Math.abs(g(c1)) < Math.abs(g(c2))) h2 = c2; else l = c1; }
         var t = (l + h2) / 2; if (Math.abs(g(t)) < tol) add(t);
       }

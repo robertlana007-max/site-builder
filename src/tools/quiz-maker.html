@@ -1,0 +1,588 @@
+<style>
+.qzm .qzm-tabs { margin-bottom: 16px; display: flex; flex-wrap: wrap; }
+.qzm .qzm-q { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 0 0 14px; background: var(--surface); }
+.qzm .qzm-q.err { border-color: var(--bad); }
+.qzm .qzm-qhead { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 8px; }
+.qzm .qzm-qhead b { flex: 1 1 auto; }
+.qzm .qzm-qhead select { width: auto; min-height: 38px; padding: 4px 8px; }
+.qzm .qzm-mini { min-width: 38px; height: 38px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; cursor: pointer; font: inherit; font-size: 14px; padding: 0 8px; }
+.qzm .qzm-mini:hover { border-color: var(--accent); color: var(--accent); }
+.qzm .qzm-mini.del:hover { border-color: var(--bad); color: var(--bad); }
+.qzm .qzm-mini[disabled] { opacity: .4; cursor: default; }
+.qzm .qzm-opt { display: grid; grid-template-columns: auto minmax(0, 1fr) 38px; gap: 8px; align-items: center; margin-bottom: 6px; }
+.qzm .qzm-opt label { margin: 0; font-weight: 400; font-size: 13px; color: var(--muted); display: flex; align-items: center; white-space: nowrap; }
+.qzm .qzm-q textarea { min-height: 64px; font-family: inherit; font-size: 15px; }
+.qzm .qzm-sub { font-size: 13px; color: var(--muted); font-weight: 600; margin: 10px 0 4px; display: block; }
+.qzm .qzm-tf { display: flex; gap: 18px; }
+.qzm .qzm-tf label { font-weight: 400; margin: 0; }
+.qzm .qzm-list { display: grid; gap: 10px; }
+.qzm .qzm-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; background: var(--bg); }
+.qzm .qzm-item div { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.qzm .qzm-item small { color: var(--muted); display: block; }
+.qzm .qzm-bar { position: sticky; top: 0; z-index: 2; display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 8px 12px; margin: 0 0 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); font-weight: 600; font-variant-numeric: tabular-nums; }
+.qzm .qzm-bar.low { border-color: var(--bad); color: var(--bad); }
+.qzm .qzm-take { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; margin: 0 0 12px; background: var(--surface); }
+.qzm .qzm-take p.qt { margin: 0 0 10px; font-weight: 600; white-space: pre-wrap; overflow-wrap: anywhere; }
+.qzm .qzm-take label.ch { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; margin: 0 0 6px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; cursor: pointer; overflow-wrap: anywhere; }
+.qzm .qzm-take label.ch input { margin: 2px 0 0; flex: none; }
+.qzm .qzm-take label.ch:hover { border-color: var(--accent); }
+.qzm .qzm-take.ok { border-color: var(--ok); } .qzm .qzm-take.no { border-color: var(--bad); }
+.qzm .qzm-take .rv { margin-top: 8px; font-size: 14.5px; overflow-wrap: anywhere; }
+.qzm .qzm-take .rv .good { color: var(--ok); font-weight: 600; } .qzm .qzm-take .rv .bad { color: var(--bad); font-weight: 600; }
+.qzm .qzm-take .ex { margin-top: 6px; padding: 8px 10px; border-radius: 10px; background: var(--bg); font-size: 14.5px; white-space: pre-wrap; }
+.qzm .qzm-score { border: 2px solid var(--accent); border-radius: 14px; padding: 14px 16px; margin: 0 0 14px; background: var(--surface); }
+.qzm .qzm-score h3 { margin: 0 0 4px; }
+.qzm .qzm-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }
+#qzmPrint { display: none; }
+@media print {
+  @page { margin: 14mm; }
+  body > *:not(#qzmPrint) { display: none !important; }
+  html, body { background: #fff !important; color: #000 !important; margin: 0 !important; padding: 0 !important; }
+  #qzmPrint { display: block !important; font: 11.5pt/1.45 Georgia, 'Times New Roman', serif; color: #000; }
+  #qzmPrint h1 { font-size: 18pt; margin: 0 0 4pt; }
+  #qzmPrint .meta { display: flex; gap: 24pt; margin: 8pt 0 14pt; }
+  #qzmPrint ol.qs > li { margin: 0 0 12pt; break-inside: avoid; }
+  #qzmPrint ol.opts { list-style: upper-alpha; margin: 4pt 0 0; }
+  #qzmPrint .line { border-bottom: 1px solid #000; height: 20pt; width: 70%; }
+  #qzmPrint .key { break-before: page; }
+  #qzmPrint .key li { margin: 0 0 4pt; }
+}
+</style>
+<div class="qzm" id="qzm">
+<div class="seg qzm-tabs" role="group" aria-label="Mode">
+  <button type="button" data-tab="edit" aria-pressed="true">Create / edit</button>
+  <button type="button" data-tab="take" aria-pressed="false">Take quiz</button>
+  <button type="button" data-tab="saved" aria-pressed="false">My quizzes <span id="qzmCount"></span></button>
+</div>
+
+<div id="qzmEdit">
+  <div class="fields">
+    <div><label for="qzmTitle">Quiz title</label><input type="text" id="qzmTitle" data-nomemo maxlength="200" placeholder="e.g. Chapter 3: The water cycle"></div>
+    <div><label for="qzmTime">Time limit in minutes (0 = no limit)</label><input type="number" id="qzmTime" data-nomemo min="0" max="600" step="1" value="0"></div>
+  </div>
+  <label for="qzmDesc">Instructions for students (optional)</label>
+  <textarea id="qzmDesc" class="plain" data-nomemo style="min-height:60px" maxlength="2000" placeholder="e.g. Answer every question. Some multiple choice questions have more than one correct answer."></textarea>
+  <div class="checks" style="margin-top:12px">
+    <label><input type="checkbox" id="qzmShufQ" data-nomemo>Shuffle question order</label>
+    <label><input type="checkbox" id="qzmShufO" data-nomemo>Shuffle answer options</label>
+  </div>
+  <div id="qzmQs"></div>
+  <div class="btns" style="margin:0 0 6px">
+    <button type="button" class="btn ghost" data-add="mc">+ Multiple choice</button>
+    <button type="button" class="btn ghost" data-add="tf">+ True / false</button>
+    <button type="button" class="btn ghost" data-add="short">+ Short answer</button>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn" id="qzmSave">Save quiz</button>
+    <button type="button" class="btn" id="qzmTakeBtn">Take this quiz</button>
+    <button type="button" class="btn ghost" id="qzmShare">Copy share link</button>
+    <button type="button" class="btn ghost" id="qzmPrintBtn">Print paper test</button>
+  </div>
+  <div class="checks" style="margin:10px 0 0"><label><input type="checkbox" id="qzmKey" data-nomemo checked>Print the answer key on a separate page</label></div>
+  <div class="btns">
+    <button type="button" class="btn ghost" id="qzmExport">Export JSON</button>
+    <button type="button" class="btn ghost" id="qzmImportBtn">Import JSON</button>
+    <input type="file" id="qzmImport" data-nomemo accept=".json,application/json" hidden>
+    <button type="button" class="btn ghost" id="qzmSample">Load a sample quiz</button>
+    <button type="button" class="btn ghost danger" id="qzmNew">New empty quiz</button>
+  </div>
+  <p class="msg" id="qzmMsg" aria-live="polite"></p>
+  <label for="qzmLink" class="qzm-sr">Share link</label>
+  <input type="text" id="qzmLink" data-nomemo readonly hidden style="margin-top:8px">
+</div>
+
+<div id="qzmTake" hidden>
+  <div id="qzmIntro">
+    <h3 id="qzmTTitle" style="margin:0 0 6px"></h3>
+    <p id="qzmTDesc" style="white-space:pre-wrap;margin:0 0 8px"></p>
+    <p class="msg" id="qzmTInfo" style="margin:0 0 6px"></p>
+    <div class="btns"><button type="button" class="btn" id="qzmStart">Start quiz</button><button type="button" class="btn ghost" id="qzmCopyEdit" hidden>Edit a copy</button></div>
+  </div>
+  <div id="qzmRun" hidden>
+    <div class="qzm-bar" id="qzmBar"><span id="qzmProg">0 of 0 answered</span><span id="qzmClock" role="timer"></span></div>
+    <div id="qzmScore" class="qzm-score" hidden aria-live="polite"></div>
+    <div id="qzmItems"></div>
+    <div class="btns" id="qzmRunBtns"><button type="button" class="btn" id="qzmSubmit">Submit answers</button></div>
+    <div class="btns" id="qzmDoneBtns" hidden><button type="button" class="btn" id="qzmAgain">Try again</button><button type="button" class="btn ghost" id="qzmWrong">Retry wrong answers only</button><button type="button" class="btn ghost" id="qzmBack">Back to editor</button></div>
+  </div>
+  <p class="msg" id="qzmTMsg" aria-live="polite"></p>
+</div>
+
+<div id="qzmSaved" hidden>
+  <p class="msg" style="margin:0 0 10px">Quizzes are saved in this browser only. Export them as JSON to keep a backup or move them to another device.</p>
+  <div class="qzm-list" id="qzmList"></div>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-quizzes', DRAFT = 'gtn-quiz-draft', MAXQ = 200;
+  var TYPES = { mc: 'Multiple choice', tf: 'True / false', short: 'Short answer' };
+  function say(id, cls, t) { $(id).className = 'msg ' + (cls || ''); $(id).textContent = t || ''; }
+  function lsGet(k) { try { return JSON.parse(localStorage.getItem(k)); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+  function el(tag, attrs, text) { var e = document.createElement(tag); if (attrs) for (var k in attrs) { if (k === 'className') e.className = attrs[k]; else e.setAttribute(k, attrs[k]); } if (text != null) e.textContent = text; return e; }
+  function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+  function blankQ(type) {
+    if (type === 'tf') return { type: 'tf', text: '', answer: true, explanation: '' };
+    if (type === 'short') return { type: 'short', text: '', accepted: [''], explanation: '' };
+    return { type: 'mc', text: '', options: ['', '', '', ''], correct: [], explanation: '' };
+  }
+  function blankQuiz() { return { id: uid(), title: '', desc: '', time: 0, shuffleQ: false, shuffleO: false, questions: [blankQ('mc')] }; }
+
+  // ---------- clean anything that comes from a file, a link or storage ----------
+  function str(v, max) { return typeof v === 'string' ? v.slice(0, max || 2000) : (typeof v === 'number' ? String(v) : ''); }
+  function clean(o) {
+    if (!o || typeof o !== 'object' || !Array.isArray(o.questions)) throw new Error('This is not a quiz file. It needs a "questions" list.');
+    var q = { id: str(o.id, 40) || uid(), title: str(o.title, 200), desc: str(o.desc, 2000), time: Math.max(0, Math.min(600, Math.round(+o.time || 0))), shuffleQ: !!o.shuffleQ, shuffleO: !!o.shuffleO, questions: [] };
+    o.questions.slice(0, MAXQ).forEach(function (x) {
+      if (!x || typeof x !== 'object') return;
+      var t = x.type === 'tf' || x.type === 'short' ? x.type : 'mc', n = { type: t, text: str(x.text), explanation: str(x.explanation) };
+      if (t === 'tf') n.answer = x.answer === false || x.answer === 'false' ? false : true;
+      else if (t === 'short') { n.accepted = (Array.isArray(x.accepted) ? x.accepted : [x.accepted]).map(function (a) { return str(a, 300); }).slice(0, 30); if (!n.accepted.length) n.accepted = ['']; }
+      else {
+        n.options = (Array.isArray(x.options) ? x.options : []).map(function (a) { return str(a, 500); }).slice(0, 6);
+        while (n.options.length < 2) n.options.push('');
+        n.correct = (Array.isArray(x.correct) ? x.correct : [x.correct]).map(Number).filter(function (i, k, a) { return i >= 0 && i < n.options.length && Math.floor(i) === i && a.indexOf(i) === k; });
+      }
+      q.questions.push(n);
+    });
+    if (!q.questions.length) q.questions.push(blankQ('mc'));
+    return q;
+  }
+
+  var quiz = blankQuiz();
+  try { var d0 = lsGet(DRAFT); if (d0) quiz = clean(d0); } catch (e) {}
+  var draftT = 0;
+  function saveDraft() { clearTimeout(draftT); draftT = setTimeout(function () { lsSet(DRAFT, quiz); }, 300); }
+
+  // ---------- editor ----------
+  function fillHead() { $('qzmTitle').value = quiz.title; $('qzmDesc').value = quiz.desc; $('qzmTime').value = quiz.time; $('qzmShufQ').checked = quiz.shuffleQ; $('qzmShufO').checked = quiz.shuffleO; }
+  function render(focusSel) {
+    var box = $('qzmQs'); box.textContent = '';
+    quiz.questions.forEach(function (q, i) {
+      var c = el('div', { className: 'qzm-q', 'data-i': i });
+      var h = el('div', { className: 'qzm-qhead' });
+      h.appendChild(el('b', null, 'Question ' + (i + 1)));
+      var sel = el('select', { 'data-act': 'type', 'aria-label': 'Question ' + (i + 1) + ' type', 'data-nomemo': '' });
+      Object.keys(TYPES).forEach(function (k) { var o = el('option', { value: k }, TYPES[k]); if (k === q.type) o.selected = true; sel.appendChild(o); });
+      h.appendChild(sel);
+      [['up', '↑', 'Move up', i === 0], ['down', '↓', 'Move down', i === quiz.questions.length - 1], ['dup', 'Copy', 'Duplicate question'], ['del', '✕', 'Delete question']].forEach(function (b) {
+        var bt = el('button', { type: 'button', className: 'qzm-mini' + (b[0] === 'del' ? ' del' : ''), 'data-act': b[0], 'aria-label': b[2] + ' ' + (i + 1), title: b[2] }, b[1]);
+        if (b[3]) bt.disabled = true; h.appendChild(bt);
+      });
+      c.appendChild(h);
+      var qid = 'qzmT' + i;
+      c.appendChild(el('label', { for: qid, className: 'qzm-sub' }, 'Question text'));
+      var ta = el('textarea', { id: qid, 'data-f': 'text', 'data-nomemo': '', maxlength: '2000', placeholder: 'Type the question…' }); ta.value = q.text; c.appendChild(ta);
+      if (q.type === 'mc') {
+        c.appendChild(el('span', { className: 'qzm-sub' }, 'Options (tick every correct answer)'));
+        q.options.forEach(function (o, j) {
+          var r = el('div', { className: 'qzm-opt' });
+          var lb = el('label', { title: 'Correct answer' }); var cb = el('input', { type: 'checkbox', 'data-f': 'correct', 'data-j': j, 'data-nomemo': '', 'aria-label': 'Option ' + (j + 1) + ' is correct' });
+          cb.checked = q.correct.indexOf(j) !== -1; lb.appendChild(cb); lb.appendChild(document.createTextNode(String.fromCharCode(65 + j)));
+          var inp = el('input', { type: 'text', 'data-f': 'opt', 'data-j': j, 'data-nomemo': '', maxlength: '500', 'aria-label': 'Option ' + String.fromCharCode(65 + j), placeholder: 'Option ' + String.fromCharCode(65 + j) }); inp.value = o;
+          var rm = el('button', { type: 'button', className: 'qzm-mini del', 'data-act': 'rmopt', 'data-j': j, 'aria-label': 'Remove option ' + String.fromCharCode(65 + j), title: 'Remove option' }, '✕');
+          if (q.options.length <= 2) rm.disabled = true;
+          r.appendChild(lb); r.appendChild(inp); r.appendChild(rm); c.appendChild(r);
+        });
+        var ad = el('button', { type: 'button', className: 'qzm-mini', 'data-act': 'addopt' }, '+ Add option'); if (q.options.length >= 6) ad.disabled = true; c.appendChild(ad);
+      } else if (q.type === 'tf') {
+        c.appendChild(el('span', { className: 'qzm-sub' }, 'Correct answer'));
+        var tf = el('div', { className: 'qzm-tf' });
+        [true, false].forEach(function (v) { var lb = el('label'); var r = el('input', { type: 'radio', name: 'qzmTf' + i, 'data-f': 'tf', value: String(v), 'data-nomemo': '' }); r.checked = q.answer === v; lb.appendChild(r); lb.appendChild(document.createTextNode(' ' + (v ? 'True' : 'False'))); tf.appendChild(lb); });
+        c.appendChild(tf);
+      } else {
+        var aid = 'qzmA' + i;
+        c.appendChild(el('label', { for: aid, className: 'qzm-sub' }, 'Accepted answers, one per line (capitals, extra spaces and a final full stop are ignored)'));
+        var at = el('textarea', { id: aid, 'data-f': 'accepted', 'data-nomemo': '', maxlength: '3000', placeholder: 'e.g. evaporation' }); at.style.minHeight = '56px'; at.value = q.accepted.join('\n'); c.appendChild(at);
+      }
+      var eid = 'qzmE' + i;
+      c.appendChild(el('label', { for: eid, className: 'qzm-sub' }, 'Explanation shown after the quiz (optional)'));
+      var ex = el('textarea', { id: eid, 'data-f': 'explanation', 'data-nomemo': '', maxlength: '2000', placeholder: 'Why is this the answer?' }); ex.style.minHeight = '48px'; ex.value = q.explanation; c.appendChild(ex);
+      box.appendChild(c);
+    });
+    if (focusSel) { var f = box.querySelector(focusSel); if (f) f.focus(); }
+    countSaved();
+  }
+  function qIndex(e) { var c = e.target.closest('.qzm-q'); return c ? +c.getAttribute('data-i') : -1; }
+  $('qzmQs').addEventListener('input', function (e) {
+    var i = qIndex(e), q = quiz.questions[i], f = e.target.getAttribute('data-f'); if (!q || !f) return;
+    if (f === 'text' || f === 'explanation') q[f] = e.target.value;
+    else if (f === 'opt') q.options[+e.target.getAttribute('data-j')] = e.target.value;
+    else if (f === 'accepted') q.accepted = e.target.value.split('\n');
+    e.target.closest('.qzm-q').classList.remove('err');
+    saveDraft();
+  });
+  $('qzmQs').addEventListener('change', function (e) {
+    var i = qIndex(e), q = quiz.questions[i]; if (!q) return;
+    var f = e.target.getAttribute('data-f'), act = e.target.getAttribute('data-act');
+    if (f === 'correct') { var j = +e.target.getAttribute('data-j'), k = q.correct.indexOf(j); if (e.target.checked && k === -1) q.correct.push(j); if (!e.target.checked && k !== -1) q.correct.splice(k, 1); q.correct.sort(); }
+    else if (f === 'tf') q.answer = e.target.value === 'true';
+    else if (act === 'type') {
+      var n = blankQ(e.target.value); n.text = q.text; n.explanation = q.explanation;
+      if (n.type === 'short' && q.type === 'mc') { var ok = q.correct.map(function (j) { return q.options[j]; }).filter(Boolean); if (ok.length) n.accepted = ok; }
+      quiz.questions[i] = n; render('.qzm-q[data-i="' + i + '"] select');
+    }
+    saveDraft();
+  });
+  $('qzmQs').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b || b.disabled) return;
+    var i = qIndex(e), q = quiz.questions[i], act = b.getAttribute('data-act'), L = quiz.questions; if (!q) return;
+    if (act === 'up' && i > 0) { L.splice(i - 1, 0, L.splice(i, 1)[0]); render('.qzm-q[data-i="' + (i - 1) + '"] [data-act=up]:not([disabled]),.qzm-q[data-i="' + (i - 1) + '"] [data-act=down]'); }
+    else if (act === 'down' && i < L.length - 1) { L.splice(i + 1, 0, L.splice(i, 1)[0]); render('.qzm-q[data-i="' + (i + 1) + '"] [data-act=down]:not([disabled]),.qzm-q[data-i="' + (i + 1) + '"] [data-act=up]'); }
+    else if (act === 'dup') { if (L.length >= MAXQ) return say('qzmMsg', 'bad', 'A quiz can have up to ' + MAXQ + ' questions.'); L.splice(i + 1, 0, JSON.parse(JSON.stringify(q))); render('#qzmT' + (i + 1)); }
+    else if (act === 'del') {
+      if ((q.text || '').trim() && !confirm('Delete question ' + (i + 1) + '?')) return;
+      L.splice(i, 1); if (!L.length) L.push(blankQ('mc')); render('#qzmT' + Math.min(i, L.length - 1));
+    }
+    else if (act === 'addopt' && q.options.length < 6) { q.options.push(''); render('.qzm-q[data-i="' + i + '"] input[data-f=opt][data-j="' + (q.options.length - 1) + '"]'); }
+    else if (act === 'rmopt' && q.options.length > 2) {
+      var j = +b.getAttribute('data-j'); q.options.splice(j, 1);
+      q.correct = q.correct.filter(function (x) { return x !== j; }).map(function (x) { return x > j ? x - 1 : x; });
+      render('.qzm-q[data-i="' + i + '"] input[data-f=opt][data-j="' + Math.max(0, j - 1) + '"]');
+    }
+    saveDraft();
+  });
+  $('qzmTitle').addEventListener('input', function () { quiz.title = this.value; saveDraft(); });
+  $('qzmDesc').addEventListener('input', function () { quiz.desc = this.value; saveDraft(); });
+  $('qzmTime').addEventListener('input', function () { quiz.time = Math.max(0, Math.min(600, Math.round(+this.value || 0))); saveDraft(); });
+  $('qzmShufQ').addEventListener('change', function () { quiz.shuffleQ = this.checked; saveDraft(); });
+  $('qzmShufO').addEventListener('change', function () { quiz.shuffleO = this.checked; saveDraft(); });
+  document.querySelectorAll('#qzmEdit [data-add]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      if (quiz.questions.length >= MAXQ) return say('qzmMsg', 'bad', 'A quiz can have up to ' + MAXQ + ' questions.');
+      quiz.questions.push(blankQ(b.getAttribute('data-add'))); render('#qzmT' + (quiz.questions.length - 1)); saveDraft();
+    });
+  });
+
+  // ---------- checking a quiz before it is taken, shared or printed ----------
+  function tidy(q) { // a copy without empty options and blank accepted answers
+    var c = clean(JSON.parse(JSON.stringify(q)));
+    c.questions.forEach(function (x) {
+      x.text = x.text.trim();
+      if (x.type === 'mc') {
+        var keep = [], corr = [];
+        x.options.forEach(function (o, j) { if (o.trim()) { if (x.correct.indexOf(j) !== -1) corr.push(keep.length); keep.push(o.trim()); } });
+        x.options = keep; x.correct = corr;
+      }
+      if (x.type === 'short') x.accepted = x.accepted.map(function (a) { return a.trim(); }).filter(Boolean);
+    });
+    return c;
+  }
+  function problems() {
+    var out = [], t = tidy(quiz);
+    document.querySelectorAll('#qzmQs .qzm-q').forEach(function (n) { n.classList.remove('err'); });
+    t.questions.forEach(function (x, i) {
+      var p = '';
+      if (!x.text) p = 'has no question text';
+      else if (x.type === 'mc' && x.options.length < 2) p = 'needs at least 2 options';
+      else if (x.type === 'mc' && !x.correct.length) p = 'has no correct option ticked';
+      else if (x.type === 'short' && !x.accepted.length) p = 'needs at least one accepted answer';
+      if (p) { out.push('Question ' + (i + 1) + ' ' + p + '.'); var n = document.querySelector('#qzmQs .qzm-q[data-i="' + i + '"]'); if (n) n.classList.add('err'); }
+    });
+    return out;
+  }
+  function ready() {
+    var p = problems();
+    if (p.length) { say('qzmMsg', 'bad', p.slice(0, 3).join(' ') + (p.length > 3 ? ' (and ' + (p.length - 3) + ' more)' : '')); var n = document.querySelector('#qzmQs .qzm-q.err textarea'); if (n) n.focus(); return null; }
+    var t = tidy(quiz); if (!t.title.trim()) t.title = 'Untitled quiz';
+    return t;
+  }
+
+  // ---------- saved quizzes ----------
+  function savedList() { var l = lsGet(KEY); return Array.isArray(l) ? l.filter(function (x) { return x && x.quiz; }) : []; }
+  function countSaved() { var n = savedList().length; $('qzmCount').textContent = n ? '(' + n + ')' : ''; }
+  $('qzmSave').addEventListener('click', function () {
+    var l = savedList(), now = Date.now(), k = -1;
+    if (!quiz.title.trim() && quiz.questions.every(function (q) { return !q.text.trim(); })) return say('qzmMsg', 'bad', 'Add a title or a question first.');
+    l.forEach(function (x, j) { if (x.quiz.id === quiz.id) k = j; });
+    var rec = { quiz: JSON.parse(JSON.stringify(quiz)), t: now };
+    if (k === -1) l.unshift(rec); else l[k] = rec;
+    if (!lsSet(KEY, l)) return say('qzmMsg', 'bad', 'Could not save. Your browser storage may be full or turned off.');
+    countSaved(); say('qzmMsg', 'ok', 'Saved "' + (quiz.title.trim() || 'Untitled quiz') + '" in this browser.'); toast('Saved'); burst($('qzmSave'));
+  });
+  function renderSaved() {
+    var box = $('qzmList'), l = savedList(); box.textContent = '';
+    if (!l.length) { box.appendChild(el('p', { className: 'msg' }, 'No saved quizzes yet. Make one in Create / edit and click Save quiz.')); return; }
+    l.forEach(function (x, j) {
+      var r = el('div', { className: 'qzm-item' }), d = el('div');
+      d.appendChild(el('b', null, x.quiz.title || 'Untitled quiz'));
+      d.appendChild(el('small', null, x.quiz.questions.length + ' question' + (x.quiz.questions.length === 1 ? '' : 's') + ' · saved ' + new Date(x.t).toLocaleString()));
+      r.appendChild(d);
+      [['open', 'Edit'], ['take', 'Take'], ['del', 'Delete']].forEach(function (b) { r.appendChild(el('button', { type: 'button', className: 'btn ghost' + (b[0] === 'del' ? ' danger' : ''), 'data-act': b[0], 'data-j': j }, b[1])); });
+      box.appendChild(r);
+    });
+  }
+  $('qzmList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-act]'); if (!b) return;
+    var l = savedList(), x = l[+b.getAttribute('data-j')]; if (!x) return;
+    var act = b.getAttribute('data-act');
+    if (act === 'del') { if (!confirm('Delete "' + (x.quiz.title || 'Untitled quiz') + '"?')) return; l.splice(+b.getAttribute('data-j'), 1); lsSet(KEY, l); renderSaved(); countSaved(); return; }
+    try { quiz = clean(x.quiz); } catch (er) { return; }
+    fillHead(); render(); saveDraft();
+    if (act === 'open') { tab('edit'); say('qzmMsg', 'ok', 'Opened "' + (quiz.title || 'Untitled quiz') + '".'); }
+    else { var t = ready(); if (t) { openTake(t, false); } else tab('edit'); }
+  });
+
+  // ---------- tabs ----------
+  var cur = 'edit';
+  function tab(name) {
+    if (cur === 'take' && name !== 'take' && running && !confirm('Leave the quiz? Your answers will be lost.')) return false;
+    if (name !== 'take') stopRun();
+    cur = name;
+    document.querySelectorAll('.qzm-tabs button').forEach(function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-tab') === name)); });
+    $('qzmEdit').hidden = name !== 'edit'; $('qzmTake').hidden = name !== 'take'; $('qzmSaved').hidden = name !== 'saved';
+    if (name === 'saved') renderSaved();
+    return true;
+  }
+  document.querySelectorAll('.qzm-tabs button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var n = b.getAttribute('data-tab');
+      if (n === 'take' && cur !== 'take') { var t = ready(); if (!t) { tab('edit'); return; } openTake(t, false); return; }
+      tab(n);
+    });
+  });
+
+  // ---------- taking a quiz ----------
+  var active = null, fromLink = false, running = false, endAt = 0, clock = 0, order = [], answers = [], lastRes = null;
+  function rnd(n) { var a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % n; }
+  function shuffle(a) { a = a.slice(); for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function openTake(t, link) {
+    active = t; fromLink = link;
+    if (!tab('take')) return;
+    stopRun();
+    $('qzmIntro').hidden = false; $('qzmRun').hidden = true; say('qzmTMsg', '', '');
+    $('qzmTTitle').textContent = t.title || 'Untitled quiz';
+    $('qzmTDesc').textContent = t.desc || ''; $('qzmTDesc').hidden = !t.desc;
+    $('qzmTInfo').textContent = t.questions.length + ' question' + (t.questions.length === 1 ? '' : 's') + ' · ' + (t.time ? 'time limit ' + t.time + ' minute' + (t.time === 1 ? '' : 's') : 'no time limit');
+    $('qzmCopyEdit').hidden = !link;
+    $('qzmStart').focus();
+  }
+  function stopRun() { running = false; clearInterval(clock); clock = 0; }
+  function start(only) {
+    var idx = only || active.questions.map(function (_, i) { return i; });
+    order = (active.shuffleQ ? shuffle(idx) : idx).map(function (qi) {
+      var q = active.questions[qi], o = null;
+      if (q.type === 'mc') { o = q.options.map(function (_, j) { return j; }); if (active.shuffleO) o = shuffle(o); }
+      return { qi: qi, opts: o };
+    });
+    answers = order.map(function () { return null; });
+    $('qzmIntro').hidden = true; $('qzmRun').hidden = false; $('qzmScore').hidden = true; $('qzmRunBtns').hidden = false; $('qzmDoneBtns').hidden = true; say('qzmTMsg', '', '');
+    var box = $('qzmItems'); box.textContent = '';
+    order.forEach(function (it, k) {
+      var q = active.questions[it.qi], c = el('div', { className: 'qzm-take', 'data-k': k });
+      c.appendChild(el('p', { className: 'qt', id: 'qzmQ' + k }, (k + 1) + '. ' + q.text));
+      if (q.type === 'mc') {
+        var multi = q.correct.length > 1;
+        if (multi) c.appendChild(el('p', { className: 'msg', style: 'margin:-6px 0 8px' }, 'Choose ' + q.correct.length + ' answers.'));
+        var g = el('div', { role: multi ? 'group' : 'radiogroup', 'aria-labelledby': 'qzmQ' + k });
+        it.opts.forEach(function (j, p) {
+          var lb = el('label', { className: 'ch' }), inp = el('input', { type: multi ? 'checkbox' : 'radio', name: 'qzmR' + k, value: String(j), 'data-nomemo': '' });
+          lb.appendChild(inp); lb.appendChild(el('span', null, String.fromCharCode(65 + p) + '. ' + q.options[j])); g.appendChild(lb);
+        });
+        c.appendChild(g);
+      } else if (q.type === 'tf') {
+        var g2 = el('div', { role: 'radiogroup', 'aria-labelledby': 'qzmQ' + k });
+        [true, false].forEach(function (v) { var lb = el('label', { className: 'ch' }), inp = el('input', { type: 'radio', name: 'qzmR' + k, value: String(v), 'data-nomemo': '' }); lb.appendChild(inp); lb.appendChild(el('span', null, v ? 'True' : 'False')); g2.appendChild(lb); });
+        c.appendChild(g2);
+      } else {
+        var inp2 = el('input', { type: 'text', 'data-nomemo': '', 'aria-labelledby': 'qzmQ' + k, autocomplete: 'off', autocapitalize: 'off', spellcheck: 'false', maxlength: '300', placeholder: 'Type your answer' });
+        c.appendChild(inp2);
+      }
+      box.appendChild(c);
+    });
+    running = true; progress();
+    clearInterval(clock);
+    if (active.time) { endAt = Date.now() + active.time * 60000; tick(); clock = setInterval(tick, 250); } else { $('qzmClock').textContent = ''; $('qzmBar').classList.remove('low'); }
+    var first = box.querySelector('input'); if (first) first.focus({ preventScroll: true });
+    $('qzmRun').scrollIntoView({ block: 'start', behavior: 'smooth' });
+  }
+  function fmtT(ms) { var s = Math.max(0, Math.ceil(ms / 1000)), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+  function tick() {
+    var left = endAt - Date.now();
+    $('qzmClock').textContent = '⏱ ' + fmtT(left) + ' left';
+    $('qzmBar').classList.toggle('low', left < 60000);
+    if (left <= 0) { submit(true); }
+  }
+  function read(k) {
+    var it = order[k], q = active.questions[it.qi], c = document.querySelector('#qzmItems .qzm-take[data-k="' + k + '"]');
+    if (q.type === 'short') { var v = c.querySelector('input').value; return v.trim() ? v : null; }
+    var ch = [].slice.call(c.querySelectorAll('input:checked')).map(function (x) { return x.value; });
+    if (!ch.length) return null;
+    if (q.type === 'tf') return ch[0] === 'true';
+    return ch.map(Number).sort();
+  }
+  function progress() { var n = 0; order.forEach(function (_, k) { if (read(k) !== null) n++; }); $('qzmProg').textContent = n + ' of ' + order.length + ' answered'; }
+  $('qzmItems').addEventListener('input', function () { if (running) progress(); });
+  $('qzmItems').addEventListener('change', function () { if (running) progress(); });
+  $('qzmItems').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.type === 'text') { e.preventDefault(); var all = [].slice.call(document.querySelectorAll('#qzmItems input[type=text]')), i = all.indexOf(e.target); if (all[i + 1]) all[i + 1].focus(); else $('qzmSubmit').focus(); } });
+  function norm(s) { return String(s).toLowerCase().normalize('NFKC').replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/\s+/g, ' ').trim().replace(/[.!?]+$/, '').trim(); }
+  function shortOk(given, acc) {
+    var g = norm(given);
+    return acc.some(function (a) {
+      var n = norm(a); if (n === g) return true;
+      var x = g.replace(/,/g, ''), y = n.replace(/,/g, '');
+      return /^-?\d*\.?\d+$/.test(x) && /^-?\d*\.?\d+$/.test(y) && parseFloat(x) === parseFloat(y);
+    });
+  }
+  function isRight(q, a) {
+    if (a === null) return false;
+    if (q.type === 'tf') return a === q.answer;
+    if (q.type === 'short') return shortOk(a, q.accepted);
+    var c = q.correct.slice().sort(); return a.length === c.length && a.every(function (v, i) { return v === c[i]; });
+  }
+  function letters(it, js) { return js.map(function (j) { return String.fromCharCode(65 + it.opts.indexOf(j)) + '. ' + active.questions[it.qi].options[j]; }).join('; '); }
+  function submit(timeUp) {
+    if (!running) return;
+    if (!timeUp) {
+      var blank = 0; order.forEach(function (_, k) { if (read(k) === null) blank++; });
+      if (blank && !confirm(blank + ' question' + (blank === 1 ? ' is' : 's are') + ' not answered. Submit anyway?')) return;
+    }
+    stopRun();
+    var right = 0, wrong = [];
+    order.forEach(function (it, k) {
+      var q = active.questions[it.qi], a = read(k), ok = isRight(q, a), c = document.querySelector('#qzmItems .qzm-take[data-k="' + k + '"]');
+      if (ok) right++; else wrong.push(it.qi);
+      c.classList.add(ok ? 'ok' : 'no');
+      c.querySelectorAll('input').forEach(function (x) { x.disabled = true; });
+      var rv = el('div', { className: 'rv' });
+      rv.appendChild(el('span', { className: ok ? 'good' : 'bad' }, ok ? '✓ Correct. ' : (a === null ? '✗ Not answered. ' : '✗ Not quite. ')));
+      var yours = a === null ? '' : q.type === 'tf' ? (a ? 'True' : 'False') : q.type === 'short' ? a.trim() : letters(it, a);
+      if (!ok && yours) rv.appendChild(document.createTextNode('Your answer: ' + yours + '. '));
+      if (!ok) rv.appendChild(document.createTextNode('Correct answer: ' + (q.type === 'tf' ? (q.answer ? 'True' : 'False') : q.type === 'short' ? q.accepted.join(' / ') : letters(it, q.correct)) + '.'));
+      c.appendChild(rv);
+      if (q.explanation.trim()) c.appendChild(el('div', { className: 'ex' }, q.explanation.trim()));
+    });
+    lastRes = wrong;
+    var pct = order.length ? Math.round(right / order.length * 100) : 0, s = $('qzmScore'); s.textContent = '';
+    s.appendChild(el('h3', null, 'Score: ' + right + ' / ' + order.length + ' (' + pct + '%)'));
+    var used = active.time ? active.time * 60000 - Math.max(0, endAt - Date.now()) : 0;
+    s.appendChild(el('p', { style: 'margin:0' }, (timeUp ? 'Time is up, so your answers were submitted. ' : '') + (pct === 100 ? 'Perfect! Every answer is right.' : pct >= 80 ? 'Great work.' : pct >= 50 ? 'Good effort. Read the explanations below and try again.' : 'Keep practising. Review the answers below, then retry the ones you missed.') + (active.time ? ' Time used: ' + fmtT(used) + '.' : '')));
+    s.hidden = false;
+    $('qzmProg').textContent = 'Finished'; $('qzmClock').textContent = ''; $('qzmBar').classList.remove('low');
+    $('qzmRunBtns').hidden = true; $('qzmDoneBtns').hidden = false; $('qzmWrong').hidden = !wrong.length; $('qzmBack').hidden = fromLink;
+    if (pct === 100) burst(s);
+    s.scrollIntoView({ block: 'start', behavior: 'smooth' }); s.setAttribute('tabindex', '-1'); s.focus({ preventScroll: true });
+  }
+  $('qzmStart').addEventListener('click', function () { start(); });
+  $('qzmSubmit').addEventListener('click', function () { submit(false); });
+  $('qzmAgain').addEventListener('click', function () { start(); });
+  $('qzmWrong').addEventListener('click', function () { if (lastRes && lastRes.length) start(lastRes.slice()); });
+  $('qzmBack').addEventListener('click', function () { tab('edit'); });
+  $('qzmCopyEdit').addEventListener('click', function () {
+    if (running && !confirm('Leave the quiz? Your answers will be lost.')) return;
+    stopRun(); var c = JSON.parse(JSON.stringify(active)); c.id = uid(); quiz = clean(c); fillHead(); render(); saveDraft();
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    tab('edit'); say('qzmMsg', 'ok', 'This is your own copy. Change anything, then click Save quiz.');
+  });
+  window.addEventListener('beforeunload', function (e) { if (running) { e.preventDefault(); e.returnValue = ''; } });
+
+  // ---------- share link: the quiz is packed into the part of the link after #, so it is never sent to a server ----------
+  function compact(t) { return { v: 1, t: t.title, d: t.desc || undefined, m: t.time || undefined, sq: t.shuffleQ ? 1 : undefined, so: t.shuffleO ? 1 : undefined, q: t.questions.map(function (x) { var o = { y: x.type, x: x.text }; if (x.explanation.trim()) o.e = x.explanation.trim(); if (x.type === 'mc') { o.o = x.options; o.c = x.correct; } else if (x.type === 'tf') o.a = x.answer ? 1 : 0; else o.a = x.accepted; return o; }) }; }
+  function expand(o) { return { title: o.t, desc: o.d, time: o.m, shuffleQ: !!o.sq, shuffleO: !!o.so, questions: (o.q || []).map(function (x) { var n = { type: x.y, text: x.x, explanation: x.e || '' }; if (x.y === 'mc') { n.options = x.o; n.correct = x.c; } else if (x.y === 'tf') n.answer = !!x.a; else n.accepted = x.a; return n; }) }; }
+  function b64u(bytes) { var s = '', i, C = 0x8000; for (i = 0; i < bytes.length; i += C) s += String.fromCharCode.apply(null, bytes.subarray(i, i + C)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function pipe(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function pack(t) {
+    var raw = new TextEncoder().encode(JSON.stringify(compact(t)));
+    if (window.CompressionStream) return pipe(raw, new CompressionStream('deflate-raw')).then(function (z) { return 'z' + b64u(z); }, function () { return 'j' + b64u(raw); });
+    return Promise.resolve('j' + b64u(raw));
+  }
+  function unpack(s) {
+    var kind = s.charAt(0), bytes;
+    try { bytes = unb64u(s.slice(1)); } catch (e) { return Promise.reject(new Error('The quiz link is damaged. Ask for the link again.')); }
+    var p;
+    if (kind === 'z') {
+      if (!window.DecompressionStream) return Promise.reject(new Error('This browser is too old to open compressed quiz links. Try a current Chrome, Edge, Firefox or Safari.'));
+      p = pipe(bytes, new DecompressionStream('deflate-raw'));
+    } else if (kind === 'j') p = Promise.resolve(bytes);
+    else return Promise.reject(new Error('The quiz link is damaged. Ask for the link again.'));
+    return p.then(function (b) { return clean(expand(JSON.parse(new TextDecoder().decode(b)))); }, function () { throw new Error('The quiz link is damaged or cut off. Ask for the link again.'); });
+  }
+  $('qzmShare').addEventListener('click', function () {
+    var t = ready(); if (!t) return;
+    pack(t).then(function (code) {
+      var url = location.origin + location.pathname + '#quiz=' + code;
+      $('qzmLink').value = url; $('qzmLink').hidden = false;
+      copyText(url, $('qzmShare'));
+      say('qzmMsg', url.length > 8000 ? '' : 'ok', 'Link copied (' + fmtNum(url.length) + ' characters). Anyone who opens it can take the quiz. The whole quiz, answers included, is inside the link, so nothing is uploaded.' + (url.length > 8000 ? ' This link is long; some chat apps may cut it. For big quizzes, share the exported JSON file instead.' : ''));
+    });
+  });
+  function fromHash() {
+    var m = /[#&]quiz=([A-Za-z0-9_-]+)/.exec(location.hash); if (!m) return;
+    unpack(m[1]).then(function (t) { if (!t.title) t.title = 'Untitled quiz'; openTake(t, true); }, function (e) { tab('edit'); say('qzmMsg', 'bad', e.message); });
+  }
+  window.addEventListener('hashchange', fromHash);
+
+  // ---------- JSON export and import ----------
+  function slugName(s) { return (s || 'quiz').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'quiz'; }
+  $('qzmExport').addEventListener('click', function () {
+    var data = JSON.stringify({ format: 'gettoolnest-quiz', version: 1, quiz: quiz }, null, 2), a = document.createElement('a'), u = URL.createObjectURL(new Blob([data], { type: 'application/json' }));
+    a.href = u; a.download = slugName(quiz.title) + '.json'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+    say('qzmMsg', 'ok', 'Exported ' + a.download + '.');
+  });
+  $('qzmImportBtn').addEventListener('click', function () { $('qzmImport').click(); });
+  $('qzmImport').addEventListener('change', function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    if (f.size > 5 * 1048576) return say('qzmMsg', 'bad', 'That file is too big for a quiz (over 5 MB).');
+    f.text().then(function (txt) {
+      var o; try { o = JSON.parse(txt); } catch (e) { throw new Error('That file is not valid JSON. Choose a .json file exported from this tool.'); }
+      if (o && o.quiz) o = o.quiz;
+      var q = clean(o); q.id = uid(); return q;
+    }).then(function (q) {
+      quiz = q; fillHead(); render(); saveDraft(); tab('edit');
+      say('qzmMsg', 'ok', 'Imported "' + (q.title || 'Untitled quiz') + '" with ' + q.questions.length + ' question' + (q.questions.length === 1 ? '' : 's') + '. Click Save quiz to keep it.');
+    }).catch(function (e) { say('qzmMsg', 'bad', e.message || 'Could not read that file.'); });
+  });
+
+  // ---------- print ----------
+  function printBox(t) {
+    var box = $('qzmPrint'); if (!box) { box = document.createElement('div'); box.id = 'qzmPrint'; document.body.appendChild(box); }
+    box.textContent = '';
+    box.appendChild(el('h1', null, t.title));
+    var m = el('div', { className: 'meta' }); m.appendChild(el('span', null, 'Name: ____________________')); m.appendChild(el('span', null, 'Date: ____________')); m.appendChild(el('span', null, 'Score: ______ / ' + t.questions.length)); box.appendChild(m);
+    if (t.desc) box.appendChild(el('p', { style: 'white-space:pre-wrap' }, t.desc));
+    var ol = el('ol', { className: 'qs' });
+    t.questions.forEach(function (q) {
+      var li = el('li'); li.appendChild(el('div', { style: 'white-space:pre-wrap' }, q.text + (q.type === 'mc' && q.correct.length > 1 ? ' (choose ' + q.correct.length + ')' : '')));
+      if (q.type === 'mc') { var o = el('ol', { className: 'opts' }); q.options.forEach(function (x) { o.appendChild(el('li', null, x)); }); li.appendChild(o); }
+      else if (q.type === 'tf') li.appendChild(el('div', null, 'True  /  False'));
+      else li.appendChild(el('div', { className: 'line' }));
+      ol.appendChild(li);
+    });
+    box.appendChild(ol);
+    if ($('qzmKey').checked) {
+      var k = el('div', { className: 'key' }); k.appendChild(el('h1', null, 'Answer key: ' + t.title));
+      var ok = el('ol');
+      t.questions.forEach(function (q) {
+        var a = q.type === 'tf' ? (q.answer ? 'True' : 'False') : q.type === 'short' ? q.accepted.join(' / ') : q.correct.map(function (j) { return String.fromCharCode(65 + j) + ' (' + q.options[j] + ')'; }).join(', ');
+        var li = el('li'); li.appendChild(el('b', null, a)); if (q.explanation.trim()) li.appendChild(document.createTextNode(' - ' + q.explanation.trim())); ok.appendChild(li);
+      });
+      k.appendChild(ok); box.appendChild(k);
+    }
+  }
+  $('qzmPrintBtn').addEventListener('click', function () { var t = ready(); if (!t) return; printBox(t); window.print(); });
+  window.addEventListener('afterprint', function () { var b = $('qzmPrint'); if (b) b.textContent = ''; });
+
+  // ---------- new and sample ----------
+  $('qzmNew').addEventListener('click', function () {
+    if (!confirm('Start a new empty quiz? Anything not saved will be lost.')) return;
+    quiz = blankQuiz(); fillHead(); render('#qzmTitle'); saveDraft(); $('qzmTitle').focus(); say('qzmMsg', '', ''); $('qzmLink').hidden = true;
+  });
+  $('qzmSample').addEventListener('click', function () {
+    var dirty = quiz.questions.some(function (q) { return q.text.trim(); });
+    if (dirty && !confirm('Replace the quiz you are editing with the sample? Anything not saved will be lost.')) return;
+    quiz = clean({ title: 'The water cycle', desc: 'Answer all five questions. Question 2 has more than one correct answer.', time: 5, shuffleO: true, questions: [
+      { type: 'mc', text: 'What is the name for water vapour turning back into liquid droplets?', options: ['Evaporation', 'Condensation', 'Precipitation', 'Infiltration'], correct: [1], explanation: 'Condensation happens when warm, moist air cools. It is how clouds and dew form.' },
+      { type: 'mc', text: 'Which of these are forms of precipitation?', options: ['Rain', 'Snow', 'Fog', 'Hail'], correct: [0, 1, 3], explanation: 'Precipitation is water that falls from clouds. Fog is a cloud at ground level, so it does not fall.' },
+      { type: 'tf', text: 'The Sun provides the energy that drives the water cycle.', answer: true, explanation: 'Heat from the Sun evaporates water from oceans, lakes and plants.' },
+      { type: 'short', text: 'What word describes water soaking down into the ground?', accepted: ['infiltration', 'percolation'], explanation: 'Infiltration is water entering the soil; percolation is it moving deeper.' },
+      { type: 'tf', text: 'Plants play no part in the water cycle.', answer: false, explanation: 'Plants release water vapour from their leaves. This is called transpiration.' }
+    ] });
+    fillHead(); render(); saveDraft(); say('qzmMsg', 'ok', 'Sample quiz loaded. Try Take this quiz, or change it to make your own.');
+  });
+  $('qzmTakeBtn').addEventListener('click', function () { var t = ready(); if (t) openTake(t, false); });
+
+  fillHead(); render(); fromHash();
+})();
+</script>
