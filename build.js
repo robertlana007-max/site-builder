@@ -322,10 +322,10 @@ write('index.html', layout({
   body: `<section class="hero hero2"><div class="hero-copy">
   <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
   <h1>Use any tool you need, <span class="hl">completely free</span></h1>
-  <p class="sub">Scroll down and pick whatever you need. All ${tools.length} tools for PDFs, pictures, money, text and code are free for everyone, with no sign-up and nothing to install.</p>
+  <p class="sub">Scroll down and pick whatever you need. All ${tools.length} tools for PDFs, pictures, money, text and code are free for everyone: zero ads, unlimited use, no sign-up and nothing to install.</p>
   <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search for a tool, for example “pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
-  <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
+  <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Zero ads</li><li>${icon('check')}Unlimited use</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
   ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>You are not a customer here, you are family.</b> And for us, family is everything. Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
   <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
@@ -422,7 +422,7 @@ for (const t of tools) {
   <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)}</p>
   <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
   <p class="lead">${esc(t.intro)}</p>
-  ${cfg.contactEmail ? `<div class="family"><span class="fam-ic" aria-hidden="true">❤️</span><div class="fam-txt"><b>You are not a customer here, you are family.</b><span>Want something new added to ${esc(t.name)}, or need a new tool? Email us and we will make it for you.</span></div><a class="fam-btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">✉ Email us</a></div>` : ''}
+  ${cfg.contactEmail ? `<div class="family"><span class="fam-ic" aria-hidden="true">❤️</span><div class="fam-txt"><b>You are not a customer here, you are family.</b><span>Zero ads, unlimited use, free forever. Want something new added to ${esc(t.name)}, or need a new tool? Email us and we will make it for you.</span></div><a class="fam-btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">✉ Email us</a></div>` : ''}
   <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>
 <div class="cols${t.wide ? ' wide' : ''}" style="--c:${COLOR[t.cat]}">
@@ -430,7 +430,7 @@ for (const t of tools) {
 <section class="card">
 ${body}
 </section>
-<p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded.</p>
+<p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded. Zero ads, unlimited use.</p>
 ${ad(cfg.adSlotTop)}
 ${guideHtml(t, g)}
 ${ad(cfg.adSlotBottom)}
