@@ -1,0 +1,293 @@
+<style>
+.sb-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.sb-stage canvas { max-width: 100%; max-height: 64vh; display: block; margin: 0 auto; border-radius: 4px; }
+.sb-sw { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.sb-sw button { width: 40px; height: 40px; border-radius: 10px; border: 2px solid var(--line); cursor: pointer; padding: 0; }
+.sb-sw button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.sb-sec { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin-bottom: 14px; }
+.sb-sec h3 { font-size: 16px; margin: 0 0 10px; }
+.sb-sec input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click, drop or paste a screenshot</b>PNG, JPG or WebP. Press Ctrl+V (⌘+V on Mac) to paste straight from your clipboard. Nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 14px"><button class="btn ghost" id="pasteBtn" type="button" hidden>Paste from clipboard</button><button class="btn ghost" id="demo" type="button">Try with a sample</button></div>
+<div class="sb-stage" id="stage" hidden><canvas id="cv" aria-label="Preview of your beautified screenshot"></canvas></div>
+
+<div class="sb-sec">
+  <h3>Background</h3>
+  <div class="fields">
+    <div><label for="bgType">Type</label><select id="bgType"><option value="grad">Gradient</option><option value="solid">Solid colour</option><option value="image">Your own image</option><option value="none">Transparent</option></select></div>
+    <div id="angRow"><label for="ang">Gradient angle: <span id="angV">135</span>°</label><input type="range" id="ang" min="0" max="360" step="5" value="135"></div>
+  </div>
+  <div class="sb-sw" id="grads" role="group" aria-label="Gradient presets"></div>
+  <div class="fields" id="colRow">
+    <div><label for="c1">Colour 1</label><input type="color" id="c1" value="#667eea"></div>
+    <div id="c2Row"><label for="c2">Colour 2</label><input type="color" id="c2" value="#f093fb"></div>
+  </div>
+  <div class="btns" id="bgImgRow" hidden style="margin:0 0 14px"><button class="btn ghost" id="bgImgBtn" type="button">Choose background image</button><span class="msg" id="bgImgName" style="margin:8px 0 0">No image chosen yet.</span></div>
+  <input type="file" id="bgFile" accept="image/*" hidden data-nomemo>
+</div>
+
+<div class="sb-sec">
+  <h3>Screenshot</h3>
+  <div class="fields">
+    <div><label for="frame">Frame</label><select id="frame"><option value="none">No frame</option><option value="browser">Browser window (light)</option><option value="browserDark">Browser window (dark)</option><option value="mac">Window, title bar only</option><option value="phone">Phone</option></select></div>
+    <div id="urlRow"><label for="url">Address bar text</label><input type="text" id="url" maxlength="80" placeholder="example.com" autocomplete="off"></div>
+    <div><label for="pad">Padding: <span id="padV">10</span>%</label><input type="range" id="pad" min="0" max="30" value="10"></div>
+    <div><label for="rad">Corner rounding: <span id="radV">3</span>%</label><input type="range" id="rad" min="0" max="12" step="0.5" value="3"></div>
+    <div><label for="shadow">Shadow</label><select id="shadow"><option value="0">None</option><option value="1">Soft</option><option value="2" selected>Medium</option><option value="3">Strong</option></select></div>
+    <div><label for="tilt">Tilt: <span id="tiltV">0</span>°</label><input type="range" id="tilt" min="-15" max="15" step="0.5" value="0"></div>
+  </div>
+</div>
+
+<div class="sb-sec">
+  <h3>Size and watermark</h3>
+  <div class="fields">
+    <div><label for="ratio">Canvas size</label><select id="ratio">
+      <option value="auto">Fit the screenshot</option>
+      <option value="1200x675">Twitter / X post (16:9)</option>
+      <option value="1080x1080">Instagram square (1:1)</option>
+      <option value="1080x1350">Instagram portrait (4:5)</option>
+      <option value="1080x1920">Story / Reel (9:16)</option>
+      <option value="1200x627">LinkedIn post (1.91:1)</option>
+      <option value="1920x1080">Slide or video (16:9)</option>
+    </select></div>
+    <div><label for="scale">Export resolution</label><select id="scale"><option value="1">1× (standard)</option><option value="2" selected>2× (sharp, retina)</option><option value="3">3× (extra sharp)</option></select></div>
+    <div><label for="wm">Watermark text (optional)</label><input type="text" id="wm" maxlength="60" placeholder="@yourname" autocomplete="off"></div>
+    <div><label for="wmPos">Watermark position</label><select id="wmPos"><option value="br">Bottom right</option><option value="bc">Bottom centre</option><option value="bl">Bottom left</option><option value="tr">Top right</option><option value="tl">Top left</option></select></div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download PNG</button><button class="btn ghost" id="copy" disabled hidden>Copy image</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var shot = null, shotName = 'screenshot', bgImg = null, busy = false, cv = $('cv');
+  var GRADS = [['#667eea', '#f093fb'], ['#ff9a8b', '#ff6a88'], ['#43cea2', '#185a9d'], ['#f6d365', '#fda085'], ['#4facfe', '#00f2fe'], ['#a18cd1', '#fbc2eb'], ['#0f2027', '#2c5364'], ['#fa709a', '#fee140'], ['#30cfd0', '#330867'], ['#ff512f', '#dd2476'], ['#11998e', '#38ef7d'], ['#e0e0e0', '#ffffff']];
+  function say(c, t) { PT.say(c, t); }
+
+  // ---------- gradient swatches ----------
+  GRADS.forEach(function (g) {
+    var b = document.createElement('button'); b.type = 'button'; b.style.background = 'linear-gradient(135deg,' + g[0] + ',' + g[1] + ')';
+    b.setAttribute('aria-label', 'Gradient ' + g[0] + ' to ' + g[1]);
+    b.addEventListener('click', function () { $('c1').value = g[0]; $('c2').value = g[1]; if ($('bgType').value !== 'grad') $('bgType').value = 'grad'; fire('c1'); });
+    $('grads').appendChild(b);
+  });
+  function fire(id) { $(id).dispatchEvent(new Event('input', { bubbles: true })); $(id).dispatchEvent(new Event('change', { bubbles: true })); }
+
+  // ---------- layout ----------
+  // Everything is measured in "layout pixels"; the export multiplies by the chosen resolution.
+  function frameBox(fr, sw, sh) { // frame size around a screenshot drawn sw × sh
+    if (fr === 'browser' || fr === 'browserDark' || fr === 'mac') { var bar = Math.max(22, Math.min(64, sw * 0.045)); return { w: sw, h: sh + bar, top: bar, side: 0, bottom: 0 }; }
+    if (fr === 'phone') { var bz = Math.max(8, Math.min(sw, sh) * 0.045); return { w: sw + 2 * bz, h: sh + 2 * bz, top: bz, side: bz, bottom: bz }; }
+    return { w: sw, h: sh, top: 0, side: 0, bottom: 0 };
+  }
+  function layout() {
+    var fr = $('frame').value, ang = $('tilt').value * Math.PI / 180, c = Math.abs(Math.cos(ang)), s = Math.abs(Math.sin(ang));
+    var nw = shot.naturalWidth || shot.width, nh = shot.naturalHeight || shot.height, pct = $('pad').value / 100;
+    var rot = function (w, h) { return { w: w * c + h * s, h: w * s + h * c }; };
+    if ($('ratio').value === 'auto') {
+      // show the screenshot at up to 1200 layout px wide (a high-resolution screenshot then stays sharp at 2×)
+      var k = Math.min(1, 1200 / nw, 1200 / nh), sw = nw * k, sh = nh * k, f = frameBox(fr, sw, sh), r = rot(f.w, f.h), pad = Math.max(f.w, f.h) * pct;
+      return { W: Math.ceil(r.w + 2 * pad), H: Math.ceil(r.h + 2 * pad), sw: sw, sh: sh, f: f };
+    }
+    var wh = $('ratio').value.split('x'), W = +wh[0], H = +wh[1], padP = Math.min(W, H) * pct;
+    var f1 = frameBox(fr, nw, nh), r1 = rot(f1.w, f1.h), z = Math.min((W - 2 * padP) / r1.w, (H - 2 * padP) / r1.h);
+    // frame parts are sized from the drawn screenshot, so solve again at the final scale
+    var sw2 = nw * z, sh2 = nh * z, f2 = frameBox(fr, sw2, sh2), r2 = rot(f2.w, f2.h), z2 = Math.min((W - 2 * padP) / r2.w, (H - 2 * padP) / r2.h, 1e9);
+    sw2 *= z2; sh2 *= z2;
+    return { W: W, H: H, sw: sw2, sh: sh2, f: frameBox(fr, sw2, sh2) };
+  }
+  function rr(x, y, w, h, r) { // rounded rectangle path
+    r = Math.max(0, Math.min(r, w / 2, h / 2));
+    var p = new Path2D(); p.moveTo(x + r, y); p.arcTo(x + w, y, x + w, y + h, r); p.arcTo(x + w, y + h, x, y + h, r); p.arcTo(x, y + h, x, y, r); p.arcTo(x, y, x + w, y, r); p.closePath(); return p;
+  }
+  function lum(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
+
+  function render(ctx, L, k) {
+    var W = L.W * k, H = L.H * k, t = $('bgType').value;
+    ctx.clearRect(0, 0, W, H);
+    // background
+    if (t === 'solid') { ctx.fillStyle = $('c1').value; ctx.fillRect(0, 0, W, H); }
+    else if (t === 'grad') {
+      var a = $('ang').value * Math.PI / 180, cx = W / 2, cy = H / 2, len = (Math.abs(W * Math.sin(a)) + Math.abs(H * Math.cos(a))) / 2;
+      var g = ctx.createLinearGradient(cx - Math.sin(a) * len, cy + Math.cos(a) * len, cx + Math.sin(a) * len, cy - Math.cos(a) * len);
+      g.addColorStop(0, $('c1').value); g.addColorStop(1, $('c2').value); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    } else if (t === 'image' && bgImg) {
+      var s = Math.max(W / bgImg.naturalWidth, H / bgImg.naturalHeight), bw = bgImg.naturalWidth * s, bh = bgImg.naturalHeight * s;
+      ctx.drawImage(bgImg, (W - bw) / 2, (H - bh) / 2, bw, bh);
+    }
+    // the framed screenshot, centred and tilted
+    var fr = $('frame').value, f = L.f, sw = L.sw * k, sh = L.sh * k, fw = f.w * k, fh = f.h * k, top = f.top * k, side = f.side * k;
+    var rad = Math.min(sw, sh) * $('rad').value / 100, outerR = fr === 'phone' ? Math.min(fw, fh) * 0.09 + rad * 0.5 : rad;
+    // draw the framed screenshot on its own layer, then place that layer with its shadow (so see-through screenshots get a true shadow)
+    var main = ctx, layer = document.createElement('canvas'); layer.width = Math.max(1, Math.ceil(fw)); layer.height = Math.max(1, Math.ceil(fh));
+    ctx = layer.getContext('2d');
+    var outer = rr(0, 0, fw, fh, outerR), sh0 = +$('shadow').value;
+    if (fr === 'none') {
+      ctx.save(); ctx.clip(outer); ctx.drawImage(shot, 0, 0, sw, sh); ctx.restore();
+    } else if (fr === 'phone') {
+      ctx.fillStyle = '#111317'; ctx.fill(outer);
+      ctx.strokeStyle = '#3a3f47'; ctx.lineWidth = Math.max(1, side * 0.12); ctx.stroke(rr(ctx.lineWidth / 2, ctx.lineWidth / 2, fw - ctx.lineWidth, fh - ctx.lineWidth, outerR));
+      var inR = Math.max(rad, outerR - side * 0.8);
+      ctx.save(); ctx.clip(rr(side, top, sw, sh, inR)); ctx.drawImage(shot, side, top, sw, sh); ctx.restore();
+      // a pill-shaped camera cut-out on portrait screens, a dot on landscape ones
+      if (sh >= sw) { var pw = sw * 0.26, ph = Math.max(6 * k, sw * 0.075); ctx.fillStyle = '#000'; ctx.fill(rr(side + (sw - pw) / 2, top + ph * 0.45, pw, ph, ph / 2)); }
+      else { var d = Math.max(4 * k, side * 0.35); ctx.fillStyle = '#05060a'; ctx.beginPath(); ctx.arc(side / 2, fh / 2, d / 2, 0, 7); ctx.fill(); }
+    } else {
+      var dark = fr === 'browserDark';
+      ctx.save(); ctx.clip(outer);
+      ctx.fillStyle = dark ? '#2b2d31' : '#eef0f3'; ctx.fillRect(0, 0, fw, top);
+      ctx.fillStyle = dark ? '#1e1f22' : '#d9dce1'; ctx.fillRect(0, top - Math.max(1, k), fw, Math.max(1, k));
+      ctx.drawImage(shot, 0, top, sw, sh);
+      ctx.restore();
+      var dot = top * 0.26, dy = top / 2;
+      ['#ff5f57', '#febc2e', '#28c840'].forEach(function (c, i) { ctx.fillStyle = c; ctx.beginPath(); ctx.arc(top * 0.55 + i * dot * 2.6, dy, dot / 2 + 0.5, 0, 7); ctx.fill(); });
+      if (fr !== 'mac') {
+        var bx = top * 0.55 + dot * 2.6 * 2 + top * 0.9, bwid = Math.min(fw * 0.6, fw - bx - top * 0.6), bh2 = top * 0.56;
+        if (bwid > top) {
+          var x0 = Math.max(bx, (fw - bwid) / 2);
+          bwid = Math.min(bwid, fw - x0 - top * 0.5);
+          ctx.fillStyle = dark ? '#1e1f22' : '#ffffff'; ctx.fill(rr(x0, dy - bh2 / 2, bwid, bh2, bh2 / 2));
+          var u = $('url').value.trim();
+          if (u) {
+            ctx.fillStyle = dark ? '#c9ccd1' : '#4b5059'; ctx.font = (bh2 * 0.55) + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'; ctx.textBaseline = 'middle'; ctx.textAlign = 'center';
+            var txt = u; while (txt.length > 3 && ctx.measureText(txt).width > bwid - bh2) txt = txt.slice(0, -2);
+            ctx.fillText(txt === u ? u : txt + '…', x0 + bwid / 2, dy + 0.5);
+          }
+        }
+      }
+    }
+    ctx = main; ctx.save();
+    ctx.translate(W / 2, H / 2); ctx.rotate($('tilt').value * Math.PI / 180);
+    if (sh0) {
+      var base = Math.max(fw, fh);
+      ctx.shadowColor = 'rgba(0,0,0,' + [0, 0.22, 0.32, 0.45][sh0] + ')'; ctx.shadowBlur = base * [0, 0.03, 0.05, 0.07][sh0]; ctx.shadowOffsetY = base * [0, 0.01, 0.02, 0.03][sh0];
+    }
+    ctx.drawImage(layer, -fw / 2, -fh / 2, layer.width, layer.height);
+    ctx.restore(); layer.width = layer.height = 0;
+    // watermark: light on dark backgrounds and dark on light ones
+    var wm = $('wm').value.trim();
+    if (wm) {
+      var light = t === 'solid' ? lum($('c1').value) : t === 'grad' ? (lum($('c1').value) + lum($('c2').value)) / 2 : t === 'none' ? 1 : 0.3;
+      var fs = Math.max(10 * k, Math.min(W, H) * 0.032), m = fs * 0.9, p = $('wmPos').value;
+      ctx.save(); ctx.font = '600 ' + fs + 'px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+      ctx.fillStyle = light > 0.6 ? 'rgba(20,20,25,.7)' : 'rgba(255,255,255,.85)';
+      ctx.textBaseline = p[0] === 't' ? 'top' : 'bottom'; ctx.textAlign = p[1] === 'r' ? 'right' : p[1] === 'l' ? 'left' : 'center';
+      ctx.fillText(wm, p[1] === 'r' ? W - m : p[1] === 'l' ? m : W / 2, p[0] === 't' ? m : H - m);
+      ctx.restore();
+    }
+  }
+
+  var raf = 0;
+  function draw() {
+    sync(); $('dl').hidden = true;
+    if (!shot || raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0;
+      var L = layout(), k = Math.min(1.5, 1000 / Math.max(L.W, L.H)) * Math.min(2, window.devicePixelRatio || 1);
+      k = Math.min(k, 1600 / Math.max(L.W, L.H));
+      cv.width = Math.max(1, Math.round(L.W * k)); cv.height = Math.max(1, Math.round(L.H * k));
+      render(cv.getContext('2d'), L, k);
+      var sc = +$('scale').value;
+      $('go').textContent = 'Download PNG (' + Math.round(L.W * sc) + ' × ' + Math.round(L.H * sc) + ')';
+    });
+  }
+  function sync() {
+    var t = $('bgType').value, fr = $('frame').value;
+    $('angRow').hidden = $('grads').hidden = $('c2Row').hidden = t !== 'grad';
+    $('colRow').hidden = t !== 'grad' && t !== 'solid';
+    $('bgImgRow').hidden = t !== 'image';
+    $('urlRow').hidden = fr !== 'browser' && fr !== 'browserDark';
+    ['ang', 'pad', 'rad', 'tilt'].forEach(function (id) { $(id + 'V').textContent = $(id).value; });
+    Array.prototype.forEach.call($('grads').children, function (b, i) { b.setAttribute('aria-pressed', GRADS[i][0] === $('c1').value && GRADS[i][1] === $('c2').value); });
+    $('go').disabled = !shot || busy; $('copy').disabled = !shot || busy;
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+    el.addEventListener('input', draw); el.addEventListener('change', draw);
+  });
+  window.addEventListener('resize', draw);
+
+  // ---------- loading ----------
+  function isImg(f) { return f && (/^image\//.test(f.type) || /\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(f.name || '')); }
+  function take(f) {
+    if (!f) return;
+    if (!isImg(f)) { say('bad', 'Please choose an image file, like a PNG or JPG screenshot.'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read that image. Try saving the screenshot as PNG and adding it again.'); return; }
+      if (im.naturalWidth * im.naturalHeight > 60e6) { say('bad', 'That image is too large (' + im.naturalWidth + ' × ' + im.naturalHeight + '). Use a screenshot under 60 megapixels.'); return; }
+      shot = im; shotName = PT.base(f.name || 'screenshot') || 'screenshot';
+      $('stage').hidden = false; $('drop').querySelector('b').textContent = 'Use a different screenshot';
+      draw(); say('', im.naturalWidth + ' × ' + im.naturalHeight + ' px screenshot. Pick a background and frame, then download.');
+    });
+  }
+  PT.drop(false, take);
+  document.addEventListener('paste', function (e) {
+    var items = (e.clipboardData || {}).items || [], it = Array.prototype.find.call(items, function (i) { return i.type.indexOf('image/') === 0; });
+    if (it) { e.preventDefault(); take(it.getAsFile()); }
+    else if (!/^(INPUT|TEXTAREA)$/.test(e.target.tagName)) say('bad', 'There is no image on your clipboard. Take a screenshot first (for example Win+Shift+S or ⌘+Shift+4 then Ctrl), then paste.');
+  });
+  if (navigator.clipboard && navigator.clipboard.read) {
+    $('pasteBtn').hidden = false;
+    $('pasteBtn').addEventListener('click', function () {
+      navigator.clipboard.read().then(function (list) {
+        for (var i = 0; i < list.length; i++) { var ty = list[i].types.find(function (x) { return x.indexOf('image/') === 0; }); if (ty) return list[i].getType(ty).then(function (b) { take(new File([b], 'screenshot.png', { type: ty })); }); }
+        say('bad', 'There is no image on your clipboard. Copy or take a screenshot first.');
+      }, function () { say('bad', 'Your browser did not allow reading the clipboard. Press Ctrl+V (⌘+V on Mac) on this page instead.'); });
+    });
+  }
+  $('demo').addEventListener('click', function () {
+    // a small made-up app screen, drawn here, so you can try the styles before you have a screenshot
+    var c = document.createElement('canvas'); c.width = 1280; c.height = 800; var x = c.getContext('2d');
+    x.fillStyle = '#ffffff'; x.fillRect(0, 0, 1280, 800); x.fillStyle = '#f3f5f9'; x.fillRect(0, 0, 240, 800);
+    x.fillStyle = '#2563eb'; x.fillRect(32, 36, 120, 22);
+    for (var i = 0; i < 6; i++) { x.fillStyle = i ? '#cfd6e2' : '#2563eb'; x.fillRect(32, 110 + i * 46, 150 - (i % 3) * 25, 14); }
+    x.fillStyle = '#111827'; x.font = 'bold 40px system-ui, sans-serif'; x.fillText('Monthly overview', 290, 90);
+    [['#2563eb', 220], ['#10b981', 300], ['#f59e0b', 170], ['#ef4444', 260], ['#8b5cf6', 330], ['#06b6d4', 240]].forEach(function (b, j) { x.fillStyle = b[0]; x.fillRect(300 + j * 150, 700 - b[1] * 1.5, 90, b[1] * 1.5); });
+    x.fillStyle = '#e5e7eb'; x.fillRect(290, 702, 940, 3);
+    c.toBlob(function (b) { take(new File([b], 'sample-screenshot.png', { type: 'image/png' })); });
+  });
+  $('bgImgBtn').addEventListener('click', function () { $('bgFile').click(); });
+  $('bgFile').addEventListener('change', function () {
+    var f = $('bgFile').files[0]; $('bgFile').value = '';
+    if (!f) return;
+    if (!isImg(f)) { say('bad', 'The background must be an image file.'); return; }
+    loadImage(f, function (im) { if (!im) { say('bad', 'Could not read that background image.'); return; } bgImg = im; $('bgImgName').textContent = f.name; draw(); });
+  });
+
+  // ---------- export ----------
+  function full() {
+    var L = layout(), sc = +$('scale').value;
+    if (L.W * sc * L.H * sc > 50e6) sc = Math.max(1, Math.floor(Math.sqrt(50e6 / (L.W * L.H)) * 100) / 100); // keep within what phones can handle
+    var c = document.createElement('canvas'); c.width = Math.round(L.W * sc); c.height = Math.round(L.H * sc);
+    render(c.getContext('2d'), L, sc);
+    return PT.blob(c, 'image/png').then(function (b) { var dims = c.width + ' × ' + c.height; c.width = c.height = 0; return { b: b, dims: dims }; });
+  }
+  $('go').addEventListener('click', function () {
+    if (!shot || busy) return;
+    if ($('bgType').value === 'image' && !bgImg) { say('bad', 'Choose a background image first, or pick another background type.'); return; }
+    busy = true; sync(); say('', 'Creating your image…');
+    setTimeout(function () {
+      full().then(function (r) {
+        busy = false; sync();
+        if (!r.b) { say('bad', 'Your browser could not create the PNG. Try a lower export resolution.'); return; }
+        var name = shotName + '-beautified.png';
+        PT.done(r.b, name, 'image/png', 'Saved ' + name + ' (' + r.dims + ' px)');
+        $('dl').textContent = 'Download ' + name; $('dl').click();
+      });
+    }, 20);
+  });
+  if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) {
+    $('copy').hidden = false;
+    $('copy').addEventListener('click', function () {
+      if (!shot || busy) return;
+      busy = true; sync();
+      // Safari wants the ClipboardItem created straight away with a promise
+      var p = full().then(function (r) { return r.b; });
+      navigator.clipboard.write([new ClipboardItem({ 'image/png': p })]).then(function () { say('ok', 'Copied. Paste it straight into a post, chat or document.'); }, function () { say('bad', 'Your browser did not allow copying images. Use Download PNG instead.'); })
+        .then(function () { busy = false; sync(); });
+    });
+  }
+  sync();
+})();
+</script>

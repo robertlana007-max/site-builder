@@ -1276,5 +1276,53 @@ module.exports = [
         ['Why does the JPG have a white background?', 'JPG files cannot be see-through, so the empty area is filled with your background colour. Download PNG to keep the transparent background.']
       ],
       icon: '<path d="M4 20h16"/><path d="M12 3c-2.2 0-4 1.8-4 4s1.8 4 4 4 4-1.8 4-4-1.8-4-4-4z"/><path d="M5 20c0-3.9 3.1-7 7-7s7 3.1 7 7"/><path d="M3 3l3 3M18 3l3 3M3 9l2 0M19 9l2 0" stroke-dasharray="2 2"/>'
+  },
+  {
+      slug: 'study-planner', cat: 'Study tools', name: 'Study Planner',
+      title: 'Study Planner - Free Exam Revision Timetable Maker',
+      desc: 'Make a day-by-day revision timetable from your exam dates. More time for hard subjects, revision days, live countdowns and .ics calendar export.',
+      card: 'Turn exam dates into a daily revision timetable.',
+      intro: 'Add your exams, topics and the hours you can study, and get a day-by-day revision plan up to your last exam, with live countdowns and a calendar export.',
+      steps: ['Add each exam with its date, difficulty and the topics you need to cover.', 'Set how many hours you can study on each day of the week and add any rest days.', 'Follow the plan and tick off sessions as you finish them. The rest is re-planned from today.', 'Export the plan as an .ics file for your calendar, or print it.'],
+      faq: [
+        ['How does the planner decide what to study each day?', 'It hands out your study time in half-hour blocks. Each block goes to the exam that is most behind, measured as work left divided by time left before the exam, with harder subjects weighted higher. Closer exams are never starved of time.'],
+        ['Do harder subjects really get more time?', 'Yes. Topic hours are multiplied by 0.8 for difficulty 1 up to 1.3 for difficulty 5, so a very hard subject gets 30% more time than you estimated.'],
+        ['What happens if I miss a day?', 'Nothing breaks. The plan always starts from today, so unfinished work is spread over the days that are left. Tick only what you actually did.'],
+        ['Can I add the plan to Google Calendar or my iPhone?', 'Yes. Click Export .ics and open or import the file in Google Calendar, Apple Calendar or Outlook. Each study session and exam becomes an event.'],
+        ['Is my plan saved?', 'Yes, in your browser on this device. Nothing is uploaded, so it does not appear on other devices or in private browsing.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M9 15.5l2 2 4-4"/>'
+  },
+  {
+      slug: 'homework-tracker', cat: 'Study tools', name: 'Homework Tracker',
+      title: 'Homework Tracker - Free Online Assignment Planner',
+      desc: 'Track homework with due dates, priorities and subjects. List and drag-and-drop board views, reminders and JSON backup. Free, private, no sign-up.',
+      card: 'Keep track of homework and due dates.',
+      intro: 'Write down every assignment with its subject, due time and priority, see what is overdue or due today, and drag work from To do to Done.',
+      steps: ['Type the homework, its subject, due date and time, and pick a priority.', 'See it in the list under Overdue, Today, Tomorrow or later, or switch to the board.', 'Tick it off or drag it to Done when you finish.', 'Turn on reminders, and export a JSON backup now and then.'],
+      faq: [
+        ['Is my homework list saved?', 'Yes. It is saved in your browser on this device and never uploaded. Use Export JSON to move it to another device.'],
+        ['How do reminders work?', 'Turn on reminders and allow notifications when your browser asks. While the page is open in a tab, you get a notification before each item is due, from 15 minutes to 1 day early.'],
+        ['Can I drag cards on a phone?', 'Yes. In the board view, drag a card by its ⠿ handle, or use the arrow buttons on the card to move it between To do, Doing and Done.'],
+        ['Can I change the colour of a subject?', 'Yes. Under Progress by subject, tap the colour square next to a subject and pick a new colour.'],
+        ['What does "Later this week" mean?', 'It holds homework due after tomorrow and up to this Sunday. Anything after that is under Later.']
+      ],
+      icon: '<path d="M9 3h6v4H9z"/><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><path d="M9 14l2 2 4-4"/>'
+  },
+  {
+      slug: 'formula-sheet', cat: 'Study tools', name: 'Formula Sheet',
+      title: 'Formula Sheet - Maths, Physics & Chemistry Formulas',
+      desc: 'Search 230+ maths, physics and chemistry formulas with symbols, units and solve-for-any-variable calculators. Save favourites and print by section.',
+      card: '230+ formulas with built-in calculators.',
+      intro: 'Look up algebra, geometry, trigonometry, calculus, statistics, physics and chemistry formulas, see what every letter means, and solve any formula for any letter.',
+      steps: ['Search for a formula or pick a section.', 'Read the formula with the meaning and unit of each symbol.', 'Click Use it, choose the letter to find and type the other values.', 'Star your favourites or print a section.'],
+      faq: [
+        ['Which formulas are included?', 'More than 230: algebra, areas, volumes and surface areas, trig identities and the sine and cosine rules, derivative and integral rules, statistics and probability, physics from motion to optics and thermodynamics, and chemistry from moles to gas laws and pH.'],
+        ['Can the calculator solve for any variable?', 'Yes. Over 100 formulas have a calculator where you choose which letter to find. It solves numerically, so you do not need to rearrange the formula, and it shows every real answer when there is more than one.'],
+        ['What units should I use?', 'Use the units shown next to each symbol, which are SI units such as metres, kilograms, seconds and kelvin. Angles in the calculators are in degrees.'],
+        ['Does it work offline?', 'Yes. The formulas are drawn with plain HTML and CSS and nothing is loaded from other websites, so the page works once it has loaded.'],
+        ['Can I print a formula sheet?', 'Yes. Click Print next to any section heading to print that section as a compact two-column sheet.']
+      ],
+      icon: '<path d="M18 5H6l6 7-6 7h12"/>'
   }
 ];

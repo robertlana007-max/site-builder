@@ -1,0 +1,478 @@
+<style>
+@font-face { font-family: "GTN Anton"; src: url(../assets/vendor/fonts/anton-latin-400-normal.woff2) format("woff2"); font-display: block; }
+.yt-lay { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 12px; scrollbar-width: thin; }
+.yt-lay button { flex: none; width: 128px; padding: 0; border: 2px solid var(--line); border-radius: 10px; background: var(--bg); cursor: pointer; overflow: hidden; color: var(--ink); font: inherit; font-size: 12.5px; }
+.yt-lay button:hover { border-color: var(--accent); }
+.yt-lay canvas { display: block; width: 100%; height: auto; }
+.yt-lay span { display: block; padding: 4px 6px; }
+.yt-stage { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 8px; margin-bottom: 12px; }
+.yt-stage canvas { display: block; width: 100%; height: auto; touch-action: none; border-radius: 4px; cursor: default; }
+.yt-stage canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.yt-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.yt-bar .btn { padding: 7px 12px; min-height: 40px; font-size: 14px; }
+.yt-stick { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.yt-stick button { width: 44px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 22px; padding: 0; display: grid; place-items: center; }
+.yt-stick button:hover { border-color: var(--accent); }
+.yt-stick svg { width: 26px; height: 26px; }
+.yt-panel { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+.yt-panel h3 { font-size: 15px; margin: 0 0 10px; }
+.yt-panel .fields { margin-bottom: 8px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.yt-panel input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+.yt-panel textarea { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 64px; resize: vertical; margin-bottom: 10px; }
+.yt-layers { list-style: none; margin: 0; padding: 0; }
+.yt-layers li { display: flex; align-items: center; gap: 6px; padding: 4px 6px; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 6px; background: var(--surface); }
+.yt-layers li.on { border-color: var(--accent); background: var(--accent-soft); }
+.yt-layers li > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; font-size: 14px; padding: 6px 2px; }
+.yt-layers button { flex: none; width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; font: inherit; padding: 0; }
+.yt-layers button:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.yt-layers button[disabled] { opacity: .4; cursor: default; }
+.yt-hint { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+</style>
+<label>Start from a layout</label>
+<div class="yt-lay" id="ytLayouts" aria-label="Starter layouts"></div>
+<div class="drop" id="drop" tabindex="0" role="button" style="padding:18px 16px"><b>Click or drop a background photo</b>Optional. It fills the whole 1280 × 720 thumbnail. Your files never leave your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<input type="file" id="ytPhotoFile" accept="image/*" hidden data-nomemo>
+<div class="yt-stage">
+  <canvas id="ytCv" width="1280" height="720" tabindex="0" aria-label="Thumbnail editor. Tap a layer to select it, drag to move it, drag the corner handle to resize and the round top handle to rotate. Arrow keys move the selected layer, Delete removes it."></canvas>
+  <p class="yt-hint">Tap a layer to select it. Drag to move, use the square corner handle to resize, the round handle to rotate. Two fingers resize and rotate on touch screens.</p>
+</div>
+<div class="yt-bar">
+  <button class="btn ghost" type="button" id="ytAddText">+ Text</button>
+  <button class="btn ghost" type="button" id="ytAddPhoto">+ Photo</button>
+  <button class="btn ghost" type="button" id="ytUndo" disabled>Undo</button>
+  <label class="btn ghost" style="margin:0;font-weight:600"><input type="checkbox" id="ytSafe" checked data-nomemo> Show video length area</label>
+</div>
+<label>Stickers and shapes</label>
+<div class="yt-stick" id="ytStickers"></div>
+<div class="yt-panel" id="ytProps" hidden>
+  <h3 id="ytPropsT">Selected layer</h3>
+  <div id="ytTextProps">
+    <label for="ytText">Text</label>
+    <textarea id="ytText" data-nomemo maxlength="200" spellcheck="false"></textarea>
+    <div class="fields">
+      <div><label for="ytFont">Font</label><select id="ytFont" data-nomemo><option value="anton">Anton (tall, bold)</option><option value="impact">Impact style</option><option value="black">Arial Black</option><option value="serif">Bold serif</option><option value="round">Rounded bold</option><option value="emoji">Emoji</option></select></div>
+      <div><label for="ytFill">Text colour</label><input type="color" id="ytFill" data-nomemo></div>
+      <div><label for="ytStroke">Outline colour</label><input type="color" id="ytStroke" data-nomemo></div>
+      <div><label for="ytStrokeW">Outline: <span id="ytStrokeWV">0</span></label><input type="range" id="ytStrokeW" min="0" max="30" data-nomemo></div>
+      <div><label for="ytBoxCol">Box colour</label><input type="color" id="ytBoxCol" data-nomemo></div>
+    </div>
+    <div class="checks"><label><input type="checkbox" id="ytShadow" data-nomemo> Drop shadow</label><label><input type="checkbox" id="ytBox" data-nomemo> Colour box behind text</label><label><input type="checkbox" id="ytUpper" data-nomemo> ALL CAPS</label></div>
+  </div>
+  <div id="ytShapeProps">
+    <div class="fields">
+      <div><label for="ytShFill">Colour</label><input type="color" id="ytShFill" data-nomemo></div>
+      <div><label for="ytShLine">Outline colour</label><input type="color" id="ytShLine" data-nomemo></div>
+      <div><label for="ytShW">Outline / line width: <span id="ytShWV">0</span></label><input type="range" id="ytShW" min="0" max="40" data-nomemo></div>
+    </div>
+  </div>
+  <div id="ytImgProps">
+    <div class="fields">
+      <div><label for="ytImgLine">Border colour</label><input type="color" id="ytImgLine" data-nomemo></div>
+      <div><label for="ytImgW">Border width: <span id="ytImgWV">0</span></label><input type="range" id="ytImgW" min="0" max="30" data-nomemo></div>
+    </div>
+  </div>
+  <div class="fields" style="margin-bottom:0">
+    <div><label for="ytRot">Rotation: <span id="ytRotV">0</span>°</label><input type="range" id="ytRot" min="-180" max="180" data-nomemo></div>
+    <div><label for="ytOpacity">Opacity: <span id="ytOpacityV">100</span>%</label><input type="range" id="ytOpacity" min="10" max="100" data-nomemo></div>
+  </div>
+</div>
+<div class="yt-panel">
+  <h3>Background</h3>
+  <div class="fields" style="margin-bottom:0">
+    <div><label for="ytBgType">Type</label><select id="ytBgType" data-nomemo><option value="grad">Gradient</option><option value="color">Solid colour</option><option value="image">Photo</option></select></div>
+    <div id="ytC1Box"><label for="ytC1">Colour 1</label><input type="color" id="ytC1" value="#ff3d3d" data-nomemo></div>
+    <div id="ytC2Box"><label for="ytC2">Colour 2</label><input type="color" id="ytC2" value="#3b0764" data-nomemo></div>
+    <div id="ytAngBox"><label for="ytAng">Direction: <span id="ytAngV">45</span>°</label><input type="range" id="ytAng" min="0" max="360" value="45" data-nomemo></div>
+    <div id="ytDimBox"><label for="ytDim">Darken photo: <span id="ytDimV">0</span>%</label><input type="range" id="ytDim" min="0" max="80" value="0" data-nomemo></div>
+  </div>
+</div>
+<h3 style="font-size:15px;margin:0 0 8px">Layers <span style="font-weight:400;color:var(--muted);font-size:13px">(top of the list is in front)</span></h3>
+<ul class="yt-layers" id="ytLayers"></ul>
+<div class="btns"><button class="btn" id="go" type="button">Download JPG</button><button class="btn ghost" id="ytPng" type="button">Download PNG</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var W = 1280, H = 720, cv = $('ytCv'), ctx = cv.getContext('2d');
+  var FONTS = {
+    anton: { f: '"GTN Anton", Impact, "Arial Narrow Bold", sans-serif', w: '400', lh: 1.08 },
+    impact: { f: 'Impact, Haettenschweiler, "GTN Anton", "Arial Black", sans-serif', w: '400', lh: 1.1 },
+    black: { f: '"Arial Black", "Helvetica Neue", Arial, system-ui, sans-serif', w: '900', lh: 1.12 },
+    serif: { f: 'Georgia, "Times New Roman", serif', w: '700', lh: 1.15 },
+    round: { f: '"Trebuchet MS", "Arial Rounded MT Bold", "Varela Round", system-ui, sans-serif', w: '800', lh: 1.15 },
+    emoji: { f: '"Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Segoe UI Symbol", sans-serif', w: '400', lh: 1.1 }
+  };
+  var bg = { type: 'grad', c1: '#ff3d3d', c2: '#3b0764', ang: 45, img: null, dim: 0 };
+  var layers = [], sel = null, uid = 1, history = [], fontReady = false;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+
+  // ---------- layers ----------
+  function text(o) { return Object.assign({ type: 'text', id: uid++, x: W / 2, y: H / 2, rot: 0, op: 1, text: 'YOUR TITLE', font: 'anton', size: 120, fill: '#ffffff', stroke: '#000000', sw: 10, shadow: true, box: false, boxCol: '#e11d48', upper: true, w: 10, h: 10 }, o); }
+  function shape(o) { return Object.assign({ type: 'shape', id: uid++, x: W / 2, y: H / 2, w: 260, h: 260, rot: 0, op: 1, shape: 'ring', fill: '#ff2d2d', line: '#ffffff', lw: 12 }, o); }
+  function photo(img, o) {
+    var s = Math.min(560 / img.naturalWidth, 560 / img.naturalHeight, 1.5);
+    return Object.assign({ type: 'image', id: uid++, img: img, x: W / 2, y: H / 2, w: img.naturalWidth * s, h: img.naturalHeight * s, rot: 0, op: 1, line: '#ffffff', lw: 0 }, o);
+  }
+  function lines(L) { return String(L.upper ? L.text.toUpperCase() : L.text).split('\n'); }
+  function fontOf(L, size) { var F = FONTS[L.font] || FONTS.anton; return F.w + ' ' + Math.round(size || L.size) + 'px ' + F.f; }
+  function measure(L) {
+    if (L.type !== 'text') return;
+    ctx.font = fontOf(L);
+    var ls = lines(L), mw = 0, F = FONTS[L.font] || FONTS.anton;
+    ls.forEach(function (s) { mw = Math.max(mw, ctx.measureText(s).width); });
+    var pad = L.size * (L.box ? 0.22 : 0.06) + L.sw;
+    L.w = Math.max(20, mw + pad * 2); L.h = Math.max(20, ls.length * L.size * F.lh + pad * 2 - L.size * (F.lh - 1));
+  }
+
+  // ---------- shapes (drawn as vectors inside a w x h box centred on 0,0) ----------
+  var SHAPES = {
+    arrow: function (c, w, h) { var t = h * 0.3; c.moveTo(-w / 2, -t / 2); c.lineTo(w / 2 - h * 0.55, -t / 2); c.lineTo(w / 2 - h * 0.55, -h / 2); c.lineTo(w / 2, 0); c.lineTo(w / 2 - h * 0.55, h / 2); c.lineTo(w / 2 - h * 0.55, t / 2); c.lineTo(-w / 2, t / 2); c.closePath(); },
+    curve: function (c, w, h) {
+      // a bent arrow: thick curved body ending in a head that points down-right
+      var t = Math.min(w, h) * 0.16;
+      c.moveTo(-w / 2, h / 2 - t * 0.2); c.quadraticCurveTo(-w / 2 + w * 0.05, -h / 2 + t, w * 0.12, -h / 2 + t * 1.2);
+      c.lineTo(w * 0.12, -h / 2); c.lineTo(w / 2, -h / 2 + t * 1.7); c.lineTo(w * 0.12, -h / 2 + t * 3.4); c.lineTo(w * 0.12, -h / 2 + t * 2.2);
+      c.quadraticCurveTo(-w / 2 + w * 0.2, -h / 2 + t * 2.2, -w / 2 + t * 1.1, h / 2); c.closePath();
+    },
+    ring: function (c, w, h) { c.ellipse(0, 0, w / 2, h / 2, 0, 0, Math.PI * 2); },
+    box: function (c, w, h) { c.rect(-w / 2, -h / 2, w, h); },
+    burst: function (c, w, h) { for (var i = 0; i < 28; i++) { var a = i / 28 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 0.74 : 1; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * w / 2 * r, Math.sin(a) * h / 2 * r); } c.closePath(); },
+    star: function (c, w, h) { for (var i = 0; i < 10; i++) { var a = i / 10 * Math.PI * 2 - Math.PI / 2, r = i % 2 ? 0.45 : 1; c[i ? 'lineTo' : 'moveTo'](Math.cos(a) * w / 2 * r, Math.sin(a) * h / 2 * r); } c.closePath(); },
+    check: function (c, w, h) { c.moveTo(-w / 2, 0); c.lineTo(-w * 0.12, h / 2); c.lineTo(w / 2, -h / 2); },
+    cross: function (c, w, h) { c.moveTo(-w / 2, -h / 2); c.lineTo(w / 2, h / 2); c.moveTo(w / 2, -h / 2); c.lineTo(-w / 2, h / 2); }
+  };
+  var STROKED = { ring: 1, check: 1, cross: 1 }; // drawn as lines; the rest are filled
+  var STICKERS = [
+    ['shape', 'arrow', 'Arrow', { w: 300, h: 150 }], ['shape', 'curve', 'Curved arrow', { w: 260, h: 220 }], ['shape', 'ring', 'Circle', { w: 260, h: 260, lw: 14 }],
+    ['shape', 'box', 'Box', { w: 320, h: 200, fill: 'rgba(0,0,0,0)', lw: 12, line: '#ffe600' }], ['shape', 'burst', 'Burst', { w: 260, h: 260, fill: '#ffe600', line: '#000000', lw: 8 }],
+    ['shape', 'star', 'Star', { w: 200, h: 200, fill: '#ffd400', line: '#000000', lw: 6 }], ['shape', 'check', 'Tick', { w: 200, h: 150, fill: '#22c55e', lw: 34 }], ['shape', 'cross', 'Cross', { w: 170, h: 170, fill: '#ef4444', lw: 34 }],
+    ['emoji', '😱'], ['emoji', '🔥'], ['emoji', '😂'], ['emoji', '🤯'], ['emoji', '👉'], ['emoji', '💰'], ['emoji', '✅'], ['emoji', '❌'], ['emoji', '❓'], ['emoji', '😍']
+  ];
+
+  // ---------- drawing ----------
+  function drawBg(c) {
+    if (bg.type === 'image' && bg.img) {
+      var s = Math.max(W / bg.img.naturalWidth, H / bg.img.naturalHeight), w = bg.img.naturalWidth * s, h = bg.img.naturalHeight * s;
+      c.imageSmoothingQuality = 'high'; c.drawImage(bg.img, (W - w) / 2, (H - h) / 2, w, h);
+      if (bg.dim) { c.fillStyle = 'rgba(0,0,0,' + bg.dim / 100 + ')'; c.fillRect(0, 0, W, H); }
+    } else if (bg.type === 'grad') {
+      var a = (bg.ang - 90) * Math.PI / 180, r = Math.abs(W / 2 * Math.cos(a)) + Math.abs(H / 2 * Math.sin(a));
+      var g = c.createLinearGradient(W / 2 - Math.cos(a) * r, H / 2 - Math.sin(a) * r, W / 2 + Math.cos(a) * r, H / 2 + Math.sin(a) * r);
+      g.addColorStop(0, bg.c1); g.addColorStop(1, bg.c2); c.fillStyle = g; c.fillRect(0, 0, W, H);
+    } else { c.fillStyle = bg.c1; c.fillRect(0, 0, W, H); }
+  }
+  function drawLayer(c, L) {
+    c.save(); c.translate(L.x, L.y); c.rotate(L.rot); c.globalAlpha = L.op;
+    if (L.type === 'image') {
+      c.imageSmoothingQuality = 'high';
+      if (L.lw) { c.fillStyle = L.line; c.fillRect(-L.w / 2 - L.lw, -L.h / 2 - L.lw, L.w + 2 * L.lw, L.h + 2 * L.lw); }
+      c.drawImage(L.img, -L.w / 2, -L.h / 2, L.w, L.h);
+    } else if (L.type === 'shape') {
+      var lined = STROKED[L.shape];
+      c.lineJoin = 'round'; c.lineCap = 'round'; c.beginPath(); SHAPES[L.shape](c, L.w, L.h);
+      c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = 14; c.shadowOffsetY = 5;
+      if (lined) {
+        if (L.lw > 0 && L.shape !== 'ring') { c.strokeStyle = L.line; c.lineWidth = L.lw + 12; c.stroke(); c.shadowColor = 'transparent'; }
+        c.strokeStyle = L.fill; c.lineWidth = Math.max(2, L.shape === 'ring' ? L.lw : L.lw); c.stroke();
+      } else {
+        c.fillStyle = L.fill; c.fill(); c.shadowColor = 'transparent';
+        if (L.lw > 0) { c.strokeStyle = L.line; c.lineWidth = L.lw; c.stroke(); }
+      }
+    } else {
+      var F = FONTS[L.font] || FONTS.anton, ls = lines(L), lh = L.size * F.lh, y0 = -(ls.length - 1) * lh / 2;
+      if (L.box) { c.fillStyle = L.boxCol; c.fillRect(-L.w / 2, -L.h / 2, L.w, L.h); }
+      c.font = fontOf(L); c.textAlign = 'center'; c.textBaseline = 'middle'; c.lineJoin = 'round'; c.miterLimit = 2;
+      ls.forEach(function (s, i) {
+        var y = y0 + i * lh + L.size * 0.04;
+        if (L.shadow) { c.shadowColor = 'rgba(0,0,0,.6)'; c.shadowBlur = L.size * 0.12; c.shadowOffsetX = L.size * 0.03; c.shadowOffsetY = L.size * 0.05; }
+        if (L.sw > 0 && L.type === 'text' && L.font !== 'emoji') { c.strokeStyle = L.stroke; c.lineWidth = L.sw * 2; c.strokeText(s, 0, y); c.shadowColor = 'transparent'; }
+        c.fillStyle = L.fill; c.fillText(s, 0, y); c.shadowColor = 'transparent';
+      });
+    }
+    c.restore();
+  }
+  function compose(c) { drawBg(c); layers.forEach(function (L) { drawLayer(c, L); }); }
+  function unit() { return W / (cv.getBoundingClientRect().width || W); } // canvas pixels per screen pixel
+  function handles(L) {
+    var u = unit(), cs = Math.cos(L.rot), sn = Math.sin(L.rot);
+    function at(lx, ly) { return { x: L.x + lx * cs - ly * sn, y: L.y + lx * sn + ly * cs }; }
+    return { size: at(L.w / 2, L.h / 2), rot: at(0, -L.h / 2 - 34 * u), top: at(0, -L.h / 2), r: 13 * u };
+  }
+  function draw() {
+    layers.forEach(measure);
+    compose(ctx);
+    if ($('ytSafe').checked) { // where the video length badge and the red progress bar cover the thumbnail
+      ctx.save(); ctx.fillStyle = 'rgba(0,0,0,.55)'; ctx.strokeStyle = 'rgba(255,255,255,.9)'; ctx.setLineDash([10, 8]); ctx.lineWidth = 3;
+      ctx.fillRect(W - 210, H - 82, 192, 66); ctx.strokeRect(W - 210, H - 82, 192, 66);
+      ctx.fillStyle = '#fff'; ctx.font = '700 34px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('12:34', W - 114, H - 49);
+      ctx.fillStyle = 'rgba(255,0,0,.55)'; ctx.fillRect(0, H - 10, W * 0.4, 10);
+      ctx.restore();
+    }
+    if (sel) {
+      var L = sel, hd = handles(L), u = unit();
+      ctx.save(); ctx.translate(L.x, L.y); ctx.rotate(L.rot);
+      ctx.strokeStyle = '#ffffff'; ctx.lineWidth = 3 * u; ctx.setLineDash([]); ctx.strokeRect(-L.w / 2, -L.h / 2, L.w, L.h);
+      ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 1.6 * u; ctx.setLineDash([7 * u, 5 * u]); ctx.strokeRect(-L.w / 2, -L.h / 2, L.w, L.h);
+      ctx.restore();
+      ctx.save(); ctx.setLineDash([]); ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2 * u;
+      ctx.beginPath(); ctx.moveTo(hd.top.x, hd.top.y); ctx.lineTo(hd.rot.x, hd.rot.y); ctx.stroke();
+      ctx.fillStyle = '#fff'; ctx.lineWidth = 3 * u;
+      ctx.beginPath(); ctx.arc(hd.rot.x, hd.rot.y, hd.r * 0.8, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.rect(hd.size.x - hd.r * 0.8, hd.size.y - hd.r * 0.8, hd.r * 1.6, hd.r * 1.6); ctx.fill(); ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // ---------- history ----------
+  function snap() { return { bg: Object.assign({}, bg), layers: layers.map(function (L) { return Object.assign({}, L); }), sel: sel ? sel.id : null }; }
+  function remember() { history.push(snap()); if (history.length > 60) history.shift(); $('ytUndo').disabled = false; }
+  var typing = null;
+  function rememberOnce(key) { if (typing !== key) { remember(); typing = key; } }
+  $('ytUndo').addEventListener('click', function () {
+    var s = history.pop(); if (!s) return;
+    bg = s.bg; layers = s.layers; sel = null; layers.forEach(function (L) { if (L.id === s.sel) sel = L; });
+    typing = null; $('ytUndo').disabled = !history.length; syncBg(); refresh();
+  });
+
+  // ---------- UI sync ----------
+  function label(L) {
+    if (L.type === 'text') return (L.font === 'emoji' ? 'Emoji ' : 'Text: ') + (L.text.replace(/\s+/g, ' ').trim() || '(empty)');
+    if (L.type === 'image') return 'Photo';
+    return { arrow: 'Arrow', curve: 'Curved arrow', ring: 'Circle', box: 'Box', burst: 'Burst', star: 'Star', check: 'Tick', cross: 'Cross' }[L.shape] || 'Shape';
+  }
+  function list() {
+    var ul = $('ytLayers'); ul.innerHTML = '';
+    if (!layers.length) { var e = document.createElement('li'); e.textContent = 'No layers yet. Add text, a photo or a sticker.'; e.style.color = 'var(--muted)'; e.style.padding = '10px'; ul.appendChild(e); }
+    layers.slice().reverse().forEach(function (L) {
+      var i = layers.indexOf(L), li = document.createElement('li'), n = document.createElement('span');
+      li.className = L === sel ? 'on' : ''; n.textContent = label(L); n.title = 'Select';
+      n.addEventListener('click', function () { sel = L; refresh(); });
+      li.appendChild(n);
+      [['↑', 'Bring forward', i < layers.length - 1, function () { layers.splice(i + 1, 0, layers.splice(i, 1)[0]); }],
+       ['↓', 'Send backward', i > 0, function () { layers.splice(i - 1, 0, layers.splice(i, 1)[0]); }],
+       ['⧉', 'Duplicate', true, function () { var d = Object.assign({}, L, { id: uid++, x: L.x + 30, y: L.y + 30 }); layers.splice(i + 1, 0, d); sel = d; }],
+       ['✕', 'Delete', true, function () { layers.splice(i, 1); if (sel === L) sel = null; }]].forEach(function (b) {
+        var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = b[0]; bt.title = b[1]; bt.setAttribute('aria-label', b[1] + ' ' + label(L)); bt.disabled = !b[2];
+        bt.addEventListener('click', function () { remember(); typing = null; b[3](); refresh(); });
+        li.appendChild(bt);
+      });
+      ul.appendChild(li);
+    });
+  }
+  function props() {
+    var L = sel; $('ytProps').hidden = !L; if (!L) return;
+    var isText = L.type === 'text';
+    $('ytTextProps').hidden = !isText; $('ytShapeProps').hidden = L.type !== 'shape'; $('ytImgProps').hidden = L.type !== 'image';
+    $('ytPropsT').textContent = 'Selected: ' + label(L).slice(0, 40);
+    if (isText) {
+      if (document.activeElement !== $('ytText')) $('ytText').value = L.text;
+      $('ytFont').value = L.font; $('ytFill').value = L.fill; $('ytStroke').value = L.stroke; $('ytStrokeW').value = L.sw; $('ytStrokeWV').textContent = L.sw;
+      $('ytShadow').checked = L.shadow; $('ytBox').checked = L.box; $('ytBoxCol').value = L.boxCol; $('ytUpper').checked = L.upper;
+    } else if (L.type === 'shape') {
+      $('ytShFill').value = /^#/.test(L.fill) ? L.fill : '#000000'; $('ytShLine').value = L.line; $('ytShW').value = L.lw; $('ytShWV').textContent = L.lw;
+    } else { $('ytImgLine').value = L.line; $('ytImgW').value = L.lw; $('ytImgWV').textContent = L.lw; }
+    var deg = Math.round(((L.rot * 180 / Math.PI) % 360 + 540) % 360 - 180);
+    $('ytRot').value = deg; $('ytRotV').textContent = deg; $('ytOpacity').value = Math.round(L.op * 100); $('ytOpacityV').textContent = Math.round(L.op * 100);
+  }
+  function refresh() { draw(); list(); props(); $('dl').hidden = true; }
+  function bind(id, ev, fn) { $(id).addEventListener(ev, function () { if (!sel) return; rememberOnce(id + sel.id); fn(sel, $(id)); refresh(); }); }
+  bind('ytText', 'input', function (L, el) { L.text = el.value; });
+  bind('ytFont', 'change', function (L, el) { L.font = el.value; });
+  bind('ytFill', 'input', function (L, el) { L.fill = el.value; });
+  bind('ytStroke', 'input', function (L, el) { L.stroke = el.value; });
+  bind('ytStrokeW', 'input', function (L, el) { L.sw = +el.value; });
+  bind('ytShadow', 'change', function (L, el) { L.shadow = el.checked; });
+  bind('ytBox', 'change', function (L, el) { L.box = el.checked; });
+  bind('ytBoxCol', 'input', function (L, el) { L.boxCol = el.value; if (!L.box) { L.box = true; } });
+  bind('ytUpper', 'change', function (L, el) { L.upper = el.checked; });
+  bind('ytShFill', 'input', function (L, el) { L.fill = el.value; });
+  bind('ytShLine', 'input', function (L, el) { L.line = el.value; });
+  bind('ytShW', 'input', function (L, el) { L.lw = +el.value; });
+  bind('ytImgLine', 'input', function (L, el) { L.line = el.value; if (!L.lw) L.lw = 8; });
+  bind('ytImgW', 'input', function (L, el) { L.lw = +el.value; });
+  bind('ytRot', 'input', function (L, el) { L.rot = el.value * Math.PI / 180; });
+  bind('ytOpacity', 'input', function (L, el) { L.op = el.value / 100; });
+  $('ytSafe').addEventListener('change', draw);
+
+  function syncBg() {
+    $('ytBgType').value = bg.type; $('ytC1').value = bg.c1; $('ytC2').value = bg.c2; $('ytAng').value = bg.ang; $('ytAngV').textContent = bg.ang; $('ytDim').value = bg.dim; $('ytDimV').textContent = bg.dim;
+    $('ytC1Box').hidden = bg.type === 'image'; $('ytC2Box').hidden = $('ytAngBox').hidden = bg.type !== 'grad'; $('ytDimBox').hidden = bg.type !== 'image';
+  }
+  ['ytBgType', 'ytC1', 'ytC2', 'ytAng', 'ytDim'].forEach(function (id) {
+    $(id).addEventListener('input', function () {
+      rememberOnce(id);
+      if (id === 'ytBgType' && $(id).value === 'image' && !bg.img) { $('file').click(); $(id).value = bg.type; return; }
+      bg.type = $('ytBgType').value; bg.c1 = $('ytC1').value; bg.c2 = $('ytC2').value; bg.ang = +$('ytAng').value; bg.dim = +$('ytDim').value;
+      syncBg(); refresh();
+    });
+  });
+
+  // ---------- adding things ----------
+  function add(L) { remember(); typing = null; layers.push(L); sel = L; refresh(); }
+  $('ytAddText').addEventListener('click', function () { add(text({ text: 'NEW TEXT', size: 100, y: H / 2 + (layers.length % 4) * 30 - 45 })); $('ytText').focus(); $('ytText').select(); });
+  $('ytAddPhoto').addEventListener('click', function () { $('ytPhotoFile').click(); });
+  function readImg(f, cb) {
+    if (!f || !/^image\//.test(f.type)) { say('bad', 'Please choose an image file (JPG, PNG, WebP or GIF).'); return; }
+    loadImage(f, function (im) { if (!im || !im.naturalWidth) { say('bad', 'Could not read that image. HEIC photos must be converted to JPG first.'); return; } say('', ''); cb(im); });
+  }
+  $('ytPhotoFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    readImg(f, function (im) { add(photo(im, { x: W * 0.72, y: H * 0.55 })); say('ok', 'Photo added. Drag it into place; PNG cut-outs with a transparent background look best.'); });
+  });
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    readImg(f, function (im) { remember(); bg.img = im; bg.type = 'image'; if (!bg.dim) bg.dim = 15; syncBg(); refresh(); say('ok', 'Background photo set. Use "Darken photo" to make text stand out.'); });
+  });
+  STICKERS.forEach(function (s) {
+    var b = document.createElement('button'); b.type = 'button';
+    if (s[0] === 'emoji') { b.textContent = s[1]; b.setAttribute('aria-label', 'Add emoji ' + s[1]); }
+    else {
+      b.setAttribute('aria-label', 'Add ' + s[2]); b.title = s[2];
+      var c = document.createElement('canvas'); c.width = c.height = 52; c.style.width = c.style.height = '26px';
+      var x = c.getContext('2d'), w = 44, h = 44 * (s[3].h / s[3].w); if (h > 44) { w = 44 * s[3].w / s[3].h; h = 44; }
+      x.translate(26, 26); x.beginPath(); SHAPES[s[1]](x, w, h); x.lineJoin = x.lineCap = 'round';
+      if (STROKED[s[1]] || s[1] === 'box') { x.strokeStyle = '#e11d48'; x.lineWidth = 6; x.stroke(); } else { x.fillStyle = '#e11d48'; x.fill(); }
+      b.appendChild(c);
+    }
+    b.addEventListener('click', function () {
+      var n = layers.length % 5;
+      if (s[0] === 'emoji') add(text({ text: s[1], font: 'emoji', size: 150, sw: 0, shadow: true, upper: false, x: W * 0.78 - n * 30, y: H * 0.35 + n * 25 }));
+      else add(shape(Object.assign({ shape: s[1], x: W / 2 + n * 30, y: H / 2 + n * 20 }, s[3])));
+    });
+    $('ytStickers').appendChild(b);
+  });
+
+  // ---------- starter layouts (original designs) ----------
+  var LAYOUTS = [
+    ['Big claim', function () { return { bg: { type: 'grad', c1: '#ff3d3d', c2: '#3b0764', ang: 45 }, layers: [text({ text: 'I TRIED IT\nFOR 30 DAYS', x: 430, y: 330, size: 130, fill: '#ffe600' }), shape({ shape: 'arrow', x: 960, y: 560, w: 300, h: 140, rot: -0.35, fill: '#ffe600', line: '#000000', lw: 8 })] }; }],
+    ['Versus', function () { return { bg: { type: 'grad', c1: '#2563eb', c2: '#dc2626', ang: 90 }, layers: [text({ text: 'THIS', x: 320, y: 140, size: 110 }), text({ text: 'THAT', x: 960, y: 140, size: 110 }), shape({ shape: 'burst', x: 640, y: 380, w: 300, h: 300, fill: '#ffe600', line: '#000000', lw: 8 }), text({ text: 'VS', x: 640, y: 385, size: 130, fill: '#000000', sw: 0, shadow: false })] }; }],
+    ['Top list', function () { return { bg: { type: 'grad', c1: '#0f172a', c2: '#0e7490', ang: 160 }, layers: [text({ text: '10', x: 270, y: 370, size: 420, fill: '#22d3ee', sw: 14 }), text({ text: 'THINGS YOU\nNEED TO KNOW', x: 820, y: 360, size: 110 })] }; }],
+    ['Before / after', function () { return { bg: { type: 'color', c1: '#111827', c2: '#111827', ang: 0 }, layers: [shape({ shape: 'box', x: 320, y: 400, w: 560, h: 560, fill: '#374151', line: '#ffffff', lw: 0 }), shape({ shape: 'box', x: 960, y: 400, w: 560, h: 560, fill: '#4b5563', line: '#ffffff', lw: 0 }), text({ text: 'BEFORE', x: 320, y: 80, size: 90, box: true, boxCol: '#dc2626', sw: 0 }), text({ text: 'AFTER', x: 960, y: 80, size: 90, box: true, boxCol: '#16a34a', sw: 0 }), shape({ shape: 'arrow', x: 640, y: 400, w: 200, h: 110, fill: '#ffe600', line: '#000000', lw: 6 })] }; }],
+    ['Easy guide', function () { return { bg: { type: 'grad', c1: '#fde047', c2: '#f97316', ang: 30 }, layers: [text({ text: 'EASY GUIDE', x: 420, y: 150, size: 110, fill: '#ffffff', box: true, boxCol: '#111111', sw: 0, shadow: false }), text({ text: 'STEP BY STEP', x: 420, y: 300, size: 96, fill: '#111111', stroke: '#ffffff', sw: 8, shadow: false }), shape({ shape: 'ring', x: 1010, y: 380, w: 330, h: 330, fill: '#dc2626', lw: 16 }), shape({ shape: 'check', x: 300, y: 520, w: 170, h: 130, fill: '#16a34a', lw: 30 })] }; }],
+    ['Reaction', function () { return { bg: { type: 'grad', c1: '#7c3aed', c2: '#db2777', ang: 120 }, layers: [text({ text: 'WAIT…\nWHAT?!', x: 400, y: 360, size: 170, fill: '#ffffff', stroke: '#000000', sw: 12 }), text({ text: '😱', font: 'emoji', x: 1000, y: 360, size: 260, sw: 0, upper: false }), shape({ shape: 'burst', x: 1150, y: 120, w: 150, h: 150, fill: '#ffe600', line: '#000000', lw: 6 })] }; }]
+  ];
+  function useLayout(i) {
+    remember(); typing = null;
+    var d = LAYOUTS[i][1]();
+    var keep = bg.img; bg = Object.assign({ img: keep, dim: bg.dim }, d.bg);
+    layers = layers.filter(function (L) { return L.type === 'image'; }).concat(d.layers); // keep photos the person already added
+    sel = null; syncBg(); refresh();
+    say('', 'Layout "' + LAYOUTS[i][0] + '" applied. Tap any text to change it.');
+  }
+  function layoutThumbs() {
+    var box = $('ytLayouts'); box.innerHTML = '';
+    var saveBg = bg, saveL = layers;
+    LAYOUTS.forEach(function (Lo, i) {
+      var b = document.createElement('button'), c = document.createElement('canvas'), sp = document.createElement('span');
+      b.type = 'button'; c.width = 256; c.height = 144; sp.textContent = Lo[0];
+      var d = Lo[1](); bg = Object.assign({ img: null, dim: 0 }, d.bg); layers = d.layers; layers.forEach(measure);
+      var x = c.getContext('2d'); x.scale(256 / W, 144 / H); compose(x);
+      b.appendChild(c); b.appendChild(sp); b.setAttribute('aria-label', 'Use layout ' + Lo[0]);
+      b.addEventListener('click', function () { useLayout(i); });
+      box.appendChild(b);
+    });
+    bg = saveBg; layers = saveL;
+  }
+
+  // ---------- pointer interaction ----------
+  function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * W / r.width, y: (e.clientY - r.top) * H / r.height }; }
+  function local(L, p) { var dx = p.x - L.x, dy = p.y - L.y, c = Math.cos(-L.rot), s = Math.sin(-L.rot); return { x: dx * c - dy * s, y: dx * s + dy * c }; }
+  function hit(p) { for (var i = layers.length - 1; i >= 0; i--) { var q = local(layers[i], p), L = layers[i]; if (Math.abs(q.x) <= L.w / 2 + 6 && Math.abs(q.y) <= L.h / 2 + 6) return L; } return null; }
+  var ptrs = {}, act = null;
+  function start(p, id) {
+    if (sel) {
+      var hd = handles(sel);
+      if (Math.hypot(p.x - hd.size.x, p.y - hd.size.y) <= hd.r * 1.8) return { mode: 'size', L: sel, d0: Math.hypot(p.x - sel.x, p.y - sel.y) || 1, s0: sel.size, w0: sel.w, h0: sel.h };
+      if (Math.hypot(p.x - hd.rot.x, p.y - hd.rot.y) <= hd.r * 1.8) return { mode: 'rot', L: sel };
+    }
+    var L = hit(p);
+    sel = L; refresh();
+    return L ? { mode: 'move', L: L, ox: p.x - L.x, oy: p.y - L.y } : null;
+  }
+  cv.addEventListener('pointerdown', function (e) {
+    var p = pt(e); ptrs[e.pointerId] = p;
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    var ids = Object.keys(ptrs);
+    if (ids.length === 2 && sel) { // pinch: resize and rotate the selected layer
+      var a = ptrs[ids[0]], b = ptrs[ids[1]];
+      act = { mode: 'pinch', L: sel, d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, a0: Math.atan2(b.y - a.y, b.x - a.x), r0: sel.rot, s0: sel.size, w0: sel.w, h0: sel.h };
+      return;
+    }
+    if (ids.length > 1) return;
+    act = start(p, e.pointerId);
+    if (act) { remember(); typing = null; }
+    e.preventDefault();
+  });
+  function scaleTo(a, f) {
+    var L = a.L;
+    if (L.type === 'text') L.size = Math.max(12, Math.min(900, a.s0 * f));
+    else { L.w = Math.max(16, a.w0 * f); L.h = Math.max(16, a.h0 * f); }
+  }
+  cv.addEventListener('pointermove', function (e) {
+    var p = pt(e);
+    if (!ptrs[e.pointerId]) { if (e.pointerType === 'mouse') { var h = sel && handles(sel); cv.style.cursor = h && (Math.hypot(p.x - h.size.x, p.y - h.size.y) <= h.r * 1.8) ? 'nwse-resize' : h && Math.hypot(p.x - h.rot.x, p.y - h.rot.y) <= h.r * 1.8 ? 'grab' : hit(p) ? 'move' : 'default'; } return; }
+    ptrs[e.pointerId] = p;
+    if (!act) return;
+    var L = act.L;
+    if (act.mode === 'pinch') {
+      var ids = Object.keys(ptrs); if (ids.length < 2) return;
+      var a = ptrs[ids[0]], b = ptrs[ids[1]];
+      scaleTo(act, Math.hypot(a.x - b.x, a.y - b.y) / act.d0);
+      L.rot = act.r0 + Math.atan2(b.y - a.y, b.x - a.x) - act.a0;
+    } else if (act.mode === 'move') { L.x = Math.min(W + L.w / 2 - 20, Math.max(-L.w / 2 + 20, p.x - act.ox)); L.y = Math.min(H + L.h / 2 - 20, Math.max(-L.h / 2 + 20, p.y - act.oy)); }
+    else if (act.mode === 'size') {
+      if (L.type === 'shape' && !e.shiftKey) { var q = local(L, p); L.w = Math.max(16, Math.abs(q.x) * 2); L.h = Math.max(16, Math.abs(q.y) * 2); }
+      else scaleTo(act, Math.hypot(p.x - L.x, p.y - L.y) / act.d0);
+    } else if (act.mode === 'rot') {
+      var ang = Math.atan2(p.y - L.y, p.x - L.x) + Math.PI / 2, step = Math.PI / 2;
+      var near = Math.round(ang / step) * step; if (Math.abs(ang - near) < 0.07) ang = near; // snap to straight angles
+      L.rot = ang;
+    }
+    draw(); props();
+  });
+  function end(e) { delete ptrs[e.pointerId]; if (!Object.keys(ptrs).length) { act = null; } else if (act && act.mode === 'pinch') act = null; $('dl').hidden = true; }
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  cv.addEventListener('dblclick', function () { if (sel && sel.type === 'text') { $('ytText').focus(); $('ytText').select(); } });
+  cv.addEventListener('keydown', function (e) {
+    if (!sel) return;
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (d) { e.preventDefault(); rememberOnce('key' + sel.id); var s = e.shiftKey ? 20 : 4; sel.x += d[0] * s; sel.y += d[1] * s; draw(); return; }
+    if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); remember(); layers.splice(layers.indexOf(sel), 1); sel = null; refresh(); }
+    if (e.key === 'Escape') { sel = null; refresh(); }
+  });
+  document.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z' && !/^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)) { e.preventDefault(); $('ytUndo').click(); }
+  });
+  window.addEventListener('resize', function () { draw(); });
+
+  // ---------- export ----------
+  var LIMIT = 2000000; // YouTube's limit is 2 MB
+  function out(type) {
+    var c = document.createElement('canvas'); c.width = W; c.height = H;
+    layers.forEach(measure); compose(c.getContext('2d'));
+    if (type === 'image/png') return PT.blob(c, type);
+    var qs = [0.92, 0.86, 0.8, 0.72, 0.62, 0.5];
+    return qs.reduce(function (p, q) { return p.then(function (b) { return b && b.size < LIMIT ? b : PT.blob(c, type, q); }); }, Promise.resolve(null));
+  }
+  function save(type) {
+    var btn = type === 'image/png' ? $('ytPng') : $('go'); btn.disabled = true; say('', 'Creating your thumbnail…');
+    out(type).then(function (b) {
+      if (!b) throw new Error('Your browser could not create the image.');
+      var name = 'youtube-thumbnail.' + (type === 'image/png' ? 'png' : 'jpg');
+      PT.done(b, name, type, '1280 × 720 ' + (type === 'image/png' ? 'PNG' : 'JPG'));
+      if (b.size >= LIMIT) say('bad', 'The PNG is ' + fmtBytes(b.size) + ', over YouTube\'s 2 MB limit for thumbnails. Download the JPG instead; it is always kept under 2 MB.');
+      else say('ok', '1280 × 720 ' + (type === 'image/png' ? 'PNG' : 'JPG') + ' · ' + fmtBytes(b.size) + ' (under YouTube\'s 2 MB limit).');
+      $('dl').textContent = 'Save ' + name; $('dl').click(); burst(btn);
+    }).catch(function (e) { say('bad', e.message || 'Something went wrong.'); }).then(function () { btn.disabled = false; });
+  }
+  $('go').addEventListener('click', function () { save('image/jpeg'); });
+  $('ytPng').addEventListener('click', function () { save('image/png'); });
+
+  // ---------- start ----------
+  syncBg();
+  var first = LAYOUTS[0][1](); bg = Object.assign({ img: null, dim: 0 }, first.bg); layers = first.layers; syncBg();
+  layoutThumbs(); refresh();
+  if (document.fonts && document.fonts.load) document.fonts.load('100px "GTN Anton"').then(function () { fontReady = true; layoutThumbs(); draw(); }, function () {});
+})();
+</script>

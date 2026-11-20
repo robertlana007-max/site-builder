@@ -1,0 +1,168 @@
+<style>
+.un-grid { display: grid; gap: 8px; margin-top: 16px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.un-item { display: flex; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.un-item:hover { border-color: var(--accent); }
+.un-name { flex: 1; min-width: 0; border: 0; background: none; color: var(--ink); font: 600 15px/1.3 var(--mono); text-align: left; padding: 10px 4px 10px 12px; cursor: pointer; overflow-wrap: anywhere; min-height: 44px; }
+.un-name small { display: block; font: 400 12px/1.2 inherit; font-family: inherit; color: var(--muted); }
+.un-star { flex: none; width: 44px; height: 44px; border: 0; background: none; cursor: pointer; font-size: 20px; color: var(--muted); border-radius: 10px; }
+.un-star[aria-pressed="true"] { color: #e0a100; }
+.un-favs { margin-top: 22px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.un-favs h2 { font-size: 17px; margin: 0; }
+.un-favs .un-grid { margin-top: 10px; }
+.un-favs .un-item { background: var(--surface); }
+</style>
+<div class="fields">
+  <div style="grid-column:1/-1"><label for="unKw">Your name or keywords</label><input type="text" id="unKw" data-nomemo maxlength="60" autocomplete="off" placeholder="e.g. Sara Khan, pixel, coffee, cricket"></div>
+  <div><label for="unStyle">Style</label><select id="unStyle"><option value="cool">Cool</option><option value="cute">Cute</option><option value="gaming">Gaming</option><option value="professional">Professional</option><option value="aesthetic">Aesthetic</option><option value="mix">Mix of all</option></select></div>
+  <div><label for="unPlat">Platform rules</label><select id="unPlat"></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="unNum" checked> Numbers</label>
+  <label><input type="checkbox" id="unUs" checked> Underscores _</label>
+  <label><input type="checkbox" id="unDot"> Dots .</label>
+</div>
+<p class="msg" id="unRule" style="margin-top:0"></p>
+<div class="btns">
+  <button class="btn" id="unGen" type="button">Generate 50 names</button>
+</div>
+<p class="msg" id="unMsg" aria-live="polite"></p>
+<div class="un-grid" id="unList" aria-live="polite"></div>
+<div class="un-favs" id="unFavBox" hidden>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:space-between;align-items:center">
+    <h2>Favourites <span id="unFavN" style="color:var(--muted);font-weight:400"></span></h2>
+    <div class="btns" style="margin:0"><button class="btn ghost" id="unFavCopy" type="button">Copy all</button><button class="btn ghost" id="unFavClr" type="button">Clear</button></div>
+  </div>
+  <div class="un-grid" id="unFavs"></div>
+</div>
+<p class="msg">Tap a name to copy it, or the star to keep it. This tool cannot check whether a name is free, so search for it in the app before you set it. Favourites are saved in this browser only.</p>
+<script>
+(function () {
+  // length limits and allowed characters, as published by each app
+  var PL = {
+    instagram: ['Instagram', 1, 30, /^[a-z0-9._]+$/, true, true, 'Up to 30 characters: letters, numbers, dots and underscores. No dot at the start or end and no two dots in a row.'],
+    tiktok: ['TikTok', 2, 24, /^[a-z0-9._]+$/, true, true, '2 to 24 characters: letters, numbers, dots and underscores. Cannot end with a dot.'],
+    x: ['X', 4, 15, /^[A-Za-z0-9_]+$/, true, false, '4 to 15 characters: letters, numbers and underscores only.'],
+    youtube: ['YouTube handle', 3, 30, /^[A-Za-z0-9._-]+$/, true, true, '3 to 30 characters: letters, numbers, underscores, hyphens and dots.'],
+    twitch: ['Twitch', 4, 25, /^[A-Za-z0-9_]+$/, true, false, '4 to 25 characters: letters, numbers and underscores. Cannot start with an underscore.'],
+    discord: ['Discord', 2, 32, /^[a-z0-9._]+$/, true, true, '2 to 32 characters: lowercase letters, numbers, dots and underscores. No two dots in a row.'],
+    snapchat: ['Snapchat', 3, 15, /^[a-z0-9._-]+$/, true, true, '3 to 15 characters. Starts with a letter and ends with a letter or number.'],
+    reddit: ['Reddit', 3, 20, /^[A-Za-z0-9_-]+$/, true, false, '3 to 20 characters: letters, numbers, dashes and underscores.'],
+    pinterest: ['Pinterest', 3, 30, /^[A-Za-z0-9_]+$/, true, false, '3 to 30 characters: letters, numbers and underscores.'],
+    gamertag: ['Game tag (12 max)', 3, 12, /^[A-Za-z0-9_]+$/, true, false, 'Short game names: up to 12 letters and numbers, as many consoles limit them.'],
+    any: ['Any (up to 20)', 3, 20, /^[A-Za-z0-9._]+$/, true, true, 'A general limit of 20 characters with letters, numbers, dots and underscores.']
+  };
+  Object.keys(PL).forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = PL[k][0]; $('unPlat').appendChild(o); });
+
+  var W = {
+    cool: { pre: ['the', 'its', 'real', 'just', 'hey', 'urban', 'neo', 'nova', 'iam', 'mr', 'ms', 'not', 'only'], adj: ['wild', 'bold', 'swift', 'chill', 'epic', 'prime', 'rogue', 'lucky', 'savage', 'urban', 'royal', 'electric', 'cosmic', 'iconic', 'rapid', 'silent', 'neon', 'solid'], noun: ['wave', 'vibe', 'flow', 'zone', 'nation', 'world', 'squad', 'club', 'king', 'boss', 'legend', 'motion', 'drift', 'nomad', 'ace', 'rider', 'storm', 'pulse'], suf: ['x', 'hq', 'official', 'daily', 'zone', 'vibes', 'world', 'life', 'online', 'only', 'tv', 'io'] },
+    cute: { pre: ['little', 'tiny', 'sweet', 'honey', 'sunny', 'baby', 'fluffy', 'cozy', 'happy', 'bubbly', 'lil', 'its'], adj: ['sweet', 'tiny', 'fluffy', 'sunny', 'peachy', 'cozy', 'cuddly', 'bubbly', 'sparkly', 'snuggly', 'dreamy', 'giggly', 'minty', 'rosy'], noun: ['bunny', 'kitty', 'bean', 'muffin', 'cupcake', 'panda', 'cookie', 'peach', 'puff', 'button', 'honey', 'mochi', 'berry', 'sprinkle', 'pudding', 'daisy', 'boba'], suf: ['bun', 'pie', 'boo', 'bear', 'bee', 'cake', 'pop', 'xo', 'kins', 'loves', 'smiles', 'hearts'] },
+    gaming: { pre: ['xx', 'pro', 'its', 'dark', 'shadow', 'toxic', 'ultra', 'mega', 'hyper', 'lord', 'sir', 'iam', 'the'], adj: ['dark', 'shadow', 'toxic', 'frozen', 'savage', 'deadly', 'silent', 'rapid', 'mystic', 'crimson', 'phantom', 'cyber', 'turbo', 'atomic', 'feral', 'blazing'], noun: ['sniper', 'slayer', 'reaper', 'hunter', 'ninja', 'wolf', 'dragon', 'viper', 'ghost', 'knight', 'raider', 'titan', 'blade', 'striker', 'falcon', 'demon', 'samurai', 'phoenix', 'clutch', 'gamer'], suf: ['gg', 'yt', 'ttv', 'pro', 'op', 'xd', 'plays', 'gaming', 'fps', 'mvp', 'x', 'live'] },
+    professional: { pre: ['hello', 'meet', 'by', 'team', 'ask', 'iam', 'its', 'with'], adj: ['studio', 'creative', 'digital', 'design', 'media', 'consulting', 'works', 'labs', 'writes', 'codes', 'builds', 'makes'], noun: ['studio', 'media', 'design', 'creative', 'labs', 'works', 'group', 'co', 'official', 'hq', 'pro', 'digital', 'consulting', 'tech'], suf: ['official', 'studio', 'hq', 'co', 'media', 'pro', 'online', 'writes', 'designs', 'dev', 'creates', 'global'] },
+    aesthetic: { pre: ['soft', 'velvet', 'lunar', 'misty', 'moonlit', 'golden', 'faded', 'dreamy', 'quiet', 'blush', 'astral', 'pastel', 'its'], adj: ['soft', 'velvet', 'lunar', 'misty', 'golden', 'hazy', 'ethereal', 'pastel', 'muted', 'serene', 'celestial', 'dusky', 'silken', 'wistful'], noun: ['moon', 'aura', 'daydream', 'petal', 'cloud', 'bloom', 'haze', 'echo', 'lune', 'mist', 'solace', 'sunday', 'skies', 'ember', 'wren', 'lilac', 'film', 'dusk'], suf: ['aura', 'daydream', 'bloom', 'skies', 'archive', 'diary', 'muse', 'notes', 'moon', 'mood', 'lens', 'world'] }
+  };
+  var NOUNS = ['nova', 'pixel', 'echo', 'river', 'orbit', 'atlas', 'comet', 'ember', 'maple', 'cedar', 'falcon', 'sky', 'zen', 'luna', 'mango', 'coral', 'onyx', 'jade', 'storm', 'spark'];
+  function rnd(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function words(raw) {
+    return raw.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase().split(/[^a-z0-9]+/).filter(function (w) { return w && w.length <= 20; }).slice(0, 6);
+  }
+  function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1); }
+  function num() { return rnd([String(Math.floor(Math.random() * 90) + 10), String(Math.floor(Math.random() * 900) + 100), String(Math.floor(Math.random() * 9) + 1), '7', '99', '01', '11', '22', '360', '247']); }
+  function leet(w) { var m = { a: '4', e: '3', i: '1', o: '0', s: '5' }, done = false; return w.replace(/[aeios]/g, function (c) { if (done || Math.random() < 0.5) return c; done = true; return m[c]; }); }
+
+  // Build one name from parts; seps chooses "", "_" or "." between parts.
+  function make(style, kw) {
+    var B = W[style], k = kw.length ? rnd(kw) : rnd(NOUNS), k2 = kw.length > 1 ? kw.filter(function (x) { return x !== k; })[0] : '';
+    var first = kw[0] || k, last = kw.length > 1 ? kw[kw.length - 1] : '';
+    var T = [
+      function () { return [rnd(B.pre), k]; },
+      function () { return [k, rnd(B.suf)]; },
+      function () { return [rnd(B.adj), k]; },
+      function () { return [k, rnd(B.noun)]; },
+      function () { return [rnd(B.adj), rnd(B.noun), k]; },
+      function () { return [rnd(B.pre), k, rnd(B.suf)]; },
+      function () { return k2 ? [k, k2] : [k, rnd(B.noun)]; },
+      function () { return [k.slice(0, Math.max(3, Math.ceil(k.length / 2))), rnd(B.noun)]; },
+      function () { return [rnd(B.adj), k.charAt(0), rnd(B.noun)].filter(function (x, i) { return i !== 1 || style === 'gaming'; }); }
+    ];
+    if (style === 'professional') T = T.concat([
+      function () { return last ? [first, last] : [first, rnd(B.suf)]; },
+      function () { return last ? [first.charAt(0), last] : [rnd(B.pre), first]; },
+      function () { return last ? [first, last.charAt(0)] : [first, rnd(B.noun)]; },
+      function () { return last ? [last, rnd(B.suf)] : [first, rnd(B.suf)]; },
+      function () { return [rnd(B.pre), first]; }
+    ]);
+    return rnd(T)();
+  }
+  function build() {
+    var p = PL[$('unPlat').value], kw = words($('unKw').value), style = $('unStyle').value;
+    var useNum = $('unNum').checked, useUs = $('unUs').checked && /_/.test('_') && p[3].test('a_b'), useDot = $('unDot').checked && p[3].test('a.b');
+    var seen = {}, out = [], tries = 0, lowerOnly = !p[3].test('A');
+    while (out.length < 50 && tries++ < 4000) {
+      var st = style === 'mix' ? rnd(Object.keys(W)) : style, parts = make(st, kw).filter(Boolean);
+      if (st === 'gaming' && Math.random() < 0.25) parts = parts.map(function (x, i) { return i === parts.length - 1 ? leet(x) : x; });
+      var seps = [''];
+      if (useUs) seps.push('_', '_');
+      if (useDot) seps.push('.', '.');
+      var sep = rnd(seps), camel = !lowerOnly && (st === 'gaming' || (st === 'professional' && Math.random() < 0.4) || (st === 'cool' && Math.random() < 0.3)) && sep === '';
+      var name = parts.map(function (x, i) { return camel ? cap(x) : x; }).join(sep);
+      if (st === 'gaming' && parts[0] === 'xx') name = (camel ? 'xX' : 'xx') + parts.slice(1).map(function (x) { return camel ? cap(x) : x; }).join(sep) + (camel ? 'Xx' : 'xx');
+      if (useNum && Math.random() < 0.45) name += (useUs && Math.random() < 0.3 && sep !== '.' ? '_' : '') + num();
+      if (useUs && Math.random() < 0.08 && !/^_/.test(name) && $('unPlat').value !== 'twitch') name = '_' + name + '_';
+      if (lowerOnly) name = name.toLowerCase();
+      // platform rules
+      if (!p[3].test(name) || name.length < p[1] || name.length > p[2]) continue;
+      if (/\.\.|^\.|\.$/.test(name)) continue;
+      if ($('unPlat').value === 'snapchat' && (!/^[a-z]/.test(name) || !/[a-z0-9]$/.test(name))) continue;
+      if (/^_/.test(name) && $('unPlat').value === 'twitch') continue;
+      if (/^\d+$/.test(name)) continue;
+      var key = name.toLowerCase();
+      if (seen[key]) continue;
+      seen[key] = 1; out.push(name);
+    }
+    return out;
+  }
+  var FKEY = 'gtnUsernameFavs';
+  function favs() { try { var a = JSON.parse(localStorage.getItem(FKEY)); return Array.isArray(a) ? a.slice(0, 200) : []; } catch (e) { return []; } }
+  function setFavs(a) { try { localStorage.setItem(FKEY, JSON.stringify(a)); } catch (e) {} paintFavs(); }
+  function isFav(n) { return favs().indexOf(n) !== -1; }
+  function item(n) {
+    var d = document.createElement('div'), b = document.createElement('button'), s = document.createElement('button');
+    d.className = 'un-item';
+    b.className = 'un-name'; b.type = 'button'; b.textContent = n; b.title = 'Copy ' + n;
+    var sm = document.createElement('small'); sm.textContent = n.length + ' characters · tap to copy'; b.appendChild(sm);
+    b.addEventListener('click', function () { copyText(n); toast('Copied ' + n); sm.textContent = 'Copied!'; setTimeout(function () { sm.textContent = n.length + ' characters · tap to copy'; }, 1200); });
+    s.className = 'un-star'; s.type = 'button'; s.textContent = '★'; s.dataset.n = n;
+    s.setAttribute('aria-pressed', isFav(n)); s.setAttribute('aria-label', 'Save ' + n + ' to favourites');
+    s.addEventListener('click', function () {
+      var a = favs(), i = a.indexOf(n);
+      if (i === -1) a.unshift(n); else a.splice(i, 1);
+      setFavs(a);
+    });
+    d.appendChild(b); d.appendChild(s);
+    return d;
+  }
+  function paintFavs() {
+    var a = favs(), box = $('unFavs');
+    box.innerHTML = '';
+    a.forEach(function (n) { box.appendChild(item(n)); });
+    $('unFavBox').hidden = !a.length;
+    $('unFavN').textContent = '(' + a.length + ')';
+    document.querySelectorAll('#unList .un-star').forEach(function (s) { s.setAttribute('aria-pressed', a.indexOf(s.dataset.n) !== -1); });
+  }
+  function rule() { $('unRule').textContent = PL[$('unPlat').value][6]; }
+  function gen() {
+    var list = build(), box = $('unList'), kw = words($('unKw').value), m = $('unMsg');
+    box.innerHTML = '';
+    list.forEach(function (n) { box.appendChild(item(n)); });
+    if (!list.length) { m.className = 'msg bad'; m.textContent = 'No names fit these rules. Try shorter keywords or turn on numbers or underscores.'; return; }
+    m.className = 'msg';
+    m.textContent = (kw.length ? '' : 'Showing random ideas. Add your name or a word you like for more personal names. ') + (list.length < 50 ? 'Only ' + list.length + ' names fit the length limit. Shorter keywords give more ideas. ' : '') + 'Click Generate again for new ones.';
+  }
+  $('unGen').addEventListener('click', gen);
+  $('unKw').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); gen(); } });
+  ['unStyle', 'unPlat', 'unNum', 'unUs', 'unDot'].forEach(function (id) { $(id).addEventListener('change', function () { rule(); if ($('unList').children.length) gen(); }); });
+  $('unFavCopy').addEventListener('click', function () { var a = favs(); if (a.length) copyText(a.join('\n'), $('unFavCopy')); });
+  $('unFavClr').addEventListener('click', function () { if (confirm('Remove all saved favourites?')) setFavs([]); });
+  rule(); paintFavs(); gen();
+})();
+</script>
