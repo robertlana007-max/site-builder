@@ -126,7 +126,7 @@
   function I(s) { return s ? '<i>' + esc(s) + '</i>' : ''; }
   var tmp = document.createElement('div');
   function plain(html) { tmp.innerHTML = html; return tmp.textContent; }
-  function endsP(html) { return /[.?!]$/.test(plain(html).trim()); }
+  function endsP(html) { return /[.?!][”’]?$/.test(plain(html).trim()); }
   function endsQ(s) { return /[?!]$/.test(String(s).trim()); }
   function dot(html) { return html ? html + (endsP(html) ? '' : '.') : ''; }
   // American double quotes; a full stop or comma goes inside, and is dropped after ? or !.
@@ -252,33 +252,31 @@
   }
   function mlaDate(c) { if (!c.year) return ''; return (c.month ? (c.day ? c.day + ' ' : '') + MLA_MON[c.month - 1] + ' ' : '') + c.year; }
   function mlaUrl(u) { return u.replace(/^https?:\/\//i, ''); }
+  // An organisation that is both author and publisher (or the website itself) is not repeated as the author.
+  function mlaSkip(c) { return c.A.length === 1 && c.A[0].org && (same(c.A[0].name, c.publisher) || same(c.A[0].name, c.container)); }
   function mla(c) {
-    var it = ITALIC_TITLE.other[c.type], A = c.A, parts = [];
-    var orgAuthor = A.length === 1 && A[0].org;
-    // An organisation that is both author and publisher (or the website itself) is not repeated as the author.
-    var skipAuthor = orgAuthor && (same(A[0].name, c.publisher) || same(A[0].name, c.container) || (c.type === 'video' && same(A[0].name, c.channel) && !c.title === false && false));
-    var out = A.length && !skipAuthor ? dot(mlaAuthors(A)) + ' ' : '';
+    var it = ITALIC_TITLE.other[c.type], A = c.A, parts;
+    var out = A.length && !mlaSkip(c) ? dot(mlaAuthors(A)) + ' ' : '';
     out += it ? dot(I(c.title)) : dq(c.title, '.');
     var link = c.doi || (c.url ? mlaUrl(c.url) : '');
-    if (c.type === 'book') parts = [edition(c.edition), esc(c.publisher), c.year];
+    var pp = c.pages ? (isRange(c.pages) ? 'pp. ' : 'p. ') + esc(pages(c.pages, 'mla')) : '';
+    if (c.type === 'book') parts = [esc(edition(c.edition)), esc(c.publisher), c.year];
     else if (c.type === 'report') parts = [c.reportno ? esc(reportNo(c.reportno)) : '', esc(c.publisher), c.year];
-    else if (c.type === 'video') parts = [I(c.container), c.channel && !(A.length && same(fullName(A[0]), c.channel)) && !(A.length === 1 && A[0].org && same(A[0].name, c.channel)) ? 'uploaded by ' + esc(c.channel) : '', mlaDate(c)];
-    else parts = [I(c.container), c.volume ? 'vol. ' + esc(c.volume) : '', c.issue ? 'no. ' + esc(c.issue) : '', mlaDate(c), c.pages ? (isRange(c.pages) ? 'pp. ' : 'p. ') + esc(pages(c.pages, 'mla')) : ''];
-    if (c.type === 'book' || c.type === 'report') parts[0] = parts[0] ? esc(parts[0]) : '';
+    else if (c.type === 'video') parts = [I(c.container), c.channel && !(A.length && same(fullName(A[0]), c.channel)) ? 'uploaded by ' + esc(c.channel) : '', mlaDate(c)];
+    else parts = [I(c.container), c.volume ? 'vol. ' + esc(c.volume) : '', c.issue ? 'no. ' + esc(c.issue) : '', mlaDate(c), pp];
     parts.push(esc(link));
-    var tail = join(parts.map(function (p) { return p ? String(p) : ''; }), ', ');
+    var tail = join(parts, ', ');
     if (tail) out += ' ' + dot(tail);
     if (c.acc && !c.year && (c.url || c.doi)) out += ' Accessed ' + c.acc.d + ' ' + MLA_MON[c.acc.m - 1] + ' ' + c.acc.y + '.';
     return out;
   }
   function mlaCite(c, narrative) {
     var pg = c.page ? esc(c.page.replace(/\s*[-–]\s*/, '-')) : '', who;
-    if (!c.A.length || (c.A.length === 1 && c.A[0].org && (same(c.A[0].name, c.publisher) || same(c.A[0].name, c.container)))) {
-      var t = ITALIC_TITLE.other[c.type] ? I(c.title) : dq(c.title);
-      if (!c.A.length) return narrative ? t + (pg ? ' (' + pg + ')' : '') : '(' + t + (pg ? ' ' + pg : '') + ')';
+    if (!c.A.length || mlaSkip(c)) who = ITALIC_TITLE.other[c.type] ? I(c.title) : dq(c.title);
+    else {
+      var s = c.A.map(function (a) { return esc(surname(a)); });
+      who = s.length === 1 ? s[0] : s.length === 2 ? s[0] + ' and ' + s[1] : s[0] + ' et al.';
     }
-    var s = c.A.map(function (a) { return esc(surname(a)); });
-    who = s.length === 1 ? s[0] : s.length === 2 ? s[0] + ' and ' + s[1] : s[0] + ' et al.';
     return narrative ? who + (pg ? ' (' + pg + ')' : '') : '(' + who + (pg ? ' ' + pg : '') + ')';
   }
 
@@ -349,31 +347,31 @@
     else if (c.type === 'video') rest = join([dot(esc(c.container) + ' video' + (c.duration ? ', ' + esc(c.duration) : '')), dated()], ' ');
     return join([out, rest], ' ') + link;
   }
+  // Joins note parts with commas; after a closing quote the comma is already inside it.
+  function cat(list) {
+    var out = '';
+    list.forEach(function (p) { if (!p) return; out = !out ? p : out + (/”$/.test(out) || /^\(/.test(p) ? ' ' : ', ') + p; });
+    return out;
+  }
   function chicagoNote(c) {
     var it = ITALIC_TITLE.other[c.type], y = c.year || 'n.d.', who = c.A.length ? chiNoteAuthors(c.A) : '';
-    var pg = c.page ? esc(pages(c.page, 'chicago')) : '', parts = [];
+    var pg = c.page ? esc(pages(c.page, 'chicago')) : '', parts;
     var title = it ? I(c.title) : dq(c.title, ',');
-    var sep = function (a, b) { return !a ? b : !b ? a : a + (/”$/.test(a) && !/[?!]”$/.test(a) ? ' ' : /[?!]”$/.test(a) ? ' ' : ', ') + b; };
-    var head = who ? who + ', ' + title : title;
     var pub = '(' + join([chiPub(c), y], ', ') + ')';
     var dated = chiDate(c) || (c.acc && c.link ? 'accessed ' + chiAcc(c) : '');
-    if (c.type === 'book') parts = [head + (edition(c.edition) ? ', ' + edition(c.edition) : '') + ' ' + pub, pg];
-    else if (c.type === 'report') parts = [head + (c.reportno ? ', ' + esc(reportNo(c.reportno)) : '') + ' ' + pub, pg];
-    else if (c.type === 'journal') parts = [head + (it ? ', ' : (/[?!,]”$/.test(title) ? ' ' : ', ')) + I(c.container) + (c.volume ? ' ' + esc(c.volume) : '') + (c.issue ? (c.volume ? ',' : '') + ' no. ' + esc(c.issue) : '') + ' (' + (c.month ? MONTHS[c.month - 1] + ' ' : '') + y + ')' + ((pg || c.pages) ? ': ' + (pg || esc(pages(c.pages, 'chicago'))) : '')];
-    else if (c.type === 'news') parts = [sep(head, I(c.container)), dated, pg];
-    else if (c.type === 'website') parts = [sep(head, esc(c.container)), dated];
-    else if (c.type === 'video') parts = [sep(head, esc(c.container) + ' video'), c.duration ? esc(c.duration) : '', dated];
+    if (c.type === 'book') parts = [who, title, esc(edition(c.edition)), pub, pg];
+    else if (c.type === 'report') parts = [who, title, c.reportno ? esc(reportNo(c.reportno)) : '', pub, pg];
+    else if (c.type === 'journal') parts = [who, title, I(c.container) + (c.volume ? ' ' + esc(c.volume) : '') + (c.issue ? (c.volume ? ',' : '') + ' no. ' + esc(c.issue) : '') + ' (' + (c.month ? MONTHS[c.month - 1] + ' ' : '') + y + ')' + ((pg || c.pages) ? ': ' + (pg || esc(pages(c.pages, 'chicago'))) : '')];
+    else if (c.type === 'news') parts = [who, title, I(c.container), dated, pg];
+    else if (c.type === 'website') parts = [who, title, esc(c.container), dated];
+    else parts = [who, title, esc(c.container) + ' video', esc(c.duration), dated];
     parts.push(esc(c.link));
-    var out = '', first = true;
-    parts.forEach(function (p) { if (!p) return; out = first ? p : out + (/[?!]”$/.test(out) || /,”$/.test(out) ? ' ' : ', ') + p; first = false; });
-    return dot(out);
+    return dot(cat(parts));
   }
   function chicagoShort(c) {
     var it = ITALIC_TITLE.other[c.type], st = shortTitle(c.title), pg = c.page ? esc(pages(c.page, 'chicago')) : '';
-    var t = it ? I(st) : dq(st, pg ? ',' : '');
-    var out = c.A.length ? chiNoteAuthors(c.A, true) + ', ' + t : t;
-    if (pg) out += (it ? ', ' : ' ') + pg;
-    return dot(out);
+    var t = it ? I(st) : dq(st, pg ? ',' : '.');
+    return dot(cat([c.A.length ? chiNoteAuthors(c.A, true) : '', t, pg]));
   }
   function chicagoCite(c, narrative) {
     var y = c.year || 'n.d.', pg = c.page ? ', ' + esc(pages(c.page, 'chicago')) : '';
@@ -558,7 +556,6 @@
     state.list.sort(function (a, b) { return sortKey(format(a, st).ref).localeCompare(sortKey(format(b, st).ref)); });
     drawList(); persist(); say('ok', 'Sorted A to Z.');
   });
-  function sorted() { var st = ui.style.value; return refs().slice().sort(function (a, b) { return sortKey(a).localeCompare(sortKey(b)); }); }
   $('ctCopyAll').addEventListener('click', function () { copyRich(refs().map(function (r) { return '<p style="margin:0 0 0 .5in;text-indent:-.5in">' + r + '</p>'; }).join(''), this); });
   function download(blob, name) {
     var a = document.createElement('a'), u = URL.createObjectURL(blob);

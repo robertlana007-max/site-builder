@@ -1,0 +1,513 @@
+<style>
+.gc-row { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto auto; align-items: center; gap: 8px; margin-bottom: 8px; }
+.gc-row[hidden] { display: none; }
+.gc-sw { width: 14px; height: 14px; border-radius: 50%; background: var(--k); flex: none; }
+.gc-row label { margin: 0; font-family: var(--mono); font-size: 15px; white-space: nowrap; }
+.gc-row input[type=text] { font-family: var(--mono); font-size: 16px; min-width: 0; }
+.gc-row input.bad { border-color: var(--bad); }
+.gc-ic { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); cursor: pointer; font: 600 18px/1 inherit; font-family: inherit; display: grid; place-items: center; padding: 0; }
+.gc-ic:hover { color: var(--accent); border-color: var(--accent); }
+.gc-ic[aria-pressed="false"] { opacity: .45; }
+.gc-err { grid-column: 3 / -1; margin: -4px 0 4px; font-size: 13.5px; color: var(--bad); }
+.gc-err:empty { display: none; }
+.gc-box { position: relative; margin-top: 14px; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface); }
+.gc-box canvas { display: block; width: 100%; height: clamp(300px, 62vw, 520px); touch-action: none; cursor: crosshair; }
+.gc-box canvas.drag { cursor: grabbing; }
+.gc-zoom { position: absolute; top: 8px; inset-inline-end: 8px; display: grid; gap: 6px; }
+.gc-zoom button { width: 40px; height: 40px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 600 20px/1 inherit; font-family: inherit; cursor: pointer; box-shadow: var(--shadow); padding: 0; }
+.gc-zoom button:hover { color: var(--accent); border-color: var(--accent); }
+.gc-read { margin-top: 8px; font-family: var(--mono); font-size: 14px; color: var(--muted); min-height: 22px; overflow-wrap: anywhere; }
+.gc-read b { color: var(--ink); font-weight: 600; }
+.gc-win { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+.gc-found { margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px; font-size: 15px; }
+.gc-found li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.gc-found i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-inline-end: 6px; }
+.gc-help { font-size: 14px; color: var(--muted); margin: 4px 0 0; }
+</style>
+<div id="fns">
+  <div class="gc-row" data-i="0"><span class="gc-sw"></span><label for="f1">y₁ =</label><input type="text" id="f1" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. sin(x)"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+  <div class="gc-row" data-i="1" hidden><span class="gc-sw"></span><label for="f2">y₂ =</label><input type="text" id="f2" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. x^2 - 3"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+  <div class="gc-row" data-i="2" hidden><span class="gc-sw"></span><label for="f3">y₃ =</label><input type="text" id="f3" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. 1/x"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+  <div class="gc-row" data-i="3" hidden><span class="gc-sw"></span><label for="f4">y₄ =</label><input type="text" id="f4" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. tan(x)"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+  <div class="gc-row" data-i="4" hidden><span class="gc-sw"></span><label for="f5">y₅ =</label><input type="text" id="f5" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. sqrt(x)"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+  <div class="gc-row" data-i="5" hidden><span class="gc-sw"></span><label for="f6">y₆ =</label><input type="text" id="f6" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="e.g. e^(-x^2)"><button type="button" class="gc-ic eye" aria-pressed="true" title="Show or hide">◉</button><button type="button" class="gc-ic del" title="Remove">×</button><p class="gc-err"></p></div>
+</div>
+<p class="gc-help">Use x as the variable. You can type 2x, x^2, sqrt(x), abs(x), ln(x), log(x), e^x, sin, cos, tan and pi.</p>
+<div class="btns"><button type="button" class="btn ghost" id="add">+ Add function</button></div>
+<div class="gc-box">
+  <canvas id="cv" role="img" aria-label="Graph of your functions"></canvas>
+  <div class="gc-zoom"><button type="button" id="zin" aria-label="Zoom in">+</button><button type="button" id="zout" aria-label="Zoom out">−</button><button type="button" id="zreset" aria-label="Reset view" title="Reset view">⟲</button></div>
+</div>
+<div class="gc-read" id="read">Drag to move, scroll or pinch to zoom. Hover or tap the graph to read values.</div>
+<details class="more" style="margin-top:12px"><summary>Set the viewing window</summary><div>
+  <div class="gc-win">
+    <div><label for="xmin">x from</label><input type="number" id="xmin" step="any" data-nomemo></div>
+    <div><label for="xmax">x to</label><input type="number" id="xmax" step="any" data-nomemo></div>
+    <div><label for="ymin">y from</label><input type="number" id="ymin" step="any" data-nomemo></div>
+    <div><label for="ymax">y to</label><input type="number" id="ymax" step="any" data-nomemo></div>
+  </div>
+  <div class="btns" style="margin-bottom:10px"><button type="button" class="btn ghost" id="setwin">Apply window</button></div>
+</div></details>
+<div class="btns">
+  <button type="button" class="btn" id="find">Find roots &amp; intersections</button>
+  <button type="button" class="btn ghost" id="png">Download PNG</button>
+</div>
+<p class="msg" id="msg"></p>
+<ul class="gc-found" id="found"></ul>
+<script>
+(function () {
+  // ---------- shared maths parser (the same code is copied into each Study tool; no eval or Function) ----------
+  function MathError(msg) { this.message = msg; }
+  var MFN = ['asinh', 'acosh', 'atanh', 'asin', 'acos', 'atan', 'sinh', 'cosh', 'tanh', 'sqrt', 'cbrt', 'sin', 'cos', 'tan', 'sec', 'csc', 'cot', 'abs', 'exp', 'log', 'ln', 'floor', 'ceil', 'round', 'sign'];
+  // Turns text into a tree: {t:'num',s:'2.5'} {t:'const',n:'pi'|'e'} {t:'var',n:'x'} {t:'neg',a} {t:'op',o:'+',a,b} {t:'fn',n:'sin',a}
+  function mParse(src, vars) {
+    vars = vars || [];
+    var s = String(src).replace(/[−–—]/g, '-').replace(/[×·∙⋅]/g, '*').replace(/[÷∕]/g, '/').replace(/\*\*/g, '^').replace(/π/g, 'pi');
+    var toks = [], i = 0, m, names = MFN.concat(['pi', 'e'], vars).sort(function (a, b) { return b.length - a.length; });
+    while (i < s.length) {
+      var c = s[i], rest = s.slice(i);
+      if (/\s/.test(c)) { i++; continue; }
+      if ((m = /^(\d+\.?\d*|\.\d+)/.exec(rest))) {
+        if (s[i + m[0].length] === '.') throw new MathError('A decimal point is in the wrong place.');
+        toks.push({ k: 'num', s: m[0] }); i += m[0].length; continue;
+      }
+      if ((m = /^[a-zA-Z]+/.exec(rest))) {
+        var w = m[0], j = 0;
+        while (j < w.length) { // split a run of letters into known names: "2xsinx" -> x, sin, x
+          var hit = null;
+          for (var n = 0; n < names.length; n++) if (names[n].length > 1 ? w.substr(j, names[n].length).toLowerCase() === names[n] : w[j] === names[n]) { hit = names[n]; break; }
+          if (!hit) {
+            var bad = w.slice(j).match(/^[a-zA-Z]+/)[0];
+            throw new MathError(vars.length ? '"' + bad + '" is not a function or variable I know. Use ' + vars.join(', ') + ' as the variable.' : '"' + bad + '" is not a function I know.');
+          }
+          if (hit === 'pi' || hit === 'e') toks.push({ k: 'const', n: hit });
+          else if (vars.indexOf(hit) !== -1) toks.push({ k: 'var', n: hit });
+          else toks.push({ k: 'fn', n: hit });
+          j += hit.length;
+        }
+        i += w.length; continue;
+      }
+      if (c === '√') { toks.push({ k: 'fn', n: 'sqrt' }); i++; continue; }
+      if (c === '²' || c === '³') { toks.push({ k: '^' }, { k: 'num', s: c === '²' ? '2' : '3' }); i++; continue; }
+      if (c === '[' || c === '{') { toks.push({ k: '(' }); i++; continue; }
+      if (c === ']' || c === '}') { toks.push({ k: ')' }); i++; continue; }
+      if ('+-*/^()!'.indexOf(c) !== -1) { toks.push({ k: c }); i++; continue; }
+      if (c === ',') throw new MathError('Use a dot for decimals, like 2.5, not a comma.');
+      throw new MathError('"' + c + '" is not something I understand.');
+    }
+    var open = 0;
+    toks.forEach(function (x) { if (x.k === '(') open++; else if (x.k === ')') open--; });
+    if (open < 0) throw new MathError('There is a ")" without a matching "(".');
+    while (open-- > 0) toks.push({ k: ')' }); // forgive missing closing brackets at the end
+    if (!toks.length) throw new MathError('Nothing to work out yet.');
+    var p = 0;
+    function peek() { return toks[p]; }
+    function starts(x) { return x && (x.k === 'num' || x.k === 'const' || x.k === 'var' || x.k === 'fn' || x.k === '('); }
+    function expr() {
+      var v = term();
+      while (peek() && (peek().k === '+' || peek().k === '-')) { var o = toks[p++].k; v = { t: 'op', o: o, a: v, b: term() }; }
+      return v;
+    }
+    function term() {
+      var v = unary();
+      for (;;) {
+        var x = peek();
+        if (x && (x.k === '*' || x.k === '/')) { p++; v = { t: 'op', o: x.k, a: v, b: unary() }; }
+        else if (starts(x)) { // implicit multiplication: 2x, 3(x+1), (x+1)(x-1), 2sin(x)
+          if (x.k === 'num' && toks[p - 1].k === 'num') throw new MathError('Two numbers need an operator between them.');
+          v = { t: 'op', o: '*', a: v, b: power() };
+        } else return v;
+      }
+    }
+    function unary() {
+      var x = peek();
+      if (x && x.k === '-') { p++; return { t: 'neg', a: unary() }; }
+      if (x && x.k === '+') { p++; return unary(); }
+      return power();
+    }
+    function power() {
+      var b = postfix();
+      if (peek() && peek().k === '^') { p++; return { t: 'op', o: '^', a: b, b: unary() }; } // right-associative; -x^2 means -(x^2)
+      return b;
+    }
+    function postfix() {
+      var v = primary();
+      while (peek() && peek().k === '!') { p++; v = { t: 'fn', n: 'fact', a: v }; }
+      return v;
+    }
+    function primary() {
+      var x = toks[p++];
+      if (!x) throw new MathError('The expression ends too early.');
+      if (x.k === 'num') return { t: 'num', s: x.s };
+      if (x.k === 'const') return { t: 'const', n: x.n };
+      if (x.k === 'var') return { t: 'var', n: x.n };
+      if (x.k === '(') {
+        if (peek() && peek().k === ')') throw new MathError('There are empty brackets.');
+        var v = expr();
+        if (!peek() || peek().k !== ')') throw new MathError('Check your brackets.');
+        p++; return v;
+      }
+      if (x.k === 'fn') {
+        if (peek() && peek().k === '^') throw new MathError('Write powers of functions with brackets, like (sin(x))^2 or sin(x)^2.');
+        if (!peek()) throw new MathError(x.n + ' needs something after it, like ' + x.n + '(2).');
+        return { t: 'fn', n: x.n, a: peek().k === '(' ? primary() : power() };
+      }
+      if (x.k === ')') throw new MathError('Check your brackets.');
+      if (x.k === '!') throw new MathError('"!" needs a number before it.');
+      throw new MathError('"' + x.k + '" is missing a number.');
+    }
+    var tree = expr();
+    if (p < toks.length) throw new MathError(toks[p].k === ')' ? 'Check your brackets.' : 'There is something extra at the end.');
+    return tree;
+  }
+  function mFact(n) { if (n < 0 || Math.floor(n) !== n) return NaN; if (n > 170) return Infinity; var r = 1; for (var i = 2; i <= n; i++) r *= i; return r; }
+  var MF = {
+    sin: Math.sin, cos: Math.cos, tan: Math.tan, asin: Math.asin, acos: Math.acos, atan: Math.atan, sinh: Math.sinh, cosh: Math.cosh, tanh: Math.tanh,
+    asinh: Math.asinh, acosh: Math.acosh, atanh: Math.atanh, sqrt: Math.sqrt, cbrt: Math.cbrt, abs: Math.abs, exp: Math.exp, ln: Math.log, log: Math.log10,
+    floor: Math.floor, ceil: Math.ceil, round: Math.round, sign: Math.sign, fact: mFact,
+    sec: function (v) { return 1 / Math.cos(v); }, csc: function (v) { return 1 / Math.sin(v); }, cot: function (v) { return 1 / Math.tan(v); }
+  };
+  function mPow(a, b) {
+    if (a < 0 && Math.floor(b) !== b) { // odd roots of negatives are real: (-8)^(1/3) = -2
+      var q = 1 / b, r = Math.round(q);
+      if (Math.abs(q - r) < 1e-9 && r % 2 !== 0) return -Math.pow(-a, b);
+    }
+    return Math.pow(a, b);
+  }
+  // Compiles a tree into a fast JavaScript closure: f(scope) -> number (NaN where undefined).
+  function mCompile(n) {
+    switch (n.t) {
+      case 'num': var v = parseFloat(n.s); return function () { return v; };
+      case 'const': var k = n.n === 'pi' ? Math.PI : Math.E; return function () { return k; };
+      case 'var': var nm = n.n; return function (s) { return s[nm]; };
+      case 'neg': var a0 = mCompile(n.a); return function (s) { return -a0(s); };
+      case 'fn': var f = MF[n.n], a1 = mCompile(n.a); return function (s) { return f(a1(s)); };
+      case 'op':
+        var A = mCompile(n.a), B = mCompile(n.b);
+        if (n.o === '+') return function (s) { return A(s) + B(s); };
+        if (n.o === '-') return function (s) { return A(s) - B(s); };
+        if (n.o === '*') return function (s) { return A(s) * B(s); };
+        if (n.o === '/') return function (s) { return A(s) / B(s); };
+        return function (s) { return mPow(A(s), B(s)); };
+    }
+  }
+  // ---------- state ----------
+  var COLORS = ['#2563eb', '#e5484d', '#12a150', '#d97706', '#8b5cf6', '#0891b2'];
+  var rows = [].slice.call(document.querySelectorAll('.gc-row'));
+  var fns = rows.map(function () { return null; }); // compiled functions, or null
+  var cv = $('cv'), ctx = cv.getContext('2d'), W = 0, H = 0, dpr = 1;
+  var view = null, trace = null, found = [], first = true;
+  rows.forEach(function (r, i) { r.querySelector('.gc-sw').style.setProperty('--k', COLORS[i]); });
+
+  function input(i) { return rows[i].querySelector('input'); }
+  function shown(i) { return !rows[i].hidden && rows[i].querySelector('.eye').getAttribute('aria-pressed') === 'true' && fns[i]; }
+  function compileRow(i) {
+    var s = input(i).value.trim().replace(/^(y\s*[₁₂₃₄₅₆\d]?|f\s*\(\s*x\s*\))\s*=/i, ''), err = rows[i].querySelector('.gc-err');
+    fns[i] = null; err.textContent = ''; input(i).classList.remove('bad');
+    if (!s) return;
+    try { var f = mCompile(mParse(s, ['x'])), sc = { x: 0 }; fns[i] = function (x) { sc.x = x; return f(sc); }; }
+    catch (e) { if (!(e instanceof MathError)) throw e; err.textContent = e.message; input(i).classList.add('bad'); }
+  }
+  function visibleRows() { var n = 1; rows.forEach(function (r, i) { if (input(i).value.trim()) n = Math.max(n, i + 1); }); return n; }
+  function syncRows(n) { rows.forEach(function (r, i) { r.hidden = i >= n; }); $('add').hidden = n >= rows.length; }
+  function anyFn() { return fns.some(function (f, i) { return shown(i); }); }
+
+  // ---------- view: world rectangle shown on the canvas ----------
+  function defaultView() { var h = 20 * H / W; return { x0: -10, x1: 10, y0: -h / 2, y1: h / 2 }; }
+  function sx(x) { return (x - view.x0) / (view.x1 - view.x0) * W; }
+  function sy(y) { return (view.y1 - y) / (view.y1 - view.y0) * H; }
+  function wx(px) { return view.x0 + px / W * (view.x1 - view.x0); }
+  function wy(py) { return view.y1 - py / H * (view.y1 - view.y0); }
+  function zoom(f, px, py) {
+    var x = wx(px), y = wy(py), w = (view.x1 - view.x0) * f, h = (view.y1 - view.y0) * f;
+    if (w < 1e-9 || h < 1e-9 || w > 1e12 || h > 1e12) return;
+    view = { x0: x - (px / W) * w, x1: x + (1 - px / W) * w, y0: y - (1 - py / H) * h, y1: y + (py / H) * h };
+    draw();
+  }
+  function pan(dx, dy) { var kx = (view.x1 - view.x0) / W, ky = (view.y1 - view.y0) / H; view = { x0: view.x0 - dx * kx, x1: view.x1 - dx * kx, y0: view.y0 + dy * ky, y1: view.y1 + dy * ky }; draw(); }
+  function showWin() { ['x0', 'x1', 'y0', 'y1'].forEach(function (k, i) { $(['xmin', 'xmax', 'ymin', 'ymax'][i]).value = +view[k].toPrecision(6); }); }
+
+  // ---------- number labels ----------
+  function niceStep(range, px) { // a 1, 2 or 5 step giving grid lines about px pixels apart
+    var raw = range / Math.max(1, px), p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p;
+    return (m < 1.5 ? 1 : m < 3.5 ? 2 : m < 7.5 ? 5 : 10) * p;
+  }
+  function label(v, step) {
+    if (Math.abs(v) < step / 1e6) return '0';
+    var a = Math.abs(v);
+    if (a >= 1e6 || a < 1e-4) return v.toExponential(Math.max(0, Math.min(6, Math.round(Math.log10(a) - Math.log10(step))))).replace('e+', 'e');
+    return v.toFixed(Math.max(0, Math.min(10, -Math.floor(Math.log10(step) + 1e-9)))).replace('-', '−');
+  }
+  function fmt(v) {
+    if (!isFinite(v)) return 'undefined';
+    var r = parseFloat(v.toPrecision(7));
+    if (r === 0) return '0';
+    var a = Math.abs(r);
+    return (a >= 1e7 || a < 1e-5 ? r.toExponential(5).replace(/\.?0+e/, 'e') : String(r)).replace('-', '−');
+  }
+
+  // ---------- drawing ----------
+  function colors() { var cs = getComputedStyle(document.documentElement); return { bg: cs.getPropertyValue('--surface').trim() || '#fff', ink: cs.getPropertyValue('--ink').trim() || '#111', muted: cs.getPropertyValue('--muted').trim() || '#666', line: cs.getPropertyValue('--line').trim() || '#ddd' }; }
+  // True when f really jumps between a and b (a pole or a step), not just a steep but continuous climb.
+  function jumps(f, a, fa, b, fb, ky) {
+    for (var k = 0; k < 40; k++) {
+      var m = (a + b) / 2, fm = f(m);
+      if (!isFinite(fm)) return true;
+      if (Math.abs(fm - fa) > Math.abs(fb - fm)) { b = m; fb = fm; } else { a = m; fa = fm; }
+      if (Math.abs(fb - fa) * ky < 0.5) return false;
+    }
+    return Math.abs(fb - fa) * ky > 1;
+  }
+  function edge(f, a, b) { // a has a finite value, b does not: walk to the edge of the domain
+    for (var k = 0; k < 40; k++) { var m = (a + b) / 2; if (isFinite(f(m))) a = m; else b = m; }
+    return a;
+  }
+  function plot(c, f, color, w, h) {
+    var n = Math.ceil(w * 1.5), ky = h / (view.y1 - view.y0), lim = h * 4, pen = false, px = 0, py = 0, prevX = 0, prevY = NaN;
+    function Y(y) { return Math.max(-lim, Math.min(h + lim, (view.y1 - y) * ky)); }
+    function X(x) { return (x - view.x0) / (view.x1 - view.x0) * w; }
+    c.beginPath(); c.strokeStyle = color; c.lineWidth = 2.5; c.lineJoin = 'round'; c.lineCap = 'round';
+    for (var i = 0; i <= n; i++) {
+      var x = view.x0 + (view.x1 - view.x0) * i / n, y = f(x);
+      if (!isFinite(y)) {
+        if (pen && i > 0) { var ex = edge(f, prevX, x), ey = f(ex); if (isFinite(ey)) c.lineTo(X(ex), Y(ey)); }
+        pen = false;
+      } else {
+        if (!pen && i > 0 && !isFinite(prevY)) { var sx2 = edge(f, x, prevX), sy2 = f(sx2); if (isFinite(sy2)) { c.moveTo(X(sx2), Y(sy2)); pen = true; } }
+        var X1 = X(x), Y1 = Y(y);
+        if (pen && Math.abs(Y1 - py) > 6 && jumps(f, prevX, prevY, x, y, ky)) pen = false;
+        if (pen) c.lineTo(X1, Y1); else c.moveTo(X1, Y1);
+        pen = true; px = X1; py = Y1;
+      }
+      prevX = x; prevY = y;
+    }
+    c.stroke();
+  }
+  function render(c, w, h, forExport) {
+    var col = colors();
+    c.fillStyle = col.bg; c.fillRect(0, 0, w, h);
+    var xs = niceStep(view.x1 - view.x0, w / 90), ys = niceStep(view.y1 - view.y0, h / 70);
+    var X = function (x) { return (x - view.x0) / (view.x1 - view.x0) * w; }, Y = function (y) { return (view.y1 - y) / (view.y1 - view.y0) * h; };
+    // minor and major grid lines
+    [[xs / 5, ys / 5, 0.45], [xs, ys, 1]].forEach(function (g) {
+      c.beginPath(); c.strokeStyle = col.line; c.globalAlpha = g[2]; c.lineWidth = 1;
+      for (var gx = Math.ceil(view.x0 / g[0]) * g[0]; gx <= view.x1; gx += g[0]) { var p = Math.round(X(gx)) + .5; c.moveTo(p, 0); c.lineTo(p, h); }
+      for (var gy = Math.ceil(view.y0 / g[1]) * g[1]; gy <= view.y1; gy += g[1]) { var q = Math.round(Y(gy)) + .5; c.moveTo(0, q); c.lineTo(w, q); }
+      c.stroke();
+    });
+    c.globalAlpha = 1;
+    // axes
+    var ax = Y(0), ay = X(0);
+    c.beginPath(); c.strokeStyle = col.muted; c.lineWidth = 1.5;
+    if (ax >= 0 && ax <= h) { c.moveTo(0, Math.round(ax) + .5); c.lineTo(w, Math.round(ax) + .5); }
+    if (ay >= 0 && ay <= w) { c.moveTo(Math.round(ay) + .5, 0); c.lineTo(Math.round(ay) + .5, h); }
+    c.stroke();
+    // labels, kept on screen even when an axis is off to the side
+    c.font = '12px system-ui, sans-serif'; c.fillStyle = col.muted;
+    var ly = Math.min(Math.max(ax + 4, 4), h - 18); c.textAlign = 'center'; c.textBaseline = 'top';
+    for (var lx = Math.ceil(view.x0 / xs) * xs; lx <= view.x1; lx += xs) {
+      if (Math.abs(lx) < xs / 2) continue;
+      var tx = X(lx); if (tx < 12 || tx > w - 12) continue;
+      halo(c, label(lx, xs), tx, ly, col.bg);
+    }
+    var lxp = Math.min(Math.max(ay - 5, 30), w - 5); c.textAlign = 'right'; c.textBaseline = 'middle';
+    if (ay - 5 < 30) { c.textAlign = 'left'; lxp = Math.max(ay + 5, 4); }
+    for (var ly2 = Math.ceil(view.y0 / ys) * ys; ly2 <= view.y1; ly2 += ys) {
+      if (Math.abs(ly2) < ys / 2) continue;
+      var ty = Y(ly2); if (ty < 10 || ty > h - 10) continue;
+      halo(c, label(ly2, ys), lxp, ty, col.bg);
+    }
+    if (ax >= 0 && ax <= h && ay >= 0 && ay <= w) { c.textAlign = 'right'; c.textBaseline = 'top'; halo(c, '0', ay - 5, ax + 4, col.bg); }
+    // curves
+    fns.forEach(function (f, i) { if (shown(i)) plot(c, f, COLORS[i], w, h); });
+    // roots and intersections that were found
+    found.forEach(function (r) { dot(c, X(r.x), Y(r.y), r.color, col.bg, 5); });
+    // trace point
+    if (trace && !forExport) {
+      c.save(); c.setLineDash([4, 4]); c.strokeStyle = col.muted; c.globalAlpha = .6; c.beginPath(); c.moveTo(Math.round(X(trace.x)) + .5, 0); c.lineTo(Math.round(X(trace.x)) + .5, h); c.stroke(); c.restore();
+      fns.forEach(function (f, i) { if (!shown(i)) return; var y = f(trace.x); if (isFinite(y)) dot(c, X(trace.x), Y(y), COLORS[i], col.bg, 5); });
+      if (trace.best != null) {
+        var y = fns[trace.best](trace.x), t = '(' + fmt(trace.x) + ', ' + fmt(y) + ')', bx = X(trace.x), by = Y(y);
+        c.font = '600 13px system-ui, sans-serif'; var tw = c.measureText(t).width + 14;
+        var bxx = Math.min(Math.max(bx + 10, 4), w - tw - 4), byy = by - 34 < 4 ? by + 12 : by - 34;
+        c.fillStyle = col.bg; c.strokeStyle = COLORS[trace.best]; c.lineWidth = 1.5; rr(c, bxx, byy, tw, 24, 6); c.fill(); c.stroke();
+        c.fillStyle = col.ink; c.textAlign = 'left'; c.textBaseline = 'middle'; c.fillText(t, bxx + 7, byy + 12);
+      }
+    }
+    if (forExport) { // legend
+      var list = []; fns.forEach(function (f, i) { if (shown(i)) list.push(i); });
+      c.font = '600 14px ui-monospace, Menlo, monospace'; c.textAlign = 'left'; c.textBaseline = 'middle';
+      var lw = 0; list.forEach(function (i) { lw = Math.max(lw, c.measureText('y = ' + input(i).value.trim()).width); });
+      if (list.length) { c.fillStyle = col.bg; c.globalAlpha = .9; c.fillRect(8, 8, lw + 40, list.length * 22 + 10); c.globalAlpha = 1; }
+      list.forEach(function (i, k) { c.fillStyle = COLORS[i]; c.fillRect(16, 18 + k * 22, 14, 4); c.fillStyle = col.ink; c.fillText('y = ' + input(i).value.trim(), 36, 20 + k * 22); });
+    }
+  }
+  function halo(c, t, x, y, bg) { c.save(); c.strokeStyle = bg; c.lineWidth = 3; c.lineJoin = 'round'; c.strokeText(t, x, y); c.restore(); c.fillText(t, x, y); }
+  function dot(c, x, y, color, bg, r) { if (x < -10 || y < -10 || x > 1e5 || y > 1e5) return; c.beginPath(); c.arc(x, y, r, 0, Math.PI * 2); c.fillStyle = color; c.fill(); c.lineWidth = 2; c.strokeStyle = bg; c.stroke(); }
+  function rr(c, x, y, w, h, r) { c.beginPath(); c.moveTo(x + r, y); c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r); c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath(); }
+  var raf = 0;
+  function draw() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; drawNow(); }); }
+  function drawNow() {
+    if (!W) return;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    render(ctx, W, H, false);
+    showWin(); readout();
+  }
+  function size() {
+    var r = cv.getBoundingClientRect(), w = Math.round(r.width), h = Math.round(r.height);
+    if (!w || !h) return;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    if (view && W) { // keep the centre and scale when the box changes size
+      var cx = (view.x0 + view.x1) / 2, cy = (view.y0 + view.y1) / 2, kx = (view.x1 - view.x0) / W, ky = (view.y1 - view.y0) / H;
+      view = { x0: cx - kx * w / 2, x1: cx + kx * w / 2, y0: cy - ky * h / 2, y1: cy + ky * h / 2 };
+    }
+    W = w; H = h; cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    if (!view) view = defaultView();
+    drawNow();
+  }
+
+  // ---------- reading values ----------
+  function readout() {
+    var el = $('read');
+    if (!trace) return;
+    var parts = ['<b>x = ' + fmt(trace.x) + '</b>'];
+    fns.forEach(function (f, i) { if (shown(i)) parts.push('<span style="color:' + COLORS[i] + '">y' + '₁₂₃₄₅₆'[i] + '</span> = ' + fmt(f(trace.x))); });
+    el.innerHTML = parts.join(' &nbsp; ');
+  }
+  function setTrace(px, py) {
+    var x = wx(px), best = null, bd = Infinity;
+    // snap to a tidy x so values read cleanly, e.g. 1.25 instead of 1.24873
+    var step = niceStep(view.x1 - view.x0, W / 4) / 100; x = Math.round(x / step) * step;
+    fns.forEach(function (f, i) { if (!shown(i)) return; var y = f(x); if (!isFinite(y)) return; var d = Math.abs(sy(y) - py); if (d < bd) { bd = d; best = i; } });
+    trace = { x: x, best: best }; draw();
+  }
+
+  // ---------- pointer: drag to pan, pinch or wheel to zoom, hover or tap to trace ----------
+  var pts = {}, moved = false, pinch = null, downAt = null;
+  function local(e) { var r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; }
+  cv.addEventListener('pointerdown', function (e) {
+    cv.setPointerCapture(e.pointerId); pts[e.pointerId] = local(e); moved = false; downAt = local(e);
+    var ids = Object.keys(pts);
+    if (ids.length === 2) { var a = pts[ids[0]], b = pts[ids[1]]; pinch = { d: Math.hypot(a[0] - b[0], a[1] - b[1]), m: [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2] }; }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    var p = local(e);
+    if (!(e.pointerId in pts)) { if (e.pointerType === 'mouse') setTrace(p[0], p[1]); return; }
+    var old = pts[e.pointerId]; pts[e.pointerId] = p;
+    var ids = Object.keys(pts);
+    if (ids.length >= 2 && pinch) {
+      var a = pts[ids[0]], b = pts[ids[1]], d = Math.hypot(a[0] - b[0], a[1] - b[1]), m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+      if (d > 10 && pinch.d > 10) { pan(m[0] - pinch.m[0], m[1] - pinch.m[1]); zoom(pinch.d / d, m[0], m[1]); }
+      pinch = { d: d, m: m }; moved = true; return;
+    }
+    if (!moved && Math.hypot(p[0] - downAt[0], p[1] - downAt[1]) < 6) return;
+    moved = true; cv.classList.add('drag');
+    pan(p[0] - old[0], p[1] - old[1]);
+  });
+  function up(e) {
+    if (!(e.pointerId in pts)) return;
+    var p = local(e); delete pts[e.pointerId];
+    if (Object.keys(pts).length < 2) pinch = null;
+    cv.classList.remove('drag');
+    if (!moved && e.type === 'pointerup') setTrace(p[0], p[1]); // a tap reads values
+  }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse' && !(e.pointerId in pts)) { trace = null; $('read').textContent = 'Drag to move, scroll or pinch to zoom. Hover or tap the graph to read values.'; draw(); } });
+  cv.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    var p = local(e), dy = e.deltaMode === 1 ? e.deltaY * 30 : e.deltaY;
+    zoom(Math.exp(Math.max(-300, Math.min(300, dy)) * 0.0018), p[0], p[1]);
+  }, { passive: false });
+  $('zin').addEventListener('click', function () { zoom(1 / 1.6, W / 2, H / 2); });
+  $('zout').addEventListener('click', function () { zoom(1.6, W / 2, H / 2); });
+  $('zreset').addEventListener('click', function () { view = defaultView(); draw(); });
+  $('setwin').addEventListener('click', function () {
+    var v = ['xmin', 'xmax', 'ymin', 'ymax'].map(function (id) { return parseFloat($(id).value); });
+    if (v.some(function (n) { return !isFinite(n); })) return say('bad', 'Fill in all four window values.');
+    if (v[0] >= v[1] || v[2] >= v[3]) return say('bad', 'Each "from" value must be smaller than its "to" value.');
+    if (v[1] - v[0] < 1e-9 || v[3] - v[2] < 1e-9) return say('bad', 'That window is too small to draw.');
+    view = { x0: v[0], x1: v[1], y0: v[2], y1: v[3] }; say('', ''); draw();
+  });
+  function say(cls, t) { $('msg').className = 'msg' + (cls ? ' ' + cls : ''); $('msg').textContent = t; }
+
+  // ---------- roots and intersections in the visible window ----------
+  function zerosOf(g, a, b) {
+    var n = 2000, out = [], xs = [], ys = [], span = b - a, ky = H / (view.y1 - view.y0), tol = 1e-9 * Math.max(1, view.y1 - view.y0);
+    for (var i = 0; i <= n; i++) { xs.push(a + span * i / n); ys.push(g(xs[i])); }
+    function add(x) { var y = g(x); if (!isFinite(y)) return; if (!out.some(function (r) { return Math.abs(r - x) < span * 1e-7; })) out.push(x); }
+    for (i = 0; i <= n; i++) {
+      var y = ys[i];
+      if (!isFinite(y)) continue;
+      if (y === 0) { add(xs[i]); continue; }
+      if (i < n && isFinite(ys[i + 1]) && ys[i + 1] !== 0 && (y < 0) !== (ys[i + 1] < 0)) { // a sign change: bisect it
+        var lo = xs[i], hi = xs[i + 1], flo = y;
+        for (var k = 0; k < 80; k++) { var m = (lo + hi) / 2, fm = g(m); if (!isFinite(fm)) break; if ((fm < 0) === (flo < 0)) { lo = m; flo = fm; } else hi = m; }
+        var r = (lo + hi) / 2;
+        if (isFinite(g(r)) && Math.abs(g(r)) < 1e-6 * Math.max(1, Math.abs(ys[i]), Math.abs(ys[i + 1]))) add(r); // a pole like tan(x) at pi/2 changes sign too, but its value there is huge, not zero
+      } else if (i > 0 && i < n && isFinite(ys[i - 1]) && isFinite(ys[i + 1]) && Math.abs(y) <= Math.abs(ys[i - 1]) && Math.abs(y) < Math.abs(ys[i + 1]) && Math.abs(y) < (view.y1 - view.y0) * 0.02) {
+        // the curve touches zero without crossing (like x^2): minimise |g| nearby
+        var l = xs[i - 1], h2 = xs[i + 1], gr = (Math.sqrt(5) - 1) / 2;
+        for (k = 0; k < 90; k++) { var c1 = h2 - gr * (h2 - l), c2 = l + gr * (h2 - l); if (Math.abs(g(c1)) < Math.abs(g(c2))) h2 = c2; else l = c1; }
+        var t = (l + h2) / 2; if (Math.abs(g(t)) < tol) add(t);
+      }
+    }
+    return out.sort(function (p, q) { return p - q; });
+  }
+  $('find').addEventListener('click', function () {
+    found = []; var ul = $('found'); ul.innerHTML = '';
+    var idx = []; fns.forEach(function (f, i) { if (shown(i)) idx.push(i); });
+    if (!idx.length) { say('bad', 'Type a function first.'); draw(); return; }
+    var items = [];
+    idx.forEach(function (i) {
+      zerosOf(fns[i], view.x0, view.x1).forEach(function (x) { found.push({ x: x, y: 0, color: COLORS[i] }); items.push([COLORS[i], 'y' + '₁₂₃₄₅₆'[i] + ' crosses zero at x = ' + fmt(x)]); });
+    });
+    for (var a = 0; a < idx.length; a++) for (var b = a + 1; b < idx.length; b++) (function (i, j) {
+      var g = function (x) { return fns[i](x) - fns[j](x); };
+      zerosOf(g, view.x0, view.x1).forEach(function (x) { var y = fns[i](x); found.push({ x: x, y: y, color: COLORS[j] }); items.push([COLORS[j], 'y' + '₁₂₃₄₅₆'[i] + ' and y' + '₁₂₃₄₅₆'[j] + ' meet at (' + fmt(x) + ', ' + fmt(y) + ')']); });
+    })(idx[a], idx[b]);
+    if (items.length > 60) { say('', 'Found ' + items.length + ' points. Showing the first 60; zoom in to see fewer.'); items = items.slice(0, 60); }
+    else say(items.length ? 'ok' : '', items.length ? 'Found ' + items.length + (items.length === 1 ? ' point' : ' points') + ' between x = ' + fmt(view.x0) + ' and x = ' + fmt(view.x1) + '.' : 'No roots or intersections between x = ' + fmt(view.x0) + ' and x = ' + fmt(view.x1) + '. Try zooming out.');
+    items.forEach(function (t) { var li = document.createElement('li'), i = document.createElement('i'); i.style.background = t[0]; li.appendChild(i); li.appendChild(document.createTextNode(t[1])); ul.appendChild(li); });
+    draw();
+  });
+  $('png').addEventListener('click', function () {
+    if (!W) return;
+    var k = 2, c = document.createElement('canvas'); c.width = W * k; c.height = H * k;
+    var g = c.getContext('2d'); g.scale(k, k); render(g, W, H, true);
+    c.toBlob(function (b) {
+      if (!b) return say('bad', 'Your browser could not save the picture.');
+      var a = document.createElement('a'), u = URL.createObjectURL(b);
+      a.href = u; a.download = 'graph.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+      say('ok', 'Saved graph.png.');
+    }, 'image/png');
+  });
+
+  // ---------- function rows ----------
+  rows.forEach(function (r, i) {
+    input(i).addEventListener('input', function () { compileRow(i); found = []; $('found').innerHTML = ''; say('', ''); draw(); });
+    r.querySelector('.eye').addEventListener('click', function () { var b = this, on = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', on); b.textContent = on ? '◉' : '○'; draw(); });
+    r.querySelector('.del').addEventListener('click', function () {
+      var n = visibleRows(), shownCount = rows.filter(function (x) { return !x.hidden; }).length;
+      for (var j = i; j < rows.length - 1; j++) { input(j).value = input(j + 1).value; rows[j].querySelector('.eye').setAttribute('aria-pressed', rows[j + 1].querySelector('.eye').getAttribute('aria-pressed')); rows[j].querySelector('.eye').textContent = rows[j + 1].querySelector('.eye').textContent; }
+      input(rows.length - 1).value = '';
+      rows.forEach(function (x, j) { compileRow(j); });
+      syncRows(Math.max(1, Math.min(shownCount - 1, rows.length))); found = []; $('found').innerHTML = '';
+      input(0).dispatchEvent(new Event('change', { bubbles: true })); // let the page remember the change
+      draw();
+    });
+  });
+  $('add').addEventListener('click', function () {
+    var n = rows.filter(function (x) { return !x.hidden; }).length;
+    if (n < rows.length) { syncRows(n + 1); input(n).focus(); }
+  });
+  if (!input(0).value && !input(1).value) { input(0).value = 'sin(x)'; input(1).value = 'x^2/4 - 2'; }
+  rows.forEach(function (r, i) { compileRow(i); });
+  syncRows(visibleRows());
+  // values restored by the page after loading arrive as input events; make sure their rows are visible
+  document.addEventListener('input', function (e) { if (rows.some(function (r, i) { return e.target === input(i); })) syncRows(Math.max(visibleRows(), rows.filter(function (x) { return !x.hidden; }).length)); });
+  if (window.ResizeObserver) new ResizeObserver(size).observe(cv); else window.addEventListener('resize', size);
+  size();
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
+})();
+</script>
