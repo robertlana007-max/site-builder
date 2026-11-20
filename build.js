@@ -275,7 +275,8 @@ const cats = Object.keys(COLOR);
 for (const t of tools) if (!(t.cat in COLOR)) throw new Error('Unknown category: ' + t.cat);
 tools.sort((a, b) => cats.indexOf(a.cat) - cats.indexOf(b.cat)); // stable: keeps the order within a category
 const footCols = cats.map(c => ({ title: c, items: tools.filter(t => t.cat === c) }));
-const card = (t, rel) => `<div class="tool-card" style="--c:${COLOR[t.cat]}">${tile(t)}<a class="t-link" href="${rel}${t.slug}/">${esc(t.name)}</a><small>${esc(t.card)}</small><button class="star" data-slug="${t.slug}" aria-label="Pin ${esc(t.name)}" aria-pressed="false">${icon('star')}</button></div>`;
+const BADGE = { 'online-notepad': 'New', 'image-text-editor': 'New', 'edit-pdf': 'New', 'merge-pdf': 'Popular', 'compress-pdf': 'Popular', 'image-compressor': 'Popular', 'mortgage-calculator': 'Popular', 'qr-code-generator': 'Popular', 'password-generator': 'Popular' };
+const card = (t, rel) => `<div class="tool-card" style="--c:${COLOR[t.cat]}">${tile(t)}${BADGE[t.slug] ? `<span class="badge b-${BADGE[t.slug].toLowerCase()}">${BADGE[t.slug]}</span>` : ''}<a class="t-link" href="${rel}${t.slug}/">${esc(t.name)}</a><small>${esc(t.card)}</small><button class="star" data-slug="${t.slug}" aria-label="Pin ${esc(t.name)}" aria-pressed="false">${icon('star')}</button></div>`;
 const bySlug = s => { const t = tools.find(t => t.slug === s); if (!t) throw new Error('No tool ' + s); return t; };
 
 // Search index used by the finder, the palette and the "My tools" lists.
@@ -310,6 +311,7 @@ const bento = [
   live('mortgage-calculator', 'Mortgage', `<span class="sc-bars">${[.45, .7, .55, .9, 1].map((h, k) => `<i style="--k:${k};--s:${h}"></i>`).join('')}</span>`)
 ].join('');
 const popular = ['merge-pdf', 'edit-pdf', 'compress-pdf', 'image-compressor', 'image-text-editor', 'mortgage-calculator'].map(bySlug);
+const spot = (slug, title, text, points, art) => { const t = bySlug(slug); return `<article class="spot-slide" style="--c:${COLOR[t.cat]}"><div class="spot-copy"><span class="spot-badge">★ Featured tool</span><h2>${esc(title)}</h2><p>${esc(text)}</p><ul>${points.map(p => `<li>${icon('check')}${esc(p)}</li>`).join('')}</ul><a class="btn" href="${slug}/">Open ${esc(t.name)} →</a></div><div class="spot-art" aria-hidden="true">${art}</div></article>`; };
 const who = (title, text, slugs) => `<div class="who"><h3>${title}</h3><p>${text}</p>${slugs.map(sl => `<a class="who-link" href="${sl}/">${esc(bySlug(sl).name)}</a>`).join('')}</div>`;
 
 write('index.html', layout({
@@ -328,6 +330,33 @@ write('index.html', layout({
   <ul class="trust"><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Your work is saved for next time</li><li>${icon('check')}Works on your phone</li></ul>
   ${cfg.firebase ? `<p class="keep">${keepLine}</p>` : ''}
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
+<section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
+  <div class="spot-track" id="spotTrack">
+    ${spot('edit-pdf', 'Change the text inside any PDF', 'Click on a word in your PDF and type. The new text uses the same font and size, so nobody can tell it was changed.', ['Keeps the original font', 'No watermark', 'Nothing uploaded'], '<span class="art-doc"><i></i><i></i><span class="art-swap"><b>Total: $500</b><b>Total: $750</b></span><i></i><i class="s"></i></span>')}
+    ${spot('online-notepad', 'GetToolNest Notepad', 'A full code and text editor with tabs, colours for 34 languages, find and replace, bookmarks and line tools. Your tabs are still there tomorrow.', ['Unlimited lines', 'Tabs saved automatically', 'Works offline'], '<span class="art-ed"><span class="art-bar"><i></i><i></i><i></i></span><i style="--w:55%;--k:0" class="k"></i><i style="--w:75%;--k:1" class="s"></i><i style="--w:40%;--k:2" class="n"></i><i style="--w:65%;--k:3" class="k"></i><i style="--w:30%;--k:4" class="s"></i></span>')}
+    ${spot('image-text-editor', 'Edit the words in a picture', 'Click on text in a photo or a poster, type something new, and download it. The tool finds the text for you.', ['Finds text by itself', 'Matches the colour', 'JPG and PNG'], '<span class="art-pic"><span class="art-sun"></span><span class="art-hill"></span><span class="art-swap art-tag"><b>SALE 50%</b><b>SALE 70%</b></span></span>')}
+    ${spot('merge-pdf', 'Join many PDFs into one', 'Drop your files, drag them into order and get one tidy PDF in a few seconds, even with dozens of pages.', ['Any number of files', 'Drag to reorder', 'Fast on phones'], '<span class="art-merge"><i></i><i></i><i></i></span>')}
+    ${spot('qr-code-generator', 'Make a QR code in one second', 'Links, Wi-Fi passwords, phone numbers or text. Pick colours and download a sharp picture for print.', ['Wi-Fi and links', 'Your own colours', 'Never expires'], `<span class="art-qr">${Array.from({ length: 49 }, (_, i) => `<i style="--k:${(i * 7) % 13}"${[0, 1, 2, 7, 9, 14, 15, 16, 4, 5, 6, 11, 13, 18, 19, 20, 28, 29, 30, 35, 37, 42, 43, 44, 24, 26, 32, 38, 40, 46, 47, 22, 33].includes(i) ? ' class="on"' : ''}></i>`).join('')}</span>`)}
+  </div>
+  <button class="spot-nav prev" type="button" aria-label="Previous">‹</button><button class="spot-nav next" type="button" aria-label="Next">›</button>
+  <div class="spot-dots" id="spotDots" role="tablist"></div>
+</section>
+<script>
+(function () {
+  var tr = document.getElementById('spotTrack'), dots = document.getElementById('spotDots'), slides = tr.children, i = 0, timer, hold = false;
+  for (var k = 0; k < slides.length; k++) (function (k) { var d = document.createElement('button'); d.type = 'button'; d.setAttribute('aria-label', 'Slide ' + (k + 1)); d.onclick = function () { go(k); }; dots.appendChild(d); })(k);
+  function go(k) { i = (k + slides.length) % slides.length; tr.scrollTo({ left: slides[i].offsetLeft - tr.offsetLeft, behavior: document.documentElement.hasAttribute('data-calm') ? 'auto' : 'smooth' }); mark(); }
+  function mark() { for (var k = 0; k < dots.children.length; k++) dots.children[k].classList.toggle('on', k === i); }
+  tr.addEventListener('scroll', function () { var n = Math.round(tr.scrollLeft / tr.clientWidth); if (n !== i) { i = n; mark(); } }, { passive: true });
+  document.querySelector('.spot .prev').onclick = function () { go(i - 1); };
+  document.querySelector('.spot .next').onclick = function () { go(i + 1); };
+  var spot = document.querySelector('.spot');
+  spot.addEventListener('mouseenter', function () { hold = true; }); spot.addEventListener('mouseleave', function () { hold = false; });
+  spot.addEventListener('focusin', function () { hold = true; }); spot.addEventListener('focusout', function () { hold = false; });
+  timer = setInterval(function () { if (!hold && !document.hidden && !document.documentElement.hasAttribute('data-calm')) go(i + 1); }, 5500);
+  mark();
+})();
+</script>
 <section class="mine" id="mine" hidden>
   <h2>Welcome back</h2>
   <p id="mineNote">${cfg.firebase ? 'Saved on this device. Sign in to sync across devices.' : 'Saved on this device.'}</p>
