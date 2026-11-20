@@ -1,0 +1,139 @@
+<style>
+.atc .atc-big { margin-top: 16px; padding: 16px; border-radius: 14px; background: var(--bg); border: 1px solid var(--line); text-align: center; }
+.atc .atc-big span { display: block; font-size: 14px; color: var(--muted); }
+.atc .atc-big b { display: block; font-size: 32px; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.atc .atc-big p { margin: 6px 0 0; font-size: 15px; }
+.atc .atc-big.ok { border-color: var(--ok); } .atc .atc-big.bad { border-color: var(--bad); }
+.atc .atc-bar { position: relative; height: 12px; border-radius: 999px; background: var(--surface); border: 1px solid var(--line); overflow: hidden; margin: 10px auto 0; max-width: 420px; }
+.atc .atc-bar i { display: block; height: 100%; width: 0; background: var(--accent); }
+.atc .atc-bar em { position: absolute; top: -1px; bottom: -1px; width: 2px; background: var(--ink); }
+.atc .atc-plan { margin-top: 12px; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); }
+.atc .atc-plan.ok { border-color: var(--ok); } .atc .atc-plan.bad { border-color: var(--bad); }
+.atc [aria-invalid="true"] { border-color: var(--bad) !important; }
+</style>
+<div class="atc">
+<div class="fields">
+  <div><label for="atHeld">Classes held so far</label><input type="number" id="atHeld" min="0" step="1" inputmode="numeric" placeholder="e.g. 40"></div>
+  <div><label for="atAtt">Classes you attended</label><input type="number" id="atAtt" min="0" step="1" inputmode="numeric" placeholder="e.g. 28"></div>
+  <div><label for="atReq">Required attendance (%)</label><input type="number" id="atReq" min="0" max="100" step="any" value="75"></div>
+</div>
+<div class="atc-big" id="atBox"><span>Your attendance</span><b id="atPct">–</b>
+  <div class="atc-bar" aria-hidden="true"><i id="atBar"></i><em id="atMark"></em></div>
+  <p id="atSay">Enter the classes held and the classes you attended.</p></div>
+<div class="stats">
+  <div class="stat"><span>Classes missed</span><b id="atMiss">–</b></div>
+  <div class="stat"><span id="atKL">Can still skip</span><b id="atK">–</b></div>
+  <div class="stat"><span>Attendance after that</span><b id="atAfter">–</b></div>
+</div>
+<p class="msg" id="atMsg"></p>
+
+<h3>Plan the rest of the semester</h3>
+<div class="fields">
+  <div><label for="atRem">Classes still to come this semester</label><input type="number" id="atRem" min="0" step="1" inputmode="numeric" placeholder="e.g. 20"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Must attend (of these)</span><b id="atNeed">–</b></div>
+  <div class="stat"><span>Can miss (of these)</span><b id="atCan">–</b></div>
+  <div class="stat"><span>Best possible final %</span><b id="atBest">–</b></div>
+</div>
+<div class="atc-plan" id="atPlan">Enter how many classes are left to plan ahead.</div>
+<p class="msg">Rules differ: some colleges count attendance per subject, round percentages, or allow medical leave. Check your own institution’s rules.</p>
+</div>
+<script>
+(function () {
+  /*MATH*/
+  var M = {
+    E: 1e-9,
+    isCount: function (v) { return v >= 0 && Math.floor(v) === v; },
+    validate: function (H, A, r) {
+      if (!M.isCount(H)) return 'Classes held must be a whole number, 0 or more.';
+      if (!M.isCount(A)) return 'Classes attended must be a whole number, 0 or more.';
+      if (A > H) return 'You cannot attend more classes than were held.';
+      if (!(r >= 0 && r <= 100)) return 'Required attendance must be between 0 and 100%.';
+      return '';
+    },
+    // Smallest x with (A + x) / (H + x) >= r/100: classes in a row needed. Infinity if never (r = 100 and a class was missed).
+    need: function (H, A, r) {
+      if (100 * A >= r * H - M.E) return 0;
+      if (r >= 100) return Infinity;
+      return Math.ceil((r * H - 100 * A) / (100 - r) - M.E);
+    },
+    // Largest k with A / (H + k) >= r/100: classes you can miss in a row. Infinity when r = 0.
+    skip: function (H, A, r) {
+      if (r <= 0) return Infinity;
+      var k = Math.floor((100 * A - r * H) / r + M.E);
+      return k > 0 ? k : 0;
+    },
+    // Remaining R classes: how many must be attended to finish at or above r.
+    plan: function (H, A, r, R) {
+      var T = H + R; if (T <= 0) return null;
+      var must = Math.max(0, Math.ceil(r * T / 100 - A - M.E));
+      return { must: must, canMiss: must > R ? 0 : R - must, possible: must <= R, best: (A + R) / T * 100, worst: A / T * 100 };
+    }
+  };
+  /*ENDMATH*/
+  function v(id) { var s = $(id).value; return s === '' ? NaN : +s; }
+  function f2(n) { return fmtNum(n, 2); }
+  function cls(n, w) { return n + ' ' + (n === 1 ? 'class' : 'classes'); }
+  function setBig(c, pct, say, r) {
+    $('atBox').className = 'atc-big' + (c ? ' ' + c : '');
+    $('atPct').textContent = isNaN(pct) ? '–' : f2(pct) + '%';
+    $('atBar').style.width = isNaN(pct) ? '0' : Math.min(100, pct) + '%';
+    $('atMark').style.left = 'calc(' + (isNaN(r) ? 75 : r) + '% - 1px)';
+    $('atSay').innerHTML = say;
+  }
+  function calc() {
+    var H = v('atHeld'), A = v('atAtt'), r = $('atReq').value === '' ? 75 : v('atReq'), R = v('atRem'), msg = $('atMsg');
+    msg.className = 'msg'; msg.textContent = '';
+    ['atMiss', 'atK', 'atAfter', 'atNeed', 'atCan', 'atBest'].forEach(function (id) { $(id).textContent = '–'; });
+    $('atKL').textContent = 'Can still skip';
+    $('atHeld').setAttribute('aria-invalid', !isNaN(H) && !M.isCount(H));
+    $('atAtt').setAttribute('aria-invalid', !isNaN(A) && (!M.isCount(A) || (M.isCount(H) && A > H)));
+    $('atReq').setAttribute('aria-invalid', !(r >= 0 && r <= 100));
+    $('atRem').setAttribute('aria-invalid', !isNaN(R) && !M.isCount(R));
+    var plan = $('atPlan'); plan.className = 'atc-plan'; plan.textContent = 'Enter how many classes are left to plan ahead.';
+    if (isNaN(H) || isNaN(A)) { setBig('', NaN, 'Enter the classes held and the classes you attended.', r); return; }
+    var err = M.validate(H, A, r);
+    if (err) { setBig('bad', NaN, '', r); msg.className = 'msg bad'; msg.textContent = err; return; }
+    var rs = f2(r) + '%';
+    if (H === 0) {
+      setBig('', NaN, 'No classes have been held yet, so there is no attendance to show. Attend every class to stay at 100%.', r);
+    } else {
+      var pct = A / H * 100, need = M.need(H, A, r), skip = M.skip(H, A, r);
+      $('atMiss').textContent = fmtNum(H - A);
+      if (need === 0) {
+        $('atKL').textContent = 'Can still skip';
+        $('atK').textContent = skip === Infinity ? 'Any' : fmtNum(skip);
+        $('atAfter').textContent = skip === Infinity ? '–' : f2(A / (H + skip) * 100) + '%';
+        setBig('ok', pct, skip === Infinity ? 'No minimum is set, so you can miss any number of classes.' :
+          skip === 0 ? 'You are at or above ' + rs + ', but missing even <b>1 more class</b> would take you below it.' :
+          'You are above ' + rs + '. You can miss the next <b>' + cls(skip) + '</b> and still be at or above ' + rs + '.', r);
+      } else if (need === Infinity) {
+        $('atKL').textContent = 'Classes needed'; $('atK').textContent = 'Not possible';
+        setBig('bad', pct, 'You need ' + rs + ' but have already missed ' + cls(H - A) + ', so you cannot get back to 100%.', r);
+      } else {
+        $('atKL').textContent = 'Attend in a row'; $('atK').textContent = fmtNum(need);
+        $('atAfter').textContent = f2((A + need) / (H + need) * 100) + '%';
+        setBig('bad', pct, 'You are below ' + rs + '. Attend the next <b>' + cls(need) + '</b> in a row, without missing any, to reach ' + rs + '.', r);
+      }
+    }
+    if (isNaN(R)) return;
+    if (!M.isCount(R)) { plan.className = 'atc-plan bad'; plan.textContent = 'Classes still to come must be a whole number, 0 or more.'; return; }
+    var p = M.plan(H, A, r, R);
+    if (!p) { plan.textContent = 'Enter the classes held so far or the classes still to come.'; return; }
+    $('atBest').textContent = f2(p.best) + '%';
+    if (!p.possible) {
+      $('atNeed').textContent = 'All ' + fmtNum(R); $('atCan').textContent = '0';
+      plan.className = 'atc-plan bad';
+      plan.innerHTML = 'Even if you attend all ' + cls(R) + ' left, you will finish at <b>' + f2(p.best) + '%</b>, below ' + rs + '. You would need ' + cls(p.must) + ' more than there are. Talk to your teacher or department about options such as condonation or medical leave.';
+    } else {
+      $('atNeed').textContent = fmtNum(p.must); $('atCan').textContent = fmtNum(p.canMiss);
+      plan.className = 'atc-plan ok';
+      plan.innerHTML = p.must === 0 ? 'You are safe: even if you miss all ' + cls(R) + ' left, you finish at <b>' + f2(p.worst) + '%</b> of ' + cls(H + R) + '.' :
+        'Out of the ' + cls(R) + ' left, attend at least <b>' + fmtNum(p.must) + '</b> and you can miss up to <b>' + fmtNum(p.canMiss) + '</b>. You will finish at ' + f2((A + p.must) / (H + R) * 100) + '% or more of ' + cls(H + R) + '.';
+    }
+  }
+  ['atHeld', 'atAtt', 'atReq', 'atRem'].forEach(function (id) { $(id).addEventListener('input', calc); });
+  calc();
+})();
+</script>

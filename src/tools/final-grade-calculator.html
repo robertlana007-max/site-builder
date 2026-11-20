@@ -1,0 +1,171 @@
+<style>
+.fgc .seg { margin-bottom: 14px; flex-wrap: wrap; }
+.fgc .fgc-big { margin-top: 16px; padding: 16px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); text-align: center; }
+.fgc .fgc-big span { display: block; font-size: 14px; color: var(--muted); }
+.fgc .fgc-big b { display: block; font-size: 32px; letter-spacing: -.02em; margin: 2px 0; font-variant-numeric: tabular-nums; }
+.fgc .fgc-big.bad { background: var(--bg); border-color: var(--bad); }
+.fgc .fgc-big.ok { background: var(--bg); border-color: var(--ok); }
+.fgc .fgc-big p { margin: 6px 0 0; font-size: 15px; }
+.fgc .fgc-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) minmax(0, 1.2fr) 40px; gap: 8px; align-items: end; margin-bottom: 8px; }
+.fgc .fgc-row label { font-size: 12.5px; color: var(--muted); font-weight: 600; margin-bottom: 3px; }
+.fgc .fgc-x { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; cursor: pointer; font: inherit; font-size: 18px; line-height: 1; padding: 0; }
+.fgc .fgc-x:hover { border-color: var(--bad); color: var(--bad); }
+.fgc [aria-invalid="true"] { border-color: var(--bad) !important; }
+@media (max-width: 560px) {
+  .fgc .fgc-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 40px; grid-template-areas: "n n n" "w s x"; padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+  .fgc .fgc-row > :nth-child(1) { grid-area: n; } .fgc .fgc-row > :nth-child(2) { grid-area: w; } .fgc .fgc-row > :nth-child(3) { grid-area: s; } .fgc .fgc-row > :nth-child(4) { grid-area: x; }
+}
+</style>
+<div class="fgc">
+<div class="seg" role="group" aria-label="Calculator mode"><button type="button" data-mode="simple" aria-pressed="true">Current grade + final</button><button type="button" data-mode="cat" aria-pressed="false">By category</button></div>
+<select id="fgMode" hidden aria-hidden="true" tabindex="-1"><option value="simple">simple</option><option value="cat">cat</option></select>
+<div id="fgSimple">
+  <div class="fields">
+    <div><label for="fgCur">Your current grade (%)</label><input type="number" id="fgCur" min="0" step="any" placeholder="e.g. 82"></div>
+    <div><label for="fgW">Final exam weight (%)</label><input type="number" id="fgW" min="0" max="100" step="any" placeholder="e.g. 40"></div>
+    <div><label for="fgTgt">Grade you want overall (%)</label><input type="number" id="fgTgt" min="0" step="any" placeholder="e.g. 85"></div>
+  </div>
+</div>
+<div id="fgCat" hidden>
+  <p class="msg" style="margin:0 0 10px">Enter each part of the course with its weight. Leave the score empty for parts you have not done yet. Scores can be a percentage (85) or marks (17/20).</p>
+  <div id="fgRows"></div>
+  <div class="btns" style="margin:0 0 14px"><button type="button" class="btn ghost" id="fgAdd">+ Add category</button><button type="button" class="btn ghost" id="fgReset">Reset</button></div>
+  <div class="fields">
+    <div><label for="fgTgt2">Grade you want overall (%)</label><input type="number" id="fgTgt2" min="0" step="any" placeholder="e.g. 85"></div>
+  </div>
+</div>
+<div class="fgc-big" id="fgBox"><span id="fgLbl">You need on the final</span><b id="fgOut">–</b><p id="fgSay"></p></div>
+<div class="stats" id="fgStats">
+  <div class="stat"><span>Current grade</span><b id="fgS1">–</b></div>
+  <div class="stat"><span>If you score 0 on what is left</span><b id="fgS2">–</b></div>
+  <div class="stat"><span>If you score 100 on what is left</span><b id="fgS3">–</b></div>
+</div>
+<p class="msg" id="fgMsg"></p>
+<h3>Score needed for other targets</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Overall grade wanted</th><th id="fgTh">Needed on the final</th></tr></thead><tbody id="fgTbl"></tbody></table></div>
+</div>
+<script>
+(function () {
+  /*MATH*/
+  var M = {
+    // "85", "85%", "17/20" -> percentage; '' -> null; anything else -> NaN
+    score: function (v) {
+      v = String(v == null ? '' : v).trim().replace(/%$/, '').trim();
+      if (v === '') return null;
+      var m = /^(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)$/.exec(v);
+      if (m) return +m[2] > 0 ? +m[1] / +m[2] * 100 : NaN;
+      return /^\d+(?:\.\d+)?$/.test(v) || /^\.\d+$/.test(v) ? +v : NaN;
+    },
+    // current grade c (%), final weight w (%), target t (%) -> needed final score (%)
+    need: function (c, w, t) { var f = w / 100; return (t - c * (1 - f)) / f; },
+    // rows: [{w, s (null = not done yet)}]
+    cats: function (rows) {
+      var W = 0, done = 0, earned = 0;
+      rows.forEach(function (r) { if (r.w > 0) { W += r.w; if (r.s != null) { done += r.w; earned += r.w * r.s; } } });
+      return { W: W, done: done, left: W - done, earned: earned, current: done > 0 ? earned / done : NaN, min: W > 0 ? earned / W : NaN, max: W > 0 ? (earned + (W - done) * 100) / W : NaN };
+    },
+    needCat: function (r, t) { return r.left > 0 ? (t * r.W - r.earned) / r.left : NaN; },
+    kind: function (need) { return need > 100 + 1e-9 ? 'impossible' : need <= 1e-9 ? 'secured' : 'ok'; }
+  };
+  /*ENDMATH*/
+  var KEY = 'gtn-final-grade', DEF = [['Assignments', '20', '88'], ['Quizzes', '10', '76'], ['Midterm exam', '25', '71'], ['Final exam', '45', '']];
+  var st = { rows: [] }, saved = false;
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+  function defaults() { st.rows = DEF.map(function (d) { return { n: d[0], w: d[1], s: d[2] }; }); }
+  try { var s0 = JSON.parse(localStorage.getItem(KEY)); if (s0 && Array.isArray(s0.rows) && s0.rows.length) { st.rows = s0.rows.map(function (r) { return { n: String(r.n || ''), w: String(r.w == null ? '' : r.w), s: String(r.s == null ? '' : r.s) }; }); saved = true; } } catch (e) {}
+  if (!st.rows.length) defaults();
+  var saveT;
+  function save() { clearTimeout(saveT); saveT = setTimeout(function () { try { localStorage.setItem(KEY, JSON.stringify(st)); saved = true; if ($('clearBtn')) $('clearBtn').hidden = false; } catch (e) {} }, 300); }
+  function num(v) { return v === '' || v == null ? NaN : +v; }
+  function f2(n) { return fmtNum(n, 2); }
+  function pc(n) { return f2(n) + '%'; }
+
+  function drawRows() {
+    $('fgRows').innerHTML = st.rows.map(function (r, i) {
+      var id = 'fgR' + i;
+      return '<div class="fgc-row" data-i="' + i + '">' +
+        '<div><label for="' + id + 'n">Category</label><input type="text" id="' + id + 'n" data-nomemo data-f="n" value="' + esc(r.n) + '" placeholder="e.g. Lab work" maxlength="40"></div>' +
+        '<div><label for="' + id + 'w">Weight (%)</label><input type="number" id="' + id + 'w" data-nomemo data-f="w" min="0" max="100" step="any" value="' + esc(r.w) + '"></div>' +
+        '<div><label for="' + id + 's">Score</label><input type="text" id="' + id + 's" data-nomemo data-f="s" inputmode="decimal" value="' + esc(r.s) + '" placeholder="Not done yet"></div>' +
+        '<button type="button" class="fgc-x" data-rm="' + i + '" aria-label="Remove ' + esc(r.n || 'category') + '" title="Remove this category">×</button></div>';
+    }).join('');
+  }
+  $('fgRows').addEventListener('input', function (e) { var el = e.target, row = el.closest('[data-i]'); if (!row) return; st.rows[+row.dataset.i][el.dataset.f] = el.value; calc(); save(); });
+  $('fgRows').addEventListener('click', function (e) { var b = e.target.closest('[data-rm]'); if (!b) return; st.rows.splice(+b.dataset.rm, 1); if (!st.rows.length) st.rows.push({ n: '', w: '', s: '' }); drawRows(); calc(); save(); });
+  $('fgAdd').addEventListener('click', function () { st.rows.push({ n: '', w: '', s: '' }); drawRows(); calc(); save(); var n = $('fgRows').querySelectorAll('[data-f="n"]'); n[n.length - 1].focus(); });
+  $('fgReset').addEventListener('click', function () { defaults(); drawRows(); calc(); save(); });
+
+  function show(cls, lbl, big, say) { $('fgBox').className = 'fgc-big' + (cls ? ' ' + cls : ''); $('fgLbl').textContent = lbl; $('fgOut').textContent = big; $('fgSay').innerHTML = say || ''; }
+  function stats(a, b, c) { $('fgS1').textContent = a; $('fgS2').textContent = b; $('fgS3').textContent = c; }
+  function table(fn, head) {
+    $('fgTh').textContent = head;
+    $('fgTbl').innerHTML = fn ? [90, 80, 70, 60, 50].map(function (t) { var n = fn(t), k = M.kind(n); return '<tr><td>' + t + '%</td><td>' + (k === 'impossible' ? 'Not possible (' + pc(n) + ')' : k === 'secured' ? 'Already secured' : pc(n)) + '</td></tr>'; }).join('') : '<tr><td colspan="2" style="text-align:start;color:var(--muted)">Fill in the details above.</td></tr>';
+  }
+  function verdict(need, t, best, worst, what) {
+    var k = M.kind(need);
+    if (k === 'impossible') return ['bad', 'Not possible', 'You would need <b>' + pc(need) + '</b> on ' + what + ', which is more than 100%. The highest overall grade you can still reach is <b>' + pc(best) + '</b>' + (best >= t ? '' : ', unless extra credit is available') + '.'];
+    if (k === 'secured') return ['ok', 'Already secured', 'Even with 0% on ' + what + ', your overall grade would be <b>' + pc(worst) + '</b>, which reaches your ' + pc(t) + ' goal.'];
+    return ['', pc(need), 'Score at least this on ' + what + ' to finish with ' + pc(t) + ' overall.'];
+  }
+  function calc() {
+    var mode = $('fgMode').value === 'cat' ? 'cat' : 'simple', msg = $('fgMsg'), warn = '';
+    document.querySelectorAll('.fgc .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode); });
+    $('fgSimple').hidden = mode !== 'simple'; $('fgCat').hidden = mode !== 'cat';
+    msg.className = 'msg'; msg.textContent = '';
+    if (mode === 'simple') {
+      var c = num($('fgCur').value), w = num($('fgW').value), t = num($('fgTgt').value);
+      $('fgCur').setAttribute('aria-invalid', c < 0); $('fgW').setAttribute('aria-invalid', w <= 0 || w > 100); $('fgTgt').setAttribute('aria-invalid', t < 0);
+      if (isNaN(c) || isNaN(w) || c < 0 || w <= 0 || w > 100) {
+        show('', 'You need on the final', '–', ''); stats('–', '–', '–'); table(null, 'Needed on the final');
+        if (w <= 0 || w > 100) warn = 'The final exam weight must be more than 0% and at most 100%.';
+        else if (c < 0) warn = 'The current grade cannot be negative.';
+        else msg.textContent = 'Enter your current grade and how much the final exam is worth.';
+      } else {
+        var f = w / 100, worst = c * (1 - f), best = worst + 100 * f;
+        stats(pc(c), pc(worst), pc(best));
+        table(function (x) { return M.need(c, w, x); }, 'Needed on the final');
+        if (isNaN(t) || t < 0) { show('', 'You need on the final', '–', 'Enter the overall grade you want.'); if (t < 0) warn = 'The grade you want cannot be negative.'; }
+        else { var v = verdict(M.need(c, w, t), t, best, worst, 'the final exam'); show(v[0], v[0] ? 'Result' : 'You need on the final', v[1], v[2]); }
+        if (w === 100) msg.textContent = 'The final is worth 100%, so your current grade does not count: you need your target on the final itself.';
+      }
+    } else {
+      var rows = [], bad = [], t2 = num($('fgTgt2').value);
+      st.rows.forEach(function (r, i) {
+        var w2 = num(r.w), s = M.score(r.s), el = $('fgRows').querySelector('[data-i="' + i + '"]');
+        var bw = r.w !== '' && !(w2 >= 0 && w2 <= 100), bs = typeof s === 'number' && (isNaN(s) || s < 0);
+        if (el) { el.querySelector('[data-f="w"]').setAttribute('aria-invalid', bw); el.querySelector('[data-f="s"]').setAttribute('aria-invalid', bs); }
+        if (bw || bs) { bad.push(r.n.trim() || 'Category ' + (i + 1)); return; }
+        rows.push({ w: w2 > 0 ? w2 : 0, s: s });
+      });
+      var R = M.cats(rows);
+      if (bad.length) warn = 'Check the weight or score for: ' + bad.join(', ') + '. Scores are a number like 85 or marks like 17/20.';
+      if (!(R.W > 0)) { show('', 'You need on what is left', '–', ''); stats('–', '–', '–'); table(null, 'Needed on what is left'); if (!warn) msg.textContent = 'Enter a weight for each category.'; }
+      else {
+        if (Math.abs(R.W - 100) > 1e-6) warn = (warn ? warn + ' ' : '') + 'Your weights add up to ' + f2(R.W) + '%, not 100%. The results treat them as parts of ' + f2(R.W) + '%.';
+        stats(R.done > 0 ? pc(R.current) : '–', pc(R.min), pc(R.max));
+        if (R.left <= 0) {
+          table(null, 'Needed on what is left');
+          show('ok', 'Final overall grade', pc(R.min), 'Every category has a score, so this is your overall grade.' + (t2 >= 0 ? (R.min + 1e-9 >= t2 ? ' It reaches your ' + pc(t2) + ' goal.' : ' It is ' + f2(t2 - R.min) + ' points short of your ' + pc(t2) + ' goal.') : ''));
+          if (!(t2 >= 0) || R.min + 1e-9 < t2) $('fgBox').className = 'fgc-big' + (t2 >= 0 ? ' bad' : '');
+        } else {
+          var what = 'the remaining ' + f2(R.left) + '% of the course (' + st.rows.filter(function (r, i) { return num(r.w) > 0 && M.score(r.s) === null; }).map(function (r) { return r.n.trim() || 'unnamed'; }).join(', ') + ')';
+          table(function (x) { return M.needCat(R, x); }, 'Average needed on what is left');
+          if (isNaN(t2) || t2 < 0) show('', 'You need on what is left', '–', 'Enter the overall grade you want.');
+          else { var v2 = verdict(M.needCat(R, t2), t2, R.max, R.min, what); show(v2[0], v2[0] ? 'Result' : 'Average needed on what is left', v2[1], v2[2]); }
+        }
+      }
+    }
+    if (warn) { msg.className = 'msg bad'; msg.textContent = warn; }
+  }
+  document.querySelectorAll('.fgc .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { $('fgMode').value = b.dataset.mode; $('fgMode').dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+  ['fgMode', 'fgCur', 'fgW', 'fgTgt', 'fgTgt2'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  document.addEventListener('DOMContentLoaded', function () {
+    var cb = $('clearBtn'); if (!cb) return;
+    if (saved) cb.hidden = false;
+    cb.addEventListener('click', function () { clearTimeout(saveT); try { localStorage.removeItem(KEY); } catch (e) {} });
+  });
+  drawRows(); calc();
+})();
+</script>
