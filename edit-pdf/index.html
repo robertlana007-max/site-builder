@@ -67,33 +67,39 @@
     <span class="grow"></span>
     <span id="count">No changes yet</span>
   </div>
+  <div class="notice" id="notice"><div class="meter" id="scanBar" hidden><i id="scanFill"></i></div><p id="hint">Opening…</p></div>
   <div class="stage" id="stage"><div class="sheet" id="sheet"><canvas id="cv"></canvas><div id="layer"></div></div></div>
-  <p class="msg">Click a line of text and type. Press Enter when you are done with a line. To remove a line, delete all of its text.</p>
+  <div class="editbar" id="bar" hidden>
+    <input type="text" class="edit-in" aria-label="New text for the selected line" autocomplete="off" spellcheck="false">
+    <button class="btn ghost" id="undoLine">Undo</button>
+    <button class="btn" id="doneLine">Done</button>
+  </div>
 </div>
 <div class="btns"><button class="btn" id="go" disabled>Save edited PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
 <p class="msg" id="msg"></p>
 <script src="../assets/vendor/pdf-lib.min.js"></script>
 <script src="../assets/vendor/fontkit.min.js"></script>
 <script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/vendor/ocr/tesseract.min.js"></script>
 <script src="../assets/pdf-tools.js"></script>
 <script>
 (function () {
-  var file = null, pdf = null, pageNum = 1, edits = {}, busy = false;
-  var cv = $('cv'), layer = $('layer'), ctx = cv.getContext('2d', { willReadFrequently: true });
+  var file = null, pdf = null, pageNum = 1, edits = {}, busy = false, cur = null, scans = {}, dpr = 1;
+  var cv = $('cv'), layer = $('layer'), ctx = cv.getContext('2d', { willReadFrequently: true }), input = document.querySelector('.edit-in');
 
-  function countEdits() { return Object.keys(edits).length; }
+  function tell(text, pct, cls) { $('notice').className = 'notice ' + (cls || ''); $('hint').textContent = text; $('scanBar').hidden = pct == null; if (pct != null) $('scanFill').style.width = pct + '%'; }
   function refresh() {
-    var n = countEdits();
+    var n = Object.keys(edits).length;
     $('count').textContent = n ? n + (n === 1 ? ' line changed' : ' lines changed') : 'No changes yet';
     $('go').disabled = !n; $('dl').hidden = true;
   }
-
+  function css(c) { return 'rgb(' + c.join(',') + ')'; }
   // Work out the paper colour behind a box and the ink colour inside it, from the rendered page.
   function sample(x, y, w, h) {
     x = Math.max(0, Math.floor(x)); y = Math.max(0, Math.floor(y));
     w = Math.max(1, Math.min(cv.width - x, Math.ceil(w))); h = Math.max(1, Math.min(cv.height - y, Math.ceil(h)));
-    var d = ctx.getImageData(x, y, w, h).data, tally = {}, best = null, bestN = 0, i, k;
-    for (i = 0; i < d.length; i += 4) { // most common colour, in steps of 8, is the background
+    var d = ctx.getImageData(x, y, w, h).data, tally = {}, best = [255, 255, 255], bestN = 0, i, k;
+    for (i = 0; i < d.length; i += 4) { // the most common colour, in steps of 8, is the background
       k = (d[i] >> 3) + ',' + (d[i + 1] >> 3) + ',' + (d[i + 2] >> 3);
       tally[k] = (tally[k] || 0) + 1;
       if (tally[k] > bestN) { bestN = tally[k]; best = [d[i], d[i + 1], d[i + 2]]; }
@@ -105,67 +111,121 @@
     }
     return { bg: best, ink: far > 60 ? ink : (best[0] + best[1] + best[2] > 380 ? [0, 0, 0] : [255, 255, 255]) };
   }
-  function css(c) { return 'rgb(' + c.join(',') + ')'; }
+
+  // One clickable line on the page. b describes where it is on screen, what it says, and how to write it back.
+  function addBox(b) {
+    var el = document.createElement('div');
+    el.className = 'pt'; el.tabIndex = 0; el.setAttribute('role', 'button'); el.setAttribute('translate', 'no');
+    el.style.left = b.left + 'px'; el.style.top = b.top + 'px'; el.style.minWidth = b.width + 'px'; el.style.height = el.style.lineHeight = b.height + 'px';
+    el.style.fontSize = b.fontPx + 'px'; el.style.fontFamily = b.family;
+    b.el = el;
+    b.paint = function () {
+      var e = edits[b.key];
+      el.classList.toggle('changed', !!e);
+      el.textContent = e ? e.text : b.str;
+      el.style.background = e ? css(e.bg) : ''; el.style.color = e ? css(e.ink) : '';
+    };
+    el.addEventListener('click', function () { select(b); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); select(b); } });
+    b.paint(); layer.appendChild(el);
+  }
+  function select(b) {
+    if (cur) cur.el.classList.remove('on');
+    cur = b; b.el.classList.add('on');
+    if (!b.s) b.s = sample(b.left * dpr - 2, b.top * dpr - 2, b.width * dpr + 4, b.height * dpr + 4);
+    $('bar').hidden = false;
+    input.value = edits[b.key] ? edits[b.key].text : b.str;
+    input.focus(); input.select();
+    tell('Type the new text in the box below the page, then press Done.', null, 'ok');
+  }
+  function deselect() { if (cur) cur.el.classList.remove('on'); cur = null; $('bar').hidden = true; tell('Click another blue box to change it, or press Save edited PDF.', null, 'ok'); }
+  input.addEventListener('input', function () {
+    if (!cur) return;
+    var text = input.value;
+    if (text === cur.str) delete edits[cur.key];
+    else edits[cur.key] = Object.assign({ page: pageNum, text: text, orig: cur.str, bg: cur.s.bg, ink: cur.s.ink }, cur.pdf, cur.font);
+    cur.paint(); refresh();
+  });
+  input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); deselect(); } });
+  $('doneLine').addEventListener('click', deselect);
+  $('undoLine').addEventListener('click', function () { if (!cur) return; delete edits[cur.key]; input.value = cur.str; cur.paint(); refresh(); input.focus(); });
+
+  // Pages with real text: one box per run of text, placed from the PDF's own coordinates.
+  function boxesFromText(page, vp, scale, tc, n) {
+    var made = 0;
+    tc.items.forEach(function (it, idx) {
+      if (!it.str || !it.str.trim()) return;
+      var m = pdfjsLib.Util.transform(vp.transform, it.transform);
+      if (Math.abs(m[1]) > .01 || Math.abs(m[2]) > .01 || m[0] <= 0) return; // rotated or mirrored text is left alone
+      var st = tc.styles[it.fontName] || {}, px = Math.hypot(m[2], m[3]), asc = st.ascent || .9, desc = st.descent || -.2, f = null;
+      try { f = page.commonObjs.get(it.fontName); } catch (e) {}
+      var size = Math.hypot(it.transform[2], it.transform[3]);
+      // width of one space in this line: (line width - width of its letters) / number of spaces
+      var sp = 0, gaps = (it.str.match(/ /g) || []).length;
+      if (gaps && f && f.charsToGlyphs) { var letters = 0, known = true; Array.from(it.str).forEach(function (ch) { if (ch === ' ') return; var g = null; try { g = f.charsToGlyphs(ch)[0]; } catch (e) {} if (g && g.width) letters += g.width / 1000 * size; else known = false; }); if (known && it.width > letters) sp = (it.width - letters) / gaps; }
+      addBox({ key: n + ':' + idx, str: it.str, left: m[4], top: m[5] - px * asc, width: it.width * scale, height: px * (asc - desc), fontPx: px, family: '"' + it.fontName + '", ' + (st.fontFamily || 'sans-serif'),
+        pdf: { x: it.transform[4], y: it.transform[5], w: it.width, size: size, asc: asc, desc: desc, space: sp },
+        font: { fontId: it.fontName, data: f && f.data && !f.missingFile ? f.data : null, name: (f && f.name) || '', bold: !!(f && f.bold), italic: !!(f && f.italic), family: st.fontFamily || '' } });
+      made++;
+    });
+    return made;
+  }
+  // Scanned pages have no text, only a picture of it: read the picture and make boxes from what is found.
+  function boxesFromScan(vp, scale, n) {
+    var mine = n, worker = null;
+    var build = function (lines) {
+      var meter = document.createElement('canvas').getContext('2d');
+      lines.forEach(function (l, idx) {
+        meter.font = '100px Arial, Helvetica, sans-serif';
+        var px = Math.max(4, 100 * l.w / Math.max(1, meter.measureText(l.text).width)); // font size that makes the words as wide as the original
+        var asc = Math.max(.3, (l.base - l.y) / px), desc = -Math.max(0, (l.y + l.h - l.base) / px), pt = vp.convertToPdfPoint(l.x, l.base);
+        addBox({ key: n + ':s' + idx, str: l.text, left: l.x, top: l.y, width: l.w, height: l.h, fontPx: px, family: 'Arial, Helvetica, sans-serif',
+          pdf: { x: pt[0], y: pt[1], w: l.w / scale, size: px / scale, asc: asc, desc: desc, space: 0, fit: true },
+          font: { fontId: '', data: null, name: '', bold: false, italic: false, family: 'sans-serif' } });
+      });
+      if (lines.length) tell('This page is a scan (a picture of a page). ' + lines.length + (lines.length === 1 ? ' line was' : ' lines were') + ' read from it: click a blue box to change one. New text on a scanned page uses a standard font.', null, 'ok');
+      else tell('No text could be read on this page. It may be a photo, handwriting, or a language other than English.', null, 'bad');
+    };
+    if (scans[n]) return build(scans[n]);
+    if (!window.Tesseract) return tell('This page is a scan, and the text reader could not load.', null, 'bad');
+    tell('This page is a scan. Reading the text from the picture…', 5);
+    var k = Math.min(1, 2000 / Math.max(cv.width, cv.height)), copy = document.createElement('canvas');
+    copy.width = Math.round(cv.width * k); copy.height = Math.round(cv.height * k); copy.getContext('2d').drawImage(cv, 0, 0, copy.width, copy.height);
+    var f = k * dpr; // from scanned-copy pixels back to on-screen pixels
+    Tesseract.createWorker('eng', 1, {
+      workerPath: '../assets/vendor/ocr/worker.min.js', corePath: '../assets/vendor/ocr', langPath: '../assets/vendor/ocr',
+      logger: function (m) { if (mine === pageNum && m.status === 'recognizing text') tell('This page is a scan. Reading the text from the picture… ' + Math.round(m.progress * 100) + '%', 10 + Math.round(m.progress * 90)); }
+    }).then(function (w) { worker = w; return w.recognize(copy); }).then(function (res) {
+      var lines = [];
+      (res.data.lines || []).forEach(function (l) {
+        var t = (l.text || '').trim(), b = l.bbox;
+        if (!t || !/[A-Za-z0-9]/.test(t) || l.confidence < 30 || b.x1 - b.x0 < 8 || b.y1 - b.y0 < 6) return;
+        lines.push({ text: t, x: b.x0 / f, y: b.y0 / f, w: (b.x1 - b.x0) / f, h: (b.y1 - b.y0) / f, base: (l.baseline ? Math.max(l.baseline.y0, l.baseline.y1) : b.y1) / f });
+      });
+      scans[n] = lines;
+      if (mine === pageNum) build(lines);
+    }).catch(function () { if (mine === pageNum) tell('This page is a scan, and the text reader could not run on this device.', null, 'bad'); })
+      .then(function () { if (worker) worker.terminate(); });
+  }
 
   async function show(n) {
     if (busy) return; busy = true;
     try {
-      pageNum = n;
+      pageNum = n; cur = null; $('bar').hidden = true;
       var page = await pdf.getPage(n), base = page.getViewport({ scale: 1 });
-      var scale = Math.max(.5, Math.min(2, ($('stage').clientWidth - 2) / base.width)), vp = page.getViewport({ scale: scale }), dpr = Math.min(2, window.devicePixelRatio || 1);
+      var scale = Math.max(.5, Math.min(2, ($('stage').clientWidth - 2) / base.width)), vp = page.getViewport({ scale: scale });
+      dpr = Math.min(2, window.devicePixelRatio || 1);
       cv.width = Math.floor(vp.width * dpr); cv.height = Math.floor(vp.height * dpr);
       cv.style.width = $('sheet').style.width = vp.width + 'px'; cv.style.height = $('sheet').style.height = vp.height + 'px';
       await page.render({ canvasContext: ctx, viewport: vp, transform: dpr === 1 ? null : [dpr, 0, 0, dpr, 0, 0] }).promise;
       var tc = await page.getTextContent();
       layer.innerHTML = '';
-      tc.items.forEach(function (it, idx) {
-        if (!it.str || !it.str.trim()) return;
-        var m = pdfjsLib.Util.transform(vp.transform, it.transform);
-        if (Math.abs(m[1]) > .01 || Math.abs(m[2]) > .01 || m[0] <= 0) return; // rotated or mirrored text is left alone
-        var st = tc.styles[it.fontName] || {}, size = Math.hypot(m[2], m[3]);
-        var asc = st.ascent || .9, desc = st.descent || -.2, key = n + ':' + idx;
-        var el = document.createElement('div');
-        el.className = 'pt'; el.spellcheck = false; el.setAttribute('translate', 'no');
-        el.style.left = m[4] + 'px'; el.style.top = (m[5] - size * asc) + 'px';
-        el.style.minWidth = it.width * scale + 'px'; el.style.height = size * (asc - desc) + 'px';
-        el.style.fontSize = size + 'px'; el.style.lineHeight = size * (asc - desc) + 'px';
-        el.style.fontFamily = '"' + it.fontName + '", ' + (st.fontFamily || 'sans-serif');
-        el.textContent = edits[key] ? edits[key].text : it.str;
-        var paint = function () {
-          var e = edits[key];
-          el.classList.toggle('changed', !!e);
-          el.style.background = e ? css(e.bg) : ''; el.style.color = e ? css(e.ink) : '';
-        };
-        el.addEventListener('focus', function () {
-          var box = el.getBoundingClientRect(), sh = $('sheet').getBoundingClientRect();
-          var s = sample((box.left - sh.left) * dpr - 2, (box.top - sh.top) * dpr - 2, it.width * scale * dpr + 4, box.height * dpr + 4);
-          el._s = el._s || s; // sample once, before our own overlay can be read back
-          el.style.background = css(el._s.bg); el.style.color = css(el._s.ink);
-        });
-        el.addEventListener('input', function () {
-          var text = el.textContent.replace(/\n/g, '');
-          if (text === it.str) delete edits[key];
-          else {
-            var f = null; try { f = page.commonObjs.get(it.fontName); } catch (e) {}
-            var size0 = Math.hypot(it.transform[2], it.transform[3]);
-            // width of one space in the original line: (line width - width of its letters) / number of spaces
-            var sp = 0, gaps = (it.str.match(/ /g) || []).length;
-            if (gaps && f && f.widths) { var letters = 0, known = true; Array.from(it.str).forEach(function (ch) { if (ch === ' ') return; var g = null; try { g = f.charsToGlyphs(ch)[0]; } catch (e2) {} if (g && g.width) letters += g.width / 1000 * size0; else known = false; }); if (known && it.width > letters) sp = (it.width - letters) / gaps; }
-            edits[key] = { page: n, text: text, space: sp, x: it.transform[4], y: it.transform[5], w: it.width, size: size0, asc: asc, desc: desc, bg: el._s.bg, ink: el._s.ink, fontId: it.fontName,
-              data: f && f.data && !f.missingFile ? f.data : null, name: (f && f.name) || '', bold: !!(f && f.bold), italic: !!(f && f.italic), family: st.fontFamily || '' };
-          }
-          refresh();
-        });
-        el.addEventListener('blur', function () { if (!edits[key]) el.textContent = it.str; paint(); });
-        el.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); el.blur(); } });
-        el.contentEditable = 'true';
-        if (edits[key]) { el._s = { bg: edits[key].bg, ink: edits[key].ink }; }
-        paint();
-        layer.appendChild(el);
-      });
       $('pageNo').textContent = 'Page ' + n + ' of ' + pdf.numPages;
       $('prev').disabled = n <= 1; $('next').disabled = n >= pdf.numPages;
-    } catch (e) { PT.say('bad', 'This page could not be shown.'); }
+      if (boxesFromText(page, vp, scale, tc, n)) tell('Click a blue box (a line of text) on the page to change it.', null, '');
+      else if (vp.rotation % 360 === 0) boxesFromScan(vp, scale, n);
+      else tell('This page has no text that can be edited.', null, 'bad');
+    } catch (e) { tell('This page could not be shown.', null, 'bad'); }
     busy = false;
   }
 
@@ -175,7 +235,7 @@
     // fontExtraProperties keeps each embedded font's data, so edits can reuse the document's own fonts.
     pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
     f.arrayBuffer().then(function (buf) { return pdfjsLib.getDocument({ data: buf, fontExtraProperties: true }).promise; }).then(function (doc) {
-      file = f; pdf = doc; edits = {}; $('editor').hidden = false; refresh();
+      file = f; pdf = doc; edits = {}; scans = {}; $('editor').hidden = false; refresh();
       PT.say('', f.name + ' · ' + doc.numPages + (doc.numPages === 1 ? ' page' : ' pages'));
       return show(1);
     }).catch(function (e) {
@@ -195,40 +255,44 @@
   }
 
   $('go').addEventListener('click', function () {
-    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    if (cur) deselect();
     PT.run(async function () {
       var doc = await PT.open(file), own = {}, std = {}, usedOwn = 0, usedStd = 0, list = Object.keys(edits).map(function (k) { return edits[k]; });
       if (window.fontkit) doc.registerFontkit(fontkit);
       for (var i = 0; i < list.length; i++) {
         var e = list[i], page = doc.getPage(e.page - 1), rgb = function (c) { return PDFLib.rgb(c[0] / 255, c[1] / 255, c[2] / 255); };
-        var pad = e.size * .08;
+        var pad = e.size * .08, size = e.size;
         page.drawRectangle({ x: e.x - pad, y: e.y + e.desc * e.size - pad, width: e.w + pad * 2, height: e.size * (e.asc - e.desc) + pad * 2, color: rgb(e.bg) });
         if (!e.text.trim()) continue;
-        var font = null;
+        var font = null, set = null;
         if (e.data && window.fontkit) { // try the document's own font first
           try {
             if (!(e.fontId in own)) own[e.fontId] = await doc.embedFont(e.data, { subset: false });
-            var set = own[e.fontId].getCharacterSet(), ok = Array.from(e.text).every(function (ch) { return ch === ' ' || set.indexOf(ch.codePointAt(0)) !== -1; });
-            if (ok && own[e.fontId].widthOfTextAtSize(e.text, e.size) > 0) font = own[e.fontId];
+            set = own[e.fontId].getCharacterSet();
+            var ok = Array.from(e.text).every(function (ch) { return ch === ' ' || set.indexOf(ch.codePointAt(0)) !== -1; });
+            if (ok && own[e.fontId].widthOfTextAtSize(e.text.replace(/ /g, ''), e.size) > 0) font = own[e.fontId];
           } catch (err) { own[e.fontId] = null; }
         }
-        if (font) usedOwn++;
-        else {
+        if (font) {
+          usedOwn++;
+          // A PDF's own font often has no space glyph, so place the words one by one.
+          var gap = set.indexOf(32) !== -1 ? font.widthOfTextAtSize(' ', size) : (e.space || size * .3), x = e.x;
+          e.text.split(' ').forEach(function (word) {
+            if (word) { page.drawText(word, { x: x, y: e.y, size: size, font: font, color: rgb(e.ink) }); x += font.widthOfTextAtSize(word, size); }
+            x += gap;
+          });
+        } else {
           var name = standard(e);
           if (!std[name]) std[name] = await doc.embedFont(name);
           font = std[name];
-          try { font.widthOfTextAtSize(e.text, e.size); }
-          catch (err) { throw new Error('On page ' + e.page + ', "' + e.text.slice(0, 30) + '" has letters this tool cannot write into the PDF. Only Latin letters work when the PDF lacks those letters in its own font.'); }
+          try {
+            font.widthOfTextAtSize(e.text, size);
+            // on a scanned page the size is whatever makes the original words as wide as they were
+            if (e.fit) { var wide = font.widthOfTextAtSize(e.orig, 1); if (wide > 0) size = Math.max(e.size * .5, Math.min(e.size * 1.6, e.w / wide)); }
+          } catch (err) { throw new Error('On page ' + e.page + ', "' + e.text.slice(0, 30) + '" has letters this tool cannot write into the PDF. Only Latin letters work when the PDF lacks those letters in its own font.'); }
           usedStd++;
+          page.drawText(e.text, { x: e.x, y: e.y, size: size, font: font, color: rgb(e.ink) });
         }
-        if (font === own[e.fontId]) {
-          // A PDF's own font often has no space glyph, so place the words one by one.
-          var gap = set.indexOf(32) !== -1 ? font.widthOfTextAtSize(' ', e.size) : (e.space || e.size * .3), x = e.x;
-          e.text.split(' ').forEach(function (word) {
-            if (word) { page.drawText(word, { x: x, y: e.y, size: e.size, font: font, color: rgb(e.ink) }); x += font.widthOfTextAtSize(word, e.size); }
-            x += gap;
-          });
-        } else page.drawText(e.text, { x: e.x, y: e.y, size: e.size, font: font, color: rgb(e.ink) });
       }
       var note = 'Saved ' + list.length + (list.length === 1 ? ' change' : ' changes');
       if (usedStd) note += '. ' + (usedOwn ? usedOwn + ' kept the original font; ' : '') + usedStd + ' used the closest standard font, because the PDF does not contain those letters in its own font';

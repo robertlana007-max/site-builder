@@ -67,8 +67,7 @@
     <button class="btn ghost" id="undo" disabled>Undo</button>
   </div>
   <div class="stage" id="stage"><canvas id="cv" style="touch-action:none;cursor:crosshair"></canvas></div>
-  <div class="meter" id="scanBar" hidden><i id="scanFill"></i></div>
-  <p class="msg" id="hint">Looking for writing in the picture…</p>
+  <div class="notice" id="notice"><div class="meter" id="scanBar" hidden><i id="scanFill"></i></div><p id="hint">Looking for writing in the picture…</p></div>
   <div id="panel" hidden>
     <div class="fields"><div style="grid-column:1/-1"><label for="txt">New text</label><input type="text" id="txt" autocomplete="off"></div></div>
     <details class="more"><summary>More options: font, size, colour</summary><div>
@@ -110,7 +109,7 @@
     ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0);
     if (marks && zones.length) { // writing found in the picture that can be clicked
       var z = cv.width / cv.getBoundingClientRect().width;
-      ctx.save(); ctx.setLineDash([5 * z, 4 * z]); ctx.lineWidth = 2 * z; ctx.strokeStyle = '#ff2d7a'; ctx.fillStyle = 'rgba(255,45,122,.12)';
+      ctx.save(); ctx.setLineDash([5 * z, 4 * z]); ctx.lineWidth = 2 * z; ctx.strokeStyle = '#ff2d7a'; ctx.fillStyle = 'rgba(255,45,122,.22)'; ctx.lineWidth = 3 * z;
       zones.forEach(function (b) { ctx.fillRect(b.x, b.y, b.w, b.h); ctx.strokeRect(b.x, b.y, b.w, b.h); });
       ctx.restore();
     }
@@ -147,29 +146,29 @@
   }
   // Read the picture with OCR and remember where each line of writing is.
   function findText() {
-    var mine = ++scan;
-    zones = []; $('scanBar').hidden = false; $('scanFill').style.width = '4%'; $('hint').textContent = 'Looking for writing in the picture…';
-    if (!window.Tesseract) { $('scanBar').hidden = true; $('hint').textContent = 'Could not load the text finder. You can still cover old text and add new text by hand.'; return; }
-    var worker = null;
+    var mine = ++scan, worker = null;
+    var tell = function (text, pct, cls) { $('notice').className = 'notice ' + (cls || ''); $('hint').textContent = text; $('scanBar').hidden = pct == null; if (pct != null) $('scanFill').style.width = pct + '%'; };
+    zones = [];
+    if (!window.Tesseract) return tell('The text reader could not load. Use “Add new text” and “Hide text by hand” instead.', null, 'bad');
+    tell('Getting the text reader ready… the first time takes a little longer.', 5);
+    // Read a smaller copy of large photos: much faster, and phones do not run out of memory.
+    var k = Math.min(1, 1800 / Math.max(cv.width, cv.height)), copy = document.createElement('canvas');
+    copy.width = Math.round(cv.width * k); copy.height = Math.round(cv.height * k); copy.getContext('2d').drawImage(img, 0, 0, copy.width, copy.height);
     Tesseract.createWorker('eng', 1, {
       workerPath: '../assets/vendor/ocr/worker.min.js', corePath: '../assets/vendor/ocr', langPath: '../assets/vendor/ocr',
-      logger: function (m) { if (mine === scan && m.status === 'recognizing text') $('scanFill').style.width = Math.max(4, Math.round(m.progress * 100)) + '%'; }
-    }).then(function (w) {
-      worker = w;
-      var copy = document.createElement('canvas'); copy.width = cv.width; copy.height = cv.height; copy.getContext('2d').drawImage(img, 0, 0); // the untouched picture
-      return w.recognize(copy);
-    }).then(function (res) {
+      logger: function (m) { if (mine === scan && m.status === 'recognizing text') tell('Reading the picture… ' + Math.round(m.progress * 100) + '%', 10 + Math.round(m.progress * 90)); }
+    }).then(function (w) { worker = w; return w.recognize(copy); }).then(function (res) {
       if (mine !== scan) return;
       (res.data.lines || []).forEach(function (l) {
         var t = (l.text || '').trim(), b = l.bbox;
-        if (!t || l.confidence < 45 || b.x1 - b.x0 < 8 || b.y1 - b.y0 < 8) return;
-        zones.push({ x: b.x0, y: b.y0, w: b.x1 - b.x0, h: b.y1 - b.y0, text: t, base: l.baseline ? Math.max(l.baseline.y0, l.baseline.y1) : b.y1 });
+        if (!t || !/[A-Za-z0-9]/.test(t) || l.confidence < 30 || b.x1 - b.x0 < 8 || b.y1 - b.y0 < 6) return;
+        zones.push({ x: b.x0 / k, y: b.y0 / k, w: (b.x1 - b.x0) / k, h: (b.y1 - b.y0) / k, text: t, base: (l.baseline ? Math.max(l.baseline.y0, l.baseline.y1) : b.y1) / k });
       });
-      $('scanBar').hidden = true;
-      $('hint').textContent = zones.length ? 'Found ' + zones.length + (zones.length === 1 ? ' line' : ' lines') + ' of writing. Click one in the picture to change it.' : 'No writing was found automatically. Use Cover old text and Add text instead.';
+      if (zones.length) tell('Found ' + zones.length + (zones.length === 1 ? ' line' : ' lines') + ' of text. Click a pink box on the picture to change that text.', null, 'ok');
+      else tell('No text could be read in this picture. This works for clear printed English letters and numbers. For anything else, use “Add new text” and “Hide text by hand”.', null, 'bad');
       draw(true);
     }).catch(function () {
-      if (mine === scan) { $('scanBar').hidden = true; $('hint').textContent = 'The text finder could not run on this device. You can still cover old text and add new text by hand.'; }
+      if (mine === scan) tell('The text reader could not run on this device. Use “Add new text” and “Hide text by hand” instead.', null, 'bad');
     }).then(function () { if (worker) worker.terminate(); });
   }
   // Turn a found line into an editable one: hide the original and put matching text on top.
@@ -204,7 +203,7 @@
     items.push({ kind: 'cover', x: b.x, y: b.y, w: b.w, h: b.h, color: bg });
     items.push({ kind: 'text', text: z.text, x: z.x, y: z.base, size: Math.max(8, Math.min(400, Math.round(best.size))), font: best.font, color: hex(ink[0], ink[1], ink[2]), bold: best.bold, ital: false, outl: false, pair: true });
     changed(); select(items.length - 1); $('txt').focus(); $('txt').select();
-    $('hint').textContent = 'Type the new text below. The font is the closest plain match; change it if another fits better.';
+    $('notice').className = 'notice ok'; $('hint').textContent = 'Now type the new text in the box below. Then click another pink box, or press Save picture.';
   }
   function select(i) {
     sel = i; var it = items[i];
@@ -218,7 +217,7 @@
     draw(true);
   }
   function changed() { $('undo').disabled = !items.length; $('go').disabled = !items.length; $('dl').hidden = true; }
-  function setMode(m) { mode = m; $('addCover').setAttribute('aria-pressed', m === 'cover'); $('pick').setAttribute('aria-pressed', m === 'pick'); if (m) $('hint').textContent = m === 'cover' ? 'Drag a box over the writing you want to hide.' : 'Click a spot on the picture to use its color.'; }
+  function setMode(m) { mode = m; $('addCover').setAttribute('aria-pressed', m === 'cover'); $('pick').setAttribute('aria-pressed', m === 'pick'); if (m) { $('notice').className = 'notice'; $('hint').textContent = m === 'cover' ? 'Drag a box over the writing you want to hide.' : 'Click a spot on the picture to use its colour.'; } }
 
   setupDrop('drop', 'file', function (f) {
     name = f.name.replace(/\.[^.]+$/, '');
