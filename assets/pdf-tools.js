@@ -22,6 +22,10 @@
     ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
     ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
     drop.addEventListener('drop', function (e) { take(e.dataTransfer.files); });
+    // A finished file no longer matches once an option changes, so hide its download button.
+    Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) {
+      el.addEventListener('input', function () { $('dl').hidden = true; });
+    });
   };
 
   // Open with pdf-lib (for editing). Rejects with a message that is safe to show.
@@ -62,7 +66,8 @@
       var m = p.match(/^(\d+)(?:\s*-\s*(\d+))?$/);
       if (!m) throw new Error('"' + p + '" is not a page number or range. Use a format like 1-3, 5.');
       var a = +m[1], b = m[2] ? +m[2] : a;
-      if (a < 1 || b < a || b > n) throw new Error('"' + p + '" is outside this PDF, which has ' + n + (n === 1 ? ' page.' : ' pages.'));
+      if (b < a) throw new Error('"' + p + '" goes backwards. Write ranges from low to high, like ' + b + '-' + a + '.');
+      if (a < 1 || b > n) throw new Error('"' + p + '" is outside this PDF, which has ' + n + (n === 1 ? ' page.' : ' pages.'));
       for (var i = a; i <= b; i++) if (!seen[i]) { seen[i] = 1; out.push(i - 1); }
     });
     return out;
@@ -106,6 +111,23 @@
     });
   };
 
+  // Page geometry as the reader sees it, taking the page's built-in rotation (/Rotate) into account.
+  // width/height are the visible size; at(u, v) turns a point measured from the visible bottom-left
+  // corner into PDF coordinates; angle is the extra rotation (degrees) that makes text read upright.
+  PT.view = function (page) {
+    var b = page.getCropBox(), r = ((Math.round((page.getRotation().angle || 0) / 90) * 90) % 360 + 360) % 360;
+    var side = r === 90 || r === 270;
+    return {
+      width: side ? b.height : b.width, height: side ? b.width : b.height, angle: r,
+      at: function (u, v) {
+        if (r === 90) return { x: b.x + b.width - v, y: b.y + u };
+        if (r === 180) return { x: b.x + b.width - u, y: b.y + b.height - v };
+        if (r === 270) return { x: b.x + v, y: b.y + b.height - u };
+        return { x: b.x + u, y: b.y + v };
+      }
+    };
+  };
+
   // Minimal ZIP writer (stored, no compression: the inputs are already-compressed images).
   var crcTable = null;
   function crc32(d) {
@@ -118,14 +140,19 @@
     return (crc ^ 0xFFFFFFFF) >>> 0;
   }
   PT.zip = function (files) { // [{ name, data: Uint8Array }]
-    var enc = new TextEncoder(), parts = [], central = [], offset = 0;
+    var enc = new TextEncoder(), parts = [], central = [], offset = 0, now = new Date();
+    // MS-DOS time and date of "now" (a zero date is invalid and some unzip tools complain)
+    var dosTime = (now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1);
+    var dosDate = ((Math.max(1980, now.getFullYear()) - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate();
     files.forEach(function (f) {
       var name = enc.encode(f.name), crc = crc32(f.data), size = f.data.length;
       var local = new DataView(new ArrayBuffer(30));
       local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0x0800, true);
+      local.setUint16(10, dosTime, true); local.setUint16(12, dosDate, true);
       local.setUint32(14, crc, true); local.setUint32(18, size, true); local.setUint32(22, size, true); local.setUint16(26, name.length, true);
       var cd = new DataView(new ArrayBuffer(46));
       cd.setUint32(0, 0x02014b50, true); cd.setUint16(4, 20, true); cd.setUint16(6, 20, true); cd.setUint16(8, 0x0800, true);
+      cd.setUint16(12, dosTime, true); cd.setUint16(14, dosDate, true);
       cd.setUint32(16, crc, true); cd.setUint32(20, size, true); cd.setUint32(24, size, true); cd.setUint16(28, name.length, true); cd.setUint32(42, offset, true);
       parts.push(new Uint8Array(local.buffer), name, f.data);
       central.push(new Uint8Array(cd.buffer), name);

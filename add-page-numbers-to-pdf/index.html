@@ -123,7 +123,7 @@
 <input type="file" id="file" accept="application/pdf,.pdf" hidden>
 <div class="fields">
   <div><label for="pos">Position</label><select id="pos"><option value="bc">Bottom center</option><option value="br">Bottom right</option><option value="bl">Bottom left</option><option value="tc">Top center</option><option value="tr">Top right</option><option value="tl">Top left</option></select></div>
-  <div><label for="fmt">Format</label><select id="fmt"><option value="n">1</option><option value="of">1 / 10</option><option value="page">Page 1 of 10</option></select></div>
+  <div><label for="fmt">Format</label><select id="fmt"><option value="n">1</option><option value="of">1 / 10 (with the last number)</option><option value="page">Page 1 of 10</option></select></div>
   <div><label for="start">Start at</label><input type="number" id="start" min="0" step="1" value="1"></div>
   <div><label for="size">Text size</label><select id="size"><option value="9">Small</option><option value="11" selected>Medium</option><option value="14">Large</option></select></div>
 </div>
@@ -133,27 +133,40 @@
 <script src="../assets/pdf-tools.js"></script>
 <script>
 (function () {
-  var file = null;
+  var file = null, pages = 0;
+  function startNum() { // the number on the first page; empty means 1
+    var v = $('start').value.trim();
+    if (!v) return 1;
+    if (!/^\d+$/.test(v) || +v > 999999) throw new Error('"Start at" must be a whole number from 0 to 999999.');
+    return +v;
+  }
+  function info() {
+    if (!file) return;
+    var s; try { s = startNum(); } catch (e) { return PT.say('bad', e.message); }
+    PT.say('', file.name + ' · ' + pages + (pages === 1 ? ' page' : ' pages') + ' · numbered ' + s + (pages > 1 ? ' to ' + (s + pages - 1) : ''));
+  }
   PT.drop(false, function (f) {
     $('dl').hidden = true;
     PT.open(f).then(function (d) {
-      file = f; var n = d.getPageCount(); $('go').disabled = false;
-      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages'));
-    }).catch(function (e) { PT.say('bad', e.message); });
+      file = f; pages = d.getPageCount(); $('go').disabled = false; info();
+    }).catch(function (e) { file = null; $('go').disabled = true; PT.say('bad', e.message); });
   });
+  $('start').addEventListener('input', info);
   $('go').addEventListener('click', function () {
     PT.run(async function () {
-      var doc = await PT.open(file), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
-      var pages = doc.getPages(), n = pages.length, start = Math.max(0, Math.floor(+$('start').value) || 0), size = +$('size').value;
+      var start = startNum(), doc = await PT.open(file), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      var list = doc.getPages(), n = list.length, size = +$('size').value;
+      // the second number in "1 / 10" and "Page 1 of 10" is the last number printed, which is the page count when starting at 1
       var pos = $('pos').value, fmt = $('fmt').value, margin = 28, last = start + n - 1;
-      pages.forEach(function (p, i) {
+      list.forEach(function (p, i) {
         var num = start + i, text = fmt === 'n' ? String(num) : fmt === 'of' ? num + ' / ' + last : 'Page ' + num + ' of ' + last;
-        var w = font.widthOfTextAtSize(text, size), box = p.getCropBox();
-        var x = pos[1] === 'l' ? box.x + margin : pos[1] === 'r' ? box.x + box.width - margin - w : box.x + (box.width - w) / 2;
-        var y = pos[0] === 'b' ? box.y + margin - size / 2 : box.y + box.height - margin - size / 2;
-        p.drawText(text, { x: x, y: y, size: size, font: font, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+        // measure on the page as it is shown, so pages with a built-in rotation get the number on the right edge, upright
+        var w = font.widthOfTextAtSize(text, size), v = PT.view(p);
+        var u = pos[1] === 'l' ? margin : pos[1] === 'r' ? v.width - margin - w : (v.width - w) / 2;
+        var at = v.at(u, pos[0] === 'b' ? margin - size / 2 : v.height - margin - size / 2);
+        p.drawText(text, { x: at.x, y: at.y, size: size, font: font, color: PDFLib.rgb(0.2, 0.2, 0.2), rotate: PDFLib.degrees(v.angle) });
       });
-      PT.done(await doc.save(), PT.base(file.name) + '-numbered.pdf', 'application/pdf', 'Numbered ' + n + (n === 1 ? ' page' : ' pages'));
+      PT.done(await doc.save(), PT.base(file.name) + '-numbered.pdf', 'application/pdf', 'Numbered ' + n + (n === 1 ? ' page' : ' pages') + ' from ' + start + ' to ' + last);
     });
   });
 })();

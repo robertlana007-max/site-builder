@@ -130,19 +130,35 @@
 <div class="preview"><img id="prev" alt="Converted preview" hidden></div>
 <script>
 (function () {
-  var src = null, name = 'image', lastUrl = null, EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  var src = null, note = '', name = 'image', lastUrl = null, EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  // An animated GIF has a loop marker or more than one frame control block.
+  function isAnimated(d) {
+    var frames = 0;
+    for (var i = 0; i < d.length - 10; i++) {
+      if (d[i] === 0x21 && d[i + 1] === 0xFF && String.fromCharCode.apply(null, d.subarray(i + 3, i + 14)) === 'NETSCAPE2.0') return true;
+      if (d[i] === 0x21 && d[i + 1] === 0xF9 && d[i + 2] === 4 && ++frames > 1) return true;
+    }
+    return false;
+  }
   function say(cls, t) { $('msg').className = 'msg ' + cls; $('msg').textContent = t; }
   setupDrop('drop', 'file', function (f) {
     name = f.name.replace(/\.[^.]+$/, '');
+    src = null; note = ''; $('go').disabled = true; $('dl').hidden = true; $('prev').hidden = true; // forget the last picture
     loadImage(f, function (img) {
-      if (!img) return say('bad', 'Could not read that image.');
-      src = img; $('go').disabled = false; $('dl').hidden = true;
+      if (!img) return say('bad', 'Could not read that image. Please choose a PNG, JPG, WebP, GIF or BMP file.');
+      src = img; $('go').disabled = false;
       say('', f.name + ' · ' + img.naturalWidth + ' × ' + img.naturalHeight + ' px · ' + fmtBytes(f.size));
+      if (f.type === 'image/gif' || /\.gif$/i.test(f.name)) f.arrayBuffer().then(function (buf) {
+        if (src !== img) return;
+        note = isAnimated(new Uint8Array(buf)) ? ' This GIF is animated: only the first frame is kept, as a still picture.' : '';
+        if (note) say('', $('msg').textContent + ' ·' + note);
+      });
     });
   });
-  $('fmt').addEventListener('change', function () { $('qBox').hidden = $('fmt').value === 'image/png'; });
-  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; });
+  $('fmt').addEventListener('change', function () { $('qBox').hidden = $('fmt').value === 'image/png'; $('dl').hidden = true; });
+  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; $('dl').hidden = true; });
   $('go').addEventListener('click', function () {
+    if (!src) return;
     var c = document.createElement('canvas'), type = $('fmt').value;
     c.width = src.naturalWidth; c.height = src.naturalHeight;
     var ctx = c.getContext('2d');
@@ -154,7 +170,7 @@
       lastUrl = URL.createObjectURL(b);
       $('prev').src = lastUrl; $('prev').hidden = false;
       $('dl').href = lastUrl; $('dl').download = name + '.' + EXT[type]; $('dl').hidden = false;
-      say('ok', 'Converted to ' + EXT[type].toUpperCase() + ' · ' + fmtBytes(b.size));
+      say('ok', 'Converted to ' + EXT[type].toUpperCase() + ' · ' + fmtBytes(b.size) + (note ? ' ·' + note : ''));
     }, type, $('q').value / 100);
   });
 })();

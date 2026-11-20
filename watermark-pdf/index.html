@@ -139,7 +139,7 @@
     PT.open(f).then(function (d) {
       file = f; var n = d.getPageCount(); $('go').disabled = false;
       PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages'));
-    }).catch(function (e) { PT.say('bad', e.message); });
+    }).catch(function (e) { file = null; $('go').disabled = true; PT.say('bad', e.message); });
   });
   $('go').addEventListener('click', function () {
     PT.run(async function () {
@@ -150,15 +150,15 @@
       catch (e) { throw new Error('The watermark can only use Latin letters, numbers and common symbols.'); }
       var diag = $('style').value === 'diag';
       doc.getPages().forEach(function (p) {
-        var box = p.getCropBox(), ang = diag ? Math.atan2(box.height, box.width) : 0;
+        // work on the page as it is shown, so pages with a built-in rotation get the same upright watermark
+        var v = PT.view(p), ang = diag ? Math.atan2(v.height, v.width) : 0;
         // Size the text to span about 70% of the diagonal (or width), then center it on the page.
-        var span = (diag ? Math.hypot(box.width, box.height) : box.width) * 0.7;
-        var size = Math.min(span / font.widthOfTextAtSize(text, 1), box.height / 4), w = font.widthOfTextAtSize(text, size), h = size * 0.7;
-        var cx = box.x + box.width / 2, cy = box.y + box.height / 2;
+        var span = (diag ? Math.hypot(v.width, v.height) : v.width) * 0.7;
+        var size = Math.min(span / font.widthOfTextAtSize(text, 1), v.height / 4), w = font.widthOfTextAtSize(text, size), h = size * 0.7;
+        var at = v.at(v.width / 2 - (w / 2) * Math.cos(ang) + (h / 2) * Math.sin(ang), v.height / 2 - (w / 2) * Math.sin(ang) - (h / 2) * Math.cos(ang));
         p.drawText(text, {
-          x: cx - (w / 2) * Math.cos(ang) + (h / 2) * Math.sin(ang),
-          y: cy - (w / 2) * Math.sin(ang) - (h / 2) * Math.cos(ang),
-          size: size, font: font, color: PDFLib.rgb(c[0], c[1], c[2]), opacity: +$('op').value, rotate: PDFLib.radians(ang)
+          x: at.x, y: at.y,
+          size: size, font: font, color: PDFLib.rgb(c[0], c[1], c[2]), opacity: +$('op').value, rotate: PDFLib.degrees(v.angle + ang * 180 / Math.PI)
         });
       });
       var n = doc.getPageCount();

@@ -15,9 +15,10 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
-  var src = null, orig = 0, name = 'image', lastUrl = null;
+  var src = null, orig = 0, name = 'image', lastUrl = null, origFile = null, origUrl = null, job = 0;
   function run() {
     if (!src) return;
+    var mine = ++job;
     var mw = parseInt($('maxw').value, 10), w = src.naturalWidth, h = src.naturalHeight;
     if (mw > 0 && mw < w) { h = Math.round(h * mw / w); w = mw; }
     var c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -25,21 +26,33 @@
     if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
     ctx.drawImage(src, 0, 0, w, h);
     c.toBlob(function (b) {
+      if (mine !== job) return; // a newer setting or file took over
       if (!b) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser could not encode this format.'; return; }
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       lastUrl = URL.createObjectURL(b);
       $('prev').src = lastUrl; $('prev').hidden = false;
-      $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').hidden = false;
       $('stats').hidden = false;
       $('s1').textContent = fmtBytes(orig); $('s2').textContent = fmtBytes(b.size);
       var pct = Math.round((1 - b.size / orig) * 100);
       $('s3').textContent = pct > 0 ? pct + '%' : '0%';
-      $('msg').className = 'msg'; $('msg').textContent = pct > 0 ? w + ' × ' + h + ' px' : 'This image is already well compressed. Try a lower quality.';
+      if (b.size < orig) {
+        $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').textContent = 'Download image';
+        $('msg').className = 'msg'; $('msg').textContent = w + ' × ' + h + ' px';
+      } else { // never hand out a bigger file than the one the person started with
+        if (!origUrl) origUrl = URL.createObjectURL(origFile);
+        $('prev').src = origUrl;
+        $('dl').href = origUrl; $('dl').download = origFile.name; $('dl').textContent = 'Download original';
+        $('msg').className = 'msg'; $('msg').textContent = 'Your image is already well compressed: at these settings the new file would be ' + fmtBytes(b.size) + ', bigger than your original. The button below gives you the original instead. Try a lower quality, a max width, or WebP.';
+      }
+      $('dl').hidden = false;
     }, type, $('q').value / 100);
   }
   setupDrop('drop', 'file', function (f) {
+    // a new file: forget the last result so nothing from it can be downloaded by mistake
+    src = null; job++; $('stats').hidden = true; $('prev').hidden = true; $('dl').hidden = true;
+    if (origUrl) { URL.revokeObjectURL(origUrl); origUrl = null; }
     if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'Please choose an image file.'; return; }
-    orig = f.size; name = f.name.replace(/\.[^.]+$/, '');
+    orig = f.size; origFile = f; name = f.name.replace(/\.[^.]+$/, '');
     loadImage(f, function (img) {
       if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image.'; return; }
       src = img; run();

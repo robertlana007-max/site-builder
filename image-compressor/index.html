@@ -136,9 +136,10 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
-  var src = null, orig = 0, name = 'image', lastUrl = null;
+  var src = null, orig = 0, name = 'image', lastUrl = null, origFile = null, origUrl = null, job = 0;
   function run() {
     if (!src) return;
+    var mine = ++job;
     var mw = parseInt($('maxw').value, 10), w = src.naturalWidth, h = src.naturalHeight;
     if (mw > 0 && mw < w) { h = Math.round(h * mw / w); w = mw; }
     var c = document.createElement('canvas'); c.width = w; c.height = h;
@@ -146,21 +147,33 @@
     if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
     ctx.drawImage(src, 0, 0, w, h);
     c.toBlob(function (b) {
+      if (mine !== job) return; // a newer setting or file took over
       if (!b) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser could not encode this format.'; return; }
       if (lastUrl) URL.revokeObjectURL(lastUrl);
       lastUrl = URL.createObjectURL(b);
       $('prev').src = lastUrl; $('prev').hidden = false;
-      $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').hidden = false;
       $('stats').hidden = false;
       $('s1').textContent = fmtBytes(orig); $('s2').textContent = fmtBytes(b.size);
       var pct = Math.round((1 - b.size / orig) * 100);
       $('s3').textContent = pct > 0 ? pct + '%' : '0%';
-      $('msg').className = 'msg'; $('msg').textContent = pct > 0 ? w + ' × ' + h + ' px' : 'This image is already well compressed. Try a lower quality.';
+      if (b.size < orig) {
+        $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').textContent = 'Download image';
+        $('msg').className = 'msg'; $('msg').textContent = w + ' × ' + h + ' px';
+      } else { // never hand out a bigger file than the one the person started with
+        if (!origUrl) origUrl = URL.createObjectURL(origFile);
+        $('prev').src = origUrl;
+        $('dl').href = origUrl; $('dl').download = origFile.name; $('dl').textContent = 'Download original';
+        $('msg').className = 'msg'; $('msg').textContent = 'Your image is already well compressed: at these settings the new file would be ' + fmtBytes(b.size) + ', bigger than your original. The button below gives you the original instead. Try a lower quality, a max width, or WebP.';
+      }
+      $('dl').hidden = false;
     }, type, $('q').value / 100);
   }
   setupDrop('drop', 'file', function (f) {
+    // a new file: forget the last result so nothing from it can be downloaded by mistake
+    src = null; job++; $('stats').hidden = true; $('prev').hidden = true; $('dl').hidden = true;
+    if (origUrl) { URL.revokeObjectURL(origUrl); origUrl = null; }
     if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'Please choose an image file.'; return; }
-    orig = f.size; name = f.name.replace(/\.[^.]+$/, '');
+    orig = f.size; origFile = f; name = f.name.replace(/\.[^.]+$/, '');
     loadImage(f, function (img) {
       if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image.'; return; }
       src = img; run();
@@ -182,7 +195,7 @@
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Live preview</b>Every change to quality, format or width redraws the image at once, so you can see the result before saving.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Size report</b>Shows the original size, the new size and the percent saved, so you know exactly what you gained.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Quality from 10% to 95%</b>A simple slider controls how hard the image is compressed. 60 to 80% is the usual sweet spot for photos.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>JPG or WebP output</b>Save in the most common format or in the smaller modern WebP format.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Optional max width</b>Scale a large photo down to a sensible width in the same step, keeping its shape.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private by design</b>Compression uses your browser’s own image engine, with no upload and no account.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: shrinking a phone photo for a blog</h2><p>You have a phone photo that is 4000 × 3000 px and 4.1 MB. You drop it in, leave Quality at 70% and Output format on JPG, and type 1600 in Max width. The picture becomes 1600 × 1200 px, because 3000 × 1600 ÷ 4000 = 1200. The Compressed box shows a size of roughly 250 to 400 KB, so Saved reads about 90%. You check the preview, it looks sharp on screen, and you click &quot;Download image&quot; to get photo-compressed.jpg.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Try a smaller max width before you push the quality very low. Halving the width cuts the file to about a quarter.</li><li>For screen use, 1200 to 2000 px wide is enough for almost every website and chat app.</li><li>Keep your original file. Compression removes detail that cannot be brought back later.</li><li>Choose WebP for websites you control, and JPG when you are not sure the other person can open WebP.</li><li>Do not compress the same JPG again and again. Each save loses a little more quality, so always start from the original.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The message says the image is already well compressed and Saved shows 0%</summary><p>The new file came out the same size or bigger. Lower the Quality slider, set a Max width, or try WebP instead of JPG.</p></details><details><summary>The transparent background turned white</summary><p>JPG cannot store transparency, so empty areas are filled with white. Choose WebP in Output format to keep the see-through areas.</p></details><details><summary>Text or a logo looks fuzzy</summary><p>Sharp graphics suffer most from compression. Raise the quality to 85% or more, or keep that image as a PNG and do not compress it here.</p></details><details><summary>&quot;Please choose an image file&quot; appears</summary><p>The file you chose is not an image, for example a PDF or a document. Pick a JPG, PNG or WebP file.</p></details><details><summary>&quot;Your browser could not encode this format&quot;</summary><p>Your browser cannot save WebP. Switch Output format to JPG, or update your browser.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The message says the image is already well compressed and Saved shows 0%</summary><p>The new file came out the same size or bigger, so the button changes to &quot;Download original&quot; and gives you your untouched file instead of a bigger one. To get a smaller file, lower the Quality slider, set a Max width, or try WebP instead of JPG.</p></details><details><summary>The transparent background turned white</summary><p>JPG cannot store transparency, so empty areas are filled with white. Choose WebP in Output format to keep the see-through areas.</p></details><details><summary>Text or a logo looks fuzzy</summary><p>Sharp graphics suffer most from compression. Raise the quality to 85% or more, or keep that image as a PNG and do not compress it here.</p></details><details><summary>&quot;Please choose an image file&quot; appears</summary><p>The file you chose is not an image, for example a PDF or a document. Pick a JPG, PNG or WebP file.</p></details><details><summary>&quot;Your browser could not encode this format&quot;</summary><p>Your browser cannot save WebP. Switch Output format to JPG, or update your browser.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Are my images uploaded to a server?</summary><p>No. The image is compressed by your own browser and is never sent anywhere.</p></details><details><summary>Which quality setting should I use?</summary><p>60 to 80 percent is a good range for photos. Most people cannot see the difference, and the file is often less than half the original size.</p></details><details><summary>Why did my PNG become a JPG?</summary><p>PNG is lossless, so it cannot be shrunk much by lowering quality. Converting to JPG or WebP gives far smaller files. Choose WebP if you need to keep transparency.</p></details></div>
