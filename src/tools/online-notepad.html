@@ -243,6 +243,9 @@
     $('npLang').textContent = tabs[cur] ? tabs[cur].lang : '';
   }
   cm.on('cursorActivity', status);
+  // marking selected text is only cosmetic (the selection is already coloured) and very slow on huge files
+  function tune() { var small = cm.lineCount() < 20000; if (cm.getOption('styleSelectedText') !== small) cm.setOption('styleSelectedText', small); }
+  cm.on('swapDoc', tune); cm.on('changes', tune);
   cm.on('change', function () { status(); persist(); var on = document.querySelector('.np-tab.on'); if (on && tabs[cur]) on.classList.toggle('dirty', dirty(tabs[cur])); title(); });
   cm.on('overwriteToggle', function (c, o) { $('npMode').textContent = o ? 'OVR' : 'INS'; });
   $('npEol').addEventListener('change', function () { if (tabs[cur]) { tabs[cur].eol = EOLS[$('npEol').value] || '\n'; persist(); } });
@@ -268,7 +271,9 @@
     var out = fn(lines);
     cm.operation(function () {
       cm.replaceRange(out.join('\n'), { line: r.from, ch: 0 }, { line: r.to, ch: cm.getLine(r.to).length });
-      cm.setSelection({ line: r.from, ch: 0 }, { line: r.from + out.length - 1, ch: (out[out.length - 1] || '').length });
+      // keep the changed lines selected, but not a whole document: that is slow on huge files and makes the next command act on a "selection"
+      if (r.all) cm.setCursor({ line: 0, ch: 0 });
+      else cm.setSelection({ line: r.from, ch: 0 }, { line: r.from + out.length - 1, ch: (out[out.length - 1] || '').length });
     });
     say((msg || 'Done') + (r.all ? ' (whole document).' : ' (selected lines).'), 'ok');
   }
@@ -352,9 +357,9 @@
     var n = 0, rep = $('npR').value;
     cm.operation(function () {
       var c = cm.getSearchCursor(re);
-      while (c.findNext()) { var m = cm.getRange(c.from(), c.to()); c.replace($('npRe').checked ? m.replace(new RegExp(re.source, re.flags.replace('g', '')), rep) : rep); n++; if (n > 100000) break; }
+      while (c.findNext()) { var m = cm.getRange(c.from(), c.to()); c.replace($('npRe').checked ? m.replace(new RegExp(re.source, re.flags.replace('g', '')), rep) : rep); n++; if (n >= 1000000) break; }
     });
-    $('npFindMsg').textContent = n ? 'Replaced ' + fmtNum(n) + (n === 1 ? ' match.' : ' matches.') : 'Nothing to replace.';
+    $('npFindMsg').textContent = n >= 1000000 ? 'Replaced the first 1,000,000 matches. Click “Replace all” again for the rest.' : n ? 'Replaced ' + fmtNum(n) + (n === 1 ? ' match.' : ' matches.') : 'Nothing to replace.';
   }
   function openFind(withReplace) {
     $('npFind').hidden = false; $('npRepRow').hidden = !withReplace;
@@ -467,8 +472,8 @@
       case 'replace': openFind(true); break;
       case 'next': if ($('npFind').hidden && !$('npQ').value) openFind(false); else find(false); break;
       case 'prev': if ($('npFind').hidden && !$('npQ').value) openFind(false); else find(true); break;
-      case 'count': if (!query()) break; var n = count(); $('npFindMsg').textContent = fmtNum(n) + (n === 1 ? ' match.' : ' matches.'); break;
-      case 'markall': if ($('npFind').hidden) { openFind(false); break; } if (!query()) break; var m = markAll(); $('npFindMsg').textContent = fmtNum(m) + ' marked.'; break;
+      case 'count': if (!query()) break; var n = count(); $('npFindMsg').textContent = (n >= 100000 ? 'More than 100,000 matches.' : fmtNum(n) + (n === 1 ? ' match.' : ' matches.')); break;
+      case 'markall': if ($('npFind').hidden) { openFind(false); break; } if (!query()) break; var m = markAll(); $('npFindMsg').textContent = m >= 20000 ? 'The first 20,000 matches are marked.' : fmtNum(m) + ' marked.'; break;
       case 'unmark': clearMarks(); $('npFindMsg').textContent = ''; break;
       case 'rep': replaceOne(); break;
       case 'repall': replaceAll(); break;

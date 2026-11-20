@@ -1,0 +1,317 @@
+<style>
+.qs-cam { position: relative; margin: 0 auto 16px; max-width: 520px; border-radius: 14px; overflow: hidden; background: #000; aspect-ratio: 4 / 3; }
+.qs-cam video { width: 100%; height: 100%; object-fit: cover; display: block; }
+.qs-cam::after { content: ''; position: absolute; inset: 15%; border: 3px solid rgba(255, 255, 255, .85); border-radius: 16px; box-shadow: 0 0 0 999px rgba(0, 0, 0, .25); pointer-events: none; }
+.qs-res { margin-top: 16px; border: 1px solid var(--accent); background: var(--accent-soft); border-radius: 14px; padding: 14px; }
+.qs-res h3 { margin: 0 0 8px; font-size: 15px; }
+.qs-text { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--mono); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 260px; overflow: auto; margin: 0; }
+.qs-kv { display: grid; grid-template-columns: minmax(80px, max-content) minmax(0, 1fr); gap: 6px 12px; margin: 10px 0 0; font-size: 15px; }
+.qs-kv dt { color: var(--muted); font-weight: 600; font-size: 13px; padding-top: 2px; }
+.qs-kv dd { margin: 0; overflow-wrap: anywhere; }
+.qs-url { margin-top: 10px; font-size: 14px; overflow-wrap: anywhere; }
+.qs-url b { color: var(--ink); }
+.qs-warn { color: var(--bad); font-weight: 600; }
+.qs-hist { list-style: none; padding: 0; margin: 8px 0 0; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
+.qs-hist li { display: flex; gap: 6px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 5px; padding-inline-start: 12px; }
+.qs-hist li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; }
+.qs-hist li small { color: var(--muted); font-size: 12px; flex: none; }
+.qs-hist button { font: inherit; font-size: 13px; height: 34px; padding: 0 10px; flex: none; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.qs-hist button:hover { border-color: var(--accent); color: var(--accent); }
+@media (max-width: 480px) { .qs-hist li small { display: none; } }
+</style>
+<div class="btns" style="margin:0 0 14px">
+  <button class="btn" id="qsStart">Scan with camera</button>
+  <button class="btn ghost" id="qsStop" hidden>Stop camera</button>
+  <button class="btn ghost" id="qsTorch" hidden aria-pressed="false">Flashlight</button>
+  <select id="qsCams" hidden aria-label="Camera" style="width:auto;max-width:100%" data-nomemo></select>
+</div>
+<div class="qs-cam" id="qsCamBox" hidden><video id="qsVideo" playsinline muted></video></div>
+<div class="drop" id="qsDrop" tabindex="0" role="button"><b>Or click, drop or paste an image of a QR code</b>Screenshots and photos work. Your image never leaves your device.</div>
+<input type="file" id="qsFile" accept="image/*" hidden data-nomemo>
+<p class="msg" id="qsMsg"></p>
+<div class="qs-res" id="qsRes" hidden>
+  <h3 id="qsType">Text</h3>
+  <pre class="qs-text" id="qsText"></pre>
+  <dl class="qs-kv" id="qsKv" hidden></dl>
+  <p class="qs-url" id="qsUrl" hidden></p>
+  <div class="btns" id="qsActs"></div>
+</div>
+<div id="qsHistBox" hidden style="margin-top:22px">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><b>Scan history</b><button class="btn ghost" id="qsClear" style="min-height:36px;padding:5px 12px">Clear history</button></div>
+  <p class="msg" style="margin:4px 0 0;font-size:13px">Saved only in this browser on this device.</p>
+  <ul class="qs-hist" id="qsHist"></ul>
+</div>
+<canvas id="qsCv" hidden></canvas>
+<script>
+(function () {
+  var HKEY = 'gtn-qr-history', stream = null, track = null, loopTimer = null, busy = false, detector = null, jsqrP = null, torchOn = false, wantRunning = false;
+  function say(cls, t) { $('qsMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('qsMsg').textContent = t; }
+
+  // ---------- decoders ----------
+  var bdReady = (function () {
+    if (!('BarcodeDetector' in window)) return Promise.resolve(null);
+    try {
+      return Promise.resolve(BarcodeDetector.getSupportedFormats ? BarcodeDetector.getSupportedFormats() : ['qr_code']).then(function (f) {
+        if (f.indexOf('qr_code') === -1) return null;
+        detector = new BarcodeDetector({ formats: ['qr_code'] }); return detector;
+      }).catch(function () { return null; });
+    } catch (e) { return Promise.resolve(null); }
+  })();
+  function loadJsqr() {
+    if (window.jsQR) return Promise.resolve(window.jsQR);
+    if (!jsqrP) jsqrP = new Promise(function (ok, bad) {
+      var s = document.createElement('script'); s.src = '../assets/vendor/jsqr/jsQR.min.js';
+      s.onload = function () { ok(window.jsQR); }; s.onerror = function () { jsqrP = null; bad(new Error('The QR decoder could not be loaded. Check your connection and try again.')); };
+      document.head.appendChild(s);
+    });
+    return jsqrP;
+  }
+  function bytesToText(r) {
+    if (r.binaryData && r.binaryData.length) {
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(new Uint8Array(r.binaryData)); } catch (e) {}
+      if (!r.data) { try { return new TextDecoder('windows-1252').decode(new Uint8Array(r.binaryData)); } catch (e) {} }
+    }
+    return r.data;
+  }
+  var cv = $('qsCv'), ctx = cv.getContext('2d', { willReadFrequently: true });
+  // draw a source onto the work canvas at a given scale; optionally with a white border so codes touching the edge still scan
+  function frame(src, w, h, scale, pad) {
+    var W = Math.max(1, Math.round(w * scale)), H = Math.max(1, Math.round(h * scale)), p = pad ? Math.round(Math.max(W, H) * 0.08) + 8 : 0;
+    cv.width = W + p * 2; cv.height = H + p * 2;
+    ctx.imageSmoothingEnabled = scale < 1;
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(src, p, p, W, H);
+    return ctx.getImageData(0, 0, cv.width, cv.height);
+  }
+  function jsqrOn(J, img, inv) { var r = J(img.data, img.width, img.height, { inversionAttempts: inv }); return r ? bytesToText(r) : null; }
+  // Thorough decode for a still image: try the fast native detector, then jsQR at a few sizes.
+  function decodeImage(src, w, h) {
+    return bdReady.then(function (d) {
+      if (!d) return null;
+      return d.detect(src).then(function (c) { return c && c.length && c[0].rawValue ? c[0].rawValue : null; }).catch(function () { return null; });
+    }).then(function (txt) {
+      if (txt) return txt;
+      return loadJsqr().then(function (J) {
+        var big = Math.max(w, h), scales = [];
+        if (big > 1400) scales.push(1400 / big, 2200 / big < 1 ? 2200 / big : 1);
+        else if (big < 500) scales.push(Math.min(8, Math.ceil(600 / big)), 1);
+        else scales.push(1);
+        if (big >= 500 && big <= 1400) scales.push(0.6);
+        for (var i = 0; i < scales.length; i++) {
+          var t = jsqrOn(J, frame(src, w, h, scales[i], true), 'attemptBoth');
+          if (t != null) return t;
+        }
+        return null;
+      });
+    });
+  }
+  // Quick decode for one camera frame.
+  function decodeFrame(v) {
+    var w = v.videoWidth, h = v.videoHeight;
+    if (!w || !h) return Promise.resolve(null);
+    if (detector) return detector.detect(v).then(function (c) { return c && c.length ? c[0].rawValue : null; }).catch(function () { return null; });
+    return loadJsqr().then(function (J) { var s = Math.min(1, 800 / Math.max(w, h)); return jsqrOn(J, frame(v, w, h, s, false), 'dontInvert'); });
+  }
+
+  // ---------- understanding the content ----------
+  function unesc(s) { return s.replace(/\\(.)/g, '$1'); }
+  function splitEsc(s, sep) { var out = [], cur = ''; for (var i = 0; i < s.length; i++) { var c = s[i]; if (c === '\\' && i + 1 < s.length) { cur += c + s[++i]; continue; } if (c === sep) { out.push(cur); cur = ''; } else cur += c; } out.push(cur); return out; }
+  function fields(body) { var o = {}; splitEsc(body, ';').forEach(function (p) { var i = p.indexOf(':'); if (i > 0) { var k = p.slice(0, i).toUpperCase(); (o[k] = o[k] || []).push(unesc(p.slice(i + 1))); } }); return o; }
+  function parse(text) {
+    var t = text.trim(), m;
+    if (/^WIFI:/i.test(t)) {
+      var f = fields(t.slice(5)), sec = (f.T || [''])[0];
+      return { type: 'Wi-Fi network', kv: [['Network (SSID)', (f.S || [''])[0]], ['Password', sec.toLowerCase() === 'nopass' ? '(none)' : (f.P || [''])[0]], ['Security', sec ? (sec.toLowerCase() === 'nopass' ? 'Open (no password)' : sec) : 'Not given'], ['Hidden network', /^true$/i.test((f.H || [''])[0]) ? 'Yes' : 'No']], copyPass: (f.P || [''])[0] };
+    }
+    if (/^BEGIN:VCARD/i.test(t)) {
+      var kv = [], lines = t.replace(/\r\n[ \t]/g, '').replace(/\n[ \t]/g, '').split(/\r?\n/);
+      var NAMES = { FN: 'Name', ORG: 'Company', TITLE: 'Job title', TEL: 'Phone', EMAIL: 'Email', URL: 'Website', ADR: 'Address', NOTE: 'Note', BDAY: 'Birthday' };
+      var hasFn = lines.some(function (l) { return /^FN[;:]/i.test(l); });
+      lines.forEach(function (l) {
+        var i = l.indexOf(':'); if (i < 0) return;
+        var key = l.slice(0, i).split(';')[0].toUpperCase().replace(/^ITEM\d+\./, ''), val = l.slice(i + 1).replace(/\\n/gi, ', ').replace(/\\([,;\\])/g, '$1');
+        if (key === 'N' && !hasFn) kv.push(['Name', val.split(';').filter(Boolean).reverse().join(' ')]);
+        else if (key === 'ADR') kv.push(['Address', val.split(';').filter(Boolean).join(', ')]);
+        else if (NAMES[key] && val) kv.push([NAMES[key], val.replace(/;+$/, '').replace(/;/g, ', ')]);
+      });
+      return { type: 'Contact card (vCard)', kv: kv, vcf: t };
+    }
+    if (/^MECARD:/i.test(t)) {
+      var g = fields(t.slice(7)), kv2 = [];
+      if (g.N) kv2.push(['Name', g.N[0].split(',').reverse().join(' ').trim()]);
+      [['ORG', 'Company'], ['TEL', 'Phone'], ['EMAIL', 'Email'], ['URL', 'Website'], ['ADR', 'Address'], ['NOTE', 'Note']].forEach(function (k) { (g[k[0]] || []).forEach(function (v) { if (v) kv2.push([k[1], v]); }); });
+      return { type: 'Contact card (MeCard)', kv: kv2 };
+    }
+    if ((m = /^tel:([+\d\s().\-*#]+)$/i.exec(t))) return { type: 'Phone number', kv: [['Number', m[1]]], href: 'tel:' + m[1].replace(/[^\d+*#]/g, ''), act: 'Call' };
+    if ((m = /^(?:SMSTO|SMS):([^:?]*)(?::([\s\S]*))?$/i.exec(t)) && !/^sms:[^?]*\?/i.test(t)) return { type: 'Text message (SMS)', kv: [['To', m[1]], ['Message', m[2] || '']], href: 'sms:' + m[1].replace(/[^\d+]/g, '') + (m[2] ? '?body=' + encodeURIComponent(m[2]) : ''), act: 'Open in Messages' };
+    if ((m = /^sms:([^?]*)\?(?:.*&)?body=([^&]*)/i.exec(t))) return { type: 'Text message (SMS)', kv: [['To', decodeURIComponent(m[1])], ['Message', safeDec(m[2])]], href: t, act: 'Open in Messages' };
+    if ((m = /^mailto:([^?]*)(\?.*)?$/i.exec(t))) {
+      var q = new URLSearchParams((m[2] || '').slice(1)), kv3 = [['To', safeDec(m[1])]];
+      if (q.get('subject')) kv3.push(['Subject', q.get('subject')]); if (q.get('body')) kv3.push(['Message', q.get('body')]);
+      return { type: 'Email', kv: kv3, href: t, act: 'Write email' };
+    }
+    if ((m = /^MATMSG:/i.exec(t))) { var e = fields(t.slice(7)); return { type: 'Email', kv: [['To', (e.TO || [''])[0]], ['Subject', (e.SUB || [''])[0]], ['Message', (e.BODY || [''])[0]]], href: 'mailto:' + encodeURIComponent((e.TO || [''])[0]).replace('%40', '@') + '?subject=' + encodeURIComponent((e.SUB || [''])[0]) + '&body=' + encodeURIComponent((e.BODY || [''])[0]), act: 'Write email' }; }
+    if ((m = /^geo:(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/i.exec(t))) return { type: 'Map location', kv: [['Latitude', m[1]], ['Longitude', m[2]]], link: 'https://www.openstreetmap.org/?mlat=' + m[1] + '&mlon=' + m[2] + '#map=16/' + m[1] + '/' + m[2] };
+    if (/^[a-z][a-z0-9+.-]*:\/\//i.test(t) && !/\s/.test(t)) {
+      var u = null; try { u = new URL(t); } catch (er) {}
+      if (u && (u.protocol === 'http:' || u.protocol === 'https:')) return { type: 'Web link', link: u.href, url: u };
+      return { type: 'Link (' + (u ? u.protocol.replace(':', '') : 'unknown') + ')', note: 'This is not a web link, so it is not opened from here for your safety. You can copy it.' };
+    }
+    if (/^www\.[^\s]+\.[a-z]{2,}/i.test(t) && !/\s/.test(t)) { try { var u2 = new URL('https://' + t); return { type: 'Web link', link: u2.href, url: u2 }; } catch (er) {} }
+    if (/^\+?[\d\s().-]{7,}$/.test(t) && (t.match(/\d/g) || []).length >= 7) return { type: 'Phone number', kv: [['Number', t]], href: 'tel:' + t.replace(/[^\d+]/g, ''), act: 'Call' };
+    if (/^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i.test(t)) return { type: 'Email address', href: 'mailto:' + t, act: 'Write email' };
+    return { type: 'Text' };
+  }
+  function safeDec(s) { try { return decodeURIComponent(s.replace(/\+/g, ' ')); } catch (e) { return s; } }
+  function btn(label, ghost) { var b = document.createElement('button'); b.type = 'button'; b.className = 'btn' + (ghost ? ' ghost' : ''); b.textContent = label; return b; }
+  function link(label, href, ghost) { var a = document.createElement('a'); a.className = 'btn' + (ghost ? ' ghost' : ''); a.textContent = label; a.href = href; return a; }
+
+  function show(text, from) {
+    var info = parse(text), acts = $('qsActs'), kv = $('qsKv'), url = $('qsUrl');
+    $('qsRes').hidden = false; $('qsType').textContent = info.type + (from ? ' · from ' + from : '');
+    $('qsText').textContent = text;
+    kv.textContent = ''; kv.hidden = !info.kv; acts.textContent = ''; url.hidden = true; url.textContent = '';
+    (info.kv || []).forEach(function (p) { var dt = document.createElement('dt'), dd = document.createElement('dd'); dt.textContent = p[0]; dd.textContent = p[1] || '–'; kv.appendChild(dt); kv.appendChild(dd); });
+    var cp = btn('Copy text'); cp.addEventListener('click', function () { copyText(text, cp); }); acts.appendChild(cp);
+    if (info.link) {
+      // show the full address before anyone opens it, and point out tricks used in phishing links
+      url.hidden = false;
+      var u = info.url || new URL(info.link), warn = [];
+      url.appendChild(document.createTextNode('Opens: '));
+      var b = document.createElement('b'); b.textContent = info.link; url.appendChild(b);
+      url.appendChild(document.createTextNode(' (site: ' + u.hostname + ')'));
+      if (u.protocol === 'http:') warn.push('not encrypted (http)');
+      if (/(^|\.)xn--/.test(u.hostname)) warn.push('the site name uses look-alike international letters');
+      if (u.username || u.password) warn.push('the link hides a user name before the site name');
+      if (/^\d+\.\d+\.\d+\.\d+$/.test(u.hostname)) warn.push('it points to a bare IP address');
+      if (warn.length) { var w = document.createElement('span'); w.className = 'qs-warn'; w.textContent = ' Be careful: ' + warn.join('; ') + '.'; url.appendChild(document.createElement('br')); url.appendChild(w); }
+      var op = link('Open link', info.link, true); op.target = '_blank'; op.rel = 'noopener noreferrer nofollow'; acts.appendChild(op);
+    }
+    if (info.href) acts.appendChild(link(info.act, info.href, true));
+    if (info.copyPass) { var pw = btn('Copy password', true); pw.addEventListener('click', function () { copyText(info.copyPass, pw); }); acts.appendChild(pw); }
+    if (info.vcf) {
+      var dl = link('Save contact (.vcf)', '#', true);
+      dl.addEventListener('click', function () { dl.href = URL.createObjectURL(new Blob([info.vcf], { type: 'text/vcard' })); dl.download = 'contact.vcf'; setTimeout(function () { URL.revokeObjectURL(dl.href); }, 4000); });
+      acts.appendChild(dl);
+    }
+    if (info.note) { url.hidden = false; url.textContent = info.note; }
+    addHist(text);
+    if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+    $('qsRes').scrollIntoView && $('qsRes').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+
+  // ---------- history ----------
+  function hist() { try { var h = JSON.parse(localStorage.getItem(HKEY)); return Array.isArray(h) ? h.filter(function (x) { return x && typeof x.text === 'string'; }) : []; } catch (e) { return []; } }
+  function addHist(text) {
+    var h = hist().filter(function (x) { return x.text !== text; });
+    h.unshift({ text: text.slice(0, 4000), t: Date.now() }); h = h.slice(0, 30);
+    try { localStorage.setItem(HKEY, JSON.stringify(h)); } catch (e) {}
+    drawHist();
+  }
+  function drawHist() {
+    var h = hist(), ul = $('qsHist'); ul.textContent = ''; $('qsHistBox').hidden = !h.length;
+    h.forEach(function (x) {
+      var li = document.createElement('li'), s = document.createElement('span'), sm = document.createElement('small'), d = new Date(x.t);
+      s.textContent = x.text.replace(/\s+/g, ' '); s.title = x.text;
+      sm.textContent = isNaN(d) ? '' : d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      var v = document.createElement('button'); v.type = 'button'; v.textContent = 'Show'; v.addEventListener('click', function () { show(x.text); });
+      var c = document.createElement('button'); c.type = 'button'; c.textContent = 'Copy'; c.addEventListener('click', function () { copyText(x.text, c); });
+      li.appendChild(s); li.appendChild(sm); li.appendChild(v); li.appendChild(c); ul.appendChild(li);
+    });
+  }
+  $('qsClear').addEventListener('click', function () { try { localStorage.removeItem(HKEY); } catch (e) {} drawHist(); toast('Scan history cleared'); });
+
+  // ---------- images ----------
+  function fromBlob(f, from) {
+    if (!f || !/^image\//.test(f.type)) { say('bad', 'That is not an image. Choose a photo or screenshot (JPG, PNG, WebP or GIF) that shows a QR code.'); return; }
+    say('', 'Reading the image…');
+    loadImage(f, function (img) {
+      if (!img || !img.naturalWidth) { say('bad', 'Could not open that image. Try a JPG or PNG.'); return; }
+      decodeImage(img, img.naturalWidth, img.naturalHeight).then(function (t) {
+        if (t == null) { say('bad', 'No QR code found in this image. Make sure the whole code is visible, sharp and not too small, then try again.'); return; }
+        say('ok', 'QR code found.'); show(t, from);
+      }, function (e) { say('bad', e.message || 'Could not read that image.'); });
+    });
+  }
+  setupDrop('qsDrop', 'qsFile', function (f) { fromBlob(f, 'image'); $('qsFile').value = ''; });
+  document.addEventListener('paste', function (e) {
+    var tg = e.target; if (tg && (tg.tagName === 'TEXTAREA' || tg.tagName === 'INPUT' || tg.isContentEditable)) return;
+    var items = (e.clipboardData && e.clipboardData.items) || [];
+    for (var i = 0; i < items.length; i++) if (items[i].kind === 'file' && /^image\//.test(items[i].type)) { e.preventDefault(); fromBlob(items[i].getAsFile(), 'pasted image'); return; }
+    if (e.clipboardData && e.clipboardData.files && e.clipboardData.files.length) return;
+    if (document.activeElement === $('qsDrop')) say('bad', 'The clipboard has no image. Copy a screenshot or picture of a QR code first.');
+  });
+
+  // ---------- camera ----------
+  function stopCam(keepMsg) {
+    wantRunning = false; clearTimeout(loopTimer);
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; track = null; torchOn = false;
+    $('qsVideo').srcObject = null; $('qsCamBox').hidden = true; $('qsStop').hidden = true; $('qsTorch').hidden = true; $('qsCams').hidden = true;
+    $('qsStart').textContent = 'Scan with camera'; $('qsStart').disabled = false;
+    if (!keepMsg) say('', '');
+  }
+  function camError(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera permission was blocked. Allow camera access for this site in your browser settings (the camera or lock icon next to the address), then try again. You can also upload a photo of the code below.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No camera was found on this device. Upload or paste a picture of the QR code instead.';
+    if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is being used by another app or tab. Close it there and try again.';
+    return 'Could not start the camera' + (e && e.message ? ' (' + e.message + ')' : '') + '. Upload or paste a picture of the QR code instead.';
+  }
+  function startCam(deviceId) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      say('bad', window.isSecureContext === false ? 'The camera only works on a secure (https) page. Upload or paste a picture of the QR code instead.' : 'This browser cannot use the camera here. Upload or paste a picture of the QR code instead.');
+      return;
+    }
+    stopCam(true); wantRunning = true;
+    $('qsStart').disabled = true; say('', 'Starting the camera… allow access if your browser asks.');
+    var video = deviceId ? { deviceId: { exact: deviceId } } : { facingMode: { ideal: 'environment' } };
+    video.width = { ideal: 1280 }; video.height = { ideal: 720 };
+    navigator.mediaDevices.getUserMedia({ video: video, audio: false }).then(function (s) {
+      if (!wantRunning) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+      stream = s; track = s.getVideoTracks()[0];
+      var v = $('qsVideo'); v.srcObject = s; $('qsCamBox').hidden = false; $('qsStop').hidden = false;
+      $('qsStart').disabled = false; $('qsStart').textContent = 'Restart camera';
+      var p = v.play(); if (p && p.catch) p.catch(function () {});
+      say('', 'Point the camera at a QR code and hold it steady inside the frame.');
+      try { var caps = track.getCapabilities ? track.getCapabilities() : {}; $('qsTorch').hidden = !caps.torch; $('qsTorch').setAttribute('aria-pressed', 'false'); } catch (e) { $('qsTorch').hidden = true; }
+      listCams(track.getSettings ? track.getSettings().deviceId : '');
+      track.addEventListener('ended', function () { if (wantRunning) { stopCam(true); say('bad', 'The camera stopped. Press Scan with camera to start it again.'); } });
+      Promise.all([bdReady, detector ? null : loadJsqr()]).then(loop, function (e) { say('bad', e.message); });
+    }, function (e) { stopCam(true); say('bad', camError(e)); });
+  }
+  function listCams(current) {
+    if (!navigator.mediaDevices.enumerateDevices) return;
+    navigator.mediaDevices.enumerateDevices().then(function (ds) {
+      var cams = ds.filter(function (d) { return d.kind === 'videoinput'; }), sel = $('qsCams');
+      sel.textContent = '';
+      if (cams.length < 2 || !stream) { sel.hidden = true; return; }
+      cams.forEach(function (d, i) { var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Camera ' + (i + 1); sel.appendChild(o); });
+      sel.value = current; sel.hidden = false;
+    }).catch(function () {});
+  }
+  function loop() {
+    if (!wantRunning || !stream) return;
+    var v = $('qsVideo');
+    if (busy || v.readyState < 2) { loopTimer = setTimeout(loop, 150); return; }
+    busy = true;
+    decodeFrame(v).then(function (t) {
+      busy = false;
+      if (!wantRunning) return;
+      if (t != null && t !== '') { stopCam(true); say('ok', 'QR code found. Press Scan with camera to scan another.'); show(t, 'camera'); return; }
+      loopTimer = setTimeout(loop, 120);
+    }, function () { busy = false; loopTimer = setTimeout(loop, 300); });
+  }
+  $('qsStart').addEventListener('click', function () { startCam(); });
+  $('qsStop').addEventListener('click', function () { stopCam(); });
+  $('qsCams').addEventListener('change', function () { startCam($('qsCams').value); });
+  $('qsTorch').addEventListener('click', function () {
+    if (!track) return;
+    var on = !torchOn;
+    track.applyConstraints({ advanced: [{ torch: on }] }).then(function () { torchOn = on; $('qsTorch').setAttribute('aria-pressed', String(on)); }, function () { say('bad', 'The flashlight could not be switched on with this camera.'); });
+  });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && stream) { stopCam(true); say('', 'Camera paused while the page was hidden. Press Scan with camera to continue.'); } });
+  window.addEventListener('pagehide', function () { if (stream) stopCam(true); });
+  drawHist();
+})();
+</script>

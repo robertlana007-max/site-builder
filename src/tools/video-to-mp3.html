@@ -1,0 +1,233 @@
+<style>
+.vm-name { margin: 0 0 10px; font-weight: 600; overflow-wrap: anywhere; }
+.vm-player { display: block; width: 100%; max-height: 320px; border-radius: 10px; background: #000; margin-bottom: 14px; }
+.vm-player.audio { height: 54px; background: none; }
+.vm-row { display: flex; gap: 8px; }
+.vm-row input { flex: 1; min-width: 0; }
+.vm-row .btn { padding: 8px 12px; white-space: nowrap; flex: none; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a video or audio file here</b>MP4, WebM, MOV, MKV, M4A, WAV and more. Nothing is uploaded.</div>
+<input type="file" id="file" accept="video/*,audio/*,.mp4,.m4v,.mov,.mkv,.webm,.m4a,.aac,.ogg,.oga,.opus,.flac,.wav,.mp3,.3gp" hidden data-nomemo>
+<div id="work" hidden>
+  <p class="vm-name" id="fname"></p>
+  <video class="vm-player" id="player" controls playsinline preload="metadata"></video>
+  <div class="fields">
+    <div><label for="start">Start (min:sec)</label><div class="vm-row"><input type="text" id="start" data-nomemo inputmode="decimal" autocomplete="off" value="0:00"><button class="btn ghost" type="button" id="setStart" title="Use the player's current time">Use player time</button></div></div>
+    <div><label for="end">End (min:sec)</label><div class="vm-row"><input type="text" id="end" data-nomemo inputmode="decimal" autocomplete="off"><button class="btn ghost" type="button" id="setEnd" title="Use the player's current time">Use player time</button></div></div>
+  </div>
+  <div class="btns" style="margin:0 0 16px"><button class="btn ghost" type="button" id="hear">▶ Play selection</button><button class="btn ghost" type="button" id="whole">Use whole file</button></div>
+  <div class="fields">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp3">MP3</option><option value="wav">WAV (no quality loss, big file)</option></select></div>
+    <div id="kbpsBox"><label for="kbps">MP3 quality</label><select id="kbps"><option value="128">128 kbps (small)</option><option value="192" selected>192 kbps (very good)</option><option value="320">320 kbps (best)</option></select></div>
+    <div><label for="chans">Channels</label><select id="chans"><option value="2">Stereo</option><option value="1">Mono (smaller file)</option></select></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Clip length</span><b id="len">–</b></div>
+    <div class="stat"><span>About this size</span><b id="est">–</b></div>
+  </div>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Convert to MP3</button><a class="btn ghost" id="dl" hidden>Download MP3</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+(function () {
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  // 75.5 -> "1:15.5"; 3725 -> "1:02:05"
+  function clock(s, exact) {
+    s = Math.max(0, s); var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, r = s - Math.floor(s / 60) * 60;
+    var sec = exact ? (Math.round(r * 10) / 10).toFixed(1).replace(/\.0$/, '') : String(Math.floor(r));
+    if (+sec >= 60) sec = '59.9';
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + (+sec < 10 ? '0' : '') + sec;
+  }
+  // "1:15.5", "75.5", "1:02:05" -> seconds, or NaN
+  function parse(t) {
+    t = String(t).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$|^\d+:\d{1,2}(\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(\.\d+)?$/.test(t)) return NaN;
+    return t.split(':').reduce(function (a, x) { return a * 60 + parseFloat(x); }, 0);
+  }
+
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+
+  var file = null, buf = null, url = null, dlUrl = null, playable = false, src = null, actx = null, busy = false;
+  var player = $('player');
+
+  function stopHear() {
+    if (src) { try { src.stop(); } catch (e) {} src = null; }
+    if (playable && !player.paused && player.dataset.sel) player.pause();
+    delete player.dataset.sel;
+    $('hear').textContent = '▶ Play selection';
+  }
+  function range() {
+    var a = parse($('start').value), b = parse($('end').value), d = buf ? buf.duration : 0;
+    if (isNaN(a)) return { err: 'Write the start time like 1:05 or 65.' };
+    if (isNaN(b)) return { err: 'Write the end time like 2:30 or 150.' };
+    if (a >= d) return { err: 'The start time is after the end of the file (' + clock(d, true) + ').' };
+    if (b > d - 0.06) b = d; // the box shows tenths, so treat the shown end as the real end
+    if (b - a < 0.1) return { err: 'The end time must be after the start time.' };
+    return { a: a, b: b };
+  }
+  function refresh() {
+    $('dl').hidden = true;
+    $('kbpsBox').hidden = $('fmt').value !== 'mp3';
+    $('go').textContent = $('fmt').value === 'mp3' ? 'Convert to MP3' : 'Convert to WAV';
+    if (!buf) return;
+    var r = range(), ch = Math.min(+$('chans').value, buf.numberOfChannels);
+    if (r.err) { $('len').textContent = '–'; $('est').textContent = '–'; $('go').disabled = true; say('bad', r.err); return; }
+    var s = r.b - r.a;
+    $('len').textContent = clock(s, true);
+    $('est').textContent = fmtBytes(Math.round($('fmt').value === 'mp3' ? +$('kbps').value * 125 * s : 44 + s * 44100 * 2 * ch));
+    $('go').disabled = busy;
+    if (!busy) say('', '');
+  }
+
+  setupDrop('drop', 'file', function (f) {
+    if (busy) return;
+    $('file').value = '';
+    stopHear(); file = f; buf = null;
+    $('work').hidden = true; $('dl').hidden = true; $('go').disabled = true;
+    if (url) URL.revokeObjectURL(url);
+    url = URL.createObjectURL(f);
+    if (!/^(video|audio)\//.test(f.type) && !/\.(mp4|m4v|mov|mkv|webm|m4a|aac|ogg|oga|opus|flac|wav|mp3|3gp|avi|wma)$/i.test(f.name)) {
+      say('bad', '"' + f.name + '" does not look like a video or audio file. Choose a file such as an MP4, MOV, WebM or MKV video.'); return;
+    }
+    if (f.size > 1.5 * 1073741824) { say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 1.5 GB are too big to convert in a browser. Trim it with your phone or video app first.'); return; }
+    say('', 'Reading the sound from "' + f.name + '"…');
+    busy = true; $('drop').setAttribute('aria-busy', 'true');
+    f.arrayBuffer().then(function (data) {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OAC) throw new Error('old');
+      return new Promise(function (res, rej) { var p = new OAC(1, 1, 44100).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+    }).then(function (b) {
+      if (file !== f) return;
+      buf = b; busy = false; $('drop').removeAttribute('aria-busy');
+      $('fname').textContent = f.name + ' · ' + fmtBytes(f.size) + ' · ' + clock(b.duration, true) + ' of sound';
+      $('start').value = '0:00'; $('end').value = clock(b.duration, true);
+      // Show the file in a player when this browser can play it, to pick the trim points.
+      playable = false; player.hidden = true; $('setStart').hidden = $('setEnd').hidden = true;
+      player.className = 'vm-player' + (/^audio\//.test(f.type) ? ' audio' : '');
+      player.onloadedmetadata = function () {
+        playable = true; player.hidden = false; $('setStart').hidden = $('setEnd').hidden = false;
+        if (!player.videoWidth) player.className = 'vm-player audio';
+      };
+      player.onerror = function () { playable = false; player.hidden = true; $('setStart').hidden = $('setEnd').hidden = true; };
+      player.src = url;
+      $('work').hidden = false;
+      refresh();
+      say('', 'Ready. Trim it if you like, then press ' + $('go').textContent + '.');
+    }).catch(function (e) {
+      if (file !== f) return;
+      busy = false; $('drop').removeAttribute('aria-busy');
+      if (e && e.name === 'NotReadableError' || e instanceof RangeError) return say('bad', 'Your device ran out of memory reading this file. Try a shorter video.');
+      if (e && e.message === 'old') return say('bad', 'This browser is too old to convert audio. Try a current Chrome, Edge, Firefox or Safari.');
+      say('bad', 'This browser could not read the sound in "' + f.name + '". Either the file has no sound track, or its sound uses a format this browser cannot decode (for example AC-3/Dolby or DTS, common in MKV movies, or WMA). Try Chrome or Edge on a computer, or another file.');
+    });
+  });
+
+  $('setStart').addEventListener('click', function () { $('start').value = clock(player.currentTime, true); refresh(); });
+  $('setEnd').addEventListener('click', function () { $('end').value = clock(player.currentTime, true); refresh(); });
+  $('whole').addEventListener('click', function () { if (!buf) return; $('start').value = '0:00'; $('end').value = clock(buf.duration, true); refresh(); });
+  ['start', 'end'].forEach(function (id) { $(id).addEventListener('input', refresh); $(id).addEventListener('change', function () { var v = parse($(id).value); if (!isNaN(v)) $(id).value = clock(v, true); refresh(); }); });
+  ['fmt', 'kbps', 'chans'].forEach(function (id) { $(id).addEventListener('change', refresh); });
+
+  $('hear').addEventListener('click', function () {
+    if (!buf) return;
+    if (src || player.dataset.sel) return stopHear();
+    var r = range(); if (r.err) return say('bad', r.err);
+    if (playable) {
+      player.dataset.sel = '1'; player.currentTime = r.a;
+      player.play().catch(stopHear);
+      player.ontimeupdate = function () { if (player.dataset.sel && player.currentTime >= r.b) stopHear(); };
+      player.onpause = function () { if (player.dataset.sel) stopHear(); };
+    } else {
+      var AC = window.AudioContext || window.webkitAudioContext; if (!AC) return;
+      if (!actx) actx = new AC();
+      actx.resume();
+      src = actx.createBufferSource(); src.buffer = buf; src.connect(actx.destination);
+      src.onended = function () { src = null; $('hear').textContent = '▶ Play selection'; };
+      src.start(0, r.a, r.b - r.a);
+    }
+    $('hear').textContent = '■ Stop';
+  });
+
+  $('go').addEventListener('click', function () {
+    if (!buf || busy) return;
+    var r = range(); if (r.err) return say('bad', r.err);
+    stopHear(); if (playable) player.pause();
+    busy = true; $('go').disabled = true; $('dl').hidden = true; $('bar').hidden = false; $('fill').style.width = '0';
+    var rate = buf.sampleRate, i0 = Math.floor(r.a * rate), i1 = Math.min(buf.length, Math.ceil(r.b * rate)), ch = [];
+    for (var k = 0; k < Math.min(2, buf.numberOfChannels); k++) ch.push(buf.getChannelData(k).subarray(i0, i1));
+    if (+$('chans').value === 1 && ch.length > 1) { var m = new Float32Array(ch[0].length); for (var j = 0; j < m.length; j++) m[j] = (ch[0][j] + ch[1][j]) / 2; ch = [m]; }
+    var mp3 = $('fmt').value === 'mp3', base = file.name.replace(/\.[^.]+$/, '') || 'audio';
+    var tag = function (s) { s = Math.floor(s); return Math.floor(s / 60) + 'm' + String(s % 60).padStart(2, '0') + 's'; };
+    if (r.a > 0 || r.b < buf.duration) base += '-' + tag(r.a) + '-to-' + tag(r.b);
+    say('', mp3 ? 'Converting to MP3…' : 'Making the WAV file…');
+    (mp3 ? encodeMp3(ch, rate, +$('kbps').value, function (f) { $('fill').style.width = Math.round(f * 100) + '%'; })
+         : new Promise(function (res) { setTimeout(function () { res(wavBlob(ch, rate)); }, 30); })
+    ).then(function (out) {
+      if (dlUrl) URL.revokeObjectURL(dlUrl);
+      dlUrl = URL.createObjectURL(out);
+      var a = $('dl'); a.href = dlUrl; a.download = base + (mp3 ? '.mp3' : '.wav'); a.textContent = 'Download ' + (mp3 ? 'MP3' : 'WAV'); a.hidden = false;
+      say('ok', 'Done: ' + clock(r.b - r.a, true) + (mp3 ? ' at ' + $('kbps').value + ' kbps' : '') + ' · ' + fmtBytes(out.size));
+    }).catch(function () {
+      say('bad', 'The conversion failed. If the file is very long, try a shorter part with the start and end times.');
+    }).then(function () { busy = false; $('bar').hidden = true; $('go').disabled = !buf; });
+  });
+})();
+</script>

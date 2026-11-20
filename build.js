@@ -363,6 +363,10 @@ write('index.html', layout({
   <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
   <div id="mineRecentBox"><h3>Recently used</h3><div class="chiprow" id="mineRecent"></div></div>
 </section>
+<section class="block explore">
+  <h2 class="section-title">Browse by category</h2>
+  <div class="explore-grid">${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<div class="ex" style="--c:${COLOR[c]}"><a class="ex-head" href="#${catId(c)}">${tile(list[0])}<span><b>${esc(c)}</b><small>${list.length} tools</small></span><em class="ex-go" aria-hidden="true">→</em></a><p>${esc(CATINFO[c][0])}</p><div class="ex-links">${list.slice(0, 3).map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div></div>`; }).join('')}</div>
+</section>
 <h2 class="section-title all-title">All tools</h2>
 <div class="pills" id="tools" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}

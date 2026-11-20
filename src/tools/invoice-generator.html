@@ -40,6 +40,8 @@
 .ivg-paper .ivg-items th:first-child, .ivg-paper .ivg-items td:first-child { text-align: start; }
 .ivg-paper .ivg-items td { padding: 7px 8px; border-bottom: 1px solid #e5e7eb; text-align: end; vertical-align: top; }
 .ivg-paper .ivg-items td:first-child { white-space: pre-line; }
+.ivg-paper .ivg-items th:not(:first-child), .ivg-paper .ivg-items td:not(:first-child) { white-space: nowrap; overflow-wrap: normal; }
+.ivg-paper .ivg-scroll { overflow-x: auto; }
 .ivg-paper .ivg-items tr { break-inside: avoid; }
 .ivg-paper .ivg-empty td { color: #9ca3af; text-align: center !important; }
 .ivg-paper .ivg-sum { width: min(300px, 100%); margin: 14px 0 0 auto; break-inside: avoid; }
@@ -58,17 +60,20 @@
   .ivg-paper { padding: 16px 14px; font-size: 12px; }
   .ivg-paper h2 { font-size: 21px; }
   .ivg-paper .ivg-parties { grid-template-columns: 1fr; gap: 12px; }
-  .ivg-paper .ivg-items th, .ivg-paper .ivg-items td { padding: 6px 4px; }
+  .ivg-paper .ivg-items th, .ivg-paper .ivg-items td { padding: 6px 4px; font-size: 11px; }
   .ivg-paper .ivg-top img { max-width: 130px; max-height: 50px; }
 }
+#ivgPrintBox { display: none; }
 @media print {
   @page { margin: 12mm; }
-  body * { visibility: hidden !important; }
-  .ivg-paper, .ivg-paper * { visibility: visible !important; }
-  .ivg-paper { position: absolute; left: 0; top: 0; width: 100%; max-width: none; box-shadow: none; border-radius: 0; padding: 0; font-size: 11pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .ivg-paper .ivg-parties { grid-template-columns: 1fr 1fr; }
-  .ivg-paper .ivg-items thead { display: table-header-group; }
-  html, body { background: #fff !important; }
+  body > *:not(#ivgPrintBox) { display: none !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #ivgPrintBox { display: block !important; }
+  #ivgPrintBox .ivg-paper { max-width: none; box-shadow: none; border-radius: 0; padding: 0; font-size: 10.5pt; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  #ivgPrintBox .ivg-paper .ivg-parties { grid-template-columns: 1fr 1fr; }
+  #ivgPrintBox .ivg-paper h2 { font-size: 24pt; }
+  #ivgPrintBox .ivg-paper .ivg-items thead { display: table-header-group; }
+  #ivgPrintBox .ivg-scroll { overflow: visible; }
 }
 </style>
 <div class="ivg" id="ivg">
@@ -341,7 +346,7 @@
       tb.appendChild(tr);
     });
     if (!shown) { var er = el('tr', 'ivg-empty'), td = el('td', null, 'Add an item above to see it here.'); td.colSpan = 4; er.appendChild(td); tb.appendChild(er); }
-    t.appendChild(tb); p.appendChild(t);
+    t.appendChild(tb); var sc = el('div', 'ivg-scroll'); sc.appendChild(t); p.appendChild(sc);
     var sum = el('table', 'ivg-sum');
     totalRows(s, c).forEach(function (r) { var tr = el('tr', r[2] || ''); tr.appendChild(el('td', null, r[0])); tr.appendChild(el('td', null, r[1])); sum.appendChild(tr); });
     p.appendChild(sum);
@@ -434,7 +439,14 @@
     if (!last.c.lines.some(function (l) { return !l.blank; })) { say('bad', 'Add at least one item with a description or price.'); rowsBox.querySelector('.ivg-d').focus(); return false; }
     return true;
   }
-  $('ivgPrint').addEventListener('click', function () { if (!ready()) return; markUsed(); window.print(); });
+  // Printing shows only a copy of the invoice, placed straight under <body>, so no other part of the page prints.
+  function printCopy() {
+    var box = $('ivgPrintBox'); if (!box) { box = document.createElement('div'); box.id = 'ivgPrintBox'; document.body.appendChild(box); }
+    var c = $('ivgPaper').cloneNode(true); c.removeAttribute('id'); box.textContent = ''; box.appendChild(c);
+  }
+  window.addEventListener('beforeprint', printCopy);
+  window.addEventListener('afterprint', function () { var box = $('ivgPrintBox'); if (box) box.textContent = ''; });
+  $('ivgPrint').addEventListener('click', function () { if (!ready()) return; markUsed(); printCopy(); window.print(); });
   $('ivgSave').addEventListener('click', function () { update(false); saveDraft(true); });
   $('ivgNew').addEventListener('click', function () {
     if (!confirm('Start a new invoice? Your business details, logo, currency, notes and payment details stay. The client, items and amounts are cleared.')) return;

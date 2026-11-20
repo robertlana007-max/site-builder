@@ -1,0 +1,257 @@
+<style>
+.wm-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 12px; }
+.wm-strip:empty { display: none; }
+.wm-th { position: relative; flex: none; width: 72px; height: 72px; border: 2px solid var(--line); border-radius: 10px; padding: 0; background: var(--bg) center / cover no-repeat; cursor: pointer; }
+.wm-th[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.wm-th span { position: absolute; top: 2px; inset-inline-end: 2px; width: 24px; height: 24px; border-radius: 99px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 24px; text-align: center; }
+.wm-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.wm-stage canvas { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto; }
+.wm-sec { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin-bottom: 14px; }
+.wm-sec > label.wm-on { font-size: 16px; font-weight: 700; display: block; margin-bottom: 10px; }
+.wm-pos { display: grid; grid-template-columns: repeat(3, 40px); gap: 4px; }
+.wm-pos button { width: 40px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); cursor: pointer; position: relative; padding: 0; }
+.wm-pos button::after { content: ''; position: absolute; inset: 15px; border-radius: 99px; background: var(--muted); }
+.wm-pos button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); }
+.wm-pos button[aria-pressed="true"]::after { background: var(--accent); }
+.wm-pos button[disabled] { opacity: .4; cursor: default; }
+.wm-row { display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start; margin-bottom: 14px; }
+.wm-row .checks { margin: 8px 0 0; }
+.wm-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }
+.wm-logo img { height: 44px; max-width: 120px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 10px 10px; }
+.wm-sec input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop images here</b>One or many JPG, PNG or WebP files. They stay on your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="wm-strip" id="strip" aria-label="Your images"></div>
+<div class="wm-stage" id="stage" hidden><canvas id="cv" aria-label="Preview with watermark"></canvas></div>
+
+<div class="wm-sec">
+  <label class="wm-on"><input type="checkbox" id="useText" checked> Text watermark</label>
+  <div class="fields">
+    <div><label for="txt">Text</label><input type="text" id="txt" value="© Your Name" maxlength="200" autocomplete="off"></div>
+    <div><label for="font">Font</label><select id="font"><option value="sans">Sans serif</option><option value="serif">Serif</option><option value="mono">Monospace</option><option value="hand">Handwriting style</option></select></div>
+    <div><label for="tsize">Size: <span id="tsizeV">6</span>% of image</label><input type="range" id="tsize" min="1" max="30" step="0.5" value="6"></div>
+    <div><label for="tcol">Colour</label><input type="color" id="tcol" value="#ffffff"></div>
+    <div><label for="topa">Opacity: <span id="topaV">50</span>%</label><input type="range" id="topa" min="5" max="100" value="50"></div>
+    <div><label for="trot">Rotation: <span id="trotV">0</span>°</label><input type="range" id="trot" min="-90" max="90" value="0"></div>
+  </div>
+  <div class="wm-row">
+    <div><label id="tposL">Position</label><div class="wm-pos" id="tposG" role="group" aria-labelledby="tposL"></div></div>
+    <div class="checks" style="flex-direction:column;gap:10px">
+      <label><input type="checkbox" id="tile"> Repeat across the whole image (tiled)</label>
+      <label><input type="checkbox" id="bold" checked> Bold</label>
+      <label><input type="checkbox" id="shadow" checked> Soft shadow (easier to read)</label>
+    </div>
+  </div>
+  <select id="tpos" hidden aria-hidden="true" tabindex="-1"><option>tl</option><option>tc</option><option>tr</option><option>ml</option><option>mc</option><option>mr</option><option>bl</option><option>bc</option><option selected>br</option></select>
+</div>
+
+<div class="wm-sec">
+  <label class="wm-on"><input type="checkbox" id="useLogo"> Logo watermark</label>
+  <div class="wm-logo"><button class="btn ghost" id="logoBtn" type="button">Choose logo image</button><img id="logoPrev" alt="Your logo" hidden><span id="logoName" class="msg" style="margin:0">PNG with a transparent background works best.</span></div>
+  <input type="file" id="logoFile" accept="image/*" hidden data-nomemo>
+  <div class="fields">
+    <div><label for="lsize">Logo width: <span id="lsizeV">20</span>% of image</label><input type="range" id="lsize" min="3" max="80" value="20"></div>
+    <div><label for="lopa">Opacity: <span id="lopaV">70</span>%</label><input type="range" id="lopa" min="5" max="100" value="70"></div>
+  </div>
+  <div class="wm-row"><div><label id="lposL">Position</label><div class="wm-pos" id="lposG" role="group" aria-labelledby="lposL"></div></div></div>
+  <select id="lpos" hidden aria-hidden="true" tabindex="-1"><option>tl</option><option>tc</option><option>tr</option><option>ml</option><option>mc</option><option>mr</option><option selected>bl</option><option>bc</option><option>br</option></select>
+</div>
+
+<div class="fields">
+  <div><label for="margin">Edge margin: <span id="marginV">3</span>%</label><input type="range" id="margin" min="0" max="15" step="0.5" value="3"></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="keep">Same as original</option><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="q">Quality (JPG, WebP): <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download this image</button><button class="btn ghost" id="all" disabled hidden>Download all as ZIP</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var imgs = [], cur = 0, logo = null, busy = false;
+  var POS = ['tl', 'tc', 'tr', 'ml', 'mc', 'mr', 'bl', 'bc', 'br'];
+  var NAMES = ['Top left', 'Top centre', 'Top right', 'Middle left', 'Centre', 'Middle right', 'Bottom left', 'Bottom centre', 'Bottom right'];
+  var FONTS = { sans: 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif', serif: 'Georgia, "Times New Roman", serif', mono: '"SFMono-Regular", Consolas, "Courier New", monospace', hand: '"Comic Sans MS", "Segoe Print", "Bradley Hand", cursive' };
+  var EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+
+  function say(cls, t) { PT.say(cls, t); }
+  // ---------- the 3 × 3 position pickers write into hidden selects, so the choice is remembered like the other settings ----------
+  function posGrid(gid, sid) {
+    var g = $(gid), s = $(sid);
+    POS.forEach(function (p, k) {
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.p = p; b.setAttribute('aria-label', NAMES[k]); b.title = NAMES[k];
+      b.addEventListener('click', function () { s.value = p; s.dispatchEvent(new Event('change', { bubbles: true })); });
+      g.appendChild(b);
+    });
+    function sync() { Array.prototype.forEach.call(g.children, function (b) { b.setAttribute('aria-pressed', b.dataset.p === s.value); }); }
+    s.addEventListener('change', function () { sync(); draw(); }); sync();
+  }
+
+  // ---------- drawing: every size is a share of the image, so a batch of different sizes looks the same ----------
+  // base is the geometric mean of width and height, so portrait and landscape photos get a similar-looking mark
+  function anchor(p, W, H, bw, bh, m) {
+    var col = p[1] === 'l' ? 0 : p[1] === 'c' ? 1 : 2, row = p[0] === 't' ? 0 : p[0] === 'm' ? 1 : 2;
+    return { x: col === 0 ? m + bw / 2 : col === 1 ? W / 2 : W - m - bw / 2, y: row === 0 ? m + bh / 2 : row === 1 ? H / 2 : H - m - bh / 2 };
+  }
+  function render(ctx, img, W, H) {
+    var base = Math.sqrt(W * H), m = base * $('margin').value / 100;
+    ctx.clearRect(0, 0, W, H);
+    ctx.drawImage(img, 0, 0, W, H);
+    var text = $('txt').value.trim();
+    if ($('useText').checked && text) {
+      var size = Math.max(4, base * $('tsize').value / 100), ang = $('trot').value * Math.PI / 180;
+      ctx.save();
+      ctx.font = ($('bold').checked ? '700 ' : '400 ') + size + 'px ' + FONTS[$('font').value];
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = $('topa').value / 100; ctx.fillStyle = $('tcol').value;
+      if ($('shadow').checked) { ctx.shadowColor = lum($('tcol').value) > 0.5 ? 'rgba(0,0,0,.55)' : 'rgba(255,255,255,.55)'; ctx.shadowBlur = size * 0.12; ctx.shadowOffsetY = size * 0.04; }
+      var tw = ctx.measureText(text).width, th = size * 1.15;
+      if ($('tile').checked) {
+        // a staggered grid of copies, laid out on a rotated plane big enough to cover every corner
+        var gx = tw + size * 2.5, gy = th * 3.2, R = Math.sqrt(W * W + H * H) / 2 + gx;
+        ctx.translate(W / 2, H / 2); ctx.rotate(ang);
+        for (var row = 0, y = -R; y <= R; y += gy, row++) for (var x = -R + (row % 2 ? gx / 2 : 0); x <= R; x += gx) ctx.fillText(text, x, y);
+      } else {
+        var fit = Math.min(1, (W - 2 * m) / (Math.abs(tw * Math.cos(ang)) + Math.abs(th * Math.sin(ang)) || 1)); // long text shrinks to fit
+        if (fit < 1) { size *= fit; ctx.font = ctx.font.replace(/[\d.]+px/, size + 'px'); tw = ctx.measureText(text).width; th = size * 1.15; }
+        var bw = Math.abs(tw * Math.cos(ang)) + Math.abs(th * Math.sin(ang)), bh = Math.abs(tw * Math.sin(ang)) + Math.abs(th * Math.cos(ang));
+        var a = anchor($('tpos').value, W, H, bw, bh, m);
+        ctx.translate(a.x, a.y); ctx.rotate(ang); ctx.fillText(text, 0, 0);
+      }
+      ctx.restore();
+    }
+    if ($('useLogo').checked && logo) {
+      var lw = W * $('lsize').value / 100, lh = lw * logo.naturalHeight / logo.naturalWidth;
+      if (lh > H * 0.9) { lh = H * 0.9; lw = lh * logo.naturalWidth / logo.naturalHeight; }
+      var b = anchor($('lpos').value, W, H, lw, lh, m);
+      ctx.save(); ctx.globalAlpha = $('lopa').value / 100; ctx.drawImage(logo, b.x - lw / 2, b.y - lh / 2, lw, lh); ctx.restore();
+    }
+  }
+  function lum(hex) { var n = parseInt(hex.slice(1), 16); return (0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255)) / 255; }
+
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true;
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0;
+      var it = imgs[cur]; if (!it) return;
+      var cv = $('cv'), s = Math.min(1, 1400 / Math.max(it.img.naturalWidth, it.img.naturalHeight));
+      cv.width = Math.max(1, Math.round(it.img.naturalWidth * s)); cv.height = Math.max(1, Math.round(it.img.naturalHeight * s));
+      render(cv.getContext('2d'), it.img, cv.width, cv.height);
+    });
+  }
+
+  function outType(it) { var f = $('fmt').value; if (f !== 'keep') return f; return EXT[it.file.type] ? it.file.type : 'image/png'; }
+  function encode(it) {
+    var W = it.img.naturalWidth, H = it.img.naturalHeight, c = document.createElement('canvas'); c.width = W; c.height = H;
+    var ctx = c.getContext('2d'), type = outType(it);
+    if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H); }
+    render(ctx, it.img, W, H);
+    return PT.blob(c, type, $('q').value / 100).then(function (b) {
+      c.width = c.height = 0; // free the memory straight away on phones
+      if (!b) throw new Error('Your browser could not save "' + it.file.name + '" in this format. Try JPG or PNG.');
+      var ext = b.type === type ? EXT[type] : (EXT[b.type] || 'png'); // Safari may hand back PNG when asked for WebP
+      return { blob: b, name: PT.base(it.file.name) + '-watermarked.' + ext };
+    });
+  }
+  var lastUrl = null;
+  function offer(blob, name, note) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false;
+    a.click();
+    say('ok', note + ' · ' + fmtBytes(blob.size) + '. If the download did not start, use the green button.');
+  }
+
+  function strip() {
+    var s = $('strip'); s.innerHTML = '';
+    imgs.forEach(function (it, k) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'wm-th'; b.style.backgroundImage = 'url("' + it.url + '")';
+      b.setAttribute('aria-label', 'Show ' + it.file.name); b.setAttribute('aria-current', k === cur); b.title = it.file.name;
+      b.addEventListener('click', function () { cur = k; strip(); draw(); });
+      var x = document.createElement('span'); x.textContent = '✕'; x.setAttribute('role', 'button'); x.setAttribute('aria-label', 'Remove ' + it.file.name); x.tabIndex = 0;
+      var rm = function (e) { e.stopPropagation(); URL.revokeObjectURL(it.url); imgs.splice(k, 1); if (cur >= imgs.length) cur = Math.max(0, imgs.length - 1); strip(); draw(); };
+      x.addEventListener('click', rm); x.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') rm(e); });
+      b.appendChild(x); s.appendChild(b);
+    });
+    if (imgs.length < 2) s.innerHTML = '';
+    $('stage').hidden = !imgs.length;
+    $('go').disabled = !imgs.length || busy;
+    $('all').hidden = imgs.length < 2; $('all').disabled = busy;
+    $('all').textContent = 'Download all ' + imgs.length + ' as ZIP';
+    if (!imgs.length) $('dl').hidden = true;
+  }
+
+  function loadImg(file) { return new Promise(function (res) { loadImage(file, res); }); }
+  PT.drop(true, async function (list) {
+    var bad = 0, broken = [];
+    for (var f of list) {
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; continue; }
+      var img = await loadImg(f);
+      if (!img || !img.naturalWidth) { broken.push(f.name); continue; }
+      imgs.push({ file: f, img: img, url: URL.createObjectURL(f) });
+    }
+    var added = list.length - bad - broken.length;
+    if (added) cur = imgs.length - added;
+    strip(); draw();
+    var notes = [];
+    if (added) notes.push(imgs.length === 1 ? imgs[0].img.naturalWidth + ' × ' + imgs[0].img.naturalHeight + ' px. Adjust the watermark, then download.' : imgs.length + ' images loaded. The same watermark is scaled to fit each one.');
+    if (bad) notes.push('Skipped ' + bad + (bad === 1 ? ' file that is' : ' files that are') + ' not an image.');
+    if (broken.length) notes.push('Could not read ' + broken.join(', ') + '.');
+    say(bad || broken.length ? 'bad' : '', notes.join(' '));
+  });
+
+  // logo
+  $('logoBtn').addEventListener('click', function () { $('logoFile').click(); });
+  $('logoFile').addEventListener('change', function () {
+    var f = $('logoFile').files[0]; $('logoFile').value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { say('bad', 'The logo must be an image file, ideally a PNG.'); return; }
+    loadImg(f).then(function (img) {
+      if (!img) { say('bad', 'Could not read that logo image.'); return; }
+      logo = img; $('logoPrev').src = URL.createObjectURL(f); $('logoPrev').hidden = false; $('logoName').textContent = f.name;
+      $('useLogo').checked = true; $('useLogo').dispatchEvent(new Event('change', { bubbles: true })); draw();
+    });
+  });
+
+  // labels and live preview
+  [['tsize', 'tsizeV'], ['topa', 'topaV'], ['trot', 'trotV'], ['lsize', 'lsizeV'], ['lopa', 'lopaV'], ['margin', 'marginV'], ['q', 'qv']].forEach(function (p) {
+    var f = function () { $(p[1]).textContent = $(p[0]).value; }; $(p[0]).addEventListener('input', f); f();
+  });
+  function sync() {
+    var t = $('tile').checked;
+    Array.prototype.forEach.call($('tposG').children, function (b) { b.disabled = t; });
+    $('q').disabled = imgs.length && imgs.every(function (it) { return outType(it) === 'image/png'; });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('.card input, .card select'), function (el) {
+    if (el.type === 'file') return;
+    el.addEventListener('input', function () { sync(); draw(); }); el.addEventListener('change', function () { sync(); draw(); });
+  });
+  posGrid('tposG', 'tpos'); posGrid('lposG', 'lpos'); sync();
+
+  // downloads
+  $('go').addEventListener('click', function () {
+    var it = imgs[cur]; if (!it || busy) return;
+    busy = true; strip(); say('', 'Saving…');
+    encode(it).then(function (r) { offer(r.blob, r.name, 'Saved ' + r.name); }, function (e) { say('bad', e.message); })
+      .then(function () { busy = false; strip(); });
+  });
+  $('all').addEventListener('click', async function () {
+    if (busy || imgs.length < 2) return;
+    busy = true; strip();
+    try {
+      var files = [], used = {};
+      for (var k = 0; k < imgs.length; k++) {
+        say('', 'Watermarking ' + (k + 1) + ' of ' + imgs.length + '…');
+        var r = await encode(imgs[k]), name = r.name, n = 2;
+        while (used[name.toLowerCase()]) name = r.name.replace(/(\.\w+)$/, '-' + (n++) + '$1');
+        used[name.toLowerCase()] = 1;
+        files.push({ name: name, data: new Uint8Array(await r.blob.arrayBuffer()) });
+      }
+      offer(PT.zip(files), 'watermarked-images.zip', 'Saved ' + files.length + ' images in a ZIP');
+    } catch (e) { say('bad', e && e.message ? e.message : 'Something went wrong while saving.'); }
+    busy = false; strip();
+  });
+})();
+</script>

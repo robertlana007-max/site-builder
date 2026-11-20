@@ -1,0 +1,113 @@
+<style>
+.fty-list { display: grid; gap: 8px; margin-top: 16px; }
+.fty-row { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.fty-body { flex: 1; min-width: 0; }
+.fty-name { display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+.fty-out { display: block; font-size: 19px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 9.5em; overflow-y: auto; }
+.fty-row .btn { flex: none; min-height: 40px; padding: 7px 14px; }
+.fty-bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-top: 12px; }
+.fty-bar input[type=search] { max-width: 260px; }
+</style>
+<label for="txt">Your text</label>
+<textarea id="txt" class="plain" data-nomemo rows="2" style="min-height:80px" maxlength="5000" placeholder="Type something, for example your name or a bio line"></textarea>
+<div class="fty-bar">
+  <span class="msg" id="msg" style="margin:0">Showing a sample. Start typing to see your own text.</span>
+  <input type="search" id="find" data-nomemo placeholder="Filter styles, e.g. bold" aria-label="Filter styles">
+</div>
+<div class="fty-list" id="list" aria-live="off"></div>
+<p class="msg" id="none" hidden>No style matches that filter.</p>
+<p class="msg">These letters are real Unicode characters, so they paste into Instagram, TikTok, X, WhatsApp, Discord and most other places. Some apps, fonts and older phones may not show every style, and screen readers can read them oddly, so keep important information in plain text.</p>
+<script>
+(function () {
+  var UP = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ', LO = 'abcdefghijklmnopqrstuvwxyz', DG = '0123456789';
+  // Build a map from the start of a Unicode Mathematical Alphanumeric run. `holes` are letters that
+  // were already encoded in the Letterlike Symbols block, so the matching math code points are reserved.
+  function block(up, lo, dg, holes) {
+    var m = {};
+    for (var i = 0; i < 26; i++) {
+      if (up) m[UP[i]] = String.fromCodePoint(up + i);
+      if (lo) m[LO[i]] = String.fromCodePoint(lo + i);
+    }
+    if (dg) for (var d = 0; d < 10; d++) m[DG[d]] = String.fromCodePoint(dg + d);
+    for (var k in holes || {}) m[k] = String.fromCodePoint(holes[k]);
+    return m;
+  }
+  function pairs(from, to) { var m = {}, a = Array.from(from), b = Array.from(to); for (var i = 0; i < a.length; i++) m[a[i]] = b[i]; return m; }
+  function mapWith(m) { return function (s) { return Array.from(s).map(function (c) { return m[c] || c; }).join(''); }; }
+  function mark(cm) { return function (s) { return Array.from(s).map(function (c) { return c === '\n' ? c : c + cm; }).join(''); }; }
+
+  var circled = block(0x24B6, 0x24D0, 0, { '0': 0x24EA }); for (var i = 1; i <= 9; i++) circled[i] = String.fromCodePoint(0x2460 + i - 1);
+  var dark = block(0x1F150, 0, 0, { '0': 0x24FF }); for (i = 1; i <= 9; i++) dark[i] = String.fromCodePoint(0x2776 + i - 1);
+  for (i = 0; i < 26; i++) dark[LO[i]] = dark[UP[i]];
+  var sq = block(0x1F130), dsq = block(0x1F170); for (i = 0; i < 26; i++) { sq[LO[i]] = sq[UP[i]]; dsq[LO[i]] = dsq[UP[i]]; }
+  var paren = block(0, 0x249C); for (i = 1; i <= 9; i++) paren[i] = String.fromCodePoint(0x2474 + i - 1);
+  var full = { ' ': '　' }; for (i = 0x21; i <= 0x7E; i++) full[String.fromCharCode(i)] = String.fromCodePoint(0xFF01 + i - 0x21);
+  var small = pairs(LO, 'ᴀʙᴄᴅᴇꜰɢʜɪᴊᴋʟᴍɴᴏᴘǫʀꜱᴛᴜᴠᴡxʏᴢ');
+  var sup = pairs(LO + UP + DG + '+-=()', 'ᵃᵇᶜᵈᵉᶠᵍʰⁱʲᵏˡᵐⁿᵒᵖᑫʳˢᵗᵘᵛʷˣʸᶻᴬᴮᶜᴰᴱᶠᴳᴴᴵᴶᴷᴸᴹᴺᴼᴾᑫᴿˢᵀᵁⱽᵂˣʸᶻ⁰¹²³⁴⁵⁶⁷⁸⁹⁺⁻⁼⁽⁾');
+  var sub = pairs('aehijklmnoprstuvx' + DG + '+-=()', 'ₐₑₕᵢⱼₖₗₘₙₒₚᵣₛₜᵤᵥₓ₀₁₂₃₄₅₆₇₈₉₊₋₌₍₎');
+  var flip = pairs(LO + UP + DG + '.,?!\'"()[]{}<>_&;‿',
+    'ɐqɔpǝɟƃɥᴉɾʞlɯuodbɹsʇnʌʍxʎz' + '∀ꓭƆꓷƎℲ⅁HIſꓘ˥WNOԀΌᴚS⊥∩ΛMX⅄Z' + '0ƖᄅƐㄣϛ9ㄥ86' + '˙\'¿¡,„)(][}{><‾⅋؛⁀');
+
+  var STYLES = [
+    ['Bold', mapWith(block(0x1D400, 0x1D41A, 0x1D7CE))],
+    ['Italic', mapWith(block(0x1D434, 0x1D44E, 0, { h: 0x210E }))],
+    ['Bold italic', mapWith(block(0x1D468, 0x1D482, 0x1D7CE))],
+    ['Script (cursive)', mapWith(block(0x1D49C, 0x1D4B6, 0, { B: 0x212C, E: 0x2130, F: 0x2131, H: 0x210B, I: 0x2110, L: 0x2112, M: 0x2133, R: 0x211B, e: 0x212F, g: 0x210A, o: 0x2134 }))],
+    ['Bold script', mapWith(block(0x1D4D0, 0x1D4EA, 0x1D7CE))],
+    ['Fraktur (gothic)', mapWith(block(0x1D504, 0x1D51E, 0, { C: 0x212D, H: 0x210C, I: 0x2111, R: 0x211C, Z: 0x2128 }))],
+    ['Bold fraktur', mapWith(block(0x1D56C, 0x1D586, 0x1D7CE))],
+    ['Double-struck (outline)', mapWith(block(0x1D538, 0x1D552, 0x1D7D8, { C: 0x2102, H: 0x210D, N: 0x2115, P: 0x2119, Q: 0x211A, R: 0x211D, Z: 0x2124 }))],
+    ['Sans-serif', mapWith(block(0x1D5A0, 0x1D5BA, 0x1D7E2))],
+    ['Sans-serif bold', mapWith(block(0x1D5D4, 0x1D5EE, 0x1D7EC))],
+    ['Sans-serif italic', mapWith(block(0x1D608, 0x1D622, 0x1D7E2))],
+    ['Sans-serif bold italic', mapWith(block(0x1D63C, 0x1D656, 0x1D7EC))],
+    ['Monospace (typewriter)', mapWith(block(0x1D670, 0x1D68A, 0x1D7F6))],
+    ['Bubble', mapWith(circled)],
+    ['Dark bubble', mapWith(dark)],
+    ['Squared', mapWith(sq)],
+    ['Dark squared', mapWith(dsq)],
+    ['Parenthesized', mapWith(paren)],
+    ['Fullwidth (vaporwave)', mapWith(full)],
+    ['Small caps', mapWith(small)],
+    ['Superscript (tiny)', mapWith(sup)],
+    ['Subscript (some letters)', mapWith(sub)],
+    ['Upside down', function (s) { return Array.from(mapWith(flip)(s)).reverse().join(''); }],
+    ['Reversed', function (s) { return Array.from(s).reverse().join(''); }],
+    ['Strikethrough', mark('̶')],
+    ['Short strike', mark('̵')],
+    ['Slashed', mark('̸')],
+    ['Underline', mark('̲')],
+    ['Double underline', mark('̳')],
+    ['Overline', mark('̅')],
+    ['Wavy underline', mark('̰')],
+    ['Dotted underline', mark('̤')],
+    ['Crossed above', mark('̽')],
+    ['Wide spaced', function (s) { return s.split('\n').map(function (l) { return Array.from(l).join(' '); }).join('\n'); }],
+    ['Sparkles', function (s) { return s.trim() ? '✨ ' + s + ' ✨' : s; }],
+    ['Bold in brackets', function (s) { return s.trim() ? '【' + STYLES[0][1](s) + '】' : s; }]
+  ];
+
+  var list = $('list'), rows = [];
+  STYLES.forEach(function (st, n) {
+    var row = document.createElement('div'), body = document.createElement('div'), name = document.createElement('span'), out = document.createElement('span'), b = document.createElement('button');
+    row.className = 'fty-row'; body.className = 'fty-body'; name.className = 'fty-name'; out.className = 'fty-out';
+    name.textContent = st[0]; b.className = 'btn ghost'; b.type = 'button'; b.textContent = 'Copy'; b.setAttribute('aria-label', 'Copy ' + st[0] + ' text');
+    b.addEventListener('click', function () { copyText(out.textContent, b); });
+    body.appendChild(name); body.appendChild(out); row.appendChild(body); row.appendChild(b); list.appendChild(row);
+    rows.push({ row: row, out: out, name: st[0].toLowerCase(), fn: st[1] });
+  });
+  function draw() {
+    var t = $('txt').value, s = t.trim() ? t : 'Hello World 123';
+    $('msg').textContent = t.trim() ? Array.from(t).length + ' characters' : 'Showing a sample. Start typing to see your own text.';
+    rows.forEach(function (r) { r.out.textContent = r.fn(s); });
+  }
+  function filter() {
+    var q = $('find').value.trim().toLowerCase(), shown = 0;
+    rows.forEach(function (r) { r.row.hidden = !!q && r.name.indexOf(q) === -1; if (!r.row.hidden) shown++; });
+    $('none').hidden = shown > 0;
+  }
+  $('txt').addEventListener('input', draw);
+  $('find').addEventListener('input', filter);
+  draw();
+})();
+</script>
