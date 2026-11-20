@@ -83,9 +83,9 @@ const ICON = {
   theme: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>',
   logo: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>'
 };
-const icon = k => svg(ICON[k]);
+const icon = k => svg(ICON[k] || (tools.find(t => t.slug === k) || {}).icon || ICON.star);
 // One flat colour per category. Key order here is also the order of sections on the home page.
-const COLOR = { 'PDF tools': '#e5484d', 'Image tools': '#8b5cf6', 'Finance calculators': '#12a150', 'Calculators': '#d6409f', 'Time tools': '#d98e00', 'Generators': '#0e9fb5', 'Text tools': '#e86a17', 'Developer tools': '#2563eb' };
+const COLOR = { 'PDF tools': '#e5484d', 'Image tools': '#8b5cf6', 'Finance calculators': '#12a150', 'Calculators': '#d6409f', 'Time tools': '#d98e00', 'Generators': '#0e9fb5', 'Text tools': '#e86a17', 'Media tools': '#0891b2', 'Developer tools': '#2563eb' };
 // What each category is for, shown on the home page.
 const CATINFO = {
   'PDF tools': ['Merge, split, compress, edit and sign PDF files', 'Join reports into one file, shrink a scan so it fits an email, change text inside a PDF in its original font, add page numbers or a watermark, and turn pages into pictures.'],
@@ -95,6 +95,7 @@ const CATINFO = {
   'Time tools': ['Timers, stopwatch, clocks and dates', 'A countdown timer with an alarm, a stopwatch with laps, time zone converter and day counters for deadlines and birthdays.'],
   'Generators': ['Passwords, QR codes, random numbers and names', 'Strong passwords, QR codes for links or Wi-Fi, fair random picks, UUIDs and placeholder text, made on your device.'],
   'Text tools': ['Write, count, clean and edit text', 'A full notepad with tabs, word and character counter, case changer, remove duplicate lines, compare two texts and more.'],
+  'Media tools': ['Record your screen and voice, turn video into MP3, text into speech', 'Make a screen recording with sound, record your voice and save it as MP3, pull the audio out of a video, and have any text read out loud.'],
   'Developer tools': ['JSON, Base64, hashes, regex and more', 'Format and check JSON, encode and decode Base64 and URLs, make hashes, test regular expressions and convert colours.']
 };
 const tile = t => `<span class="tile" style="--c:${COLOR[t.cat]}">${icon(t.slug)}</span>`;
@@ -271,7 +272,7 @@ ${body}
 `;
 }
 
-const cats = Object.keys(COLOR);
+const cats = Object.keys(COLOR).filter(c => tools.some(t => t.cat === c));
 for (const t of tools) if (!(t.cat in COLOR)) throw new Error('Unknown category: ' + t.cat);
 tools.sort((a, b) => cats.indexOf(a.cat) - cats.indexOf(b.cat)); // stable: keeps the order within a category
 const footCols = cats.map(c => ({ title: c, items: tools.filter(t => t.cat === c) }));

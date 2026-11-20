@@ -343,14 +343,14 @@ module.exports = [
   {
     slug: 'hash-generator', cat: 'Developer tools', name: 'Hash Generator',
     title: 'SHA-256 Hash Generator - SHA-1, SHA-384, SHA-512',
-    desc: 'Generate SHA-256, SHA-1, SHA-384 and SHA-512 hashes of any text instantly. Computed in your browser, nothing is uploaded.',
-    card: 'SHA-1, SHA-256, SHA-384 and SHA-512 of any text.',
-    intro: 'Calculate SHA hashes of any text as you type. The text never leaves your browser.',
-    steps: ['Type or paste your text.', 'The four hashes update as you type.', 'Click Copy next to the one you need.'],
+    desc: 'Generate SHA-256, MD5, SHA-1, SHA-384 and SHA-512 hashes of any text or file instantly. Computed in your browser, nothing is uploaded.',
+    card: 'MD5, SHA-1, SHA-256, SHA-384 and SHA-512 of text or files.',
+    intro: 'Calculate MD5 and SHA hashes of any text as you type, or of a file. Nothing leaves your browser.',
+    steps: ['Type or paste your text, or choose a file.', 'The five hashes update as you type.', 'Click Copy next to the one you need.'],
     faq: [
       ['What is a hash?', 'A fixed-length fingerprint of some data. The same input always gives the same hash, and a tiny change gives a completely different one.'],
       ['Can a hash be reversed?', 'No. Hashes are one-way. The original text cannot be calculated from the hash.'],
-      ['Which one should I use?', 'SHA-256 is the usual choice. SHA-1 is no longer considered secure and is included only for checking old values.']
+      ['Which one should I use?', 'SHA-256 is the usual choice. MD5 and SHA-1 are no longer considered secure and are included only for checksums and old values.']
     ]
   },
   {

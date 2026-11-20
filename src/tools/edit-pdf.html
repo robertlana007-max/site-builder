@@ -86,6 +86,8 @@
     if (text === cur.str) delete edits[cur.key];
     else edits[cur.key] = Object.assign({ page: pageNum, text: text, orig: cur.str, bg: cur.s.bg, ink: cur.s.ink }, cur.pdf, cur.font);
     cur.paint(); refresh();
+    if (text.length > cur.str.length && cur.el.scrollWidth > cur.width * 1.08 + 2) tell('The new text is longer than the original line. It is not wrapped onto a new line, so it may run into nearby text. Check the page before saving.', null, 'bad');
+    else tell('Type the new text in the box below the page, then press Done.', null, 'ok');
   });
   input.addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); deselect(); } });
   $('doneLine').addEventListener('click', deselect);
@@ -164,6 +166,7 @@
       $('pageNo').textContent = 'Page ' + n + ' of ' + pdf.numPages;
       $('prev').disabled = n <= 1; $('next').disabled = n >= pdf.numPages;
       if (boxesFromText(page, vp, scale, tc, n)) tell('Click a blue box (a line of text) on the page to change it.', null, '');
+      else if (tc.items.some(function (it) { return it.str && it.str.trim(); })) tell('The text on this page is turned sideways or upside down, so it cannot be edited here. Straighten the page with Rotate PDF first.', null, 'bad');
       else if (vp.rotation % 360 === 0) boxesFromScan(vp, scale, n);
       else tell('This page has no text that can be edited.', null, 'bad');
     } catch (e) { tell('This page could not be shown.', null, 'bad'); }
@@ -317,10 +320,10 @@
       var upright = Math.abs(m[1]) < .01 && Math.abs(m[2]) < .01 && m[0] > 0;
       targets.forEach(function (t) {
         var tol = Math.max(1, t.size * .15);
-        if (lost || !upright || Math.abs(sy - t.y) > t.size * .35 || Math.abs(size / t.size - 1) > .25 || sx < t.x - tol || sx > t.x + t.w - tol) return;
+        if (lost || !upright || Math.abs(sy - t.y) > t.size * .35 || Math.abs(size / t.size - 1) > .25 || sx < t.x - Math.max(1, t.size * .4) || sx > t.x + t.w - tol) return;
         if (!known) { t.partial = true; return; }
         var ex = mul([1, 0, 0, 1, tx, 0], mul(tm, gs.ctm))[4];
-        if (ex > t.x + t.w + tol) { t.partial = true; return; } // this instruction also writes words after the changed line
+        if (ex > t.x + t.w + Math.max(1, t.size * .4)) { t.partial = true; return; } // this instruction also writes words after the changed line (a trailing space is fine)
         t.spans.push([sx, ex]);
         edits.push({ a: tk[from].a, b: tk[k].b, text: prefix + '[' + fmt(-tx * 1000 / (gs.fs * gs.th)) + '] TJ' });
       });
