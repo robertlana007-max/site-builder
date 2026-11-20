@@ -100,6 +100,10 @@ function ad(slot) {
 // Languages offered in the header menu. The page is translated in place by Google Translate.
 const LANGS = [['en', 'English'], ['ur', 'اردو'], ['hi', 'हिन्दी'], ['ar', 'العربية'], ['es', 'Español'], ['fr', 'Français'], ['pt', 'Português'], ['de', 'Deutsch'], ['id', 'Indonesia'], ['tr', 'Türkçe'], ['ru', 'Русский'], ['bn', 'বাংলা'], ['zh-CN', '中文'], ['ja', '日本語'], ['ko', '한국어'], ['it', 'Italiano'], ['fa', 'فارسی'], ['vi', 'Tiếng Việt'], ['th', 'ไทย'], ['sw', 'Kiswahili'], ['nl', 'Nederlands'], ['pl', 'Polski'], ['ms', 'Melayu'], ['pa', 'ਪੰਜਾਬੀ']];
 
+// Header links to the main sections of the home page.
+const NAV = [['PDF tools', 'PDF'], ['Image tools', 'Image'], ['Finance calculators', 'Finance'], ['Calculators', 'Calculators'], ['Developer tools', 'Developer']];
+const catId = c => c.toLowerCase().replace(/[^a-z]+/g, '-');
+
 function layout({ rel, urlPath, title, desc, body, slug = '', here = '', color = '', head = '', noindex = false }) {
   const canonical = SITE + '/' + urlPath;
   return `<!doctype html>
@@ -130,11 +134,12 @@ ${head}
 <body>
 <header class="site-header"><div class="wrap">
   <a class="logo" href="${rel || './'}"><b></b><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
+  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}about/">About</a></nav>
   <span class="sp"></span>
-  <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span><kbd>Ctrl K</kbd></button>
+  <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
   <button class="hbtn" id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
-  <button class="hbtn auth" id="authBtn" hidden><span>Sign in</span></button>
   <button class="hbtn" id="themeBtn" aria-label="Switch light or dark theme">${icon('theme')}</button>
+  <button class="hbtn auth" id="authBtn">Sign in</button>
   <div class="lang-menu notranslate" id="langMenu" translate="no" hidden><p>Translated by Google</p>${LANGS.map(([code, name]) => `<button data-lang="${code}" lang="${code}">${name}</button>`).join('')}</div>
 </div></header>
 <div id="gt"></div>
@@ -142,6 +147,12 @@ ${head}
   <div class="finder">${icon('search')}<input type="search" id="palInput" data-empty="all" placeholder="Search ${tools.length} tools…" aria-label="Search tools" autocomplete="off"></div>
   <div class="f-list" id="palResults"></div>
   <p class="pal-hint">↑ ↓ to move · Enter to open · Esc to close</p>
+</dialog>
+<dialog class="palette" id="authInfo" aria-labelledby="authInfoT" style="max-width:420px;padding:22px">
+  <h2 id="authInfoT" style="margin:0 0 8px;font-size:20px">Sign in with Google</h2>
+  <p style="margin:0 0 10px;color:var(--muted)">Sign-in is being set up and is not switched on yet.</p>
+  <p style="margin:0 0 18px;color:var(--muted)">You do not need it to use the site: the tools you pin and the numbers you enter are already saved on this device and will be here when you come back.</p>
+  <form method="dialog"><button class="btn">OK</button></form>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <main class="wrap">
@@ -211,7 +222,7 @@ write('index.html', layout({
 </section>
 <div class="pills" id="tools" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}
-${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
+${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" id="${catId(c)}" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
 ${ad(cfg.adSlotBottom)}
 <section class="block">
   <h2 class="section-title">How it works</h2>

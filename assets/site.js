@@ -199,6 +199,10 @@
       try { localStorage.setItem('theme', next); } catch (e) {}
     });
 
+    // Sign in: handled by cloud.js when Firebase is configured; until then, say so plainly.
+    var authBtn = $('authBtn'), authInfo = $('authInfo');
+    if (authBtn && authInfo && !window.FIREBASE_CONFIG) authBtn.addEventListener('click', function () { if (authInfo.showModal) authInfo.showModal(); else toast('Sign-in is not switched on yet. Your work is saved on this device.'); });
+
     // palette
     var pal = $('palette'), palInput = $('palInput');
     if (pal && pal.showModal) {
