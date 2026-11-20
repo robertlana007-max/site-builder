@@ -1,0 +1,47 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>Resized in your browser. Nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden>
+<div class="fields">
+  <div><label for="w">Width (px)</label><input type="number" id="w" min="1"></div>
+  <div><label for="h">Height (px)</label><input type="number" id="h" min="1"></div>
+  <div><label for="fmt">Output format</label><select id="fmt"><option value="image/png">PNG</option><option value="image/jpeg">JPG</option><option value="image/webp">WebP</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="lock" checked>Keep aspect ratio</label></div>
+<div class="btns"><button class="btn" id="go" disabled>Resize image</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<div class="preview"><img id="prev" alt="Resized preview" hidden></div>
+<script>
+(function () {
+  var src = null, name = 'image', lastUrl = null;
+  setupDrop('drop', 'file', function (f) {
+    name = f.name.replace(/\.[^.]+$/, '');
+    loadImage(f, function (img) {
+      if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image.'; return; }
+      src = img; $('w').value = img.naturalWidth; $('h').value = img.naturalHeight; $('go').disabled = false;
+      $('msg').className = 'msg'; $('msg').textContent = 'Original size: ' + img.naturalWidth + ' × ' + img.naturalHeight + ' px';
+    });
+  });
+  $('w').addEventListener('input', function () {
+    if (src && $('lock').checked && +$('w').value > 0) $('h').value = Math.round($('w').value * src.naturalHeight / src.naturalWidth);
+  });
+  $('h').addEventListener('input', function () {
+    if (src && $('lock').checked && +$('h').value > 0) $('w').value = Math.round($('h').value * src.naturalWidth / src.naturalHeight);
+  });
+  $('go').addEventListener('click', function () {
+    var w = parseInt($('w').value, 10), h = parseInt($('h').value, 10);
+    if (!(w > 0 && h > 0) || w > 10000 || h > 10000) { $('msg').className = 'msg bad'; $('msg').textContent = 'Enter a width and height between 1 and 10000 px.'; return; }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d'), type = $('fmt').value;
+    ctx.imageSmoothingQuality = 'high';
+    if (type === 'image/jpeg') { ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h); }
+    ctx.drawImage(src, 0, 0, w, h);
+    c.toBlob(function (b) {
+      if (!b) { $('msg').className = 'msg bad'; $('msg').textContent = 'Your browser could not encode this format.'; return; }
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(b);
+      $('prev').src = lastUrl; $('prev').hidden = false;
+      $('dl').href = lastUrl; $('dl').download = name + '-' + w + 'x' + h + '.' + ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' })[type]; $('dl').hidden = false;
+      $('msg').className = 'msg ok'; $('msg').textContent = 'Done: ' + w + ' × ' + h + ' px, ' + fmtBytes(b.size);
+    }, type, 0.92);
+  });
+})();
+</script>

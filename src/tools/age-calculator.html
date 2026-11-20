@@ -1,0 +1,46 @@
+<div class="fields">
+  <div><label for="dob">Date of birth</label><input type="date" id="dob"></div>
+  <div><label for="on">Age on this date</label><input type="date" id="on"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Age</span><b id="age">–</b></div>
+  <div class="stat"><span>Total months</span><b id="tm">–</b></div>
+  <div class="stat"><span>Total weeks</span><b id="tw">–</b></div>
+  <div class="stat"><span>Total days</span><b id="td">–</b></div>
+  <div class="stat"><span>Next birthday in</span><b id="nb">–</b></div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  function parse(v) { var p = v.split('-'); return p.length === 3 ? new Date(+p[0], p[1] - 1, +p[2]) : null; }
+  function dim(y, m) { return new Date(y, m + 1, 0).getDate(); }
+  function iso(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  $('on').value = iso(new Date());
+  function calc() {
+    var a = parse($('dob').value), b = parse($('on').value);
+    var ids = ['age', 'tm', 'tw', 'td', 'nb'];
+    if (!a || !b || isNaN(a) || isNaN(b)) { ids.forEach(function (i) { $(i).textContent = '–'; }); $('msg').textContent = ''; return; }
+    if (a > b) { ids.forEach(function (i) { $(i).textContent = '–'; }); $('msg').className = 'msg bad'; $('msg').textContent = 'Date of birth must be before the other date.'; return; }
+    $('msg').textContent = '';
+    // Whole months first (birth day clamped to the month's length), then leftover days.
+    var utc = function (x) { return Date.UTC(x.getFullYear(), x.getMonth(), x.getDate()); };
+    var plus = function (n) {
+      var t = a.getFullYear() * 12 + a.getMonth() + n, yr = Math.floor(t / 12), mo = t % 12;
+      return new Date(yr, mo, Math.min(a.getDate(), dim(yr, mo)));
+    };
+    var months = (b.getFullYear() - a.getFullYear()) * 12 + b.getMonth() - a.getMonth();
+    if (plus(months) > b) months--;
+    var y = Math.floor(months / 12), m = months % 12, d = Math.round((utc(b) - utc(plus(months))) / 86400000);
+    var days = Math.round((utc(b) - utc(a)) / 86400000);
+    $('age').textContent = y + 'y ' + m + 'm ' + d + 'd';
+    $('tm').textContent = fmtNum(y * 12 + m);
+    $('tw').textContent = fmtNum(Math.floor(days / 7));
+    $('td').textContent = fmtNum(days);
+    var ny = b.getFullYear(), mk = function (yr) { return new Date(yr, a.getMonth(), Math.min(a.getDate(), dim(yr, a.getMonth()))); };
+    var next = mk(ny); if (next < b) next = mk(ny + 1);
+    var left = Math.round((Date.UTC(next.getFullYear(), next.getMonth(), next.getDate()) - Date.UTC(b.getFullYear(), b.getMonth(), b.getDate())) / 86400000);
+    $('nb').textContent = left === 0 ? 'Today!' : left + ' days';
+  }
+  $('dob').addEventListener('input', calc); $('on').addEventListener('input', calc);
+})();
+</script>
