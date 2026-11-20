@@ -1,0 +1,164 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a picture here</b>Cover old text and write new text on it. Nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden>
+<div id="editor" hidden>
+  <div class="pager">
+    <button class="btn" id="addText">+ Add text</button>
+    <button class="btn ghost" id="addCover" aria-pressed="false">Cover old text</button>
+    <span class="grow"></span>
+    <button class="btn ghost" id="undo" disabled>Undo</button>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv" style="touch-action:none;cursor:crosshair"></canvas></div>
+  <p class="msg" id="hint">Add text, then drag it into place. To replace existing writing, first cover it, then put new text on top.</p>
+  <div id="panel" hidden>
+    <div class="fields">
+      <div style="grid-column:1/-1"><label for="txt">Text</label><input type="text" id="txt" autocomplete="off"></div>
+      <div><label for="font">Font</label><select id="font"></select></div>
+      <div><label for="size">Size: <span id="sv">48</span> px</label><input type="range" id="size" min="8" max="400" value="48"></div>
+      <div><label for="col">Color</label><input type="color" id="col" value="#ffffff" style="width:100%;height:46px;padding:4px;border-radius:12px;border:1px solid var(--line);background:var(--field)"></div>
+    </div>
+    <div class="checks">
+      <label><input type="checkbox" id="bold">Bold</label>
+      <label><input type="checkbox" id="ital">Italic</label>
+      <label><input type="checkbox" id="outl">Outline</label>
+    </div>
+    <div class="btns" style="margin:0 0 14px"><button class="btn ghost" id="pick" aria-pressed="false">Pick color from picture</button><button class="btn ghost" id="del">Delete this item</button></div>
+  </div>
+  <div class="fields">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="image/png">PNG (best quality)</option><option value="image/jpeg">JPG (smaller file)</option></select></div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Save picture</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var FONTS = ['Arial', 'Helvetica', 'Verdana', 'Tahoma', 'Trebuchet MS', 'Segoe UI', 'Roboto', 'Times New Roman', 'Georgia', 'Garamond', 'Palatino', 'Courier New', 'Consolas', 'Impact', 'Arial Black', 'Comic Sans MS', 'Brush Script MT'];
+  var cv = $('cv'), ctx = cv.getContext('2d', { willReadFrequently: true }), img = null, name = 'picture', items = [], sel = -1, mode = '', drag = null, lastUrl = null;
+  $('font').innerHTML = FONTS.map(function (f) { return '<option style="font-family:\'' + f + '\'">' + f + '</option>'; }).join('');
+  function say(cls, t) { $('msg').className = 'msg ' + cls; $('msg').textContent = t; }
+  function fontOf(it) { return (it.ital ? 'italic ' : '') + (it.bold ? 'bold ' : '') + it.size + 'px "' + it.font + '", sans-serif'; }
+  function box(it) { // bounding box in picture pixels
+    if (it.kind === 'cover') return { x: Math.min(it.x, it.x + it.w), y: Math.min(it.y, it.y + it.h), w: Math.abs(it.w), h: Math.abs(it.h) };
+    ctx.font = fontOf(it);
+    return { x: it.x, y: it.y - it.size * .85, w: Math.max(10, ctx.measureText(it.text || ' ').width), h: it.size * 1.15 };
+  }
+  // Draw everything. With marks=false the result is the clean picture that gets saved.
+  function draw(marks) {
+    ctx.clearRect(0, 0, cv.width, cv.height); ctx.drawImage(img, 0, 0);
+    items.forEach(function (it, i) {
+      if (it.kind === 'cover') { var b = box(it); ctx.fillStyle = it.color; ctx.fillRect(b.x, b.y, b.w, b.h); }
+      else {
+        ctx.font = fontOf(it); ctx.textBaseline = 'alphabetic'; ctx.lineJoin = 'round';
+        if (it.outl) { ctx.lineWidth = Math.max(2, it.size / 9); ctx.strokeStyle = lum(it.color) > 140 ? '#000' : '#fff'; ctx.strokeText(it.text, it.x, it.y); }
+        ctx.fillStyle = it.color; ctx.fillText(it.text, it.x, it.y);
+      }
+      if (marks && i === sel) {
+        var s = box(it), u = cv.width / cv.getBoundingClientRect().width;
+        ctx.save(); ctx.setLineDash([6 * u, 4 * u]); ctx.lineWidth = 2 * u; ctx.strokeStyle = '#22d3ee'; ctx.strokeRect(s.x - 3 * u, s.y - 3 * u, s.w + 6 * u, s.h + 6 * u); ctx.restore();
+      }
+    });
+  }
+  function lum(hex) { var n = parseInt(hex.slice(1), 16); return ((n >> 16) * 299 + ((n >> 8) & 255) * 587 + (n & 255) * 114) / 1000; }
+  function hex(r, g, b) { return '#' + [r, g, b].map(function (v) { return v.toString(16).padStart(2, '0'); }).join(''); }
+  function pos(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+  function hit(p) { for (var i = items.length - 1; i >= 0; i--) { var b = box(items[i]); if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) return i; } return -1; }
+  // The colour around the edge of a rectangle, read from the untouched picture: used to hide old text.
+  function edgeColor(b) {
+    var t = document.createElement('canvas'); t.width = cv.width; t.height = cv.height;
+    var c = t.getContext('2d'); c.drawImage(img, 0, 0);
+    var x = Math.max(0, Math.floor(b.x)), y = Math.max(0, Math.floor(b.y)), w = Math.max(1, Math.min(cv.width - x, Math.ceil(b.w))), h = Math.max(1, Math.min(cv.height - y, Math.ceil(b.h)));
+    var d = c.getImageData(x, y, w, h).data, tally = {}, best = [255, 255, 255], bestN = 0;
+    for (var j = 0; j < h; j++) for (var i = 0; i < w; i++) {
+      if (i > 1 && i < w - 2 && j > 1 && j < h - 2) continue; // border pixels only
+      var o = (j * w + i) * 4, k = (d[o] >> 3) + ',' + (d[o + 1] >> 3) + ',' + (d[o + 2] >> 3);
+      tally[k] = (tally[k] || 0) + 1;
+      if (tally[k] > bestN) { bestN = tally[k]; best = [d[o], d[o + 1], d[o + 2]]; }
+    }
+    return hex(best[0], best[1], best[2]);
+  }
+  function select(i) {
+    sel = i; var it = items[i];
+    $('panel').hidden = !it;
+    if (it) {
+      var text = it.kind === 'text';
+      ['txt', 'font', 'size', 'bold', 'ital', 'outl'].forEach(function (id) { $(id).closest('div, label').hidden = !text; });
+      $('col').value = it.color;
+      if (text) { $('txt').value = it.text; $('font').value = it.font; $('size').value = it.size; $('sv').textContent = it.size; $('bold').checked = it.bold; $('ital').checked = it.ital; $('outl').checked = it.outl; }
+    }
+    draw(true);
+  }
+  function changed() { $('undo').disabled = !items.length; $('go').disabled = !items.length; $('dl').hidden = true; }
+  function setMode(m) { mode = m; $('addCover').setAttribute('aria-pressed', m === 'cover'); $('pick').setAttribute('aria-pressed', m === 'pick'); $('hint').textContent = m === 'cover' ? 'Drag a box over the writing you want to hide.' : m === 'pick' ? 'Click a spot on the picture to use its color.' : 'Drag items to move them. Click one to change it.'; }
+
+  setupDrop('drop', 'file', function (f) {
+    name = f.name.replace(/\.[^.]+$/, '');
+    loadImage(f, function (im) {
+      if (!im) return say('bad', 'Could not read that picture.');
+      img = im; cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.style.width = '100%'; cv.style.maxWidth = im.naturalWidth + 'px';
+      items = []; sel = -1; $('editor').hidden = false; $('panel').hidden = true; setMode(''); changed(); draw(true);
+      say('', f.name + ' · ' + im.naturalWidth + ' × ' + im.naturalHeight + ' px');
+    });
+  });
+  $('addText').addEventListener('click', function () {
+    var size = Math.max(16, Math.round(cv.width / 14));
+    items.push({ kind: 'text', text: 'Your text', x: cv.width * .1, y: cv.height * .5, size: Math.min(400, size), font: 'Arial', color: '#ffffff', bold: true, ital: false, outl: true });
+    setMode(''); changed(); select(items.length - 1); $('txt').focus(); $('txt').select();
+  });
+  $('addCover').addEventListener('click', function () { setMode(mode === 'cover' ? '' : 'cover'); });
+  $('pick').addEventListener('click', function () { setMode(mode === 'pick' ? '' : 'pick'); });
+  $('undo').addEventListener('click', function () { items.pop(); setMode(''); changed(); select(-1); });
+  $('del').addEventListener('click', function () { if (sel > -1) { items.splice(sel, 1); changed(); select(-1); } });
+
+  cv.addEventListener('pointerdown', function (e) {
+    if (!img) return;
+    var p = pos(e);
+    if (mode === 'pick') {
+      draw(false); var d = ctx.getImageData(Math.floor(p.x), Math.floor(p.y), 1, 1).data;
+      if (sel > -1) { items[sel].color = hex(d[0], d[1], d[2]); $('col').value = items[sel].color; }
+      setMode(''); select(sel); return;
+    }
+    cv.setPointerCapture(e.pointerId);
+    if (mode === 'cover') { items.push({ kind: 'cover', x: p.x, y: p.y, w: 0, h: 0, color: '#ffffff' }); sel = items.length - 1; drag = { make: true }; return; }
+    var i = hit(p); select(i);
+    if (i > -1) drag = { dx: p.x - items[i].x, dy: p.y - items[i].y };
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag || sel < 0) return;
+    var p = pos(e), it = items[sel];
+    if (drag.make) { it.w = p.x - it.x; it.h = p.y - it.y; }
+    else { it.x = p.x - drag.dx; it.y = p.y - drag.dy; $('dl').hidden = true; }
+    draw(true);
+  });
+  var end = function () {
+    if (!drag) return;
+    if (drag.make) {
+      var it = items[sel], b = box(it);
+      if (b.w < 4 || b.h < 4) { items.pop(); sel = -1; }
+      else { it.x = b.x; it.y = b.y; it.w = b.w; it.h = b.h; it.color = edgeColor(b); }
+      setMode(''); changed(); select(sel);
+    }
+    drag = null;
+  };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+
+  var apply = function () {
+    var it = items[sel]; if (!it) return;
+    it.color = $('col').value;
+    if (it.kind === 'text') { it.text = $('txt').value; it.font = $('font').value; it.size = +$('size').value; it.bold = $('bold').checked; it.ital = $('ital').checked; it.outl = $('outl').checked; $('sv').textContent = it.size; }
+    $('dl').hidden = true; draw(true);
+  };
+  ['txt', 'font', 'size', 'col', 'bold', 'ital', 'outl'].forEach(function (id) { $(id).addEventListener('input', apply); });
+
+  $('go').addEventListener('click', function () {
+    var type = $('fmt').value;
+    draw(false); // without the selection outline
+    cv.toBlob(function (b) {
+      draw(true);
+      if (!b) return say('bad', 'This picture is too large to save on this device.');
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(b);
+      $('dl').href = lastUrl; $('dl').download = name + '-edited.' + (type === 'image/png' ? 'png' : 'jpg'); $('dl').hidden = false;
+      say('ok', 'Ready · ' + fmtBytes(b.size));
+    }, type, 0.92);
+  });
+})();
+</script>

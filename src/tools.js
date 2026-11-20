@@ -628,5 +628,34 @@ module.exports = [
       ['Does it keep running in another tab?', 'Yes. The time is measured from the clock, so it stays correct even when the page is in the background.'],
       ['What is a lap time?', 'The time since the previous lap. The Total column shows the time since you pressed Start.']
     ]
+  },
+  {
+    slug: 'edit-pdf', cat: 'PDF tools', name: 'Edit PDF Text',
+    title: 'Edit PDF Text Online - Change Text in a PDF Free, No Upload',
+    desc: 'Click any line in a PDF and retype it. The editor reuses the PDF\'s own font where it can, so the change blends in. Free, no upload, no sign-up.',
+    card: 'Click a line and retype it, in the PDF\'s own font.',
+    intro: 'Fix a typo, change a date or update a name in a PDF. Click the line, type the new text and save. The editor keeps the original font whenever the PDF contains the letters you type.',
+    steps: ['Choose a PDF.', 'Click the line of text you want to change and type the new text.', 'Use the arrows to move between pages.', 'Click Save edited PDF, then Download.'],
+    faq: [
+      ['Does the new text use the same font?', 'When the PDF carries its own font and that font contains every letter you typed, yes: the new text is written in that exact font. PDFs usually store only the letters they already use, so if you type a letter that appears nowhere else in that font, the closest standard font (Helvetica, Times or Courier, with matching bold and italic) is used instead. The tool tells you how many changes used each.'],
+      ['How does it change the text?', 'It paints over the old line with the page colour behind it and writes your new text in the same place, size and colour.'],
+      ['Can I edit a scanned PDF?', 'No. A scan is a picture of a page, so there is no text to click. Use the Image Text Editor on a page saved as a picture instead.'],
+      ['Can I move text or change its size?', 'Not yet. You can replace or delete a line, and the new text keeps the position and size of the old one.'],
+      ['Is my PDF uploaded?', 'No. The file is opened and saved on your own device.']
+    ]
+  },
+  {
+    slug: 'image-text-editor', cat: 'Image tools', name: 'Image Text Editor',
+    title: 'Image Text Editor - Add or Replace Text on a Photo Free',
+    desc: 'Add text to a picture or replace writing that is already on it. Cover the old text, type the new text, choose a font and colour, and save. No upload.',
+    card: 'Add text to a picture or replace what is written.',
+    intro: 'Write on a photo, a screenshot or a meme. To change writing that is already there, cover it with the background colour and type new text on top.',
+    steps: ['Choose a picture.', 'To replace writing, press Cover old text and drag a box over it. The box takes the colour around it.', 'Press Add text, type your words and drag them into place.', 'Choose the font, size and colour, then press Save picture.'],
+    faq: [
+      ['Can it copy the exact font from my picture?', 'No. A picture only holds pixels, not font information, so the editor cannot know the font automatically. Pick the closest font from the list and use Pick color from picture to match the colour.'],
+      ['How do I hide the old text cleanly?', 'Covering works best on a plain background. Draw the box tightly around the writing. On a photo or a patterned background the box will be visible.'],
+      ['Which fonts can I use?', 'The fonts installed on your own device from the list, such as Arial, Times New Roman, Georgia, Courier New and Impact. If a font is missing on your device, a similar one is used.'],
+      ['Does it reduce picture quality?', 'PNG keeps the full quality. JPG makes a smaller file with a little loss.']
+    ]
   }
 ];
