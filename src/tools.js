@@ -1584,5 +1584,118 @@ module.exports = [
         ['Is my photo uploaded?', 'No. Everything is drawn in your browser and your photo never leaves your device.']
       ],
       icon: '<circle cx="12" cy="12" r="9.5"/><circle cx="12" cy="10" r="3"/><path d="M6.5 18.5a6.5 6.5 0 0 1 11 0"/>'
+  },
+  {
+      slug: 'graphing-calculator', cat: 'Study tools', name: 'Graphing Calculator',
+      title: 'Graphing Calculator - Plot Functions Online Free',
+      desc: 'Plot up to 6 functions, zoom and pan, trace values, find roots and intersections, and download the graph as PNG. Works on phones. Free and private.',
+      card: 'Plot functions, find roots and intersections.',
+      intro: 'Type functions of x to draw them on one grid. Drag, zoom or pinch to explore, tap to read values, and find roots and intersections in one click.',
+      steps: ['Type a function such as x^2 - 3 or sin(x) in the y₁ box.', 'Add up to six functions; drag to move and scroll, pinch or use the buttons to zoom.', 'Hover or tap the graph to read values, or press Find roots & intersections.', 'Press Download PNG to save the graph.'],
+      faq: [
+        ['What can I type?', 'Use x as the variable with + − * / and ^, brackets, pi, e, sqrt, abs, ln, log (base 10), exp, sin, cos, tan and their inverses. You can write 2x or 3(x + 1) without a times sign.'],
+        ['Are angles in degrees or radians?', 'Radians, as in all function graphing. One full sine wave is 2π, about 6.28, wide.'],
+        ['How are asymptotes handled?', 'The graph checks for jumps between points and does not join the curve across a pole or a step, so tan(x), 1/x and floor(x) draw correctly.'],
+        ['How accurate are the roots?', 'Roots and intersections in the visible area are refined to about seven significant figures. Zoom in to separate roots that are very close together.'],
+        ['Does it work on a phone?', 'Yes. Drag with one finger to move, pinch to zoom and tap to read values.'],
+        ['Is anything uploaded?', 'No. Everything is drawn in your browser.']
+      ],
+      icon: '<path d="M3 3v18h18"/><path d="M6 17c3-9 6-9 8-4s4 4 6-6"/>'
+  },
+  {
+      slug: 'equation-solver', cat: 'Study tools', name: 'Equation Solver',
+      title: 'Equation Solver - Linear, Quadratic, Cubic with Steps',
+      desc: 'Solve linear, quadratic and cubic equations and 2 or 3 simultaneous equations with step-by-step working, exact fractions and complex roots. Free.',
+      card: 'Solve equations and systems with full steps.',
+      intro: 'Type an equation such as x^2 - 5x + 6 = 0 or a system of equations and get exact answers with every step of the working shown.',
+      steps: ['Choose Type it, Linear, Quadratic, Cubic, 2 equations or 3 equations.', 'Type the equation or fill in the coefficients.', 'Read the answer and follow the step-by-step working below it.'],
+      faq: [
+        ['Does it give exact answers?', 'Yes. Fractions stay exact and square roots are simplified, for example x = −2 ± √3, with decimals shown alongside.'],
+        ['Can it find complex roots?', 'Yes. Quadratics and cubics with no real roots get complex roots in the form a + bi.'],
+        ['How does it solve cubics?', 'It first tries the rational root theorem and divides out any root it finds. Otherwise it uses Cardano\'s formula or the trigonometric method for three real roots.'],
+        ['How are simultaneous equations solved?', 'With Gaussian elimination on the augmented matrix. Each row operation is shown, and it tells you when there is no solution or infinitely many.'],
+        ['Can it solve equations with sin or e^x?', 'No, only polynomial equations up to degree 3. Use the Graphing Calculator to find roots of other functions.']
+      ],
+      icon: '<path d="M4 9h6M4 15h6M15 7l5 10M20 7l-5 10"/>'
+  },
+  {
+      slug: 'statistics-calculator', cat: 'Study tools', name: 'Statistics Calculator',
+      title: 'Statistics Calculator - Mean, Median, SD, Quartiles',
+      desc: 'Paste numbers to get mean, median, mode, quartiles, IQR, variance, standard deviation, z-scores, a frequency table and a histogram. Free and private.',
+      card: 'Mean, median, SD, quartiles and histogram.',
+      intro: 'Paste a list of numbers, or values with frequencies, to get all the descriptive statistics, a frequency table, z-scores and a histogram at once.',
+      steps: ['Paste or type your numbers, separated by commas, spaces or new lines.', 'Choose the quartile method and whether z-scores use the sample or population standard deviation.', 'Read the results, the histogram and the tables, and press Copy results if you need them.'],
+      faq: [
+        ['What is the difference between sample and population standard deviation?', 'The sample version divides by n − 1 and is used when your data is a sample of a bigger group. The population version divides by n. Both are shown.'],
+        ['Which quartile method is used?', 'You can choose. Median of halves is used in most school books and on TI calculators; linear interpolation matches Excel QUARTILE.INC. The method is stated under the results.'],
+        ['Can I enter a frequency table?', 'Yes. Choose Value, frequency and type one value and its frequency per line, such as 3, 12.'],
+        ['How are outliers found?', 'Values below Q1 − 1.5 × IQR or above Q3 + 1.5 × IQR are listed as outliers.'],
+        ['Is my data uploaded?', 'No. All calculations happen in your browser.']
+      ],
+      icon: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>'
+  },
+  {
+      slug: 'fraction-calculator', cat: 'Study tools', name: 'Fraction Calculator',
+      title: 'Fraction Calculator - Add, Subtract, Multiply, Divide',
+      desc: 'Add, subtract, multiply and divide fractions and mixed numbers with steps and LCD, simplify, and convert fractions to repeating decimals and back.',
+      card: 'Fractions and mixed numbers with working.',
+      intro: 'Work with fractions and mixed numbers, see every step including the lowest common denominator, and convert between fractions and (repeating) decimals.',
+      steps: ['Type two fractions, such as 1 1/2 and 2/3.', 'Choose +, −, × or ÷.', 'Read the simplest fraction, mixed number, decimal and percent, and follow the steps below.'],
+      faq: [
+        ['How do I type a mixed number?', 'Put a space between the whole number and the fraction, like 2 3/4. For a negative mixed number type −2 3/4.'],
+        ['How are repeating decimals shown?', 'The repeating digits are marked with a bar, and written in brackets when copied: 1/6 = 0.1(6).'],
+        ['Can it turn a repeating decimal into a fraction?', 'Yes. In Decimal to fraction type 0.(3), 0.1(6) or 0.1666... and the algebra method is shown.'],
+        ['Does it handle big numbers?', 'Yes. It uses exact whole-number arithmetic of any size, so answers never lose digits.'],
+        ['What is the LCD?', 'The lowest common denominator is the smallest number both denominators divide into. Fractions are rewritten with it before adding or subtracting.']
+      ],
+      icon: '<circle cx="12" cy="5" r="1.5"/><circle cx="12" cy="19" r="1.5"/><path d="M5 12h14"/>'
+  },
+  {
+      slug: 'matrix-calculator', cat: 'Study tools', name: 'Matrix Calculator',
+      title: 'Matrix Calculator - Determinant, Inverse, RREF Steps',
+      desc: 'Add, subtract and multiply matrices up to 6×6 and find the determinant, inverse, rank, transpose and RREF with steps, using exact fractions. Free.',
+      card: 'Determinant, inverse, RREF and products.',
+      intro: 'Enter matrices up to 6×6 to add, multiply, transpose, or find the determinant, inverse, rank and reduced row echelon form, with exact fractions and every row operation shown.',
+      steps: ['Set the size of matrix A (and B if needed) and type the entries.', 'Press an operation such as A × B, Determinant, Inverse or RREF.', 'Read the result and open Show the steps to see each row operation.'],
+      faq: [
+        ['Are answers exact?', 'Yes, when you enter whole numbers or fractions the answers are exact fractions. Decimal input gives decimal answers.'],
+        ['Why does A × B give an error?', 'Matrix multiplication needs the number of columns of A to equal the number of rows of B. The message states both sizes.'],
+        ['When does a matrix have no inverse?', 'When it is not square, or when its determinant is 0 (it is singular). The tool tells you and shows the rank.'],
+        ['What is RREF?', 'Reduced row echelon form: each pivot is 1 and is the only non-zero entry in its column. It is used to solve systems and find the rank.'],
+        ['Can I use the result again?', 'Yes. Press Use as A or Use as B, or Copy result to paste into a spreadsheet.']
+      ],
+      icon: '<path d="M7 4H4v16h3M17 4h3v16h-3"/><path d="M9 9h.01M15 9h.01M9 15h.01M15 15h.01"/>'
+  },
+  {
+      slug: 'number-base-converter', cat: 'Study tools', name: 'Number Base Converter',
+      title: 'Number Base Converter - Binary, Hex, Octal, Decimal',
+      desc: 'Convert numbers between binary, octal, decimal, hex and any base 2-36, with fractions, negative numbers, two\'s complement and step-by-step working.',
+      card: 'Binary, hex, octal and any base, with steps.',
+      intro: 'Convert any number between binary, octal, decimal, hexadecimal and bases 2 to 36, including big numbers, negatives and fractions, with two\'s complement and the full working.',
+      steps: ['Type the number and choose the base it is written in.', 'Read binary, octal, decimal, hex and your chosen base at once.', 'Check the two\'s complement table and the step-by-step working below.'],
+      faq: [
+        ['Can it convert fractions?', 'Yes. The fractional part is converted exactly; repeating digits are shown in brackets, and very long results are cut at the number of digits you choose, with a note.'],
+        ['How are negative numbers handled?', 'With a minus sign in every base, plus a two\'s complement table for 8, 16, 32 and 64 bits.'],
+        ['Can I decode a two\'s complement pattern?', 'Yes. Set Read input as two\'s complement to the bit width, then type a pattern such as 11111111 or FF.'],
+        ['Is there a size limit?', 'Numbers with thousands of digits are converted exactly using big integers.'],
+        ['Does it understand 0x and 0b?', 'Yes. The prefixes 0x, 0b and 0o set the base automatically.']
+      ],
+      icon: '<path d="M5 4v6M3 4h2M8 4h3v6H8zM13 14h3v6h-3zM18 14v6M16 14h2"/><path d="M4 17h5M7 15l2 2-2 2"/>'
+  },
+  {
+      slug: 'periodic-table', cat: 'Study tools', name: 'Periodic Table',
+      title: 'Periodic Table of Elements with Molar Mass Calculator',
+      desc: 'Interactive periodic table of all 118 elements with atomic weights, electron configurations, categories, electronegativity and a molar mass calculator.',
+      card: 'All 118 elements plus a molar mass calculator.',
+      intro: 'Explore all 118 elements by category, click any element for its details, and calculate the molar mass of any chemical formula.',
+      steps: ['Click an element or search by name, symbol or number.', 'Read its atomic weight, electron configuration, category, state and electronegativity.', 'Type a formula such as CuSO4·5H2O to get its molar mass and element breakdown.'],
+      faq: [
+        ['Which atomic weights are used?', 'IUPAC standard atomic weights (abridged). Radioactive elements with no stable isotope show the mass number of their most stable isotope in brackets.'],
+        ['Which formulas can the molar mass calculator read?', 'Formulas with brackets, square brackets, hydrate dots and coefficients, such as Ca(OH)2, K4[Fe(CN)6] and CuSO4·5H2O.'],
+        ['Are the electron configurations correct for exceptions?', 'Yes. Known exceptions such as chromium, copper, palladium, gold and several actinides are shown correctly. Configurations from element 104 on are predicted.'],
+        ['How do I use it on a phone?', 'Swipe the table sideways inside its box, or switch to List view.'],
+        ['Does it work offline?', 'Yes. All data is built into the page.']
+      ],
+      icon: '<rect x="3" y="3" width="6" height="6" rx="1"/><rect x="15" y="3" width="6" height="6" rx="1"/><rect x="3" y="11" width="6" height="6" rx="1"/><rect x="9" y="11" width="6" height="6" rx="1"/><rect x="15" y="11" width="6" height="6" rx="1"/><path d="M6 21h12"/>'
   }
 ];

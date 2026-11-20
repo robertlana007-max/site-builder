@@ -1,0 +1,344 @@
+<style>
+.pe-bar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; align-items: center; }
+.pe-bar .btn { min-height: 40px; padding: 6px 12px; }
+.pe-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 12px; user-select: none; -webkit-user-select: none; }
+.pe-wrap { position: relative; line-height: 0; width: fit-content; max-width: 100%; margin: 0 auto; }
+.pe-wrap canvas { display: block; max-width: 100%; max-height: 65vh; }
+.pe-wrap #peOv { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; touch-action: none; cursor: move; }
+.pe-tag { position: absolute; top: 8px; inset-inline-start: 8px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 1; padding: 6px 9px; border-radius: 99px; }
+.pe-presets { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 12px; }
+.pe-presets button { flex: none; width: 76px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); padding: 3px; cursor: pointer; font: 500 12px/1.2 inherit; font-family: inherit; color: var(--ink); }
+.pe-presets button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.pe-presets canvas { width: 66px; height: 66px; display: block; border-radius: 7px; margin-bottom: 3px; }
+.pe-sec { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin-bottom: 14px; }
+.pe-sec h3 { font-size: 16px; margin: 0 0 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+.pe-sec h3 button { font: 600 13px/1 inherit; font-family: inherit; color: var(--accent); background: none; border: 0; cursor: pointer; padding: 6px; }
+.pe-adj { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.pe-adj label { display: flex; justify-content: space-between; }
+.pe-adj label span { color: var(--muted); font-weight: 500; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a photo here</b>JPG, PNG or WebP, up to about 50 megapixels. Edited on your device, never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div id="editor" hidden>
+  <div class="pe-bar">
+    <button class="btn ghost" type="button" id="undo" disabled aria-label="Undo">↶ Undo</button>
+    <button class="btn ghost" type="button" id="redo" disabled aria-label="Redo">↷ Redo</button>
+    <button class="btn ghost" type="button" id="cmp" title="Hold to see the original">◐ Hold to compare</button>
+    <button class="btn ghost" type="button" id="cropBtn" aria-pressed="false">⛶ Crop and rotate</button>
+    <button class="btn ghost" type="button" id="resetAll">Reset all</button>
+  </div>
+  <div class="pe-sec" id="cropPanel" hidden>
+    <h3>Crop and rotate</h3>
+    <div class="fields">
+      <div><label for="aspect">Crop shape</label><select id="aspect" data-nomemo><option value="free">Free</option><option value="orig">Original</option><option value="1">Square 1:1</option><option value="0.8">Portrait 4:5</option><option value="1.5">Photo 3:2</option><option value="0.6666667">Photo 2:3</option><option value="1.7777778">Wide 16:9</option><option value="0.5625">Story 9:16</option></select></div>
+      <div><label for="straight">Straighten: <span id="straightV">0</span>°</label><input type="range" id="straight" min="-45" max="45" step="0.5" value="0" data-nomemo></div>
+    </div>
+    <div class="pe-bar">
+      <button class="btn ghost" type="button" id="rotL">⟲ Rotate left</button>
+      <button class="btn ghost" type="button" id="rotR">⟳ Rotate right</button>
+      <button class="btn ghost" type="button" id="flipH">⇆ Flip</button>
+      <button class="btn ghost" type="button" id="flipV">⇅ Flip up/down</button>
+      <button class="btn ghost" type="button" id="cropReset">Reset crop</button>
+      <button class="btn" type="button" id="cropDone">Done</button>
+    </div>
+  </div>
+  <div class="pe-stage"><div class="pe-wrap" id="wrap"><canvas id="pv" aria-label="Photo preview"></canvas><canvas id="peOv" hidden aria-label="Crop box. Drag inside to move it, drag a corner to resize."></canvas><span class="pe-tag" id="tag" hidden>Original</span></div></div>
+  <p class="msg" id="info" style="margin:-4px 0 12px;text-align:center"></p>
+  <div class="pe-sec">
+    <h3>Filters</h3>
+    <div class="pe-presets" id="presets" role="group" aria-label="Filters"></div>
+    <div class="fields" id="fsRow" hidden><div><label for="fs">Filter strength: <span id="fsV">100</span>%</label><input type="range" id="fs" min="0" max="100" value="100" data-nomemo></div></div>
+  </div>
+  <div class="pe-sec">
+    <h3>Adjust <button type="button" id="resetAdj">Reset sliders</button></h3>
+    <div class="fields pe-adj" id="adj"></div>
+  </div>
+  <div class="fields">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+    <div id="qRow"><label for="q">Quality: <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download full size</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<progress id="prog" max="1" value="0" hidden style="width:100%;margin-top:10px;accent-color:var(--accent)"></progress>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  // ---------- the pixel pipeline. Self-contained so the very same code runs in the background worker. ----------
+  function PIPE(d, w, h, P) {
+    var expM = Math.pow(2, P.exp / 50), br = P.bri * 0.6, cc = P.con * 1.28, cf = (259 * (cc + 255)) / (255 * (259 - cc)), lut = new Float32Array(256), v, i;
+    for (v = 0; v < 256; v++) lut[v] = cf * (v * expM + br - 128) + 128;
+    var sh = P.sh * 0.7, hl = P.hl * 0.7, tp = P.temp * 0.35, tn = P.tint * 0.3, sat = 1 + P.sat / 100, vib = P.vib * 0.015;
+    var mono = Math.min(1, P.mono), sep = Math.min(1, P.sepia), fade = P.fade, fk = 1 - fade / 255, st = P.split, hasSt = st.some(function (x) { return x; });
+    for (i = 0; i < d.length; i += 4) {
+      var r = lut[d[i]], g = lut[d[i + 1]], b = lut[d[i + 2]];
+      var l = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255; l = l < 0 ? 0 : l > 1 ? 1 : l;
+      var il = 1 - l, add = sh * il * il + hl * l * l;
+      r += add + tp + tn * 0.33; g += add - tn; b += add - tp + tn * 0.33;
+      var L = 0.2126 * r + 0.7152 * g + 0.0722 * b, mx = r > g ? (r > b ? r : b) : (g > b ? g : b), mn = r < g ? (r < b ? r : b) : (g < b ? g : b);
+      var s = (mx - mn) / 255; s = s > 1 ? 1 : s < 0 ? 0 : s;
+      var k = sat + vib * (1 - s); if (k < 0) k = 0;
+      r = L + (r - L) * k; g = L + (g - L) * k; b = L + (b - L) * k;
+      if (mono) { r += (L - r) * mono; g += (L - g) * mono; b += (L - b) * mono; }
+      if (sep) { var sr = 0.393 * r + 0.769 * g + 0.189 * b, sg = 0.349 * r + 0.686 * g + 0.168 * b, sb = 0.272 * r + 0.534 * g + 0.131 * b; r += (sr - r) * sep; g += (sg - g) * sep; b += (sb - b) * sep; }
+      if (hasSt) { var ll = L / 255; ll = ll < 0 ? 0 : ll > 1 ? 1 : ll; var il2 = 1 - ll; r += st[0] * il2 + st[3] * ll; g += st[1] * il2 + st[4] * ll; b += st[2] * il2 + st[5] * ll; }
+      if (fade) { r = fade + r * fk; g = fade + g * fk; b = fade + b * fk; }
+      d[i] = r; d[i + 1] = g; d[i + 2] = b;
+    }
+    if (P.sharp > 0 && w > 2 && h > 2) { // unsharp convolution: centre 1 + 4a, the four neighbours -a
+      var a = P.sharp / 100 * 0.9, src = d.slice(), row = w * 4, x, y, o, c;
+      for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) {
+        o = (y * w + x) * 4;
+        for (c = 0; c < 3; c++) d[o + c] = (1 + 4 * a) * src[o + c] - a * (src[o + c - 4] + src[o + c + 4] + src[o + c - row] + src[o + c + row]);
+      }
+    }
+    if (P.vig || P.grain) {
+      var cx = w / 2, cy = h / 2, vg = P.vig / 100 * 0.8, gr = P.grain * 0.9, seed = 9187;
+      for (var yy = 0; yy < h; yy++) {
+        var dy = (yy - cy) / cy, dy2 = dy * dy;
+        for (var xx = 0; xx < w; xx++) {
+          var p = (yy * w + xx) * 4, f = 1, n = 0;
+          if (vg) { var dx = (xx - cx) / cx, t = ((dx * dx + dy2) / 2 - 0.12) / 0.88; t = t < 0 ? 0 : t > 1 ? 1 : t; t = t * t * (3 - 2 * t); f = 1 - vg * t; }
+          if (gr) { var hh = Math.imul(xx, 374761393) + Math.imul(yy, 668265263) + seed | 0; hh = Math.imul(hh ^ (hh >>> 13), 1274126177); hh ^= hh >>> 16; n = ((hh >>> 0) / 4294967296 - 0.5) * gr; }
+          d[p] = d[p] * f + n; d[p + 1] = d[p + 1] * f + n; d[p + 2] = d[p + 2] * f + n;
+        }
+      }
+    }
+  }
+
+  var ADJ = [['exp', 'Exposure'], ['bri', 'Brightness'], ['con', 'Contrast'], ['hl', 'Highlights'], ['sh', 'Shadows'], ['sat', 'Saturation'], ['vib', 'Vibrance'], ['temp', 'Warmth'], ['tint', 'Tint'], ['sharp', 'Sharpen', 0], ['vig', 'Vignette'], ['grain', 'Grain', 0]];
+  var PRESETS = [
+    ['none', 'Original', {}], ['vivid', 'Vivid', { con: 15, sat: 30, vib: 20, exp: 3 }], ['warm', 'Warm', { temp: 35, sat: 8, bri: 5 }], ['cool', 'Cool', { temp: -35, tint: -5, con: 5 }],
+    ['golden', 'Golden Hour', { temp: 45, tint: 8, hl: -15, sh: 15, sat: 10, vig: 20 }], ['faded', 'Faded', { con: -20, fade: 35, sat: -20, temp: 8 }], ['noir', 'Noir', { mono: 1, con: 45, vig: 35, sh: -15 }],
+    ['silver', 'Silver', { mono: 1, con: -5, fade: 20, hl: -10 }], ['sepia', 'Sepia', { sepia: 0.9, con: 5, fade: 12, vig: 15 }], ['teal', 'Teal & Orange', { split: [-20, 10, 30, 30, 10, -25], con: 15, sat: 10 }],
+    ['pastel', 'Pastel', { sat: -25, bri: 15, con: -15, fade: 15, tint: 5 }], ['moody', 'Moody', { exp: -10, con: 20, sat: -25, temp: -10, vig: 40, sh: -10 }],
+    ['retro', 'Retro', { temp: 25, tint: 12, fade: 28, con: -8, sat: -10, grain: 25, split: [0, 0, 25, 25, 15, -10] }], ['crisp', 'Crisp', { con: 25, sharp: 35, vib: 15, hl: -10 }],
+    ['matte', 'Matte', { fade: 30, con: -10, sh: 10, sat: -5 }], ['lush', 'Lush', { sat: 15, vib: 25, tint: -12, temp: -5, con: 10 }]
+  ];
+  var PMAP = {}; PRESETS.forEach(function (p) { PMAP[p[0]] = p[2]; });
+
+  var img = null, file = null, st = fresh(), hist = [], fut = [], cropMode = false;
+  function fresh() { var a = {}; ADJ.forEach(function (x) { a[x[0]] = 0; }); return { adj: a, preset: 'none', fs: 100, r: 0, fh: false, fv: false, ang: 0, crop: { x: 0, y: 0, w: 1, h: 1 } }; }
+  function params(s) { // the user's sliders plus the filter, scaled by its strength
+    var f = PMAP[s.preset] || {}, k = s.fs / 100, P = { mono: 0, sepia: 0, fade: 0, split: [0, 0, 0, 0, 0, 0] };
+    ADJ.forEach(function (x) { P[x[0]] = s.adj[x[0]] + (f[x[0]] || 0) * k; });
+    P.mono = (f.mono || 0) * k; P.sepia = (f.sepia || 0) * k; P.fade = (f.fade || 0) * k;
+    if (f.split) P.split = f.split.map(function (v) { return v * k; });
+    P.sharp = Math.max(0, P.sharp); P.grain = Math.max(0, P.grain);
+    return P;
+  }
+  function say(c, t) { PT.say(c, t); }
+
+  // ---------- geometry: quarter turns, flips, straighten (zoomed so no empty corners), crop ----------
+  function frame(s, scale) { var w = img.naturalWidth, h = img.naturalHeight, odd = s.r % 2; return { w: (odd ? h : w) * scale, h: (odd ? w : h) * scale }; }
+  function geom(s, scale, withCrop) {
+    var F = frame(s, scale), cr = withCrop ? s.crop : { x: 0, y: 0, w: 1, h: 1 };
+    var W = Math.max(1, Math.round(F.w * cr.w)), H = Math.max(1, Math.round(F.h * cr.h)), c = document.createElement('canvas'); c.width = W; c.height = H;
+    var x = c.getContext('2d'), t = Math.abs(s.ang) * Math.PI / 180, z = Math.max(Math.cos(t) + F.h / F.w * Math.sin(t), F.w / F.h * Math.sin(t) + Math.cos(t));
+    x.imageSmoothingQuality = 'high';
+    x.translate(-cr.x * F.w + F.w / 2, -cr.y * F.h + F.h / 2); x.rotate(s.ang * Math.PI / 180); x.scale(z, z); x.rotate(s.r * Math.PI / 2);
+    x.scale(s.fh ? -1 : 1, s.fv ? -1 : 1);
+    var iw = img.naturalWidth * scale, ih = img.naturalHeight * scale;
+    x.drawImage(img, -iw / 2, -ih / 2, iw, ih);
+    return c;
+  }
+
+  // ---------- background worker (falls back to the main thread if workers are blocked) ----------
+  var worker = null, wid = 0, waiting = {};
+  try {
+    worker = new Worker(URL.createObjectURL(new Blob(['var PIPE = ' + PIPE.toString() + ';\nonmessage = function (e) { var m = e.data, d = new Uint8ClampedArray(m.buf); PIPE(d, m.w, m.h, m.P); postMessage({ id: m.id, buf: m.buf }, [m.buf]); };'], { type: 'text/javascript' })));
+    worker.onmessage = function (e) { var cb = waiting[e.data.id]; delete waiting[e.data.id]; if (cb) cb(new Uint8ClampedArray(e.data.buf)); };
+    worker.onerror = function () { worker = null; Object.keys(waiting).forEach(function (k) { var cb = waiting[k]; delete waiting[k]; cb(null); }); };
+  } catch (e) { worker = null; }
+  function processData(id, w, h, P, cb) { // cb(Uint8ClampedArray with the result)
+    if (worker) { var n = ++wid; waiting[n] = function (out) { if (out) cb(out); else { PIPE(id.data, w, h, P); cb(id.data); } }; worker.postMessage({ id: n, buf: id.data.buffer, w: w, h: h, P: P }, [id.data.buffer]); }
+    else setTimeout(function () { PIPE(id.data, w, h, P); cb(id.data); }, 0);
+  }
+
+  // ---------- preview at screen size ----------
+  var pv = $('pv'), ov = $('peOv'), src = null, srcKey = '', running = false, again = false, showOrig = false;
+  function previewScale(s) { var F = frame(s, 1), cr = cropMode ? { w: 1, h: 1 } : s.crop; return Math.min(1, Math.min(1600, 1000 * Math.min(2, window.devicePixelRatio || 1)) / Math.max(F.w * cr.w, F.h * cr.h)); }
+  function refresh() {
+    if (!img) return;
+    if (running) { again = true; return; }
+    var key = JSON.stringify([st.r, st.fh, st.fv, st.ang, cropMode ? 0 : st.crop]);
+    if (key !== srcKey) { var g = geom(st, previewScale(st), !cropMode); src = g.getContext('2d').getImageData(0, 0, g.width, g.height); srcKey = key; }
+    if (showOrig) { pv.width = src.width; pv.height = src.height; pv.getContext('2d').putImageData(src, 0, 0); overlay(); return; }
+    running = true;
+    var copy = new ImageData(new Uint8ClampedArray(src.data), src.width, src.height), w = src.width, h = src.height;
+    processData(copy, w, h, params(st), function (out) {
+      running = false;
+      if (!showOrig) { pv.width = w; pv.height = h; pv.getContext('2d').putImageData(new ImageData(out, w, h), 0, 0); overlay(); }
+      if (again) { again = false; refresh(); }
+    });
+    var F = frame(st, 1);
+    $('info').textContent = cropMode ? 'Drag the box to crop.' : 'Full size: ' + Math.round(F.w * st.crop.w) + ' × ' + Math.round(F.h * st.crop.h) + ' px';
+  }
+
+  // ---------- crop box on its own overlay ----------
+  function overlay() {
+    ov.hidden = !cropMode; if (!cropMode) return;
+    ov.width = pv.width; ov.height = pv.height;
+    var c = ov.getContext('2d'), W = ov.width, H = ov.height, b = st.crop, u = W / (ov.getBoundingClientRect().width || W);
+    var x = b.x * W, y = b.y * H, w = b.w * W, h = b.h * H;
+    c.fillStyle = 'rgba(0,0,0,.5)'; c.fillRect(0, 0, W, H); c.clearRect(x, y, w, h);
+    c.strokeStyle = 'rgba(255,255,255,.5)'; c.lineWidth = u;
+    for (var i = 1; i < 3; i++) { c.beginPath(); c.moveTo(x + w * i / 3, y); c.lineTo(x + w * i / 3, y + h); c.moveTo(x, y + h * i / 3); c.lineTo(x + w, y + h * i / 3); c.stroke(); }
+    c.strokeStyle = '#fff'; c.lineWidth = 2 * u; c.strokeRect(x, y, w, h);
+    [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(function (p) { c.fillStyle = '#fff'; c.fillRect(p[0] - 7 * u, p[1] - 7 * u, 14 * u, 14 * u); c.strokeStyle = '#2563eb'; c.strokeRect(p[0] - 7 * u, p[1] - 7 * u, 14 * u, 14 * u); });
+  }
+  function ratio() { var v = $('aspect').value; if (v === 'free') return 0; if (v === 'orig') { return img.naturalWidth / img.naturalHeight; } return +v; }
+  function fitAspect(b, keepCentre) { // make the box match the chosen shape, as large as possible inside the frame
+    var r = ratio(); if (!r) return b;
+    var F = frame(st, 1), rn = r * F.h / F.w, w = b.w, h = w / rn;
+    if (h > 1) { h = 1; w = rn; } if (w > 1) { w = 1; h = 1 / rn; }
+    var cx = keepCentre ? b.x + b.w / 2 : 0.5, cy = keepCentre ? b.y + b.h / 2 : 0.5;
+    return { x: Math.min(1 - w, Math.max(0, cx - w / 2)), y: Math.min(1 - h, Math.max(0, cy - h / 2)), w: w, h: h };
+  }
+  var cd = null;
+  function ovPt(e) { var r = ov.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width, y: (e.clientY - r.top) / r.height, u: 1 / r.width }; }
+  ov.addEventListener('pointerdown', function (e) {
+    e.preventDefault(); ov.setPointerCapture(e.pointerId);
+    var p = ovPt(e), b = st.crop, cs = [[b.x, b.y], [b.x + b.w, b.y], [b.x, b.y + b.h], [b.x + b.w, b.y + b.h]], tol = 18 * p.u, tolY = tol * ov.getBoundingClientRect().width / ov.getBoundingClientRect().height;
+    for (var i = 0; i < 4; i++) if (Math.abs(p.x - cs[i][0]) < tol && Math.abs(p.y - cs[i][1]) < tolY) { cd = { kind: 'size', ax: cs[3 - i][0], ay: cs[3 - i][1] }; return; }
+    if (p.x > b.x && p.x < b.x + b.w && p.y > b.y && p.y < b.y + b.h) cd = { kind: 'move', sx: p.x, sy: p.y, o: { x: b.x, y: b.y } };
+    else cd = { kind: 'size', ax: Math.min(1, Math.max(0, p.x)), ay: Math.min(1, Math.max(0, p.y)) };
+  });
+  ov.addEventListener('pointermove', function (e) {
+    if (!cd) return;
+    var p = ovPt(e), b = st.crop, x = Math.min(1, Math.max(0, p.x)), y = Math.min(1, Math.max(0, p.y));
+    if (cd.kind === 'move') { b.x = Math.min(1 - b.w, Math.max(0, cd.o.x + p.x - cd.sx)); b.y = Math.min(1 - b.h, Math.max(0, cd.o.y + p.y - cd.sy)); }
+    else {
+      var w = Math.max(0.02, Math.abs(x - cd.ax)), h = Math.max(0.02, Math.abs(y - cd.ay)), r = ratio();
+      if (r) { var F = frame(st, 1), rn = r * F.h / F.w; if (w / h > rn) w = h * rn; else h = w / rn; }
+      var nx = x < cd.ax ? cd.ax - w : cd.ax, ny = y < cd.ay ? cd.ay - h : cd.ay;
+      if (nx < 0 || ny < 0 || nx + w > 1.0001 || ny + h > 1.0001) return; // stay inside the photo
+      b.x = nx; b.y = ny; b.w = w; b.h = h;
+    }
+    overlay();
+  });
+  function cropEnd() { if (cd) { cd = null; commit(); } }
+  ov.addEventListener('pointerup', cropEnd); ov.addEventListener('pointercancel', cropEnd);
+
+  // ---------- undo / redo ----------
+  var last = '';
+  function commit() { var s = JSON.stringify(st); if (s === last) return; if (last) hist.push(last); if (hist.length > 60) hist.shift(); last = s; fut = []; ui(); }
+  function restore(s) { st = JSON.parse(s); last = s; ui(); refresh(); }
+  $('undo').addEventListener('click', function () { if (!hist.length) return; fut.push(last); restore(hist.pop()); });
+  $('redo').addEventListener('click', function () { if (!fut.length) return; hist.push(last); restore(fut.pop()); });
+  document.addEventListener('keydown', function (e) {
+    if (!img || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== 'range') return;
+    var k = e.key.toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && k === 'z') { e.preventDefault(); $(e.shiftKey ? 'redo' : 'undo').click(); }
+    else if ((e.ctrlKey || e.metaKey) && k === 'y') { e.preventDefault(); $('redo').click(); }
+  });
+
+  // ---------- controls ----------
+  ADJ.forEach(function (a) {
+    var d = document.createElement('div'), min = a[2] === 0 ? 0 : -100;
+    d.innerHTML = '<label for="a_' + a[0] + '">' + a[1] + ' <span id="a_' + a[0] + 'V">0</span></label><input type="range" id="a_' + a[0] + '" min="' + min + '" max="100" value="0" data-nomemo>';
+    $('adj').appendChild(d);
+    var el = d.querySelector('input');
+    el.addEventListener('input', function () { st.adj[a[0]] = +el.value; $('a_' + a[0] + 'V').textContent = el.value; refresh(); });
+    el.addEventListener('change', commit);
+    el.addEventListener('dblclick', function () { el.value = 0; st.adj[a[0]] = 0; ui(); refresh(); commit(); }); // double-click a slider to reset it
+  });
+  function ui() {
+    ADJ.forEach(function (a) { var el = $('a_' + a[0]); el.value = st.adj[a[0]]; $('a_' + a[0] + 'V').textContent = st.adj[a[0]]; });
+    Array.prototype.forEach.call($('presets').children, function (b) { b.setAttribute('aria-pressed', b.dataset.p === st.preset); });
+    $('fsRow').hidden = st.preset === 'none'; $('fs').value = st.fs; $('fsV').textContent = st.fs;
+    $('straight').value = st.ang; $('straightV').textContent = st.ang;
+    $('undo').disabled = !hist.length; $('redo').disabled = !fut.length;
+    $('qRow').hidden = $('fmt').value === 'image/png'; $('qv').textContent = $('q').value;
+    $('cropBtn').setAttribute('aria-pressed', cropMode); $('cropPanel').hidden = !cropMode;
+    $('go').disabled = !img || busy;
+    $('dl').hidden = true;
+  }
+  $('fs').addEventListener('input', function () { st.fs = +$('fs').value; $('fsV').textContent = st.fs; refresh(); });
+  $('fs').addEventListener('change', commit);
+  $('resetAdj').addEventListener('click', function () { st.adj = fresh().adj; ui(); refresh(); commit(); });
+  $('resetAll').addEventListener('click', function () { st = fresh(); cropMode = false; $('aspect').value = 'free'; ui(); refresh(); commit(); });
+  ['fmt', 'q'].forEach(function (id) { $(id).addEventListener('input', ui); $(id).addEventListener('change', ui); });
+
+  // crop and rotate
+  function setCrop(on) { cropMode = on; srcKey = ''; ui(); refresh(); }
+  $('cropBtn').addEventListener('click', function () { setCrop(!cropMode); });
+  $('cropDone').addEventListener('click', function () { setCrop(false); commit(); });
+  function turn(dir) { st.r = (st.r + dir + 4) % 4; st.crop = fitAspect({ x: 0, y: 0, w: 1, h: 1 }); srcKey = ''; refresh(); commit(); }
+  $('rotL').addEventListener('click', function () { turn(-1); });
+  $('rotR').addEventListener('click', function () { turn(1); });
+  $('flipH').addEventListener('click', function () { if (st.r % 2) st.fv = !st.fv; else st.fh = !st.fh; refresh(); commit(); }); // flips act on what you see
+  $('flipV').addEventListener('click', function () { if (st.r % 2) st.fh = !st.fh; else st.fv = !st.fv; refresh(); commit(); });
+  $('cropReset').addEventListener('click', function () { st.crop = fitAspect({ x: 0, y: 0, w: 1, h: 1 }); st.ang = 0; ui(); refresh(); commit(); });
+  $('straight').addEventListener('input', function () { st.ang = +$('straight').value; $('straightV').textContent = st.ang; refresh(); });
+  $('straight').addEventListener('change', commit);
+  $('aspect').addEventListener('change', function () { st.crop = fitAspect(st.crop, true); overlay(); refresh(); commit(); });
+
+  // before / after: hold the button (mouse, finger or Space key)
+  function orig(on) { if (!img || showOrig === on) return; showOrig = on; $('tag').hidden = !on; if (on) running = false; refresh(); }
+  $('cmp').addEventListener('pointerdown', function (e) { e.preventDefault(); orig(true); });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { $('cmp').addEventListener(ev, function () { orig(false); }); });
+  $('cmp').addEventListener('keydown', function (e) { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); orig(true); } });
+  $('cmp').addEventListener('keyup', function () { orig(false); });
+  $('cmp').addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // filter thumbnails, drawn with each filter on a small copy of your photo
+  function thumbs() {
+    var box = $('presets'); box.innerHTML = '';
+    var t = document.createElement('canvas'), n = 132; t.width = t.height = n;
+    var x = t.getContext('2d'), s = Math.max(n / img.naturalWidth, n / img.naturalHeight);
+    x.drawImage(img, (n - img.naturalWidth * s) / 2, (n - img.naturalHeight * s) / 2, img.naturalWidth * s, img.naturalHeight * s);
+    var base = x.getImageData(0, 0, n, n);
+    PRESETS.forEach(function (p) {
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.p = p[0];
+      var c = document.createElement('canvas'); c.width = c.height = n;
+      var id = new ImageData(new Uint8ClampedArray(base.data), n, n), s2 = fresh(); s2.preset = p[0];
+      PIPE(id.data, n, n, params(s2)); c.getContext('2d').putImageData(id, 0, 0);
+      b.appendChild(c); b.appendChild(document.createTextNode(p[1]));
+      b.addEventListener('click', function () { st.preset = p[0]; if (p[0] !== 'none' && st.fs === 0) st.fs = 100; ui(); refresh(); commit(); });
+      box.appendChild(b);
+    });
+  }
+
+  // ---------- loading ----------
+  PT.drop(false, function (f) {
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', 'Please choose a photo (JPG, PNG or WebP).'); return; }
+    say('', 'Opening…');
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read that photo. It may be damaged, or in a format your browser cannot open (like HEIC or RAW). Convert it to JPG first.'); return; }
+      if (im.naturalWidth * im.naturalHeight > 60e6) { say('bad', 'That photo is ' + Math.round(im.naturalWidth * im.naturalHeight / 1e6) + ' megapixels, more than your browser can safely edit. Resize it below 50 megapixels first.'); return; }
+      img = im; file = f; st = fresh(); hist = []; fut = []; last = ''; cropMode = false; srcKey = ''; $('aspect').value = 'free';
+      $('editor').hidden = false; $('drop').querySelector('b').textContent = 'Open a different photo';
+      thumbs(); commit(); ui(); refresh();
+      say('', im.naturalWidth + ' × ' + im.naturalHeight + ' px. Try a filter or the sliders. Your original file is never changed.');
+    });
+  });
+
+  // ---------- export at full resolution, processed in the background worker ----------
+  var busy = false;
+  $('go').addEventListener('click', function () {
+    if (!img || busy) return;
+    if (cropMode) setCrop(false);
+    busy = true; ui(); $('prog').hidden = false; $('prog').removeAttribute('value'); say('', 'Processing the full-size photo…');
+    setTimeout(function () {
+      var c, x, id;
+      try { c = geom(st, 1, true); x = c.getContext('2d'); id = x.getImageData(0, 0, c.width, c.height); }
+      catch (e) { busy = false; $('prog').hidden = true; ui(); say('bad', 'This photo is too large for your browser\'s memory. Try a smaller copy.'); return; }
+      var W = c.width, H = c.height, t0 = Date.now();
+      processData(id, W, H, params(st), function (out) {
+        x.putImageData(new ImageData(out, W, H), 0, 0);
+        var type = $('fmt').value;
+        if (type === 'image/jpeg') { x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
+        PT.blob(c, type, $('q').value / 100).then(function (b) {
+          c.width = c.height = 0; busy = false; $('prog').hidden = true; ui();
+          if (!b) { say('bad', 'Your browser could not save in this format. Try JPG.'); return; }
+          var ext = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[b.type] || 'png', name = PT.base(file.name) + '-edited.' + ext;
+          PT.done(b, name, b.type, 'Saved ' + name + ' at ' + W + ' × ' + H + ' px in ' + ((Date.now() - t0) / 1000).toFixed(1) + ' s');
+          $('dl').textContent = 'Download ' + name; $('dl').click();
+        });
+      });
+    }, 30);
+  });
+  window.addEventListener('resize', function () { if (cropMode) overlay(); });
+})();
+</script>
