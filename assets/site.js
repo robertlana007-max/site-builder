@@ -76,14 +76,14 @@
   };
 
   // ---------- small delights ----------
-  var COLORS = ['#22d3ee', '#8b7bff', '#f06bd9', '#4ff0b0', '#ffd166'];
+  var COLORS = ['#ef476f', '#ffd23f', '#06d6a0', '#4cc9f0', '#ff8c42'];
   window.burst = function (el) {
     if (calm || !el || !el.animate) return;
     var r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
     for (var i = 0; i < 14; i++) {
       var b = document.createElement('i'), a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
       b.className = 'bit'; b.style.left = x + 'px'; b.style.top = y + 'px';
-      b.style.background = COLORS[i % COLORS.length]; b.style.boxShadow = '0 0 10px ' + COLORS[i % COLORS.length];
+      b.style.background = COLORS[i % COLORS.length];
       document.body.appendChild(b);
       b.animate([{ transform: 'translate(-50%,-50%) scale(1)', opacity: 1 },
         { transform: 'translate(' + (Math.cos(a) * d - 4) + 'px,' + (Math.sin(a) * d + 30) + 'px) rotate(' + (Math.random() * 540 - 270) + 'deg) scale(.4)', opacity: 0 }],
@@ -148,6 +148,7 @@
       var a = fill($('minePins'), o.favs), b = fill($('mineRecent'), o.recent.slice(0, 8));
       $('minePinsBox').hidden = !a; $('mineRecentBox').hidden = !b; mine.hidden = !(a + b);
     }
+    fill($('taskPins'), o.favs.slice(0, 8)); // pinned tools sit on the task bar of every page
     var side = $('sidePins');
     if (side) { var k = fill($('sidePinsList'), o.favs.filter(function (s) { return s !== SLUG; })); side.hidden = !k; }
   }
@@ -194,7 +195,7 @@
     // theme
     var themeBtn = $('themeBtn');
     if (themeBtn) themeBtn.addEventListener('click', function () {
-      var next = root.getAttribute('data-theme') === 'light' ? 'dark' : 'light';
+      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
       root.setAttribute('data-theme', next);
       try { localStorage.setItem('theme', next); } catch (e) {}
     });
@@ -205,6 +206,7 @@
       var renderPal = finder(palInput, $('palResults'));
       var open = function () { if (pal.open) return; palInput.value = ''; pal.showModal(); renderPal(); palInput.focus(); };
       $('palBtn').addEventListener('click', open);
+      if ($('startBtn')) $('startBtn').addEventListener('click', open);
       document.addEventListener('keydown', function (e) {
         var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || '')) || e.target.isContentEditable;
         if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); open(); }
@@ -224,16 +226,16 @@
         var cat = p.dataset.cat;
         document.querySelectorAll('.pill').forEach(function (o) { o.classList.toggle('on', o === p); o.setAttribute('aria-pressed', o === p); });
         document.querySelectorAll('.cat').forEach(function (s) { s.hidden = !!cat && s.dataset.cat !== cat; });
-        document.querySelectorAll('.cat:not([hidden]) .reveal').forEach(function (el) { el.classList.add('in'); });
+        document.querySelectorAll('.cat:not([hidden])').forEach(function (el) { el.classList.add('in'); });
       });
     });
 
     // stars and pin button
     document.querySelectorAll('.star').forEach(function (b) {
-      b.addEventListener('click', function () { var on = Store.toggleFav(b.dataset.slug); if (on) burst(b); toast(on ? 'Pinned to My tools' : 'Removed from My tools'); });
+      b.addEventListener('click', function () { var on = Store.toggleFav(b.dataset.slug); if (on) burst(b); toast(on ? 'Pinned to your taskbar' : 'Removed from your taskbar'); });
     });
     var pin = $('pinBtn');
-    if (pin) pin.addEventListener('click', function () { var on = Store.toggleFav(SLUG); if (on) burst(pin); toast(on ? 'Pinned. Find it under My tools on the home page.' : 'Removed from My tools'); });
+    if (pin) pin.addEventListener('click', function () { var on = Store.toggleFav(SLUG); if (on) burst(pin); toast(on ? 'Pinned to your taskbar' : 'Removed from your taskbar'); });
     var share = $('shareBtn');
     if (share) share.addEventListener('click', function () {
       var url = (document.querySelector('link[rel=canonical]') || {}).href || location.href;
@@ -326,18 +328,36 @@
       document.head.appendChild(gs);
     }
 
-    // ---------- pointer glow and 3D tilt on cards ----------
-    if (fine && !calm) {
-      var tilted = null;
-      document.addEventListener('pointermove', function (e) {
-        var el = e.target.closest ? e.target.closest('.tool-card,.live,.feature,.who') : null;
-        if (tilted && tilted !== el) { tilted.style.removeProperty('--rx'); tilted.style.removeProperty('--ry'); }
-        tilted = el;
-        if (!el) return;
-        var r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-        el.style.setProperty('--mx', (x * 100).toFixed(1) + '%'); el.style.setProperty('--my', (y * 100).toFixed(1) + '%');
-        if (el.matches('.tool-card,.live')) { el.style.setProperty('--ry', ((x - .5) * 10).toFixed(2) + 'deg'); el.style.setProperty('--rx', ((.5 - y) * 10).toFixed(2) + 'deg'); }
-      }, { passive: true });
+    // ---------- desktop behaviour: clock, draggable windows, boot screen ----------
+    var clocks = document.querySelectorAll('.clock');
+    var tick = function () { var d = new Date(), t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); clocks.forEach(function (c) { c.textContent = t; }); };
+    tick(); setInterval(tick, 15000);
+
+    if (fine) { // drag a window by its title bar; double-click the bar to put it back
+      var held = null;
+      document.addEventListener('pointerdown', function (e) {
+        var bar = e.target.closest ? e.target.closest('.win > .tb') : null;
+        if (!bar || e.button !== 0 || e.target.closest('button, a') || innerWidth < 961) return;
+        var w = bar.parentNode, at = (w.style.translate || '0px 0px').split(' ');
+        held = { w: w, x: e.clientX - parseFloat(at[0]), y: e.clientY - parseFloat(at[1] || 0) };
+        w.classList.add('dragging'); e.preventDefault();
+      });
+      document.addEventListener('pointermove', function (e) { if (held) held.w.style.translate = (e.clientX - held.x) + 'px ' + (e.clientY - held.y) + 'px'; });
+      document.addEventListener('pointerup', function () { if (held) { held.w.classList.remove('dragging'); held = null; } });
+      document.addEventListener('dblclick', function (e) { var bar = e.target.closest ? e.target.closest('.win > .tb') : null; if (bar && !e.target.closest('button, a')) bar.parentNode.style.translate = ''; });
+    }
+
+    // a one-second boot screen, once per browser session, on the home page only
+    var seenBoot = true;
+    try { seenBoot = !!sessionStorage.getItem('boot'); sessionStorage.setItem('boot', '1'); } catch (e) {}
+    if (!seenBoot && !calm && !SLUG && $('toolSearch')) {
+      var boot = document.createElement('div');
+      boot.id = 'boot'; boot.setAttribute('aria-hidden', 'true');
+      boot.innerHTML = '<b>GetToolNest OS</b><span>loading ' + (window.TOOLS || []).length + ' tools…</span><u><i></i></u><span>click to skip</span>';
+      var done = function () { boot.style.opacity = '0'; setTimeout(function () { boot.remove(); }, 260); };
+      boot.addEventListener('click', done);
+      document.body.appendChild(boot);
+      setTimeout(done, 1150);
     }
 
     // ---------- numbers that count up when they scroll into view ----------
@@ -350,37 +370,6 @@
       };
       if (!window.IntersectionObserver) counts.forEach(run);
       else { var co = new IntersectionObserver(function (en) { en.forEach(function (x) { if (x.isIntersecting) { run(x.target); co.unobserve(x.target); } }); }); counts.forEach(function (el) { co.observe(el); }); }
-    }
-
-    // ---------- star field behind the hero ----------
-    var cv = $('stars');
-    if (cv && cv.getContext) {
-      var ctx = cv.getContext('2d'), pts = [], W = 0, H = 0, seen = true, raf = 0;
-      var size = function () {
-        var r = cv.getBoundingClientRect(), dpr = Math.min(2, window.devicePixelRatio || 1);
-        W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-        var n = Math.round(Math.min(90, W * H / 14000)); pts = [];
-        for (var i = 0; i < n; i++) pts.push({ x: Math.random() * W, y: Math.random() * H, vx: (Math.random() - .5) * .25, vy: (Math.random() - .5) * .25, r: Math.random() * 1.4 + .4 });
-      };
-      var draw = function () {
-        ctx.clearRect(0, 0, W, H);
-        var light = root.getAttribute('data-theme') === 'light', dot = light ? '80,90,200' : '170,200,255';
-        for (var i = 0; i < pts.length; i++) {
-          var p = pts[i]; p.x += p.vx; p.y += p.vy;
-          if (p.x < 0 || p.x > W) p.vx *= -1; if (p.y < 0 || p.y > H) p.vy *= -1;
-          ctx.fillStyle = 'rgba(' + dot + ',.8)'; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 6.3); ctx.fill();
-          for (var j = i + 1; j < pts.length; j++) {
-            var q = pts[j], dx = p.x - q.x, dy = p.y - q.y, d2 = dx * dx + dy * dy;
-            if (d2 < 13000) { ctx.strokeStyle = 'rgba(' + (light ? '90,80,220' : '110,170,255') + ',' + (.22 * (1 - d2 / 13000)).toFixed(3) + ')'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(p.x, p.y); ctx.lineTo(q.x, q.y); ctx.stroke(); }
-          }
-        }
-        if (!calm && seen && !document.hidden) raf = requestAnimationFrame(draw); else raf = 0;
-      };
-      var kick = function () { if (!raf) raf = requestAnimationFrame(draw); };
-      size(); draw();
-      window.addEventListener('resize', function () { size(); kick(); });
-      document.addEventListener('visibilitychange', kick);
-      if (window.IntersectionObserver) new IntersectionObserver(function (en) { seen = en[0].isIntersecting; if (seen) kick(); }).observe(cv);
     }
 
     // ---------- home page: the typed line and the three script-driven live tiles ----------
