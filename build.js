@@ -318,10 +318,7 @@ write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
   desc: `${tools.length} free online tools: merge PDF, edit PDF text, compress PDF, image compressor, mortgage calculator and more. No sign-up needed. Files never leave your device.`,
-  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, alternateName: 'GetToolNest free online tools', url: SITE + '/', potentialAction: { '@type': 'SearchAction', target: SITE + '/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) + jsonLd({ '@context': 'https://schema.org', '@type': 'Organization', name: cfg.siteName, url: SITE + '/', logo: SITE + '/assets/icon-512.png', email: cfg.contactEmail || undefined }) + jsonLd({
-    '@context': 'https://schema.org', '@type': 'FAQPage',
-    mainEntity: homeFaq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } }))
-  }),
+  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, alternateName: 'GetToolNest free online tools', url: SITE + '/', potentialAction: { '@type': 'SearchAction', target: SITE + '/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) + jsonLd({ '@context': 'https://schema.org', '@type': 'Organization', name: cfg.siteName, url: SITE + '/', logo: SITE + '/assets/icon-512.png', email: cfg.contactEmail || undefined }) ,
   body: `<section class="hero hero2"><div class="hero-copy">
   <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
   <h1>Use any tool you need, <span class="hl">completely free</span></h1>
@@ -365,47 +362,11 @@ write('index.html', layout({
   <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
   <div id="mineRecentBox"><h3>Recently used</h3><div class="chiprow" id="mineRecent"></div></div>
 </section>
-<section class="intro">
-  <div class="intro-text">
-    <h2 class="section-title">What is ${esc(cfg.siteName)}?</h2>
-    <p>${esc(cfg.siteName)} is one place for the small jobs that come up every day: a PDF that is too big to email, a photo that needs to be smaller, a loan you want to understand, a password you need right now, or notes you want to keep. Instead of searching for a different website each time, you will find ${tools.length} tools here, all made to look and work the same way.</p>
-    <p>Everything runs <b>inside your own browser</b>. Your files are not uploaded to a server, so they stay private and the work is quick even on a slow connection. There is no sign-up, no watermark and no daily limit. You can sign in if you want your pinned tools and settings on every device, and you can install the site as an app on your phone or computer.</p>
-  </div>
-  <ul class="stats">
-    <li><b>${tools.length}</b><span>free tools</span></li>
-    <li><b>0</b><span>files uploaded</span></li>
-    <li><b>${LANGS.length}</b><span>languages</span></li>
-    <li><b>Free</b><span>no sign-up, no limits</span></li>
-  </ul>
-</section>
-<section class="block explore">
-  <h2 class="section-title">What you can do here</h2>
-  <p class="section-sub">Eight groups of tools. Pick a group to jump to its tools, or open one of the examples straight away.</p>
-  <div class="explore-grid">${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<div class="ex" style="--c:${COLOR[c]}"><a class="ex-head" href="#${catId(c)}">${tile(list[0])}<span><b>${esc(c)}</b><small>${list.length} tools</small></span></a><h3>${esc(CATINFO[c][0])}</h3><p>${esc(CATINFO[c][1])}</p><div class="ex-links">${list.slice(0, 3).map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div></div>`; }).join('')}</div>
-</section>
 <h2 class="section-title all-title">All tools</h2>
 <div class="pills" id="tools" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}
-${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" id="${catId(c)}" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><p class="cat-desc">${esc(CATINFO[c][1])}</p><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
+${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" id="${catId(c)}" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
 ${ad(cfg.adSlotBottom)}
-<section class="block">
-  <h2 class="section-title">How it works</h2>
-  <p class="section-sub">If you can drag a file or type a number, you already know how to use this site.</p>
-  <ol class="how">
-    <li><h3>Pick a tool</h3><p>Search for it or choose it from the list. There is no sign-up wall.</p></li>
-    <li><h3>Add your file or numbers</h3><p>The work happens on your own device, so nothing waits in an upload queue.</p></li>
-    <li><h3>Get the result</h3><p>Download or copy it. When you come back, your numbers are where you left them.</p></li>
-  </ol>
-</section>
-<section class="block">
-  <h2 class="section-title">Who uses it</h2>
-  <div class="whos">
-    ${who('Students', 'Assignments and forms that only accept a small PDF.', ['merge-pdf', 'compress-pdf', 'word-counter', 'gpa-calculator'])}
-    ${who('Home and money', 'Know the real cost before you sign.', ['mortgage-calculator', 'loan-calculator', 'credit-card-payoff-calculator', 'salary-calculator'])}
-    ${who('Shops and freelancers', 'Price it, tax it and send it.', ['profit-margin-calculator', 'sales-tax-calculator', 'watermark-pdf', 'qr-code-generator'])}
-    ${who('Developers', 'The small utilities you keep searching for.', ['json-formatter', 'base64-encoder', 'hash-generator', 'uuid-generator'])}
-  </div>
-</section>
 <section class="block">
   <h2 class="section-title">Why people like it</h2>
   <div class="features">
@@ -415,11 +376,7 @@ ${ad(cfg.adSlotBottom)}
     <div class="feature" style="--c:#0e9fb5"><span class="tile">${icon('globe')}</span><h3>Your language</h3><p>Switch the whole site into ${LANGS.length} languages from the menu at the top.</p></div>
   </div>
 </section>
-<section class="block">
-  <h2 class="section-title">Questions and answers</h2>
-  <div class="faq" style="max-width:820px">${homeFaq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
-</section>
-<section class="cta"><h2>Need a tool that is not here yet?</h2><p>Tell us what would save you time and we will consider building it.</p><a class="btn" href="contact/">Suggest a tool</a></section>`
+`
 }));
 
 // ---------- tool pages ----------
