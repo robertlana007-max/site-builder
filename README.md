@@ -28,7 +28,7 @@ Pinned tools, recently used tools and what was entered into a tool's short field
 
 The language menu translates the page in place with Google Translate. Its script is only loaded after a visitor picks a language other than English.
 
-Google sign-in is off until `firebase` in `config.json` holds a Firebase web config (`apiKey`, `authDomain`, `projectId`, `appId`). When set, a Sign in button appears and the same saved state is synced to one Firestore document per user (`users/{uid}`). In Firebase: enable the Google provider under Authentication, add the site domain to the authorised domains, create a Firestore database, and use these rules:
+Accounts are off until `firebase` in `config.json` holds a Firebase web config (`apiKey`, `authDomain`, `projectId`, `appId`). Until then the Sign in menu and forms are shown but say accounts are not ready. When set, visitors can sign in or create an account with Google or with email and password (enable both providers under Authentication > Sign-in method), and the same saved state is synced to one Firestore document per user (`users/{uid}`). In Firebase: enable the Google provider under Authentication, add the site domain to the authorised domains, create a Firestore database, and use these rules:
 
 ```
 rules_version = '2';

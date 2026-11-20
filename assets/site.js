@@ -199,9 +199,72 @@
       try { localStorage.setItem('theme', next); } catch (e) {}
     });
 
-    // Sign in: handled by cloud.js when Firebase is configured; until then, say so plainly.
-    var authBtn = $('authBtn'), authInfo = $('authInfo');
-    if (authBtn && authInfo && !window.FIREBASE_CONFIG) authBtn.addEventListener('click', function () { if (authInfo.showModal) authInfo.showModal(); else toast('Sign-in is not switched on yet. Your work is saved on this device.'); });
+    // ---------- account menu and sign-in dialog ----------
+    // The forms always work as forms; the actual sign-in is done by cloud.js (window.GTNAuth),
+    // which is only present once the site owner has added a Firebase config.
+    var authBtn = $('authBtn'), menu = $('acctMenu'), box = $('authBox'), tab = 'in';
+    var A = function () { return window.GTNAuth && window.GTNAuth.on ? window.GTNAuth : null; };
+    var NOT_ON = 'Accounts are being switched on for this site and are not ready yet. Your pinned tools and saved work are already kept on this device.';
+    var say = function (t, ok) { var m = $('authMsg'); m.textContent = t || ''; m.className = 'authmsg' + (ok ? ' ok' : ''); };
+    var setTab = function (t) {
+      tab = t; var up = t === 'up';
+      box.querySelectorAll('[role=tab]').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.tab === t); });
+      $('authT').textContent = up ? 'Create your free account' : 'Welcome back';
+      $('authSub').textContent = up ? 'It takes a few seconds. Your pinned tools and saved work will follow you to every device.' : 'Sign in to keep your pinned tools and saved work on every device.';
+      $('gLabel').textContent = up ? 'Sign up with Google' : 'Continue with Google';
+      $('nameRow').hidden = !up; $('authGo').textContent = up ? 'Create account' : 'Sign in';
+      $('aPass').autocomplete = up ? 'new-password' : 'current-password'; $('aPass').placeholder = up ? 'At least 6 characters' : '';
+      $('authForgot').hidden = up;
+      $('authSwitch').innerHTML = up ? 'Already have an account? <button class="linkbtn" type="button" data-tab="in">Sign in</button>' : 'New here? <button class="linkbtn" type="button" data-tab="up">Create a free account</button>';
+      say('');
+    };
+    var openBox = function (t) { menu.hidden = true; authBtn.setAttribute('aria-expanded', 'false'); setTab(t); if (box.showModal) box.showModal(); (t === 'up' ? $('aName') : $('aEmail')).focus(); };
+    var done = function (text) { box.close(); toast(text); burst(authBtn); };
+    var busy = function (on) { box.querySelectorAll('button, input').forEach(function (el) { el.disabled = on; }); };
+    var attempt = function (job, okText) {
+      var a = A(); if (!a) return say(NOT_ON);
+      busy(true); say('Please wait…', true);
+      job(a).then(function () { busy(false); done(okText); }, function (e) { busy(false); say(e.message); });
+    };
+    if (authBtn && box) {
+      authBtn.addEventListener('click', function (e) { e.stopPropagation(); menu.hidden = !menu.hidden; authBtn.setAttribute('aria-expanded', !menu.hidden); });
+      document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('#acctMenu')) { menu.hidden = true; authBtn.setAttribute('aria-expanded', 'false'); } });
+      menu.addEventListener('click', function (e) {
+        var b = e.target.closest('[data-auth]'); if (!b) return;
+        if (b.dataset.auth === 'lang') { e.stopPropagation(); menu.hidden = true; $('langMenu').hidden = false; return; }
+        if (b.dataset.auth === 'out') { menu.hidden = true; var a = A(); if (a) a.signOut().then(function () { toast('Signed out. Your tools stay saved on this device.'); }); }
+        else openBox(b.dataset.auth);
+      });
+      box.addEventListener('click', function (e) { var t = e.target.closest('[data-tab]'); if (t) setTab(t.dataset.tab); if (e.target === box) box.close(); });
+      $('authClose').addEventListener('click', function () { box.close(); });
+      $('authGoogle').addEventListener('click', function () { attempt(function (a) { return a.google(); }, 'Signed in. Your tools now follow you.'); });
+      $('authForm').addEventListener('submit', function (e) {
+        e.preventDefault();
+        var email = $('aEmail').value.trim(), pass = $('aPass').value, name = $('aName').value.trim();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Type your email address, for example name@gmail.com.');
+        if (pass.length < 6) return say(tab === 'up' ? 'Choose a password with at least 6 characters.' : 'Type your password.');
+        if (tab === 'up') attempt(function (a) { return a.signUp(name, email, pass); }, 'Account created. Welcome' + (name ? ', ' + name.split(' ')[0] : '') + '!');
+        else attempt(function (a) { return a.signIn(email, pass); }, 'Signed in. Welcome back!');
+      });
+      $('authForgot').addEventListener('click', function () {
+        var email = $('aEmail').value.trim(), a = A();
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return say('Type your email above first, then press this again.');
+        if (!a) return say(NOT_ON);
+        a.reset(email).then(function () { say('We sent a link to ' + email + '. Open it to choose a new password.', true); }, function (e) { say(e.message); });
+      });
+      // reflect who is signed in
+      var show = function (u) {
+        var nm = u ? (u.displayName || u.email || 'Account').split(' ')[0] : 'Sign in';
+        $('authName').textContent = nm;
+        authBtn.classList.toggle('in', !!u);
+        $('acctOut').hidden = !!u; $('acctIn').hidden = !u;
+        if (u) $('acctWho').textContent = 'Signed in as ' + (u.email || u.displayName);
+        var note = $('mineNote'); if (note) note.textContent = u ? 'Synced to your account.' : 'Saved on this device. Sign in to keep it on every device.';
+      };
+      window.GTNAuth = window.GTNAuth || {};
+      window.GTNAuth.onChange = show;
+      if (A() && A().user()) show(A().user());
+    }
 
     // palette
     var pal = $('palette'), palInput = $('palInput');
