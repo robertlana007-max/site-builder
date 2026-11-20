@@ -148,7 +148,6 @@
       var a = fill($('minePins'), o.favs), b = fill($('mineRecent'), o.recent.slice(0, 8));
       $('minePinsBox').hidden = !a; $('mineRecentBox').hidden = !b; mine.hidden = !(a + b);
     }
-    fill($('taskPins'), o.favs.slice(0, 8)); // pinned tools sit on the task bar of every page
     var side = $('sidePins');
     if (side) { var k = fill($('sidePinsList'), o.favs.filter(function (s) { return s !== SLUG; })); side.hidden = !k; }
   }
@@ -206,7 +205,6 @@
       var renderPal = finder(palInput, $('palResults'));
       var open = function () { if (pal.open) return; palInput.value = ''; pal.showModal(); renderPal(); palInput.focus(); };
       $('palBtn').addEventListener('click', open);
-      if ($('startBtn')) $('startBtn').addEventListener('click', open);
       document.addEventListener('keydown', function (e) {
         var typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target.tagName || '')) || e.target.isContentEditable;
         if ((e.key === 'k' || e.key === 'K') && (e.ctrlKey || e.metaKey)) { e.preventDefault(); open(); }
@@ -232,10 +230,10 @@
 
     // stars and pin button
     document.querySelectorAll('.star').forEach(function (b) {
-      b.addEventListener('click', function () { var on = Store.toggleFav(b.dataset.slug); if (on) burst(b); toast(on ? 'Pinned to your taskbar' : 'Removed from your taskbar'); });
+      b.addEventListener('click', function () { var on = Store.toggleFav(b.dataset.slug); if (on) burst(b); toast(on ? 'Pinned. Find it on the home page.' : 'Unpinned'); });
     });
     var pin = $('pinBtn');
-    if (pin) pin.addEventListener('click', function () { var on = Store.toggleFav(SLUG); if (on) burst(pin); toast(on ? 'Pinned to your taskbar' : 'Removed from your taskbar'); });
+    if (pin) pin.addEventListener('click', function () { var on = Store.toggleFav(SLUG); if (on) burst(pin); toast(on ? 'Pinned. Find it on the home page.' : 'Unpinned'); });
     var share = $('shareBtn');
     if (share) share.addEventListener('click', function () {
       var url = (document.querySelector('link[rel=canonical]') || {}).href || location.href;
@@ -326,38 +324,6 @@
       gs.src = 'https://translate.google.com/translate_a/element.js?cb=gtInit'; gs.async = true;
       gs.onerror = function () { toast('Translation could not load. Showing English.'); };
       document.head.appendChild(gs);
-    }
-
-    // ---------- desktop behaviour: clock, draggable windows, boot screen ----------
-    var clocks = document.querySelectorAll('.clock');
-    var tick = function () { var d = new Date(), t = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); clocks.forEach(function (c) { c.textContent = t; }); };
-    tick(); setInterval(tick, 15000);
-
-    if (fine) { // drag a window by its title bar; double-click the bar to put it back
-      var held = null;
-      document.addEventListener('pointerdown', function (e) {
-        var bar = e.target.closest ? e.target.closest('.win > .tb') : null;
-        if (!bar || e.button !== 0 || e.target.closest('button, a') || innerWidth < 961) return;
-        var w = bar.parentNode, at = (w.style.translate || '0px 0px').split(' ');
-        held = { w: w, x: e.clientX - parseFloat(at[0]), y: e.clientY - parseFloat(at[1] || 0) };
-        w.classList.add('dragging'); e.preventDefault();
-      });
-      document.addEventListener('pointermove', function (e) { if (held) held.w.style.translate = (e.clientX - held.x) + 'px ' + (e.clientY - held.y) + 'px'; });
-      document.addEventListener('pointerup', function () { if (held) { held.w.classList.remove('dragging'); held = null; } });
-      document.addEventListener('dblclick', function (e) { var bar = e.target.closest ? e.target.closest('.win > .tb') : null; if (bar && !e.target.closest('button, a')) bar.parentNode.style.translate = ''; });
-    }
-
-    // a one-second boot screen, once per browser session, on the home page only
-    var seenBoot = true;
-    try { seenBoot = !!sessionStorage.getItem('boot'); sessionStorage.setItem('boot', '1'); } catch (e) {}
-    if (!seenBoot && !calm && !SLUG && $('toolSearch')) {
-      var boot = document.createElement('div');
-      boot.id = 'boot'; boot.setAttribute('aria-hidden', 'true');
-      boot.innerHTML = '<b>GetToolNest OS</b><span>loading ' + (window.TOOLS || []).length + ' tools…</span><u><i></i></u><span>click to skip</span>';
-      var done = function () { boot.style.opacity = '0'; setTimeout(function () { boot.remove(); }, 260); };
-      boot.addEventListener('click', done);
-      document.body.appendChild(boot);
-      setTimeout(done, 1150);
     }
 
     // ---------- numbers that count up when they scroll into view ----------
