@@ -16,26 +16,41 @@
 <div class="out" id="need">–</div>
 <script>
 (function () {
+  // Month by month: interest is added, then the payment (or whatever is left) is taken off.
+  function payoff(B, r, P, max) {
+    var bal = B, n = 0, interest = 0;
+    while (bal > 0.005 && n < max) { var i = bal * r; interest += i; bal = bal + i - Math.min(P, bal + i); n++; }
+    return { n: n, interest: interest, left: bal > 0.005 ? bal : 0 };
+  }
   function calc() {
     var B = +$('bal').value, r = +$('apr').value / 1200, P = +$('pay').value, ids = ['time', 'int', 'tot'];
     $('msg').textContent = '';
-    if (!(B > 0) || r < 0 || !(P > 0)) ids.forEach(function (i) { $(i).textContent = '–'; });
-    else if (P <= B * r) {
-      ids.forEach(function (i) { $(i).textContent = '–'; });
-      $('msg').className = 'msg bad';
-      $('msg').textContent = 'This payment does not cover the monthly interest of ' + fmtNum(B * r, 2) + ', so the balance would never go down. Pay more than that each month.';
-    } else {
-      // Simulate month by month so the smaller final payment is counted exactly.
-      var bal = B, n = 0, interest = 0;
-      while (bal > 0.005 && n < 1200) { var i = bal * r; interest += i; bal = bal + i - Math.min(P, bal + i); n++; }
-      var y = Math.floor(n / 12), m = n % 12;
-      $('time').textContent = (y ? y + (y === 1 ? ' yr ' : ' yrs ') : '') + (m || !y ? m + ' mo' : '');
-      $('int').textContent = fmtNum(interest, 2);
-      $('tot').textContent = fmtNum(B + interest, 2);
+    function fail(text) { ids.forEach(function (i) { $(i).textContent = '–'; }); $('msg').className = 'msg bad'; $('msg').textContent = text; }
+    if (!(B > 0)) fail('Enter a card balance above 0.');
+    else if ($('apr').value === '' || !(r >= 0)) fail('Enter an interest rate of 0 or more.');
+    else if (!(P > 0)) fail('Enter a monthly payment above 0.');
+    else if (P <= B * r) fail('This payment does not cover the monthly interest of ' + fmtNum(B * r, 2) + ', so the balance would never go down. Pay more than that each month.');
+    else {
+      var res = payoff(B, r, P, 1200);
+      if (res.left) fail('At this payment it would take more than 100 years to pay off the card. Pay more each month.');
+      else {
+        var y = Math.floor(res.n / 12), m = res.n % 12;
+        $('time').textContent = (y ? y + (y === 1 ? ' yr ' : ' yrs ') : '') + (m || !y ? m + ' mo' : '');
+        $('int').textContent = fmtNum(res.interest, 2);
+        $('tot').textContent = fmtNum(B + res.interest, 2);
+      }
     }
-    var N = Math.floor(+$('months').value);
-    if (!(B > 0) || r < 0 || !(N >= 1 && N <= 600)) $('need').textContent = '–';
-    else $('need').textContent = 'Pay ' + fmtNum(r === 0 ? B / N : B * r / (1 - Math.pow(1 + r, -N)), 2) + ' a month';
+    var N = +$('months').value;
+    if (!(B > 0) || !(r >= 0) || $('apr').value === '') $('need').textContent = '–';
+    else if (!(N >= 1 && N <= 600 && N === Math.floor(N))) $('need').textContent = 'Enter a whole number of months from 1 to 600';
+    else {
+      // Start from the loan formula, round up to the cent, then check with the same month-by-month payoff.
+      var est = r === 0 ? B / N : B * r / (1 - Math.pow(1 + r, -N)), c = Math.ceil(est * 100 - 1e-6);
+      while (c > 1 && payoff(B, r, (c - 1) / 100, N).left === 0) c--;
+      while (payoff(B, r, c / 100, N).left > 0) c++;
+      var t = payoff(B, r, c / 100, N);
+      $('need').textContent = 'Pay ' + fmtNum(c / 100, 2) + ' a month' + (t.n < N ? ' (paid off in ' + t.n + ' months)' : '') + ', total interest ' + fmtNum(t.interest, 2);
+    }
   }
   ['bal', 'apr', 'pay', 'months'].forEach(function (id) { $(id).addEventListener('input', calc); });
   calc();

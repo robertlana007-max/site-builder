@@ -1,5 +1,5 @@
 <div class="fields">
-  <div><label for="bill">Bill amount</label><input type="number" id="bill" min="0" step="any" placeholder="0.00"></div>
+  <div><label for="bill">Bill amount</label><input type="number" id="bill" min="0" step="any" value="50"></div>
   <div><label for="tip">Tip (%)</label><input type="number" id="tip" min="0" step="any" value="15"></div>
   <div><label for="ppl">Split between (people)</label><input type="number" id="ppl" min="1" step="1" value="1"></div>
 </div>
@@ -16,20 +16,35 @@
   <div class="stat"><span>Each person pays</span><b id="each">–</b></div>
   <div class="stat"><span>Tip per person</span><b id="teach">–</b></div>
 </div>
+<p class="msg" id="msg"></p>
 <script>
 (function () {
+  var ids = ['t', 'tot', 'each', 'teach'];
+  function money(c) { return fmtNum(c / 100, 2); }
   function calc() {
-    var bill = +$('bill').value, tip = Math.max(0, +$('tip').value), ppl = Math.max(1, Math.floor(+$('ppl').value) || 1);
-    if (!(bill > 0)) { ['t', 'tot', 'each', 'teach'].forEach(function (i) { $(i).textContent = '–'; }); return; }
-    var t = bill * tip / 100;
-    $('t').textContent = fmtNum(t, 2);
-    $('tot').textContent = fmtNum(bill + t, 2);
-    $('each').textContent = fmtNum((bill + t) / ppl, 2);
-    $('teach').textContent = fmtNum(t / ppl, 2);
+    var bill = +$('bill').value, tip = +$('tip').value, pv = +$('ppl').value;
+    var err = !(bill > 0) ? 'Enter a bill amount above 0.'
+      : ($('tip').value === '' || !(tip >= 0)) ? 'The tip cannot be negative. Enter 0 or more.'
+      : !(pv >= 1 && pv === Math.floor(pv)) ? 'Enter a whole number of people, 1 or more.' : '';
+    $('msg').className = err ? 'msg bad' : 'msg'; $('msg').textContent = err;
+    if (err) { ids.forEach(function (i) { $(i).textContent = '–'; }); return; }
+    // Work in whole cents so the shares always add up exactly to the total.
+    var ppl = pv, billC = Math.round(bill * 100), tipC = Math.round(bill * tip), totC = billC + tipC;
+    var base = Math.floor(totC / ppl), extra = totC - base * ppl, tBase = Math.floor(tipC / ppl), tExtra = tipC - tBase * ppl;
+    $('t').textContent = money(tipC);
+    $('tot').textContent = money(totC);
+    $('each').textContent = money(base + (extra ? 1 : 0));
+    $('teach').textContent = money(tBase + (tExtra ? 1 : 0));
+    if (extra) {
+      $('msg').textContent = 'The total does not split evenly, so the shares are rounded to the cent: ' +
+        extra + (extra === 1 ? ' person pays ' : ' people pay ') + money(base + 1) + ' and ' +
+        (ppl - extra) + ((ppl - extra) === 1 ? ' person pays ' : ' people pay ') + money(base) + '. Together that is exactly ' + money(totC) + '.';
+    }
   }
   ['bill', 'tip', 'ppl'].forEach(function (id) { $(id).addEventListener('input', calc); });
   document.querySelectorAll('[data-t]').forEach(function (b) {
     b.addEventListener('click', function () { $('tip').value = b.dataset.t; calc(); });
   });
+  calc();
 })();
 </script>
