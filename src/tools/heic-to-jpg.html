@@ -1,0 +1,161 @@
+<style>
+.hj-list li { min-height: 50px; }
+.hj-list img { width: 38px; height: 38px; object-fit: cover; border-radius: 6px; flex: none; background: var(--line); }
+.hj-list small { display: block; color: var(--muted); font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.hj-list .bad small { color: var(--bad); }
+.hj-list a { font-size: 14px; font-weight: 600; flex: none; padding: 0 8px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop HEIC photos here</b>iPhone .HEIC or .HEIF files, as many as you like. They are converted on your device and never uploaded.</div>
+<input type="file" id="file" accept=".heic,.heif,.hif,image/heic,image/heif,image/heic-sequence,image/heif-sequence" multiple hidden data-nomemo>
+<div class="fields">
+  <div><label for="fmt">Convert to</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG (lossless, bigger)</option></select></div>
+  <div id="qBox"><label for="q">JPG quality: <span id="qv">90</span>%</label><input type="range" id="q" min="50" max="100" value="90"></div>
+  <div><label for="multi">Files with several images</label><select id="multi"><option value="primary">Main image only</option><option value="all">All images</option></select></div>
+</div>
+<ul class="files hj-list" id="list"></ul>
+<div class="btns"><button class="btn" id="go" disabled>Convert</button><button class="btn ghost" id="clear" type="button" hidden>Clear list</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var files = [], results = [], urls = [], lib = null, libLoading = null, busy = false;
+  var MAX = 200 * 1024 * 1024;
+
+  function sniff(file) { // first 32 bytes say what the file really is
+    return file.slice(0, 32).arrayBuffer().then(function (b) {
+      var u = new Uint8Array(b), s = String.fromCharCode.apply(null, u);
+      if (u[0] === 0xFF && u[1] === 0xD8) return 'jpg';
+      if (s.slice(1, 4) === 'PNG') return 'png';
+      if (s.slice(4, 8) !== 'ftyp') return 'other';
+      var brands = s.slice(8, 32);
+      if (/avif|avis/.test(brands) && !/hei|hev/.test(brands)) return 'avif';
+      return /heic|heix|hevc|hevx|heim|heis|hevm|hevs|mif1|msf1/.test(brands) ? 'heic' : 'other';
+    });
+  }
+  function loadLib() {
+    if (lib) return Promise.resolve(lib);
+    if (libLoading) return libLoading;
+    PT.say('', 'Loading the HEIC decoder (about 2 MB, only the first time)…');
+    libLoading = new Promise(function (res, rej) {
+      var s = document.createElement('script');
+      s.src = '../assets/vendor/heif/libheif-bundle.js';
+      s.onload = function () { Promise.resolve(window.libheif()).then(function (m) { lib = m; res(m); }, rej); };
+      s.onerror = function () { rej(new Error('The HEIC decoder could not be downloaded. Check your connection and try again.')); };
+      document.head.appendChild(s);
+    }).catch(function (e) { libLoading = null; throw e.message ? e : new Error('The HEIC decoder could not start in this browser.'); });
+    return libLoading;
+  }
+  function row(f) {
+    var li = document.createElement('li'), img = document.createElement('img'), span = document.createElement('span'), small = document.createElement('small');
+    img.alt = ''; img.hidden = true; span.textContent = f.name; small.textContent = fmtBytes(f.size) + ' · waiting';
+    span.appendChild(small); li.appendChild(img); li.appendChild(span);
+    $('list').appendChild(li);
+    return { li: li, img: img, small: small };
+  }
+  function render() {
+    $('list').innerHTML = '';
+    files.forEach(function (x) { x.ui = row(x.file); });
+    $('go').disabled = !files.length || busy; $('clear').hidden = !files.length;
+  }
+  function forget() { urls.forEach(URL.revokeObjectURL); urls = []; results = []; $('dl').hidden = true; }
+  PT.drop(true, function (list) {
+    if (busy) { PT.say('bad', 'Please wait until the current photos are converted.'); return; }
+    forget();
+    var skipped = [];
+    Promise.all(list.map(function (f) {
+      if (!f.size) { skipped.push(f.name + ' (empty)'); return null; }
+      if (f.size > MAX) { skipped.push(f.name + ' (over 200 MB)'); return null; }
+      return sniff(f).then(function (k) {
+        if (k === 'heic') return f;
+        skipped.push(f.name + (k === 'jpg' ? ' (already a JPG)' : k === 'png' ? ' (already a PNG)' : k === 'avif' ? ' (AVIF, not HEIC: use the Image Converter)' : ' (not a HEIC photo)'));
+        return null;
+      });
+    })).then(function (ok) {
+      ok.filter(Boolean).forEach(function (f) { files.push({ file: f }); });
+      render();
+      if (skipped.length) PT.say('bad', 'Skipped: ' + skipped.join(', ') + '.');
+      else PT.say('', files.length + (files.length === 1 ? ' photo' : ' photos') + ' ready. Press Convert.');
+    });
+  });
+  $('clear').addEventListener('click', function () { if (busy) return; files = []; forget(); render(); PT.say('', ''); });
+  function syncQ() { $('qv').textContent = $('q').value; $('qBox').hidden = $('fmt').value !== 'image/jpeg'; }
+  $('q').addEventListener('input', syncQ); $('fmt').addEventListener('change', syncQ); $('fmt').addEventListener('input', syncQ); syncQ();
+
+  function decodeAll(m, buf, wantAll) {
+    var dec = new m.HeifDecoder(), imgs = dec.decode(buf);
+    if (!imgs || !imgs.length) throw new Error('not readable');
+    var pick = wantAll ? imgs : [imgs.filter(function (i) { return i.is_primary(); })[0] || imgs[0]];
+    imgs.forEach(function (i) { if (pick.indexOf(i) < 0) i.free(); });
+    return pick;
+  }
+  function toCanvas(image) {
+    var w = image.get_width(), h = image.get_height();
+    if (w * h > 100e6) { image.free(); return Promise.reject(new Error('too big')); }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d'), data = ctx.createImageData(w, h);
+    return new Promise(function (res, rej) {
+      image.display(data, function (out) {
+        image.free();
+        if (!out) return rej(new Error('decode'));
+        ctx.putImageData(data, 0, 0); res(c);
+      });
+    });
+  }
+  function flatten(c) { // JPG has no transparency: put the picture on white
+    var o = document.createElement('canvas'); o.width = c.width; o.height = c.height;
+    var x = o.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, o.width, o.height); x.drawImage(c, 0, 0); return o;
+  }
+  function pause() { return new Promise(function (r) { setTimeout(r, 0); }); }
+
+  $('go').addEventListener('click', function () {
+    if (busy || !files.length) return;
+    busy = true; forget();
+    var type = $('fmt').value, q = $('q').value / 100, wantAll = $('multi').value === 'all', ext = type === 'image/png' ? 'png' : 'jpg';
+    var used = {}, failed = 0;
+    function uniq(n) { var b = n, k = 2; while (used[n.toLowerCase()]) { n = b.replace(/(\.[a-z]+)$/, '-' + k++ + '$1'); } used[n.toLowerCase()] = 1; return n; }
+    $('go').disabled = true; $('dl').hidden = true; $('clear').disabled = true;
+    files.forEach(function (x) { x.ui.li.className = ''; x.ui.small.textContent = fmtBytes(x.file.size) + ' · waiting'; var a = x.ui.li.querySelector('a'); if (a) a.remove(); });
+    loadLib().then(async function (m) {
+      for (var n = 0; n < files.length; n++) {
+        var x = files[n], base = PT.base(x.file.name);
+        PT.say('', 'Converting ' + (n + 1) + ' of ' + files.length + '…');
+        x.ui.small.textContent = 'converting…';
+        await pause();
+        try {
+          var imgs = decodeAll(m, new Uint8Array(await x.file.arrayBuffer()), wantAll), notes = [];
+          for (var k = 0; k < imgs.length; k++) {
+            var c = await toCanvas(imgs[k]);
+            if (type === 'image/jpeg') c = flatten(c);
+            var blob = await PT.blob(c, type, q);
+            if (!blob) throw new Error('encode');
+            var name = uniq(base + (imgs.length > 1 ? '-' + (k + 1) : '') + '.' + ext);
+            results.push({ name: name, blob: blob });
+            var url = URL.createObjectURL(blob); urls.push(url);
+            if (k === 0) { x.ui.img.src = url; x.ui.img.hidden = false; }
+            notes.push(c.width + ' × ' + c.height);
+            var a = document.createElement('a'); a.href = url; a.download = name; a.textContent = imgs.length > 1 ? '#' + (k + 1) : 'Save';
+            a.setAttribute('aria-label', 'Download ' + name);
+            x.ui.li.appendChild(a);
+            c.width = c.height = 0; await pause();
+          }
+          x.ui.small.textContent = (imgs.length > 1 ? imgs.length + ' images · ' : '') + notes[0] + ' px · ' + fmtBytes(results[results.length - 1].blob.size);
+        } catch (e) {
+          failed++; x.ui.li.className = 'bad';
+          x.ui.small.textContent = e && e.message === 'too big' ? 'too large to convert in a browser' : 'could not be read: the file may be damaged or use an unsupported HEIC feature';
+        }
+      }
+      if (!results.length) { PT.say('bad', failed === 1 && files.length === 1 ? 'This photo could not be converted. It may be damaged or not a real HEIC file.' : 'None of the photos could be converted.'); return; }
+      var dl = $('dl'), out;
+      if (results.length === 1) { out = results[0].blob; dl.download = results[0].name; dl.textContent = 'Download ' + ext.toUpperCase(); }
+      else {
+        var parts = [];
+        for (var i = 0; i < results.length; i++) parts.push({ name: results[i].name, data: new Uint8Array(await results[i].blob.arrayBuffer()) });
+        out = PT.zip(parts); dl.download = 'heic-to-' + ext + '.zip'; dl.textContent = 'Download all (ZIP)';
+      }
+      var u = URL.createObjectURL(out); urls.push(u); dl.href = u; dl.hidden = false;
+      PT.say(failed ? 'bad' : 'ok', 'Converted ' + results.length + (results.length === 1 ? ' image' : ' images') + (failed ? '. ' + failed + ' file(s) could not be read.' : '.') + ' Total ' + fmtBytes(out.size) + '.');
+    }).catch(function (e) { PT.say('bad', e && e.message ? e.message : 'Something went wrong.'); })
+      .then(function () { busy = false; $('go').disabled = !files.length; $('clear').disabled = false; });
+  });
+})();
+</script>

@@ -1,0 +1,236 @@
+<style>
+.xc-prev { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0 4px; background: var(--surface); }
+.xc-prev table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.xc-prev th, .xc-prev td { border: 1px solid var(--line); padding: 4px 8px; white-space: nowrap; max-width: 260px; overflow: hidden; text-overflow: ellipsis; text-align: start; }
+.xc-prev thead th { position: sticky; top: 0; background: var(--bg); color: var(--muted); font-weight: 600; z-index: 1; }
+.xc-prev tbody th { position: sticky; left: 0; background: var(--bg); color: var(--muted); font-weight: 600; }
+.xc-note { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.xc-out textarea { min-height: 160px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a spreadsheet or CSV file</b>Excel (.xlsx, .xlsm, .xls), OpenDocument (.ods), CSV, TSV or JSON. It never leaves your device.</div>
+<input type="file" id="file" accept=".xlsx,.xlsm,.xlsb,.xls,.ods,.csv,.tsv,.txt,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,text/csv,text/tab-separated-values,application/json" hidden>
+<details class="more">
+  <summary>Options for reading CSV and text files</summary>
+  <div class="fields">
+    <div><label for="enc">Text encoding</label><select id="enc"><option value="auto">Automatic (UTF-8)</option><option value="windows-1252">Windows-1252 (Western Europe, old Excel)</option><option value="iso-8859-1">ISO-8859-1 (Latin-1)</option><option value="utf-16le">UTF-16</option><option value="windows-1250">Windows-1250 (Central Europe)</option><option value="windows-1251">Windows-1251 (Cyrillic)</option><option value="shift_jis">Shift_JIS (Japanese)</option><option value="gbk">GBK (Chinese)</option></select></div>
+    <div><label for="inDelim">Columns are separated by</label><select id="inDelim"><option value="auto">Detect automatically</option><option value=",">Comma ,</option><option value=";">Semicolon ;</option><option value="&#9;">Tab</option><option value="|">Pipe |</option></select></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="nums" checked> Turn number text into real numbers (leading zeros like 007 are always kept)</label></div>
+</details>
+<div id="loaded" hidden>
+  <div class="fields">
+    <div id="sheetBox"><label for="sheet">Sheet</label><select id="sheet" data-nomemo></select></div>
+    <div><label for="fmt">Convert to</label><select id="fmt"><option value="csv">CSV (comma-separated)</option><option value="tsv">TSV (tab-separated)</option><option value="json">JSON</option><option value="xlsx">Excel workbook (.xlsx)</option><option value="ods">OpenDocument (.ods)</option></select></div>
+    <div id="delimBox"><label for="delim">CSV separator</label><select id="delim"><option value=",">Comma , (most programs)</option><option value=";">Semicolon ; (Excel in much of Europe)</option><option value="|">Pipe |</option></select></div>
+  </div>
+  <div class="checks">
+    <label id="bomBox"><input type="checkbox" id="bom" checked> Add a UTF-8 marker (BOM) so Excel shows accents and other alphabets correctly</label>
+    <label id="rawBox"><input type="checkbox" id="raw"> Write numbers as stored (full precision), not as formatted</label>
+    <label id="blankBox"><input type="checkbox" id="blank" checked> Leave out empty rows</label>
+    <label id="headBox" hidden><input type="checkbox" id="head" checked> First row holds the column names</label>
+  </div>
+  <p class="xc-note" id="xNote"></p>
+  <h3 style="margin-top:4px">Preview</h3>
+  <div class="xc-prev" id="prev"></div>
+  <p class="xc-note" id="prevNote"></p>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Convert</button><a class="btn ghost" id="dl" hidden>Download</a><button class="btn ghost" id="copy" hidden>Copy text</button></div>
+<p class="msg" id="msg"></p>
+<div class="xc-out" id="outBox" hidden><label for="out">Result (first part shown)</label><textarea id="out" readonly data-nomemo spellcheck="false"></textarea></div>
+<script src="../assets/vendor/xlsx/xlsx.full.min.js"></script>
+<script>
+(function () {
+  var wb = null, base = 'sheet', srcKind = '', lastUrl = null, lastText = '', file = null;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function hideResult() { $('dl').hidden = true; $('copy').hidden = true; $('outBox').hidden = true; }
+
+  // ---------- CSV reading (own parser: keeps leading zeros, handles quotes and line breaks inside cells) ----------
+  function sniff(text) {
+    var lines = text.split(/\r\n|\n|\r/).slice(0, 30).filter(function (l) { return l.length; }), best = ',', score = -1;
+    [',', ';', '\t', '|'].forEach(function (d) {
+      var counts = lines.map(function (l) { var n = 0, q = false; for (var i = 0; i < l.length; i++) { var c = l[i]; if (c === '"') q = !q; else if (c === d && !q) n++; } return n; });
+      if (!counts.length || !counts[0]) return;
+      var same = counts.filter(function (n) { return n === counts[0]; }).length, s = same * 100 + counts[0];
+      if (s > score) { score = s; best = d; }
+    });
+    return best;
+  }
+  function parseCsv(text, d) {
+    var rows = [], row = [], cell = '', q = false, i = 0, n = text.length;
+    while (i < n) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i += 2; continue; } q = false; i++; continue; }
+        cell += c; i++; continue;
+      }
+      if (c === '"' && cell === '') { q = true; i++; continue; }
+      if (c === d) { row.push(cell); cell = ''; i++; continue; }
+      if (c === '\r' || c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; i += (c === '\r' && text[i + 1] === '\n') ? 2 : 1; continue; }
+      cell += c; i++;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+  function typed(rows) {
+    if (!$('nums').checked) return rows;
+    return rows.map(function (r) {
+      return r.map(function (v) {
+        var t = v.trim();
+        if (/^[-+]?(0|[1-9]\d{0,14})(\.\d+)?([eE][-+]?\d+)?$/.test(t) && t.replace(/[^\d]/g, '').length <= 15) return Number(t);
+        if (/^(TRUE|FALSE)$/i.test(t)) return /^true$/i.test(t);
+        return v;
+      });
+    });
+  }
+  function decode(buf) {
+    var b = new Uint8Array(buf), enc = $('enc').value;
+    if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+    if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+    if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+    if (enc === 'auto') {
+      try { return new TextDecoder('utf-8', { fatal: true }).decode(b); }
+      catch (e) { return new TextDecoder('windows-1252').decode(b); } // not valid UTF-8: most often an old Excel export
+    }
+    return new TextDecoder(enc).decode(b);
+  }
+
+  function load(f) {
+    file = f; wb = null; hideResult(); $('loaded').hidden = true; $('go').disabled = true;
+    base = f.name.replace(/\.[^.]+$/, '') || 'sheet';
+    var ext = (f.name.match(/\.([^.]+)$/) || [])[1]; ext = ext ? ext.toLowerCase() : '';
+    if (/^(doc|docx|pdf|pptx?|zip|rar|7z|png|jpe?g|gif|webp|mp3|mp4)$/.test(ext)) { say('bad', '"' + f.name + '" is not a spreadsheet. Choose an Excel, OpenDocument, CSV, TSV or JSON file.'); return; }
+    if (!f.size) { say('bad', '"' + f.name + '" is empty.'); return; }
+    say('', 'Reading ' + f.name + '…');
+    f.arrayBuffer().then(function (buf) {
+      var b = new Uint8Array(buf), isZip = b[0] === 0x50 && b[1] === 0x4B, isOle = b[0] === 0xD0 && b[1] === 0xCF;
+      if (isZip || isOle || /^(xlsx|xlsm|xlsb|xls|ods|numbers)$/.test(ext)) {
+        srcKind = 'book';
+        wb = XLSX.read(b, { type: 'array', cellDates: true, cellNF: true });
+      } else {
+        var text = decode(buf);
+        if (ext === 'json' || /^\s*[\[{]/.test(text) && ext !== 'csv' && ext !== 'tsv') {
+          var data;
+          try { data = JSON.parse(text); } catch (e) { throw new Error('This JSON file could not be read: ' + e.message); }
+          if (data && !Array.isArray(data)) { var k = Object.keys(data).filter(function (x) { return Array.isArray(data[x]); })[0]; if (k) data = data[k]; }
+          if (!Array.isArray(data) || !data.length) throw new Error('The JSON needs to be a list of rows, for example [{"name":"Ann","age":31}, …].');
+          var ws = Array.isArray(data[0]) ? XLSX.utils.aoa_to_sheet(data) : XLSX.utils.json_to_sheet(data.map(function (r) {
+            var o = {}; Object.keys(r || {}).forEach(function (key) { var v = r[key]; o[key] = v !== null && typeof v === 'object' ? JSON.stringify(v) : v; }); return o;
+          }));
+          wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1'); srcKind = 'json';
+        } else {
+          if (text.indexOf('\u0000') !== -1) throw new Error('"' + f.name + '" does not look like a text or spreadsheet file.');
+          var d = $('inDelim').value === 'auto' ? (ext === 'tsv' ? '\t' : sniff(text)) : $('inDelim').value;
+          var rows = typed(parseCsv(text, d));
+          if (!rows.length) throw new Error('"' + f.name + '" has no rows.');
+          wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Sheet1'); srcKind = 'csv';
+          $('xNote').textContent = 'Read as text with ' + ({ ',': 'commas', ';': 'semicolons', '\t': 'tabs', '|': 'pipes' }[d] || 'separators') + ' between columns. If the columns look wrong, change the reading options above.';
+        }
+      }
+      if (!wb || !wb.SheetNames.length) throw new Error('No sheets were found in "' + f.name + '".');
+      var sel = $('sheet'); sel.innerHTML = '';
+      wb.SheetNames.forEach(function (n, i) { var o = document.createElement('option'); o.value = n; o.textContent = (i + 1) + '. ' + n; sel.appendChild(o); });
+      $('sheetBox').hidden = wb.SheetNames.length < 2;
+      if (srcKind === 'book') $('xNote').textContent = 'Formulas are converted to their last calculated values. Colours, fonts, charts and pictures cannot be kept in CSV, TSV or JSON.';
+      if (srcKind === 'json') $('xNote').textContent = 'Read as JSON: each item became one row. Nested values were kept as JSON text.';
+      // A CSV is pointless to convert into itself, so suggest Excel.
+      if (srcKind !== 'book' && $('fmt').value === 'csv' && srcKind === 'csv') $('fmt').value = 'xlsx';
+      $('loaded').hidden = false; $('go').disabled = false;
+      options(); preview();
+      say('ok', 'Loaded ' + f.name + ' (' + fmtBytes(f.size) + ', ' + wb.SheetNames.length + (wb.SheetNames.length === 1 ? ' sheet' : ' sheets') + '). Choose the format, then press Convert.');
+    }).catch(function (e) {
+      wb = null;
+      var m = e && e.message || '';
+      say('bad', /password|encrypt/i.test(m) ? '"' + f.name + '" is password protected. Open it in Excel, remove the password, save, and try again.' : m && !/^[a-z]/.test(m) ? m : '"' + f.name + '" could not be read as a spreadsheet.');
+    });
+  }
+  setupDrop('drop', 'file', load);
+  ['enc', 'inDelim', 'nums'].forEach(function (id) { $(id).addEventListener('change', function () { if (file && srcKind !== 'book') load(file); }); });
+
+  function sheet() { return wb.Sheets[$('sheet').value] || wb.Sheets[wb.SheetNames[0]]; }
+  function options() {
+    var f = $('fmt').value, text = f === 'csv' || f === 'tsv';
+    $('delimBox').hidden = f !== 'csv';
+    $('bomBox').hidden = !text; $('blankBox').hidden = !text && f !== 'json';
+    $('rawBox').hidden = !(text || f === 'json');
+    $('headBox').hidden = f !== 'json';
+    $('go').textContent = 'Convert to ' + { csv: 'CSV', tsv: 'TSV', json: 'JSON', xlsx: 'Excel', ods: 'ODS' }[f];
+    hideResult();
+  }
+  function preview() {
+    var ws = sheet(), box = $('prev'); box.innerHTML = '';
+    var ref = ws['!ref'];
+    if (!ref) { box.innerHTML = '<p style="padding:10px;margin:0">This sheet is empty.</p>'; $('prevNote').textContent = ''; return; }
+    var r = XLSX.utils.decode_range(ref), rows = r.e.r - r.s.r + 1, cols = r.e.c - r.s.c + 1;
+    var maxR = Math.min(rows, 100), maxC = Math.min(cols, 40);
+    var t = document.createElement('table'), th = t.createTHead().insertRow(), tb = t.createTBody();
+    th.appendChild(document.createElement('th'));
+    for (var c = 0; c < maxC; c++) { var h = document.createElement('th'); h.textContent = XLSX.utils.encode_col(r.s.c + c); th.appendChild(h); }
+    for (var i = 0; i < maxR; i++) {
+      var tr = tb.insertRow(), n = document.createElement('th'); n.textContent = r.s.r + i + 1; tr.appendChild(n);
+      for (c = 0; c < maxC; c++) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r.s.r + i, c: r.s.c + c })], td = tr.insertCell();
+        td.textContent = cell ? (cell.w != null ? cell.w : cell.v instanceof Date ? cell.v.toLocaleDateString() : String(cell.v)) : '';
+        if (cell && cell.t === 'n') td.style.textAlign = 'end';
+      }
+    }
+    box.appendChild(t);
+    $('prevNote').textContent = fmtNum(rows, 0) + ' rows × ' + fmtNum(cols, 0) + ' columns' + (rows > maxR || cols > maxC ? ' · the preview shows the first ' + maxR + ' rows and ' + maxC + ' columns' : '');
+  }
+  $('sheet').addEventListener('change', function () { preview(); hideResult(); });
+  $('fmt').addEventListener('change', options);
+  ['delim', 'bom', 'raw', 'blank', 'head'].forEach(function (id) { $(id).addEventListener('change', hideResult); });
+
+  // Dates as the spreadsheet shows them (2024-03-15, plus the time if there is one), never shifted by time zones.
+  function dateText(d) {
+    if (isNaN(d)) return '';
+    var p = function (n) { return String(n).padStart(2, '0'); }, t = d.getHours() || d.getMinutes() || d.getSeconds();
+    return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + (t ? ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) : '');
+  }
+  function done(blob, name, text) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    $('dl').href = lastUrl; $('dl').download = name; $('dl').textContent = 'Download ' + name; $('dl').hidden = false;
+    lastText = text || '';
+    $('copy').hidden = !text; $('outBox').hidden = !text;
+    if (text) $('out').value = text.length > 100000 ? text.slice(0, 100000) + '\n… (' + fmtNum(text.length - 100000, 0) + ' more characters in the download)' : text;
+  }
+  $('go').addEventListener('click', function () {
+    if (!wb) return;
+    var f = $('fmt').value, ws = sheet(), sName = $('sheet').value, one = wb.SheetNames.length > 1 ? '-' + sName.replace(/[\\\/:*?"<>|]+/g, '_') : '';
+    $('go').disabled = true; say('', 'Converting…');
+    setTimeout(function () {
+      try {
+        if (f === 'csv' || f === 'tsv') {
+          var txt = XLSX.utils.sheet_to_csv(ws, { FS: f === 'tsv' ? '\t' : $('delim').value, RS: '\r\n', blankrows: !$('blank').checked, rawNumbers: $('raw').checked });
+          if (!$('blank').checked) txt = txt.replace(/(\r\n)+$/, ''); else txt = txt.replace(/\r\n$/, '');
+          txt += '\r\n';
+          var bom = $('bom').checked ? '﻿' : '';
+          done(new Blob([bom + txt], { type: f === 'tsv' ? 'text/tab-separated-values;charset=utf-8' : 'text/csv;charset=utf-8' }), base + one + '.' + f, txt);
+          var lines = txt.split('\r\n').length - 1;
+          say('ok', 'Done: ' + fmtNum(lines, 0) + ' rows · ' + fmtBytes(new Blob([bom + txt]).size) + (bom ? ' · UTF-8 with BOM' : ' · UTF-8'));
+        } else if (f === 'json') {
+          var rows = XLSX.utils.sheet_to_json(ws, { header: $('head').checked ? undefined : 1, defval: '', raw: $('raw').checked, blankrows: !$('blank').checked });
+          if (!$('raw').checked && $('head').checked) {
+            // Formatted text for display values, but real numbers and true/false where the cell holds them.
+            var real = XLSX.utils.sheet_to_json(ws, { defval: '', raw: true, blankrows: !$('blank').checked });
+            rows = rows.map(function (r, i) { var o = {}; Object.keys(r).forEach(function (k) { var v = real[i] && real[i][k]; o[k] = typeof v === 'number' || typeof v === 'boolean' || v instanceof Date ? v : r[k]; }); return o; });
+          }
+          var js = JSON.stringify(rows, function (k, v) { var d = this[k]; return d instanceof Date ? dateText(d) : v; }, 2);
+          done(new Blob([js], { type: 'application/json' }), base + one + '.json', js);
+          say('ok', 'Done: ' + fmtNum(rows.length, 0) + ' items · ' + fmtBytes(new Blob([js]).size));
+        } else {
+          var out = wb;
+          if (srcKind !== 'book' && wb.SheetNames.length === 1) { out = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(out, ws, base.slice(0, 31).replace(/[\\\/?*\[\]:]/g, '_') || 'Sheet1'); }
+          var data = XLSX.write(out, { bookType: f, type: 'array', compression: true });
+          done(new Blob([data], { type: f === 'xlsx' ? 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' : 'application/vnd.oasis.opendocument.spreadsheet' }), base + '.' + f);
+          say('ok', 'Done: ' + (out.SheetNames.length === 1 ? '1 sheet' : out.SheetNames.length + ' sheets') + ' · ' + fmtBytes(data.byteLength || data.length));
+        }
+        burst($('dl'));
+      } catch (e) { say('bad', 'The file could not be converted' + (e && e.message ? ': ' + e.message : '.')); }
+      $('go').disabled = false;
+    }, 30);
+  });
+  $('copy').addEventListener('click', function () { copyText(lastText, $('copy')); });
+  if (!window.XLSX) { say('bad', 'The spreadsheet reader could not load. Reload the page and try again.'); $('drop').style.pointerEvents = 'none'; }
+})();
+</script>

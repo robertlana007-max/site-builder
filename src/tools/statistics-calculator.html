@@ -1,0 +1,207 @@
+<style>
+.st-top { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.st-res[hidden] { display: none; }
+.st-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.st-grid .stat b { font-size: 19px; }
+.st-grid .stat small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.st-note { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+.st-tbl { max-height: 360px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 8px; }
+.st-tbl table { margin: 0; }
+.st-tbl th { position: sticky; top: 0; background: var(--surface); }
+.st-hist { margin-top: 10px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.st-hist canvas { display: block; width: 100%; height: 280px; }
+.st-opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-top: 14px; }
+</style>
+<div class="st-top">
+  <div class="seg" role="group" aria-label="How your data is written"><button type="button" id="mVals" aria-pressed="true">List of numbers</button><button type="button" id="mFreq" aria-pressed="false">Value, frequency</button></div>
+  <button type="button" class="btn ghost" id="ex" style="min-height:38px;padding:6px 14px">Try an example</button>
+</div>
+<label for="data" id="dlab">Your numbers</label>
+<textarea id="data" data-nomemo spellcheck="false" placeholder="Paste or type numbers separated by commas, spaces or new lines, e.g. 4, 8, 15, 16, 23, 42"></textarea>
+<div class="st-opts">
+  <div><label for="qm">Quartile method</label><select id="qm"><option value="halves">Median of halves (school books, TI-84)</option><option value="linear">Linear interpolation (Excel QUARTILE.INC)</option></select></div>
+  <div><label for="zs">z-scores use</label><select id="zs"><option value="s">Sample standard deviation (s)</option><option value="p">Population standard deviation (σ)</option></select></div>
+  <div><label for="bins">Histogram classes</label><select id="bins"><option value="auto">Automatic</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option><option value="12">12</option><option value="15">15</option><option value="20">20</option></select></div>
+</div>
+<p class="msg" id="msg"></p>
+<div class="st-res" id="res" hidden>
+  <div class="st-grid" id="grid"></div>
+  <p class="st-note" id="qnote"></p>
+  <div class="btns"><button type="button" class="btn ghost" id="copy">Copy results</button><button type="button" class="btn ghost" id="clr">Clear</button></div>
+  <h3>Histogram</h3>
+  <div class="st-hist"><canvas id="hist" role="img" aria-label="Histogram of your data"></canvas></div>
+  <h3>Frequency table</h3>
+  <div class="st-tbl"><table class="sched" id="ftab"></table></div>
+  <h3>z-scores</h3>
+  <p class="st-note" id="znote" style="margin-top:0"></p>
+  <div class="st-tbl"><table class="sched" id="ztab"></table></div>
+</div>
+<script>
+(function () {
+  var mode = 'vals', last = null, copyTxt = '';
+  function fmt(v) {
+    if (v === null || v === undefined || !isFinite(v)) return '–';
+    var r = parseFloat(v.toPrecision(10)); if (r === 0) return '0';
+    var a = Math.abs(r);
+    return (a >= 1e15 || a < 1e-6 ? r.toExponential(6).replace(/\.?0+e/, 'e') : String(r)).replace('-', '−');
+  }
+  function sumOf(a) { var s = 0, c = 0; for (var i = 0; i < a.length; i++) { var t = s + a[i]; c += Math.abs(s) >= Math.abs(a[i]) ? (s - t) + a[i] : (a[i] - t) + s; s = t; } return s + c; } // Neumaier sum: no lost digits
+  function num(tok) {
+    var t = tok.replace(/[−–]/g, '-');
+    if (!/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t)) return NaN;
+    return parseFloat(t);
+  }
+  function parse(text) {
+    var out = [];
+    if (mode === 'vals') {
+      var toks = text.split(/[\s,;]+/).filter(Boolean);
+      for (var i = 0; i < toks.length; i++) { var v = num(toks[i]); if (!isFinite(v)) throw new Error('"' + toks[i] + '" is not a number. Separate numbers with commas, spaces or new lines, and use a dot for decimals.'); out.push(v); }
+      return out;
+    }
+    var lines = text.split(/\n/), total = 0;
+    for (var j = 0; j < lines.length; j++) {
+      var line = lines[j].trim(); if (!line) continue;
+      var parts = line.split(/\s*[x×]\s*|\s*[,;:\t ]\s*/).filter(Boolean);
+      if (parts.length !== 2) throw new Error('Line ' + (j + 1) + ' ("' + line + '") should be a value and a frequency, like 5, 3.');
+      var val = num(parts[0]), f = num(parts[1]);
+      if (!isFinite(val)) throw new Error('Line ' + (j + 1) + ': "' + parts[0] + '" is not a number.');
+      if (!(f >= 0) || Math.floor(f) !== f) throw new Error('Line ' + (j + 1) + ': the frequency "' + parts[1] + '" must be a whole number of 0 or more.');
+      total += f; if (total > 2000000) throw new Error('That is more than 2,000,000 values in total. Please use smaller frequencies.');
+      for (var k = 0; k < f; k++) out.push(val);
+    }
+    return out;
+  }
+  function median(a, lo, hi) { var n = hi - lo; if (n <= 0) return NaN; var m = lo + (n >> 1); return n % 2 ? a[m] : (a[m - 1] + a[m]) / 2; }
+  function quartiles(a, method) {
+    var n = a.length;
+    if (n === 1) return [a[0], a[0]];
+    if (method === 'linear') { var q = function (p) { var h = (n - 1) * p, f = Math.floor(h); return f + 1 < n ? a[f] + (h - f) * (a[f + 1] - a[f]) : a[f]; }; return [q(0.25), q(0.75)]; }
+    return [median(a, 0, n >> 1), median(a, Math.ceil(n / 2), n)];
+  }
+  function stats(data) {
+    var a = data.slice().sort(function (x, y) { return x - y; }), n = a.length, sum = sumOf(a), mean = sum / n;
+    var ss = sumOf(a.map(function (x) { return (x - mean) * (x - mean); }));
+    var counts = new Map(); a.forEach(function (x) { counts.set(x, (counts.get(x) || 0) + 1); });
+    var maxf = 0; counts.forEach(function (c) { maxf = Math.max(maxf, c); });
+    var modes = []; counts.forEach(function (c, v) { if (c === maxf) modes.push(v); });
+    var qs = quartiles(a, $('qm').value);
+    return { a: a, n: n, sum: sum, mean: mean, min: a[0], max: a[n - 1], median: median(a, 0, n), counts: counts, maxf: maxf, modes: modes,
+      q1: qs[0], q3: qs[1], pvar: ss / n, svar: n > 1 ? ss / (n - 1) : NaN };
+  }
+  function stat(label, val, note) { return '<div class="stat"><span>' + label + '</span><b>' + val + '</b>' + (note ? '<small>' + note + '</small>' : '') + '</div>'; }
+  function run() {
+    var text = $('data').value;
+    $('msg').className = 'msg'; $('msg').textContent = '';
+    if (!text.trim()) { $('res').hidden = true; last = null; return; }
+    var data;
+    try { data = parse(text); } catch (e) { $('res').hidden = true; last = null; $('msg').className = 'msg bad'; $('msg').textContent = e.message; return; }
+    if (!data.length) { $('res').hidden = true; last = null; $('msg').className = 'msg bad'; $('msg').textContent = 'All frequencies are 0, so there is no data yet.'; return; }
+    var s = stats(data); last = s;
+    var sd = Math.sqrt(s.svar), pd = Math.sqrt(s.pvar), iqr = s.q3 - s.q1, lo = s.q1 - 1.5 * iqr, hi = s.q3 + 1.5 * iqr;
+    var out = s.a.filter(function (x) { return x < lo || x > hi; });
+    var modeTxt, modeNote = '';
+    if (s.counts.size === 1) { modeTxt = fmt(s.modes[0]); modeNote = 'every value is the same'; }
+    else if (s.maxf === 1) { modeTxt = 'None'; modeNote = 'every value appears once'; }
+    else if (s.modes.length === s.counts.size) { modeTxt = 'None'; modeNote = 'every value appears ' + s.maxf + ' times'; }
+    else { modeTxt = s.modes.slice(0, 6).map(fmt).join(', ') + (s.modes.length > 6 ? ' …' : ''); modeNote = (s.modes.length > 1 ? s.modes.length + ' modes, each' : 'appears') + ' ' + s.maxf + ' times'; }
+    var cv = s.n > 1 && s.mean !== 0 ? sd / Math.abs(s.mean) * 100 : NaN;
+    var one = s.n < 2 ? 'needs 2 or more values' : '';
+    var items = [
+      ['Count (n)', fmt(s.n)], ['Sum', fmt(s.sum)], ['Mean', fmt(s.mean)], ['Median', fmt(s.median)], ['Mode', modeTxt, modeNote],
+      ['Minimum', fmt(s.min)], ['Maximum', fmt(s.max)], ['Range', fmt(s.max - s.min)],
+      ['Q1 (lower quartile)', fmt(s.q1)], ['Q3 (upper quartile)', fmt(s.q3)], ['IQR', fmt(iqr), 'Q3 − Q1'],
+      ['Sample variance (s²)', fmt(s.svar), one || 'divides by n − 1'], ['Sample std dev (s)', fmt(sd), one],
+      ['Population variance (σ²)', fmt(s.pvar), 'divides by n'], ['Population std dev (σ)', fmt(pd)],
+      ['Coefficient of variation', isFinite(cv) ? fmt(+cv.toPrecision(6)) + '%' : '–', isFinite(cv) ? 's ÷ |mean|' : (s.n < 2 ? one : 'mean is 0')],
+      ['Standard error of mean', fmt(sd / Math.sqrt(s.n)), one || 's ÷ √n'],
+      ['Outliers', out.length ? fmt(out.length) : 'None', 'outside ' + fmt(lo) + ' to ' + fmt(hi) + ' (1.5 × IQR)']
+    ];
+    $('grid').innerHTML = items.map(function (x) { return stat(x[0], x[1], x[2]); }).join('');
+    $('qnote').textContent = ($('qm').value === 'linear'
+      ? 'Quartiles use linear interpolation: the value at position (n − 1) × p + 1 in the sorted list, the same as Excel QUARTILE.INC and Google Sheets QUARTILE.'
+      : 'Quartiles use the median-of-halves method: Q1 is the median of the lower half and Q3 the median of the upper half, leaving out the middle value when n is odd. This is the method in most school books and on TI calculators.')
+      + (out.length ? ' Outliers: ' + out.slice(0, 20).map(fmt).join(', ') + (out.length > 20 ? ' …' : '') + '.' : '');
+    copyTxt = items.map(function (x) { return x[0] + ': ' + x[1]; }).join('\n') + (s.modes.length > 6 && modeTxt !== 'None' ? '\nAll modes: ' + s.modes.map(fmt).join(', ') : '');
+    $('res').hidden = false;
+    freqTable(s); zTable(s, sd, pd);
+  }
+  function niceWidth(raw) { var p = Math.pow(10, Math.floor(Math.log10(raw))), m = raw / p; return (m <= 1 ? 1 : m <= 2 ? 2 : m <= 2.5 ? 2.5 : m <= 5 ? 5 : 10) * p; }
+  function classes(s) { // [{label, lo, hi, f}] and whether each bar is a single value
+    var vals = [], bins = $('bins').value;
+    s.counts.forEach(function (c, v) { vals.push([v, c]); });
+    vals.sort(function (x, y) { return x[0] - y[0]; });
+    if (bins === 'auto' && vals.length <= 15) return { single: true, list: vals.map(function (x) { return { label: fmt(x[0]), f: x[1] }; }) };
+    var k = bins === 'auto' ? Math.max(5, Math.min(20, Math.ceil(Math.log2(s.n)) + 1)) : +bins;
+    if (s.max === s.min) return { single: true, list: [{ label: fmt(s.min), f: s.n }] };
+    var w = niceWidth((s.max - s.min) / k), start = Math.floor(s.min / w) * w, list = [];
+    for (var i = 0; start + i * w <= s.max || i === 0; i++) list.push({ lo: start + i * w, hi: start + (i + 1) * w, f: 0 });
+    s.a.forEach(function (x) { var j = Math.min(list.length - 1, Math.floor((x - start) / w + 1e-9)); list[j].f++; });
+    list.forEach(function (b, j) { b.label = fmt(+b.lo.toPrecision(12)) + ' to under ' + fmt(+b.hi.toPrecision(12)); });
+    return { single: false, list: list, w: w };
+  }
+  function freqTable(s) {
+    var c = classes(s), cum = 0;
+    var h = '<thead><tr><th>' + (c.single ? 'Value' : 'Class') + '</th><th>Frequency</th><th>Relative</th><th>Cumulative</th></tr></thead><tbody>';
+    c.list.forEach(function (b) { cum += b.f; h += '<tr><td>' + b.label + '</td><td>' + fmtNum(b.f, 0) + '</td><td>' + (b.f / s.n * 100).toFixed(1) + '%</td><td>' + fmtNum(cum, 0) + '</td></tr>'; });
+    $('ftab').innerHTML = h + '</tbody>';
+    drawHist(c);
+  }
+  function zTable(s, sd, pd) {
+    var useS = $('zs').value === 's', d = useS ? sd : pd;
+    $('znote').textContent = 'z = (value − mean) ÷ ' + (useS ? 's' : 'σ') + '. A z-score tells you how many standard deviations a value is above (+) or below (−) the mean.' + (!(d > 0) ? ' All values are equal or there are too few, so z-scores cannot be worked out.' : '');
+    var vals = []; s.counts.forEach(function (c, v) { vals.push([v, c]); }); vals.sort(function (x, y) { return x[0] - y[0]; });
+    var rep = vals.some(function (x) { return x[1] > 1; }), h = '<thead><tr><th>Value</th>' + (rep ? '<th>Count</th>' : '') + '<th>z-score</th></tr></thead><tbody>';
+    vals.slice(0, 500).forEach(function (x) { h += '<tr><td>' + fmt(x[0]) + '</td>' + (rep ? '<td>' + x[1] + '</td>' : '') + '<td>' + (d > 0 ? fmt(+((x[0] - s.mean) / d).toFixed(4)) : '–') + '</td></tr>'; });
+    if (vals.length > 500) h += '<tr><td colspan="3">Showing the first 500 of ' + fmtNum(vals.length, 0) + ' different values.</td></tr>';
+    $('ztab').innerHTML = h + '</tbody>';
+  }
+  var histData = null;
+  function drawHist(c) {
+    histData = c || histData; if (!histData) return;
+    var cv = $('hist'), r = cv.getBoundingClientRect(), W = Math.round(r.width), H = Math.round(r.height);
+    if (!W) return;
+    var dpr = Math.min(window.devicePixelRatio || 1, 3), g = cv.getContext('2d'), cs = getComputedStyle(document.documentElement);
+    cv.width = W * dpr; cv.height = H * dpr; g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var ink = cs.getPropertyValue('--muted').trim() || '#666', line = cs.getPropertyValue('--line').trim() || '#ddd', acc = cs.getPropertyValue('--accent').trim() || '#2563eb';
+    g.clearRect(0, 0, W, H);
+    var list = histData.list, maxf = Math.max.apply(null, list.map(function (b) { return b.f; })) || 1;
+    var L = 44, R = 12, T = 14, B = 46, pw = W - L - R, ph = H - T - B;
+    var step = Math.max(1, Math.ceil(maxf / 5)), p = Math.pow(10, Math.floor(Math.log10(step))); step = Math.ceil(step / p) * p;
+    g.font = '12px system-ui, sans-serif'; g.fillStyle = ink; g.strokeStyle = line; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+    var top = Math.ceil(maxf / step) * step;
+    for (var y = 0; y <= top; y += step) { var py = T + ph - y / top * ph; g.beginPath(); g.moveTo(L, Math.round(py) + .5); g.lineTo(W - R, Math.round(py) + .5); g.stroke(); g.fillText(fmtNum(y, 0), L - 6, py); }
+    var n = list.length, bw = pw / n, gap = histData.single ? Math.min(12, bw * 0.2) : 1;
+    g.fillStyle = acc;
+    list.forEach(function (b, i) { var h = b.f / top * ph; g.fillRect(L + i * bw + gap / 2, T + ph - h, Math.max(1, bw - gap), h); });
+    g.fillStyle = ink; g.textAlign = 'center'; g.textBaseline = 'top';
+    var every = Math.ceil(n / Math.max(1, Math.floor(pw / 56)));
+    list.forEach(function (b, i) {
+      if (i % every) return;
+      if (histData.single) g.fillText(b.label, L + (i + .5) * bw, T + ph + 6);
+      else g.fillText(fmt(+b.lo.toPrecision(12)), L + i * bw, T + ph + 6);
+    });
+    if (!histData.single && (n % every === 0)) g.fillText(fmt(+list[n - 1].hi.toPrecision(12)), L + n * bw, T + ph + 6);
+    g.fillText(histData.single ? 'Value' : 'Class (each bar includes its left edge)', L + pw / 2, T + ph + 26);
+  }
+  function setMode(m) {
+    mode = m;
+    $('mVals').setAttribute('aria-pressed', m === 'vals'); $('mFreq').setAttribute('aria-pressed', m === 'freq');
+    $('dlab').textContent = m === 'vals' ? 'Your numbers' : 'One value and its frequency per line';
+    $('data').placeholder = m === 'vals' ? 'Paste or type numbers separated by commas, spaces or new lines, e.g. 4, 8, 15, 16, 23, 42' : 'e.g.\n1, 4\n2, 7\n3, 5\n(value, how many times it occurs)';
+    run();
+  }
+  $('mVals').addEventListener('click', function () { setMode('vals'); });
+  $('mFreq').addEventListener('click', function () { setMode('freq'); });
+  $('ex').addEventListener('click', function () {
+    if (mode === 'vals') $('data').value = '12, 15, 11, 18, 15, 22, 19, 15, 14, 30, 17, 16, 13, 21, 15, 18, 20, 14';
+    else $('data').value = '0, 3\n1, 8\n2, 12\n3, 9\n4, 5\n5, 2';
+    run();
+  });
+  var t; $('data').addEventListener('input', function () { clearTimeout(t); t = setTimeout(run, 200); });
+  ['qm', 'zs', 'bins'].forEach(function (id) { $(id).addEventListener('change', run); });
+  $('copy').addEventListener('click', function () { copyText(copyTxt, this); });
+  $('clr').addEventListener('click', function () { $('data').value = ''; run(); $('data').focus(); });
+  if (window.ResizeObserver) new ResizeObserver(function () { drawHist(); }).observe($('hist'));
+  new MutationObserver(function () { drawHist(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style'] });
+})();
+</script>

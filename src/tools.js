@@ -1098,5 +1098,53 @@ module.exports = [
         ['Does it work for 80% or 85% rules?', 'Yes. Change the required attendance to any value from 0 to 100%.']
       ],
       icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M8.5 15.5l2 2 4.5-4.5"/>'
+  },
+  {
+      slug: 'text-to-handwriting', cat: 'Study tools', name: 'Text to Handwriting',
+      title: 'Text to Handwriting Converter - Notebook Page, PNG & PDF',
+      desc: 'Turn typed text into realistic handwriting on ruled, plain or grid paper. Six styles, any ink colour, multi-page PNG, ZIP and PDF. Free and private.',
+      card: 'Turn typed text into realistic handwritten pages.',
+      intro: 'Type or paste your text and see it written by hand on notebook paper, with a natural wobble in every letter. Choose the handwriting, paper and ink, then download the pages as images or one PDF.',
+      steps: ['Type or paste your text.', 'Choose a handwriting style, paper and ink colour.', 'Adjust size, spacing and messiness until it looks natural.', 'Download a page as PNG, all pages as a ZIP, or one PDF.'],
+      faq: [
+        ['Does it look like real handwriting?', 'Yes. Each letter and word is drawn with a small random change in height, angle, size and ink darkness, so no two letters look exactly the same. The Messiness slider controls how much.'],
+        ['Can I make several pages?', 'Yes. Long text flows onto new A4 pages automatically. Flip through them in the preview and download all pages as a PDF or a ZIP of PNG images.'],
+        ['Which languages work?', 'The handwriting fonts cover English and most Western European letters with accents. Other scripts and emoji fall back to your device\'s normal font.'],
+        ['Is my text uploaded?', 'No. The pages are drawn in your browser and the text never leaves your device.'],
+        ['Can I use the images for school or social media?', 'Yes, the pages you make are yours to use. The fonts are free open-licence (SIL OFL) fonts. Please do not hand in computer-made handwriting where real handwriting is required.']
+      ],
+      icon: '<path d="M3 21c2-1 3-3 5-3s2 2 4 2 3-2 5-2"/><path d="M14.5 3.5l3 3L9 15l-4 1 1-4z"/>'
+  },
+  {
+      slug: 'mind-map-maker', cat: 'Study tools', name: 'Mind Map Maker',
+      title: 'Mind Map Maker - Free Online Mind Mapping Tool',
+      desc: 'Create mind maps online: add topics with Tab and Enter, drag, auto layout, colours, collapse, undo. Save maps, export PNG or JSON, print. No sign-up.',
+      card: 'Brainstorm ideas as a colourful mind map.',
+      intro: 'Start with a central idea and grow branches around it. Add topics with the keyboard or a tap, drag them anywhere, tidy everything with Auto layout, and export a sharp PNG.',
+      steps: ['Double-click the central topic and type your subject.', 'Select a topic and press Tab for a child or Enter for a sibling.', 'Drag topics, change colours, collapse branches or click Auto layout.', 'Download a PNG, export JSON or print.'],
+      faq: [
+        ['Are my mind maps saved?', 'Yes. Every change is saved automatically in this browser, and you can keep several maps. Use Export JSON for a backup or to move a map to another device.'],
+        ['Does it work on a phone or tablet?', 'Yes. Tap to select, double-tap to edit, drag topics with your finger, drag the background to pan and pinch to zoom.'],
+        ['What are the keyboard shortcuts?', 'Tab adds a child, Enter adds a sibling, F2 edits, Space collapses or expands, Delete removes a topic, the arrow keys move between topics and Ctrl+Z / Ctrl+Y undo and redo.'],
+        ['How big is the PNG export?', 'The image is made at up to three times screen size and up to 8000 pixels on the longest side, so it stays sharp when printed or zoomed.'],
+        ['Is anything uploaded?', 'No. Your maps stay in your browser. Nothing is sent to a server.']
+      ],
+      icon: '<circle cx="12" cy="12" r="3"/><circle cx="4" cy="5" r="2"/><circle cx="20" cy="5" r="2"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/><path d="M9.5 10.3L5.6 6.4M14.5 10.3l3.9-3.9M9.5 13.7l-3.9 3.9M14.5 13.7l3.9 3.9"/>'
+  },
+  {
+      slug: 'focus-sounds', cat: 'Study tools', name: 'Focus Sounds',
+      title: 'Focus Sounds - Rain, White & Brown Noise Mixer Online',
+      desc: 'Mix rain, ocean, wind, fireplace, coffee shop, white, pink and brown noise for focus or sleep. Presets and fade-out timer. Free, no downloads.',
+      card: 'Mix rain, noise and nature sounds for focus or sleep.',
+      intro: 'Play calming background sounds made live in your browser. Mix rain, waves, wind, fire, a coffee shop and white, pink or brown noise, and set a timer that fades out gently.',
+      steps: ['Click Play or choose a preset such as Deep focus or Sleep.', 'Switch sounds on and set each slider to build your mix.', 'Set the master volume and, if you like, a timer.', 'Keep working: the sound plays on in the background.'],
+      faq: [
+        ['What is the difference between white, pink and brown noise?', 'White noise has equal energy at all frequencies and sounds bright, like a hiss. Pink noise is softer, like steady rain. Brown noise is deeper still, like a distant waterfall or rumble.'],
+        ['Does it keep playing in another tab?', 'Yes. Sound keeps playing when you switch tabs or apps, and the timer fade still happens on time. Some phones may pause it when the screen locks.'],
+        ['Why does nothing play until I click?', 'Browsers do not allow web pages to start sound on their own. One click on Play, a preset or a sound starts it.'],
+        ['Does it use a lot of data?', 'No. There are no audio files. Every sound is generated live on your device with Web Audio, so it uses no data after the page has loaded.'],
+        ['Is my mix saved?', 'Yes. Your sounds, volumes and master volume are remembered in this browser for next time.']
+      ],
+      icon: '<path d="M3 14v-2a9 9 0 0 1 18 0v2"/><rect x="2" y="14" width="5" height="7" rx="2"/><rect x="17" y="14" width="5" height="7" rx="2"/>'
   }
 ];

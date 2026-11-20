@@ -1,0 +1,309 @@
+<style>
+.bc-out { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px; border: 1px solid var(--line); border-radius: 12px; padding: 16px; text-align: center; margin: 4px 0 12px; overflow-x: auto; }
+.bc-out svg { max-width: 100%; height: auto; display: inline-block; vertical-align: middle; }
+.bc-check { font-size: 14px; margin: 0 0 12px; color: var(--muted); }
+.bc-check.ok { color: var(--ok); } .bc-check.bad { color: var(--bad); }
+.bc-sec { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 18px 0 0; }
+.bc-sec h3 { font-size: 16px; margin: 0 0 8px; }
+.bc-hint { font-size: 14px; color: var(--muted); margin: -6px 0 14px; }
+.bc-col input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="fields">
+  <div><label for="bfmt">Barcode type</label><select id="bfmt">
+    <option value="CODE128">Code 128 (any text, most common)</option>
+    <option value="EAN13">EAN-13 (retail products, 13 digits)</option>
+    <option value="EAN8">EAN-8 (small products, 8 digits)</option>
+    <option value="UPC">UPC-A (US and Canada retail, 12 digits)</option>
+    <option value="CODE39">Code 39 (capital letters and digits)</option>
+    <option value="ITF14">ITF-14 (shipping cartons, 14 digits)</option>
+    <option value="MSI">MSI Plessey (shelf labels, digits)</option>
+    <option value="pharmacode">Pharmacode (packaging, 3 to 131070)</option>
+  </select></div>
+  <div><label for="val">Value to encode</label><input type="text" id="val" value="GetToolNest-123" maxlength="80" autocomplete="off" spellcheck="false"></div>
+</div>
+<p class="bc-hint" id="hint"></p>
+<div class="fields" id="extraRow" hidden>
+  <div id="msiRow" hidden><label for="msick">MSI check digit</label><select id="msick"><option value="MSI10">Mod 10 (most common)</option><option value="MSI">None</option><option value="MSI11">Mod 11</option><option value="MSI1010">Mod 10 + Mod 10</option><option value="MSI1110">Mod 11 + Mod 10</option></select></div>
+  <div id="c39Row" hidden class="checks" style="margin:30px 0 0"><label><input type="checkbox" id="mod43"> Add Mod 43 check character</label></div>
+</div>
+<div class="bc-out" id="out" aria-live="polite"><svg id="bsvg" role="img" aria-label="Barcode preview"></svg></div>
+<p class="bc-check" id="check"></p>
+<div class="stats" id="stats" hidden>
+  <div class="stat"><span>Encoded as</span><b id="sEnc">–</b></div>
+  <div class="stat"><span>Check digit</span><b id="sChk">–</b></div>
+  <div class="stat"><span>PNG size</span><b id="sSize">–</b></div>
+</div>
+<div class="fields bc-col" style="margin-top:16px">
+  <div><label for="bw">Bar width: <span id="bwV">2</span> px</label><input type="range" id="bw" min="1" max="6" value="2"></div>
+  <div><label for="bh">Height: <span id="bhV">100</span> px</label><input type="range" id="bh" min="20" max="300" step="5" value="100"></div>
+  <div><label for="bm">Quiet zone (margin): <span id="bmV">10</span> px</label><input type="range" id="bm" min="0" max="60" value="10"></div>
+  <div><label for="fs">Text size: <span id="fsV">20</span> px</label><input type="range" id="fs" min="8" max="48" value="20"></div>
+  <div><label for="lc">Bar and text colour</label><input type="color" id="lc" value="#000000"></div>
+  <div><label for="bg">Background colour</label><input type="color" id="bg" value="#ffffff"></div>
+  <div><label for="scale">PNG resolution</label><select id="scale"><option value="1">1× (screen)</option><option value="2" selected>2× (sharp)</option><option value="4">4× (print)</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="showTxt" checked> Show the value under the bars</label>
+  <label><input type="checkbox" id="transp"> Transparent background</label>
+</div>
+<div class="fields" id="ctxtRow"><div><label for="ctxt">Custom text under the bars (optional)</label><input type="text" id="ctxt" maxlength="80" placeholder="Leave empty to show the value" autocomplete="off" data-nomemo></div></div>
+<div class="btns"><button class="btn" id="png" disabled>Download PNG</button><button class="btn ghost" id="svgBtn" disabled>Download SVG</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+
+<div class="bc-sec">
+  <h3>Batch: many barcodes at once</h3>
+  <p class="bc-hint" style="margin:0 0 10px">One value per line, up to 1000. Each one uses the type and style above and is saved as its own file inside a ZIP.</p>
+  <label for="batch">Values</label>
+  <textarea id="batch" style="min-height:120px" placeholder="590123412345&#10;400638133393&#10;871125300120" data-nomemo spellcheck="false"></textarea>
+  <div class="fields" style="margin-top:12px"><div><label for="bfile">File type in the ZIP</label><select id="bfile"><option value="png">PNG</option><option value="svg">SVG</option></select></div></div>
+  <div class="btns" style="margin-top:0"><button class="btn" id="zipBtn">Create ZIP</button><a class="btn ghost" id="zdl" hidden>Download ZIP</a></div>
+  <p class="msg" id="zmsg"></p>
+</div>
+<script src="../assets/vendor/jsbarcode/JsBarcode.all.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var INFO = {
+    CODE128: { sample: 'GetToolNest-123', hint: 'Letters, digits, spaces and symbols (plain ASCII), up to 80 characters.' },
+    EAN13: { sample: '590123412345', hint: 'Type 12 digits and the 13th (check digit) is added for you, or type all 13 to have them checked.' },
+    EAN8: { sample: '9638507', hint: 'Type 7 digits and the check digit is added, or type all 8 to have them checked.' },
+    UPC: { sample: '03600029145', hint: 'Type 11 digits and the check digit is added, or type all 12 to have them checked.' },
+    CODE39: { sample: 'ABC-1234', hint: 'Capital letters A to Z, digits, space and - . $ / + %. Small letters are turned into capitals.' },
+    ITF14: { sample: '1540014128876', hint: 'Type 13 digits and the check digit is added, or type all 14 to have them checked.' },
+    MSI: { sample: '1234567', hint: 'Digits only, up to 40. Pick the check digit your scanner expects.' },
+    pharmacode: { sample: '1234', hint: 'A whole number from 3 to 131070. Pharmacode has no text, only bars.' }
+  };
+  var NAMES = { CODE128: 'Code 128', EAN13: 'EAN-13', EAN8: 'EAN-8', UPC: 'UPC-A', CODE39: 'Code 39', ITF14: 'ITF-14', MSI: 'MSI', pharmacode: 'Pharmacode' };
+  var cur = null; // { fmt, data, text, check }
+
+  // GS1 check digit (EAN, UPC, ITF-14): weights 3 and 1 from the right
+  function gs1(body) { var s = 0; for (var i = body.length - 1, w = 3; i >= 0; i--, w = 4 - w) s += +body[i] * w; return String((10 - s % 10) % 10); }
+
+  // Returns { data, check, note } or throws an Error with a message for people.
+  function validate(fmt, raw) {
+    var v = raw.trim();
+    if (!v) throw new Error('Type a value to encode.');
+    var digits = /^\d+$/.test(v);
+    function gs1fixed(n, label) {
+      if (!digits) throw new Error(label + ' can only contain digits 0 to 9. Remove "' + v.replace(/\d/g, '').charAt(0) + '".');
+      if (v.length === n - 1) { var c = gs1(v); return { data: v + c, check: c, note: 'Check digit ' + c + ' was added.' }; }
+      if (v.length === n) {
+        var want = gs1(v.slice(0, -1));
+        if (want !== v.slice(-1)) throw new Error('The last digit should be ' + want + ', not ' + v.slice(-1) + '. ' + label + ' check digits catch typing mistakes, so check the number, or type only the first ' + (n - 1) + ' digits and the right check digit is added.');
+        return { data: v, check: want, note: 'Check digit ' + want + ' is correct.' };
+      }
+      throw new Error(label + ' needs ' + (n - 1) + ' digits (check digit added for you) or ' + n + ' digits. You typed ' + v.length + '.');
+    }
+    switch (fmt) {
+      case 'EAN13': return gs1fixed(13, 'EAN-13');
+      case 'EAN8': return gs1fixed(8, 'EAN-8');
+      case 'UPC': return gs1fixed(12, 'UPC-A');
+      case 'ITF14': return gs1fixed(14, 'ITF-14');
+      case 'CODE128':
+        for (var i = 0; i < v.length; i++) if (v.charCodeAt(i) > 126 || v.charCodeAt(i) < 32) throw new Error('Code 128 can only hold plain keyboard characters. "' + v.charAt(i) + '" is not supported, so remove or replace it (accents and emoji cannot be encoded).');
+        if (v.length > 80) throw new Error('Keep Code 128 values to 80 characters or fewer so scanners can read them.');
+        return { data: v, check: 'Built in', note: '' };
+      case 'CODE39':
+        var up = v.toUpperCase(), bad = up.replace(/[0-9A-Z \-.$\/+%]/g, '');
+        if (bad) throw new Error('Code 39 cannot hold "' + bad.charAt(0) + '". Use capital letters, digits, space and - . $ / + % only.');
+        if (up.length > 43) throw new Error('Code 39 gets very wide. Keep it to 43 characters or fewer, or use Code 128.');
+        return { data: up, check: $('mod43').checked ? 'Mod 43' : 'None', note: up !== v ? 'Changed to capitals: Code 39 has no small letters.' : '' };
+      case 'MSI':
+        if (!digits) throw new Error('MSI can only contain digits 0 to 9.');
+        if (v.length > 40) throw new Error('Keep MSI codes to 40 digits or fewer.');
+        return { data: v, check: $('msick').selectedOptions[0].textContent.replace(/ \(.*\)/, ''), note: '' };
+      case 'pharmacode':
+        if (!digits) throw new Error('Pharmacode is a whole number, digits only.');
+        var n = +v;
+        if (n < 3 || n > 131070) throw new Error('Pharmacode must be from 3 to 131070. ' + v + ' is ' + (n < 3 ? 'too small.' : 'too large.'));
+        return { data: String(n), check: 'None', note: '' };
+    }
+    throw new Error('Unknown barcode type.');
+  }
+
+  function opts(fmt, s, forText) {
+    var show = $('showTxt').checked && fmt !== 'pharmacode';
+    var o = {
+      format: fmt === 'MSI' ? $('msick').value : fmt,
+      width: +$('bw').value * s, height: +$('bh').value * s, margin: +$('bm').value * s,
+      fontSize: +$('fs').value * s, textMargin: 2 * s, displayValue: show,
+      lineColor: $('lc').value, background: $('transp').checked ? 'rgba(0,0,0,0)' : $('bg').value,
+      font: 'monospace'
+    };
+    if (fmt === 'CODE39') o.mod43 = $('mod43').checked;
+    var t = $('ctxt').value.trim(); if (t && show) o.text = t;
+    return o;
+  }
+  // JsBarcode throws strings or calls valid(false); wrap so we always get an Error
+  function render(target, fmt, data, s) {
+    var ok = true, o = opts(fmt, s);
+    o.valid = function (v) { ok = v; };
+    try { JsBarcode(target, data, o); } catch (e) { ok = false; }
+    if (!ok) throw new Error('This value cannot be encoded as ' + NAMES[fmt] + '.');
+  }
+
+  // ---------- independent EAN/UPC reference: encode digits to modules, and decode modules back to digits ----------
+  var L = ['0001101', '0011001', '0010011', '0111101', '0100011', '0110001', '0101111', '0111011', '0110111', '0001011'];
+  var R = L.map(function (c) { return c.replace(/./g, function (b) { return b === '1' ? '0' : '1'; }); });
+  var G = R.map(function (c) { return c.split('').reverse().join(''); });
+  var PAR = ['LLLLLL', 'LLGLGG', 'LLGGLG', 'LLGGGL', 'LGLLGG', 'LGGLLG', 'LGGGLL', 'LGLGLG', 'LGLGGL', 'LGGLGL'];
+  function refEncode(d) { // 13 or 8 digits
+    var out = '101', i;
+    if (d.length === 13) {
+      for (i = 1; i <= 6; i++) out += (PAR[+d[0]][i - 1] === 'L' ? L : G)[+d[i]];
+      out += '01010'; for (i = 7; i <= 12; i++) out += R[+d[i]];
+    } else {
+      for (i = 0; i < 4; i++) out += L[+d[i]];
+      out += '01010'; for (i = 4; i < 8; i++) out += R[+d[i]];
+    }
+    return out + '101';
+  }
+  function refDecode(bits) {
+    var n = bits.length === 95 ? 6 : bits.length === 67 ? 4 : 0;
+    if (!n) return null;
+    if (bits.slice(0, 3) !== '101' || bits.slice(-3) !== '101' || bits.substr(3 + 7 * n, 5) !== '01010') return null;
+    var left = '', par = '', right = '', k, c, j;
+    for (k = 0; k < n; k++) {
+      c = bits.substr(3 + 7 * k, 7);
+      if ((j = L.indexOf(c)) >= 0) { left += j; par += 'L'; } else if ((j = G.indexOf(c)) >= 0) { left += j; par += 'G'; } else return null;
+    }
+    for (k = 0; k < n; k++) { c = bits.substr(8 + 7 * (n + k), 7); if ((j = R.indexOf(c)) < 0) return null; right += j; }
+    var digits;
+    if (n === 6) { var f = PAR.indexOf(par); if (f < 0) return null; digits = f + left + right; }
+    else { if (par !== 'LLLL') return null; digits = left + right; }
+    return gs1(digits.slice(0, -1)) === digits.slice(-1) ? digits : null;
+  }
+  // Read the bars back off the finished image: one scan line through the top of the bars.
+  function scan(canvas, modules) {
+    var ctx = canvas.getContext('2d'), w = canvas.width, y = +$('bm').value * +$('scale').value + 2;
+    var row = ctx.getImageData(0, y, w, 1).data, dark = [], bgL = luma($('transp').checked ? '#ffffff' : $('bg').value), fgL = luma($('lc').value);
+    for (var x = 0; x < w; x++) {
+      var a = row[x * 4 + 3] / 255, l = (0.299 * row[x * 4] + 0.587 * row[x * 4 + 1] + 0.114 * row[x * 4 + 2]) * a + bgL * (1 - a);
+      dark.push(Math.abs(l - fgL) < Math.abs(l - bgL));
+    }
+    var a0 = dark.indexOf(true), a1 = dark.lastIndexOf(true);
+    if (a0 < 0) return '';
+    var mw = (a1 - a0 + 1) / modules, bits = '';
+    for (var m = 0; m < modules; m++) bits += dark[Math.floor(a0 + (m + 0.5) * mw)] ? '1' : '0';
+    return bits;
+  }
+  function luma(hex) { var n = parseInt(hex.slice(1), 16); return 0.299 * (n >> 16) + 0.587 * (n >> 8 & 255) + 0.114 * (n & 255); }
+  function verify(fmt, data, canvas) {
+    if (fmt !== 'EAN13' && fmt !== 'EAN8' && fmt !== 'UPC') return null;
+    var full = fmt === 'UPC' ? '0' + data : data, expect = refEncode(full), bits = scan(canvas, expect.length), got = refDecode(bits);
+    if (bits === expect && got === full) return { ok: true, text: '✓ Verified: the bars were read back from the image and decode to ' + (fmt === 'UPC' ? got.slice(1) : got) + ', matching the ' + NAMES[fmt] + ' standard pattern.' };
+    if (luma($('lc').value) > luma($('bg').value) - 60 && !$('transp').checked) return { ok: false, text: 'Warning: the bars are not much darker than the background. Most scanners need dark bars on a light background.' };
+    return { ok: false, text: 'Warning: the image could not be read back as ' + NAMES[fmt] + ' ' + full + '. Try a bar width of 2 px or more.' };
+  }
+
+  var pngCanvas = null, pngTimer = 0;
+  function update() {
+    var fmt = $('bfmt').value;
+    $('hint').textContent = INFO[fmt].hint;
+    $('extraRow').hidden = fmt !== 'MSI' && fmt !== 'CODE39'; $('msiRow').hidden = fmt !== 'MSI'; $('c39Row').hidden = fmt !== 'CODE39';
+    $('ctxtRow').hidden = fmt === 'pharmacode' || !$('showTxt').checked;
+    ['bwV', 'bhV', 'bmV', 'fsV'].forEach(function (id) { $(id).textContent = $(id.slice(0, -1)).value; });
+    $('bg').disabled = $('transp').checked;
+    $('dl').hidden = true;
+    var r;
+    try { r = validate(fmt, $('val').value); render($('bsvg'), fmt, r.data, 1); }
+    catch (e) {
+      cur = null; $('bsvg').innerHTML = ''; $('bsvg').removeAttribute('width'); $('bsvg').removeAttribute('height');
+      $('out').hidden = true; $('stats').hidden = true; $('check').textContent = '';
+      $('png').disabled = $('svgBtn').disabled = true;
+      PT.say('bad', e.message); return;
+    }
+    cur = { fmt: fmt, data: r.data };
+    $('out').hidden = false; $('stats').hidden = false; $('png').disabled = $('svgBtn').disabled = false;
+    $('bsvg').setAttribute('aria-label', NAMES[fmt] + ' barcode for ' + r.data);
+    $('sEnc').textContent = r.data.length > 18 ? r.data.slice(0, 17) + '…' : r.data; $('sChk').textContent = r.check;
+    PT.say(r.note ? 'ok' : '', r.note);
+    // build the downloadable PNG a moment later so dragging a slider stays smooth
+    clearTimeout(pngTimer);
+    pngTimer = setTimeout(function () {
+      if (!cur) return;
+      pngCanvas = document.createElement('canvas');
+      try { render(pngCanvas, cur.fmt, cur.data, +$('scale').value); } catch (e) { return; }
+      $('sSize').textContent = pngCanvas.width + ' × ' + pngCanvas.height;
+      var v = verify(cur.fmt, cur.data, pngCanvas);
+      $('check').className = 'bc-check' + (v ? (v.ok ? ' ok' : ' bad') : '');
+      $('check').textContent = v ? v.text : '';
+    }, 120);
+  }
+  function safe(s) { return s.replace(/[^\w.-]+/g, '_').slice(0, 60) || 'barcode'; }
+  var lastUrl = null;
+  function offer(a, blob, name) {
+    if (a.dataset.url) URL.revokeObjectURL(a.dataset.url);
+    var u = URL.createObjectURL(blob); a.dataset.url = u;
+    a.href = u; a.download = name; a.textContent = 'Download ' + name; a.hidden = false; a.click();
+  }
+  function svgText(fmt, data) {
+    var svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    render(svg, fmt, data, 1);
+    svg.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    return '<?xml version="1.0" encoding="UTF-8"?>\n' + new XMLSerializer().serializeToString(svg);
+  }
+  function pngBlob(fmt, data) {
+    var c = document.createElement('canvas'); render(c, fmt, data, +$('scale').value);
+    return PT.blob(c, 'image/png');
+  }
+
+  $('png').addEventListener('click', function () {
+    if (!cur) return;
+    pngBlob(cur.fmt, cur.data).then(function (b) {
+      if (!b) { PT.say('bad', 'Your browser could not create the PNG.'); return; }
+      offer($('dl'), b, 'barcode-' + cur.fmt.toLowerCase() + '-' + safe(cur.data) + '.png');
+      PT.say('ok', 'PNG saved · ' + fmtBytes(b.size) + '. If the download did not start, use the button above.');
+    });
+  });
+  $('svgBtn').addEventListener('click', function () {
+    if (!cur) return;
+    var b = new Blob([svgText(cur.fmt, cur.data)], { type: 'image/svg+xml' });
+    offer($('dl'), b, 'barcode-' + cur.fmt.toLowerCase() + '-' + safe(cur.data) + '.svg');
+    PT.say('ok', 'SVG saved · ' + fmtBytes(b.size) + '. SVG stays sharp at any size, ideal for print.');
+  });
+
+  var zbusy = false;
+  function zsay(cls, t) { $('zmsg').className = 'msg ' + cls; $('zmsg').textContent = t; }
+  $('zipBtn').addEventListener('click', async function () {
+    if (zbusy) return;
+    var fmt = $('bfmt').value, lines = $('batch').value.split(/\r?\n/).map(function (s) { return s.trim(); }).filter(Boolean);
+    $('zdl').hidden = true;
+    if (!lines.length) { zsay('bad', 'Type or paste at least one value, one per line.'); return; }
+    if (lines.length > 1000) { zsay('bad', 'That is ' + lines.length + ' lines. Please split it into batches of up to 1000.'); return; }
+    zbusy = true; $('zipBtn').disabled = true;
+    var files = [], errs = [], used = {}, kind = $('bfile').value, enc = new TextEncoder();
+    try {
+      for (var k = 0; k < lines.length; k++) {
+        if (k % 25 === 0) { zsay('', 'Creating ' + (k + 1) + ' of ' + lines.length + '…'); await new Promise(function (r) { setTimeout(r, 0); }); }
+        var r;
+        try { r = validate(fmt, lines[k]); } catch (e) { errs.push('Line ' + (k + 1) + ' (' + lines[k].slice(0, 20) + '): ' + e.message); continue; }
+        var base = safe(r.data), name = base + '.' + kind, n = 2;
+        while (used[name]) name = base + '-' + (n++) + '.' + kind;
+        used[name] = 1;
+        var data;
+        if (kind === 'svg') data = enc.encode(svgText(fmt, r.data));
+        else { var b = await pngBlob(fmt, r.data); data = new Uint8Array(await b.arrayBuffer()); }
+        files.push({ name: name, data: data });
+      }
+      if (!files.length) zsay('bad', 'None of the lines could be encoded as ' + NAMES[fmt] + '. ' + errs.slice(0, 3).join(' '));
+      else {
+        var z = PT.zip(files);
+        offer($('zdl'), z, 'barcodes-' + fmt.toLowerCase() + '.zip');
+        zsay(errs.length ? 'bad' : 'ok', files.length + ' barcode' + (files.length === 1 ? '' : 's') + ' saved in the ZIP · ' + fmtBytes(z.size) + '.' + (errs.length ? ' Skipped ' + errs.length + ': ' + errs.slice(0, 5).join(' ') + (errs.length > 5 ? ' …' : '') : ''));
+      }
+    } catch (e) { zsay('bad', 'Something went wrong while creating the ZIP.'); }
+    zbusy = false; $('zipBtn').disabled = false;
+  });
+
+  $('bfmt').addEventListener('change', function () {
+    var fmt = $('bfmt').value;
+    try { validate(fmt, $('val').value); } catch (e) { $('val').value = INFO[fmt].sample; }
+    update();
+  });
+  ['val', 'msick', 'mod43', 'bw', 'bh', 'bm', 'fs', 'lc', 'bg', 'scale', 'showTxt', 'transp', 'ctxt'].forEach(function (id) {
+    $(id).addEventListener('input', update); $(id).addEventListener('change', update);
+  });
+  update();
+})();
+</script>

@@ -27,12 +27,15 @@
 .cc-read { font-size: 15px; font-weight: 600; min-height: 1.5em; margin: 10px 0 4px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .cc-svg { width: 100%; height: auto; display: block; touch-action: pan-y; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
 .cc-svg:focus-visible { outline: 3px solid var(--accent-soft); }
-.cc-svg text { font-size: 11px; fill: var(--muted); font-family: inherit; }
+.cc-svg text { font-size: 12px; fill: var(--muted); font-family: inherit; }
 .cc-svg .grid { stroke: var(--line); stroke-width: 1; }
 .cc-svg .line { fill: none; stroke: var(--accent); stroke-width: 2.25; stroke-linejoin: round; stroke-linecap: round; }
 .cc-svg .area { fill: var(--accent); opacity: .1; }
 .cc-svg .cross { stroke: var(--muted); stroke-width: 1; stroke-dasharray: 3 3; }
 .cc-svg .dot { fill: var(--accent); stroke: var(--surface); stroke-width: 2; }
+.cc-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cc-stats .stat { padding: 10px 12px; }
+.cc-stats .stat b { font-size: 18px; }
 .cc-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
 .cc-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: middle; }
 .cc-table td:nth-child(2) { text-align: end; }
@@ -84,7 +87,7 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
 </div>
 <p class="cc-read" id="ccRead" aria-live="polite"></p>
 <svg class="cc-svg" id="ccSvg" viewBox="0 0 640 240" tabindex="0" role="img" aria-label="Exchange rate chart"></svg>
-<div class="stats">
+<div class="stats cc-stats">
   <div class="stat"><span>High</span><b id="ccHi">–</b></div>
   <div class="stat"><span>Low</span><b id="ccLo">–</b></div>
   <div class="stat"><span>Change</span><b id="ccChg">–</b></div>
@@ -298,7 +301,7 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
   function getJSON(url) {
     var ctl = window.AbortController ? new AbortController() : null, tm = setTimeout(function () { if (ctl) ctl.abort(); }, 12000);
     return fetch(url, { cache: 'no-store', signal: ctl ? ctl.signal : undefined })
-      .then(function (r) { clearTimeout(tm); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); }, function (e) { clearTimeout(tm); throw e; });
+      .then(function (r) { clearTimeout(tm); if (!r.ok) { var er = new Error('HTTP ' + r.status); er.status = r.status; throw er; } return r.json(); }, function (e) { clearTimeout(tm); throw e; });
   }
   function firstOk(urls) { return getJSON(urls[0]).catch(function () { if (urls.length > 1) return firstOk(urls.slice(1)); throw new Error('all failed'); }); }
   function good(v) { return typeof v === 'number' && isFinite(v) && v > 0; }
@@ -350,12 +353,16 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
   }
   function fetchDay(date) {
     if (inflight[date]) return inflight[date];
-    return (inflight[date] = firstOk(fawazUrls(date)).then(function (j) {
-      var z = parseFz(j); if (!z || z.date !== date) throw new Error('bad');
-      hist[date] = slim(z); return true;
-    }).catch(function () {
-      var age = (Date.now() - Date.parse(date)) / 864e5;
-      if (age > 3 && navigator.onLine !== false) hist[date] = 0; // not published for that day; do not ask again
+    var urls = fawazUrls(date), notFound = 0;
+    function attempt(i) {
+      return getJSON(urls[i]).then(function (j) {
+        var z = parseFz(j); if (!z || z.date !== date) throw new Error('bad');
+        return z;
+      }).catch(function (e) { if (e && e.status === 404) notFound++; if (i + 1 < urls.length) return attempt(i + 1); throw e; });
+    }
+    return (inflight[date] = attempt(0).then(function (z) { hist[date] = slim(z); return true; }).catch(function () {
+      // Remember a day as missing only when every mirror says it does not exist; network trouble is retried next time.
+      if (notFound === urls.length && (Date.now() - Date.parse(date)) / 864e5 > 3) hist[date] = 0;
       return false;
     }).then(function (ok) { delete inflight[date]; return ok; }));
   }
@@ -391,9 +398,10 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
     }
   }
   var W = 640, H = 240, PL = 64, PR = 14, PT = 14, PB = 28;
+  function size() { var w = Math.round($('ccSvg').getBoundingClientRect().width) || 640; W = Math.max(280, w); H = W < 500 ? 200 : 240; PL = W < 500 ? 58 : 64; $('ccSvg').setAttribute('viewBox', '0 0 ' + W + ' ' + H); }
   function sx(i) { return PL + (series.length < 2 ? 0 : i * (W - PL - PR) / (series.length - 1)); }
   function drawChart() {
-    var svg = $('ccSvg'), NS = 'http://www.w3.org/2000/svg'; svg.innerHTML = '';
+    var svg = $('ccSvg'), NS = 'http://www.w3.org/2000/svg'; svg.innerHTML = ''; size();
     function el(n, a) { var e = document.createElementNS(NS, n); for (var k in a) e.setAttribute(k, a[k]); svg.appendChild(e); return e; }
     if (series.length < 2) {
       ['ccHi', 'ccLo', 'ccChg'].forEach(function (i) { $(i).textContent = '–'; }); $('ccRead').textContent = '';
@@ -403,11 +411,13 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
     var vs = series.map(function (p) { return p.v; }), lo = Math.min.apply(null, vs), hi = Math.max.apply(null, vs), pad = (hi - lo) * 0.08 || hi * 0.01;
     var y0 = lo - pad, y1 = hi + pad;
     function sy(v) { return PT + (y1 - v) / (y1 - y0) * (H - PT - PB); }
-    for (var g = 0; g <= 3; g++) { var v = y0 + (y1 - y0) * g / 3, y = sy(v); el('line', { x1: PL, x2: W - PR, y1: y, y2: y, class: 'grid' }); el('text', { x: PL - 6, y: y + 4, 'text-anchor': 'end' }).textContent = rateStr(v); }
+    var ad = Math.max(0, Math.min(10, Math.ceil(-Math.log10((y1 - y0) / 3)) + 1)), labs = [0, 1, 2, 3].map(function (g) { return fmtNum(y0 + (y1 - y0) * g / 3, ad); });
+    PL = 12 + 7 * Math.max.apply(null, labs.map(function (l) { return l.length; }));
+    for (var g = 0; g <= 3; g++) { var v = y0 + (y1 - y0) * g / 3, y = sy(v); el('line', { x1: PL, x2: W - PR, y1: y, y2: y, class: 'grid' }); el('text', { x: PL - 6, y: y + 4, 'text-anchor': 'end' }).textContent = labs[g]; }
     var d = series.map(function (p, i) { return (i ? 'L' : 'M') + sx(i).toFixed(1) + ' ' + sy(p.v).toFixed(1); }).join(' ');
     el('path', { d: d + ' L' + sx(series.length - 1).toFixed(1) + ' ' + (H - PB) + ' L' + PL + ' ' + (H - PB) + ' Z', class: 'area' });
     el('path', { d: d, class: 'line' });
-    [0, Math.floor((series.length - 1) / 2), series.length - 1].forEach(function (i, k) { el('text', { x: sx(i), y: H - 8, 'text-anchor': k === 0 ? 'start' : k === 2 ? 'end' : 'middle' }).textContent = day(series[i].d); });
+    (W < 420 ? [0, series.length - 1] : [0, Math.floor((series.length - 1) / 2), series.length - 1]).forEach(function (i, k) { el('text', { x: sx(i), y: H - 8, 'text-anchor': i === 0 ? 'start' : i === series.length - 1 ? 'end' : 'middle' }).textContent = day(series[i].d); });
     var first = series[0].v, lastV = series[series.length - 1].v, chg = (lastV - first) / first * 100;
     $('ccHi').textContent = rateStr(hi); $('ccLo').textContent = rateStr(lo);
     $('ccChg').textContent = (chg > 0 ? '+' : '') + fmtNum(chg, 2) + '%';
@@ -424,6 +434,8 @@ details.cc-more summary { cursor: pointer; font-weight: 600; }
     i = Math.max(0, Math.min(series.length - 1, i));
     if (i !== hover) { hover = i; drawChart(); }
   }
+  var lastW = 0; if (window.ResizeObserver) new ResizeObserver(function () { var w = Math.round($('ccSvg').getBoundingClientRect().width); if (w && w !== lastW) { lastW = w; drawChart(); } }).observe($('ccSvg'));
+  else window.addEventListener('resize', function () { drawChart(); });
   $('ccSvg').addEventListener('pointermove', pick);
   $('ccSvg').addEventListener('pointerdown', pick);
   $('ccSvg').addEventListener('pointerleave', function (e) { if (e.pointerType === 'mouse') { hover = -1; drawChart(); } });
