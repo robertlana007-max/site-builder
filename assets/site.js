@@ -3,13 +3,36 @@
 (function () {
   var root = document.documentElement;
   root.classList.add('js');
-  try {
-    var saved = localStorage.getItem('theme');
-    if (saved) root.setAttribute('data-theme', saved);
-  } catch (e) {}
   var REL = root.getAttribute('data-rel') || '';
   var SLUG = root.getAttribute('data-slug') || '';
-  var calm = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var calmOS = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = calmOS;
+  var darkOS = window.matchMedia ? matchMedia('(prefers-color-scheme: dark)') : null;
+
+  // ---------- visitor preferences (Settings). Stored with the rest of the saved state, so they sync with an account. ----------
+  var ACCENTS = { blue: '#2563eb', violet: '#7c3aed', green: '#059669', teal: '#0d9488', orange: '#ea580c', pink: '#db2777', red: '#dc2626', gray: '#475569' };
+  var PREF = { theme: 'light', accent: 'blue', size: 'm', density: 'comfy', corners: 'round', tiles: true, desc: true, newtab: false, motion: true, rememberInputs: true, rememberRecent: true, confetti: true };
+  function rawState() { try { return JSON.parse(localStorage.getItem('gtn1')) || {}; } catch (e) { return {}; } }
+  function prefsOf(o) {
+    var p = {}, src = (o && o.prefs && typeof o.prefs === 'object') ? o.prefs : {}, k;
+    for (k in PREF) p[k] = (k in src && typeof src[k] === typeof PREF[k]) ? src[k] : PREF[k];
+    if (!(o && o.prefs && o.prefs.theme)) { try { var old = localStorage.getItem('theme'); if (old === 'dark' || old === 'light') p.theme = old; } catch (e) {} }
+    return p;
+  }
+  window.applyPrefs = function (p) {
+    p = p || prefsOf(rawState());
+    var dark = p.theme === 'dark' || (p.theme === 'auto' && darkOS && darkOS.matches);
+    root.setAttribute('data-theme', dark ? 'dark' : 'light');
+    var c = ACCENTS[p.accent] || ACCENTS.blue, a = dark ? 'color-mix(in srgb, ' + c + ' 62%, #ffffff)' : c;
+    root.style.setProperty('--accent', a);
+    root.style.setProperty('--accent-soft', 'color-mix(in srgb, ' + a + ' 15%, var(--surface))');
+    root.style.setProperty('--on-accent', dark ? '#0b1220' : '#ffffff');
+    root.setAttribute('data-size', p.size); root.setAttribute('data-density', p.density); root.setAttribute('data-corners', p.corners);
+    root.toggleAttribute('data-notiles', !p.tiles); root.toggleAttribute('data-nodesc', !p.desc);
+    calm = calmOS || !p.motion; root.toggleAttribute('data-calm', !p.motion);
+    return p;
+  };
+  applyPrefs();
+  if (darkOS && darkOS.addEventListener) darkOS.addEventListener('change', function () { if (prefsOf(rawState()).theme === 'auto') applyPrefs(); });
   var fine = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
 
   // ---------- language: the page is translated in place by Google Translate, loaded only when asked for ----------
@@ -78,7 +101,7 @@
   // ---------- small delights ----------
   var COLORS = ['#ef476f', '#ffd23f', '#06d6a0', '#4cc9f0', '#ff8c42'];
   window.burst = function (el) {
-    if (calm || !el || !el.animate) return;
+    if (calm || !el || !el.animate || !read().prefs.confetti) return;
     var r = el.getBoundingClientRect(), x = r.left + r.width / 2, y = r.top + r.height / 2;
     for (var i = 0; i < 14; i++) {
       var b = document.createElement('i'), a = Math.random() * Math.PI * 2, d = 40 + Math.random() * 70;
@@ -103,7 +126,7 @@
   function read() {
     var o = {};
     try { o = JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) {}
-    return { favs: Array.isArray(o.favs) ? o.favs : [], recent: Array.isArray(o.recent) ? o.recent : [], inputs: o.inputs && typeof o.inputs === 'object' ? o.inputs : {}, t: +o.t || 0 };
+    return { favs: Array.isArray(o.favs) ? o.favs : [], recent: Array.isArray(o.recent) ? o.recent : [], inputs: o.inputs && typeof o.inputs === 'object' ? o.inputs : {}, prefs: prefsOf(o), t: +o.t || 0 };
   }
   function write(o, quiet) {
     if (!quiet) o.t = Date.now();
@@ -112,7 +135,7 @@
   }
   var Store = window.Store = {
     read: read,
-    replace: function (o) { write(o, true); paint(); }, // used by cloud sync; does not echo a change event
+    replace: function (o) { write(o, true); applyPrefs(prefsOf(o)); paint(); if (window.refreshSettings) refreshSettings(); }, // used by cloud sync; does not echo a change event
     isFav: function (s) { return read().favs.indexOf(s) !== -1; },
     toggleFav: function (s) {
       var o = read(), i = o.favs.indexOf(s);
@@ -120,6 +143,11 @@
       write(o); paint();
       return i === -1;
     }
+  };
+  window.Prefs = {
+    get: function () { return read().prefs; },
+    set: function (k, v) { var o = read(); o.prefs[k] = v; write(o); applyPrefs(o.prefs); if (k === 'theme') { try { localStorage.setItem('theme', v); } catch (e) {} } return o.prefs; },
+    reset: function () { var o = read(); o.prefs = prefsOf({ prefs: { theme: 'light' } }); write(o); applyPrefs(o.prefs); try { localStorage.removeItem('theme'); } catch (e) {} }
   };
   function tool(slug) { var T = window.TOOLS || []; for (var i = 0; i < T.length; i++) if (T[i][0] === slug) return T[i]; return null; }
   function chip(t, saved) {
@@ -194,9 +222,8 @@
     // theme
     var themeBtn = $('themeBtn');
     if (themeBtn) themeBtn.addEventListener('click', function () {
-      var next = root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-      root.setAttribute('data-theme', next);
-      try { localStorage.setItem('theme', next); } catch (e) {}
+      Prefs.set('theme', root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
+      if (window.refreshSettings) refreshSettings();
     });
 
     // ---------- account menu and sign-in dialog ----------
@@ -231,6 +258,7 @@
       document.addEventListener('click', function (e) { if (!menu.hidden && !e.target.closest('#acctMenu')) { menu.hidden = true; authBtn.setAttribute('aria-expanded', 'false'); } });
       menu.addEventListener('click', function (e) {
         var b = e.target.closest('[data-auth]'); if (!b) return;
+        if (b.dataset.auth === 'set') { e.stopPropagation(); menu.hidden = true; openSettings(); return; }
         if (b.dataset.auth === 'lang') { e.stopPropagation(); menu.hidden = true; $('langMenu').hidden = false; return; }
         if (b.dataset.auth === 'out') { menu.hidden = true; var a = A(); if (a) a.signOut().then(function () { toast('Signed out. Your tools stay saved on this device.'); }); }
         else openBox(b.dataset.auth);
@@ -265,6 +293,67 @@
       window.GTNAuth.onChange = show;
       if (A() && A().user()) show(A().user());
     }
+
+    // ---------- settings dialog ----------
+    var setBox = $('setBox');
+    window.openSettings = function () { if (!setBox) return; refreshSettings(); if (setBox.showModal) setBox.showModal(); };
+    window.refreshSettings = function () {
+      if (!setBox) return;
+      var p = read().prefs;
+      setBox.querySelectorAll('[data-pref]').forEach(function (g) {
+        var k = g.dataset.pref;
+        if (g.type === 'checkbox') g.checked = !!p[k];
+        else g.querySelectorAll('[data-v]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === String(p[k])); });
+      });
+      var u = window.GTNAuth && window.GTNAuth.user ? window.GTNAuth.user() : null;
+      $('setAcct').textContent = u ? 'Signed in as ' + (u.email || u.displayName) + '. Your settings, pinned tools and saved work are kept in your account and follow you to every device.' : 'Not signed in. Your settings are saved on this device only. Sign in to keep them on every device.';
+      $('setSignIn').hidden = !!u; $('setSignOut').hidden = !u;
+      var o = read(); $('setCounts').textContent = o.favs.length + ' pinned · ' + o.recent.length + ' recent · ' + Object.keys(o.inputs).length + ' tools with saved entries';
+      if ($('setLang')) $('setLang').value = LANG;
+    };
+    var newTab = function () {
+      var on = read().prefs.newtab;
+      document.querySelectorAll('a.t-link, a.live, .popular a, a.side-link, .chip').forEach(function (a) { if (on) { a.target = '_blank'; a.rel = 'noopener'; } else { a.removeAttribute('target'); } });
+    };
+    if (setBox) {
+      setBox.addEventListener('click', function (e) {
+        if (e.target === setBox) return setBox.close();
+        var b = e.target.closest('[data-v]'), g = b && b.closest('[data-pref]');
+        if (g) { Prefs.set(g.dataset.pref, b.dataset.v); refreshSettings(); toast('Saved'); }
+      });
+      setBox.querySelectorAll('input[type=checkbox][data-pref]').forEach(function (c) {
+        c.addEventListener('change', function () { Prefs.set(c.dataset.pref, c.checked); if (c.dataset.pref === 'newtab') newTab(); toast('Saved'); });
+      });
+      $('setClose').addEventListener('click', function () { setBox.close(); });
+      if ($('setLang')) $('setLang').addEventListener('change', function () { setLang($('setLang').value); });
+      $('setSignIn').addEventListener('click', function () { setBox.close(); var m = document.querySelector('#acctOut [data-auth="in"]'); if (m) m.click(); });
+      $('setSignOut').addEventListener('click', function () { var a = window.GTNAuth; if (a && a.signOut) a.signOut().then(function () { refreshSettings(); toast('Signed out. Your tools stay saved on this device.'); }); });
+      $('setExport').addEventListener('click', function () {
+        var blob = new Blob([JSON.stringify(read(), null, 2)], { type: 'application/json' }), a = document.createElement('a');
+        a.href = URL.createObjectURL(blob); a.download = 'gettoolnest-my-data.json'; document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(a.href); }, 2000);
+      });
+      $('setImportBtn').addEventListener('click', function () { $('setImport').click(); });
+      $('setImport').addEventListener('change', function () {
+        var f = this.files[0]; this.value = ''; if (!f) return;
+        f.text().then(function (t) {
+          var o = JSON.parse(t);
+          if (!o || !Array.isArray(o.favs) || !Array.isArray(o.recent)) throw new Error();
+          write({ favs: o.favs.filter(tool), recent: o.recent.filter(tool), inputs: o.inputs && typeof o.inputs === 'object' ? o.inputs : {}, prefs: prefsOf(o) });
+          applyPrefs(); paint(); refreshSettings(); newTab(); toast('Your data was imported.');
+        }).catch(function () { toast('That file is not a GetToolNest data file.'); });
+      });
+      $('setClearInputs').addEventListener('click', function () { if (!confirm('Delete the numbers and text saved in every tool?')) return; var o = read(); o.inputs = {}; write(o); paint(); refreshSettings(); toast('Saved entries deleted.'); });
+      $('setClearRecent').addEventListener('click', function () { var o = read(); o.recent = []; write(o); paint(); refreshSettings(); toast('History cleared.'); });
+      $('setReset').addEventListener('click', function () { Prefs.reset(); refreshSettings(); newTab(); toast('Settings are back to normal.'); });
+      $('setWipe').addEventListener('click', function () {
+        if (!confirm('Delete everything this site saved on this device: settings, pinned tools, history and saved entries?')) return;
+        write({ favs: [], recent: [], inputs: {}, prefs: prefsOf({ prefs: { theme: 'light' } }) });
+        try { localStorage.removeItem('theme'); } catch (e) {}
+        applyPrefs(); paint(); refreshSettings(); newTab(); toast('Everything was deleted from this device.');
+      });
+    }
+    newTab();
 
     // palette
     var pal = $('palette'), palInput = $('palInput');
@@ -311,7 +400,7 @@
     if (SLUG) {
       // remember this visit
       var o = read(), at = o.recent.indexOf(SLUG);
-      if (at !== 0) { if (at > 0) o.recent.splice(at, 1); o.recent.unshift(SLUG); o.recent = o.recent.slice(0, 12); write(o); }
+      if (o.prefs.rememberRecent && at !== 0) { if (at > 0) o.recent.splice(at, 1); o.recent.unshift(SLUG); o.recent = o.recent.slice(0, 12); write(o); }
 
       // Remember what was entered so a returning visitor finds their work as they left it.
       // Short fields only: never textareas, which may hold private documents, and never files.
@@ -334,6 +423,7 @@
         var saveTimer, ready = false;
         setTimeout(function () { ready = true; }, 0); // ignore the events fired by the restore above
         var remember = function (e) {
+          if (!read().prefs.rememberInputs) return;
           if (!ready) return;
           clearTimeout(saveTimer);
           saveTimer = setTimeout(function () {

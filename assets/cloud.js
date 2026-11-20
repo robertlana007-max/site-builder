@@ -19,11 +19,11 @@
   // Keep everything pinned on either side; for the rest, the more recently changed side wins.
   function merge(local, remote) {
     remote = remote || {};
-    var r = { favs: remote.favs || [], recent: remote.recent || [], inputs: remote.inputs || {}, t: +remote.t || 0 };
+    var r = { favs: remote.favs || [], recent: remote.recent || [], inputs: remote.inputs || {}, prefs: remote.prefs || null, t: +remote.t || 0 };
     var newer = local.t >= r.t ? local : r, older = newer === local ? r : local, inputs = {}, k;
     for (k in older.inputs) inputs[k] = older.inputs[k];
     for (k in newer.inputs) inputs[k] = newer.inputs[k];
-    return { favs: uniq(local.favs.concat(r.favs)), recent: uniq(newer.recent.concat(older.recent)).slice(0, 12), inputs: inputs, t: Math.max(local.t, r.t) };
+    return { favs: uniq(local.favs.concat(r.favs)), recent: uniq(newer.recent.concat(older.recent)).slice(0, 12), inputs: inputs, prefs: newer.prefs || older.prefs || local.prefs, t: Math.max(local.t, r.t) };
   }
   function push() {
     if (!doc) return;
@@ -31,7 +31,7 @@
     timer = setTimeout(function () {
       if (!doc) return;
       var s = Store.read();
-      doc.set({ favs: s.favs, recent: s.recent, inputs: s.inputs, t: s.t }).catch(function () {});
+      doc.set({ favs: s.favs, recent: s.recent, inputs: s.inputs, prefs: s.prefs, t: s.t }).catch(function () {});
     }, 1500);
   }
   // Plain-language messages for the errors people actually hit.
@@ -72,6 +72,7 @@
     });
     document.addEventListener('gtn:change', push);
   });
+  ready.catch(function () {}); // if the Firebase scripts cannot load, the dialog reports it when used
 
   // The page's sign-in dialog calls these. Each returns a promise that rejects with a readable message.
   var run = function (fn) { return ready.then(fn).catch(function (e) { var m = why(e); throw new Error(m); }); };

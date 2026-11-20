@@ -69,6 +69,7 @@ const ICON = {
   share: '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7M16 6l-4-4-4 4M12 2v13"/>',
   'edit-pdf': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 17l1-3 5-5 2 2-5 5z"/>',
   'image-text-editor': '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h8M12 9v7M10 16h4"/>',
+  gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
   undo: '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
@@ -143,6 +144,7 @@ ${head}
       <button class="hbtn auth" id="authBtn" aria-haspopup="true" aria-expanded="false"><span id="authName">Sign in</span><svg class="i caret-d" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></button>
       <div class="acct-menu" id="acctMenu" hidden>
         <div id="acctOut"><button data-auth="in">${icon('arrow')}Sign in</button><button data-auth="up">${icon('star')}Create account <small>New here?</small></button></div>
+        <button data-auth="set" class="setlink">${icon('gear')}Settings</button>
         <button class="only-s" data-auth="lang">${icon('globe')}Language</button>
         <div id="acctIn" hidden><p id="acctWho"></p><a href="${rel || './'}#mine">${icon('star')}My saved tools</a><button data-auth="out">${icon('undo')}Sign out</button></div>
       </div>
@@ -171,6 +173,44 @@ ${head}
     <button class="linkbtn" id="authForgot" type="button">Forgot your password?</button>
   </form>
   <p class="authfoot" id="authSwitch">New here? <button class="linkbtn" type="button" data-tab="up">Create a free account</button></p>
+</dialog>
+<dialog class="palette setbox" id="setBox" aria-labelledby="setT">
+  <div class="sethead"><h2 id="setT">${icon('gear')}Settings</h2><button class="x" id="setClose" aria-label="Close">×</button></div>
+  <div class="setbody">
+  <section><h3>Appearance</h3>
+    <div class="row"><span>Theme</span><div class="seg" data-pref="theme" role="group"><button type="button" data-v="light">☀ Light</button><button type="button" data-v="dark">☾ Dark</button><button type="button" data-v="auto">Auto</button></div></div>
+    <div class="row"><span>Colour</span><div class="sw" data-pref="accent" role="group"><button type="button" data-v="blue" style="--s:#2563eb" aria-label="Blue" title="Blue"></button><button type="button" data-v="violet" style="--s:#7c3aed" aria-label="Violet" title="Violet"></button><button type="button" data-v="green" style="--s:#059669" aria-label="Green" title="Green"></button><button type="button" data-v="teal" style="--s:#0d9488" aria-label="Teal" title="Teal"></button><button type="button" data-v="orange" style="--s:#ea580c" aria-label="Orange" title="Orange"></button><button type="button" data-v="pink" style="--s:#db2777" aria-label="Pink" title="Pink"></button><button type="button" data-v="red" style="--s:#dc2626" aria-label="Red" title="Red"></button><button type="button" data-v="gray" style="--s:#475569" aria-label="Gray" title="Gray"></button></div></div>
+    <div class="row"><span>Text size</span><div class="seg" data-pref="size" role="group"><button type="button" data-v="s">A</button><button type="button" data-v="m">A</button><button type="button" data-v="l">A</button><button type="button" data-v="xl">A</button></div></div>
+    <div class="row"><span>Spacing</span><div class="seg" data-pref="density" role="group"><button type="button" data-v="comfy">Comfortable</button><button type="button" data-v="compact">Compact</button></div></div>
+    <div class="row"><span>Corners</span><div class="seg" data-pref="corners" role="group"><button type="button" data-v="round">Rounded</button><button type="button" data-v="square">Square</button></div></div>
+  </section>
+  <section><h3>Home page and tools</h3>
+    <label class="tog"><input type="checkbox" data-pref="tiles"><i></i><span><b>Live tiles</b><small>The moving QR, timer and other tiles beside the search box.</small></span></label>
+    <label class="tog"><input type="checkbox" data-pref="desc"><i></i><span><b>Tool descriptions</b><small>The short line under each tool name.</small></span></label>
+    <label class="tog"><input type="checkbox" data-pref="newtab"><i></i><span><b>Open tools in a new tab</b><small>Keep the list open while you use a tool.</small></span></label>
+    <label class="tog"><input type="checkbox" data-pref="motion"><i></i><span><b>Animations</b><small>Turn off if movement bothers you or your phone is slow.</small></span></label>
+    <label class="tog"><input type="checkbox" data-pref="confetti"><i></i><span><b>Celebrations</b><small>A little burst of colour when you copy, pin or download.</small></span></label>
+  </section>
+  <section><h3>Privacy</h3>
+    <label class="tog"><input type="checkbox" data-pref="rememberInputs"><i></i><span><b>Remember what I enter</b><small>Numbers and short text in a tool are kept for your next visit.</small></span></label>
+    <label class="tog"><input type="checkbox" data-pref="rememberRecent"><i></i><span><b>Remember tools I open</b><small>Shown as “Recently used” on the home page.</small></span></label>
+    <p class="setnote" id="setCounts"></p>
+    <div class="setbtns"><button type="button" class="btn ghost" id="setClearRecent">Clear history</button><button type="button" class="btn ghost" id="setClearInputs">Delete saved entries</button></div>
+  </section>
+  <section><h3>Language</h3>
+    <div class="row"><span>Site language</span><select id="setLang" aria-label="Site language">${LANGS.map(([code, name]) => `<option value="${code}">${name}</option>`).join('')}</select></div>
+    <p class="setnote">Translation is done by Google Translate.</p>
+  </section>
+  <section><h3>Account and data</h3>
+    <p class="setnote" id="setAcct"></p>
+    <div class="setbtns"><button type="button" class="btn" id="setSignIn">Sign in or create account</button><button type="button" class="btn ghost" id="setSignOut" hidden>Sign out</button></div>
+    <div class="setbtns"><button type="button" class="btn ghost" id="setExport">Download my data</button><button type="button" class="btn ghost" id="setImportBtn">Load data from a file</button><input type="file" id="setImport" accept="application/json,.json" hidden></div>
+    <div class="setbtns"><button type="button" class="btn ghost" id="setReset">Reset settings</button><button type="button" class="btn ghost danger" id="setWipe">Delete everything on this device</button></div>
+  </section>
+  <section><h3>Keyboard shortcuts</h3>
+    <ul class="keys"><li><kbd>Ctrl</kbd> <kbd>K</kbd> or <kbd>/</kbd><span>Search tools</span></li><li><kbd>↑</kbd> <kbd>↓</kbd><span>Move in search results</span></li><li><kbd>Enter</kbd><span>Open the highlighted tool</span></li><li><kbd>Esc</kbd><span>Close a window</span></li></ul>
+  </section>
+  </div>
 </dialog>
 <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 <main class="wrap">
