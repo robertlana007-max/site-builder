@@ -1,0 +1,303 @@
+{%- liquid
+  assign variant = product.selected_or_first_available_variant
+  assign title_parts = product.title | split: ' — '
+  assign sub_title = ''
+  if title_parts.size > 1
+    assign sub_title = title_parts.last
+  endif
+  assign wa = settings.whatsapp_number | remove: '+' | remove: ' '
+-%}
+<div class="g-container">
+  <div class="g-product">
+    <div
+      class="g-gallery{% if product.images.size < 2 %} g-gallery--single{% endif %}"
+      data-g-gallery
+    >
+      {%- if product.images.size > 1 -%}
+        <div class="g-gallery__thumbs" role="tablist" aria-label="Product photos">
+          {%- for image in product.images -%}
+            <button
+              type="button"
+              class="g-gallery__thumb{% if forloop.first %} is-active{% endif %}"
+              data-g-thumb
+              aria-label="Show photo {{ forloop.index }}"
+            >
+              <img
+                src="{{ image | image_url: width: 200 }}"
+                alt=""
+                width="84"
+                height="100"
+                loading="lazy"
+              >
+            </button>
+          {%- endfor -%}
+        </div>
+      {%- endif -%}
+
+      <div class="g-gallery__stage">
+        {%- for image in product.images -%}
+          <div class="g-gallery__slide{% if forloop.first %} is-active{% endif %}" data-g-slide>
+            <img
+              src="{{ image | image_url: width: 1200 }}"
+              srcset="{{ image | image_url: width: 600 }} 600w, {{ image | image_url: width: 900 }} 900w, {{ image | image_url: width: 1200 }} 1200w, {{ image | image_url: width: 1800 }} 1800w"
+              sizes="(min-width: 900px) 48vw, 100vw"
+              alt="{{ image.alt | default: product.title | escape }}"
+              width="{{ image.width }}"
+              height="{{ image.height }}"
+              {% if forloop.first %}
+                fetchpriority="high"
+              {% else %}
+                loading="lazy"
+              {% endif %}
+            >
+          </div>
+        {%- else -%}
+          <div class="g-gallery__slide is-active">{{ 'product-1' | placeholder_svg_tag }}</div>
+        {%- endfor -%}
+      </div>
+    </div>
+
+    <div class="g-pinfo">
+      <ol class="g-crumbs">
+        <li><a href="{{ routes.root_url }}">Home</a></li>
+        <li><a href="{{ routes.all_products_collection_url }}">Shop</a></li>
+        <li aria-current="page">{{ title_parts.first | escape }}</li>
+      </ol>
+
+      <p class="g-eyebrow">{{ product.vendor | escape }}</p>
+      <h1 class="g-pinfo__title">{{ title_parts.first | escape }}</h1>
+      {%- if sub_title != blank -%}
+        <p class="g-pinfo__sub">{{ sub_title | escape }}</p>
+      {%- endif -%}
+
+      {% render 'price', product: product, show_saving: true %}
+      {%- if section.settings.price_note != blank -%}
+        <p class="g-pinfo__note">{{ section.settings.price_note | escape }}</p>
+      {%- endif -%}
+
+      {%- if product.available -%}
+        <p class="g-stock">{{ section.settings.stock_text | escape }}</p>
+      {%- else -%}
+        <p class="g-stock g-stock--out">Sold out</p>
+      {%- endif -%}
+
+      {%- form 'product', product, class: 'g-pform', data-g-product-form: '', data-g-main-form: '' -%}
+        {%- if product.has_only_default_variant -%}
+          <input type="hidden" name="id" value="{{ variant.id }}">
+        {%- else -%}
+          <label class="g-pform__label" for="ProductVariant">Option</label>
+          <select class="g-select" id="ProductVariant" name="id" data-g-variant-select>
+            {%- for v in product.variants -%}
+              <option
+                value="{{ v.id }}"
+                data-price="{{ v.price | money_without_trailing_zeros | escape }}"
+                data-compare="{% if v.compare_at_price > v.price %}{{ v.compare_at_price | money_without_trailing_zeros | escape }}{% endif %}"
+                {% if v == variant %}
+                  selected
+                {% endif %}
+                {% unless v.available %}
+                  disabled
+                {% endunless %}
+              >
+                {{ v.title | escape }}
+              </option>
+            {%- endfor -%}
+          </select>
+        {%- endif -%}
+
+        <div class="g-pform__row">
+          <div class="g-qty g-qty--lg">
+            <button type="button" class="g-qty__btn" data-g-step="-1" aria-label="Decrease quantity">&minus;</button>
+            <input
+              class="g-qty__input"
+              type="number"
+              name="quantity"
+              value="1"
+              min="1"
+              max="99"
+              inputmode="numeric"
+              aria-label="Quantity"
+            >
+            <button type="button" class="g-qty__btn" data-g-step="1" aria-label="Increase quantity">+</button>
+          </div>
+          <button
+            type="submit"
+            name="add"
+            class="g-btn g-btn--ghost"
+            {% unless product.available %}
+              disabled
+            {% endunless %}
+          >
+            {% render 'icon', name: 'bag' %}
+            Add to cart
+          </button>
+        </div>
+
+        <div class="g-pform__buy">
+          <button
+            type="submit"
+            class="g-btn g-btn--block"
+            data-g-buy-now
+            {% unless product.available %}
+              disabled
+            {% endunless %}
+          >
+            {{ section.settings.buy_label | escape }}
+            {% render 'icon', name: 'arrow' %}
+          </button>
+        </div>
+      {%- endform -%}
+
+      {%- if section.blocks.size > 0 -%}
+        <ul class="g-assure">
+          {%- for block in section.blocks -%}
+            {%- case block.type -%}
+              {%- when '@app' -%}
+                <li {{ block.shopify_attributes }}>{% render block %}</li>
+              {%- else -%}
+                <li {{ block.shopify_attributes }}>
+                  {% render 'icon', name: block.settings.icon %}
+                  <div>
+                    <b>{{ block.settings.title | escape }}</b>
+                    <span>{{ block.settings.text | escape }}</span>
+                  </div>
+                </li>
+            {%- endcase -%}
+          {%- endfor -%}
+        </ul>
+      {%- endif -%}
+
+      {%- if section.settings.show_whatsapp and wa != blank -%}
+        <p style="margin:16px 0 0">
+          <a
+            class="g-link"
+            href="https://wa.me/{{ wa }}?text={{ 'I want to order: ' | append: product.title | url_encode }}"
+            target="_blank"
+            rel="noopener"
+          >
+            Order or ask on WhatsApp
+            {% render 'icon', name: 'arrow' %}
+          </a>
+        </p>
+      {%- endif -%}
+
+      {%- if product.description != blank -%}
+        <div class="g-pdesc">
+          <div class="g-pdesc__head">
+            <h2 class="g-pdesc__title">Product details</h2>
+          </div>
+          <div class="g-rte">{{ product.description }}</div>
+        </div>
+      {%- endif -%}
+    </div>
+  </div>
+</div>
+
+<div class="g-buybar" data-g-buybar>
+  <div class="g-buybar__info">
+    <span class="g-buybar__title">{{ title_parts.first | escape }}</span>
+    <span class="g-buybar__price">{{ variant.price | money_without_trailing_zeros }}</span>
+  </div>
+  <button
+    type="button"
+    class="g-btn"
+    data-g-buybar-submit
+    {% unless product.available %}
+      disabled
+    {% endunless %}
+  >
+    Order now
+  </button>
+</div>
+
+<script type="application/ld+json">
+  {{ product | structured_data }}
+</script>
+
+{% schema %}
+{
+  "name": "Product",
+  "max_blocks": 6,
+  "settings": [
+    {
+      "type": "text",
+      "id": "price_note",
+      "label": "Note under the price",
+      "default": "Free Cash on Delivery all over Pakistan"
+    },
+    {
+      "type": "text",
+      "id": "stock_text",
+      "label": "In stock text",
+      "default": "In stock, ready to ship"
+    },
+    {
+      "type": "text",
+      "id": "buy_label",
+      "label": "Buy button label",
+      "default": "Order now with Cash on Delivery"
+    },
+    {
+      "type": "checkbox",
+      "id": "show_whatsapp",
+      "label": "Show WhatsApp link",
+      "default": true
+    }
+  ],
+  "blocks": [
+    {
+      "type": "@app"
+    },
+    {
+      "type": "assurance",
+      "name": "Assurance",
+      "settings": [
+        {
+          "type": "select",
+          "id": "icon",
+          "label": "Icon",
+          "default": "cash",
+          "options": [
+            {
+              "value": "cash",
+              "label": "Cash"
+            },
+            {
+              "value": "truck",
+              "label": "Delivery"
+            },
+            {
+              "value": "return",
+              "label": "Returns"
+            },
+            {
+              "value": "chat",
+              "label": "Chat"
+            },
+            {
+              "value": "leaf",
+              "label": "Leaf"
+            },
+            {
+              "value": "sparkle",
+              "label": "Sparkle"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "label": "Title",
+          "default": "Cash on Delivery"
+        },
+        {
+          "type": "text",
+          "id": "text",
+          "label": "Text",
+          "default": "Pay when it arrives"
+        }
+      ]
+    }
+  ]
+}
+{% endschema %}
