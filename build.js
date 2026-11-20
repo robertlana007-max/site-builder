@@ -187,7 +187,7 @@ ${head}
 <body>
 <header class="site-header"><div class="wrap">
   <a class="logo" href="${rel || './'}"><b></b><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
-  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}about/">About</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
+  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
   <span class="sp"></span>
   <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
   <button class="hbtn" id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
@@ -262,7 +262,7 @@ ${body}
 <footer class="site-footer"><div class="wrap">
   <div class="foot-grid">
     ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
-    <div><h2>Site</h2><a href="${rel}donate/">Support us</a><a href="${rel}app/">Get the app</a><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
+    <div><h2>Site</h2><a href="${rel}guides/">Guides and tutorials</a><a href="${rel}donate/">Support us</a><a href="${rel}app/">Get the app</a><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
   </div>
   <div class="foot-bottom">© ${YEAR} ${esc(cfg.siteName)}. ${tools.length} free tools that run in your browser.</div>
 </div></footer>
@@ -421,7 +421,22 @@ ${ad(cfg.adSlotBottom)}
 }));
 
 // ---------- tool pages ----------
+// Full tutorials live in src/guides/<slug>.json (what, uses, tutorial, features, example, tips, problems).
+const guideOf = slug => { const f = path.join(ROOT, 'src/guides', slug + '.json'); return fs.existsSync(f) ? JSON.parse(fs.readFileSync(f, 'utf8')) : null; };
+function guideHtml(t, g) {
+  if (!g) return `<h2 id="tutorial">How to use ${esc(t.name)}</h2>\n<ol class="steps">${t.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>`;
+  const toc = [['about', `What is ${t.name}?`], ['uses', 'What it is for'], ['tutorial', 'Step-by-step tutorial'], ['features', 'Features'], g.example && ['example', 'Example'], ['tips', 'Tips'], ['problems', 'Problems and fixes'], ['faq', 'Questions']].filter(Boolean);
+  return `<nav class="toc" aria-label="On this page"><b>On this page</b>${toc.map(([id, l]) => `<a href="#${id}">${esc(l)}</a>`).join('')}</nav>
+<section class="guide" id="about"><h2>What is ${esc(t.name)}?</h2>${g.what.map(p => `<p>${esc(p)}</p>`).join('')}</section>
+<section class="guide" id="uses"><h2>What you can use it for</h2><div class="uses">${g.uses.map(([h, p]) => `<div class="use"><h3>${esc(h)}</h3><p>${esc(p)}</p></div>`).join('')}</div></section>
+<section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use ${esc(t.name)}</h2><ol class="tut">${g.tutorial.map(([h, p]) => `<li><h3>${esc(h)}</h3><p>${esc(p)}</p></li>`).join('')}</ol></section>
+<section class="guide" id="features"><h2>Features</h2><ul class="feats">${g.features.map(([h, p]) => `<li>${icon('check')}<span><b>${esc(h)}</b>${esc(p)}</span></li>`).join('')}</ul></section>
+${g.example ? `<section class="guide" id="example"><div class="example"><h2>${esc(g.example.title)}</h2><p>${esc(g.example.text)}</p></div></section>` : ''}
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips">${g.tips.map(p => `<li>${esc(p)}</li>`).join('')}</ul></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs">${g.problems.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div></section>`;
+}
 for (const t of tools) {
+  const g = guideOf(t.slug);
   const body = fs.readFileSync(path.join(ROOT, 'src/tools', t.slug + '.html'), 'utf8');
   const same = tools.filter(o => o !== t && o.cat === t.cat);
   const related = same.concat(tools.filter(o => o !== t && o.cat !== t.cat)).slice(0, Math.max(6, Math.min(same.length, 9)));
@@ -435,7 +450,10 @@ for (const t of tools) {
     }) + jsonLd({
       '@context': 'https://schema.org', '@type': 'FAQPage',
       mainEntity: t.faq.map(([q, a]) => ({ '@type': 'Question', name: q, acceptedAnswer: { '@type': 'Answer', text: a } }))
-    }) + jsonLd({
+    }) + (g ? jsonLd({
+      '@context': 'https://schema.org', '@type': 'HowTo', name: `How to use ${t.name}`, description: g.what[0],
+      step: g.tutorial.map(([h, p], i) => ({ '@type': 'HowToStep', position: i + 1, name: h, text: p, url: `${SITE}/${t.slug}/#tutorial` }))
+    }) : '') + jsonLd({
       '@context': 'https://schema.org', '@type': 'BreadcrumbList', itemListElement: [
         { '@type': 'ListItem', position: 1, name: 'Home', item: SITE + '/' },
         { '@type': 'ListItem', position: 2, name: t.name, item: `${SITE}/${t.slug}/` }
@@ -447,17 +465,16 @@ for (const t of tools) {
   <p class="lead">${esc(t.intro)}</p>
   <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>
-<div class="cols${t.wide ? ' wide' : ''}">
+<div class="cols${t.wide ? ' wide' : ''}" style="--c:${COLOR[t.cat]}">
 <div class="content">
 <section class="card">
 ${body}
 </section>
 <p class="safe">${icon('shield')}Runs on your device. Nothing is uploaded.</p>
 ${ad(cfg.adSlotTop)}
-<h2>How to use ${esc(t.name)}</h2>
-<ol class="steps">${t.steps.map(st => `<li>${esc(st)}</li>`).join('')}</ol>
+${guideHtml(t, g)}
 ${ad(cfg.adSlotBottom)}
-<h2>Questions and answers</h2>
+<h2 id="faq">Questions and answers</h2>
 <div class="faq">${t.faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
 </div>
 <aside class="side">
@@ -577,6 +594,23 @@ ${contact}` },
 <h2>What is not affected</h2>
 <p>Files you open in the tools are never uploaded, so there is nothing of them to delete. Data saved in your browser on a device stays there until you clear it under Settings, Account and data, <b>Delete everything on this device</b>.</p>` }
 ];
+pages.push({ slug: 'guides', title: 'Guides and tutorials', desc: `Step-by-step tutorials for all ${tools.length} ${cfg.siteName} tools: what each tool does, how to use it, tips and fixes.`, html: `
+<p class="lead" style="margin-top:0">Every tool on ${esc(cfg.siteName)} has its own full tutorial: what the tool is, what you can use it for, a step-by-step guide, its features, a worked example, tips and fixes for common problems. Pick a tool below to read its guide.</p>
+<div class="gfind"><input type="search" id="gq" placeholder="Search the guides, for example “compress”" aria-label="Search the guides" autocomplete="off" data-nomemo></div>
+${cats.map(c => `<section class="gcat" data-cat="${esc(c)}"><h2 style="--c:${COLOR[c]}">${esc(c)}</h2><p class="cat-desc">${esc(CATINFO[c][1])}</p><div class="glist">${tools.filter(t => t.cat === c).map(t => { const g = guideOf(t.slug); return `<a class="gitem" href="../${t.slug}/#tutorial" style="--c:${COLOR[t.cat]}">${tile(t)}<span><b>How to use ${esc(t.name)}</b><small>${esc(g ? g.what[0] : t.intro)}</small><em>${g ? g.tutorial.length + ' steps · ' + g.tips.length + ' tips · ' + g.problems.length + ' fixes' : t.steps.length + ' steps'}</em></span></a>`; }).join('')}</div></section>`).join('')}
+<script>
+(function () {
+  var q = document.getElementById('gq');
+  q.addEventListener('input', function () {
+    var v = q.value.trim().toLowerCase();
+    document.querySelectorAll('.gcat').forEach(function (s) {
+      var any = false;
+      s.querySelectorAll('.gitem').forEach(function (a) { var ok = !v || a.textContent.toLowerCase().indexOf(v) !== -1; a.hidden = !ok; any = any || ok; });
+      s.hidden = !any;
+    });
+  });
+})();
+</script>` });
 for (const p of pages) {
   write(`${p.slug}/index.html`, layout({
     rel: '../', urlPath: p.slug + '/', title: `${p.title} | ${cfg.siteName}`, desc: p.desc,
