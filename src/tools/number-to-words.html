@@ -1,0 +1,50 @@
+<div class="fields">
+  <div><label for="num">Number</label><input type="text" id="num" inputmode="decimal" placeholder="1,234.56" autocomplete="off"></div>
+  <div><label for="mode">Write as</label><select id="mode"><option value="n">Number</option><option value="usd">Dollars and cents (for checks)</option></select></div>
+</div>
+<div class="out" id="out" style="font-family:inherit;font-weight:500">–</div>
+<div class="btns"><button class="btn ghost" id="cp">Copy</button></div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  var SCALE = ['', 'thousand', 'million', 'billion', 'trillion', 'quadrillion'];
+  function under1000(n) {
+    var s = [];
+    if (n >= 100) { s.push(ONES[Math.floor(n / 100)] + ' hundred'); n %= 100; }
+    if (n >= 20) s.push(TENS[Math.floor(n / 10)] + (n % 10 ? '-' + ONES[n % 10] : ''));
+    else if (n > 0) s.push(ONES[n]);
+    return s.join(' ');
+  }
+  function words(digits) { // string of digits, any length up to 18
+    digits = digits.replace(/^0+(?=\d)/, '');
+    if (digits === '0') return 'zero';
+    var groups = [], out = [];
+    for (var i = digits.length; i > 0; i -= 3) groups.push(+digits.slice(Math.max(0, i - 3), i));
+    for (var g = groups.length - 1; g >= 0; g--) if (groups[g]) out.push(under1000(groups[g]) + (SCALE[g] ? ' ' + SCALE[g] : ''));
+    return out.join(' ');
+  }
+  function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+  function calc() {
+    var raw = $('num').value.replace(/[,\s$]/g, ''), m = raw.match(/^(-?)(\d*)(?:\.(\d+))?$/);
+    $('msg').textContent = '';
+    if (raw === '') { $('out').textContent = '–'; return; }
+    if (!m || (m[2] === '' && !m[3])) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'Enter a number using digits, for example 1234.56.'; return; }
+    var int = m[2] || '0', dec = m[3] || '';
+    if (int.replace(/^0+/, '').length > 18) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'That number is too large. The limit is 18 digits.'; return; }
+    var neg = m[1] && (/[1-9]/.test(int) || /[1-9]/.test(dec)) ? 'minus ' : '', s;
+    if ($('mode').value === 'usd') {
+      var cents = Math.round(+('0.' + (dec || '0')) * 100);
+      if (cents === 100) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'Use at most two decimal places for dollars and cents.'; return; }
+      var d = words(int);
+      s = neg + d + (d === 'one' ? ' dollar' : ' dollars') + ' and ' + String(cents).padStart(2, '0') + '/100';
+    } else {
+      s = neg + words(int) + (dec ? ' point ' + dec.split('').map(function (c) { return ONES[+c]; }).join(' ') : '');
+    }
+    $('out').textContent = cap(s);
+  }
+  $('num').addEventListener('input', calc); $('mode').addEventListener('input', calc);
+  $('cp').addEventListener('click', function () { if ($('out').textContent !== '–') copyText($('out').textContent, $('cp')); });
+})();
+</script>

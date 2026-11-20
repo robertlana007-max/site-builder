@@ -1,0 +1,66 @@
+<div class="big" id="time" role="timer" aria-live="off">05:00</div>
+<div class="fields">
+  <div><label for="h">Hours</label><input type="number" id="h" min="0" max="99" step="1" value="0"></div>
+  <div><label for="m">Minutes</label><input type="number" id="m" min="0" max="59" step="1" value="5"></div>
+  <div><label for="s">Seconds</label><input type="number" id="s" min="0" max="59" step="1" value="0"></div>
+</div>
+<div class="btns" style="margin:0 0 6px">
+  <button class="btn ghost" data-min="1">1 min</button>
+  <button class="btn ghost" data-min="5">5 min</button>
+  <button class="btn ghost" data-min="10">10 min</button>
+  <button class="btn ghost" data-min="25">25 min</button>
+  <button class="btn ghost" data-min="60">1 hour</button>
+</div>
+<div class="btns"><button class="btn" id="go">Start</button><button class="btn ghost" id="reset">Reset</button></div>
+<div class="checks" style="margin-top:14px"><label><input type="checkbox" id="snd" checked>Play a sound when time is up</label></div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var running = false, endAt = 0, left = 0, timer = 0, title = document.title, audio = null;
+  var p = function (x) { return String(x).padStart(2, '0'); };
+  function fmt(ms) { var t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return (h ? p(h) + ':' : '') + p(m) + ':' + p(s); }
+  function inputMs() {
+    var v = function (id, max) { return Math.min(max, Math.max(0, Math.floor(+$(id).value) || 0)); };
+    return (v('h', 99) * 3600 + v('m', 59) * 60 + v('s', 59)) * 1000;
+  }
+  function beep() {
+    try {
+      audio = audio || new (window.AudioContext || window.webkitAudioContext)();
+      [0, 0.35, 0.7].forEach(function (d) {
+        var o = audio.createOscillator(), g = audio.createGain();
+        o.frequency.value = 880; o.connect(g); g.connect(audio.destination);
+        g.gain.setValueAtTime(0.25, audio.currentTime + d); g.gain.exponentialRampToValueAtTime(0.001, audio.currentTime + d + 0.25);
+        o.start(audio.currentTime + d); o.stop(audio.currentTime + d + 0.25);
+      });
+    } catch (e) {}
+  }
+  function show(ms) { $('time').textContent = fmt(ms); if (running) document.title = fmt(ms) + ' · Timer'; }
+  function stop() { running = false; clearInterval(timer); document.title = title; $('go').textContent = 'Start'; }
+  function tick() {
+    left = endAt - Date.now();
+    if (left <= 0) {
+      stop(); left = 0; show(0);
+      $('msg').className = 'msg ok'; $('msg').textContent = 'Time is up!';
+      document.title = 'Time is up!';
+      if ($('snd').checked) beep();
+      return;
+    }
+    show(left);
+  }
+  $('go').addEventListener('click', function () {
+    if (running) { left = endAt - Date.now(); stop(); $('go').textContent = 'Resume'; return; }
+    if (left <= 0) left = inputMs();
+    if (left <= 0) { $('msg').className = 'msg bad'; $('msg').textContent = 'Set a time longer than zero.'; return; }
+    $('msg').textContent = '';
+    if ($('snd').checked) { try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {} } // must be created on a click
+    endAt = Date.now() + left; running = true; $('go').textContent = 'Pause';
+    timer = setInterval(tick, 200); tick();
+  });
+  function reset() { stop(); left = 0; $('msg').textContent = ''; show(inputMs()); }
+  $('reset').addEventListener('click', reset);
+  ['h', 'm', 's'].forEach(function (id) { $(id).addEventListener('input', function () { if (!running) { left = 0; show(inputMs()); } }); });
+  document.querySelectorAll('[data-min]').forEach(function (b) {
+    b.addEventListener('click', function () { var t = +b.dataset.min; $('h').value = Math.floor(t / 60); $('m').value = t % 60; $('s').value = 0; reset(); });
+  });
+})();
+</script>

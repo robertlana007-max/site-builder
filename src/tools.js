@@ -93,7 +93,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'age-calculator', cat: 'Calculators', name: 'Age Calculator',
+    slug: 'age-calculator', cat: 'Time tools', name: 'Age Calculator',
     title: 'Age Calculator - Exact Age in Years, Months & Days',
     desc: 'Work out an exact age in years, months and days from a date of birth, plus total weeks, total days and days to the next birthday.',
     card: 'Exact age in years, months and days.',
@@ -250,7 +250,7 @@ module.exports = [
     ]
   },
   {
-    slug: 'days-between-dates', cat: 'Calculators', name: 'Days Between Dates',
+    slug: 'days-between-dates', cat: 'Time tools', name: 'Days Between Dates',
     title: 'Days Between Dates Calculator - Count Days & Weekdays',
     desc: 'Count the days, weeks, months and working days between two dates. Optionally include the end date.',
     card: 'Count days, weeks and weekdays between two dates.',
@@ -364,6 +364,269 @@ module.exports = [
       ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), and HSL such as hsl(243, 75%, 59%).'],
       ['What is the difference between RGB and HSL?', 'RGB describes a color by its red, green and blue light. HSL describes it by hue, saturation and lightness, which is easier to adjust by eye.'],
       ['Why does HSL change slightly when converted back?', 'HSL values are rounded to whole numbers, so a round trip can shift a color by one step.']
+    ]
+  },
+  {
+    slug: 'merge-pdf', cat: 'PDF tools', name: 'Merge PDF',
+    title: 'Merge PDF - Combine PDF Files Free, No Upload',
+    desc: 'Combine several PDF files into one, in the order you choose. Runs in your browser, so your files are never uploaded. Free, no sign-up.',
+    card: 'Combine several PDFs into one file.',
+    intro: 'Join two or more PDF files into a single document. The files are merged on your own device and are never sent to a server.',
+    steps: ['Click the box or drop your PDF files onto it.', 'Use the arrows to put the files in the right order.', 'Click Merge PDFs.', 'Click Download merged PDF.'],
+    faq: [
+      ['Are my PDFs uploaded?', 'No. The files are read and merged by your browser. They never leave your device.'],
+      ['How many files can I merge?', 'There is no fixed limit. Very large files may be slow on a phone because all the work happens on your device.'],
+      ['Can I merge password-protected PDFs?', 'No. Remove the password first, then merge.'],
+      ['Does merging reduce quality?', 'No. Pages are copied as they are, without re-compressing anything.']
+    ]
+  },
+  {
+    slug: 'split-pdf', cat: 'PDF tools', name: 'Split PDF',
+    title: 'Split PDF - Extract Pages from a PDF Free',
+    desc: 'Extract selected pages from a PDF into a new file, or split every page into its own PDF. Works in your browser with no upload.',
+    card: 'Extract pages or split into single-page PDFs.',
+    intro: 'Pull out the pages you need from a PDF, or split it into one file per page.',
+    steps: ['Choose a PDF.', 'Type the pages you want, such as 1-3, 5.', 'Choose one PDF or a separate PDF for every page.', 'Click Split PDF, then Download.'],
+    faq: [
+      ['How do I write page ranges?', 'Use commas between pages and a hyphen for a range. For example 1-3, 5 means pages 1, 2, 3 and 5.'],
+      ['Can I change the page order?', 'Yes. Pages come out in the order you type them, so 5, 1-3 puts page 5 first.'],
+      ['What do I get when I split every page?', 'A ZIP file containing one PDF for each page you listed.']
+    ]
+  },
+  {
+    slug: 'compress-pdf', cat: 'PDF tools', name: 'Compress PDF',
+    title: 'Compress PDF - Reduce PDF File Size Free, No Upload',
+    desc: 'Make a PDF smaller for email or upload limits. Best for scanned documents and image-heavy PDFs. Runs in your browser, no upload.',
+    card: 'Shrink scanned and image-heavy PDFs.',
+    intro: 'Reduce the size of a PDF so it fits email and upload limits. Works best on scans and PDFs with many photos.',
+    steps: ['Choose a PDF.', 'Pick a compression level. Start with Medium.', 'Click Compress PDF and compare the sizes.', 'Download the result if you are happy with it.'],
+    faq: [
+      ['How does this compress the PDF?', 'Each page is redrawn as a compressed picture and a new PDF is built from those pictures.'],
+      ['Will I still be able to select text?', 'No. Pages become images, so text can no longer be selected or searched. Keep your original if you need that.'],
+      ['Why did my file not get smaller?', 'PDFs that are mostly text are already tiny. Turning them into pictures makes them larger, so the tool tells you to keep the original.'],
+      ['Is my file uploaded?', 'No. Compression happens on your device.']
+    ]
+  },
+  {
+    slug: 'jpg-to-pdf', cat: 'PDF tools', name: 'JPG to PDF',
+    title: 'JPG to PDF - Convert Images to PDF Free',
+    desc: 'Turn JPG, PNG or WebP images into a PDF, one image per page. Choose the page size and order. No upload, no sign-up.',
+    card: 'Turn photos and scans into one PDF.',
+    intro: 'Combine photos, screenshots or scanned pages into a single PDF, with one image on each page.',
+    steps: ['Click the box or drop your images onto it.', 'Use the arrows to set the page order.', 'Choose a page size and margin.', 'Click Create PDF, then Download.'],
+    faq: [
+      ['Which image types are supported?', 'JPG and PNG are placed in the PDF unchanged. WebP and other types your browser can open are converted to JPG first.'],
+      ['Which page size should I pick?', 'Choose A4 or US Letter for printing. Choose "Same as each image" to keep every picture at its full size.'],
+      ['Does it reduce image quality?', 'JPG and PNG images are embedded as they are, with no extra compression.']
+    ]
+  },
+  {
+    slug: 'pdf-to-jpg', cat: 'PDF tools', name: 'PDF to JPG',
+    title: 'PDF to JPG - Convert PDF Pages to Images Free',
+    desc: 'Convert every page of a PDF into a JPG or PNG image and download them one by one or as a ZIP. No upload, no sign-up.',
+    card: 'Save every PDF page as a JPG or PNG.',
+    intro: 'Turn each page of a PDF into a picture you can share, post or paste into a document.',
+    steps: ['Choose a PDF.', 'Pick JPG or PNG and a resolution.', 'Click Convert to images.', 'Tap a page to save it, or download them all as a ZIP.'],
+    faq: [
+      ['JPG or PNG?', 'JPG gives smaller files and suits most pages. PNG is sharper for text and diagrams but the files are larger.'],
+      ['Which resolution should I use?', 'High is right for most uses. Use Very high for printing or zooming in, and Standard when you need small files.'],
+      ['Is there a page limit?', 'Up to 200 pages per file. Split larger PDFs first.']
+    ]
+  },
+  {
+    slug: 'pdf-to-text', cat: 'PDF tools', name: 'PDF to Text',
+    title: 'PDF to Text - Extract Text from a PDF Free',
+    desc: 'Extract all the text from a PDF so you can copy it or save it as a .txt file. Works in your browser with no upload.',
+    card: 'Copy all the text out of a PDF.',
+    intro: 'Get the words out of a PDF so you can copy, edit or search them.',
+    steps: ['Choose a PDF.', 'Click Extract text.', 'Copy the text or download it as a .txt file.'],
+    faq: [
+      ['Why did I get no text?', 'The PDF is probably a scan. Scanned pages are pictures of text, and reading them needs OCR, which this tool does not do.'],
+      ['Is the layout kept?', 'Line breaks are kept where the PDF has them. Columns, tables and fonts are not.'],
+      ['Is my PDF uploaded?', 'No. The text is read on your device.']
+    ]
+  },
+  {
+    slug: 'rotate-pdf', cat: 'PDF tools', name: 'Rotate PDF',
+    title: 'Rotate PDF - Turn PDF Pages Free and Save',
+    desc: 'Rotate all pages or selected pages of a PDF by 90 or 180 degrees and save the result. No upload, no sign-up.',
+    card: 'Turn sideways or upside-down pages.',
+    intro: 'Fix pages that are sideways or upside down and save the PDF the right way up.',
+    steps: ['Choose a PDF.', 'Choose the direction to rotate.', 'Leave Pages empty for the whole file, or type the pages to rotate.', 'Click Rotate PDF, then Download.'],
+    faq: [
+      ['Is the rotation permanent?', 'Yes. The downloaded file opens rotated in every PDF reader.'],
+      ['Can I rotate only some pages?', 'Yes. Type the pages, for example 2, 5-7.'],
+      ['Does rotating change quality?', 'No. Only the page direction changes.']
+    ]
+  },
+  {
+    slug: 'delete-pdf-pages', cat: 'PDF tools', name: 'Delete PDF Pages',
+    title: 'Delete PDF Pages - Remove Pages from a PDF Free',
+    desc: 'Remove unwanted pages from a PDF and download the rest. Runs in your browser, so the file is never uploaded.',
+    card: 'Remove unwanted pages from a PDF.',
+    intro: 'Remove blank, duplicate or unwanted pages from a PDF.',
+    steps: ['Choose a PDF.', 'Type the pages to delete, such as 2, 4-6.', 'Click Delete pages, then Download PDF.'],
+    faq: [
+      ['Is my original file changed?', 'No. A new PDF is created without the deleted pages. Your original stays as it is.'],
+      ['Can I delete several pages at once?', 'Yes. Separate pages with commas and use a hyphen for a range.'],
+      ['Can I undo it?', 'Just run the tool again on your original file.']
+    ]
+  },
+  {
+    slug: 'add-page-numbers-to-pdf', cat: 'PDF tools', name: 'Add Page Numbers to PDF',
+    title: 'Add Page Numbers to PDF - Free Online Tool',
+    desc: 'Add page numbers to every page of a PDF. Choose the position, format, size and starting number. No upload, no sign-up.',
+    card: 'Number every page of a PDF.',
+    intro: 'Stamp page numbers onto a PDF, in the corner and format you choose.',
+    steps: ['Choose a PDF.', 'Pick the position and number format.', 'Set the starting number if it should not be 1.', 'Click Add page numbers, then Download.'],
+    faq: [
+      ['Can I start from a number other than 1?', 'Yes. Change "Start at" to any number.'],
+      ['Can I skip the cover page?', 'Not directly. Split the cover off first, number the rest, then merge the two files.'],
+      ['Will the numbers cover my content?', 'They sit in the page margin, about one centimetre from the edge. Check the result if your pages have very small margins.']
+    ]
+  },
+  {
+    slug: 'watermark-pdf', cat: 'PDF tools', name: 'Watermark PDF',
+    title: 'Watermark PDF - Add a Text Watermark Free',
+    desc: 'Add a text watermark such as CONFIDENTIAL or DRAFT across every page of a PDF. Choose the style, strength and color. No upload.',
+    card: 'Stamp DRAFT or CONFIDENTIAL on every page.',
+    intro: 'Mark every page of a PDF with a see-through text watermark.',
+    steps: ['Choose a PDF.', 'Type the watermark text.', 'Choose the style, strength and color.', 'Click Add watermark, then Download.'],
+    faq: [
+      ['Can someone remove the watermark?', 'It becomes part of each page, but a person with PDF editing software could remove it. It discourages casual copying rather than preventing it.'],
+      ['Which characters can I use?', 'Latin letters, numbers and common symbols. Other scripts are not supported by the built-in font.'],
+      ['Does it hide the text underneath?', 'No. The watermark is see-through. Use Light if the page must stay easy to read.']
+    ]
+  },
+  {
+    slug: 'credit-card-payoff-calculator', cat: 'Finance calculators', name: 'Credit Card Payoff Calculator',
+    title: 'Credit Card Payoff Calculator - Months & Interest',
+    desc: 'See how long it will take to pay off a credit card and how much interest you will pay, or find the payment needed to clear it by a date.',
+    card: 'How long to clear a card, and the interest.',
+    intro: 'Find out how long your credit card will take to pay off, what it costs in interest, and what to pay to clear it sooner.',
+    steps: ['Enter your balance and the card\'s APR.', 'Enter what you pay each month.', 'Read the payoff time and total interest.', 'Use the second box to find the payment for a target number of months.'],
+    faq: [
+      ['How is the interest calculated?', 'Each month, interest of APR ÷ 12 is added to the balance, then your payment is taken off. This assumes you make no new purchases.'],
+      ['Why does it say the balance would never go down?', 'Your payment is less than or equal to the interest added each month, so nothing is left to reduce the debt.'],
+      ['How can I pay less interest?', 'Pay more each month. Even a small increase shortens the payoff time a lot, because less interest builds up.'],
+      ['Is this financial advice?', 'No. It is an estimate. Your card issuer may calculate interest daily and add fees.']
+    ]
+  },
+  {
+    slug: 'profit-margin-calculator', cat: 'Finance calculators', name: 'Profit Margin Calculator',
+    title: 'Profit Margin Calculator - Margin, Markup & Price',
+    desc: 'Calculate profit, profit margin and markup from cost and selling price, or find the price needed to hit a target margin.',
+    card: 'Margin, markup and the price to charge.',
+    intro: 'Work out your profit margin and markup, or find the selling price that gives the margin you want.',
+    steps: ['Enter what the item costs you and what you sell it for.', 'Read the profit, margin and markup.', 'Or enter a cost and a target margin to get the price to charge.'],
+    faq: [
+      ['What is the difference between margin and markup?', 'Margin is profit as a share of the selling price. Markup is profit as a share of the cost. A product that costs 60 and sells for 100 has a 40% margin and a 66.67% markup.'],
+      ['How do I price for a target margin?', 'Divide the cost by 1 minus the margin as a decimal. For a 40% margin on a cost of 60: 60 ÷ 0.6 = 100.'],
+      ['Is this gross or net margin?', 'It depends on what you include in cost. Using only the cost of the goods gives gross margin.']
+    ]
+  },
+  {
+    slug: 'gpa-calculator', cat: 'Calculators', name: 'GPA Calculator',
+    title: 'GPA Calculator - College & High School (4.0 Scale)',
+    desc: 'Calculate your GPA on the 4.0 scale from your grades and credit hours. Add as many courses as you need.',
+    card: 'GPA from your grades and credits.',
+    intro: 'Calculate your grade point average from letter grades and credit hours.',
+    steps: ['Enter the credits for each course.', 'Choose the grade you got.', 'Click Add course for more rows.', 'Read your GPA below.'],
+    faq: [
+      ['How is GPA calculated?', 'Each grade is turned into points, multiplied by the course credits, added up, then divided by the total credits.'],
+      ['What points does each grade get?', 'A and A+ are 4.0, A- 3.7, B+ 3.3, B 3.0, B- 2.7, C+ 2.3, C 2.0, C- 1.7, D+ 1.3, D 1.0 and F 0.'],
+      ['My school uses a different scale. Is this right for me?', 'Scales differ between schools. Check your school\'s own table if your result does not match your transcript.']
+    ]
+  },
+  {
+    slug: 'calorie-calculator', cat: 'Calculators', name: 'Calorie Calculator',
+    title: 'Calorie Calculator - Daily Calories to Lose or Maintain Weight',
+    desc: 'Estimate how many calories you need each day to maintain, lose or gain weight, based on your age, size and activity level.',
+    card: 'Daily calories to maintain, lose or gain.',
+    intro: 'Estimate the calories you burn each day and how many to eat to maintain, lose or gain weight.',
+    steps: ['Choose your units and sex.', 'Enter your age, weight and height.', 'Pick the activity level closest to your week.', 'Read your daily calorie targets.'],
+    faq: [
+      ['Which formula does this use?', 'The Mifflin-St Jeor equation for calories burned at rest, multiplied by a standard activity factor.'],
+      ['How fast will I lose weight?', 'A deficit of about 500 calories a day is commonly linked with losing roughly half a kilogram, or one pound, a week. Real results vary.'],
+      ['How accurate is it?', 'It is an estimate for adults. Individual needs can differ by a few hundred calories. It is not medical advice.']
+    ]
+  },
+  {
+    slug: 'roman-numeral-converter', cat: 'Calculators', name: 'Roman Numeral Converter',
+    title: 'Roman Numeral Converter - Numbers to Roman & Back',
+    desc: 'Convert numbers to Roman numerals and Roman numerals to numbers, from 1 to 3999. Checks that the numeral is valid.',
+    card: 'Numbers to Roman numerals and back.',
+    intro: 'Convert a number to Roman numerals, or read a Roman numeral as a number.',
+    steps: ['Type a number from 1 to 3999, or type a Roman numeral.', 'The other box updates as you type.'],
+    faq: [
+      ['Why does it stop at 3999?', 'Standard Roman numerals have no symbol above M (1000), and no symbol repeats more than three times, so 3999 (MMMCMXCIX) is the largest.'],
+      ['How do Roman numerals work?', 'Symbols are added together, largest first. A smaller symbol before a larger one is subtracted, so IV is 4 and IX is 9.'],
+      ['Is there a Roman numeral for zero?', 'No. The system has no zero.']
+    ]
+  },
+  {
+    slug: 'number-to-words', cat: 'Text tools', name: 'Number to Words',
+    title: 'Number to Words Converter - Spell Out Numbers & Check Amounts',
+    desc: 'Convert numbers into English words, or write an amount in dollars and cents for a check. Handles decimals and very large numbers.',
+    card: 'Spell out any number in English words.',
+    intro: 'Turn digits into English words, for writing checks, contracts and invoices.',
+    steps: ['Type a number.', 'Choose a plain number or dollars and cents.', 'Click Copy.'],
+    faq: [
+      ['How do I write an amount on a check?', 'Choose "Dollars and cents". The cents are written as a fraction, for example "One thousand two hundred thirty-four dollars and 56/100".'],
+      ['How large a number can it handle?', 'Up to 18 digits, which is hundreds of quadrillions.'],
+      ['Does it use "and"?', 'No. It follows the American style, as in "one hundred five", which is the usual style on checks.']
+    ]
+  },
+  {
+    slug: 'text-compare', cat: 'Text tools', name: 'Text Compare',
+    title: 'Text Compare - Find Differences Between Two Texts',
+    desc: 'Compare two texts and see which lines were added or removed. A free online diff checker that runs in your browser.',
+    card: 'See what changed between two texts.',
+    intro: 'Paste two versions of a text to see exactly which lines were added and removed.',
+    steps: ['Paste the original text on the left.', 'Paste the changed text on the right.', 'Click Compare.', 'Lines marked + were added and lines marked − were removed.'],
+    faq: [
+      ['How are the texts compared?', 'Line by line. A line that changed is shown as the old line removed and the new line added.'],
+      ['Is my text uploaded?', 'No. The comparison happens in your browser.'],
+      ['Can it ignore small differences?', 'Yes. Tick the options to ignore leading and trailing spaces or upper and lower case.']
+    ]
+  },
+  {
+    slug: 'text-to-binary', cat: 'Developer tools', name: 'Text to Binary',
+    title: 'Text to Binary Converter - Binary to Text Translator',
+    desc: 'Convert text to binary code and binary back to text. Supports every language and emoji using UTF-8.',
+    card: 'Translate text to binary code and back.',
+    intro: 'Translate text into the 0s and 1s a computer stores, or turn binary back into readable text.',
+    steps: ['Type text or paste binary.', 'Click Text to binary or Binary to text.', 'Click Copy.'],
+    faq: [
+      ['How is text turned into binary?', 'Each character is stored as one or more bytes using UTF-8, and each byte is written as eight binary digits.'],
+      ['Why do some characters use more than 8 digits?', 'English letters take one byte. Accented letters, other scripts and emoji take two to four bytes each.'],
+      ['Do spaces between groups matter when decoding?', 'No. Spaces and line breaks are ignored, as long as the total number of digits is a multiple of 8.']
+    ]
+  },
+  {
+    slug: 'countdown-timer', cat: 'Time tools', name: 'Online Timer',
+    title: 'Online Timer - Free Countdown Timer with Alarm',
+    desc: 'A simple online countdown timer with an alarm sound. Set hours, minutes and seconds or use a quick preset.',
+    card: 'Countdown timer with an alarm.',
+    intro: 'Set a countdown for cooking, studying, workouts or breaks. A sound plays when the time is up.',
+    steps: ['Set the hours, minutes and seconds, or tap a preset.', 'Click Start.', 'Keep the page open. The remaining time also shows in the browser tab.'],
+    faq: [
+      ['Does the timer work if I switch tabs?', 'Yes. It keeps the correct time in the background as long as the page stays open.'],
+      ['Why did I not hear the alarm?', 'Check that your device is not muted and the sound option is ticked. Phones may silence a page while the screen is locked.'],
+      ['Can I pause it?', 'Yes. Click Pause, then Resume to continue from where you stopped.']
+    ]
+  },
+  {
+    slug: 'stopwatch', cat: 'Time tools', name: 'Online Stopwatch',
+    title: 'Online Stopwatch - Free Stopwatch with Lap Times',
+    desc: 'A free online stopwatch accurate to a hundredth of a second, with lap times, pause and reset.',
+    card: 'Stopwatch with laps, to 1/100 second.',
+    intro: 'Time anything to a hundredth of a second and record lap times.',
+    steps: ['Click Start.', 'Click Lap to record a split without stopping.', 'Click Pause to stop, and Reset to clear.'],
+    faq: [
+      ['How accurate is it?', 'It uses your device\'s high-resolution clock and shows hundredths of a second.'],
+      ['Does it keep running in another tab?', 'Yes. The time is measured from the clock, so it stays correct even when the page is in the background.'],
+      ['What is a lap time?', 'The time since the previous lap. The Total column shows the time since you pressed Start.']
     ]
   }
 ];

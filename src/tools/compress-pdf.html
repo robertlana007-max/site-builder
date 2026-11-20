@@ -1,0 +1,50 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Compressed on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="lvl">Compression</label><select id="lvl"><option value="low">Light (best quality)</option><option value="mid" selected>Medium</option><option value="high">Strong (smallest file)</option></select></div>
+</div>
+<p class="msg">This tool works by turning each page into a compressed picture. It is best for scanned documents and PDFs full of photos. Text in the result can no longer be selected or searched.</p>
+<div class="btns"><button class="btn" id="go" disabled>Compress PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<div class="stats" id="stats" hidden>
+  <div class="stat"><span>Original</span><b id="s1">–</b></div>
+  <div class="stat"><span>Compressed</span><b id="s2">–</b></div>
+  <div class="stat"><span>Saved</span><b id="s3">–</b></div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, MAX = 200, LVL = { low: [2, 0.8], mid: [1.5, 0.65], high: [1.1, 0.5] }; // [render scale, JPG quality]
+  PT.drop(false, function (f) {
+    if (!PT.isPdf(f)) return PT.say('bad', 'Please choose a PDF file.');
+    file = f; $('go').disabled = false; $('dl').hidden = true; $('stats').hidden = true;
+    PT.say('', f.name + ' · ' + fmtBytes(f.size));
+  });
+  $('go').addEventListener('click', function () {
+    $('stats').hidden = true;
+    PT.run(async function () {
+      var pdf = await PT.render(file), n = pdf.numPages, lv = LVL[$('lvl').value];
+      if (n > MAX) throw new Error('This PDF has ' + n + ' pages. The limit is ' + MAX + '. Split it first.');
+      var out = await PDFLib.PDFDocument.create();
+      for (var i = 1; i <= n; i++) {
+        PT.say('', 'Compressing page ' + i + ' of ' + n + '…');
+        var r = await PT.pageCanvas(pdf, i, lv[0]), blob = await PT.blob(r.canvas, 'image/jpeg', lv[1]);
+        if (!blob) throw new Error('Page ' + i + ' is too large to process on this device.');
+        var img = await out.embedJpg(await blob.arrayBuffer());
+        out.addPage([r.width, r.height]).drawImage(img, { x: 0, y: 0, width: r.width, height: r.height });
+        r.canvas.width = r.canvas.height = 0;
+      }
+      var bytes = await out.save();
+      $('stats').hidden = false; $('s1').textContent = fmtBytes(file.size); $('s2').textContent = fmtBytes(bytes.length);
+      if (bytes.length >= file.size) {
+        $('s3').textContent = '0%';
+        throw new Error('This PDF is already small. The compressed version would be larger, so keep your original, or try Strong.');
+      }
+      $('s3').textContent = Math.round((1 - bytes.length / file.size) * 100) + '%';
+      PT.done(bytes, PT.base(file.name) + '-compressed.pdf', 'application/pdf', 'Compressed ' + n + (n === 1 ? ' page' : ' pages'));
+    });
+  });
+})();
+</script>

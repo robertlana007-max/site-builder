@@ -1,0 +1,39 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Numbers are added on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="pos">Position</label><select id="pos"><option value="bc">Bottom center</option><option value="br">Bottom right</option><option value="bl">Bottom left</option><option value="tc">Top center</option><option value="tr">Top right</option><option value="tl">Top left</option></select></div>
+  <div><label for="fmt">Format</label><select id="fmt"><option value="n">1</option><option value="of">1 / 10</option><option value="page">Page 1 of 10</option></select></div>
+  <div><label for="start">Start at</label><input type="number" id="start" min="0" step="1" value="1"></div>
+  <div><label for="size">Text size</label><select id="size"><option value="9">Small</option><option value="11" selected>Medium</option><option value="14">Large</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Add page numbers</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null;
+  PT.drop(false, function (f) {
+    $('dl').hidden = true;
+    PT.open(f).then(function (d) {
+      file = f; var n = d.getPageCount(); $('go').disabled = false;
+      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages'));
+    }).catch(function (e) { PT.say('bad', e.message); });
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var doc = await PT.open(file), font = await doc.embedFont(PDFLib.StandardFonts.Helvetica);
+      var pages = doc.getPages(), n = pages.length, start = Math.max(0, Math.floor(+$('start').value) || 0), size = +$('size').value;
+      var pos = $('pos').value, fmt = $('fmt').value, margin = 28, last = start + n - 1;
+      pages.forEach(function (p, i) {
+        var num = start + i, text = fmt === 'n' ? String(num) : fmt === 'of' ? num + ' / ' + last : 'Page ' + num + ' of ' + last;
+        var w = font.widthOfTextAtSize(text, size), box = p.getCropBox();
+        var x = pos[1] === 'l' ? box.x + margin : pos[1] === 'r' ? box.x + box.width - margin - w : box.x + (box.width - w) / 2;
+        var y = pos[0] === 'b' ? box.y + margin - size / 2 : box.y + box.height - margin - size / 2;
+        p.drawText(text, { x: x, y: y, size: size, font: font, color: PDFLib.rgb(0.2, 0.2, 0.2) });
+      });
+      PT.done(await doc.save(), PT.base(file.name) + '-numbered.pdf', 'application/pdf', 'Numbered ' + n + (n === 1 ? ' page' : ' pages'));
+    });
+  });
+})();
+</script>

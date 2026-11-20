@@ -1,0 +1,49 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop images here</b>JPG, PNG or WebP. Each image becomes one page. Nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" multiple hidden>
+<ul class="files" id="list"></ul>
+<div class="fields">
+  <div><label for="page">Page size</label><select id="page"><option value="fit">Same as each image</option><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+  <div><label for="margin">Margin</label><select id="margin"><option value="0">None</option><option value="24">Small</option><option value="48">Large</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Create PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var files = [], SIZE = { a4: [595.28, 841.89], letter: [612, 792] };
+  function refresh() { $('go').disabled = !files.length; $('dl').hidden = true; PT.say('', files.length > 1 ? 'Use the arrows to set the page order.' : ''); }
+  PT.drop(true, function (list) {
+    files = files.concat(list.filter(function (f) { return /^image\//.test(f.type); }));
+    PT.list(files, refresh); refresh();
+  });
+  // JPG and PNG are embedded untouched; other formats are redrawn as JPG first.
+  async function embed(doc, f) {
+    var buf = await f.arrayBuffer();
+    if (f.type === 'image/jpeg') return doc.embedJpg(buf);
+    if (f.type === 'image/png') return doc.embedPng(buf);
+    var img = await new Promise(function (res) { loadImage(f, res); });
+    if (!img) throw new Error('"' + f.name + '" could not be read as an image.');
+    var c = document.createElement('canvas'); c.width = img.naturalWidth; c.height = img.naturalHeight;
+    var ctx = c.getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); ctx.drawImage(img, 0, 0);
+    return doc.embedJpg(await (await PT.blob(c, 'image/jpeg', 0.92)).arrayBuffer());
+  }
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var doc = await PDFLib.PDFDocument.create(), m = +$('margin').value, kind = $('page').value;
+      for (var i = 0; i < files.length; i++) {
+        var img;
+        try { img = await embed(doc, files[i]); }
+        catch (e) { throw new Error(/could not be read/.test(e.message) ? e.message : '"' + files[i].name + '" is damaged or not a supported image.'); }
+        var pw, ph;
+        if (kind === 'fit') { pw = img.width + m * 2; ph = img.height + m * 2; }
+        else { pw = SIZE[kind][0]; ph = SIZE[kind][1]; if (img.width > img.height) { var t = pw; pw = ph; ph = t; } } // landscape page for wide images
+        var s = kind === 'fit' ? 1 : Math.min((pw - m * 2) / img.width, (ph - m * 2) / img.height);
+        var w = img.width * s, h = img.height * s;
+        doc.addPage([pw, ph]).drawImage(img, { x: (pw - w) / 2, y: (ph - h) / 2, width: w, height: h });
+      }
+      PT.done(await doc.save(), 'images.pdf', 'application/pdf', 'Created a PDF with ' + files.length + (files.length === 1 ? ' page' : ' pages'));
+    });
+  });
+})();
+</script>

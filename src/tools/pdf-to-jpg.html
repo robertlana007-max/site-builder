@@ -1,0 +1,42 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Every page becomes an image, on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="fmt">Image format</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option></select></div>
+  <div><label for="scale">Resolution</label><select id="scale"><option value="1">Standard (72 dpi)</option><option value="2" selected>High (144 dpi)</option><option value="3">Very high (216 dpi)</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Convert to images</button><a class="btn ghost" id="dl" hidden>Download all (ZIP)</a></div>
+<p class="msg" id="msg"></p>
+<div class="thumbs" id="thumbs"></div>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, MAX = 200, urls = [];
+  PT.drop(false, function (f) {
+    if (!PT.isPdf(f)) return PT.say('bad', 'Please choose a PDF file.');
+    file = f; $('go').disabled = false; $('dl').hidden = true; $('thumbs').innerHTML = '';
+    PT.say('', f.name + ' · ' + fmtBytes(f.size));
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var pdf = await PT.render(file), n = pdf.numPages, type = $('fmt').value, ext = type === 'image/png' ? 'png' : 'jpg', base = PT.base(file.name);
+      if (n > MAX) throw new Error('This PDF has ' + n + ' pages. The limit is ' + MAX + '. Split it first.');
+      urls.forEach(function (u) { URL.revokeObjectURL(u); }); urls = [];
+      $('thumbs').innerHTML = '';
+      var out = [];
+      for (var i = 1; i <= n; i++) {
+        PT.say('', 'Converting page ' + i + ' of ' + n + '…');
+        var r = await PT.pageCanvas(pdf, i, +$('scale').value), blob = await PT.blob(r.canvas, type, 0.9);
+        if (!blob) throw new Error('Page ' + i + ' is too large for this resolution. Choose a lower one.');
+        var name = base + '-page-' + i + '.' + ext, url = URL.createObjectURL(blob); urls.push(url);
+        out.push({ name: name, data: new Uint8Array(await blob.arrayBuffer()) });
+        var a = document.createElement('a'), img = document.createElement('img'), cap = document.createElement('span');
+        a.href = url; a.download = name; img.src = url; img.alt = 'Page ' + i; img.loading = 'lazy'; cap.textContent = 'Page ' + i + ' · ' + fmtBytes(blob.size);
+        a.appendChild(img); a.appendChild(cap); $('thumbs').appendChild(a);
+        r.canvas.width = r.canvas.height = 0; // free memory before the next page
+      }
+      PT.done(PT.zip(out), base + '-images.zip', 'application/zip', n + (n === 1 ? ' image' : ' images') + ' ready. Tap one to save it, or download them all');
+    });
+  });
+})();
+</script>

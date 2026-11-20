@@ -1,0 +1,29 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop PDF files here</b>Add two or more. They are merged on your device and never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" multiple hidden>
+<ul class="files" id="list"></ul>
+<div class="btns"><button class="btn" id="go" disabled>Merge PDFs</button><a class="btn ghost" id="dl" hidden>Download merged PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var files = [];
+  function refresh() { $('go').disabled = files.length < 2; $('dl').hidden = true; PT.say('', files.length === 1 ? 'Add at least one more PDF.' : files.length ? 'Use the arrows to set the order.' : ''); }
+  PT.drop(true, function (list) {
+    var bad = list.filter(function (f) { return !PT.isPdf(f); });
+    files = files.concat(list.filter(PT.isPdf));
+    PT.list(files, refresh); refresh();
+    if (bad.length) PT.say('bad', 'Skipped ' + bad.length + ' file(s) that are not PDFs.');
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var out = await PDFLib.PDFDocument.create();
+      for (var i = 0; i < files.length; i++) {
+        var src = await PT.open(files[i]);
+        (await out.copyPages(src, src.getPageIndices())).forEach(function (p) { out.addPage(p); });
+      }
+      PT.done(await out.save(), 'merged.pdf', 'application/pdf', 'Merged ' + files.length + ' files, ' + out.getPageCount() + ' pages');
+    });
+  });
+})();
+</script>

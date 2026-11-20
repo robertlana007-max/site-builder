@@ -1,0 +1,32 @@
+<div class="fields">
+  <div><label for="a">Original text</label><textarea id="a" class="plain" style="min-height:180px" placeholder="Paste the first version here..."></textarea></div>
+  <div><label for="b">Changed text</label><textarea id="b" class="plain" style="min-height:180px" placeholder="Paste the second version here..."></textarea></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="ws">Ignore spaces at the start and end of lines</label><label><input type="checkbox" id="ci">Ignore upper/lower case</label></div>
+<div class="btns"><button class="btn" id="go">Compare</button></div>
+<p class="msg" id="msg"></p>
+<div class="diff" id="out" hidden></div>
+<script>
+(function () {
+  $('go').addEventListener('click', function () {
+    var norm = function (s) { if ($('ws').checked) s = s.trim(); if ($('ci').checked) s = s.toLowerCase(); return s; };
+    var A = $('a').value.split(/\r?\n/), B = $('b').value.split(/\r?\n/), n = A.length, m = B.length, out = $('out');
+    out.innerHTML = ''; out.hidden = true;
+    if (n * m > 4000000) { $('msg').className = 'msg bad'; $('msg').textContent = 'These texts are too long to compare here. Try comparing smaller sections.'; return; }
+    var a = A.map(norm), b = B.map(norm), w = m + 1, L = new Uint32Array((n + 1) * w), i, j;
+    // Longest common subsequence table, filled from the end so the walk below runs forwards.
+    for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--) L[i * w + j] = a[i] === b[j] ? L[(i + 1) * w + j + 1] + 1 : Math.max(L[(i + 1) * w + j], L[i * w + j + 1]);
+    var add = 0, del = 0;
+    function row(cls, sign, text) { var d = document.createElement('div'); d.className = cls; d.textContent = sign + ' ' + text; out.appendChild(d); }
+    i = 0; j = 0;
+    while (i < n || j < m) {
+      if (i < n && j < m && a[i] === b[j]) { row('same', ' ', B[j]); i++; j++; }
+      else if (j < m && (i === n || L[i * w + j + 1] >= L[(i + 1) * w + j])) { row('add', '+', B[j]); add++; j++; }
+      else { row('del', '−', A[i]); del++; i++; }
+    }
+    out.hidden = false;
+    $('msg').className = 'msg ' + (add || del ? '' : 'ok');
+    $('msg').textContent = add || del ? add + (add === 1 ? ' line added, ' : ' lines added, ') + del + (del === 1 ? ' line removed.' : ' lines removed.') : 'The two texts are identical.';
+  });
+})();
+</script>

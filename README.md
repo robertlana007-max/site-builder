@@ -1,6 +1,6 @@
 # GetToolNest
 
-A static site of 12 free browser tools (image compressor, image resizer, QR code generator, password generator, word counter, case converter, JSON formatter, and age, percentage, loan, BMI and unit calculators). Everything runs client-side, so it can be hosted free on GitHub Pages.
+A static site of free browser tools: PDF tools (merge, split, compress, convert), image tools, finance and everyday calculators, generators, and text and developer utilities. Everything runs client-side, so it can be hosted free on GitHub Pages.
 
 ## Editing
 

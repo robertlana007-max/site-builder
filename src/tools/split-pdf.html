@@ -1,0 +1,41 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Pages are extracted on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="pages">Pages to extract</label><input type="text" id="pages" placeholder="e.g. 1-3, 5" autocomplete="off" disabled></div>
+  <div><label for="mode">Output</label><select id="mode"><option value="one">One PDF with these pages</option><option value="each">A separate PDF for every page (ZIP)</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Split PDF</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, doc = null;
+  PT.drop(false, function (f) {
+    $('dl').hidden = true;
+    PT.open(f).then(function (d) {
+      file = f; doc = d; var n = d.getPageCount();
+      $('pages').disabled = false; $('pages').value = '1-' + n; $('go').disabled = false;
+      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages'));
+    }).catch(function (e) { PT.say('bad', e.message); });
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var idx = PT.ranges($('pages').value, doc.getPageCount()), base = PT.base(file.name);
+      if ($('mode').value === 'one') {
+        var out = await PDFLib.PDFDocument.create();
+        (await out.copyPages(doc, idx)).forEach(function (p) { out.addPage(p); });
+        PT.done(await out.save(), base + '-pages.pdf', 'application/pdf', 'Extracted ' + idx.length + (idx.length === 1 ? ' page' : ' pages'));
+      } else {
+        var parts = [];
+        for (var i = 0; i < idx.length; i++) {
+          var one = await PDFLib.PDFDocument.create();
+          one.addPage((await one.copyPages(doc, [idx[i]]))[0]);
+          parts.push({ name: base + '-page-' + (idx[i] + 1) + '.pdf', data: await one.save() });
+        }
+        PT.done(PT.zip(parts), base + '-pages.zip', 'application/zip', 'Created ' + parts.length + ' PDFs');
+      }
+    });
+  });
+})();
+</script>

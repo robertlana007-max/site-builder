@@ -45,6 +45,26 @@ const ICON = {
   'url-encoder': '<path d="M10 14a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1M14 10a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/>',
   'hash-generator': '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/>',
   'color-converter': '<path d="M12 3s6 6.5 6 11a6 6 0 0 1-12 0c0-4.5 6-11 6-11z"/>',
+  'merge-pdf': '<path d="M8 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3M16 3h3a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-3M12 8v8M8 12h8"/>',
+  'split-pdf': '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.1 15.9M14.5 14.5L20 20M8.1 8.1L12 12"/>',
+  'compress-pdf': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 10v3M10.5 11.5L12 13l1.5-1.5M12 19v-3M10.5 17.5L12 16l1.5 1.5"/>',
+  'jpg-to-pdf': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="10" cy="13" r="1"/><path d="M8 18l3-3 2 2 1-1 2 2"/>',
+  'pdf-to-jpg': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M12 11v6M9.5 14.5L12 17l2.5-2.5"/>',
+  'pdf-to-text': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 12h6M9 15h6M9 18h3"/>',
+  'rotate-pdf': '<path d="M21 12a9 9 0 1 1-3-6.7"/><polyline points="21 3 21 9 15 9"/>',
+  'delete-pdf-pages': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 15h6"/>',
+  'add-page-numbers-to-pdf': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 17h6M12 17v-5l-1.5 1"/>',
+  'watermark-pdf': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 12h6M12 12v6"/>',
+  'credit-card-payoff-calculator': '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20M6 15h4"/>',
+  'profit-margin-calculator': '<path d="M21 12A9 9 0 1 1 12 3v9z"/><path d="M15 3.5A9 9 0 0 1 20.5 9H15z"/>',
+  'gpa-calculator': '<path d="M2 9l10-5 10 5-10 5z"/><path d="M6 11.5V16c2 2 10 2 12 0v-4.5M22 9v6"/>',
+  'calorie-calculator': '<path d="M12 22c4 0 7-3 7-7 0-3-2-5-3-7-1 2-2 3-3 3 0-3-1-6-4-8 0 4-4 6-4 12 0 4 3 7 7 7z"/>',
+  'roman-numeral-converter': '<path d="M5 5h14M5 19h14M8 5v14M12 5v14M16 5v14"/>',
+  'number-to-words': '<path d="M4 7h3v10M4 17h6M14 9a2 2 0 1 1 4 0c0 2-4 4-4 8h4"/>',
+  'text-compare': '<path d="M8 3v12M5 12l3 3 3-3M16 21V9M13 12l3-3 3 3"/>',
+  'text-to-binary': '<path d="M6 5l2-1v7M6 11h4M15 4h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1zM6 13h2a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-5a1 1 0 0 1 1-1zM15 14l2-1v7M15 20h4"/>',
+  'countdown-timer': '<path d="M6 3h12M6 21h12M7 3v4l5 5 5-5V3M7 21v-4l5-5 5 5v4"/>',
+  'stopwatch': '<circle cx="12" cy="14" r="7"/><path d="M12 14v-3.5M10 3h4M12 3v4"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
@@ -57,7 +77,7 @@ const ICON = {
 const icon = k => svg(ICON[k]);
 // Hue per category, used to tint icon tiles and card hovers.
 // Key order here is also the order of sections on the home page.
-const HUE = { 'Image tools': 262, 'Finance calculators': 150, 'Calculators': 340, 'Generators': 185, 'Text tools': 32, 'Developer tools': 215 };
+const HUE = { 'PDF tools': 4, 'Image tools': 262, 'Finance calculators': 150, 'Calculators': 325, 'Time tools': 48, 'Generators': 185, 'Text tools': 24, 'Developer tools': 215 };
 const tile = t => `<span class="tile" style="--h:${HUE[t.cat]}">${icon(t.slug)}</span>`;
 
 function write(rel, content) {
@@ -113,7 +133,7 @@ ${body}
 </main>
 <footer class="site-footer"><div class="wrap">
   <div class="foot-grid">
-    <div class="foot-brand">${logo(rel)}<p>${tools.length} free tools for images, money, text and code. Everything runs in your browser.</p></div>
+    <div class="foot-brand">${logo(rel)}<p>${tools.length} free tools for PDFs, images, money, text and code. Everything runs in your browser.</p></div>
     ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
     <div><h2>Site</h2><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
   </div>
@@ -130,19 +150,19 @@ const logo = rel => `<a class="logo" href="${rel || './'}"><span class="logo-mar
 const footCols = cats.map(c => ({ title: c, items: tools.filter(t => t.cat === c) }));
 const card = (t, rel) => `<a class="tool-card" style="--h:${HUE[t.cat]}" href="${rel}${t.slug}/">${tile(t)}<b>${esc(t.name)}</b><small>${esc(t.card)}</small><span class="go">${icon('arrow')}</span></a>`;
 const bySlug = s => tools.find(t => t.slug === s);
-const popular = ['image-compressor', 'mortgage-calculator', 'qr-code-generator', 'password-generator'].map(bySlug);
+const popular = ['merge-pdf', 'compress-pdf', 'image-compressor', 'mortgage-calculator', 'qr-code-generator'].map(bySlug);
 
 // ---------- home ----------
 write('index.html', layout({
   rel: '', urlPath: '',
-  title: `${cfg.siteName} - Free Online Tools: Image, Text, Calculators`,
-  desc: `${tools.length} free online tools: image compressor, mortgage calculator, QR code generator, password generator, word counter and more. No sign-up. Files never leave your device.`,
+  title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
+  desc: `${tools.length} free online tools: merge PDF, compress PDF, image compressor, mortgage calculator, QR code generator and more. No sign-up. Files never leave your device.`,
   head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, url: SITE + '/' }),
   band: `<section class="hero">
   <span class="badge"><i></i>${tools.length} tools · 100% free · No sign-up</span>
   <h1>Free online tools that <span class="grad">just work</span></h1>
-  <p>Compress images, work out a mortgage, make QR codes and convert almost anything. Fast, private and free, right in your browser.</p>
-  <div class="search-box">${icon('search')}<input type="search" id="toolSearch" placeholder="Search tools, e.g. compress image" aria-label="Search tools"></div>
+  <p>Merge PDFs, compress images, work out a mortgage and convert almost anything. Fast, private and free, right in your browser.</p>
+  <div class="search-box">${icon('search')}<input type="search" id="toolSearch" placeholder="Search tools, e.g. merge pdf" aria-label="Search tools"></div>
   <div class="chips">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div>
   <div class="trust"><span>${icon('check')}Files never leave your device</span><span>${icon('check')}No account needed</span><span>${icon('check')}Works on phone and desktop</span></div>
 </section>`,
@@ -194,7 +214,7 @@ ${ad(cfg.adSlotTop)}
 ${body}
 </section>
 ${ad(cfg.adSlotBottom)}
-<h2>How to use the ${esc(t.name.toLowerCase())}</h2>
+<h2>How to use ${esc(t.name)}</h2>
 <ol class="steps">${t.steps.map(s => `<li><span>${esc(s)}</span></li>`).join('')}</ol>
 <h2>Frequently asked questions</h2>
 <div class="faq">${t.faq.map(([q, a], i) => `<details${i === 0 ? ' open' : ''}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div>
@@ -219,7 +239,7 @@ const analytics = cfg.googleAnalyticsId
 
 const pages = [
   { slug: 'about', title: 'About', desc: `What ${cfg.siteName} is and why the tools are free and private.`, html: `
-<p>${esc(cfg.siteName)} is a small collection of free online tools for everyday jobs: shrinking a photo, making a QR code, counting words or working out a loan payment.</p>
+<p>${esc(cfg.siteName)} is a small collection of free online tools for everyday jobs: merging PDFs, shrinking a photo, making a QR code or working out a loan payment.</p>
 <h2>How it works</h2>
 <p>Every tool is plain JavaScript that runs in your browser. When you compress an image or format JSON, the work is done by your own device. We have no server that receives your files.</p>
 <h2>Why it is free</h2>
@@ -230,7 +250,7 @@ ${contact}` },
   { slug: 'privacy', title: 'Privacy Policy', desc: `How ${cfg.siteName} handles your data. Short version: your files and text stay on your device.`, html: `
 <p>Last updated: ${TODAY}</p>
 <h2>Data you enter into tools</h2>
-<p>Images, text, numbers and passwords you enter are processed in your browser. They are not uploaded to or stored by ${esc(cfg.siteName)}.</p>
+<p>PDFs, images, text, numbers and passwords you enter are processed in your browser. They are not uploaded to or stored by ${esc(cfg.siteName)}.</p>
 <h2>Local storage</h2>
 <p>We save one setting in your browser's local storage: your light or dark theme choice. It never leaves your device.</p>
 <h2>Analytics</h2>
@@ -247,7 +267,7 @@ ${contact}` },
 <h2>No warranty</h2>
 <p>The tools are provided "as is", without warranties of any kind. We work to keep results correct, but we cannot guarantee they are free of errors.</p>
 <h2>Not professional advice</h2>
-<p>The finance and BMI calculators give general estimates only. They are not financial or medical advice. Check important decisions with a qualified professional.</p>
+<p>The finance, BMI and calorie calculators give general estimates only. They are not financial or medical advice. Check important decisions with a qualified professional.</p>
 <h2>Your content</h2>
 <p>You keep all rights to anything you create with the tools, including compressed images and QR codes.</p>
 <h2>Changes</h2>

@@ -1,0 +1,32 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Pages are removed on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="pages">Pages to delete</label><input type="text" id="pages" placeholder="e.g. 2, 4-6" autocomplete="off" disabled></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Delete pages</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, doc = null;
+  PT.drop(false, function (f) {
+    $('dl').hidden = true;
+    PT.open(f).then(function (d) {
+      file = f; doc = d; var n = d.getPageCount();
+      $('pages').disabled = false; $('go').disabled = false;
+      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages'));
+    }).catch(function (e) { PT.say('bad', e.message); });
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var n = doc.getPageCount(), drop = PT.ranges($('pages').value, n);
+      if (drop.length >= n) throw new Error('You cannot delete every page. Leave at least one.');
+      var keep = doc.getPageIndices().filter(function (i) { return drop.indexOf(i) === -1; });
+      var out = await PDFLib.PDFDocument.create();
+      (await out.copyPages(doc, keep)).forEach(function (p) { out.addPage(p); });
+      PT.done(await out.save(), PT.base(file.name) + '-edited.pdf', 'application/pdf', 'Deleted ' + drop.length + (drop.length === 1 ? ' page, ' : ' pages, ') + keep.length + ' left');
+    });
+  });
+})();
+</script>

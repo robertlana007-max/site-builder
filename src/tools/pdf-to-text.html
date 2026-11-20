@@ -1,0 +1,34 @@
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>The text is read on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<textarea id="out" class="plain" style="min-height:260px" readonly aria-label="Extracted text" placeholder="The text from your PDF will appear here."></textarea>
+<div class="btns"><button class="btn" id="go" disabled>Extract text</button><button class="btn ghost" id="cp">Copy</button><a class="btn ghost" id="dl" hidden>Download .txt</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null;
+  PT.drop(false, function (f) {
+    if (!PT.isPdf(f)) return PT.say('bad', 'Please choose a PDF file.');
+    file = f; $('go').disabled = false; $('dl').hidden = true; $('out').value = '';
+    PT.say('', f.name + ' · ' + fmtBytes(f.size));
+  });
+  $('go').addEventListener('click', function () {
+    PT.run(async function () {
+      var pdf = await PT.render(file), n = pdf.numPages, pages = [];
+      for (var i = 1; i <= n; i++) {
+        PT.say('', 'Reading page ' + i + ' of ' + n + '…');
+        var tc = await (await pdf.getPage(i)).getTextContent(), s = '';
+        tc.items.forEach(function (it) { s += it.str + (it.hasEOL ? '\n' : ''); });
+        pages.push(s.replace(/[ \t]+\n/g, '\n').trim());
+      }
+      var text = pages.join('\n\n').trim();
+      $('out').value = text;
+      if (!text) throw new Error('No text was found. This PDF is probably a scan, which contains pictures of text rather than text.');
+      var words = text.split(/\s+/).length;
+      PT.done(text, PT.base(file.name) + '.txt', 'text/plain;charset=utf-8', n + (n === 1 ? ' page, ' : ' pages, ') + fmtNum(words) + ' words');
+    });
+  });
+  $('cp').addEventListener('click', function () { copyText($('out').value, $('cp')); });
+})();
+</script>
