@@ -86,6 +86,17 @@ const ICON = {
 const icon = k => svg(ICON[k]);
 // One flat colour per category. Key order here is also the order of sections on the home page.
 const COLOR = { 'PDF tools': '#e5484d', 'Image tools': '#8b5cf6', 'Finance calculators': '#12a150', 'Calculators': '#d6409f', 'Time tools': '#d98e00', 'Generators': '#0e9fb5', 'Text tools': '#e86a17', 'Developer tools': '#2563eb' };
+// What each category is for, shown on the home page.
+const CATINFO = {
+  'PDF tools': ['Merge, split, compress, edit and sign PDF files', 'Join reports into one file, shrink a scan so it fits an email, change text inside a PDF in its original font, add page numbers or a watermark, and turn pages into pictures.'],
+  'Image tools': ['Resize, compress, convert and edit pictures', 'Make a photo smaller without it looking worse, crop it for a profile, change JPG to PNG or WebP, and even click on text in a picture to change it.'],
+  'Finance calculators': ['Loans, mortgages, salary, tax and savings', 'See the real monthly payment and total interest before you sign, plan how fast a card can be paid off, and work out take-home pay or compound growth.'],
+  'Calculators': ['Everyday maths, health and school', 'Percentages, BMI and calories, age, GPA, discounts, tips and unit conversions, with the working shown clearly.'],
+  'Time tools': ['Timers, stopwatch, clocks and dates', 'A countdown timer with an alarm, a stopwatch with laps, time zone converter and day counters for deadlines and birthdays.'],
+  'Generators': ['Passwords, QR codes, random numbers and names', 'Strong passwords, QR codes for links or Wi-Fi, fair random picks, UUIDs and placeholder text, made on your device.'],
+  'Text tools': ['Write, count, clean and edit text', 'A full notepad with tabs, word and character counter, case changer, remove duplicate lines, compare two texts and more.'],
+  'Developer tools': ['JSON, Base64, hashes, regex and more', 'Format and check JSON, encode and decode Base64 and URLs, make hashes, test regular expressions and convert colours.']
+};
 const tile = t => `<span class="tile" style="--c:${COLOR[t.cat]}">${icon(t.slug)}</span>`;
 
 function write(rel, content) {
@@ -323,9 +334,28 @@ write('index.html', layout({
   <div id="minePinsBox"><h3>Pinned</h3><div class="chiprow" id="minePins"></div></div>
   <div id="mineRecentBox"><h3>Recently used</h3><div class="chiprow" id="mineRecent"></div></div>
 </section>
+<section class="intro">
+  <div class="intro-text">
+    <h2 class="section-title">What is ${esc(cfg.siteName)}?</h2>
+    <p>${esc(cfg.siteName)} is one place for the small jobs that come up every day: a PDF that is too big to email, a photo that needs to be smaller, a loan you want to understand, a password you need right now, or notes you want to keep. Instead of searching for a different website each time, you will find ${tools.length} tools here, all made to look and work the same way.</p>
+    <p>Everything runs <b>inside your own browser</b>. Your files are not uploaded to a server, so they stay private and the work is quick even on a slow connection. There is no sign-up, no watermark and no daily limit. You can sign in if you want your pinned tools and settings on every device, and you can install the site as an app on your phone or computer.</p>
+  </div>
+  <ul class="stats">
+    <li><b>${tools.length}</b><span>free tools</span></li>
+    <li><b>0</b><span>files uploaded</span></li>
+    <li><b>${LANGS.length}</b><span>languages</span></li>
+    <li><b>Free</b><span>no sign-up, no limits</span></li>
+  </ul>
+</section>
+<section class="block explore">
+  <h2 class="section-title">What you can do here</h2>
+  <p class="section-sub">Eight groups of tools. Pick a group to jump to its tools, or open one of the examples straight away.</p>
+  <div class="explore-grid">${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<div class="ex" style="--c:${COLOR[c]}"><a class="ex-head" href="#${catId(c)}">${tile(list[0])}<span><b>${esc(c)}</b><small>${list.length} tools</small></span></a><h3>${esc(CATINFO[c][0])}</h3><p>${esc(CATINFO[c][1])}</p><div class="ex-links">${list.slice(0, 3).map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</div></div>`; }).join('')}</div>
+</section>
+<h2 class="section-title all-title">All tools</h2>
 <div class="pills" id="tools" role="group" aria-label="Filter by category"><button class="pill on" data-cat="" aria-pressed="true">All tools</button>${cats.map(c => `<button class="pill" data-cat="${esc(c)}" aria-pressed="false">${esc(c)}</button>`).join('')}</div>
 ${ad(cfg.adSlotTop)}
-${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" id="${catId(c)}" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
+${cats.map(c => { const list = tools.filter(t => t.cat === c); return `<section class="cat" id="${catId(c)}" data-cat="${esc(c)}"><h2 class="cat-title">${esc(c)}<span>${list.length}</span></h2><p class="cat-desc">${esc(CATINFO[c][1])}</p><div class="grid">${list.map(t => card(t, '')).join('')}</div></section>`; }).join('\n')}
 ${ad(cfg.adSlotBottom)}
 <section class="block">
   <h2 class="section-title">How it works</h2>
@@ -496,7 +526,6 @@ ${contact}` },
 <div class="warnbox"><b>Before you send:</b> choose the <b>same network</b> in your wallet as the one shown on the card. Crypto sent on a different network, or a different coin, cannot be recovered.</div>
 <div class="coins">${(cfg.donate || []).map((d, i) => `<div class="coin" data-coin="${esc(d.coin)}">
   <div class="coin-head"><b>${esc(d.coin)}</b><span class="net">${esc(d.network)}</span></div>
-  <canvas class="coin-qr" width="200" height="200" data-addr="${esc(d.address)}" aria-label="QR code of the ${esc(d.coin)} ${esc(d.network)} address"></canvas>
   <code class="addr notranslate" translate="no">${esc(d.address)}</code>
   <button class="btn ghost" type="button" data-copy="${esc(d.address)}">Copy address</button>
   <small>Send only ${esc(d.coin)} on ${esc(d.network)}. Minimum ${esc(d.min)}.${d.note ? ' ' + esc(d.note) : ''}</small>
@@ -504,16 +533,8 @@ ${contact}` },
 <h2>Other ways to help</h2>
 <ul><li><b>Share ${esc(cfg.siteName)}</b> with a friend, a class group or your colleagues.</li><li><b>Tell us</b> about a bug or a tool you need on the <a href="../contact/">contact page</a>.</li><li><b>Install the app</b> from <a href="../app/">Get the app</a> and keep using it.</li></ul>
 <p class="setnote">Donations are voluntary gifts. They do not buy any product, service or extra features.</p>
-<script src="../assets/vendor/qrcode.js"></script>
 <script>
 (function () {
-  qrcode.stringToBytes = function (s) { return Array.from(new TextEncoder().encode(s)); };
-  document.querySelectorAll('.coin-qr').forEach(function (cv) {
-    var q = qrcode(0, 'M'); q.addData(cv.dataset.addr, 'Byte'); q.make();
-    var n = q.getModuleCount(), size = cv.width, quiet = 3, cell = Math.floor(size / (n + quiet * 2)), off = Math.floor((size - cell * n) / 2), x = cv.getContext('2d');
-    x.fillStyle = '#fff'; x.fillRect(0, 0, size, size); x.fillStyle = '#000';
-    for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (q.isDark(r, c)) x.fillRect(off + c * cell, off + r * cell, cell, cell);
-  });
   document.querySelectorAll('[data-copy]').forEach(function (b) { b.addEventListener('click', function () { copyText(b.dataset.copy, b); }); });
 })();
 </script>` },

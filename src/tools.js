@@ -660,11 +660,11 @@ module.exports = [
     ]
   },
   {
-    slug: 'online-notepad', cat: 'Text tools', name: 'Online Notepad', wide: true,
-    title: 'Online Notepad & Code Editor - Tabs, Syntax Colours, Find & Replace',
-    desc: 'A free online notepad and code editor that works like a desktop editor: tabs, syntax colours for 30+ languages, find and replace with regex, line tools, and it saves your tabs automatically.',
-    card: 'Notepad with tabs, code colours, find and replace.',
-    intro: 'A full text and code editor in your browser, in the spirit of desktop editors such as Notepad++: open many files in tabs, colour code in more than 30 languages, find and replace with regular expressions, sort and clean lines, and save. Your tabs are kept in this browser, so they are still there tomorrow.',
+    slug: 'online-notepad', cat: 'Text tools', name: 'GetToolNest Notepad', wide: true,
+    title: 'GetToolNest Notepad - Free Online Notepad & Code Editor with Tabs',
+    desc: 'GetToolNest Notepad is a free online notepad and code editor that works like a desktop editor: unlimited lines, tabs, syntax colours for 30+ languages, find and replace with regex, line tools, and it saves your tabs automatically.',
+    card: 'Full notepad: tabs, code colours, find and replace, bookmarks.',
+    intro: 'GetToolNest Notepad is a full text and code editor in your browser, in the spirit of desktop editors such as Notepad++: write as many lines as you like, open many files in tabs, colour code in more than 30 languages, find and replace with regular expressions, bookmark lines, sort and clean lines, and save. Your tabs are kept in this browser, so they are still there tomorrow.',
     steps: ['Start typing, press Alt+N for a new tab, or open files with Ctrl+O (or drop them on the editor).', 'Pick the language from the Language menu, or rename the tab with an extension such as .py or .html.', 'Use Search for find and replace, and Lines or Edit for sorting, cleaning and changing case.', 'Press Ctrl+S to save the current tab, or File → Save all as ZIP.'],
     faq: [
       ['Is this the real Notepad++?', 'No. Notepad++ is a Windows program. This is an independent online editor with many of the same everyday features: tabs, syntax colouring, find and replace with regular expressions, line operations, code folding, multiple cursors, word wrap and zoom.'],
@@ -672,7 +672,8 @@ module.exports = [
       ['Will my tabs still be here later?', 'Yes, on the same browser and device. Clearing your browser data erases them, so save anything important with Ctrl+S.'],
       ['Which languages are coloured?', 'JavaScript, TypeScript, JSON, HTML, XML, CSS, SCSS, LESS, Python, Java, C, C++, C#, Kotlin, Dart, PHP, SQL, Markdown, Shell, PowerShell, YAML, TOML, INI, Go, Rust, Ruby, Lua, Perl, R, Swift, Dockerfile, Nginx and Diff.'],
       ['How do I edit several lines at once?', 'Hold Ctrl (Cmd on Mac) and click to add more cursors, or hold Alt and drag to select a column.'],
-      ['Can it open very large files?', 'Files up to 20 MB open. Very large files can be slow on phones.']
+      ['Is there a limit on lines or file size?', 'No fixed limit. You can write or paste as many lines as you like; only lines on screen are drawn, so long files stay smooth. Files over 50 MB ask before opening because very large files can slow a phone down.'],
+      ['How do bookmarks work?', 'Click a line number or press Ctrl+F2 to put a blue dot on that line. F2 jumps to the next bookmark. In the Search menu you can bookmark every line that matches a search, then copy or remove those lines.']
     ]
   }
 ];
