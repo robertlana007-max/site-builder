@@ -74,6 +74,7 @@ const ICON = {
   undo: '<path d="M3 7v6h6"/><path d="M3 13a9 9 0 1 0 3-7.7L3 8"/>',
   shield: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/>',
   zap: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
+  'online-notepad': '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9.5 12.5L8 14l1.5 1.5M14.5 12.5L16 14l-1.5 1.5"/>',
   heart: '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8l1 1.1L12 21.2l7.8-7.7 1-1.1a5.5 5.5 0 0 0 0-7.8z"/>',
   phone: '<rect x="6" y="2" width="12" height="20" rx="2"/><path d="M11 18h2"/>',
   check: '<circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/>',
@@ -387,7 +388,7 @@ for (const t of tools) {
   <p class="lead">${esc(t.intro)}</p>
   <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>
-<div class="cols">
+<div class="cols${t.wide ? ' wide' : ''}">
 <div class="content">
 <section class="card">
 ${body}
@@ -490,8 +491,8 @@ ${contact}` },
 <h2>Why use the app</h2>
 <ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },
   { slug: 'donate', title: 'Support GetToolNest', desc: `${cfg.siteName} is free. If it helps you, you can support it with USDT, USDC or Bitcoin.`, html: `
-<p class="lead" style="margin-top:0">Every tool on ${esc(cfg.siteName)} is free, and it will stay free. There is nothing to buy and nothing locked.</p>
-<p>If the tools save you time and you would like to say thanks, you can send any amount in crypto. It pays for the domain and helps us build new tools. Thank you! ❤</p>
+<p class="lead" style="margin-top:0"><b>All our services are free</b>, and they will stay free. There is nothing to buy and nothing locked.</p>
+<p><b>But if you would like to support us, you can send a gift to the addresses below</b>, in any amount. It pays for the website and helps us build new tools. Thank you! ❤</p>
 <div class="warnbox"><b>Before you send:</b> choose the <b>same network</b> in your wallet as the one shown on the card. Crypto sent on a different network, or a different coin, cannot be recovered.</div>
 <div class="coins">${(cfg.donate || []).map((d, i) => `<div class="coin" data-coin="${esc(d.coin)}">
   <div class="coin-head"><b>${esc(d.coin)}</b><span class="net">${esc(d.network)}</span></div>

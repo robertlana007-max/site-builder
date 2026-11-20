@@ -658,5 +658,21 @@ module.exports = [
       ['Why can I see a box where the old text was?', 'Hiding works best on a plain background. On a photo or a pattern the covered patch is one flat colour, so it shows.'],
       ['Is my picture uploaded?', 'No. Finding and editing the text both happen on your own device.']
     ]
+  },
+  {
+    slug: 'online-notepad', cat: 'Text tools', name: 'Online Notepad', wide: true,
+    title: 'Online Notepad & Code Editor - Tabs, Syntax Colours, Find & Replace',
+    desc: 'A free online notepad and code editor that works like a desktop editor: tabs, syntax colours for 30+ languages, find and replace with regex, line tools, and it saves your tabs automatically.',
+    card: 'Notepad with tabs, code colours, find and replace.',
+    intro: 'A full text and code editor in your browser, in the spirit of desktop editors such as Notepad++: open many files in tabs, colour code in more than 30 languages, find and replace with regular expressions, sort and clean lines, and save. Your tabs are kept in this browser, so they are still there tomorrow.',
+    steps: ['Start typing, press Alt+N for a new tab, or open files with Ctrl+O (or drop them on the editor).', 'Pick the language from the Language menu, or rename the tab with an extension such as .py or .html.', 'Use Search for find and replace, and Lines or Edit for sorting, cleaning and changing case.', 'Press Ctrl+S to save the current tab, or File → Save all as ZIP.'],
+    faq: [
+      ['Is this the real Notepad++?', 'No. Notepad++ is a Windows program. This is an independent online editor with many of the same everyday features: tabs, syntax colouring, find and replace with regular expressions, line operations, code folding, multiple cursors, word wrap and zoom.'],
+      ['Are my files uploaded?', 'No. Files you open are read by your browser and stay on your device. Your tabs are saved in this browser’s storage, not on a server.'],
+      ['Will my tabs still be here later?', 'Yes, on the same browser and device. Clearing your browser data erases them, so save anything important with Ctrl+S.'],
+      ['Which languages are coloured?', 'JavaScript, TypeScript, JSON, HTML, XML, CSS, SCSS, LESS, Python, Java, C, C++, C#, Kotlin, Dart, PHP, SQL, Markdown, Shell, PowerShell, YAML, TOML, INI, Go, Rust, Ruby, Lua, Perl, R, Swift, Dockerfile, Nginx and Diff.'],
+      ['How do I edit several lines at once?', 'Hold Ctrl (Cmd on Mac) and click to add more cursors, or hold Alt and drag to select a column.'],
+      ['Can it open very large files?', 'Files up to 20 MB open. Very large files can be slow on phones.']
+    ]
   }
 ];
