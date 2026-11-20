@@ -646,16 +646,17 @@ module.exports = [
   },
   {
     slug: 'image-text-editor', cat: 'Image tools', name: 'Image Text Editor',
-    title: 'Image Text Editor - Add or Replace Text on a Photo Free',
-    desc: 'Add text to a picture or replace writing that is already on it. Cover the old text, type the new text, choose a font and colour, and save. No upload.',
-    card: 'Add text to a picture or replace what is written.',
-    intro: 'Write on a photo, a screenshot or a meme. To change writing that is already there, cover it with the background colour and type new text on top.',
-    steps: ['Choose a picture.', 'To replace writing, press Cover old text and drag a box over it. The box takes the colour around it.', 'Press Add text, type your words and drag them into place.', 'Choose the font, size and colour, then press Save picture.'],
+    title: 'Edit Text in Image Online - Change Text on a Photo Free',
+    desc: 'Click the writing in a picture and change it. The editor finds the text, hides the old words and writes yours in the same place, size and colour. No upload.',
+    card: 'Click the writing in a picture and change it.',
+    intro: 'Change a price, a date or a name written in a picture. The editor finds the writing for you: click a line, type the new words, save.',
+    steps: ['Choose a picture and wait a moment while the editor finds the writing.', 'Click a highlighted line in the picture.', 'Type the new text. Change the font, size or colour if needed.', 'Press Save picture, then Download.'],
     faq: [
-      ['Can it copy the exact font from my picture?', 'No. A picture only holds pixels, not font information, so the editor cannot know the font automatically. Pick the closest font from the list and use Pick color from picture to match the colour.'],
-      ['How do I hide the old text cleanly?', 'Covering works best on a plain background. Draw the box tightly around the writing. On a photo or a patterned background the box will be visible.'],
-      ['Which fonts can I use?', 'The fonts installed on your own device from the list, such as Arial, Times New Roman, Georgia, Courier New and Impact. If a font is missing on your device, a similar one is used.'],
-      ['Does it reduce picture quality?', 'PNG keeps the full quality. JPG makes a smaller file with a little loss.']
+      ['How does it edit text that is part of a picture?', 'It reads the picture to find each line of writing. When you click a line, it paints over the old words with the colour around them and writes your new text in the same position, size and colour.'],
+      ['Will the new text be in exactly the same font?', 'Not always. A picture holds only pixels, with no font information, so the editor picks the closest of a few plain fonts by comparing shapes and sizes. You can switch to another font from the list if one fits better.'],
+      ['It did not find the writing in my picture. Why?', 'Automatic finding works for printed Latin letters and numbers that are reasonably sharp. Handwriting, very small or stylised text, and other scripts such as Urdu or Arabic may be missed. Use Cover old text and Add text to do those by hand.'],
+      ['Why can I see a box where the old text was?', 'Hiding works best on a plain background. On a photo or a pattern the covered patch is one flat colour, so it shows.'],
+      ['Is my picture uploaded?', 'No. Finding and editing the text both happen on your own device.']
     ]
   }
 ];
