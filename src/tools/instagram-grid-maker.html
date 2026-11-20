@@ -1,0 +1,234 @@
+<style>
+.ig-stage { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 16px; }
+.ig-stage canvas { display: block; width: 100%; max-width: 560px; margin: 0 auto; height: auto; touch-action: none; cursor: grab; border-radius: 4px; }
+.ig-stage canvas.grabbing { cursor: grabbing; }
+.ig-stage canvas:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ig-hint { font-size: 13px; color: var(--muted); margin: 8px 0 0; text-align: center; }
+.ig-h { font-size: 15px; margin: 18px 0 8px; }
+.ig-phone { max-width: 360px; margin: 0 auto 16px; background: var(--surface); border: 1px solid var(--line); border-radius: 18px; padding: 12px 0 0; overflow: hidden; }
+.ig-top { display: flex; align-items: center; gap: 12px; padding: 0 14px 10px; font-size: 13px; color: var(--muted); }
+.ig-top i { width: 44px; height: 44px; border-radius: 50%; background: var(--line); flex: none; }
+.ig-top b { display: block; color: var(--ink); font-size: 14px; }
+.ig-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; }
+.ig-grid canvas { width: 100%; height: auto; display: block; }
+.ig-grid .old { background: repeating-linear-gradient(45deg, var(--line), var(--line) 6px, var(--bg) 6px, var(--bg) 12px); opacity: .7; }
+.ig-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 10px; margin-top: 12px; }
+.ig-tiles a { display: block; text-decoration: none; color: var(--ink); font-size: 13px; text-align: center; border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--surface); }
+.ig-tiles a:hover { border-color: var(--accent); color: var(--accent); }
+.ig-tiles img { width: 100%; height: auto; display: block; border-radius: 6px; margin-bottom: 4px; }
+.ig-note { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a photo here</b>Or paste one with Ctrl+V. Your photo never leaves your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="fields">
+  <div><label for="igRows">Grid size</label><select id="igRows"><option value="1">3 × 1 (3 posts)</option><option value="2">3 × 2 (6 posts)</option><option value="3" selected>3 × 3 (9 posts)</option><option value="4">3 × 4 (12 posts)</option></select></div>
+  <div><label for="igShape">Tile shape</label><select id="igShape"><option value="p">Portrait 4:5 (1080 × 1350)</option><option value="s">Square 1:1 (1080 × 1080)</option></select></div>
+  <div><label for="igZoom">Zoom: <span id="igZoomV">100</span>%</label><input type="range" id="igZoom" min="100" max="400" value="100"></div>
+</div>
+<div class="checks" id="igAlignRow"><label><input type="checkbox" id="igAlign" checked> Line up for the profile grid (3:4 thumbnails)</label></div>
+<div id="igWork" hidden>
+  <div class="ig-stage">
+    <canvas id="igCv" tabindex="0" aria-label="Your photo split into tiles. Drag to move the photo inside the grid. Arrow keys move it too."></canvas>
+    <p class="ig-hint">Drag the photo (or use two fingers to zoom) to choose what goes in the grid. Numbers show the posting order.</p>
+  </div>
+  <h3 class="ig-h">Profile preview</h3>
+  <div class="ig-phone" aria-label="Preview of the tiles on a profile page">
+    <div class="ig-top"><i></i><div><b>your.profile</b>How the grid looks once every tile is posted</div></div>
+    <div class="ig-grid" id="igGrid"></div>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" type="button" disabled>Make tiles</button><a class="btn" id="dl" hidden>Download all as ZIP</a></div>
+<p class="msg" id="msg"></p>
+<div id="igOut" hidden>
+  <p class="ig-note">Post the tiles in number order: <b>1 first</b> (the bottom-right tile), and the top-left tile last. Instagram adds new posts to the top of your profile, so the picture builds up from the bottom.</p>
+  <div class="ig-tiles" id="igTiles"></div>
+</div>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var cv = $('igCv'), ctx = cv.getContext('2d');
+  var img = null, pv = null, name = 'grid', px = 0.5, py = 0.5, zoom = 1, urls = [], job = 0;
+  var COLS = 3, TW = 1080;
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  // Grid geometry. In "line up" mode each 4:5 tile is shown on the profile as a 3:4 thumbnail,
+  // which hides about 34 px at each side, so neighbouring tiles share those hidden strips.
+  function geo() {
+    var rows = +$('igRows').value, port = $('igShape').value === 'p', th = port ? 1350 : 1080;
+    var step = port && $('igAlign').checked ? Math.round(th * 3 / 4) : TW, m = (TW - step) / 2;
+    return { rows: rows, th: th, step: step, m: m, ew: COLS * step + 2 * m, eh: rows * th, port: port };
+  }
+  // Where the photo sits in grid space: x and y of its top-left corner (the origin is the left edge of the first tile) and its size.
+  function place(g) {
+    var s = Math.max(g.ew / img.naturalWidth, g.eh / img.naturalHeight) * zoom;
+    var w = img.naturalWidth * s, h = img.naturalHeight * s;
+    return { x: -(w - g.ew) * px, y: -(h - g.eh) * py, w: w, h: h, s: s };
+  }
+  function tile(g, p, r, c, out, k) {
+    k = k || 1;
+    var x0 = c * g.step, y0 = r * g.th;
+    out.fillStyle = '#ffffff'; out.fillRect(0, 0, TW * k, g.th * k);
+    out.imageSmoothingQuality = 'high';
+    out.drawImage(img, (p.x - x0) * k, (p.y - y0) * k, p.w * k, p.h * k);
+  }
+  function postNo(g, r, c) { return g.rows * COLS - (r * COLS + c); }
+
+  function draw() {
+    if (!img) return;
+    var g = geo(), p = place(g), k = Math.min(1, 900 / g.ew);
+    cv.width = Math.round(g.ew * k); cv.height = Math.round(g.eh * k);
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, cv.width, cv.height);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(pv, p.x * k, p.y * k, p.w * k, p.h * k);
+    // hidden strips at the outer edges (they are posted but cropped from the profile thumbnails)
+    if (g.m) { ctx.fillStyle = 'rgba(0,0,0,.35)'; ctx.fillRect(0, 0, g.m * k, cv.height); ctx.fillRect(cv.width - g.m * k, 0, g.m * k, cv.height); }
+    ctx.lineWidth = Math.max(2, 3 * k * 2); ctx.strokeStyle = 'rgba(255,255,255,.95)';
+    ctx.beginPath();
+    for (var c = 1; c < COLS; c++) { var x = (g.m + c * g.step) * k; ctx.moveTo(x, 0); ctx.lineTo(x, cv.height); }
+    for (var r = 1; r < g.rows; r++) { var y = r * g.th * k; ctx.moveTo(0, y); ctx.lineTo(cv.width, y); }
+    ctx.stroke();
+    var fs = Math.round(Math.min(g.step, g.th) * k * 0.16);
+    ctx.font = '700 ' + fs + 'px system-ui, sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (r = 0; r < g.rows; r++) for (c = 0; c < COLS; c++) {
+      var cx = (g.m + c * g.step + g.step / 2) * k, cy = (r * g.th + g.th / 2) * k;
+      ctx.fillStyle = 'rgba(0,0,0,.5)'; ctx.beginPath(); ctx.arc(cx, cy, fs * 0.9, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.fillText(String(postNo(g, r, c)), cx, cy + 1);
+    }
+    profile(g, p);
+  }
+  // Small profile preview: each tile cropped the way the profile grid shows it (3:4 for portrait posts, 1:1 for square).
+  function profile(g, p) {
+    var box = $('igGrid'); box.innerHTML = '';
+    var vw = g.port ? g.th * 3 / 4 : TW, k = 240 / g.th;
+    for (var r = 0; r < g.rows; r++) for (var c = 0; c < COLS; c++) {
+      var t = document.createElement('canvas'); t.width = Math.round(vw * k); t.height = Math.round(g.th * k);
+      var tc = t.getContext('2d'), off = (TW - vw) / 2;
+      tc.fillStyle = '#fff'; tc.fillRect(0, 0, t.width, t.height);
+      tc.drawImage(pv, (p.x - c * g.step - off) * k, (p.y - r * g.th) * k, p.w * k, p.h * k);
+      box.appendChild(t);
+    }
+    for (var i = 0; i < 3; i++) { var o = document.createElement('div'); o.className = 'old'; o.style.aspectRatio = g.port ? '3 / 4' : '1 / 1'; box.appendChild(o); }
+  }
+  function stale() {
+    job++; $('dl').hidden = true; $('igOut').hidden = true; $('igTiles').innerHTML = '';
+    urls.forEach(function (u) { URL.revokeObjectURL(u); }); urls = [];
+  }
+  function update() {
+    $('igAlignRow').hidden = $('igShape').value !== 'p';
+    stale(); draw();
+    if (img) {
+      var g = geo(), p = place(g);
+      if (p.s > 1.6) say('', 'Heads-up: your photo is ' + img.naturalWidth + ' × ' + img.naturalHeight + ' px, smaller than the grid (' + (COLS * TW) + ' × ' + g.eh + ' px), so the tiles will look a little soft.');
+      else say('', COLS * g.rows + ' tiles, each ' + TW + ' × ' + g.th + ' px.');
+    }
+  }
+
+  function take(f) {
+    stale();
+    if (!f || !/^image\//.test(f.type)) { say('bad', 'Please choose an image file (JPG, PNG, WebP or GIF).'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read that image. If it is a HEIC photo from an iPhone, convert it to JPG first.'); return; }
+      img = im; pv = im;
+      var big = Math.max(im.naturalWidth, im.naturalHeight);
+      if (big > 1800) { // a lighter copy keeps dragging smooth; the tiles are still cut from the full photo
+        pv = document.createElement('canvas'); pv.width = Math.round(im.naturalWidth * 1800 / big); pv.height = Math.round(im.naturalHeight * 1800 / big);
+        var pc = pv.getContext('2d'); pc.imageSmoothingQuality = 'high'; pc.drawImage(im, 0, 0, pv.width, pv.height);
+      }
+      name = (f.name || 'grid').replace(/\.[^.]+$/, '') || 'grid';
+      px = py = 0.5; zoom = 1; $('igZoom').value = 100; $('igZoomV').textContent = '100';
+      $('igWork').hidden = false; $('go').disabled = false;
+      update();
+    });
+  }
+  setupDrop('drop', 'file', take);
+  $('file').addEventListener('click', function () { this.value = ''; });
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.files && e.clipboardData.files[0];
+    if (it && /^image\//.test(it.type)) take(it);
+  });
+  ['igRows', 'igShape', 'igAlign'].forEach(function (id) { $(id).addEventListener('change', update); });
+  $('igZoom').addEventListener('input', function () { zoom = $('igZoom').value / 100; $('igZoomV').textContent = $('igZoom').value; update(); });
+
+  // Drag to pan, two fingers to zoom.
+  var pts = {}, last = null, pinch = null;
+  function pan(dx, dy) { // dx, dy in screen pixels
+    if (!img) return;
+    var g = geo(), p = place(g), k = g.ew / cv.getBoundingClientRect().width;
+    if (p.w > g.ew) px = Math.min(1, Math.max(0, px + dx * k / (p.w - g.ew)));
+    if (p.h > g.eh) py = Math.min(1, Math.max(0, py + dy * k / (p.h - g.eh)));
+  }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!img) return;
+    pts[e.pointerId] = { x: e.clientX, y: e.clientY };
+    try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    cv.classList.add('grabbing');
+    var ids = Object.keys(pts);
+    if (ids.length === 2) { var a = pts[ids[0]], b = pts[ids[1]]; pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, z: zoom }; }
+  });
+  cv.addEventListener('pointermove', function (e) {
+    var q = pts[e.pointerId]; if (!q) return;
+    var dx = e.clientX - q.x, dy = e.clientY - q.y;
+    q.x = e.clientX; q.y = e.clientY;
+    var ids = Object.keys(pts);
+    if (ids.length >= 2 && pinch) {
+      var a = pts[ids[0]], b = pts[ids[1]];
+      zoom = Math.min(4, Math.max(1, pinch.z * Math.hypot(a.x - b.x, a.y - b.y) / pinch.d));
+      $('igZoom').value = Math.round(zoom * 100); $('igZoomV').textContent = $('igZoom').value;
+    } else pan(-dx, -dy);
+    stale(); draw();
+  });
+  function up(e) {
+    if (!pts[e.pointerId]) return;
+    delete pts[e.pointerId]; pinch = null;
+    if (!Object.keys(pts).length) { cv.classList.remove('grabbing'); update(); }
+  }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('keydown', function (e) {
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key];
+    if (!d || !img) return;
+    e.preventDefault();
+    var s = e.shiftKey ? 40 : 8; pan(-d[0] * s, -d[1] * s); update();
+  });
+
+  $('go').addEventListener('click', function () {
+    if (!img) return;
+    var mine = ++job, g = geo(), p = place(g), files = [], n = COLS * g.rows, go = $('go');
+    go.disabled = true; say('', 'Making ' + n + ' tiles…');
+    var c = document.createElement('canvas'); c.width = TW; c.height = g.th;
+    var cc = c.getContext('2d'), list = [];
+    for (var r = 0; r < g.rows; r++) for (var col = 0; col < COLS; col++) list.push([r, col]);
+    list.sort(function (a, b) { return postNo(g, a[0], a[1]) - postNo(g, b[0], b[1]); });
+    var pad = n > 9 ? 2 : 1;
+    list.reduce(function (chain, rc) {
+      return chain.then(function () {
+        tile(g, p, rc[0], rc[1], cc);
+        return PT.blob(c, 'image/jpeg', 0.95).then(function (b) {
+          if (!b) throw new Error('Your browser could not create the JPG files.');
+          var no = postNo(g, rc[0], rc[1]);
+          files.push({ no: no, blob: b, name: name + '-post-' + String(no).padStart(pad, '0') + '-of-' + n + '.jpg' });
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      if (mine !== job) return;
+      return Promise.all(files.map(function (f) { return f.blob.arrayBuffer(); })).then(function (bufs) {
+        if (mine !== job) return;
+        var zip = PT.zip(files.map(function (f, i) { return { name: f.name, data: new Uint8Array(bufs[i]) }; }));
+        var zu = URL.createObjectURL(zip); urls.push(zu);
+        $('dl').href = zu; $('dl').download = name + '-grid-tiles.zip'; $('dl').hidden = false;
+        var box = $('igTiles'); box.innerHTML = '';
+        files.forEach(function (f) {
+          var u = URL.createObjectURL(f.blob); urls.push(u);
+          var a = document.createElement('a'), im = document.createElement('img');
+          a.href = u; a.download = f.name; im.src = u; im.alt = 'Tile ' + f.no;
+          a.appendChild(im); a.appendChild(document.createTextNode('Post ' + f.no + (f.no === 1 ? ' (first)' : f.no === n ? ' (last)' : '')));
+          box.appendChild(a);
+        });
+        $('igOut').hidden = false;
+        say('ok', n + ' tiles ready (' + TW + ' × ' + g.th + ' px, high quality JPG) · ZIP ' + fmtBytes(zip.size) + '. Tap a tile to save just that one.');
+        burst($('dl'));
+      });
+    }).catch(function (e) { say('bad', e && e.message ? e.message : 'Something went wrong while making the tiles.'); })
+      .then(function () { go.disabled = !img; });
+  });
+})();
+</script>

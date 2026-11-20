@@ -120,10 +120,15 @@
   }
 
   // ---------- model ----------
+  var gpuP = null, reporter = function () {};
+  function detect() {
+    return gpuP || (gpuP = Promise.resolve(navigator.gpu ? navigator.gpu.requestAdapter() : null).catch(function () { return null; }).then(function (ad) {
+      useGpu = !!ad && !ad.isFallbackAdapter && !(ad.info && ad.info.isFallbackAdapter); // a software GPU is slower than WebAssembly
+    }));
+  }
   function getOrt(onProg) {
     if (ortP) return ortP;
-    ortP = (navigator.gpu ? navigator.gpu.requestAdapter().catch(function () { return null; }) : Promise.resolve(null)).then(function (ad) {
-      useGpu = !!ad && !ad.isFallbackAdapter && !(ad.info && ad.info.isFallbackAdapter); // a software GPU is slower than WebAssembly
+    ortP = detect().then(function () {
       var w = WASM[useGpu ? 'gpu' : 'cpu'];
       return Promise.all([loadScript(BASE + w[0]), fetchBuf(BASE + w[1], w[2], onProg)]).then(function (r) {
         ort.env.wasm.wasmPaths = new URL(BASE, location.href).href;
@@ -139,14 +144,15 @@
   }
   function getSession(key, report) {
     if (sessions[key]) return Promise.resolve(sessions[key]);
-    var m = MODELS[key], wasmBytes = ortP ? 0 : WASM[navigator.gpu ? 'gpu' : 'cpu'][2], a = 0, b = 0;
-    function tell() { report((a + b) / (wasmBytes + m.bytes), 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(wasmBytes + m.bytes) + '). This happens only once.'); }
-    tell();
-    var p = sessions[key + 'P'] || (sessions[key + 'P'] = Promise.all([
+    var m = MODELS[key], wasmBytes = 0, a = 0, b = 0;
+    reporter = report; // the latest photo shows the progress of a shared download
+    function tell() { reporter((a + b) / (wasmBytes + m.bytes), 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(wasmBytes + m.bytes) + '). This happens only once.'); }
+    report(0, 'Getting the AI model ready…');
+    var p = sessions[key + 'P'] || (sessions[key + 'P'] = detect().then(function () { wasmBytes = ortP ? 0 : WASM[useGpu ? 'gpu' : 'cpu'][2]; tell(); }).then(function () { return Promise.all([
       getOrt(function (n) { a = n; tell(); }),
       fetchBuf(BASE + m.file, m.bytes, function (n) { b = n; tell(); })
-    ]).then(function (r) {
-      report(null, 'Starting the AI model…');
+    ]); }).then(function (r) {
+      reporter(null, 'Starting the AI model…');
       var buf = new Uint8Array(r[1]), opts = { graphOptimizationLevel: 'all' };
       var tryGpu = useGpu ? ort.InferenceSession.create(buf.slice(), Object.assign({ executionProviders: ['webgpu'] }, opts)).then(function (s) { s.ep = 'WebGPU'; return s; }, function () { return null; }) : Promise.resolve(null);
       return tryGpu.then(function (s) {
