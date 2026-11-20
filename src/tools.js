@@ -1935,5 +1935,103 @@ module.exports = [
         ['What makes a strong password?', 'Length and unpredictability: 4 or more random words, or 16+ random characters from a password manager. Use a different password for every site.']
       ],
       icon: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3M9 16l2 2 4-4"/>'
+  },
+  {
+      slug: 'photo-editor', cat: 'Image tools', name: 'Photo Editor',
+      title: 'Photo Editor - Filters, Adjustments, Crop & Rotate Free',
+      desc: 'Edit photos in your browser: 15 filters, exposure, contrast, warmth, shadows, sharpen, vignette and grain, plus crop, rotate and straighten. No upload.',
+      card: 'Filters, light and colour, crop and straighten.',
+      intro: 'Brighten, recolour and crop your photos with filters and pro-style sliders, then save the full-size result as JPG, PNG or WebP.',
+      steps: ['Choose or drop a photo.', 'Pick a filter and fine-tune exposure, contrast, colour, sharpness, vignette and grain.', 'Open Crop and rotate to crop to a shape, turn, flip or straighten the picture.', 'Hold Compare to check against the original, then download at full size.'],
+      faq: [
+        ['Is my photo uploaded?', 'No. All editing happens in your browser and the photo never leaves your device.'],
+        ['Does it save at full resolution?', 'Yes. The preview is screen-sized for speed, but the download is processed at the full size of your photo (after any crop).'],
+        ['Will big phone photos freeze the page?', 'No. The full-size image is processed in a background worker, so a 12 MP photo usually saves in a second or two while the page stays responsive.'],
+        ['Can I undo changes?', 'Yes. Use Undo and Redo, or Ctrl+Z and Ctrl+Y. Double-click any slider to reset it, or use Reset all.'],
+        ['Can I open HEIC or RAW photos?', 'Only formats your browser can show. Most browsers open JPG, PNG and WebP; convert HEIC or RAW files to JPG first.'],
+        ['Does it keep the photo details (EXIF)?', 'No. The saved image is a fresh file without camera details or location, which is safer to share.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 16v-3M12 16V8M17 16v-5"/><circle cx="7" cy="11" r="1.5"/><circle cx="12" cy="6.5" r="1.5"/><circle cx="17" cy="9" r="1.5"/>'
+  },
+  {
+      slug: 'collage-maker', cat: 'Image tools', name: 'Collage Maker',
+      title: 'Collage Maker - Photo Grid & Mosaic Layouts, No Upload',
+      desc: 'Make a photo collage from 2 to 9 pictures with 30+ grid and mosaic layouts. Pan and zoom each photo, set spacing, corners and colour, and save up to 3000 px.',
+      card: 'Photo grids and mosaics for 2 to 9 pictures.',
+      intro: 'Put 2 to 9 photos into a grid or mosaic layout, frame each one exactly how you like, and download a sharp collage for social media or print.',
+      steps: ['Choose 2 to 9 photos.', 'Pick a layout and a canvas shape such as square, 4:5, 9:16, 16:9 or A4.', 'Drag photos to reposition them in their frames, zoom, swap frames, and set spacing, corners and background colour.', 'Download the collage as JPG or PNG at up to 3000 px.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. The collage is drawn in your browser and your photos never leave your device.'],
+        ['How many photos can a collage have?', 'From 2 to 9. There are layouts for every number, from simple side-by-side splits to mosaics with one big photo.'],
+        ['How do I change which part of a photo shows?', 'Click a frame and drag the photo inside it. Zoom with the slider, the mouse wheel or two fingers on a phone.'],
+        ['How do I move a photo to another frame?', 'Drag its thumbnail onto a frame, tap the thumbnail and then the frame, or select a frame and use Swap with another frame.'],
+        ['Which size should I choose?', '1080 px suits Instagram and WhatsApp, 2000 px is a good all-round size, and 3000 px is best for printing.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M12 3v18M3 12h9M12 9h9"/>'
+  },
+  {
+      slug: 'gif-maker', cat: 'Image tools', name: 'GIF Maker',
+      title: 'GIF Maker - Turn Images into an Animated GIF Free',
+      desc: 'Make an animated GIF from your pictures. Reorder frames, set the speed per frame, loop count and size, add a caption, preview it and download. No upload.',
+      card: 'Turn pictures into an animated GIF.',
+      intro: 'Combine two or more pictures into an animated GIF. Arrange the frames, choose the timing and size, add a caption and see a live preview before you save.',
+      steps: ['Choose two or more images.', 'Drag the frames into order and set how long each one shows.', 'Choose the size, how the pictures fit, the loop setting and optional text.', 'Click Create GIF, check the result and its file size, then download.'],
+      faq: [
+        ['Are my pictures uploaded?', 'No. The GIF is encoded in your browser, in a background worker, and nothing leaves your device.'],
+        ['How do I make the GIF faster or slower?', 'Change Time per frame. 100 ms is fast, 500 ms is half a second per picture. Untick Same time for every frame to give each frame its own time.'],
+        ['How can I make the file smaller?', 'Use a smaller width, fewer frames or 64 colours per frame. Photos with lots of detail make bigger GIFs than simple graphics.'],
+        ['Can the GIF play only once?', 'Yes. Set Repeat to Play once, or choose to play it 2, 3 or 5 times. Loop forever is the default.'],
+        ['Why do photos look a little grainy or banded?', 'A GIF can show at most 256 colours per frame, so smooth gradients lose some detail. This is a limit of the GIF format.']
+      ],
+      icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M9.5 9.5a2 2 0 1 0 0 5h.5v-2M13 9.5v5M16 14.5v-5h2.5M16 12h2"/>'
+  },
+  {
+      slug: 'blur-image', cat: 'Image tools', name: 'Blur & Censor Image',
+      title: 'Blur Image - Blur, Pixelate or Black Out Parts of a Photo',
+      desc: 'Hide faces, number plates and private details. Blur, pixelate or black out rectangles, ellipses or brush strokes, or blur the whole image. No upload.',
+      card: 'Blur, pixelate or black out private details.',
+      intro: 'Cover faces, names, addresses or number plates with blur, a pixel mosaic or a solid bar, then save the image at full resolution.',
+      steps: ['Choose or paste an image.', 'Pick Rectangle, Ellipse or Brush and drag over what you want to hide.', 'Choose Blur, Pixelate or Solid bar and set the strength for each area. Move, resize or remove areas any time.', 'Download the censored image in its original size.'],
+      faq: [
+        ['Is my image uploaded?', 'No. The blurring happens in your browser and the image never leaves your device.'],
+        ['Which effect is safest for passwords and ID numbers?', 'Solid bar. Light blur or large pixel blocks can sometimes be partly undone, so use a solid bar, or high strength, for anything sensitive.'],
+        ['Can I change an area after drawing it?', 'Yes. Select it in the list or with Select and move, then drag it, resize it from a corner, change its effect or strength, or delete it.'],
+        ['Does it find faces automatically?', 'Only in browsers that have a built-in face detector, where a Find faces button appears. Always check the result and cover anything it missed by hand.'],
+        ['Is the original image changed?', 'No. You download a new copy; your original file stays as it was.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M8 9h2v2H8zM12 9h2v2h-2zM10 11h2v2h-2zM14 11h2v2h-2zM8 13h2v2H8zM12 13h2v2h-2z"/>'
+  },
+  {
+      slug: 'barcode-generator', cat: 'Generators', name: 'Barcode Generator',
+      title: 'Barcode Generator - EAN-13, UPC, Code 128 PNG & SVG Free',
+      desc: 'Create EAN-13, EAN-8, UPC-A, Code 128, Code 39, ITF-14, MSI and Pharmacode barcodes with check digits. Download PNG or SVG, or a batch as ZIP.',
+      card: 'EAN, UPC, Code 128 and more, as PNG or SVG.',
+      intro: 'Type a number or text to get a scannable barcode. Check digits are worked out and checked for you, and you can make hundreds at once.',
+      steps: ['Choose the barcode type, for example EAN-13 for retail products or Code 128 for any text.', 'Type the value. Check digits are added or verified automatically.', 'Set the bar width, height, text and colours.', 'Download PNG or SVG, or paste a list to get a ZIP of barcodes.'],
+      faq: [
+        ['Which barcode type should I use?', 'EAN-13 (or UPC-A in the US and Canada) for products sold in shops, ITF-14 for shipping cartons, and Code 128 for labels, inventory and anything with letters.'],
+        ['Do I need to type the check digit?', 'No. Type 12 digits for EAN-13 (11 for UPC-A, 7 for EAN-8, 13 for ITF-14) and the check digit is added. If you type it, the tool tells you whether it is right.'],
+        ['Can I use these barcodes on products in shops?', 'The barcodes are standard and scannable, but retail product numbers must be registered with GS1. Do not invent EAN or UPC numbers for products you sell.'],
+        ['PNG or SVG?', 'SVG stays sharp at any size and is best for print and design software. PNG suits documents and websites; choose 4× resolution for print.'],
+        ['How do I make many barcodes at once?', 'Paste one value per line in the Batch box and click Create ZIP. Invalid lines are skipped and listed.'],
+        ['Is my data uploaded?', 'No. Barcodes are drawn in your browser and nothing leaves your device.']
+      ],
+      icon: '<path d="M3 5v14M6 5v14M10 5v14M13 5v14M17 5v14M21 5v14M8 5v14M19 5v14"/>'
+  },
+  {
+      slug: 'screenshot-beautifier', cat: 'Image tools', name: 'Screenshot Beautifier',
+      title: 'Screenshot Beautifier - Add Background, Frame & Shadow',
+      desc: 'Make screenshots look polished: gradient background, padding, rounded corners, shadow, browser or phone frame, tilt and watermark. Export sharp PNG at 2×.',
+      card: 'Gradient background, frame and shadow for screenshots.',
+      intro: 'Paste a screenshot and turn it into a polished image for social media, docs or slides, with a background, rounded corners, shadow and an optional device frame.',
+      steps: ['Paste a screenshot with Ctrl+V, or drop or choose an image.', 'Pick a gradient, solid colour or your own background image.', 'Add a browser or phone frame and set padding, rounding, shadow and tilt.', 'Choose a size such as Twitter/X or Instagram and download the PNG.'],
+      faq: [
+        ['Is my screenshot uploaded?', 'No. Everything is drawn in your browser, so private screens stay on your device.'],
+        ['Why export at 2×?', 'A 2× image has twice the pixels in each direction, so text stays crisp on phones and high-resolution screens. 1× gives a smaller file.'],
+        ['Which size should I pick for social media?', 'Twitter / X post (16:9) for X, Instagram square or portrait for Instagram, LinkedIn post for LinkedIn, and Fit the screenshot for docs and blogs.'],
+        ['Can I keep a transparent background?', 'Yes. Choose Transparent as the background type; the PNG then has see-through areas around the screenshot.'],
+        ['Are the browser and phone frames images of real devices?', 'No. They are simple generic frames drawn by the tool, not images of any brand of phone or browser.']
+      ],
+      icon: '<rect x="2" y="3" width="20" height="18" rx="3"/><rect x="6" y="7" width="12" height="10" rx="1.5"/><path d="M6 9.5h12"/>'
   }
 ];
