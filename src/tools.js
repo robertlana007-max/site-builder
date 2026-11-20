@@ -639,7 +639,7 @@ module.exports = [
     faq: [
       ['Does the new text use the same font?', 'When the PDF carries its own font and that font contains every letter you typed, yes: the new text is written in that exact font. PDFs usually store only the letters they already use, so if you type a letter that appears nowhere else in that font, the closest standard font (Helvetica, Times or Courier, with matching bold and italic) is used instead. The tool tells you how many changes used each.'],
       ['How does it change the text?', 'It paints over the old line with the page colour behind it and writes your new text in the same place, size and colour.'],
-      ['Can I edit a scanned PDF?', 'No. A scan is a picture of a page, so there is no text to click. Use the Image Text Editor on a page saved as a picture instead.'],
+      ['Can I edit a scanned PDF?', 'Often, yes. When a page has no real text, the tool reads the scan with text recognition (English, upright pages) so you can click the lines. Results depend on how clear the scan is; for a single photo or picture, the Image Text Editor gives you more control.'],
       ['Can I move text or change its size?', 'Not yet. You can replace or delete a line, and the new text keeps the position and size of the old one.'],
       ['Is my PDF uploaded?', 'No. The file is opened and saved on your own device.']
     ]
