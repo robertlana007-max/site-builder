@@ -1,0 +1,115 @@
+<style>
+.ytg .ytg-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.ytg .ytg-tag { font: 500 14px/1.2 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 7px 12px; cursor: pointer; min-height: 36px; overflow-wrap: anywhere; text-align: start; }
+.ytg .ytg-tag[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.ytg .ytg-group { margin-top: 14px; }
+.ytg .ytg-group h3 { font-size: 14px; margin: 0; color: var(--muted); font-weight: 600; }
+.ytg .ytg-sel { margin-top: 18px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.ytg .ytg-bar { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 8px 0; }
+.ytg .ytg-bar i { display: block; height: 100%; background: var(--ok); width: 0; transition: width .2s; }
+.ytg .ytg-bar i.full { background: var(--bad); }
+.ytg .ytg-head { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: center; font-weight: 700; }
+.ytg .ytg-add { display: flex; gap: 8px; margin-top: 12px; }
+.ytg .ytg-add input { flex: 1; min-width: 0; }
+</style>
+<div class="ytg" id="ytg">
+<label for="ytTitle">Video title or main topic</label>
+<input type="text" id="ytTitle" data-nomemo maxlength="200" placeholder="e.g. How to make sourdough bread at home">
+<div class="fields" style="margin-top:12px">
+  <div><label for="ytKeys">Extra keywords (optional, comma separated)</label><input type="text" id="ytKeys" data-nomemo maxlength="200" placeholder="e.g. baking, starter, beginner"></div>
+  <div><label for="ytType">Video type</label><select id="ytType"><option value="any">Any</option><option value="tutorial">Tutorial or how-to</option><option value="review">Review or comparison</option><option value="vlog">Vlog</option><option value="gaming">Gaming</option><option value="music">Music</option><option value="shorts">Shorts</option><option value="education">Education</option><option value="recipe">Recipe</option><option value="news">News or explainer</option></select></div>
+  <div><label for="ytChannel">Channel name (optional)</label><input type="text" id="ytChannel" data-nomemo maxlength="60" placeholder="Your channel"></div>
+</div>
+<div class="btns"><button type="button" class="btn" id="ytGo">Generate tags</button></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div id="ytOut" hidden>
+  <div class="ytg-group"><h3>Main tags (most important)</h3><div class="ytg-tags" id="ytMain"></div></div>
+  <div class="ytg-group"><h3>Related phrases</h3><div class="ytg-tags" id="ytRel"></div></div>
+  <div class="ytg-group"><h3>Broad tags</h3><div class="ytg-tags" id="ytBroad"></div></div>
+</div>
+<div class="ytg-sel">
+  <div class="ytg-head"><span>Your tags: <span id="ytN">0</span></span><span id="ytCount">0 / 500 characters</span></div>
+  <div class="ytg-bar"><i id="ytBar"></i></div>
+  <div class="ytg-tags" id="ytSel"></div>
+  <div class="ytg-add"><input type="text" id="ytAddIn" data-nomemo maxlength="100" placeholder="Add your own tag" aria-label="Add your own tag"><button type="button" class="btn ghost" id="ytAdd">Add</button></div>
+  <div class="btns"><button type="button" class="btn" id="ytCopy">Copy tags</button><button type="button" class="btn ghost" id="ytCopyHash">Copy as hashtags</button><button type="button" class="btn ghost" id="ytClear">Clear</button></div>
+  <p class="msg" style="font-size:13.5px">YouTube allows 500 characters of tags. Commas count, and a tag with spaces counts 2 extra characters. Tap a tag to add or remove it.</p>
+</div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var STOP = 'a an the and or but of to in on at for with from by is are was were be been it its this that these those my your our their his her how what why when where who which do does did i you we they me us them vs versus into about as so if than then just very can will would should could get got make made using use'.split(' ');
+  var MOD = {
+    any: ['{k}', 'how to {k}', '{k} tips', 'best {k}', '{k} for beginners', '{k} {y}', '{k} explained', '{k} guide', '{k} ideas'],
+    tutorial: ['how to {k}', '{k} tutorial', '{k} for beginners', '{k} step by step', 'easy {k}', '{k} tips and tricks', 'learn {k}', '{k} guide {y}', '{k} made easy'],
+    review: ['{k} review', '{k} honest review', 'is {k} worth it', '{k} pros and cons', '{k} comparison', 'best {k} {y}', '{k} unboxing', '{k} after 30 days', '{k} alternatives'],
+    vlog: ['{k} vlog', 'day in my life', '{k} day in the life', 'weekly vlog', '{k} routine', 'come with me', '{k} diaries', 'life update'],
+    gaming: ['{k} gameplay', '{k} walkthrough', '{k} tips', '{k} best settings', '{k} funny moments', '{k} guide', '{k} no commentary', '{k} tier list', '{k} {y}'],
+    music: ['{k} cover', '{k} lyrics', '{k} official video', '{k} live', '{k} acoustic', '{k} remix', '{k} instrumental', '{k} karaoke'],
+    shorts: ['{k} shorts', '{k} #shorts', 'shorts', 'viral shorts', '{k} short video', '{k} in 60 seconds', 'quick {k}'],
+    education: ['{k} explained', 'what is {k}', '{k} for students', '{k} lecture', '{k} simple explanation', 'learn {k}', '{k} basics', '{k} exam revision'],
+    recipe: ['{k} recipe', 'easy {k} recipe', 'homemade {k}', 'how to make {k}', '{k} at home', 'quick {k}', 'healthy {k}', 'best {k} recipe'],
+    news: ['{k} explained', '{k} news', '{k} update', 'what happened {k}', '{k} {y}', '{k} analysis', 'why {k}', '{k} latest']
+  };
+  var BROAD = { any: ['tips', 'how to', 'guide'], tutorial: ['tutorial', 'how to', 'diy', 'learn'], review: ['review', 'unboxing', 'tech review'], vlog: ['vlog', 'lifestyle', 'daily vlog'], gaming: ['gaming', 'gameplay', 'gamer'], music: ['music', 'song', 'cover'], shorts: ['shorts', 'youtube shorts', 'trending'], education: ['education', 'study', 'learning'], recipe: ['recipe', 'cooking', 'food', 'easy recipes'], news: ['news', 'explained', 'current events'] };
+  var sel = [], KEY = 'gtnYtTags';
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function clean(t) { return String(t).toLowerCase().replace(/[#"“”<>]/g, '').replace(/[|:;!?¿¡.,()\[\]{}*/\\]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function cost(t) { return Array.from(t).length + (/\s/.test(t) ? 2 : 0); }
+  function total() { return sel.reduce(function (s, t) { return s + cost(t); }, 0) + Math.max(0, sel.length - 1); }
+  function words(t) { return clean(t).split(' ').filter(function (w) { return w && STOP.indexOf(w) < 0 && !/^\d{1,2}$/.test(w); }); }
+  function generate() {
+    var title = $('ytTitle').value.trim(), extra = $('ytKeys').value.split(',').map(clean).filter(Boolean), type = $('ytType').value, y = new Date().getFullYear(), ch = clean($('ytChannel').value);
+    if (!title && !extra.length) { say('bad', 'Type your video title or a few keywords first.'); $('ytTitle').focus(); return; }
+    var w = words(title), main = [], rel = [], seen = {};
+    function add(list, t) { t = clean(t); if (!t || seen[t] || Array.from(t).length > 100 || Array.from(t).length < 2) return; seen[t] = 1; list.push(t); }
+    // main phrase: the title without filler, then the most specific two to four word chunk
+    var core = w.slice(0, 5).join(' ');
+    if (title && Array.from(clean(title)).length <= 70) add(main, title);
+    add(main, core);
+    if (w.length >= 3) add(main, w.slice(0, 3).join(' '));
+    if (w.length >= 2) add(main, w.slice(-2).join(' '));
+    extra.forEach(function (e) { add(main, e); if (w.length) add(rel, e + ' ' + w[w.length - 1]); });
+    var key = w.length >= 2 ? w.slice(-2).join(' ') : w[0] || extra[0];
+    var key2 = w.length >= 3 ? w.slice(0, 3).join(' ') : key;
+    (MOD[type] || MOD.any).forEach(function (m) { add(main.length < 8 ? main : rel, m.replace('{k}', key).replace('{y}', y)); });
+    (MOD[type] || MOD.any).slice(0, 5).forEach(function (m) { add(rel, m.replace('{k}', key2).replace('{y}', y)); });
+    for (var i = 0; i < w.length - 1; i++) add(rel, w[i] + ' ' + w[i + 1]);
+    var broad = []; w.forEach(function (x) { if (x.length > 3) add(broad, x); }); (BROAD[type] || BROAD.any).forEach(function (b) { add(broad, b); }); if (ch) add(broad, ch);
+    draw('ytMain', main); draw('ytRel', rel.slice(0, 18)); draw('ytBroad', broad.slice(0, 12));
+    $('ytOut').hidden = false;
+    // pick a strong starting set that fits in 500 characters
+    sel = []; main.concat(rel.slice(0, 6), broad.slice(0, 3)).forEach(function (t) { if (total() + cost(t) + 1 <= 450 && sel.length < 18) sel.push(t); });
+    showSel(); say('ok', 'Picked ' + sel.length + ' tags to start. Tap any tag to add or remove it.');
+  }
+  function draw(id, list) { $(id).innerHTML = list.map(function (t) { return '<button type="button" class="ytg-tag" data-t="' + t.replace(/"/g, '&quot;') + '" aria-pressed="' + (sel.indexOf(t) >= 0) + '"></button>'; }).join(''); Array.prototype.forEach.call($(id).children, function (b) { b.textContent = b.dataset.t; }); }
+  function refresh() { document.querySelectorAll('#ytOut .ytg-tag').forEach(function (b) { b.setAttribute('aria-pressed', String(sel.indexOf(b.dataset.t) >= 0)); }); }
+  function showSel() {
+    var t = total(); $('ytN').textContent = sel.length; $('ytCount').textContent = t + ' / 500 characters';
+    $('ytBar').style.width = Math.min(100, t / 5) + '%'; $('ytBar').classList.toggle('full', t > 500);
+    $('ytCount').style.color = t > 500 ? 'var(--bad)' : '';
+    $('ytSel').innerHTML = sel.length ? '' : '<span class="msg" style="margin:0">No tags yet.</span>';
+    sel.forEach(function (x) { var b = document.createElement('button'); b.type = 'button'; b.className = 'ytg-tag'; b.setAttribute('aria-pressed', 'true'); b.dataset.t = x; b.textContent = x + '  ×'; b.setAttribute('aria-label', 'Remove ' + x); $('ytSel').appendChild(b); });
+    refresh(); try { localStorage.setItem(KEY, JSON.stringify(sel)); } catch (e) {}
+  }
+  $('ytg').addEventListener('click', function (e) {
+    var b = e.target.closest('.ytg-tag'); if (!b) return; var t = b.dataset.t, i = sel.indexOf(t);
+    if (i >= 0) sel.splice(i, 1);
+    else { if (total() + cost(t) + (sel.length ? 1 : 0) > 500) return say('bad', 'That tag would go over YouTube\'s 500 character limit. Remove a tag first.'); sel.push(t); }
+    say('', ''); showSel();
+  });
+  function addOwn() {
+    var raw = $('ytAddIn').value; if (!raw.trim()) return;
+    raw.split(',').map(clean).filter(Boolean).forEach(function (t) { if (Array.from(t).length > 100) return say('bad', 'A tag can be at most 100 characters.'); if (sel.indexOf(t) < 0) { if (total() + cost(t) + (sel.length ? 1 : 0) > 500) return say('bad', 'Over the 500 character limit. Remove a tag first.'); sel.push(t); } });
+    $('ytAddIn').value = ''; showSel();
+  }
+  $('ytAdd').addEventListener('click', addOwn); $('ytAddIn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addOwn(); } });
+  $('ytGo').addEventListener('click', generate); $('ytTitle').addEventListener('keydown', function (e) { if (e.key === 'Enter') generate(); });
+  $('ytCopy').addEventListener('click', function () { if (!sel.length) return say('bad', 'There are no tags to copy yet.'); copyText(sel.join(', '), this); say('ok', 'Copied. In YouTube Studio, open your video, click "Show more", and paste into Tags.'); });
+  $('ytCopyHash').addEventListener('click', function () { if (!sel.length) return say('bad', 'There are no tags to copy yet.'); copyText(sel.slice(0, 15).map(function (t) { return '#' + t.replace(/\s+/g, ''); }).join(' '), this); say('ok', 'Copied up to 15 hashtags for your description. YouTube shows the first 3 above the title.'); });
+  $('ytClear').addEventListener('click', function () { sel = []; showSel(); });
+  try { var s = JSON.parse(localStorage.getItem(KEY)); if (Array.isArray(s)) sel = s.filter(function (x) { return typeof x === 'string' && x.length <= 100; }).slice(0, 60); } catch (e) {}
+  showSel();
+})();
+</script>
