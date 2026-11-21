@@ -3691,5 +3691,21 @@ module.exports = [
         ['Is my caption saved?', 'Only in this browser, so you can come back to it. Nothing is uploaded.']
       ],
       icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M9 14h6M9 17h4M11 5h2"/>'
+  },
+  {
+    slug: 'online-keyboard', cat: 'Text tools', name: 'Online Keyboard (All Languages)',
+    title: 'Online Keyboard for 49 Languages - Virtual Keyboard, Free',
+    desc: 'Type in Arabic, Hindi, Russian, Greek, Korean, Japanese, Thai, Hebrew, Vietnamese and 40 more languages with an on-screen keyboard. Copy or download.',
+    card: 'Type in 49 languages with an on-screen keyboard.',
+    intro: 'Type in almost any language without installing anything. Pick a keyboard from the list, then tap the on-screen keys or use your computer keys, which are mapped to the chosen language. Korean letters join into syllables, Japanese romaji becomes kana, and accent keys add marks to any letter.',
+    steps: ['Find your language in the list (it starts with your browser\'s language).', 'Type with your computer keys or tap the on-screen keys; Shift and AltGr give more characters.', 'Use the accent keys or special-letter keys above the keyboard when you need them.', 'Copy your text or download it as a .txt file.'],
+    faq: [
+      ['Which languages are included?', 'Arabic, Persian, Urdu, Pashto, Hindi, Marathi, Nepali, Bengali, Punjabi, Gujarati, Tamil, Telugu, Russian, Ukrainian, Bulgarian, Serbian, Kazakh, Greek, Hebrew, Georgian, Armenian, Thai, Korean, Japanese, Amharic, Vietnamese, Chinese Pinyin, Turkish, Azerbaijani, Spanish, French, German, Portuguese, Italian, Polish, Czech, Romanian, Hungarian, Swedish, Norwegian, Danish, Icelandic, Dutch, Swahili, Yoruba, Hausa, Igbo and English.'],
+      ['How do my computer keys type another alphabet?', 'Each key position is mapped to the chosen language\'s standard layout (for example ЙЦУКЕН for Russian, InScript for Indian languages, Kedmanee for Thai, 2-set for Korean), whatever layout your computer uses. The small Latin letter on each on-screen key shows which key to press.'],
+      ['How do I type accents like é, ñ or ş?', 'Tap an accent key (´ ` ^ ¨ ~ ˇ and more), then a letter. Most Latin languages also have a row of their special letters, and AltGr (right Alt) with a letter gives common accented letters. You can also turn on accent keys for your own keyboard: \' then e gives é.'],
+      ['How do Korean, Japanese and Vietnamese work?', 'Korean jamo join into syllable blocks as you type. For Japanese, type romaji (konnichiha) and it turns into hiragana or katakana. For Vietnamese, Telex typing turns aa into â, dd into đ and s f r x j into tone marks; tone buttons are on screen too.'],
+      ['Is my text saved or uploaded?', 'No. Your text stays in your browser. Only your last chosen keyboard is remembered on this device.']
+    ],
+    icon: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 15h8"/><circle cx="18" cy="3.5" r="2.5"/>'
   }
 ];
