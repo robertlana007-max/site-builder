@@ -86,7 +86,7 @@ export default {
     const amount = Math.round(Number(body && body.amount) * 100) / 100;
     const low = minFor(request).min;
     if (!isFinite(amount) || amount < low || amount > MAX) {
-      return json({ error: `Please choose an amount between $${low} and $${MAX}.` }, 400, origin);
+      return json({ error: amount > MAX ? `Maximum is $${MAX}.` : `Minimum is $${low}.` }, 400, origin);
     }
     const email = String((body && body.email) || '').trim().slice(0, 254);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Please enter a valid email address.' }, 400, origin);
