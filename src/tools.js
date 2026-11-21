@@ -494,7 +494,7 @@ module.exports = [
     steps: ['Choose a PDF.', 'Type the watermark text.', 'Choose the style, strength and color.', 'Click Add watermark, then Download.'],
     faq: [
       ['Can someone remove the watermark?', 'It becomes part of each page, but a person with PDF editing software could remove it. It discourages casual copying rather than preventing it.'],
-      ['Which characters can I use?', 'Latin letters, numbers and common symbols. Other scripts are not supported by the built-in font.'],
+      ['Which characters can I use?', 'Any language, including Arabic, Urdu, Chinese and emoji. Latin letters are added as real text; other scripts are added as a sharp see-through picture of the text.'],
       ['Does it hide the text underneath?', 'No. The watermark is see-through. Use Light if the page must stay easy to read.']
     ]
   },
