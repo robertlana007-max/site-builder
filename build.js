@@ -602,7 +602,7 @@ ${contact}` },
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { say('Please enter your email address. The payment page needs it to send your receipt.', 'bad'); em.focus(); return; }
     go.disabled = true; say('Opening the secure checkout…');
     fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: a, email: email }) })
-      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.url) throw new Error(d.error || 'The checkout could not be opened. Please try again.'); location.href = d.url; }); })
+      .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.url) throw new Error(d.error || 'The checkout could not be opened. Please try again.'); try { localStorage.setItem('gtn-gift', JSON.stringify({ order: d.order || '', t: Date.now() })); } catch (e) {} location.href = d.url; }); })
       .catch(function (e) { go.disabled = false; say(e && e.message && e.message !== 'Failed to fetch' ? e.message : 'Could not reach the payment service. Please check your internet and try again.', 'bad'); });
   });
   window.addEventListener('pageshow', function () { go.disabled = false; });
@@ -656,92 +656,128 @@ write('404.html', layout({
   write('thank-you.html', layout({
     rel: '', urlPath: 'thank-you.html', title: `Thank you! | ${cfg.siteName}`, desc: `Thank you for supporting ${cfg.siteName}.`, noindex: true,
     body: `<section class="ty">
+  <div class="ty-state" id="tyCheck">
+    <div class="ty-spin" aria-hidden="true"></div>
+    <h1>Confirming your payment…</h1>
+    <p>This usually takes a few seconds. Please keep this page open.</p>
+  </div>
+
+  <div class="ty-state" id="tyFail" hidden>
+    <div class="ty-sicon" aria-hidden="true">🙂</div>
+    <h1>Your payment was not completed</h1>
+    <p>No problem at all, <b>nothing was charged</b>. You can try again whenever you like.</p>
+    <p class="ty-small" id="tyWait" hidden>Already paid? Some cards take a minute to confirm. This page will update by itself.</p>
+    <div class="ty-sbtns"><a class="btn" href="donate/">💳 Try again</a><a class="btn ghost" href="./">← Back to Tools</a></div>
+  </div>
+
+  <div class="ty-state" id="tyNone" hidden>
+    <div class="ty-sicon" aria-hidden="true">💳</div>
+    <h1>No payment found</h1>
+    <p>Your thank-you message appears here right after a card gift.${mail ? ` Paid and still seeing this? Email <a href="mailto:${esc(mail)}?subject=${encodeURIComponent('Question about my gift')}">${esc(mail)}</a> and we will check it for you.` : ''}</p>
+    <div class="ty-sbtns"><a class="btn" href="donate/">❤ Support us</a><a class="btn ghost" href="./">← Back to Tools</a></div>
+  </div>
+
+  <div id="tyPaid" hidden>
   <div class="ty-hero">
     <div class="ty-heart" aria-hidden="true">💖</div>
     <h1>Thank you, from the bottom of our hearts!</h1>
-    <p class="ty-lead">Your gift made our whole day. You are awesome. 🙌</p>
-    <div class="ty-stats"><span><b>${tools.length}+</b>free tools</span><span><b>0</b>ads</span><span><b>∞</b>use</span><span><b>0</b>sign-up</span></div>
-  </div>
-  <p class="ty-note" id="tyNote" hidden>Closed the payment page without paying? No problem, nothing was charged. <a href="donate/">Try again</a> any time. ❤</p>
-
-  <div class="ty-card ty-letter">
-    <h2>💌 A note from us to you</h2>
-    <p>Dear friend, everything here is free, and nobody asked you to pay. <b>You chose to help anyway</b>, and that means the world to us.</p>
-    <p class="ty-quote">You are not a customer here.<br><b>You are family.</b> ❤</p>
-    <details class="ty-more"><summary>Read our full note</summary>
-      <p>There are millions of websites on the internet, and today you stopped at ours and decided to give something back. You did not have to. Nothing was locked, and there was nothing to buy. You simply chose to help.</p>
-      <p>${esc(cfg.siteName)} is not a big company with a big office. It is a small project built with a lot of late nights, a lot of testing and a lot of love. Every time we add a tool, we ask ourselves: <i>"Would this really help someone today?"</i> Gifts like yours tell us the answer is yes.</p>
-      <p>For us, family is everything. Today, family showed up for us, and we will never forget it.</p>
-    </details>
+    <p class="ty-lead">Your payment is confirmed, and your gift made our whole day. You are awesome. 🙌</p>
+    <div class="ty-stats"><span><b>${tools.length}+</b>free tools</span><span><b>0</b>ads</span><span><b>∞</b>unlimited use</span><span><b>0</b>sign-up</span></div>
   </div>
 
-  <div class="ty-card">
-    <h2>🎯 Our goal</h2>
-    <p class="ty-big">Useful tools, <span class="hl">completely free</span>, for everyone in the world. Forever.</p>
-    <div class="ty-chips"><span>🚫 No ads</span><span>♾️ No limits</span><span>🔓 No sign-up</span><span>🔒 Files stay on your device</span></div>
-    <details class="ty-more"><summary>Why we started</summary>
-      <p>We were tired of tool websites that make you wait, watch ads, create an account or pay just to merge two PDFs or resize one photo. Simple everyday tasks should be simple, and free. A student in a small town should get the same tools as a big company.</p>
-      <p>So every tool on ${esc(cfg.siteName)} runs in your own browser. Your files are never uploaded. Just open a tool and use it, as many times as you like.</p>
-    </details>
-  </div>
+  <div class="ty-grid3">
+    <div class="ty-card ty-letter ty-w2">
+      <h2>💌 A note from us to you</h2>
+      <p>Dear friend, everything here is free, and nobody asked you to pay. <b>You chose to help anyway</b>, and that means the world to us. ${esc(cfg.siteName)} is not a big company. It is a small project built with late nights, a lot of testing and a lot of love, and gifts like yours tell us the work really helps people.</p>
+      <p class="ty-quote">You are not a customer here. <b>You are family.</b> And for us, family is everything. ❤</p>
+    </div>
 
-  <div class="ty-card">
-    <h2>🧭 Where your gift goes</h2>
-    <div class="ty-tiles">
-      <div><span>🌐</span><b>Keeps the site online</b><small>Domain, hosting, speed</small></div>
-      <div><span>🛠️</span><b>New tools</b><small>Design, coding, testing</small></div>
-      <div><span>🐞</span><b>Fixes</b><small>Fewer bugs, faster tools</small></div>
-      <div><span>🎓</span><b>Free for students</b><small>No limits, no ads</small></div>
+    <div class="ty-card">
+      <h2>🎯 Our goal</h2>
+      <p class="ty-big">Useful tools, <span class="hl">completely free</span>, for everyone in the world. Forever.</p>
+      <div class="ty-chips"><span>🚫 No ads</span><span>♾️ No limits</span><span>🔓 No sign-up</span><span>🔒 Files stay on your device</span></div>
+    </div>
+
+    <div class="ty-card ty-w2">
+      <h2>🧭 Where your gift goes</h2>
+      <div class="ty-tiles">
+        <div><span>🌐</span><b>Keeps the site online</b><small>Domain, hosting and speed, every day</small></div>
+        <div><span>🛠️</span><b>New tools</b><small>Design, coding and testing</small></div>
+        <div><span>🐞</span><b>Fixes</b><small>Fewer bugs, faster tools</small></div>
+        <div><span>🎓</span><b>Free for students</b><small>No limits, no ads, for everyone</small></div>
+      </div>
+    </div>
+
+    <div class="ty-card">
+      <h2>🤞 Our promises</h2>
+      <ul class="ty-checks">
+        <li>Every tool stays <b>free</b>, with <b>zero ads</b></li>
+        <li>We will <b>never sell</b> your email</li>
+        <li>We <b>read every email</b> you send</li>
+        <li>Your gift is used <b>honestly</b></li>
+      </ul>
+    </div>
+
+    <div class="ty-card">
+      <h2>🤝 Who you just helped</h2>
+      <ul class="ty-people">
+        <li><span>📚</span><em>A <b>student</b> submitting work on time</em></li>
+        <li><span>🏪</span><em>A <b>shop owner</b> making a free invoice</em></li>
+        <li><span>👩‍🏫</span><em>A <b>teacher</b> making a quiz in minutes</em></li>
+        <li><span>🌍</span><em><b>Thousands of people</b> worldwide</em></li>
+      </ul>
+    </div>
+
+    <div class="ty-card ty-idea">
+      <h2>💡 Need a new tool?</h2>
+      <p>Tell us your idea. <b>We will build it</b>, and email you <b>personally</b> the moment it goes live. ✨</p>
+      ${mail ? `<a class="btn ty-wide" href="mailto:${esc(mail)}?subject=${encodeURIComponent('New tool idea for ' + cfg.siteName)}">✉ Email us your idea</a><p class="ty-mail">${esc(mail)}</p>` : ''}
+    </div>
+
+    <div class="ty-card ty-share">
+      <h2>📣 One small favour</h2>
+      <p>Liked our tools? Please share <b>gettoolnest.xyz</b> with your friends and groups. It takes 5 seconds and helps us a lot.</p>
+      <div class="ty-btns"><button class="btn" type="button" id="tyCopy">🔗 Copy Website Link</button><a class="btn ghost" href="https://wa.me/?text=${encodeURIComponent('Free online tools for PDFs, photos, study and more. No ads, no sign-up: ' + SITE + '/')}" target="_blank" rel="noopener">💬 WhatsApp</a><a class="btn ghost" href="./">← Back to Tools</a></div>
     </div>
   </div>
 
-  <div class="ty-card">
-    <h2>🤝 Who you just helped</h2>
-    <ul class="ty-people">
-      <li><span>📚</span><em>A <b>student</b> submitting an assignment on time</em></li>
-      <li><span>🏪</span><em>A <b>shop owner</b> making an invoice for free</em></li>
-      <li><span>👩‍🏫</span><em>A <b>teacher</b> making a quiz in minutes</em></li>
-      <li><span>💼</span><em>A <b>job seeker</b> fitting a CV into an upload form</em></li>
-      <li><span>🌍</span><em><b>Thousands of people</b> around the world</em></li>
-    </ul>
+  <p class="ty-foot">🧾 Your receipt was sent to your email by PayMeGate. We never see your card details.${mail ? ` Questions? <a href="mailto:${esc(mail)}?subject=${encodeURIComponent('Question about my gift')}">${esc(mail)}</a>` : ''}</p>
+  <p class="ty-sign">With love and gratitude, <b>the ${esc(cfg.siteName)} family</b> ❤</p>
   </div>
-
-  <div class="ty-card">
-    <h2>🤞 Our promises to you</h2>
-    <ul class="ty-checks">
-      <li>Every tool stays <b>free</b>, with <b>zero ads</b> and <b>unlimited use</b></li>
-      <li>We will <b>never sell</b> or share your email</li>
-      <li>We <b>read every email</b> and reply as a friend</li>
-      <li>Your gift is used <b>honestly</b>, only for ${esc(cfg.siteName)}</li>
-      <li>We keep making the tools <b>better every month</b></li>
-    </ul>
-  </div>
-
-  <div class="ty-card ty-idea">
-    <h2>💡 Need a new tool?</h2>
-    <p>Tell us your idea. <b>We will build it</b>, and email you <b>personally</b> when it is live. ✨</p>
-    ${mail ? `<a class="btn ty-wide" href="mailto:${esc(mail)}?subject=${encodeURIComponent('New tool idea for ' + cfg.siteName)}">✉ Email us your idea</a><p class="ty-mail">${esc(mail)}</p>` : ''}
-  </div>
-
-  <div class="ty-card ty-share">
-    <h2>📣 One small favour</h2>
-    <p>Liked our tools? Please share <b>gettoolnest.xyz</b> with your friends, family and class or office groups. It takes 5 seconds and helps us a lot.</p>
-    <div class="ty-btns"><button class="btn" type="button" id="tyCopy">🔗 Copy Website Link</button><a class="btn ghost" href="https://wa.me/?text=${encodeURIComponent('Free online tools for PDFs, photos, study and more. No ads, no sign-up: ' + SITE + '/')}" target="_blank" rel="noopener">💬 Share on WhatsApp</a><a class="btn ghost" href="./">← Back to Tools</a></div>
-  </div>
-
-  <details class="ty-card ty-more ty-pay"><summary>🧾 About your payment</summary>
-    <p>Your payment was handled safely by PayMeGate, and your receipt was sent to your email. We never see your card details. Something wrong?${mail ? ` Email <a href="mailto:${esc(mail)}?subject=${encodeURIComponent('Question about my gift')}">${esc(mail)}</a> and we will fix it quickly.` : ''}</p>
-    <p class="setnote">Gifts are voluntary and do not buy any product or feature. Everything stays free for everyone.</p>
-  </details>
-
-  <p class="ty-sign">With love and gratitude,<br><b>The ${esc(cfg.siteName)} family</b> ❤</p>
 </section>
 <script>
 (function () {
-  if (/[?&]ref=/.test(location.search)) document.getElementById('tyNote').hidden = false;
-  var b = document.getElementById('tyCopy');
-  b.addEventListener('click', function () { copyText(${JSON.stringify(SITE + '/')}, b); });
-  if (window.burst) setTimeout(function () { burst(document.querySelector('.ty-heart')); }, 300);
+  var API = ${JSON.stringify((CARD.checkoutApi || '').replace(/\/checkout\/?$/, '/status'))};
+  var $id = function (i) { return document.getElementById(i); };
+  function show(k) { ['tyCheck', 'tyFail', 'tyNone', 'tyPaid'].forEach(function (i) { $id(i).hidden = i !== k; }); }
+  var gift = null;
+  try { gift = JSON.parse(localStorage.getItem('gtn-gift') || 'null'); } catch (e) {}
+  if (!API || !gift || !gift.order || Date.now() - (gift.t || 0) > 3 * 864e5) { show('tyNone'); return; }
+
+  var start = Date.now(), done = false;
+  function paid() {
+    done = true; show('tyPaid');
+    try { gift.paid = true; localStorage.setItem('gtn-gift', JSON.stringify(gift)); } catch (e) {}
+    var b = $id('tyCopy');
+    b.addEventListener('click', function () { copyText(${JSON.stringify(SITE + '/')}, b); });
+    if (window.burst) setTimeout(function () { burst(document.querySelector('.ty-heart')); }, 300);
+  }
+  function check() {
+    if (done) return;
+    var age = Date.now() - start;
+    fetch(API + '?order=' + encodeURIComponent(gift.order), { cache: 'no-store' })
+      .then(function (r) { return r.json().catch(function () { return {}; }); })
+      .then(function (d) {
+        var s = String(d.status || '');
+        if (s === 'paid' || s === 'completed' || s === 'success') return paid();
+        if (s === 'expired' || s === 'failed' || s === 'cancelled' || s === 'canceled') { done = true; show('tyFail'); return; }
+        // unpaid / confirming / unknown: keep checking for up to 3 minutes
+        if (age > 12000) { show('tyFail'); $id('tyWait').hidden = false; }
+        if (age < 180000) setTimeout(check, age < 30000 ? 3000 : 8000); else $id('tyWait').hidden = true;
+      })
+      .catch(function () { if (age > 12000) { show('tyFail'); $id('tyWait').hidden = false; } if (age < 180000) setTimeout(check, 5000); });
+  }
+  check();
 })();
 </script>`
   }));

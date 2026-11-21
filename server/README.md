@@ -11,8 +11,8 @@ Support page --(amount, email)--> Cloudflare Worker --(X-API-Key)--> api.paymega
 - `paymegate-worker.js` – the Worker. The API key lives only in Cloudflare secrets, never in this repo.
 - The Support page reads the Worker address from `config.json` → `card.checkoutApi`.
   While it is empty, the Card tab says "Card payments are being set up…" and Crypto works as before.
-- PayMeGate has a single `backUrl` (no separate cancel URL), so people who close the checkout also land on
-  `thank-you.html`. The page then shows a small "Closed the payment page without paying? Nothing was charged" note.
+- PayMeGate has a single `backUrl`, so people who close the checkout also land on `thank-you.html`. The page therefore asks the Worker (`GET /status?order=…`, which calls PayMeGate `GET /v1/orders/{orderUUID}`) and shows the thank-you message **only when the order status is `paid`**. Otherwise it shows "Your payment was not completed, nothing was charged". It keeps checking for 3 minutes in case a card is slow to confirm.
+- **Confirm in the docs:** that `GET /v1/orders/{orderUUID}` exists and that the status field is `status` (values unpaid / confirming / paid / expired / failed). If the name differs, change `orderStatus()` in the Worker.
 - Minimum $2 (Stripe on PayMeGate). Google Pay / Apple Pay need $10+. Fees: 1% PayMeGate + provider fee. Payouts in USDC.
 
 ## Status
