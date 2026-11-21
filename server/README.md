@@ -75,16 +75,16 @@ which chain). Do not change anything else.
    (same single basic permission).
 2. In Cloudflare, replace the `PAYMEGATE_API_KEY` secret with the live key and deploy.
 
-## Owner alert on every gift (Telegram)
+## Owner email on every gift
 
 When someone pays, PayMeGate calls `https://gettoolnest-pay.robertlana007.workers.dev/webhook` (signed `order.paid`).
-The Worker checks the signature, reads the order, and sends you a Telegram message with the amount, name, email,
-method and time. Every payment is also listed in the PayMeGate dashboard under Orders.
+The Worker checks the signature, reads the order and emails **gettoolnest14@gmail.com** the amount, name, email,
+method and time (sent with Resend, free up to 100 emails a day). Every payment is also listed in PayMeGate under Orders.
 
-1. Telegram → search **@BotFather** → `/newbot` → name `GetToolNest Alerts` → username ending in `bot`. Copy the **token** (keep it private).
-2. Open your new bot, press **Start**, send `hi`.
-3. In your browser open `https://api.telegram.org/bot<TOKEN>/getUpdates` and find `"chat":{"id":123456789` — that number is your **chat id**.
-4. Cloudflare → gettoolnest-pay → Settings → Variables and Secrets: add `TELEGRAM_BOT_TOKEN` (Secret) and `TELEGRAM_CHAT_ID` (Text). Deploy.
-5. PayMeGate → webhook settings: URL `https://gettoolnest-pay.robertlana007.workers.dev/webhook`. Copy the **signing secret** it shows once into
-   Cloudflare as `PAYMEGATE_SECRET_KEY` (Secret). Deploy.
-6. Test: open `https://gettoolnest-pay.robertlana007.workers.dev/notify-test?chat=<your chat id>` — a sample message arrives in Telegram.
+1. Sign up at **resend.com** with **gettoolnest14@gmail.com** (must be this address). API Keys → Create API key
+   (permission: Sending access). Copy it.
+2. Cloudflare → gettoolnest-pay → Settings → Variables and Secrets: add `RESEND_API_KEY` (Secret). Deploy.
+3. PayMeGate → webhook settings: URL `https://gettoolnest-pay.robertlana007.workers.dev/webhook`. Copy the **signing secret**
+   it shows once into Cloudflare as `PAYMEGATE_SECRET_KEY` (Secret). Deploy.
+4. Test: open `https://gettoolnest-pay.robertlana007.workers.dev/notify-test?key=<last 6 characters of the Resend key>`.
+   A sample email arrives (check Spam the first time and mark it "Not spam").

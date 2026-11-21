@@ -8,8 +8,8 @@
 // Variables and secrets (Cloudflare → Workers → gettoolnest-pay → Settings → Variables and Secrets):
 //   PAYMEGATE_API_KEY     (Secret)  merchant API key (pmg_test_… for sandbox, live key later). Sent as X-API-Key.
 //   PAYMEGATE_SECRET_KEY  (Secret)  optional: the webhook signingSecret (only if you set up a webhook).
-//   TELEGRAM_BOT_TOKEN    (Secret)  optional: your Telegram bot token, for a phone message on every gift.
-//   TELEGRAM_CHAT_ID      (Text)    optional: your Telegram chat id (where the message goes).
+//   RESEND_API_KEY        (Secret)  optional: resend.com API key, to email the owner on every gift.
+//   OWNER_EMAIL           (Text)    optional: where gift emails go (default gettoolnest14@gmail.com).
 //   PAYMEGATE_METHODS     (Text)    optional: comma-separated payment method keys, e.g. "stripe".
 //                                   Leave empty for the card methods in CARD_METHODS. See GET /methods below.
 //
@@ -24,6 +24,7 @@
 const API = 'https://api.paymegate.com';
 const ALLOWED_ORIGINS = ['https://gettoolnest.xyz', 'https://www.gettoolnest.xyz'];
 const SITE = 'https://gettoolnest.xyz';
+const OWNER_EMAIL = 'gettoolnest14@gmail.com';
 const CURRENCY = 'USD';
 const MIN = 2;      // dollars (Stripe card minimum on PayMeGate is $2)
 const MAX = 1000;   // dollars
@@ -139,7 +140,7 @@ async function listMethods(env) {
 
 // POST /webhook: PayMeGate sends a signed "order.paid" event here (set the webhook URL to
 // https://<worker>/webhook in PayMeGate). The Worker checks the signature, reads the order,
-// and sends the owner a Telegram message: who gave, how much, and when.
+// and emails the owner: who gave, how much, and when.
 async function webhook(request, env) {
   const raw = await request.text();
   if (!env.PAYMEGATE_SECRET_KEY) return new Response('Webhook secret not set', { status: 503 });
@@ -192,24 +193,32 @@ function giftText(o, id) {
   ].filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i < a.length - 1)).join('\n');
 }
 
-// Sends a Telegram message to the owner. Needs TELEGRAM_BOT_TOKEN (Secret) and TELEGRAM_CHAT_ID (Text).
+// Emails the owner through Resend (free: resend.com). Needs RESEND_API_KEY (Secret).
+// With Resend's shared sender (onboarding@resend.dev) mail can only go to the email the
+// Resend account was made with, so make the Resend account with OWNER_EMAIL.
 async function notifyOwner(env, text) {
-  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) { console.log('No Telegram set up:', text); return false; }
+  const to = env.OWNER_EMAIL || OWNER_EMAIL;
+  if (!env.RESEND_API_KEY) { console.log('No email set up:', text); return false; }
+  const subject = text.split('\n')[0].replace(/^💰\s*/, '💰 ');
+  const html = '<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.6;color:#111">' +
+    text.split('\n').map(l => l ? l.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/^([A-Za-z ]+):/, '<b>$1:</b>') : '<br>').join('<br>') + '</div>';
   try {
-    const r = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendMessage', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true })
+    const r = await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: { 'Authorization': 'Bearer ' + env.RESEND_API_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ from: env.MAIL_FROM || 'GetToolNest <onboarding@resend.dev>', to: [to], subject, text, html })
     });
-    if (!r.ok) console.log('Telegram error', r.status, (await r.text()).slice(0, 300));
+    if (!r.ok) console.log('Email error', r.status, (await r.text()).slice(0, 300));
     return r.ok;
-  } catch (e) { console.log('Telegram failed', String(e)); return false; }
+  } catch (e) { console.log('Email failed', String(e)); return false; }
 }
 
-// GET /notify-test?chat=<your TELEGRAM_CHAT_ID>: sends a sample message so you can check Telegram works.
+// GET /notify-test?key=<last 6 characters of your RESEND_API_KEY>: sends a sample email so you can check it works.
 async function notifyTest(url, env) {
-  if (!env.TELEGRAM_CHAT_ID || url.searchParams.get('chat') !== String(env.TELEGRAM_CHAT_ID)) return new Response('Not found', { status: 404 });
+  const k = String(env.RESEND_API_KEY || '');
+  if (k.length < 12 || url.searchParams.get('key') !== k.slice(-6)) return new Response('Not found', { status: 404 });
   const ok = await notifyOwner(env, giftText({ amount: '10.00', currency: 'USD', customer: { fullName: 'Test Person', email: 'test@example.com' }, paymentMethodKey: 'stripe' }, 'TEST-ONLY'));
-  return new Response(ok ? 'Sent! Check Telegram.' : 'Could not send. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, and that you pressed Start in your bot.', { status: ok ? 200 : 500 });
+  return new Response(ok ? 'Sent! Check ' + (env.OWNER_EMAIL || OWNER_EMAIL) + ' (and the Spam folder the first time).' : 'Could not send. Check RESEND_API_KEY, and that your Resend account uses ' + (env.OWNER_EMAIL || OWNER_EMAIL) + '.', { status: ok ? 200 : 500 });
 }
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
