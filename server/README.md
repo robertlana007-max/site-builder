@@ -19,8 +19,9 @@ Support page --(amount, email)--> Cloudflare Worker --(X-API-Key)--> api.paymega
 
 - [x] PayMeGate: sandbox API key `gettoolnest-worker` created, Back URL set to https://gettoolnest.xyz/thank-you.html
 - [ ] PayMeGate: add a payout wallet (EVM 0x address from a wallet you control, not an exchange)
-- [ ] Cloudflare Worker created, code pasted, secrets added (prompt below)
-- [ ] `config.json` → `card.checkoutApi` set, site rebuilt and pushed
+- [x] Cloudflare Worker `gettoolnest-pay` created and code deployed (https://gettoolnest-pay.robertlana007.workers.dev)
+- [ ] `PAYMEGATE_API_KEY` added, but as Text: change its type to Secret
+- [x] `config.json` → `card.checkoutApi` set, site rebuilt and pushed
 - [ ] Sandbox test payment → lands on thank-you page
 - [ ] Switch to a live key in Cloudflare
 
