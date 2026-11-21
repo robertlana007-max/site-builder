@@ -1045,9 +1045,9 @@ module.exports = [
       steps: ['Choose CGPA → Percentage or Percentage → CGPA.', 'Pick the formula for your board or university, or enter a custom one.', 'Type your CGPA or percentage.', 'Read the result and the note about that formula.'],
       faq: [
         ['Is there one official formula for every university?', 'No. Each board and university sets its own rule or equivalence table. This tool shows common formulas for a quick estimate; the figure your university gives is the one that counts.'],
-        ['How do I convert a 4.0 CGPA to a percentage in Pakistan?', 'There is no single formula for every university. The simple proportional estimate is CGPA ÷ 4 × 100, but universities publish their own equivalence tables, so check yours before using the number on a form.'],
+        ['How do I convert a 4.0 CGPA to a percentage?', 'There is no single formula for every university. The simple proportional estimate is CGPA ÷ 4 × 100, so 3.2 becomes 80%. Many universities (for example in Pakistan, Bangladesh or the USA) publish their own equivalence tables, so check yours before using the number on a form.'],
         ['What is the CBSE formula?', 'Multiply the CGPA by 9.5. CBSE gave this for its CGPA grades, so 8.4 becomes 79.8%.'],
-        ['What are the VTU and Mumbai University formulas?', 'The commonly quoted VTU formula is (CGPA − 0.75) × 10, and the Mumbai University one is 7.1 × CGPA + 11. Rules can differ by scheme and year, so confirm yours.'],
+        ['What are the VTU, GTU and Mumbai University formulas?', 'The commonly quoted VTU (and MAKAUT) formula is (CGPA − 0.75) × 10, GTU uses (CGPA − 0.5) × 10, and Mumbai University 7.1 × CGPA + 11. Rules can differ by scheme and year, so confirm yours.'],
         ['Can I use my own university formula?', 'Yes. Choose Custom and enter the multiplier, the offset and the highest CGPA on your scale.']
       ],
       icon: '<path d="M4 7h7M4 12h4"/><path d="M14 17l6-10"/><circle cx="14.5" cy="8.5" r="1.5"/><circle cx="19.5" cy="15.5" r="1.5"/><path d="M4 17h7"/>'
