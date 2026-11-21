@@ -1,0 +1,322 @@
+<style>
+.fb-list { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 0 12px; }
+.fb-list:empty { display: none; }
+.fb-list button { flex: none; position: relative; width: 74px; height: 74px; padding: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; }
+.fb-list button[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.fb-list img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fb-list small { position: absolute; left: 3px; bottom: 3px; background: rgba(0,0,0,.65); color: #fff; font: 600 11px/1 system-ui, sans-serif; padding: 3px 5px; border-radius: 5px; }
+.fb-stage { position: relative; text-align: center; line-height: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.fb-stage canvas { max-width: 100%; height: auto; touch-action: manipulation; cursor: pointer; }
+.fb-stage.draw canvas { touch-action: none; cursor: crosshair; }
+.fb-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.fb-tools .btn { min-height: 40px; padding: 6px 14px; }
+.fb-help { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop photos here</b>One or many JPG, PNG or WebP photos. Faces are found on your device; nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="fields">
+  <div><label for="fx">Cover faces with</label><select id="fx"><option value="blur">Blur</option><option value="pixel">Pixels (mosaic)</option><option value="emoji">Emoji</option><option value="solid">Solid colour</option></select></div>
+  <div id="strW"><label for="str">Strength: <span id="strv">60</span></label><input type="range" id="str" min="10" max="100" value="60"></div>
+  <div id="emoW" hidden><label for="emo">Emoji</label><select id="emo"><option>😀</option><option>🙂</option><option>😎</option><option>🤖</option><option>🐱</option><option>🐶</option><option>⭐</option><option>❤️</option><option>🙈</option></select></div>
+  <div id="colW" hidden><label for="col">Colour</label><input type="color" id="col" value="#111111"></div>
+  <div><label for="shape">Shape</label><select id="shape"><option value="oval">Oval</option><option value="rect">Rectangle</option></select></div>
+  <div><label for="pad">Cover size: <span id="padv">+25%</span></label><input type="range" id="pad" min="0" max="80" step="5" value="25"></div>
+</div>
+<div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat"></p></div>
+<ul class="fb-list" id="list" aria-label="Your photos"></ul>
+<div id="work" hidden>
+  <div class="fb-tools">
+    <div class="seg" id="mode" role="group" aria-label="What a tap does"><button type="button" data-v="toggle" aria-pressed="true">Tap to switch faces</button><button type="button" data-v="draw" aria-pressed="false">Draw a new box</button></div>
+    <label style="margin:0;font-weight:400"><input type="checkbox" id="outl" checked> Show outlines</label>
+  </div>
+  <div class="fb-stage" id="stage"><canvas id="cv" width="10" height="10" aria-label="Photo with covered faces"></canvas></div>
+  <p class="fb-help" id="help"></p>
+  <div class="fb-tools">
+    <button class="btn ghost" id="allOn" type="button">Cover all</button>
+    <button class="btn ghost" id="allOff" type="button">Uncover all</button>
+    <button class="btn ghost" id="undo" type="button">Remove my last box</button>
+    <button class="btn ghost" id="redo" type="button">Find faces again</button>
+  </div>
+  <div class="btns">
+    <button class="btn" id="dl" type="button">Download this photo</button>
+    <button class="btn ghost" id="dlAll" type="button" hidden>Download all (ZIP)</button>
+    <button class="btn ghost" id="remove" type="button">Remove this photo</button>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var BASE = '../assets/vendor/onnx/', MODEL = ['yunet-face.onnx', 232589], WASM = ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852];
+  var S = 640, THRESH = 0.6, MAXPX = 50e6, MAXFILES = 100, PREVIEW = 1600;
+  var photos = [], cur = -1, sessP = null, queue = [], working = false, mode = 'toggle', urls = [];
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function progress(frac, text) { $('notice').hidden = false; $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%'; $('stat').textContent = text; }
+  function loadScript(url) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); }); }
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() { return reader.read().then(function (d) { if (d.done) { var out = new Uint8Array(got), o = 0; parts.forEach(function (p) { out.set(p, o); o += p.length; }); return out.buffer; } parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump(); }); }
+      return pump();
+    });
+  }
+  // ---------- the face finder (YuNet, MIT licence), run with ONNX Runtime Web ----------
+  function session() {
+    if (sessP) return sessP;
+    var a = 0, b = 0, total = WASM[2] + MODEL[1], have = !!window.ort;
+    function tell() { progress((a + b) / total, 'Downloading the face finder (' + fmtBytes(a + b) + ' of about ' + fmtBytes(total) + '). This happens only once.'); }
+    tell();
+    sessP = Promise.all([have ? null : loadScript(BASE + WASM[0]), fetchBuf(BASE + WASM[1], WASM[2], function (n) { a = n; tell(); }), fetchBuf(BASE + MODEL[0], MODEL[1], function (n) { b = n; tell(); })]).then(function (r) {
+      progress(null, 'Starting the face finder…');
+      ort.env.wasm.wasmPaths = new URL(BASE, location.href).href; ort.env.wasm.wasmBinary = r[1];
+      ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+      ort.env.logLevel = 'error';
+      return ort.InferenceSession.create(r[2], { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    });
+    sessP.catch(function () { sessP = null; });
+    return sessP;
+  }
+  // Run the model on one 640x640 window: (sx, sy) is where the window starts in the scaled picture, k the scale.
+  function runWindow(s, src, k, sx, sy) {
+    var c = canvas(S, S), x = c.getContext('2d', { willReadFrequently: true });
+    x.fillStyle = '#000'; x.fillRect(0, 0, S, S);
+    x.drawImage(src, -sx, -sy, (src.naturalWidth || src.width) * k, (src.naturalHeight || src.height) * k);
+    var p = x.getImageData(0, 0, S, S).data, t = new Float32Array(3 * S * S), n = S * S;
+    for (var i = 0; i < n; i++) { t[i] = p[i * 4 + 2]; t[n + i] = p[i * 4 + 1]; t[2 * n + i] = p[i * 4]; } // BGR, 0..255
+    var feeds = {}; feeds[s.inputNames[0]] = new ort.Tensor('float32', t, [1, 3, S, S]);
+    return s.run(feeds).then(function (o) {
+      var found = [];
+      [8, 16, 32].forEach(function (st) {
+        var cols = S / st, cls = o['cls_' + st].data, obj = o['obj_' + st].data, bb = o['bbox_' + st].data;
+        for (var j = 0; j < cls.length; j++) {
+          var sc = Math.sqrt(Math.min(1, Math.max(0, cls[j])) * Math.min(1, Math.max(0, obj[j])));
+          if (sc < THRESH) continue;
+          var r = Math.floor(j / cols), cc = j % cols, cx = (cc + bb[j * 4]) * st, cy = (r + bb[j * 4 + 1]) * st, w = Math.exp(bb[j * 4 + 2]) * st, h = Math.exp(bb[j * 4 + 3]) * st;
+          found.push({ x: (cx - w / 2 + sx) / k, y: (cy - h / 2 + sy) / k, w: w / k, h: h / k, s: sc });
+        }
+      });
+      return found;
+    });
+  }
+  function iou(a, b) {
+    var ix = Math.max(0, Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x)), iy = Math.max(0, Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y)), i = ix * iy;
+    return { u: i / (a.w * a.h + b.w * b.h - i), small: i / Math.min(a.w * a.h, b.w * b.h) };
+  }
+  function nms(list) {
+    list.sort(function (a, b) { return b.s - a.s; });
+    var keep = [];
+    list.forEach(function (f) { if (f.w < 4 || f.h < 4) return; for (var i = 0; i < keep.length; i++) { var o = iou(f, keep[i]); if (o.u > 0.3 || o.small > 0.6) return; } keep.push(f); });
+    return keep;
+  }
+  // Several passes: the whole picture (normal and small, for very close faces) and, for big photos, overlapping tiles for small faces far away.
+  function detect(ph, onStep) {
+    return session().then(function (s) {
+      var W = ph.w, H = ph.h, L = Math.max(W, H), jobs = [];
+      var k1 = S / L; jobs.push([k1, 0, 0]); jobs.push([k1 / 2, 0, 0]);
+      if (L > 900) {
+        var k3 = Math.min(1, 1920 / L), sw = W * k3, sh = H * k3, step = S - 128;
+        for (var y = 0; y < Math.max(1, Math.ceil((sh - 128) / step)); y++) for (var x = 0; x < Math.max(1, Math.ceil((sw - 128) / step)); x++) jobs.push([k3, Math.min(x * step, Math.max(0, sw - S)), Math.min(y * step, Math.max(0, sh - S))]);
+      }
+      var all = [], i = 0;
+      function next() {
+        if (i >= jobs.length) return nms(all);
+        var j = jobs[i++]; onStep(i / jobs.length);
+        return runWindow(s, ph.img, j[0], j[1], j[2]).then(function (f) { all = all.concat(f); return new Promise(function (r) { setTimeout(r, 0); }); }).then(next);
+      }
+      return next();
+    });
+  }
+
+  // ---------- drawing ----------
+  function coverRect(f, W, H) {
+    var p = +$('pad').value / 100, w = f.w * (1 + p), h = f.h * (1 + p * 1.1), cx = f.x + f.w / 2, cy = f.y + f.h / 2 - f.h * p * 0.05;
+    return { x: cx - w / 2, y: cy - h / 2, w: w, h: h };
+  }
+  function paint(ctx, img, W, H, faces, scale) { // scale: output pixels per photo pixel
+    ctx.drawImage(img, 0, 0, W * scale, H * scale);
+    var fx = $('fx').value, str = +$('str').value / 100, oval = $('shape').value === 'oval';
+    faces.forEach(function (f) {
+      if (!f.on) return;
+      var r = coverRect(f, W, H), x = r.x * scale, y = r.y * scale, w = r.w * scale, h = r.h * scale;
+      ctx.save(); ctx.beginPath();
+      if (oval) ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2); else ctx.rect(x, y, w, h);
+      if (fx === 'emoji') {
+        ctx.restore(); var sz = Math.max(w, h) * 1.02; ctx.save();
+        ctx.font = sz + 'px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText($('emo').value, x + w / 2, y + h / 2 + sz * 0.05); ctx.restore(); return;
+      }
+      ctx.clip();
+      if (fx === 'solid') { ctx.fillStyle = $('col').value; ctx.fill(); ctx.restore(); return; }
+      // blur and mosaic are made from a shrunken copy of the area, so faces cannot be recovered by sharpening
+      var bx = Math.max(0, Math.floor(x - w * 0.15)), by = Math.max(0, Math.floor(y - h * 0.15)), bw = Math.min(W * scale - bx, Math.ceil(w * 1.3)), bh = Math.min(H * scale - by, Math.ceil(h * 1.3));
+      if (bw < 1 || bh < 1) { ctx.restore(); return; }
+      var cells = fx === 'pixel' ? Math.max(3, Math.round(16 - str * 12)) : Math.max(2, Math.round(10 - str * 8)), sw = Math.max(1, Math.round(cells * bw / Math.max(w, 1))), sh = Math.max(1, Math.round(cells * bh / Math.max(h, 1)));
+      var t = canvas(sw, sh), tx = t.getContext('2d'); tx.imageSmoothingQuality = 'high';
+      tx.drawImage(img, bx / scale, by / scale, bw / scale, bh / scale, 0, 0, sw, sh);
+      ctx.imageSmoothingEnabled = fx !== 'pixel';
+      if (fx === 'blur') { // smooth enlargement, then a real blur where the browser supports it
+        if ('filter' in ctx) ctx.filter = 'blur(' + Math.max(2, Math.round(Math.max(w, h) * 0.04 * str)) + 'px)';
+      }
+      ctx.drawImage(t, 0, 0, sw, sh, bx, by, bw, bh);
+      ctx.restore();
+    });
+  }
+  function show() {
+    var ph = photos[cur]; if (!ph) { $('work').hidden = true; return; }
+    $('work').hidden = false;
+    var k = Math.min(1, PREVIEW / Math.max(ph.w, ph.h)), cv = $('cv');
+    cv.width = Math.round(ph.w * k); cv.height = Math.round(ph.h * k);
+    var ctx = cv.getContext('2d'); paint(ctx, ph.img, ph.w, ph.h, ph.faces || [], k);
+    if ($('outl').checked && ph.faces) ph.faces.forEach(function (f) {
+      var r = coverRect(f, ph.w, ph.h); ctx.lineWidth = Math.max(2, cv.width / 400); ctx.setLineDash(f.on ? [] : [6, 5]);
+      ctx.strokeStyle = f.on ? (f.manual ? '#f59f00' : '#22c55e') : '#ef4444'; ctx.strokeRect(r.x * k, r.y * k, r.w * k, r.h * k);
+    });
+    ctx.setLineDash([]);
+    if (drag) { ctx.strokeStyle = '#f59f00'; ctx.lineWidth = 2; ctx.strokeRect(Math.min(drag.x0, drag.x1) * k, Math.min(drag.y0, drag.y1) * k, Math.abs(drag.x1 - drag.x0) * k, Math.abs(drag.y1 - drag.y0) * k); }
+    var n = (ph.faces || []).filter(function (f) { return f.on; }).length, auto = (ph.faces || []).filter(function (f) { return !f.manual; }).length;
+    $('help').textContent = ph.faces ? (auto ? 'Found ' + auto + (auto === 1 ? ' face' : ' faces') + '. ' : 'No faces were found automatically. ') + n + ' covered. Green = covered, red dashed = left visible, orange = your own boxes. Check every face before you share: automatic detection can miss faces that are small, turned away or partly hidden.' : 'Looking for faces…';
+    $('undo').disabled = !(ph.faces || []).some(function (f) { return f.manual; });
+    Array.prototype.forEach.call($('list').children, function (li, i) { li.firstChild.setAttribute('aria-current', i === cur ? 'true' : 'false'); var s = li.querySelector('small'); s.textContent = photos[i].faces ? String(photos[i].faces.filter(function (f) { return f.on; }).length) : '…'; });
+    $('dlAll').hidden = photos.length < 2;
+  }
+
+  // ---------- adding photos ----------
+  function addFiles(list) {
+    var bad = 0, heic = 0, added = 0;
+    list.forEach(function (f) {
+      if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { heic++; return; }
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; return; }
+      if (photos.length + queue.length >= MAXFILES) { bad++; return; }
+      queue.push(f); added++;
+    });
+    var notes = [];
+    if (bad) notes.push('Skipped ' + bad + ' file(s) that are not photos' + (photos.length + queue.length >= MAXFILES ? ' or are over the ' + MAXFILES + '-photo limit' : '') + '.');
+    if (heic) notes.push(heic + ' HEIC photo(s) (the iPhone format) cannot be opened here. Convert them to JPG first with the HEIC to JPG tool.');
+    say(notes.length ? 'bad' : '', notes.join(' '));
+    if (added) pump();
+  }
+  function pump() {
+    if (working) return; var f = queue.shift(); if (!f) { $('notice').hidden = true; return; }
+    working = true;
+    loadImage(f, function (img) {
+      if (!img || !img.naturalWidth) { say('bad', 'Could not open "' + f.name + '". It may be damaged.'); working = false; pump(); return; }
+      if (img.naturalWidth * img.naturalHeight > MAXPX) { say('bad', '"' + f.name + '" is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.'); working = false; pump(); return; }
+      var ph = { img: img, w: img.naturalWidth, h: img.naturalHeight, name: f.name, type: f.type, faces: null };
+      photos.push(ph);
+      var t = canvas(1, 1), k = Math.min(1, 160 / Math.max(ph.w, ph.h)); t.width = Math.max(1, Math.round(ph.w * k)); t.height = Math.max(1, Math.round(ph.h * k)); t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
+      var li = document.createElement('li'), b = document.createElement('button'), im = new Image(), s = document.createElement('small');
+      li.style.listStyle = 'none'; b.type = 'button'; b.setAttribute('aria-label', f.name); im.alt = ''; im.src = t.toDataURL('image/jpeg', 0.7); s.textContent = '…';
+      b.appendChild(im); b.appendChild(s); li.appendChild(b); $('list').appendChild(li);
+      b.addEventListener('click', function () { cur = photos.indexOf(ph); show(); });
+      if (cur < 0 || photos.length === 1) cur = photos.length - 1;
+      show();
+      find(ph).then(function () { working = false; pump(); });
+    });
+  }
+  function find(ph) {
+    var left = queue.length, pre = photos.length > 1 || left ? 'Photo ' + photos.length + (left ? ' (' + left + ' more waiting)' : '') + ': ' : '';
+    ph.faces = null; show();
+    return detect(ph, function (p) { progress(p, pre + 'Looking for faces… ' + Math.round(p * 100) + '%'); }).then(function (found) {
+      var manual = (ph.manualKeep || []);
+      ph.faces = found.map(function (f) { return { x: f.x, y: f.y, w: f.w, h: f.h, s: f.s, on: true }; }).concat(manual);
+      if (photos.indexOf(ph) === cur) show(); else show();
+      var total = photos.reduce(function (n, p) { return n + (p.faces ? p.faces.filter(function (f) { return !f.manual; }).length : 0); }, 0);
+      say('ok', photos.length > 1 ? photos.length + ' photos, ' + total + ' faces found in all.' : found.length ? 'Found ' + found.length + (found.length === 1 ? ' face.' : ' faces.') + ' Tap any face to switch its cover on or off.' : 'No faces were found. Choose "Draw a new box" to cover areas yourself.');
+    }).catch(function (e) {
+      ph.faces = ph.faces || [];
+      say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which the face finder needs. You can still draw boxes yourself.' : 'The face finder could not start' + (e && e.message === 'net' ? ' because the download failed. Check your connection and try again.' : ' on this device.') + ' You can still draw boxes yourself.');
+      $('notice').hidden = true; show();
+    });
+  }
+  PT_drop();
+  function PT_drop() {
+    var drop = $('drop'), input = $('file');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var a = Array.prototype.slice.call(input.files); input.value = ''; if (a.length) addFiles(a); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { addFiles(Array.prototype.slice.call(e.dataTransfer.files)); });
+  }
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.items, files = []; if (!it) return;
+    for (var j = 0; j < it.length; j++) if (it[j].kind === 'file' && /^image\//.test(it[j].type)) files.push(new File([it[j].getAsFile()], 'pasted-photo-' + (photos.length + files.length + 1) + '.png', { type: it[j].type }));
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  });
+
+  // ---------- tapping and drawing on the photo ----------
+  var drag = null;
+  function pt(e) { var ph = photos[cur], r = $('cv').getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * ph.w, y: (e.clientY - r.top) / r.height * ph.h }; }
+  $('cv').addEventListener('pointerdown', function (e) {
+    var ph = photos[cur]; if (!ph || !ph.faces) return;
+    var p = pt(e);
+    if (mode === 'draw') { drag = { x0: p.x, y0: p.y, x1: p.x, y1: p.y }; try { this.setPointerCapture(e.pointerId); } catch (x) {} e.preventDefault(); return; }
+    // the smallest box under the finger wins
+    var hit = null; ph.faces.forEach(function (f) { var r = coverRect(f, ph.w, ph.h); if (p.x >= r.x && p.x <= r.x + r.w && p.y >= r.y && p.y <= r.y + r.h && (!hit || r.w * r.h < hit.a)) hit = { f: f, a: r.w * r.h }; });
+    if (hit) { hit.f.on = !hit.f.on; show(); }
+    else say('', 'Nothing to switch there. To cover something the face finder missed, choose "Draw a new box" and drag over it.');
+  });
+  $('cv').addEventListener('pointermove', function (e) { if (!drag) return; var p = pt(e); drag.x1 = p.x; drag.y1 = p.y; show(); });
+  function endDrag() {
+    if (!drag) return; var ph = photos[cur], d = drag; drag = null;
+    var w = Math.abs(d.x1 - d.x0), h = Math.abs(d.y1 - d.y0), min = Math.max(ph.w, ph.h) * 0.01;
+    if (w > min && h > min) {
+      var p = +$('pad').value / 100; // store the box so that, with the current cover size, it covers exactly what was drawn
+      var f = { w: w / (1 + p), h: h / (1 + p * 1.1), on: true, manual: true }; f.x = Math.min(d.x0, d.x1) + w / 2 - f.w / 2; f.y = Math.min(d.y0, d.y1) + h / 2 - f.h / 2 + f.h * p * 0.05;
+      ph.faces.push(f); ph.manualKeep = ph.faces.filter(function (q) { return q.manual; });
+      say('ok', 'Box added. Draw more, or choose "Tap to switch faces" to switch boxes on and off.');
+    }
+    show();
+  }
+  $('cv').addEventListener('pointerup', endDrag); $('cv').addEventListener('pointercancel', function () { drag = null; show(); });
+  Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () { mode = b.dataset.v; $('stage').className = 'fb-stage' + (mode === 'draw' ? ' draw' : ''); Array.prototype.forEach.call($('mode').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); }); });
+  });
+  $('allOn').addEventListener('click', function () { var ph = photos[cur]; if (ph && ph.faces) { ph.faces.forEach(function (f) { f.on = true; }); show(); } });
+  $('allOff').addEventListener('click', function () { var ph = photos[cur]; if (ph && ph.faces) { ph.faces.forEach(function (f) { f.on = false; }); show(); } });
+  $('undo').addEventListener('click', function () { var ph = photos[cur]; if (!ph || !ph.faces) return; for (var i = ph.faces.length - 1; i >= 0; i--) if (ph.faces[i].manual) { ph.faces.splice(i, 1); break; } ph.manualKeep = ph.faces.filter(function (q) { return q.manual; }); show(); });
+  $('redo').addEventListener('click', function () { var ph = photos[cur]; if (!ph || working || !ph.faces) return; working = true; find(ph).then(function () { working = false; pump(); }); });
+  $('remove').addEventListener('click', function () {
+    if (cur < 0) return; photos.splice(cur, 1); $('list').removeChild($('list').children[cur]);
+    cur = Math.min(cur, photos.length - 1); show(); say('', photos.length ? photos.length + (photos.length === 1 ? ' photo' : ' photos') + ' left.' : '');
+  });
+  function syncLabels() {
+    var fx = $('fx').value; $('strW').hidden = fx === 'emoji' || fx === 'solid'; $('emoW').hidden = fx !== 'emoji'; $('colW').hidden = fx !== 'solid';
+    $('strv').textContent = $('str').value; $('padv').textContent = '+' + $('pad').value + '%';
+  }
+  ['fx', 'str', 'emo', 'col', 'shape', 'pad', 'outl'].forEach(function (id) { $(id).addEventListener('input', function () { syncLabels(); show(); }); $(id).addEventListener('change', function () { syncLabels(); show(); }); });
+  syncLabels();
+
+  // ---------- saving ----------
+  function render(ph) {
+    var c = canvas(ph.w, ph.h), x = c.getContext('2d'); paint(x, ph.img, ph.w, ph.h, ph.faces || [], 1);
+    var png = /png|gif|bmp/.test(ph.type), type = png ? 'image/png' : /webp/.test(ph.type) ? 'image/webp' : 'image/jpeg';
+    return new Promise(function (r) { c.toBlob(function (b) { r({ blob: b, name: ph.name.replace(/\.[^.]+$/, '') + '-faces-covered.' + (type === 'image/png' ? 'png' : type === 'image/webp' ? 'webp' : 'jpg') }); }, type, 0.92); });
+  }
+  function save(blob, name) { var u = URL.createObjectURL(blob); urls.push(u); var a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); if (urls.length > 4) URL.revokeObjectURL(urls.shift()); }
+  $('dl').addEventListener('click', function () {
+    var ph = photos[cur]; if (!ph) return;
+    render(ph).then(function (r) { if (!r.blob) { say('bad', 'Your browser could not create the file. The photo may be too large for this device.'); return; } save(r.blob, r.name); burst($('dl')); say('ok', 'Saved ' + r.name + ' (' + fmtBytes(r.blob.size) + '). Location and camera details (EXIF) are not included.'); });
+  });
+  $('dlAll').addEventListener('click', function () {
+    if (!photos.length) return; var files = [], i = 0, names = {};
+    $('dlAll').disabled = true; say('', 'Preparing the ZIP…');
+    (function next() {
+      if (i >= photos.length) {
+        var z = PT.zip(files); save(z, 'faces-covered.zip'); $('dlAll').disabled = false; $('notice').hidden = true; burst($('dlAll'));
+        say('ok', 'Saved ' + files.length + ' photos in faces-covered.zip (' + fmtBytes(z.size) + ').'); return;
+      }
+      var ph = photos[i++];
+      progress(i / photos.length, 'Adding photo ' + i + ' of ' + photos.length + '…');
+      render(ph).then(function (r) {
+        if (!r.blob) return;
+        var n = r.name; while (names[n]) n = n.replace(/(\.\w+)$/, '-' + i + '$1'); names[n] = 1;
+        return r.blob.arrayBuffer().then(function (a) { files.push({ name: n, data: new Uint8Array(a) }); });
+      }).then(next, function () { $('dlAll').disabled = false; $('notice').hidden = true; say('bad', 'The ZIP could not be made. Try downloading the photos one at a time.'); });
+    })();
+  });
+})();
+</script>

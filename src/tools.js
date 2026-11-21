@@ -697,7 +697,7 @@ module.exports = [
   {
       slug: 'image-to-text', cat: 'Image tools', name: 'Image to Text (OCR)',
       title: 'Image to Text Converter - Free OCR Online, No Upload',
-      desc: 'Copy text from photos, screenshots and scans. Paste with Ctrl+V or drop several images, then copy or download the text. Free OCR that runs on your device.',
+      desc: 'Copy text from photos, screenshots and scans in 12 languages. Paste with Ctrl+V or drop several images, then copy or download the text. Runs on your device.',
       card: 'Copy the text out of photos and screenshots.',
       intro: 'Turn the words in a picture into text you can copy and edit. Drop images or paste a screenshot, and the text appears in seconds. The reading happens on your device, so your pictures stay private.',
       steps: ['Drop one or more images on the box, or press Ctrl+V to paste a screenshot.', 'Wait while each image is read. The bar shows the progress.', 'Choose whether to keep line breaks or join lines into paragraphs, and correct any mistakes.', 'Press Copy text or Download .txt.'],
@@ -3775,5 +3775,103 @@ module.exports = [
         ['Is there a length limit?', 'Up to 50,000 characters at a time. Long text is translated paragraph by paragraph, and the paragraphs are kept.']
       ],
       icon: '<path d="M4 5h8M8 3v2M10 5c-.5 3-2.5 6-6 8M6 9c1 2 3 3.5 5 4"/><path d="M13 21l4-10 4 10M14.5 17.5h5"/>'
+  },
+  {
+      slug: 'document-scanner', cat: 'PDF tools', name: 'Document Scanner',
+      title: 'Document Scanner - Scan Paper to PDF with Your Phone',
+      desc: 'Turn phone photos of paper into straight, clean scans. Automatic edge detection, black & white or colour, many pages, one PDF. Free, no upload.',
+      card: 'Scan paper to a clean PDF with your camera.',
+      intro: 'Take photos of letters, receipts, forms or notes and get straight, clean scans. The page edges are found for you, the perspective is corrected and the paper is made white, then all pages are saved as one PDF. Your photos never leave your device.',
+      steps: ['Tap Take a photo, or upload photos of your pages.', 'Check the blue outline and drag the corners onto the page if needed.', 'Pick a look: Colour, Grey, Black & white or Original, and add more pages.', 'Choose the page size and press Download PDF or Download JPG.'],
+      faq: [
+        ['Are my documents uploaded?', 'No. The pages are found, straightened and cleaned in your browser. Nothing is sent to a server, so it is safe for private papers.'],
+        ['What if the edges are not found?', 'Drag the four round handles onto the corners of the page. A magnifier helps you place them exactly. Photos taken on a dark, plain surface are detected most reliably.'],
+        ['Which look should I choose?', 'Black & white gives crisp text and small files, like a photocopy. Colour keeps stamps, logos and blue ink while making the paper white. Grey is in between, and Original leaves the photo as it is.'],
+        ['Can I scan several pages into one PDF?', 'Yes. Add as many pages as you need (up to 100), change their order with the arrows, and Download PDF saves them all in one file.'],
+        ['What page size will the PDF have?', 'A4, Letter, or the same shape as the scan. Each page is turned to portrait or landscape to match the scan.'],
+        ['Does it work on iPhone and Android?', 'Yes. Take a photo opens your phone camera. On a computer it can use your webcam, or you can upload photos.']
+      ],
+      icon: '<path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><path d="M8 7h8v10H8z"/><path d="M3 12h18"/>'
+  },
+  {
+      slug: 'signature-cleaner', cat: 'Image tools', name: 'Signature Cleaner',
+      title: 'Signature Cleaner - Transparent PNG Signature from Photo',
+      desc: 'Turn a photo of your handwritten signature into a clean transparent PNG. Remove the paper, change the ink colour, crop and copy. Free, no upload.',
+      card: 'Photo of your signature to a transparent PNG.',
+      intro: 'Sign on paper, take a photo and get a clean signature with a see-through background, ready to put on PDFs, letters and invoices. Shadows and paper are removed on your device, and you can make the ink black, blue or any colour.',
+      steps: ['Sign on white paper with a dark pen and take a clear photo.', 'Drop the photo on the box. The paper is removed automatically.', 'Adjust the ink sensitivity, smoothness, ink colour and size.', 'Press Download PNG or Copy image, then use it in Sign PDF.'],
+      faq: [
+        ['Is my signature uploaded?', 'No. The photo is cleaned in your browser and never sent anywhere.'],
+        ['How do I use it to sign a PDF?', 'Download the PNG and add it as an image in our Sign PDF tool. The transparent background means it sits neatly on the signature line.'],
+        ['Why are parts of my signature missing?', 'The pen may be too faint for the light. Move Ink sensitivity to the right, or sign again with a darker, thicker pen.'],
+        ['Can I make the signature blue?', 'Yes. Choose Blue, keep the pen\'s own colour with Original, or pick any colour with Custom.'],
+        ['Is a signature image legally valid?', 'It depends on your country and the document. Many everyday documents accept an image signature, but some contracts need a certified digital signature. Check with whoever asked for it.']
+      ],
+      icon: '<path d="M3 17c3-1 4-9 6-9s1 8 3 8 2-4 4-4 1 3 5 3"/><path d="M3 21h18"/>'
+  },
+  {
+      slug: 'face-blur', cat: 'Image tools', name: 'Face Blur',
+      title: 'Blur Faces in Photos - Automatic Face Blur, Free & Private',
+      desc: 'Automatically find and blur faces in photos, or cover them with pixels or emoji. Toggle faces, add boxes, batch many photos. Runs on your device.',
+      card: 'Find and hide faces in photos automatically.',
+      intro: 'Hide the faces of people in your photos before you share them. A small AI face finder runs in your browser and covers every face with a blur, pixels, an emoji or a solid colour. Tap faces to keep them visible, draw extra boxes, and process many photos at once.',
+      steps: ['Drop one or more photos on the box. Faces are found automatically.', 'Choose Blur, Pixels, Emoji or Solid colour, and the strength and size.', 'Tap a face to keep it visible, or draw a box over anything that was missed.', 'Download each photo, or all of them in a ZIP.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. The face finder is downloaded to your browser once and runs on your device. Your photos are never sent anywhere.'],
+        ['Does it find every face?', 'It finds most faces, from close-ups to small faces in crowds, but very small, blurred, side-on or partly hidden faces can be missed. Always check, and draw a box over any face it missed.'],
+        ['Can the blur be removed later?', 'No. The blur and mosaic are made from a shrunken copy of the face, so the detail is not in the saved photo. For the strongest privacy choose Pixels or Solid colour.'],
+        ['Can I keep some faces visible?', 'Yes. Tap a face to switch its cover off; it shows a red dashed outline and stays visible in the saved photo.'],
+        ['Is the location data removed?', 'Yes. Saved photos are drawn again from scratch, so camera and GPS details (EXIF) are not included.'],
+        ['How many photos can I do at once?', 'Up to 100. Use Download all (ZIP) to save them together.']
+      ],
+      icon: '<circle cx="12" cy="10" r="5"/><path d="M4 21c1.5-3.5 4.5-5 8-5s6.5 1.5 8 5"/><path d="M9 8h0M12 8h0M15 8h0M9 11h0M12 11h0M15 11h0" stroke-width="2.5" stroke-linecap="round"/>'
+  },
+  {
+      slug: 'photo-colorizer', cat: 'Image tools', name: 'Photo Colorizer',
+      title: 'Colorize Black and White Photos Free - AI Photo Colorizer',
+      desc: 'Add colour to black and white photos with AI in your browser. Two colour styles, strength control, full-size download. Free, private, no upload.',
+      card: 'Add colour to black and white photos with AI.',
+      intro: 'Bring old black and white photos to life. An AI model guesses natural colours for skies, skin, plants and more and paints them onto your photo at full size. It runs on your device, so family photos stay private.',
+      steps: ['Choose a colour style: Natural or Vivid.', 'Drop a black and white photo on the box and wait a few seconds.', 'Drag across the photo to compare, and adjust the colour strength.', 'Press Download JPG or Download PNG.'],
+      faq: [
+        ['Is my photo uploaded?', 'No. The AI model is downloaded to your browser and colours the photo on your device.'],
+        ['Are the colours the real ones?', 'No. The AI makes an educated guess from millions of colour photos it learned from. Skies, plants and skin are usually convincing; clothes, cars and painted objects may differ from reality.'],
+        ['How big is the download?', 'About 15 MB for the AI engine plus 32 to 34 MB for each colour style, only the first time. Your browser keeps them for next time.'],
+        ['Does it keep the full resolution?', 'Yes. The colour is added to your original photo, so the saved file has the same size and detail as your scan.'],
+        ['What is the difference between Natural and Vivid?', 'They are two different AI models. Natural gives softer, realistic colours; Vivid gives stronger, warmer colours. Try both on your photo.']
+      ],
+      icon: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 2-.9 2-2 0-.5-.2-1-.5-1.3-.3-.4-.5-.8-.5-1.3 0-1.1.9-2 2-2h2.3A4.7 4.7 0 0 0 21 9.8C21 6 17 3 12 3z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>'
+  },
+  {
+      slug: 'color-blindness-simulator', cat: 'Image tools', name: 'Colour Blindness Simulator',
+      title: 'Color Blindness Simulator - See Images as Colorblind People',
+      desc: 'See how an image looks with protanopia, deuteranopia, tritanopia or achromatopsia. Side-by-side, slider and all-types views. Free, runs in your browser.',
+      card: 'See images the way colour-blind people do.',
+      intro: 'Check how your photos, charts, maps and designs look to people with colour blindness. Pick a type and strength and compare it with normal vision side by side, with a slider, or all types at once, using the accepted Machado (2009) model.',
+      steps: ['Drop an image on the box or paste a screenshot.', 'Choose the type of colour blindness and the strength.', 'Switch between Side by side, Slider and All types.', 'Download the simulated image or a labelled comparison.'],
+      faq: [
+        ['How accurate is the simulation?', 'It uses the Machado, Oliveira and Fernandes (2009) model, which is widely used in research and accessibility tools. It is a good approximation, but each person\'s colour vision is a little different.'],
+        ['What do the names mean?', 'Protan is red-blind, deutan is green-blind and tritan is blue-blind. At 100% (the -opia forms) one type of cone is missing; lower strengths show the milder, more common -anomaly forms. Achromatopsia means seeing no colour.'],
+        ['Which type is the most common?', 'Deuteranomaly, a mild green weakness, affects about 5 in 100 men. In total around 1 in 12 men and 1 in 200 women have some colour vision deficiency.'],
+        ['Is my image uploaded?', 'No. The simulation runs in your browser.'],
+        ['How do I make my design colour-blind friendly?', 'Do not rely on colour alone: add labels, icons, patterns or different line styles, and avoid red against green. Then check again here.']
+      ],
+      icon: '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/><path d="M12 9v6"/>'
+  },
+  {
+      slug: 'before-after-slider', cat: 'Image tools', name: 'Before and After Slider',
+      title: 'Before and After Image Slider Maker - Embed, GIF, Video',
+      desc: 'Compare two images with a draggable slider. Get HTML embed code, a side-by-side image or an animated GIF or video wipe. Free, no upload, no sign-up.',
+      card: 'Compare two images with a drag slider.',
+      intro: 'Put a before and an after image on top of each other with a divider you can drag. Then copy a ready-to-paste embed code for your website, or download a side-by-side image or an animated GIF or video. Your images stay on your device.',
+      steps: ['Add the before image and the after image.', 'Set the labels, the direction and how different sizes are matched.', 'Drag the divider in the preview to check it.', 'Create the embed code, a side-by-side image, or a GIF or video.'],
+      faq: [
+        ['How do I put the slider on my website?', 'Press Create embed code, copy it and paste it into an HTML or custom code block. The code contains both images and a tiny script, so it needs no other files.'],
+        ['Are my images uploaded?', 'No. Everything is made in your browser. The images are only inside the code or files you download.'],
+        ['What if the two images are different sizes?', 'The first image sets the shape. The second is cropped to match, or fitted inside with bars if you prefer.'],
+        ['Can I share it on social media?', 'Yes. Make an animated GIF or a video in which the divider sweeps across by itself, or download a side-by-side image.'],
+        ['Does the slider work on phones?', 'Yes. It works with a finger, a mouse and the keyboard arrow keys.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 2v20"/><path d="M9 10l-2 2 2 2M15 10l2 2-2 2"/>'
   }
 ];

@@ -1,0 +1,338 @@
+<style>
+.bas-in { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.bas-in .drop { margin: 0; padding: 18px 10px; min-height: 150px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; overflow: hidden; }
+.bas-in .drop img { max-width: 100%; max-height: 110px; border-radius: 8px; display: block; }
+.bas-in .drop small { font-size: 13px; overflow-wrap: anywhere; }
+.bas-pv { margin: 6px 0 4px; }
+.bas-sec { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+.bas-sec h3 { margin-top: 16px; }
+.bas-code { width: 100%; min-height: 120px; font: 12.5px/1.45 var(--mono, monospace); }
+.bas-anim img, .bas-anim video { max-width: 100%; max-height: 360px; border: 1px solid var(--line); border-radius: 10px; display: block; margin: 12px auto 0; }
+.bas-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.bas-row select { width: auto; min-height: 44px; }
+@media (max-width: 520px) { .bas-in .drop { min-height: 120px; } .bas-in .drop b { font-size: 15px; } }
+</style>
+<div class="bas-in">
+  <div class="drop" id="dropA" tabindex="0" role="button"><b>Before</b><span id="infoA">Click or drop the first image</span></div>
+  <div class="drop" id="dropB" tabindex="0" role="button"><b>After</b><span id="infoB">Click or drop the second image</span></div>
+</div>
+<input type="file" id="fileA" accept="image/*" hidden data-nomemo>
+<input type="file" id="fileB" accept="image/*" hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 16px"><button class="btn ghost" id="swap" type="button" disabled>⇄ Swap images</button><button class="btn ghost" id="sample" type="button">Try with sample images</button></div>
+<div class="fields">
+  <div><label for="labA">Label for the first image</label><input type="text" id="labA" value="Before" maxlength="30"></div>
+  <div><label for="labB">Label for the second image</label><input type="text" id="labB" value="After" maxlength="30"></div>
+  <div><label for="dir">Slider direction</label><select id="dir"><option value="h">Left and right</option><option value="v">Top and bottom</option></select></div>
+  <div><label for="fit">If the sizes differ</label><select id="fit"><option value="cover">Crop the second image to match</option><option value="contain">Fit the second image inside (add bars)</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="showLab" checked>Show labels on the images</label></div>
+<div id="work" hidden>
+  <div class="bas-pv" id="pv"></div>
+  <p class="msg" style="margin-top:6px">Drag across the picture, or tab to it and use the arrow keys.</p>
+
+  <div class="bas-sec">
+    <h3>Embed on a website or blog</h3>
+    <p class="msg" style="margin-top:0">A ready-to-paste HTML snippet with both images built in. It needs no other files or scripts and works on any page that allows HTML.</p>
+    <div class="bas-row">
+      <label for="embW" style="margin:0">Width</label>
+      <select id="embW"><option value="600">600 px</option><option value="800" selected>800 px</option><option value="1000">1000 px</option><option value="1200">1200 px</option><option value="1600">1600 px</option></select>
+      <button class="btn" id="mkEmb" type="button">Create embed code</button>
+    </div>
+    <div id="embBox" hidden>
+      <textarea id="code" class="bas-code plain" readonly data-nomemo aria-label="Embed code"></textarea>
+      <div class="btns"><button class="btn" id="copyCode" type="button">Copy code</button><a class="btn ghost" id="dlHtml">Download .html page</a></div>
+      <p class="msg" id="embMsg"></p>
+    </div>
+  </div>
+
+  <div class="bas-sec">
+    <h3>Side-by-side image</h3>
+    <div class="bas-row">
+      <select id="sbsLay" aria-label="Layout"><option value="row">Next to each other</option><option value="col">One above the other</option></select>
+      <select id="sbsFmt" aria-label="Format"><option value="jpg">JPG</option><option value="png">PNG</option></select>
+      <button class="btn" id="mkSbs" type="button">Download image</button>
+    </div>
+  </div>
+
+  <div class="bas-sec bas-anim">
+    <h3>Animated wipe (GIF or video)</h3>
+    <div class="bas-row">
+      <select id="anFmt" aria-label="Animation format"><option value="gif">GIF</option><option value="video">Video (WebM/MP4)</option></select>
+      <select id="anW" aria-label="Animation width"><option value="360">360 px wide</option><option value="480" selected>480 px wide</option><option value="640">640 px wide</option><option value="800">800 px wide</option></select>
+      <select id="anLen" aria-label="Length"><option value="3">3 seconds</option><option value="4" selected>4 seconds</option><option value="6">6 seconds</option></select>
+      <button class="btn" id="mkAn" type="button">Create animation</button>
+    </div>
+    <div class="notice" id="anNote" hidden><div class="meter"><i id="anBar"></i></div><p id="anTxt"></p></div>
+    <div id="anOut"></div>
+    <div class="btns"><a class="btn" id="dlAn" hidden>Download</a></div>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/fix-webm-duration/fix-webm-duration.js"></script>
+<script>
+// The slider itself. This exact function is also copied into the embed code, so keep it self-contained (no site helpers).
+function baMount(root, vert) {
+  var top = root.querySelector('[data-ba-top]'), line = root.querySelector('[data-ba-line]'), pos = 50, on = false;
+  function set(p) {
+    pos = Math.max(0, Math.min(100, p));
+    top.style.clipPath = vert ? 'inset(0 0 ' + (100 - pos) + '% 0)' : 'inset(0 ' + (100 - pos) + '% 0 0)';
+    if (vert) line.style.top = pos + '%'; else line.style.left = pos + '%';
+    root.setAttribute('aria-valuenow', Math.round(pos));
+  }
+  function at(e) { var r = root.getBoundingClientRect(); set(vert ? (e.clientY - r.top) / r.height * 100 : (e.clientX - r.left) / r.width * 100); }
+  root.addEventListener('pointerdown', function (e) { on = true; try { root.setPointerCapture(e.pointerId); } catch (x) {} at(e); });
+  root.addEventListener('pointermove', function (e) { if (on) at(e); });
+  root.addEventListener('pointerup', function () { on = false; });
+  root.addEventListener('pointercancel', function () { on = false; });
+  root.addEventListener('keydown', function (e) {
+    var k = e.key, d = e.shiftKey ? 10 : 2;
+    if (k === 'ArrowLeft' || k === 'ArrowUp') { set(pos - d); e.preventDefault(); }
+    else if (k === 'ArrowRight' || k === 'ArrowDown') { set(pos + d); e.preventDefault(); }
+    else if (k === 'Home') { set(0); e.preventDefault(); } else if (k === 'End') { set(100); e.preventDefault(); }
+  });
+  set(50);
+}
+(function () {
+  var A = null, B = null, url = {}, MAXPX = 50e6, LONG = 2400;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return '&#' + c.charCodeAt(0) + ';'; }); }
+
+  // ---------- inputs ----------
+  function take(which, f) {
+    if (!f) return;
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { say('bad', 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool.'); return; }
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG, WebP, GIF or BMP file.'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not open "' + f.name + '". It may be damaged or in a format this browser cannot show.'); return; }
+      if (im.naturalWidth * im.naturalHeight > MAXPX) { say('bad', '"' + f.name + '" is very large (' + im.naturalWidth + ' × ' + im.naturalHeight + '). Please make it smaller with the Image Resizer first.'); return; }
+      set(which, im, f.name);
+    });
+  }
+  function set(which, im, nm) {
+    var o = { img: im, w: im.naturalWidth || im.width, h: im.naturalHeight || im.height, name: nm };
+    if (which === 'A') A = o; else B = o;
+    var box = $('info' + which), t = canvas(1, 1), k = Math.min(1, 220 / Math.max(o.w, o.h));
+    t.width = Math.max(1, Math.round(o.w * k)); t.height = Math.max(1, Math.round(o.h * k)); t.getContext('2d').drawImage(im, 0, 0, t.width, t.height);
+    box.innerHTML = ''; var i = new Image(); i.alt = ''; i.src = t.toDataURL('image/jpeg', 0.8); var s = document.createElement('small'); s.textContent = nm + ' · ' + o.w + ' × ' + o.h;
+    box.appendChild(i); box.appendChild(s);
+    update();
+  }
+  ['A', 'B'].forEach(function (w) {
+    setupDrop('drop' + w, 'file' + w, function (f) { take(w, f); });
+    $('file' + w).addEventListener('click', function () { this.value = ''; });
+  });
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.items; if (!it) return;
+    for (var j = 0; j < it.length; j++) if (it[j].kind === 'file' && /^image\//.test(it[j].type)) { e.preventDefault(); take(A && !B ? 'B' : 'A', new File([it[j].getAsFile()], 'pasted-image.png', { type: it[j].type })); return; }
+  });
+  $('swap').addEventListener('click', function () {
+    var a = A, b = B; A = null; B = null;
+    if (b) set('A', b.img, b.name); if (a) set('B', a.img, a.name);
+  });
+  $('sample').addEventListener('click', function () {
+    var w = 900, h = 600, a = canvas(w, h), b = canvas(w, h), x = a.getContext('2d'), y = b.getContext('2d'), g;
+    // the same little landscape twice: dull and faded, then bright and clean
+    function scene(c, vivid) {
+      g = c.createLinearGradient(0, 0, 0, h); g.addColorStop(0, vivid ? '#4aa3ff' : '#9aa3ad'); g.addColorStop(1, vivid ? '#d6efff' : '#c9ccd0'); c.fillStyle = g; c.fillRect(0, 0, w, h);
+      c.fillStyle = vivid ? '#ffd23f' : '#d8d2bf'; c.beginPath(); c.arc(700, 140, 60, 0, 7); c.fill();
+      c.fillStyle = vivid ? '#2f9e44' : '#7d877c'; c.beginPath(); c.moveTo(0, 420); c.quadraticCurveTo(250, 300, 470, 420); c.quadraticCurveTo(700, 330, 900, 400); c.lineTo(900, 600); c.lineTo(0, 600); c.fill();
+      c.fillStyle = vivid ? '#e8590c' : '#8f8a84'; c.fillRect(160, 330, 160, 120); c.fillStyle = vivid ? '#c92a2a' : '#6f6a66'; c.beginPath(); c.moveTo(140, 335); c.lineTo(240, 260); c.lineTo(340, 335); c.fill();
+      if (!vivid) { var d = c.getImageData(0, 0, w, h), p = d.data, s = 3; for (var i = 0; i < p.length; i += 4) { s = (s * 16807) % 2147483647; var n = (s / 2147483647 - 0.5) * 40; p[i] += n; p[i + 1] += n; p[i + 2] += n; } c.putImageData(d, 0, 0); }
+    }
+    scene(x, false); scene(y, true);
+    set('A', a, 'sample-before.png'); set('B', b, 'sample-after.png');
+  });
+
+  // ---------- the shared frame both images are drawn into ----------
+  function frame() {
+    var k = Math.min(1, LONG / Math.max(A.w, A.h));
+    return { w: Math.max(1, Math.round(A.w * k)), h: Math.max(1, Math.round(A.h * k)) };
+  }
+  function drawB(ctx, w, h) {
+    var s = $('fit').value === 'contain' ? Math.min(w / B.w, h / B.h) : Math.max(w / B.w, h / B.h), dw = B.w * s, dh = B.h * s;
+    if ($('fit').value === 'contain') { ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h); }
+    ctx.drawImage(B.img, (w - dw) / 2, (h - dh) / 2, dw, dh);
+  }
+  function layer(which, w, h, labels) { // a canvas with one image (and its label) at w x h
+    var c = canvas(w, h), x = c.getContext('2d'); x.imageSmoothingQuality = 'high';
+    if (which === 'A') x.drawImage(A.img, 0, 0, w, h); else drawB(x, w, h);
+    if (labels) tag(x, which, w, h);
+    return c;
+  }
+  function tag(x, which, w, h) {
+    var t = (which === 'A' ? $('labA') : $('labB')).value.trim(); if (!t || !$('showLab').checked) return;
+    var fs = Math.max(11, Math.round(Math.min(w, h) * 0.045)), pad = Math.round(fs * 0.5), m = Math.round(fs * 0.6);
+    x.font = '600 ' + fs + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'; x.textBaseline = 'middle';
+    var tw = x.measureText(t).width, bw = tw + pad * 2, bh = fs + pad * 1.4, vert = $('dir').value === 'v';
+    var bx = which === 'A' || vert ? m : w - m - bw, by = which === 'B' && vert ? h - m - bh : m;
+    x.fillStyle = 'rgba(0,0,0,.6)'; x.beginPath(); if (x.roundRect) x.roundRect(bx, by, bw, bh, fs * 0.3); else x.rect(bx, by, bw, bh); x.fill();
+    x.fillStyle = '#fff'; x.textAlign = 'left'; x.fillText(t, bx + pad, by + bh / 2 + 1);
+  }
+  // HTML of the slider (used for both the live preview and the embed code)
+  function sliderHtml(srcA, srcB, w, h, id, maxW) {
+    var vert = $('dir').value === 'v', a = esc($('labA').value.trim() || 'Before'), b = esc($('labB').value.trim() || 'After');
+    var img = 'position:absolute;top:0;left:0;width:100%;height:100%;display:block;margin:0;max-width:none;border:0;pointer-events:none;';
+    var lineCss = vert ? 'left:0;right:0;height:3px;margin-top:-1.5px;' : 'top:0;bottom:0;width:3px;margin-left:-1.5px;';
+    var knob = 'position:absolute;top:50%;left:50%;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;background:#fff;box-shadow:0 1px 5px rgba(0,0,0,.45);color:#222;font:700 18px/36px system-ui,sans-serif;text-align:center;';
+    return '<div id="' + id + '" role="slider" tabindex="0" aria-label="' + a + ' and ' + b + ' comparison" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50"' +
+      ' style="position:relative;width:100%;max-width:' + maxW + 'px;aspect-ratio:' + w + '/' + h + ';overflow:hidden;border-radius:8px;touch-action:' + (vert ? 'pan-x' : 'pan-y') + ';user-select:none;-webkit-user-select:none;cursor:' + (vert ? 'ns-resize' : 'ew-resize') + ';background:#000;line-height:0">' +
+      '<img src="' + srcB + '" alt="' + b + '" draggable="false" style="' + img + '">' +
+      '<img data-ba-top src="' + srcA + '" alt="' + a + '" draggable="false" style="' + img + '">' +
+      '<div data-ba-line style="position:absolute;' + lineCss + 'background:#fff;box-shadow:0 0 0 1px rgba(0,0,0,.3);pointer-events:none"><div style="' + knob + '">' + (vert ? '&#8597;' : '&#8596;') + '</div></div>' +
+      '</div>';
+  }
+
+  var pvUrls = [];
+  function update() {
+    $('swap').disabled = !(A || B);
+    if (!A || !B) { $('work').hidden = true; if (A || B) say('', 'Now add the ' + (A ? 'second' : 'first') + ' image.'); return; }
+    var f = frame(), pw = Math.min(f.w, 1400), ph = Math.round(f.h * pw / f.w);
+    var ca = layer('A', pw, ph, true), cb = layer('B', pw, ph, true);
+    pvUrls.forEach(URL.revokeObjectURL); pvUrls = [];
+    Promise.all([ca, cb].map(function (c) { return new Promise(function (r) { c.toBlob(r, 'image/jpeg', 0.9); }); })).then(function (bl) {
+      if (!bl[0] || !bl[1]) { say('bad', 'Your browser could not draw these images. Try smaller copies.'); return; }
+      pvUrls = bl.map(function (b) { return URL.createObjectURL(b); });
+      $('pv').innerHTML = sliderHtml(pvUrls[0], pvUrls[1], pw, ph, 'basPv', 1400);
+      baMount($('basPv'), $('dir').value === 'v');
+      $('work').hidden = false;
+      var same = Math.abs(A.w / A.h - B.w / B.h) < 0.01;
+      say('ok', 'Ready. ' + (same ? 'Both images have the same shape.' : 'The images have different shapes, so the second one is ' + ($('fit').value === 'cover' ? 'cropped' : 'fitted inside with bars') + ' to match the first (' + A.w + ' × ' + A.h + ').'));
+    });
+    $('embBox').hidden = true; $('dlAn').hidden = true; $('anOut').innerHTML = '';
+  }
+  ['labA', 'labB'].forEach(function (id) { var t; $(id).addEventListener('input', function () { clearTimeout(t); t = setTimeout(function () { if (A && B) update(); }, 300); }); });
+  ['dir', 'fit', 'showLab'].forEach(function (id) { $(id).addEventListener('change', function () { if (A && B) update(); }); });
+
+  function blobOf(c, type, q) { return new Promise(function (r) { c.toBlob(r, type, q); }); }
+  function dataUrl(c, q) { return c.toDataURL('image/jpeg', q); }
+  function setUrl(key, blob) { if (url[key]) URL.revokeObjectURL(url[key]); url[key] = URL.createObjectURL(blob); return url[key]; }
+  function download(href, name) { var a = document.createElement('a'); a.href = href; a.download = name; document.body.appendChild(a); a.click(); a.remove(); }
+  function base() { return (A.name || 'image').replace(/\.[^.]+$/, '') || 'image'; }
+
+  // ---------- embed ----------
+  $('mkEmb').addEventListener('click', function () {
+    if (!A || !B) return;
+    var f = frame(), w = Math.min(+$('embW').value, f.w), h = Math.round(f.h * w / f.w);
+    var id = 'ba-' + Math.random().toString(36).slice(2, 8), a = dataUrl(layer('A', w, h, true), 0.82), b = dataUrl(layer('B', w, h, true), 0.82);
+    var code = '\x3C!-- Before and after slider, made with GetToolNest. Paste anywhere HTML is allowed. -->\n' + sliderHtml(a, b, w, h, id, w) +
+      '\n\x3Cscript>(function(){' + baMount.toString() + '\nbaMount(document.getElementById("' + id + '"),' + ($('dir').value === 'v') + ');})();<\/script>\n';
+    $('code').value = code; $('embBox').hidden = false;
+    var page = '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' + esc($('labA').value || 'Before') + ' / ' + esc($('labB').value || 'After') + '</title></head>\n<body style="margin:0;padding:16px;font-family:system-ui,sans-serif;background:#f4f5f7">\n' + code + '</body></html>\n';
+    $('dlHtml').href = setUrl('html', new Blob([page], { type: 'text/html' })); $('dlHtml').download = base() + '-before-after.html';
+    $('embMsg').className = 'msg ok'; $('embMsg').textContent = 'Code size: ' + fmtBytes(new Blob([code]).size) + ' (' + w + ' × ' + h + ' px). Some site builders limit the size of HTML blocks; choose a smaller width if yours refuses it.';
+  });
+  $('copyCode').addEventListener('click', function () { copyText($('code').value, $('copyCode')); });
+
+  // ---------- side by side ----------
+  $('mkSbs').addEventListener('click', function () {
+    if (!A || !B) return;
+    var f = frame(), row = $('sbsLay').value === 'row', k = Math.min(1, 1800 / (row ? f.w : f.h)), w = Math.round(f.w * k), h = Math.round(f.h * k), gap = Math.max(6, Math.round(Math.min(w, h) * 0.015));
+    var out = canvas(row ? w * 2 + gap : w, row ? h : h * 2 + gap), x = out.getContext('2d');
+    var ca = layer('A', w, h, false), cb = layer('B', w, h, false); tagLeft(ca, 'A'); tagLeft(cb, 'B'); // labels sit at the top-left of each half
+    x.fillStyle = '#fff'; x.fillRect(0, 0, out.width, out.height); x.drawImage(ca, 0, 0); x.drawImage(cb, row ? w + gap : 0, row ? 0 : h + gap);
+    var jpg = $('sbsFmt').value === 'jpg';
+    blobOf(out, jpg ? 'image/jpeg' : 'image/png', 0.9).then(function (bl) {
+      if (!bl) { say('bad', 'Your browser could not create the image. Try smaller pictures.'); return; }
+      download(setUrl('sbs', bl), base() + '-side-by-side.' + (jpg ? 'jpg' : 'png')); say('ok', 'Downloaded the side-by-side image (' + out.width + ' × ' + out.height + ', ' + fmtBytes(bl.size) + ').'); burst($('mkSbs'));
+    });
+  });
+  function tagLeft(c, which) { // same label style, always top-left
+    var x = c.getContext('2d'), t = (which === 'A' ? $('labA') : $('labB')).value.trim(); if (!t || !$('showLab').checked) return;
+    var w = c.width, h = c.height, fs = Math.max(11, Math.round(Math.min(w, h) * 0.045)), pad = Math.round(fs * 0.5), m = Math.round(fs * 0.6);
+    x.font = '600 ' + fs + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'; x.textBaseline = 'middle';
+    var bw = x.measureText(t).width + pad * 2, bh = fs + pad * 1.4;
+    x.fillStyle = 'rgba(0,0,0,.6)'; x.beginPath(); if (x.roundRect) x.roundRect(m, m, bw, bh, fs * 0.3); else x.rect(m, m, bw, bh); x.fill();
+    x.fillStyle = '#fff'; x.textAlign = 'left'; x.fillText(t, m + pad, m + bh / 2 + 1);
+  }
+
+  // ---------- animation ----------
+  var anJob = 0, worker = null;
+  function wipeAt(t) { // 0..1 over the loop: hold, sweep, hold, sweep back
+    var p = t < 0.15 ? 0 : t < 0.5 ? (t - 0.15) / 0.35 : t < 0.65 ? 1 : 1 - (t - 0.65) / 0.35;
+    return 0.5 - 0.5 * Math.cos(Math.PI * Math.max(0, Math.min(1, p))); // ease in and out
+  }
+  function paintWipe(x, ca, cb, w, h, p, vert) {
+    x.drawImage(cb, 0, 0);
+    var cut = Math.round((vert ? h : w) * (1 - p));
+    if (cut > 0) { if (vert) x.drawImage(ca, 0, 0, w, cut, 0, 0, w, cut); else x.drawImage(ca, 0, 0, cut, h, 0, 0, cut, h); }
+    if (cut > 0 && cut < (vert ? h : w)) { x.fillStyle = '#fff'; if (vert) x.fillRect(0, cut - 1, w, 3); else x.fillRect(cut - 1, 0, 3, h); }
+  }
+  function anProgress(f, t) { $('anNote').hidden = false; $('anBar').style.width = Math.round(f * 100) + '%'; $('anTxt').textContent = t; }
+  function videoType() {
+    if (!window.MediaRecorder || !HTMLCanvasElement.prototype.captureStream) return null;
+    var list = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm', 'video/mp4;codecs=avc1', 'video/mp4'];
+    if (!MediaRecorder.isTypeSupported) return '';
+    for (var i = 0; i < list.length; i++) if (MediaRecorder.isTypeSupported(list[i])) return list[i];
+    return null;
+  }
+  $('mkAn').addEventListener('click', function () {
+    if (!A || !B) return;
+    var mine = ++anJob, f = frame(), w = Math.min(+$('anW').value, f.w), h = Math.round(f.h * w / f.w), secs = +$('anLen').value, vert = $('dir').value === 'v';
+    w -= w % 2; h -= h % 2; w = Math.max(2, w); h = Math.max(2, h);
+    var ca = layer('A', w, h, true), cb = layer('B', w, h, true), c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    $('dlAn').hidden = true; $('anOut').innerHTML = ''; $('mkAn').disabled = true;
+    function done() { if (mine === anJob) { $('mkAn').disabled = false; $('anNote').hidden = true; } }
+    if ($('anFmt').value === 'gif') {
+      if (typeof Worker !== 'function') { say('bad', 'Your browser cannot run background tasks, which GIF making needs.'); done(); return; }
+      var fps = 12, n = Math.round(secs * fps), frames = [];
+      for (var i = 0; i < n; i++) { paintWipe(x, ca, cb, w, h, wipeAt(i / n), vert); frames.push(x.getImageData(0, 0, w, h).data.buffer); }
+      // one shared palette from both pictures keeps the colours steady between frames
+      var both = canvas(w, h * 2), bx = both.getContext('2d', { willReadFrequently: true }); bx.drawImage(ca, 0, 0); bx.drawImage(cb, 0, h);
+      var sample = bx.getImageData(0, 0, w, h * 2).data.buffer;
+      if (worker) worker.terminate();
+      var lib = new URL('../assets/vendor/gifenc/gifenc.js', location.href).href;
+      worker = new Worker(URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');\n' +
+        'onmessage = function (e) { var m = e.data, G = self.gifenc, enc = G.GIFEncoder();\n' +
+        ' try { var pal = G.quantize(new Uint8ClampedArray(m.sample), 256, { format: "rgb444" });\n' +
+        '  for (var i = 0; i < m.frames.length; i++) { var idx = G.applyPalette(new Uint8ClampedArray(m.frames[i]), pal, "rgb444");\n' +
+        '   enc.writeFrame(idx, m.w, m.h, i ? { delay: m.delay } : { palette: pal, delay: m.delay, repeat: 0 }); postMessage({ p: (i + 1) / m.frames.length }); }\n' +
+        '  enc.finish(); var out = enc.bytes(); postMessage({ done: out.buffer }, [out.buffer]); } catch (err) { postMessage({ error: String(err && err.message || err) }); } };'], { type: 'text/javascript' })));
+      worker.onmessage = function (e) {
+        if (mine !== anJob) return; var m = e.data;
+        if (m.p) { anProgress(m.p, 'Making the GIF… ' + Math.round(m.p * 100) + '%'); return; }
+        worker.terminate(); worker = null; done();
+        if (m.error) { say('bad', 'The GIF could not be created: ' + m.error); return; }
+        var bl = new Blob([m.done], { type: 'image/gif' }), u = setUrl('an', bl), im = new Image(); im.alt = 'Animated before and after wipe'; im.src = u;
+        $('anOut').innerHTML = ''; $('anOut').appendChild(im);
+        $('dlAn').href = u; $('dlAn').download = base() + '-before-after.gif'; $('dlAn').textContent = 'Download GIF (' + fmtBytes(bl.size) + ')'; $('dlAn').hidden = false;
+        say('ok', 'GIF ready: ' + w + ' × ' + h + ', ' + n + ' frames, ' + fmtBytes(bl.size) + '.'); burst($('dlAn'));
+      };
+      worker.onerror = function () { if (mine !== anJob) return; done(); say('bad', 'The GIF engine could not start. Check your connection and reload the page.'); };
+      anProgress(0, 'Making the GIF…');
+      worker.postMessage({ frames: frames, sample: sample, w: w, h: h, delay: Math.round(1000 / fps) }, frames.concat([sample]));
+      return;
+    }
+    var type = videoType();
+    if (type === null) { say('bad', 'This browser cannot record video from a picture. Choose GIF instead, or try Chrome, Edge or Firefox.'); done(); return; }
+    var stream = c.captureStream(30), chunks = [], rec;
+    try { rec = new MediaRecorder(stream, type ? { mimeType: type, videoBitsPerSecond: 4000000 } : undefined); } catch (e) { say('bad', 'This browser could not start the video recorder. Choose GIF instead.'); done(); return; }
+    rec.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+    var start = 0, timer = null, total = secs * 1000 * 2; // two loops so it plays nicely when it does not repeat
+    rec.onstop = function () {
+      clearInterval(timer); stream.getTracks().forEach(function (t) { t.stop(); });
+      if (mine !== anJob) return;
+      var mime = (rec.mimeType || type || 'video/webm').split(';')[0], ext = /mp4/.test(mime) ? 'mp4' : 'webm', raw = new Blob(chunks, { type: mime });
+      var ready = ext === 'webm' && window.ysFixWebmDuration ? ysFixWebmDuration(raw, total, { logger: false }).catch(function () { return raw; }) : Promise.resolve(raw);
+      ready.then(function (bl) {
+        done();
+        if (!bl.size) { say('bad', 'The video came out empty. Choose GIF instead.'); return; }
+        var u = setUrl('an', bl), v = document.createElement('video'); v.src = u; v.controls = true; v.loop = true; v.muted = true; v.playsInline = true; v.autoplay = true;
+        $('anOut').innerHTML = ''; $('anOut').appendChild(v);
+        $('dlAn').href = u; $('dlAn').download = base() + '-before-after.' + ext; $('dlAn').textContent = 'Download ' + ext.toUpperCase() + ' (' + fmtBytes(bl.size) + ')'; $('dlAn').hidden = false;
+        say('ok', 'Video ready: ' + w + ' × ' + h + ', ' + (total / 1000) + ' s, ' + fmtBytes(bl.size) + '.'); burst($('dlAn'));
+      });
+    };
+    paintWipe(x, ca, cb, w, h, 0, vert);
+    rec.start(500); start = performance.now();
+    // a timer rather than animation frames, so recording carries on if the tab is in the background
+    timer = setInterval(function () {
+      var t = performance.now() - start;
+      if (mine !== anJob) { clearInterval(timer); try { rec.stop(); } catch (e) {} return; }
+      if (t >= total) { clearInterval(timer); paintWipe(x, ca, cb, w, h, 0, vert); setTimeout(function () { try { rec.stop(); } catch (e) {} }, 120); return; }
+      paintWipe(x, ca, cb, w, h, wipeAt((t % (secs * 1000)) / (secs * 1000)), vert);
+      anProgress(t / total, 'Recording the video… ' + Math.ceil((total - t) / 1000) + ' s left');
+    }, 1000 / 30);
+  });
+})();
+</script>

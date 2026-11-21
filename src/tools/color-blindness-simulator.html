@@ -1,0 +1,248 @@
+<style>
+.cbs-views { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.cbs-stage { position: relative; text-align: center; }
+.cbs-stage label, .cbs-stage input { text-align: start; line-height: normal; }
+.cbs-slide { line-height: 0; }
+.cbs-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.cbs-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(46%, 220px), 1fr)); gap: 10px; }
+.cbs-fig { margin: 0; min-width: 0; }
+.cbs-fig canvas { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.cbs-fig figcaption { font-size: 13.5px; color: var(--muted); margin-top: 4px; line-height: 1.35; text-align: center; }
+.cbs-fig figcaption b { color: var(--ink); font-weight: 600; }
+.cbs-slide { position: relative; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: ew-resize; max-width: 100%; display: inline-block; }
+.cbs-slide canvas { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 10px; }
+.cbs-slide .cbs-line { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.35); pointer-events: none; }
+.cbs-slide .cbs-line::after { content: '\2194'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #111; font: 700 18px/34px system-ui, sans-serif; box-shadow: 0 1px 4px rgba(0,0,0,.4); text-align: center; }
+.cbs-tag { position: absolute; top: 8px; font: 600 12px/1 system-ui, sans-serif; background: rgba(0,0,0,.6); color: #fff; padding: 5px 8px; border-radius: 6px; pointer-events: none; line-height: 1; }
+.cbs-note { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here, or paste one with Ctrl+V</b>A photo, chart, map, screenshot or design. JPG, PNG, WebP, GIF or BMP. It stays on your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 16px"><button class="btn ghost" id="sample" type="button">Try with a sample picture</button></div>
+<div class="fields">
+  <div><label for="type">Type of colour blindness</label><select id="type">
+    <option value="protan">Red-blind (protan)</option>
+    <option value="deutan" selected>Green-blind (deutan)</option>
+    <option value="tritan">Blue-blind (tritan)</option>
+    <option value="achro">No colour (achromatopsia)</option>
+  </select></div>
+  <div><label for="sev">Strength: <span id="sevv">100% (full)</span></label><input type="range" id="sev" min="10" max="100" step="10" value="100"></div>
+</div>
+<div class="cbs-views" role="group" aria-label="View">
+  <div class="seg" id="views"><button type="button" data-v="pair" aria-pressed="true">Side by side</button><button type="button" data-v="slide" aria-pressed="false">Slider</button><button type="button" data-v="all" aria-pressed="false">All types</button></div>
+</div>
+<div id="out" hidden>
+  <div id="vPair" class="cbs-pair">
+    <figure class="cbs-fig"><canvas id="cOrig"></canvas><figcaption><b>Normal vision</b></figcaption></figure>
+    <figure class="cbs-fig"><canvas id="cSim"></canvas><figcaption id="simCap"></figcaption></figure>
+  </div>
+  <div id="vSlide" class="cbs-stage" hidden>
+    <div class="cbs-slide" id="slideBox"><canvas id="cSlide"></canvas><div class="cbs-line" id="slideLine"></div><span class="cbs-tag" style="left:8px">Normal</span><span class="cbs-tag" id="slideTag" style="right:8px"></span></div>
+    <label for="slidePos" style="margin-top:10px">Divider position</label><input type="range" id="slidePos" min="0" max="100" value="50">
+  </div>
+  <div id="vAll" class="cbs-grid" hidden></div>
+  <p class="cbs-note" id="info"></p>
+  <div class="btns">
+    <button class="btn" id="dlSim" type="button">Download simulated image</button>
+    <button class="btn ghost" id="dlCmp" type="button">Download comparison</button>
+    <select id="fmt" aria-label="File format" style="width:auto;min-height:44px"><option value="png">PNG</option><option value="jpg">JPG</option></select>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  // Machado, Oliveira & Fernandes (2009) matrices for linear RGB, severity 0.0 to 1.0 in steps of 0.1.
+  var M = {"protan":[[1,0,0,0,1,0,0,0,1],[0.856167,0.182038,-0.038205,0.029342,0.955115,0.015544,-0.00288,-0.001563,1.004443],[0.734766,0.334872,-0.069637,0.05184,0.919198,0.028963,-0.004928,-0.004209,1.009137],[0.630323,0.465641,-0.095964,0.069181,0.890046,0.040773,-0.006308,-0.007724,1.014032],[0.539009,0.579343,-0.118352,0.082546,0.866121,0.051332,-0.007136,-0.011959,1.019095],[0.458064,0.679578,-0.137642,0.092785,0.846313,0.060902,-0.007494,-0.016807,1.024301],[0.38545,0.769005,-0.154455,0.100526,0.829802,0.069673,-0.007442,-0.02219,1.029632],[0.319627,0.849633,-0.169261,0.106241,0.815969,0.07779,-0.007025,-0.028051,1.035076],[0.259411,0.923008,-0.18242,0.110296,0.80434,0.085364,-0.006276,-0.034346,1.040622],[0.203876,0.990338,-0.194214,0.112975,0.794542,0.092483,-0.005222,-0.041043,1.046265],[0.152286,1.052583,-0.204868,0.114503,0.786281,0.099216,-0.003882,-0.048116,1.051998]],
+    "deutan":[[1,0,0,0,1,0,0,0,1],[0.866435,0.177704,-0.044139,0.049567,0.939063,0.01137,-0.003453,0.007233,0.99622],[0.760729,0.319078,-0.079807,0.090568,0.889315,0.020117,-0.006027,0.013325,0.992702],[0.675425,0.43385,-0.109275,0.125303,0.847755,0.026942,-0.00795,0.018572,0.989378],[0.605511,0.52856,-0.134071,0.155318,0.812366,0.032316,-0.009376,0.023176,0.9862],[0.547494,0.607765,-0.155259,0.181692,0.781742,0.036566,-0.01041,0.027275,0.983136],[0.498864,0.674741,-0.173604,0.205199,0.754872,0.039929,-0.011131,0.030969,0.980162],[0.457771,0.731899,-0.18967,0.226409,0.731012,0.042579,-0.011595,0.034333,0.977261],[0.422823,0.781057,-0.203881,0.245752,0.709602,0.044646,-0.011843,0.037423,0.974421],[0.392952,0.82361,-0.216562,0.263559,0.69021,0.046232,-0.01191,0.040281,0.97163],[0.367322,0.860646,-0.227968,0.280085,0.672501,0.047413,-0.01182,0.04294,0.968881]],
+    "tritan":[[1,0,0,0,1,0,0,0,1],[0.92667,0.092514,-0.019184,0.021191,0.964503,0.014306,0.008437,0.054813,0.93675],[0.89572,0.13333,-0.02905,0.029997,0.9454,0.024603,0.013027,0.104707,0.882266],[0.905871,0.127791,-0.033662,0.026856,0.941251,0.031893,0.01341,0.148296,0.838294],[0.948035,0.08949,-0.037526,0.014364,0.946792,0.038844,0.010853,0.193991,0.795156],[1.017277,0.027029,-0.044306,-0.006113,0.958479,0.047634,0.006379,0.248708,0.744913],[1.104996,-0.046633,-0.058363,-0.032137,0.971635,0.060503,0.001336,0.317922,0.680742],[1.193214,-0.109812,-0.083402,-0.058496,0.97941,0.079086,-0.002346,0.403492,0.598854],[1.257728,-0.139648,-0.118081,-0.078003,0.975409,0.102594,-0.003316,0.501214,0.502102],[1.278864,-0.125333,-0.153531,-0.084748,0.957674,0.127074,-0.000989,0.601151,0.399838],[1.255528,-0.076749,-0.178779,-0.078411,0.930809,0.147602,0.004733,0.691367,0.3039]]};
+  var NAMES = {
+    protan: ['Protanopia', 'Protanomaly', 'Red cones missing', 'Red cones weak', 'Reds look darker and are easy to confuse with greens and browns. About 1 in 100 men has protanopia and about 1 in 100 has protanomaly.'],
+    deutan: ['Deuteranopia', 'Deuteranomaly', 'Green cones missing', 'Green cones weak', 'Reds, greens, browns and oranges are hard to tell apart. Deuteranomaly is the most common type, affecting about 5 in 100 men; deuteranopia affects about 1 in 100.'],
+    tritan: ['Tritanopia', 'Tritanomaly', 'Blue cones missing', 'Blue cones weak', 'Blues and greens, and yellows and pinks, are confused. It is rare (well under 1 in 1,000 people) and affects men and women equally.'],
+    achro: ['Achromatopsia', 'Partial colour loss', 'No colour vision', 'Colours look faded', 'Everything is seen in shades of grey. Full achromatopsia is very rare, about 1 in 30,000 people.']
+  };
+  var PREV = 1200, MAXPX = 50e6;
+  var img = null, name = 'image', view = 'pair', origData = null, PW = 0, PH = 0, url = null, pos = 0.5;
+  // sRGB <-> linear lookup tables
+  var toLin = new Float32Array(256), toS = new Uint8ClampedArray(4097), i;
+  for (i = 0; i < 256; i++) { var c = i / 255; toLin[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  for (i = 0; i <= 4096; i++) { var l = i / 4096; toS[i] = Math.round(255 * (l <= 0.0031308 ? l * 12.92 : 1.055 * Math.pow(l, 1 / 2.4) - 0.055)); }
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function matrix(type, sev) {
+    if (type === 'achro') { // blend towards the luminance of linear sRGB
+      var Y = [0.2126, 0.7152, 0.0722], m = [];
+      for (var r = 0; r < 3; r++) for (var k = 0; k < 3; k++) m.push((r === k ? 1 - sev : 0) + sev * Y[k]);
+      return m;
+    }
+    return M[type][Math.round(sev * 10)];
+  }
+  function simulate(src, m) { // src ImageData -> new ImageData
+    var out = new ImageData(src.width, src.height), s = src.data, d = out.data, n = s.length;
+    for (var j = 0; j < n; j += 4) {
+      var r = toLin[s[j]], g = toLin[s[j + 1]], b = toLin[s[j + 2]];
+      var R = m[0] * r + m[1] * g + m[2] * b, G = m[3] * r + m[4] * g + m[5] * b, B = m[6] * r + m[7] * g + m[8] * b;
+      d[j] = toS[R <= 0 ? 0 : R >= 1 ? 4096 : (R * 4096 + 0.5) | 0];
+      d[j + 1] = toS[G <= 0 ? 0 : G >= 1 ? 4096 : (G * 4096 + 0.5) | 0];
+      d[j + 2] = toS[B <= 0 ? 0 : B >= 1 ? 4096 : (B * 4096 + 0.5) | 0];
+      d[j + 3] = s[j + 3];
+    }
+    return out;
+  }
+  function label(type, sev) {
+    var n = NAMES[type], full = sev >= 1;
+    return { name: full ? n[0] : n[1] + ' (' + Math.round(sev * 100) + '%)', what: full ? n[2] : n[3], info: n[4] };
+  }
+  function cur() { return { type: $('type').value, sev: +$('sev').value / 100 }; }
+  function put(cv, data) { cv.width = data.width; cv.height = data.height; cv.getContext('2d').putImageData(data, 0, 0); }
+
+  function render() {
+    if (!origData) return;
+    var c = cur(), lb = label(c.type, c.sev);
+    $('sevv').textContent = c.sev >= 1 ? '100% (full)' : Math.round(c.sev * 100) + '%';
+    $('info').textContent = lb.name + ': ' + lb.info;
+    $('vPair').hidden = view !== 'pair'; $('vSlide').hidden = view !== 'slide'; $('vAll').hidden = view !== 'all';
+    $('dlCmp').textContent = view === 'all' ? 'Download all types' : 'Download comparison';
+    if (view === 'pair') {
+      put($('cOrig'), origData); put($('cSim'), simulate(origData, matrix(c.type, c.sev)));
+      $('simCap').innerHTML = ''; var b = document.createElement('b'); b.textContent = lb.name; $('simCap').appendChild(b); $('simCap').appendChild(document.createTextNode(' · ' + lb.what));
+    } else if (view === 'slide') {
+      slideSim = simulate(origData, matrix(c.type, c.sev)); $('slideTag').textContent = lb.name; drawSlide();
+    } else {
+      var box = $('vAll'); box.innerHTML = '';
+      allTypes().forEach(function (t) {
+        var f = document.createElement('figure'), cv = document.createElement('canvas'), cap = document.createElement('figcaption'), b = document.createElement('b');
+        f.className = 'cbs-fig'; put(cv, t.m ? simulate(origData, t.m) : origData);
+        b.textContent = t.name; cap.appendChild(b); if (t.what) cap.appendChild(document.createTextNode(' · ' + t.what));
+        f.appendChild(cv); f.appendChild(cap); box.appendChild(f);
+      });
+    }
+  }
+  function allTypes() {
+    var list = [{ name: 'Normal vision', what: '', m: null }];
+    ['protan', 'deutan', 'tritan', 'achro'].forEach(function (t) { var lb = label(t, 1); list.push({ name: lb.name, what: lb.what, m: matrix(t, 1), type: t }); });
+    list.splice(3, 0, { name: label('deutan', 0.6).name, what: 'the most common type', m: matrix('deutan', 0.6) });
+    return list;
+  }
+  var slideSim = null;
+  function drawSlide() {
+    var cv = $('cSlide'); if (cv.width !== PW || cv.height !== PH) { cv.width = PW; cv.height = PH; }
+    var x = cv.getContext('2d'), cut = Math.round(PW * pos);
+    x.putImageData(slideSim, 0, 0);
+    if (cut > 0) x.putImageData(origData, 0, 0, 0, 0, cut, PH);
+    $('slideLine').style.left = (pos * 100) + '%';
+  }
+  $('slidePos').addEventListener('input', function () { pos = +this.value / 100; if (slideSim) drawSlide(); });
+  (function () {
+    var box = $('slideBox'), on = false;
+    function at(e) { var r = box.getBoundingClientRect(); pos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); $('slidePos').value = Math.round(pos * 100); if (slideSim) drawSlide(); }
+    box.addEventListener('pointerdown', function (e) { on = true; try { box.setPointerCapture(e.pointerId); } catch (x) {} at(e); });
+    box.addEventListener('pointermove', function (e) { if (on) at(e); });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { box.addEventListener(ev, function () { on = false; }); });
+  })();
+
+  Array.prototype.forEach.call($('views').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () {
+      view = b.dataset.v;
+      Array.prototype.forEach.call($('views').querySelectorAll('button'), function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+      render();
+    });
+  });
+  $('type').addEventListener('change', render);
+  $('sev').addEventListener('input', render);
+
+  function setImage(source, w, h, nm) {
+    if (w * h > MAXPX) { say('bad', 'This picture is very large (' + w + ' × ' + h + '). Please make it smaller with the Image Resizer first.'); return; }
+    img = source; name = nm || 'image';
+    var k = Math.min(1, PREV / Math.max(w, h)); PW = Math.max(1, Math.round(w * k)); PH = Math.max(1, Math.round(h * k));
+    var c = canvas(PW, PH), x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingQuality = 'high'; x.drawImage(source, 0, 0, PW, PH);
+    origData = x.getImageData(0, 0, PW, PH);
+    $('out').hidden = false; say('ok', 'Showing ' + nm + ' (' + w + ' × ' + h + ' px). Downloads are full size.');
+    render();
+  }
+  function take(f) {
+    if (!f) return;
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { say('bad', 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool.'); return; }
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG, WebP, GIF or BMP file.'); return; }
+    say('', 'Opening…');
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not open "' + f.name + '". It may be damaged or in a format this browser cannot show.'); return; }
+      setImage(im, im.naturalWidth, im.naturalHeight, f.name.replace(/\.[^.]+$/, '') || 'image');
+    });
+  }
+  setupDrop('drop', 'file', take);
+  $('file').addEventListener('click', function () { this.value = ''; });
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.items; if (!it) return;
+    for (var j = 0; j < it.length; j++) if (it[j].kind === 'file' && /^image\//.test(it[j].type)) { e.preventDefault(); take(new File([it[j].getAsFile()], 'pasted-image.png', { type: it[j].type })); return; }
+  });
+  $('sample').addEventListener('click', function () {
+    var w = 960, h = 600, c = canvas(w, h), x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, w, h);
+    var cols = ['#e41a1c', '#4daf4a', '#377eb8', '#ff7f00', '#984ea3', '#ffff33', '#a65628', '#f781bf', '#1b9e77', '#d95f02'];
+    for (var j = 0; j < w; j++) { x.fillStyle = 'hsl(' + (j / w * 360) + ',90%,50%)'; x.fillRect(j, 0, 1, 90); }
+    cols.forEach(function (col, k) { x.fillStyle = col; x.fillRect(20 + k * 93, 110, 80, 80); });
+    var vals = [62, 48, 75, 33, 55, 68], bars = ['#d73027', '#1a9850', '#fc8d59', '#91cf60', '#4575b4', '#fee08b'];
+    vals.forEach(function (v, k) { x.fillStyle = bars[k]; x.fillRect(40 + k * 80, 560 - v * 4.5, 56, v * 4.5); });
+    x.fillStyle = '#222'; x.font = 'bold 22px system-ui, sans-serif'; x.fillText('Sales by region', 40, 236);
+    // a dot pattern with a hidden number, in the style of colour vision test plates
+    var cx = 760, cy = 400, R = 170, seed = 7; function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+    var off = document.createElement('canvas'); off.width = off.height = 2 * R; var ox = off.getContext('2d');
+    ox.font = 'bold 230px system-ui, sans-serif'; ox.textAlign = 'center'; ox.textBaseline = 'middle'; ox.fillText('74', R, R + 10);
+    var mask = ox.getImageData(0, 0, 2 * R, 2 * R).data;
+    for (var t = 0; t < 2600; t++) {
+      var a = rnd() * Math.PI * 2, rr = Math.sqrt(rnd()) * (R - 8), px = cx + Math.cos(a) * rr, py = cy + Math.sin(a) * rr, rad = 4 + rnd() * 6;
+      var inside = mask[((Math.round(py - cy + R) * 2 * R) + Math.round(px - cx + R)) * 4 + 3] > 100;
+      var pal = inside ? ['#d9653b', '#e07a43', '#c9573a', '#e88d4f'] : ['#8fae4a', '#a3b85a', '#7d9c45', '#b7c46a'];
+      x.fillStyle = pal[(rnd() * 4) | 0]; x.beginPath(); x.arc(px, py, rad, 0, Math.PI * 2); x.fill();
+    }
+    setImage(c, w, h, 'sample');
+  });
+
+  function fullCanvas(m) { // full-size simulation (or the original when m is null)
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(img, 0, 0);
+    if (m) { var band = 512; for (var y = 0; y < h; y += band) { var hh = Math.min(band, h - y); x.putImageData(simulate(x.getImageData(0, y, w, hh), m), 0, y); } }
+    return c;
+  }
+  function save(c, suffix) {
+    var jpg = $('fmt').value === 'jpg';
+    if (jpg) { var f = canvas(c.width, c.height), fx = f.getContext('2d'); fx.fillStyle = '#fff'; fx.fillRect(0, 0, f.width, f.height); fx.drawImage(c, 0, 0); c = f; }
+    c.toBlob(function (b) {
+      if (!b) { say('bad', 'Your browser could not create the file. The image may be too large for this device.'); return; }
+      if (url) URL.revokeObjectURL(url);
+      url = URL.createObjectURL(b);
+      var a = document.createElement('a'); a.href = url; a.download = name + '-' + suffix + (jpg ? '.jpg' : '.png'); document.body.appendChild(a); a.click(); a.remove();
+      say('ok', 'Downloaded ' + a.download + ' · ' + fmtBytes(b.size)); burst($('dlSim'));
+    }, jpg ? 'image/jpeg' : 'image/png', 0.92);
+  }
+  function busy(fn) { say('', 'Preparing the file…'); setTimeout(function () { try { fn(); } catch (e) { say('bad', 'This image is too large to process on this device. Try a smaller copy.'); } }, 30); }
+  $('dlSim').addEventListener('click', function () {
+    if (!img) return; var c = cur();
+    busy(function () { save(fullCanvas(matrix(c.type, c.sev)), label(c.type, c.sev).name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/-+$/, '')); });
+  });
+  function caption(x, text, w, y, size) { x.fillStyle = '#111'; x.font = '600 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle'; x.fillText(text, w / 2, y); }
+  $('dlCmp').addEventListener('click', function () {
+    if (!img) return;
+    busy(function () {
+      var w0 = img.naturalWidth || img.width, h0 = img.naturalHeight || img.height, k = Math.min(1, 1600 / Math.max(w0, h0));
+      var w = Math.round(w0 * k), h = Math.round(h0 * k), pad = Math.round(Math.max(12, w * 0.02)), fs = Math.round(Math.max(16, Math.min(40, w * 0.035))), capH = fs * 2;
+      var small = canvas(w, h), sx = small.getContext('2d', { willReadFrequently: true }); sx.imageSmoothingQuality = 'high'; sx.drawImage(img, 0, 0, w, h);
+      var base = sx.getImageData(0, 0, w, h), panels;
+      if (view === 'all') panels = allTypes().map(function (t) { return { d: t.m ? simulate(base, t.m) : base, t: t.name }; });
+      else { var c = cur(); panels = [{ d: base, t: 'Normal vision' }, { d: simulate(base, matrix(c.type, c.sev)), t: label(c.type, c.sev).name }]; }
+      var cols = panels.length > 2 ? 3 : 2, rows = Math.ceil(panels.length / cols);
+      var out = canvas(cols * w + (cols + 1) * pad, rows * (h + capH) + (rows + 1) * pad), ox = out.getContext('2d');
+      ox.fillStyle = '#fff'; ox.fillRect(0, 0, out.width, out.height);
+      panels.forEach(function (p, n) {
+        var cx = pad + (n % cols) * (w + pad), cy = pad + Math.floor(n / cols) * (h + capH + pad), t = canvas(w, h);
+        t.getContext('2d').putImageData(p.d, 0, 0); ox.drawImage(t, cx, cy);
+        ox.save(); ox.translate(cx, cy + h); caption(ox, p.t, w, capH / 2, fs); ox.restore();
+      });
+      save(out, view === 'all' ? 'colour-blindness-all-types' : 'colour-blindness-comparison');
+    });
+  });
+})();
+</script>
