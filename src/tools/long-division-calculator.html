@@ -1,0 +1,173 @@
+<style>
+.ldc .ldc-board { margin-top: 16px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 18px; overflow-x: auto; }
+.ldc .ldc-grid { display: grid; font: 600 22px/1 var(--mono, ui-monospace, monospace); font-variant-numeric: tabular-nums; width: max-content; margin: 0 auto; }
+.ldc .ldc-grid span { width: 1.05em; height: 1.45em; display: flex; align-items: center; justify-content: center; box-sizing: border-box; }
+.ldc .ldc-grid .q { color: var(--accent); }
+.ldc .ldc-grid .top { border-top: 2.5px solid var(--ink); }
+.ldc .ldc-grid .bar { border-left: 2.5px solid var(--ink); border-top-left-radius: 10px; }
+.ldc .ldc-grid .ul { border-bottom: 2px solid var(--ink); }
+.ldc .ldc-grid .m { color: var(--muted); font-size: .8em; }
+.ldc .ldc-grid .r { color: var(--bad); }
+.ldc .ldc-grid .bd { color: var(--ok); }
+.ldc .ldc-grid .ov { text-decoration: overline; text-decoration-thickness: 2px; }
+.ldc .ldc-steps { margin: 16px 0 0; padding-inline-start: 22px; }
+.ldc .ldc-steps li { margin: 6px 0; }
+.ldc .ldc-steps b { font-variant-numeric: tabular-nums; }
+.ldc .ldc-note { font-size: 14px; color: var(--muted); margin: 10px 0 0; }
+.ldc .ldc-opt { display: flex; gap: 6px 16px; flex-wrap: wrap; margin-bottom: 12px; }
+.ldc .ldc-opt label { display: inline-flex; align-items: center; gap: 6px; font-weight: 400; margin: 0; }
+.ldc .ldc-opt input[type=radio] { accent-color: var(--accent); width: 18px; height: 18px; }
+@media (max-width: 480px) { .ldc .ldc-grid { font-size: 18px; } .ldc .ldc-board { padding: 12px 8px; } }
+</style>
+<div class="ldc" id="ldc">
+<div class="fields">
+  <div><label for="ldA">Dividend (number to divide)</label><input type="text" id="ldA" inputmode="decimal" maxlength="24" value="7452" autocomplete="off"></div>
+  <div><label for="ldB">Divisor (divide by)</label><input type="text" id="ldB" inputmode="decimal" maxlength="12" value="6" autocomplete="off"></div>
+</div>
+<div class="ldc-opt" role="radiogroup" aria-label="Answer type">
+  <label><input type="radio" name="ldMode" id="ldModeR" value="r" checked>With remainder</label>
+  <label><input type="radio" name="ldMode" id="ldModeD" value="d">With decimals</label>
+</div>
+<div class="fields">
+  <div><label for="ldDp">Decimal places (decimal answers)</label><select id="ldDp"><option value="2">2</option><option value="3">3</option><option value="4" selected>4</option><option value="6">6</option><option value="10">10</option><option value="auto">Until it ends or repeats</option></select></div>
+  <div><label for="ldStyle">Layout</label><select id="ldStyle"><option value="bus">Bus stop (US, UK, Asia, Australia)</option><option value="eu">European (dividend : divisor = answer)</option></select></div>
+</div>
+<div class="stats" id="ldStats"></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="ldc-board" id="ldBoard" aria-label="Long division worked out"></div>
+<ol class="ldc-steps" id="ldSteps"></ol>
+<div class="btns"><button type="button" class="btn ghost" id="ldCopy">Copy steps</button><button type="button" class="btn ghost" id="ldRand">Random example</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var TEN = BigInt(10), Z = BigInt(0);
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function parse(s) {
+    s = String(s).trim().replace(/[\s_']/g, '').replace(/^−/, '-');
+    if (/^-?\d{1,3}(,\d{3})+(\.\d*)?$/.test(s)) s = s.replace(/,/g, '');
+    else if (/^-?\d*,\d+$/.test(s)) s = s.replace(',', '.');
+    var m = /^(-?)(\d*)(?:\.(\d*))?$/.exec(s);
+    if (!m || (!m[2] && !m[3])) return null;
+    var i = (m[2] || '0').replace(/^0+(?=\d)/, ''), f = (m[3] || '').replace(/0+$/, '');
+    return { neg: m[1] === '-' && /[1-9]/.test(i + f), i: i, f: f };
+  }
+  function show(p) { return (p.neg ? '−' : '') + fmt(p.i) + (p.f ? '.' + p.f : ''); }
+  function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+  function fmt(s) { return String(s).replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  function rounded(qi, qf, dp, up) {
+    var s = qi + qf.slice(0, dp).padEnd(dp, '0'), n = BigInt(s) + (up ? BigInt(1) : Z), t = n.toString().padStart(dp + 1, '0');
+    return fmt(t.slice(0, t.length - dp)) + (dp ? '.' + t.slice(-dp) : '');
+  }
+  function solve() {
+    var A = parse($('ldA').value), B = parse($('ldB').value), mode = $('ldModeD').checked ? 'd' : 'r', notes = [];
+    $('ldBoard').innerHTML = ''; $('ldSteps').innerHTML = ''; $('ldStats').innerHTML = '';
+    if (!$('ldA').value.trim() || !$('ldB').value.trim()) return say('', 'Type the two numbers to see the long division.');
+    if (!A || !B) return say('bad', !A ? 'Type the dividend as a number, like 7452 or 18.5.' : 'Type the divisor as a number, like 6 or 0.25.');
+    if (!/[1-9]/.test(B.i + B.f)) return say('bad', 'You cannot divide by zero. Choose another divisor.');
+    if ((A.i + A.f).length > 22 || (B.i + B.f).replace(/^0+/, '').length > 10) return say('bad', 'That number is too long to show step by step. Use up to 22 digits for the dividend and 10 for the divisor.');
+    // make the divisor a whole number by moving both decimal points
+    var k = B.f.length, dvd = A.i + A.f, dvdInt = A.i.length + k;
+    while (dvd.length < dvdInt) dvd += '0';
+    var dvs = (B.i + B.f).replace(/^0+/, '');
+    var lead = dvd.slice(0, dvdInt).length - dvd.slice(0, dvdInt).replace(/^0+(?=\d)/, '').length;
+    dvd = dvd.slice(lead); dvdInt -= lead;
+    if (k) notes.push('The divisor ' + show(B).replace('−', '') + ' has ' + k + (k === 1 ? ' decimal place' : ' decimal places') + ', so move the decimal point ' + k + (k === 1 ? ' place' : ' places') + ' to the right in both numbers. ' + show(A).replace('−', '') + ' ÷ ' + show(B).replace('−', '') + ' becomes ' + fmt(dvd.slice(0, dvdInt)) + (dvd.length > dvdInt ? '.' + dvd.slice(dvdInt) : '') + ' ÷ ' + fmt(dvs) + '. The answer stays the same.');
+    if (A.neg || B.neg) notes.push('Divide the numbers without their minus signs, then add the sign: ' + (A.neg !== B.neg ? 'one number is negative, so the answer is negative.' : 'both are negative, so the answer is positive.'));
+    if (mode === 'r' && dvd.length > dvdInt) { mode = 'd'; notes.push('The numbers have decimals, so the answer is shown with decimals instead of a remainder.'); }
+    var d = BigInt(dvs), dpSel = $('ldDp').value, maxDp = dpSel === 'auto' ? 40 : +dpSel;
+    var digits = dvd.split(''), ownLen = digits.length, cur = Z, steps = [], q = '', started = false, seen = {}, rep = -1, pos = 0;
+    // one quotient digit for every dividend digit, then extra zeros for decimal places
+    while (pos <= 200) {
+      if (pos >= digits.length) {
+        if (mode === 'r' || cur === Z || pos - dvdInt >= maxDp) break;
+        var key = cur.toString(); if (seen[key] != null) { rep = seen[key]; break; } seen[key] = pos - dvdInt;
+        digits.push('0');
+      }
+      cur = cur * TEN + BigInt(digits[pos]);
+      var qd = cur / d, prod = qd * d, rem = cur - prod;
+      if (!started && (qd > Z || pos >= dvdInt - 1)) started = true;
+      q += qd.toString();
+      if (started) steps.push({ pos: pos, cur: cur, qd: qd, prod: prod, rem: rem, down: null });
+      cur = rem; pos++;
+    }
+    for (var s = 0; s < steps.length; s++) steps[s].down = s + 1 < steps.length ? digits[steps[s + 1].pos] : null;
+    var qi = q.slice(0, dvdInt).replace(/^0+(?=\d)/, '') || '0', qf = q.slice(dvdInt);
+    var neg = A.neg !== B.neg && /[1-9]/.test(q) , sign = neg ? '−' : '', exact = cur === Z && rep < 0;
+    if (mode === 'r') {
+      var r = cur, g = gcd(r, d) || BigInt(1), f8 = (r * BigInt(100000000) / d).toString().padStart(8, '0').replace(/0+$/, ''), dec = fmt(qi) + (f8 ? '.' + f8 + (r * BigInt(100000000) % d ? '…' : '') : '');
+      $('ldStats').innerHTML = '<div class="stat"><span>Quotient</span><b>' + sign + fmt(qi) + '</b></div><div class="stat"><span>Remainder</span><b>' + fmt(r) + '</b></div>' +
+        (r ? '<div class="stat"><span>As a mixed number</span><b>' + sign + (qi === '0' ? '' : fmt(qi) + ' ') + (r / g) + '/' + (d / g) + '</b></div>' : '') +
+        '<div class="stat"><span>As a decimal</span><b>' + sign + dec + '</b></div>';
+      say('ok', show(A) + ' ÷ ' + show(B) + ' = ' + sign + fmt(qi) + (r ? ' remainder ' + fmt(r) + '. Check: ' + fmt(qi) + ' × ' + fmt(dvs) + ' + ' + fmt(r) + ' = ' + fmt(dvd) + '.' : ' exactly, with no remainder.'));
+    } else {
+      var fr = qf, ov = '';
+      if (rep >= 0) { ov = fr.slice(rep); fr = fr.slice(0, rep); }
+      var more = !exact && rep < 0;
+      $('ldStats').innerHTML = '<div class="stat"><span>Answer</span><b>' + sign + fmt(qi) + (fr || ov ? '.' + fr + (ov ? '<span style="text-decoration:overline">' + ov + '</span>' : '') : '') + (more ? '…' : '') + '</b></div>' +
+        (more ? '<div class="stat"><span>Rounded to ' + maxDp + ' places</span><b>' + sign + rounded(qi, qf, maxDp, cur * TEN >= d * BigInt(5)) + '</b></div>' : '') +
+        (rep >= 0 ? '<div class="stat"><span>Repeating part</span><b>' + ov + '</b></div>' : '');
+      say('ok', show(A) + ' ÷ ' + show(B) + ' = ' + sign + fmt(qi) + (fr || ov ? '.' + fr + (ov ? '(' + ov + ' repeating)' : '') : '') + (exact ? ' exactly.' : more ? '… (it keeps going; shown to ' + maxDp + ' decimal places).' : '.'));
+    }
+    draw(dvd, dvdInt, ownLen, dvs, q, steps, mode, cur, rep);
+    explain(steps, dvdInt, ownLen, dvs, mode, notes, cur, rep);
+  }
+
+  // ---------- the written layout ----------
+  function draw(dvd, dvdInt, ownLen, dvs, q, steps, mode, rem, rep) {
+    var eu = $('ldStyle').value === 'eu', nd = q.length, hasPt = nd > dvdInt;
+    var L = eu ? 1 : dvs.length;
+    function col(i) { return L + i + (hasPt && i >= dvdInt ? 1 : 0); }
+    var rows = [], W = col(nd - 1) + 3 + String(rem).length + (eu ? dvs.length + nd + 8 : 0);
+    function row() { var r = []; for (var i = 0; i < W; i++) r.push({ t: '', c: '' }); rows.push(r); return r; }
+    function put(r, c, t, cls) { if (c >= 0 && c < W) { r[c].t = t; if (cls) r[c].c += ' ' + cls; } }
+    function putNum(r, str, lastPos, cls, lastCls) { var n = str.length; str.split('').forEach(function (ch, j) { put(r, col(lastPos - (n - 1 - j)), ch, (cls || '') + (j === n - 1 && lastCls ? ' ' + lastCls : '')); }); }
+    var firstQ = steps.length ? steps[0].pos : 0;
+    function dividendRow(r) { for (var k = 0; k < nd; k++) put(r, col(k), dvd[k] != null ? dvd[k] : '0', k >= ownLen ? 'm' : ''); if (hasPt) put(r, L + dvdInt, '.'); }
+    if (!eu) {
+      var qr = row();
+      for (var i = firstQ; i < nd; i++) put(qr, col(i), q[i], 'q' + (rep >= 0 && i - dvdInt >= rep ? ' ov' : ''));
+      if (hasPt) put(qr, L + dvdInt, '.', 'q');
+      if (mode === 'r' && rem > Z) { put(qr, col(nd - 1) + 2, 'R', 'r'); String(rem).split('').forEach(function (ch, j) { put(qr, col(nd - 1) + 3 + j, ch, 'r'); }); }
+      var dr = row();
+      dvs.split('').forEach(function (ch, j) { put(dr, j, ch); });
+      for (var c = L; c <= col(nd - 1); c++) dr[c].c += ' top';
+      dr[L].c += ' bar';
+      dividendRow(dr);
+    } else {
+      var er = row(); dividendRow(er);
+      var x = col(nd - 1) + 2; put(er, x, ':'); dvs.split('').forEach(function (ch, j) { put(er, x + 2 + j, ch); });
+      x += 3 + dvs.length; put(er, x, '='); x += 2;
+      var qt = (q.slice(0, dvdInt).replace(/^0+(?=\d)/, '') || '0') + (hasPt ? '.' + q.slice(dvdInt) : '');
+      qt.split('').forEach(function (ch, j) { put(er, x + j, ch, 'q' + (rep >= 0 && hasPt && j - qt.indexOf('.') - 1 >= rep && j > qt.indexOf('.') ? ' ov' : '')); });
+      if (mode === 'r' && rem > Z) { x += qt.length + 1; put(er, x, 'R', 'r'); String(rem).split('').forEach(function (ch, j) { put(er, x + 1 + j, ch, 'r'); }); }
+    }
+    steps.forEach(function (s, idx) {
+      var ps = s.prod.toString(), cs = s.cur.toString();
+      if (idx > 0) putNum(row(), cs, s.pos, '', 'bd');
+      var pr = row();
+      put(pr, col(s.pos - ps.length + 1) - 1, '−', 'm');
+      putNum(pr, ps, s.pos);
+      for (var u = col(s.pos - Math.max(ps.length, cs.length) + 1); u <= col(s.pos); u++) pr[u].c += ' ul';
+    });
+    if (steps.length) { var last = steps[steps.length - 1]; putNum(row(), last.rem.toString(), last.pos, 'r'); }
+    $('ldBoard').innerHTML = '<div class="ldc-grid" style="grid-template-columns:repeat(' + W + ', auto)">' + rows.map(function (r) { return r.map(function (c) { return '<span class="' + c.c.trim() + '">' + c.t + '</span>'; }).join(''); }).join('') + '</div>';
+  }
+  function explain(steps, dvdInt, ownLen, dv, mode, notes, rem, rep) {
+    var out = notes.map(function (t) { return '<li>' + t + '</li>'; });
+    steps.forEach(function (s) {
+      var t = 'How many times does <b>' + fmt(dv) + '</b> go into <b>' + fmt(s.cur) + '</b>? <b>' + s.qd + '</b> time' + (s.qd === BigInt(1) ? '' : 's') + ' (' + s.qd + ' × ' + fmt(dv) + ' = ' + fmt(s.prod) + '). Write ' + s.qd + ' in the answer. Subtract: ' + fmt(s.cur) + ' − ' + fmt(s.prod) + ' = <b>' + fmt(s.rem) + '</b>.';
+      if (s.pos === dvdInt && mode === 'd') t = 'You have passed the decimal point, so put a decimal point in the answer too. ' + t;
+      if (s.down != null) t += ' Bring down the next digit' + (s.pos + 1 >= ownLen ? ' (a 0, because the number has run out of digits)' : '') + ': <b>' + s.down + '</b>.';
+      out.push('<li>' + t + '</li>');
+    });
+    if (mode === 'r') out.push('<li>There are no digits left to bring down, so the remainder is <b>' + fmt(rem) + '</b>.</li>');
+    else if (rep >= 0) out.push('<li>This remainder has appeared before, so the same digits will repeat forever. A line over the digits marks the repeating part.</li>');
+    $('ldSteps').innerHTML = out.join('');
+  }
+  ['ldA', 'ldB', 'ldDp', 'ldStyle', 'ldModeR', 'ldModeD'].forEach(function (id) { $(id).addEventListener('input', solve); $(id).addEventListener('change', solve); });
+  $('ldCopy').addEventListener('click', function () { copyText($('msg').textContent + '\n\n' + Array.prototype.map.call($('ldSteps').children, function (li, i) { return (i + 1) + '. ' + li.textContent; }).join('\n'), this); });
+  $('ldRand').addEventListener('click', function () { $('ldB').value = String(2 + Math.floor(Math.random() * 23)); $('ldA').value = String(100 + Math.floor(Math.random() * 99900)); solve(); });
+  solve();
+})();
+</script>

@@ -1,0 +1,152 @@
+<style>
+.wsc .wsc-top { display: flex; flex-wrap: wrap; gap: 6px; justify-content: space-between; align-items: center; font-size: 14px; color: var(--muted); margin: 14px 0 6px; }
+.wsc .wsc-tiles { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 12px 0; min-height: 56px; }
+.wsc .wsc-tiles button { width: 48px; height: 52px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); font: 800 24px/1 system-ui, sans-serif; text-transform: uppercase; cursor: pointer; box-shadow: 0 2px 0 var(--line); }
+.wsc .wsc-tiles button:disabled { opacity: .25; cursor: default; box-shadow: none; }
+.wsc .wsc-slots { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 6px 0 12px; }
+.wsc .wsc-slots span { width: 40px; height: 46px; border-bottom: 3px solid var(--muted); display: flex; align-items: center; justify-content: center; font: 800 24px/1 system-ui, sans-serif; text-transform: uppercase; }
+.wsc .wsc-slots span.h { color: var(--accent); }
+.wsc .wsc-slots span.sp { border: 0; width: 14px; }
+.wsc .wsc-slots.ok span { border-color: var(--ok); color: var(--ok); }
+.wsc .wsc-slots.bad span { border-color: var(--bad); animation: wscShake .3s; }
+@keyframes wscShake { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+@media (prefers-reduced-motion: reduce) { .wsc .wsc-slots.bad span { animation: none; } }
+.wsc .wsc-form { display: flex; gap: 8px; max-width: 420px; margin: 0 auto; }
+.wsc .wsc-form input { text-transform: uppercase; font-size: 18px; text-align: center; letter-spacing: .1em; }
+.wsc .wsc-hint { text-align: center; min-height: 24px; margin: 10px 0 0; font-weight: 600; }
+.wsc .wsc-hint.ok { color: var(--ok); } .wsc .wsc-hint.bad { color: var(--bad); }
+.wsc .btns { justify-content: center; }
+@media (max-width: 420px) { .wsc .wsc-tiles button { width: 40px; height: 46px; font-size: 20px; } .wsc .wsc-slots span { width: 32px; font-size: 20px; } }
+</style>
+<div class="wsc" id="wsc">
+<div class="fields">
+  <div><label for="wsCat">Category</label><select id="wsCat"><option value="mix">Mixed</option><option value="animals">Animals</option><option value="food">Food and drink</option><option value="countries">Countries</option><option value="cities">World cities</option><option value="sports">Sports</option><option value="science">Science</option><option value="jobs">Jobs</option><option value="nature">Nature and weather</option><option value="home">Around the house</option><option value="school">School</option><option value="body">Human body</option><option value="custom">My own words</option></select></div>
+  <div><label for="wsLvl">Difficulty</label><select id="wsLvl"><option value="easy">Easy (3–5 letters)</option><option value="med" selected>Medium (5–7 letters)</option><option value="hard">Hard (8+ letters)</option><option value="any">Any length</option></select></div>
+  <div><label for="wsLen">Round</label><select id="wsLen"><option value="10" selected>10 words</option><option value="20">20 words</option><option value="t90">90 seconds</option><option value="0">Endless</option></select></div>
+</div>
+<div class="fields" id="wsCustomBox" hidden><div><label for="wsCustom">Your words (one per line or separated by commas)</label><textarea id="wsCustom" data-nomemo class="plain" style="min-height:90px" maxlength="5000" placeholder="photosynthesis, chlorophyll, oxygen"></textarea></div></div>
+<div class="btns" style="justify-content:flex-start"><button type="button" class="btn" id="wsStart">Start game</button></div>
+<div id="wsGame" hidden>
+  <div class="wsc-top"><span id="wsInfo"></span><span id="wsTime"></span></div>
+  <div class="wsc-slots" id="wsSlots" aria-live="polite"></div>
+  <div class="wsc-tiles" id="wsTiles" aria-label="Scrambled letters"></div>
+  <form class="wsc-form" id="wsForm"><input type="text" id="wsGuess" data-nomemo autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Your answer"><button type="submit" class="btn">Check</button></form>
+  <p class="wsc-hint" id="wsHintTxt" role="status"></p>
+  <div class="btns"><button type="button" class="btn ghost" id="wsHint">Hint (−5)</button><button type="button" class="btn ghost" id="wsShuf">Shuffle</button><button type="button" class="btn ghost" id="wsBack">Undo letter</button><button type="button" class="btn ghost" id="wsSkip">Skip</button></div>
+</div>
+<div class="stats"><div class="stat"><span>Score</span><b id="wsScore">0</b></div><div class="stat"><span>Solved</span><b id="wsSolved">0</b></div><div class="stat"><span>Streak</span><b id="wsStreak">0</b></div><div class="stat"><span>Best score</span><b id="wsBest">0</b></div></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var W = {
+    animals: 'cat dog cow pig owl fox bat bee ant hen yak elk lion bear wolf frog duck goat deer seal swan crab mole hare moth zebra tiger horse sheep camel otter koala panda whale shark eagle mouse snake goose llama sloth rhino donkey rabbit monkey turtle parrot jaguar beaver falcon walrus lizard gorilla dolphin giraffe penguin hamster leopard cheetah octopus buffalo peacock ostrich kangaroo elephant flamingo squirrel hedgehog porcupine alligator chameleon crocodile butterfly rhinoceros hippopotamus',
+    food: 'tea egg jam pie rice milk cake soup corn bean pear plum lime kiwi fish salt bread pasta pizza honey lemon mango grape apple melon olive bacon onion curry sushi toast juice cheese butter carrot banana cherry orange tomato potato pepper noodle yogurt coffee cookie muffin waffle pancake noodles avocado biscuit chicken lettuce pumpkin spinach sandwich broccoli pineapple chocolate blueberry cucumber dumpling omelette mushroom strawberry watermelon cauliflower',
+    countries: 'peru chad cuba iran iraq fiji mali togo oman laos chile china egypt ghana india italy japan kenya nepal spain qatar syria yemen brazil canada france greece mexico norway poland russia sweden turkey uganda zambia jordan israel kuwait panama belgium denmark finland germany hungary ireland jamaica morocco nigeria pakistan portugal malaysia thailand ethiopia argentina australia indonesia singapore venezuela bangladesh colombia philippines switzerland netherlands',
+    cities: 'rome oslo lima baku doha kyiv cairo paris tokyo delhi dubai seoul miami dhaka accra quito sydney london madrid berlin moscow lisbon athens vienna prague dublin nairobi karachi lahore mumbai bangkok beijing toronto chicago jakarta manila riyadh istanbul shanghai santiago montreal brussels budapest amsterdam stockholm barcelona melbourne vancouver singapore edinburgh johannesburg',
+    sports: 'golf polo judo swim race surf yoga chess rugby boxing hockey tennis soccer squash karate skiing rowing diving cycling cricket netball archery fencing sailing bowling running climbing baseball handball football surfing badminton gymnastics volleyball basketball marathon wrestling triathlon skateboard snowboard',
+    science: 'atom cell gene acid heat mass wave lens volt force light sound orbit solar fossil oxygen carbon proton energy magnet gravity neutron element nucleus mineral formula battery bacteria molecule electron velocity reaction particle chemistry evolution microscope experiment hypothesis photosynthesis thermometer laboratory telescope astronomy',
+    jobs: 'chef cook pilot nurse judge baker actor coach guard tutor farmer dentist doctor lawyer singer artist writer barber tailor driver plumber teacher painter cashier soldier sailor scientist engineer designer mechanic musician reporter waiter firefighter carpenter architect astronaut librarian pharmacist accountant electrician photographer veterinarian programmer',
+    nature: 'sun sky sea fog ice rain snow wind tree leaf rock lake hill moon star cloud storm river ocean beach grass flower forest desert island valley meadow canyon thunder rainbow volcano glacier lightning mountain waterfall hurricane sunshine blizzard tornado earthquake avalanche',
+    home: 'bed cup pan mop rug sofa lamp door desk sink fork bowl oven clock chair table plate spoon towel brush mirror pillow carpet window kettle drawer blanket curtain toaster cupboard bathtub doorbell staircase microwave wardrobe fridge bookshelf dishwasher refrigerator',
+    school: 'pen map bag desk book exam test chalk class paper ruler pencil eraser lesson school poster teacher library science history student project homework notebook calculator dictionary playground classroom geography backpack timetable scissors principal',
+    body: 'arm leg eye ear lip toe hip jaw hand foot knee neck nose chin hair skin bone heart brain liver mouth thumb elbow ankle wrist teeth tongue finger muscle kidney stomach shoulder forehead eyebrow skeleton knuckle lungs'
+  };
+  var LABEL = { animals: 'an animal', food: 'food or drink', countries: 'a country', cities: 'a city', sports: 'a sport', science: 'a science word', jobs: 'a job', nature: 'nature or weather', home: 'something at home', school: 'something at school', body: 'a body part', custom: 'one of your words' };
+  var BEST = 'gtnWordScrambleBest', g = null, timer = null;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function hint(c, t) { var m = $('wsHintTxt'); m.className = 'wsc-hint ' + (c || ''); m.textContent = t || ''; }
+  function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function norm(w) { return w.normalize('NFC').toLowerCase().trim().replace(/\s+/g, ' '); }
+  function best() { try { return +localStorage.getItem(BEST) || 0; } catch (e) { return 0; } }
+  $('wsBest').textContent = best();
+  $('wsCat').addEventListener('change', function () { $('wsCustomBox').hidden = this.value !== 'custom'; });
+  function pool() {
+    var cat = $('wsCat').value, lvl = $('wsLvl').value, list = [];
+    if (cat === 'custom') list = $('wsCustom').value.split(/[\n,;]+/).map(norm).filter(function (w) { return /^[\p{L}' -]{2,30}$/u.test(w) && w.replace(/[^\p{L}]/gu, '').length >= 2; }).map(function (w) { return [w, 'custom']; });
+    else (cat === 'mix' ? Object.keys(W) : [cat]).forEach(function (k) { W[k].split(' ').forEach(function (w) { list.push([w, k]); }); });
+    if (cat !== 'custom' && lvl !== 'any') list = list.filter(function (x) { var n = x[0].length; return lvl === 'easy' ? n <= 5 : lvl === 'med' ? n >= 5 && n <= 7 : n >= 8; });
+    var seen = {}; return shuffle(list.filter(function (x) { if (seen[x[0]]) return false; seen[x[0]] = 1; return true; }));
+  }
+  function scramble(w) {
+    var letters = Array.from(w.replace(/ /g, '')), s, tries = 0;
+    if (new Set(letters).size < 2) return letters;
+    do { s = shuffle(letters.slice()); } while (s.join('') === letters.join('') && tries++ < 20);
+    return s;
+  }
+  function start() {
+    var P = pool();
+    if ($('wsCat').value === 'custom' && !P.length) { say('bad', 'Type at least one word of 2 or more letters in "Your words".'); $('wsCustom').focus(); return; }
+    if (!P.length) { say('bad', 'No words fit that category and difficulty. Choose another.'); return; }
+    clearInterval(timer);
+    var L = $('wsLen').value;
+    g = { P: P, i: -1, len: L === 't90' ? 0 : +L, end: L === 't90' ? Date.now() + 90000 : 0, score: 0, solved: 0, streak: 0, bestStreak: 0, missed: [] };
+    $('wsGame').hidden = false; say('', ''); $('wsStart').textContent = 'Restart';
+    stats(); next();
+    if (g.end) { tick(); timer = setInterval(tick, 250); } else $('wsTime').textContent = '';
+  }
+  function tick() { var s = Math.max(0, Math.ceil((g.end - Date.now()) / 1000)); $('wsTime').textContent = s + ' s left'; if (s <= 0) finish('Time is up!'); }
+  function next() {
+    g.i++;
+    if ((g.len && g.i >= g.len) || g.i >= g.P.length) return finish(g.i >= g.P.length && !g.len ? 'You have used every word in this set!' : '');
+    var w = g.P[g.i]; g.word = w[0]; g.cat = w[1]; g.letters = scramble(g.word); g.used = []; g.fixed = []; g.revealed = 0; g.hints = 0; g.typed = [];
+    $('wsInfo').textContent = 'Word ' + (g.i + 1) + (g.len ? ' of ' + g.len : '') + ' · ' + Array.from(g.word.replace(/ /g, '')).length + ' letters · ' + (g.cat === 'custom' ? 'your list' : 'It is ' + LABEL[g.cat]);
+    $('wsGuess').value = ''; hint('', ''); draw(); $('wsGuess').focus({ preventScroll: true });
+  }
+  function draw() {
+    var target = Array.from(g.word), typed = g.typed, ti = 0, html = '';
+    target.forEach(function (ch, i) {
+      if (ch === ' ') { html += '<span class="sp"></span>'; return; }
+      var shown = i < g.revealed ? ch : typed[ti] || ''; if (i >= g.revealed) ti++;
+      html += '<span class="' + (i < g.revealed ? 'h' : '') + '">' + shown + '</span>';
+    });
+    $('wsSlots').className = 'wsc-slots'; $('wsSlots').innerHTML = html;
+    $('wsTiles').innerHTML = g.letters.map(function (ch, i) { return '<button type="button" data-i="' + i + '"' + (g.used.indexOf(i) >= 0 ? ' disabled' : '') + ' aria-label="Letter ' + ch.toUpperCase() + '">' + ch + '</button>'; }).join('');
+  }
+  function rev() { return Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).length; }
+  function refix() { g.used = []; Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).forEach(function (c) { var k = g.letters.findIndex(function (l, i) { return l === c && g.used.indexOf(i) < 0; }); if (k >= 0) g.used.push(k); }); g.fixed = g.used.slice(); }
+  function current() { return Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).join('') + g.typed.join(''); }
+  function check(guess) {
+    if (!g || g.over) return;
+    guess = norm(guess).replace(/ /g, ''); var target = g.word.replace(/ /g, '');
+    if (!guess) return;
+    if (guess === target) {
+      var pts = Math.max(5, Array.from(target).length * 10 - g.hints * 5);
+      g.score += pts; g.solved++; g.streak++; g.bestStreak = Math.max(g.bestStreak, g.streak);
+      g.typed = Array.from(target).slice(rev()); draw(); $('wsSlots').classList.add('ok');
+      hint('ok', 'Correct! +' + pts + ' points' + (g.streak >= 3 ? ' · ' + g.streak + ' in a row!' : ''));
+      stats(); g.over = true; setTimeout(function () { g.over = false; next(); }, 900);
+    } else {
+      $('wsSlots').classList.remove('bad'); void $('wsSlots').offsetWidth; $('wsSlots').classList.add('bad');
+      hint('bad', Array.from(guess).length !== Array.from(target).length ? 'The word has ' + Array.from(target).length + ' letters.' : 'Not quite. Try again or take a hint.');
+      g.streak = 0; stats();
+    }
+  }
+  function stats() { $('wsScore').textContent = g ? g.score : 0; $('wsSolved').textContent = g ? g.solved : 0; $('wsStreak').textContent = g ? g.streak : 0; }
+  function finish(why) {
+    clearInterval(timer); timer = null; if (!g) return; g.over = true; $('wsGame').hidden = true;
+    var b = best(), rec = g.score > b; if (rec) { try { localStorage.setItem(BEST, String(g.score)); } catch (e) {} $('wsBest').textContent = g.score; }
+    say('ok', (why ? why + ' ' : 'Round over! ') + 'You solved ' + g.solved + ' word' + (g.solved === 1 ? '' : 's') + ' for ' + g.score + ' points.' + (rec ? ' New best score!' : '') + (g.missed.length ? ' Words you skipped: ' + g.missed.slice(0, 10).join(', ') + '.' : ''));
+    if (rec && window.burst) burst($('wsStart'));
+    $('wsStart').textContent = 'Play again';
+  }
+  $('wsStart').addEventListener('click', start);
+  $('wsForm').addEventListener('submit', function (e) { e.preventDefault(); check($('wsGuess').value || current()); });
+  $('wsGuess').addEventListener('input', function () { if (!g || g.over) return; var v = Array.from(norm(this.value).replace(/ /g, '')); g.typed = v.slice(0, Array.from(g.word.replace(/ /g, '')).length - rev()); g.used = g.fixed.slice(); var pool = g.letters.map(function (c, i) { return [c, i]; }); g.typed.forEach(function (c) { var k = pool.findIndex(function (p) { return p[0] === c && g.used.indexOf(p[1]) < 0; }); if (k >= 0) g.used.push(pool[k][1]); }); draw(); if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) check(current()); });
+  $('wsTiles').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-i]'); if (!b || !g || g.over) return;
+    var i = +b.dataset.i; g.used.push(i); g.typed.push(g.letters[i]); $('wsGuess').value = g.typed.join(''); draw();
+    if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) { var c = current(); if (norm(c) === g.word.replace(/ /g, '')) check(c); else { check(c); g.typed = []; g.used = g.fixed.slice(); $('wsGuess').value = ''; setTimeout(function () { if (g && !g.over) draw(); }, 400); } }
+  });
+  $('wsBack').addEventListener('click', function () { if (!g || g.over || !g.typed.length || g.used.length <= g.fixed.length) return; g.typed.pop(); g.used.pop(); $('wsGuess').value = g.typed.join(''); draw(); });
+  $('wsShuf').addEventListener('click', function () { if (!g || g.over) return; g.letters = scramble(g.word); g.typed = []; refix(); $('wsGuess').value = ''; draw(); });
+  $('wsHint').addEventListener('click', function () {
+    if (!g || g.over) return; var len = Array.from(g.word).length;
+    if (g.revealed >= len - 1) return hint('', 'Only one letter left. You can do it!');
+    g.revealed++; if (Array.from(g.word)[g.revealed - 1] === ' ') g.revealed++;
+    g.hints++; g.typed = []; $('wsGuess').value = ''; refix(); draw(); hint('', 'It starts with "' + Array.from(g.word).slice(0, g.revealed).join('').toUpperCase() + '".');
+  });
+  $('wsSkip').addEventListener('click', function () { if (!g || g.over) return; g.missed.push(g.word); g.streak = 0; stats(); hint('', 'The word was ' + g.word.toUpperCase() + '.'); g.over = true; setTimeout(function () { g.over = false; next(); }, 1100); });
+})();
+</script>

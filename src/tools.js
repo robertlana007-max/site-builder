@@ -3467,5 +3467,245 @@ module.exports = [
       ['Which time zone does cron use?', 'The time zone of the server where it runs, often UTC. Switch Next 5 runs to UTC to check a server schedule, or to My time to see it in your local time.']
     ],
     icon: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/><path d="M19 5l1.5-1.5"/>'
+  },
+  {
+      slug: 'resume-maker', cat: 'Generators', name: 'Resume Maker',
+      title: 'Free Resume Maker - CV Builder with PDF Download',
+      desc: 'Build a professional resume or CV with 5 templates, including an ATS-friendly one. Live preview, autosave, real text PDF and print. Free and private.',
+      card: 'Build a CV with 5 templates and download a PDF.',
+      intro: 'Fill in your details section by section and watch your CV take shape in a live preview. Pick one of five clean templates, including a plain ATS-friendly one, then download a real text PDF or print it. Your work is saved on this device as you type.',
+      steps: ['Fill in your contact details, then add your experience, education, skills and any other sections you need.', 'Choose a template, colour, font, text size and A4 or US Letter paper.', 'Check the live preview and the tips under it. Tap a page to see it larger.', 'Press Download PDF or Print. Use Save backup file to keep a copy you can open on another device.'],
+      faq: [
+        ['Is this resume maker really free?', 'Yes. There is no sign-up, no watermark and no paywall on the PDF. You can make as many CVs as you like.'],
+        ['Is the PDF readable by applicant tracking systems (ATS)?', 'Yes. The PDF contains real, selectable text, not a picture. For online job portals, the ATS simple template is the safest choice: one column, standard headings and no photo or graphics.'],
+        ['Is my information uploaded anywhere?', 'No. Everything runs in your browser. Your CV is saved only in this browser on this device, and you can save a backup file to move it elsewhere.'],
+        ['Should I use A4 or US Letter?', 'Use US Letter for jobs in the United States and Canada, and A4 almost everywhere else. The tool picks the usual size for your region, and you can change it.'],
+        ['Should I add a photo?', 'It depends on the country. In the US, UK, Canada and Australia, CVs usually have no photo. In much of Europe, the Middle East and Asia a photo is common. The ATS template always hides it.'],
+        ['Can I write my CV in another language?', 'Yes. Headings can be renamed and the fonts cover Latin, Greek and Cyrillic letters. For other scripts, such as Arabic, Chinese or Hindi, use Print and choose Save as PDF so your device fonts are used.']
+      ],
+      icon: '<rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="9" cy="8" r="2"/><path d="M6.5 13a3 3 0 0 1 5 0M14 7h3M14 10h3M7 16h10M7 19h7"/>'
+  },
+  {
+      slug: 'email-signature-generator', cat: 'Generators', name: 'Email Signature Generator',
+      title: 'Email Signature Generator - Free for Gmail & Outlook',
+      desc: 'Make a professional HTML email signature with photo, logo, social links and a button. Copy it into Gmail, Outlook or Apple Mail in one click.',
+      card: 'Make an email signature for Gmail and Outlook.',
+      intro: 'Type your details, pick one of five layouts and a colour, and copy a ready-made signature that pastes straight into Gmail, Outlook, Apple Mail and most other email apps. Step-by-step instructions for each app are below the preview.',
+      steps: ['Type your name, job, company and contact details.', 'Add a photo or logo link, social links and an optional button.', 'Choose a layout, colour, font and size.', 'Press Copy signature and paste it into your email settings, following the steps for your app.'],
+      faq: [
+        ['Which email apps does it work with?', 'Gmail, Outlook (web, new app and classic desktop), Apple Mail, Thunderbird, Yahoo Mail and most others that accept a pasted or HTML signature. Phone apps often only take plain text.'],
+        ['Why does my photo not show in Gmail?', 'Gmail and some versions of Outlook remove pictures that are stored inside the signature. Upload your photo to your website or an image host and paste its https:// link instead.'],
+        ['Is it free?', 'Yes, with no sign-up and no "made with" branding added to your signature.'],
+        ['Are my details uploaded?', 'No. The signature is built in your browser and saved only on this device.'],
+        ['Can I edit the HTML?', 'Yes. Press "Copy HTML code" or open "Show the HTML code" and change it in any editor. The code uses simple tables and inline styles that email apps understand.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 7l9 6 9-6"/><path d="M13 17c1.5-1.5 2.5-1 3 0s1.5 1.5 3-1"/>'
+  },
+  {
+      slug: 'business-card-maker', cat: 'Generators', name: 'Business Card Maker',
+      title: 'Business Card Maker - Print-Ready PDF with Bleed & QR',
+      desc: 'Design a business card front and back with your logo and a QR code, then download a print-ready PDF with bleed, a home printing sheet or PNG.',
+      card: 'Design business cards and get a print-ready PDF.',
+      intro: 'Type your details, add your logo and pick from six designs. Your card gets a QR code that saves your contact details, and you can download a print-shop PDF with 3 mm bleed and crop marks, a sheet of 10 cards for home printing, or PNG pictures.',
+      steps: ['Type your name, job, company and contact details, and add your logo.', 'Pick a template, colour, font, card size and what the QR code holds.', 'Check the front and back in the preview.', 'Download the PDF for a print shop or for home printing, or save each side as a PNG.'],
+      faq: [
+        ['What size are the cards?', 'Choose 85 × 55 mm (Europe and most countries), 3.5 × 2 in (US and Canada), 90 × 55 mm (Australia, India and China) or 91 × 55 mm (Japan).'],
+        ['What is bleed and do I need it?', 'Bleed is extra background beyond the cut line, so no white edge shows if the cutter is slightly off. Print shops usually ask for 3 mm (about 1/8 inch). The print-shop PDF includes it and marks the trim size.'],
+        ['What does the QR code do?', 'By default it holds a contact card (vCard). When someone scans it, their phone offers to save your name, phone, email and website. You can also make it open your website or any text you choose.'],
+        ['Can I print the cards at home?', 'Yes. Choose "Print at home" to get 10 cards on A4 or US Letter with cut marks. Print the fronts, turn the sheet over and print the backs at 100% scale.'],
+        ['Is it free and private?', 'Yes. It is free with no watermark, and everything, including your logo, stays on your device.']
+      ],
+      icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="11" r="2"/><path d="M5.5 16a3 3 0 0 1 5 0M14 10h4M14 13h4M14 16h2"/>'
+  },
+  {
+      slug: 'certificate-maker', cat: 'Generators', name: 'Certificate Maker',
+      title: 'Certificate Maker - Free Certificates with Batch PDF',
+      desc: 'Make certificates of achievement, participation, appreciation or completion. Paste a list of names to get one page per person in a single PDF.',
+      card: 'Make certificates for a whole list of names.',
+      intro: 'Choose what the certificate is for, pick a design and colour, and add your logo and signatures. Paste a list of names and download one PDF with a certificate for each person, or save any one as a picture.',
+      steps: ['Choose the certificate type and edit the title and wording.', 'Paste the names, one per line, and add your organisation and date.', 'Add up to two signatures, typed or as pictures, and choose a design.', 'Download the PDF with one page per name, or save one certificate as a PNG.'],
+      faq: [
+        ['How many names can I add?', 'Up to 500. Each name gets its own page in the same PDF, ready to print or email.'],
+        ['Can I use a real signature?', 'Yes. Take a photo or scan of a signature on white paper and add it. The white background is removed automatically. Otherwise the name is written in an elegant script font.'],
+        ['Which paper sizes are there?', 'A4 and US Letter, in landscape or portrait.'],
+        ['Can I change the wording?', 'Yes. Every line can be edited. Type {name} in the description to repeat the person\'s name there.'],
+        ['Is it free?', 'Yes, with no watermark and no sign-up. Logos and signatures stay on your device.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="13" rx="1"/><path d="M7 8h10M8 11h8"/><circle cx="12" cy="17" r="3"/><path d="M10.5 19.5 10 22l2-1 2 1-.5-2.5"/>'
+  },
+  {
+      slug: 'card-maker', cat: 'Generators', name: 'Card Maker',
+      title: 'Card Maker - Birthday, Wedding & Invitation Cards',
+      desc: 'Make greeting cards and invitations for birthdays, weddings, parties, thank-yous and more. Add a photo, then download a PNG or print-ready PDF.',
+      card: 'Make greeting cards and invitations to share or print.',
+      intro: 'Pick an occasion and the headline and message fill in for you. Change the words, choose decorations, colours and a font, add a photo if you like, and download a picture to share or a PDF to print.',
+      steps: ['Choose an occasion, such as Birthday, Party invite, Wedding or Thank you.', 'Edit the headline and message, and for invitations add the date, place and RSVP.', 'Pick decorations, colours, a font, a size and an optional photo.', 'Download a PNG to share or a PDF to print.'],
+      faq: [
+        ['What occasions are included?', 'Birthday, party invitation, wedding, thank you, congratulations, festive greetings, new baby, anniversary and get well soon. You can write anything you like for any other occasion.'],
+        ['Can I use it for religious festivals?', 'Yes. The "Festive greetings" card has neutral wording by default. Type your own greeting, such as Eid Mubarak, Merry Christmas, Happy Diwali or Happy Lunar New Year.'],
+        ['What size should I choose?', 'Square or Story for WhatsApp, Instagram and other apps; 5 × 7 in, A5 or 7 × 5 in to print and fold or post.'],
+        ['Is my photo uploaded?', 'No. The card is made in your browser and your photo never leaves your device.'],
+        ['Is it free?', 'Yes, with no watermark and no sign-up.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 9.5c-1.2-1.8-4-1-3.5 1.2.4 1.6 3.5 3.8 3.5 3.8s3.1-2.2 3.5-3.8c.5-2.2-2.3-3-3.5-1.2z"/>'
+  },
+  {
+      slug: 'business-name-generator', cat: 'Generators', name: 'Business Name Generator',
+      title: 'Business Name Generator - Brand & Domain Name Ideas',
+      desc: 'Get business name ideas from your keywords and industry, in brandable, professional, fun or short styles, with matching .com and other domain ideas.',
+      card: 'Get brand name ideas with domain suggestions.',
+      intro: 'Type a few words about your business, pick your industry and a style, and get 48 name ideas at a time. Each name shows matching web addresses with the endings you choose. Tap to copy, star the ones you like and keep a shortlist.',
+      steps: ['Type one to three keywords about your business.', 'Choose your industry, a style and the longest name you want.', 'Tick the domain endings to show, such as .com, .co.uk or .ca.', 'Press Generate names, tap a name to copy it and star your favourites.'],
+      faq: [
+        ['Does it check if a domain or name is available?', 'No. It suggests web addresses as text only. Check them with a domain registrar, and search your country\'s business and trademark registers before you decide.'],
+        ['Which domain endings are included?', 'Global endings such as .com, .net, .org, .io, .co, .app, .shop, .store and .online, plus country endings such as .co.uk, .ca, .com.au, .de, .fr, .in, .pk, .ae, .ng, .za and .com.br.'],
+        ['What do the styles mean?', 'Brandable makes new invented words; Professional adds words like Partners or Studio; Fun uses playful twists; Short keeps to one word.'],
+        ['Where are my favourites kept?', 'In this browser on this device. Use Copy favourites to keep them somewhere else.']
+      ],
+      icon: '<path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/><path d="M17 3l.6 1.4L19 5l-1.4.6L17 7l-.6-1.4L15 5l1.4-.6z"/>'
+  },
+  {
+      slug: 'color-palette-generator', cat: 'Generators', name: 'Color Palette Generator',
+      title: 'Color Palette Generator - Harmonies, Locks & Gradients',
+      desc: 'Generate color palettes from random, complementary, analogous or triadic rules. Lock colors, copy HEX and CSS, and build CSS gradients.',
+      card: 'Make color palettes and CSS gradients.',
+      intro: 'Press Generate or the space bar for a new palette. Choose a colour rule, start from your own colour and lock the shades you like. Copy HEX codes or CSS variables, save palettes, and turn any palette into a CSS gradient.',
+      steps: ['Choose a colour rule and how many colours you want.', 'Press Generate, or the space bar, until you like what you see. Lock colours to keep them.', 'Tap a code to copy it, or copy the whole palette as CSS or HEX.', 'Open the Gradient tab to build a gradient and copy its CSS.'],
+      faq: [
+        ['What do the colour rules mean?', 'Complementary uses opposite colours on the colour wheel; analogous uses neighbours; triadic and square use three or four evenly spaced hues; monochrome uses shades of one hue.'],
+        ['How do I keep a colour I like?', 'Tap the lock on it. Locked colours stay when you generate again.'],
+        ['Can I start from my brand colour?', 'Yes. Type its HEX code in "Start from colour" and the palette is built around it.'],
+        ['Can I use the colours in my website?', 'Yes. Copy CSS gives you ready-made CSS variables, and the Gradient tab gives a background line you can paste in.'],
+        ['Where are saved palettes kept?', 'In this browser on this device.']
+      ],
+      icon: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.6-.8 1.6-1.6 0-.9-.6-1.3-.6-2.1 0-.9.7-1.5 1.6-1.5H17a4 4 0 0 0 4-4c0-4.9-4-8.8-9-8.8z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/>'
+  },
+  {
+      slug: 'multiplication-table-generator', cat: 'Study tools', name: 'Multiplication Table Generator',
+      title: 'Multiplication Table Generator - Charts, Worksheets & Quiz',
+      desc: 'Show times tables from 1 to 100, a multiplication chart, printable worksheets with answer keys, and a practice quiz with scores and streaks.',
+      card: 'Times tables, printable worksheets and a quiz.',
+      intro: 'See any times table from 1 to 100, highlight rows on a multiplication chart, print worksheets with an answer key, or practise in a quick quiz that tracks your score, streak and the facts you missed.',
+      steps: ['Choose Tables, Chart, Worksheet or Practice at the top.', 'Pick the tables and how far to multiply, for example 1 to 12.', 'Print the tables, chart or worksheet, or start a practice round.', 'In Practice, type each answer and press Check; your score and missed facts show at the end.'],
+      faq: [
+        ['Which tables can I show?', 'Any table from 1 to 100, multiplied up to 10, 12, 15, 20, 25 or 30. Up to 50 tables show at once.'],
+        ['Does the worksheet come with answers?', 'Yes. Print gives the worksheet on page 1 and the answer key on page 2. You can also show answers on screen.'],
+        ['What question types are there?', 'Find the answer (3 × 4 = __), missing number (3 × __ = 12), division (12 ÷ 3 = __), or a mix.'],
+        ['Is it good for young children?', 'Yes. Start with the 2, 5 and 10 tables, short 10-question rounds and no timer, then add more tables.'],
+        ['Is it free?', 'Yes, with no sign-up. Everything runs in your browser.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/><path d="M13 13l4 4M17 13l-4 4"/>'
+  },
+  {
+      slug: 'long-division-calculator', cat: 'Study tools', name: 'Long Division Calculator',
+      title: 'Long Division Calculator - Step by Step with Remainders',
+      desc: 'Divide any numbers with long division shown step by step, the way it is taught in school. Remainders, decimals, repeating decimals and explanations.',
+      card: 'See long division worked out step by step.',
+      intro: 'Type the number to divide and the number to divide by. The tool writes out the long division just like on paper, in the bus stop or European layout, and explains every step: divide, multiply, subtract and bring down.',
+      steps: ['Type the dividend (the number to divide) and the divisor.', 'Choose an answer with a remainder or with decimals.', 'Pick the layout you learned at school.', 'Read the written working and the numbered steps underneath.'],
+      faq: [
+        ['What is the difference between a remainder and a decimal answer?', 'With a remainder, you stop at whole numbers: 1000 ÷ 7 = 142 remainder 6. With decimals, you keep dividing by adding zeros: 142.857…'],
+        ['Can it divide decimals?', 'Yes. If the divisor has decimals, both numbers are multiplied by 10, 100 and so on until the divisor is whole, just as taught in school. The answer stays the same.'],
+        ['What is a repeating decimal?', 'Some answers never end, like 1 ÷ 3 = 0.333… When a remainder comes back, the digits repeat. The tool spots this and marks the repeating digits with a line.'],
+        ['Which layout should I use?', 'The bus stop layout is used in the US, UK, India, Pakistan, Australia and many other countries. Much of Europe writes dividend : divisor = answer with the working below.'],
+        ['How big can the numbers be?', 'Up to 22 digits for the dividend and 10 for the divisor.']
+      ],
+      icon: '<path d="M5 12h14"/><circle cx="12" cy="6.5" r="1.5"/><circle cx="12" cy="17.5" r="1.5"/>'
+  },
+  {
+      slug: 'scientific-notation-converter', cat: 'Study tools', name: 'Scientific Notation Converter',
+      title: 'Scientific Notation Converter - E, Engineering & Sig Figs',
+      desc: 'Convert numbers to and from scientific notation, E notation and engineering notation with SI prefixes. Round to significant figures and count them.',
+      card: 'Convert to scientific and engineering notation.',
+      intro: 'Type a number in any form, such as 0.000452, 6.02 × 10^23 or 3.1e-7, and see it in scientific, E, engineering and standard form at once. Round to the significant figures you need and see which digits are significant.',
+      steps: ['Type or paste a number in normal or scientific form.', 'Choose how many significant figures to keep.', 'Copy the result in the format you need.', 'Check the highlighted significant figures in what you typed.'],
+      faq: [
+        ['What is scientific notation?', 'A way to write very big or small numbers as a number between 1 and 10 multiplied by a power of ten. For example, 45,000 is 4.5 × 10⁴ and 0.0032 is 3.2 × 10⁻³.'],
+        ['What is engineering notation?', 'Like scientific notation, but the power of ten is always a multiple of 3, so it matches SI prefixes such as kilo (10³), mega (10⁶) and micro (10⁻⁶).'],
+        ['How do significant figures work?', 'All non-zero digits count. Zeros between them count. Leading zeros never count. Trailing zeros count only when there is a decimal point, such as 45.00.'],
+        ['What formats can I type?', '0.000452, 4.52e-4, 4.52E-4, 4.52 × 10^-4, 4.52x10^-4, 4.52 × 10⁻⁴, 10^6 and numbers with thousands separators.'],
+        ['Does it round correctly?', 'Yes. It works on the digits themselves, not on computer floating point, so there are no rounding errors. 5 and above rounds up.']
+      ],
+      icon: '<path d="M3 10l5 5M8 10l-5 5"/><path d="M11 9.5 12.5 8v8"/><rect x="14.5" y="8" width="4" height="8" rx="2"/><path d="M18.5 3.5h2.5l-2.5 3H21"/>'
+  },
+  {
+      slug: 'word-scramble', cat: 'Study tools', name: 'Word Scramble',
+      title: 'Word Scramble Game - Unscramble Words with Hints',
+      desc: 'Play word scramble with 11 categories, 3 difficulty levels, hints, timed rounds and best scores. Add your own word lists for spelling practice.',
+      card: 'Unscramble words by category, with hints.',
+      intro: 'Unscramble the letters to find the hidden word. Pick a category and difficulty, then tap letters or type your answer. Use hints when you are stuck, build streaks and beat your best score. Teachers can add their own word lists.',
+      steps: ['Choose a category, difficulty and round length.', 'Press Start game.', 'Tap the letters in order or type the word, then press Check.', 'Use Hint, Shuffle or Skip when you are stuck, and try to beat your best score.'],
+      faq: [
+        ['How are points scored?', 'Each solved word is worth 10 points per letter, minus 5 for each hint, with at least 5 points per word.'],
+        ['Can I use my own words?', 'Yes. Choose "My own words" and type or paste a list, such as this week\'s spelling words.'],
+        ['What do the difficulty levels mean?', 'Easy uses words with 3 to 5 letters, medium 5 to 7, and hard 8 or more.'],
+        ['Is my best score saved?', 'Yes, in this browser on this device.'],
+        ['Does it work on phones?', 'Yes. Tap the big letter tiles, or type with the keyboard.']
+      ],
+      icon: '<rect x="3" y="7" width="5" height="5" rx="1"/><rect x="10" y="4" width="5" height="5" rx="1"/><rect x="16" y="10" width="5" height="5" rx="1"/><path d="M4 18h16M6 15l-2 3 2 3"/>'
+  },
+  {
+      slug: 'youtube-tag-generator', cat: 'Social media tools', name: 'YouTube Tag Generator',
+      title: 'YouTube Tag Generator - Free Tags from Your Title',
+      desc: 'Generate YouTube tags from your video title and keywords, pick the best ones and stay under the 500-character limit with a live counter. Free.',
+      card: 'Make YouTube tags from your title, within 500 chars.',
+      intro: 'Type your video title and choose the type of video. The tool finds the main topic and builds main tags, related phrases and broad tags, picks a strong starting set, and counts characters the way YouTube does so you stay under 500.',
+      steps: ['Type your video title, plus any extra keywords.', 'Choose the type of video, such as tutorial, review or gaming.', 'Press Generate tags, then tap tags to add or remove them.', 'Press Copy tags and paste them into the Tags box in YouTube Studio.'],
+      faq: [
+        ['How many characters can YouTube tags have?', '500 in total. Commas between tags count, and a tag with spaces counts 2 extra characters because YouTube stores it in quotes. The counter follows these rules.'],
+        ['Do tags still matter?', 'YouTube says tags play a small role, mostly for common misspellings and alternative names. Your title, description and thumbnail matter more, but good tags do no harm.'],
+        ['Where do I paste the tags?', 'In YouTube Studio, open the video\'s details, click "Show more" and paste into Tags. They are added one by one at each comma.'],
+        ['Does it use YouTube data or paid tools?', 'No. It works out tags from your own words with built-in patterns, entirely in your browser.'],
+        ['Can I add my own tags?', 'Yes. Type them in the box and press Add, separated by commas if you have several.']
+      ],
+      icon: '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'
+  },
+  {
+      slug: 'instagram-caption-generator', cat: 'Social media tools', name: 'Instagram Caption Generator',
+      title: 'Instagram Caption Generator - Captions & Bio Ideas',
+      desc: 'Get Instagram captions and bio ideas by mood and topic, with emojis and hashtags. Ten ideas at a time, character counts and one-tap copy. Free.',
+      card: 'Instagram captions and bios by mood and topic.',
+      intro: 'Choose a topic and a mood, add what your post is about, and get ten caption ideas with emojis and hashtags. Switch to Bio for short profile bios that fit Instagram\'s 150-character limit.',
+      steps: ['Pick Captions or Bio.', 'Choose a topic and mood, and type what the post is about.', 'Set the amount of emojis, hashtags and the ending.', 'Press Generate, then tap Copy on the one you like.'],
+      faq: [
+        ['How long can an Instagram caption be?', 'Up to 2,200 characters and 30 hashtags. Only the first line or two show before "more", so start strong.'],
+        ['How long can an Instagram bio be?', '150 characters. Each bio idea shows its length, and long ones are marked.'],
+        ['How many hashtags should I use?', 'Instagram allows up to 30, but a handful of specific, relevant hashtags usually works better than many general ones.'],
+        ['Does it use AI or send my words anywhere?', 'No. Ideas come from a built-in library of templates, mixed with your words, entirely in your browser.'],
+        ['Can I use these captions on other apps?', 'Yes. They work on TikTok, Facebook, Threads and other apps too; check each app\'s limits.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M7 15h7M7 11h10M7 7h4"/>'
+  },
+  {
+      slug: 'youtube-title-checker', cat: 'Social media tools', name: 'YouTube Title Checker',
+      title: 'YouTube Title Checker - Length, Keyword & Preview',
+      desc: 'Check your YouTube title and description: length, keyword position, hashtags and chapters, with a live preview of how the title gets cut off.',
+      card: 'Check titles and see where YouTube cuts them.',
+      intro: 'Type your video title, main keyword and description. You get a score, clear checks and a live preview of how the title looks on phones, in search, in suggested videos and on the watch page, including exactly where it gets cut off.',
+      steps: ['Type your title and the main keyword people would search for.', 'Paste your description.', 'Read the score and the checks, and fix anything marked with ! or ✕.', 'Switch the preview between phone, search, suggested and watch page to see where the title is cut.'],
+      faq: [
+        ['How long can a YouTube title be?', '100 characters. On most screens about 60 to 70 show before the title is cut off, so put the important words first.'],
+        ['How long can the description be?', '5,000 characters. Only the first two or three lines show before "more".'],
+        ['How many hashtags can I use?', 'If a description has more than 15 hashtags, YouTube ignores all of them. The first three can show above the title.'],
+        ['How do chapters work?', 'Start a list of timestamps with 0:00, include at least three, and make each chapter at least 10 seconds long.'],
+        ['Is the preview exact?', 'It is a close guide using YouTube\'s usual font sizes and widths. Real devices and window sizes vary a little.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="12" rx="2"/><path d="M7 20h6M6 8h8M6 11h5"/><path d="m15.5 18.5 2 2 4-4"/>'
+  },
+  {
+      slug: 'tiktok-caption-counter', cat: 'Social media tools', name: 'TikTok Caption Counter',
+      title: 'TikTok Caption Counter - Characters, Hashtags & Preview',
+      desc: 'Count TikTok caption characters, hashtags, mentions and emojis against the 4,000 limit, and preview how your caption looks on a video before "more".',
+      card: 'Count caption characters and preview it on a video.',
+      intro: 'Type or paste your caption to count characters, hashtags, mentions, words and emojis against TikTok\'s limit. A phone preview shows the caption over a video, cut after two lines like in the app, with tips to improve it.',
+      steps: ['Type or paste your caption.', 'Check the counters and the bar against the limit.', 'Look at the phone preview to see what shows before "more".', 'Follow the tips, then copy the caption.'],
+      faq: [
+        ['How long can a TikTok caption be?', 'Up to 4,000 characters for video captions in current versions of the app. Some older apps and tools still use 2,200, so you can check against that too.'],
+        ['How are characters counted?', 'Each letter, space, line break, hashtag sign and emoji counts. Emojis made of several parts, like family or flag emojis, count as one, as you see them.'],
+        ['How many hashtags should I use?', 'There is no fixed rule. Three to five specific, relevant hashtags usually work better than a long list.'],
+        ['Why did my hashtag break?', 'Hashtags stop at spaces and punctuation, so #self-care becomes #self. Write #selfcare.'],
+        ['Is my caption saved?', 'Only in this browser, so you can come back to it. Nothing is uploaded.']
+      ],
+      icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M9 14h6M9 17h4M11 5h2"/>'
   }
 ];

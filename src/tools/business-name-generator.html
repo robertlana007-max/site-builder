@@ -1,0 +1,135 @@
+<style>
+.bng .bng-opts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 0 0 12px; }
+.bng .bng-opts label { display: inline-flex; align-items: center; font-weight: 400; margin: 0; }
+.bng .bng-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 8px; margin-top: 14px; }
+.bng .bng-card { display: flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 12px; padding: 8px 6px 8px 12px; background: var(--surface); min-width: 0; }
+.bng .bng-card div { flex: 1; min-width: 0; cursor: pointer; }
+.bng .bng-card b { display: block; font-size: 16px; overflow-wrap: anywhere; }
+.bng .bng-card small { display: block; color: var(--muted); font-size: 12.5px; overflow-wrap: anywhere; }
+.bng .bng-card button { border: 0; background: none; width: 38px; height: 38px; border-radius: 50%; cursor: pointer; font-size: 19px; color: var(--muted); flex: none; }
+.bng .bng-card button:hover { background: var(--bg); color: var(--ink); }
+.bng .bng-card button[aria-pressed="true"] { color: #e0a800; }
+.bng .bng-fav { margin-top: 20px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.bng .bng-fav h3 { margin: 0 0 4px; font-size: 15px; }
+.bng .bng-empty { color: var(--muted); font-size: 14px; margin: 6px 0 0; }
+</style>
+<div class="bng" id="bng">
+<div class="fields">
+  <div><label for="bnKeys">Keywords</label><input type="text" id="bnKeys" maxlength="80" placeholder="e.g. coffee, green, fast" autocomplete="off"></div>
+  <div><label for="bnInd">Industry</label><select id="bnInd">
+    <option value="general">Any business</option><option value="tech">Tech and apps</option><option value="food">Food and drink</option><option value="fashion">Fashion and clothing</option><option value="beauty">Beauty and wellness</option><option value="fitness">Fitness and sport</option><option value="consult">Consulting and finance</option><option value="creative">Design and creative</option><option value="retail">Shop and e-commerce</option><option value="home">Home services and building</option><option value="travel">Travel and events</option><option value="edu">Education and tutoring</option><option value="pets">Pets and animals</option><option value="health">Health and care</option></select></div>
+  <div><label for="bnStyle">Style</label><select id="bnStyle"><option value="mix">Mix of all</option><option value="brand">Brandable (invented words)</option><option value="pro">Professional</option><option value="fun">Fun and catchy</option><option value="short">Short (one word)</option></select></div>
+  <div><label for="bnMax">Longest name</label><select id="bnMax"><option value="10">10 letters</option><option value="14">14 letters</option><option value="20" selected>20 letters</option><option value="40">No limit</option></select></div>
+</div>
+<label>Domain endings to show (text only, not checked for availability)</label>
+<div class="bng-opts" id="bnTlds"></div>
+<div class="btns"><button type="button" class="btn" id="bnGo">Generate names</button></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="bng-grid" id="bnOut" aria-live="polite"></div>
+<div class="bng-fav"><h3>Favourites <span id="bnFavN"></span></h3><div class="bng-grid" id="bnFav"></div><p class="bng-empty" id="bnFavEmpty">Tap the star on a name to keep it here. Favourites are saved on this device.</p>
+<div class="btns"><button type="button" class="btn ghost" id="bnCopyFav">Copy favourites</button><button type="button" class="btn ghost" id="bnClearFav">Clear favourites</button></div></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  var FAVKEY = 'gtnBizNameFavs';
+  var TLDS = ['.com', '.net', '.org', '.io', '.co', '.app', '.shop', '.store', '.online', '.co.uk', '.ca', '.com.au', '.de', '.fr', '.in', '.pk', '.ae', '.ng', '.za', '.com.br'];
+  var DEF_TLDS = { '.com': 1, '.co': 1, '.io': 1 };
+  var IND = {
+    general: { words: ['Co', 'Group', 'Works', 'Hub', 'House', 'Collective', 'Studio', 'Partners', 'Supply', 'Labs'], adj: ['Bright', 'True', 'Prime', 'Bold', 'Clear', 'Golden', 'Swift', 'Modern', 'Noble', 'Fresh'] },
+    tech: { words: ['Labs', 'Tech', 'Logic', 'Stack', 'Cloud', 'Bit', 'Byte', 'Data', 'Code', 'Systems', 'AI', 'Apps', 'Digital', 'Sync'], adj: ['Smart', 'Quantum', 'Rapid', 'Pixel', 'Neural', 'Nimbus', 'Vector', 'Hyper', 'Open', 'Next'] },
+    food: { words: ['Kitchen', 'Bites', 'Table', 'Bakery', 'Grill', 'Pantry', 'Eats', 'Spoon', 'Cafe', 'Feast', 'Oven', 'Bowl'], adj: ['Tasty', 'Golden', 'Fresh', 'Hearty', 'Spicy', 'Sweet', 'Rustic', 'Urban', 'Happy', 'Little'] },
+    fashion: { words: ['Threads', 'Wear', 'Studio', 'Atelier', 'Closet', 'Label', 'Stitch', 'Boutique', 'Style', 'Thread', 'Loom'], adj: ['Velvet', 'Luxe', 'Urban', 'Silk', 'Chic', 'Bold', 'Ivory', 'Indigo', 'Wild', 'Modern'] },
+    beauty: { words: ['Glow', 'Beauty', 'Skin', 'Spa', 'Bloom', 'Studio', 'Lab', 'Salon', 'Aura', 'Essence'], adj: ['Pure', 'Radiant', 'Velvet', 'Rose', 'Golden', 'Soft', 'Natural', 'Divine', 'Luxe', 'Calm'] },
+    fitness: { words: ['Fit', 'Gym', 'Strength', 'Motion', 'Athletics', 'Training', 'Move', 'Pulse', 'Core', 'Club'], adj: ['Iron', 'Peak', 'Strong', 'Active', 'Power', 'Rapid', 'Bold', 'Prime', 'Elite', 'Vital'] },
+    consult: { words: ['Advisory', 'Partners', 'Capital', 'Consulting', 'Group', 'Associates', 'Strategy', 'Ledger', 'Insight', 'Solutions'], adj: ['Summit', 'Keystone', 'Clear', 'Sterling', 'Pinnacle', 'True', 'Northern', 'Prime', 'Trusted', 'Wise'] },
+    creative: { words: ['Studio', 'Design', 'Creative', 'Works', 'Ink', 'Canvas', 'Lab', 'Pixels', 'Story', 'Frame'], adj: ['Bright', 'Bold', 'Paper', 'Neon', 'Little', 'Wild', 'Curious', 'Mighty', 'Crimson', 'Clever'] },
+    retail: { words: ['Market', 'Store', 'Shop', 'Mart', 'Goods', 'Trading', 'Supply', 'Emporium', 'Corner', 'Bazaar'], adj: ['Daily', 'Happy', 'Urban', 'Golden', 'Simple', 'Smart', 'Little', 'Grand', 'Local', 'Prime'] },
+    home: { words: ['Builders', 'Homes', 'Repairs', 'Works', 'Construction', 'Plumbing', 'Electric', 'Care', 'Fix', 'Craft'], adj: ['Solid', 'Reliable', 'Handy', 'Trusty', 'Cornerstone', 'Swift', 'Ace', 'Precision', 'Oak', 'Steel'] },
+    travel: { words: ['Travel', 'Journeys', 'Trips', 'Voyages', 'Escapes', 'Tours', 'Events', 'Getaways', 'Trails', 'Compass'], adj: ['Wander', 'Blue', 'Sunny', 'Global', 'Horizon', 'Wild', 'Golden', 'Island', 'Nomad', 'Silver'] },
+    edu: { words: ['Academy', 'Learning', 'Tutors', 'School', 'Minds', 'Scholars', 'Classroom', 'Institute', 'Prep', 'Study'], adj: ['Bright', 'Smart', 'Little', 'Clever', 'Wise', 'Future', 'Young', 'Star', 'Open', 'Brilliant'] },
+    pets: { words: ['Paws', 'Pets', 'Tails', 'Whiskers', 'Pack', 'Den', 'Barkery', 'Kennel', 'Grooming', 'Buddies'], adj: ['Happy', 'Furry', 'Wagging', 'Cosy', 'Loyal', 'Playful', 'Fluffy', 'Gentle', 'Good', 'Lucky'] },
+    health: { words: ['Health', 'Care', 'Clinic', 'Wellness', 'Medical', 'Life', 'Therapy', 'Vita', 'Heal', 'Balance'], adj: ['Pure', 'Vital', 'Kind', 'Gentle', 'Whole', 'Clear', 'Bright', 'Trusted', 'Caring', 'Green'] }
+  };
+  var SUF = ['ly', 'ify', 'io', 'ora', 'ia', 'able', 'ster', 'ful', 'wise', 'hub', 'nest', 'lab', 'go', 'eo', 'ix', 'era', 'ovo', 'ana'];
+  var PRE = ['Get', 'Go', 'My', 'Try', 'Hey', 'The', 'Up', 'Be', 'Pro', 'Re'];
+  var NATURE = ['Oak', 'Pine', 'River', 'Stone', 'Peak', 'Fox', 'Bee', 'Leaf', 'Wave', 'Cedar', 'Maple', 'Harbor', 'Ember', 'Atlas', 'Orbit', 'Nova', 'Lumen', 'Echo'];
+  var FUN = ['Happy', 'Cheeky', 'Jolly', 'Funky', 'Crazy', 'Busy', 'Lucky', 'Giddy', 'Zippy', 'Snappy', 'Bouncy', 'Peppy'];
+  var SYL1 = ['za', 've', 'lu', 'no', 'ki', 'ra', 'so', 'ma', 'ti', 'qu', 'xe', 'bo', 'li', 'fa', 'ne', 'zo', 'ka', 'mi', 'tre', 'vo'], SYL2 = ['ra', 'lo', 'vi', 'na', 'ta', 'ro', 'mi', 'xa', 'ne', 'ly', 'zo', 'ri', 'va', 'do'], END = ['a', 'o', 'ix', 'en', 'ia', 'io', 'ar', 'is', 'on', 'um', 'ex', 'y'];
+  var favs = [];
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function pick(a) { return a[Math.floor(Math.random() * a.length)]; }
+  function cap(w) { return w.charAt(0).toUpperCase() + w.slice(1).toLowerCase(); }
+  function keys() { return $('bnKeys').value.normalize('NFD').replace(/[̀-ͯ]/g, '').split(/[,\s]+/).map(function (w) { return w.replace(/[^A-Za-z0-9]/g, ''); }).filter(function (w) { return w.length >= 2; }).slice(0, 6).map(cap); }
+  function blend(a, b) { var i = Math.max(2, Math.ceil(a.length * 0.6)), j = Math.floor(b.length * 0.4); return cap(a.slice(0, i) + b.slice(j).toLowerCase()); }
+  function invented(seed) {
+    var m = seed ? /^[^aeiouy]*[aeiouy]+/i.exec(seed) : null, s = (m ? m[0] : pick(SYL1)).toLowerCase(), t = pick(SYL2);
+    if (/[aeiouy]$/.test(s) && /^[aeiouy]/.test(t)) t = t.slice(1) || 'n';
+    s += t; if (Math.random() < 0.5) s += pick(['n', 'x', 'r', 's', 'l', 'm', 'nt', 'sa', 'ra', 'ia', 'o']);
+    return cap(s);
+  }
+  // keep names easy to say: no long consonant runs, doubled vowels or awkward endings in single words
+  function sayable(n) {
+    return n.split(/\s+/).every(function (w) { w = w.toLowerCase().replace(/[^a-z]/g, ''); return !/[^aeiouy]{4}/.test(w) && !/[aeiou]{3}/.test(w) && !/(aa|ii|uu|yy)/.test(w) && (!/[^aeiouy]{2}$/.test(w) || /(nd|st|nt|rk|ng|ck|sh|th|ch|ft|lt|rt|ss|ll|rs|ns|ks|ps|ts|ds|ws|bs|ms|ls|gs|fs|xt)$/.test(w)); });
+  }
+  function generate() {
+    var K = keys(), ind = IND[$('bnInd').value] || IND.general, style = $('bnStyle').value, max = +$('bnMax').value;
+    if (!K.length) K = [pick(ind.adj), pick(NATURE)].map(cap);
+    var P = {
+      brand: [function (k) { return cap(k + pick(SUF)); }, function (k) { return invented(k); }, function (k) { return blend(k, pick(NATURE)); }, function (k) { return invented(''); }, function (k) { return cap(k.replace(/[aeiou]([^aeiou]*)$/i, '$1') + pick(['r', 'ly', 'io', 'a'])); }],
+      pro: [function (k) { return k + ' ' + pick(ind.words); }, function (k) { return pick(ind.adj) + ' ' + k + ' ' + pick(ind.words); }, function (k) { return k + ' & Co.'; }, function (k) { return 'The ' + k + ' ' + pick(ind.words); }, function (k) { return pick(NATURE) + ' ' + pick(ind.words); }, function (k) { return k + ' ' + pick(['Group', 'Partners', 'Associates', 'Solutions']); }],
+      fun: [function (k) { var a = FUN.filter(function (f) { return f[0] === k[0]; }); return (a.length ? pick(a) : pick(FUN)) + ' ' + k; }, function (k) { return pick(PRE) + k; }, function (k) { return k + pick(['tastic', 'licious', 'zilla', 'topia', 'ville', 'palooza']); }, function (k) { return pick(FUN) + ' ' + pick(ind.words); }, function (k) { return k + ' ' + pick(['Squad', 'Gang', 'Club', 'Crew', 'Factory']); }],
+      short: [function (k) { return cap(k + pick(SUF)); }, function (k) { return pick(PRE) + k; }, function (k) { return invented(k); }, function (k) { return k + pick(ind.words).replace(/\s/g, ''); }, function (k) { return blend(k, pick(ind.words)); }]
+    };
+    var pools = style === 'mix' ? ['brand', 'pro', 'fun', 'short'] : [style], out = [], seen = {}, tries = 0;
+    if (K.length > 1) P.pro.push(function () { return K[0] + ' ' + K[1]; }), P.short.push(function () { return blend(K[0], K[1]); }), P.brand.push(function () { return blend(K[1], K[0]); });
+    while (out.length < 48 && tries++ < 3000) {
+      var pool = P[pools[tries % pools.length]], n = pick(pool)(pick(K)).replace(/\s+/g, ' ').trim();
+      var letters = n.replace(/[^A-Za-z0-9]/g, '');
+      if (letters.length < 3 || letters.length > max || seen[letters.toLowerCase()] || !sayable(n)) continue;
+      if (style === 'short' && /\s/.test(n)) continue;
+      seen[letters.toLowerCase()] = 1; out.push(n);
+    }
+    return out;
+  }
+  function tlds() { return Array.prototype.filter.call($('bnTlds').querySelectorAll('input'), function (i) { return i.checked; }).map(function (i) { return i.value; }); }
+  function domains(n) { var d = n.toLowerCase().replace(/&/g, 'and').replace(/[^a-z0-9]/g, ''); return tlds().map(function (t) { return d + t; }); }
+  function card(n) {
+    var d = document.createElement('div'); d.className = 'bng-card';
+    var t = document.createElement('div'); t.title = 'Copy'; t.setAttribute('role', 'button'); t.tabIndex = 0;
+    var b = document.createElement('b'); b.textContent = n; var s = document.createElement('small'); s.textContent = domains(n).join('  ') || ' ';
+    t.appendChild(b); t.appendChild(s);
+    var star = document.createElement('button'); star.type = 'button'; star.textContent = favs.indexOf(n) >= 0 ? '★' : '☆'; star.setAttribute('aria-pressed', String(favs.indexOf(n) >= 0)); star.setAttribute('aria-label', 'Save ' + n + ' to favourites'); star.dataset.n = n;
+    d.appendChild(t); d.appendChild(star); d.dataset.n = n;
+    return d;
+  }
+  var last = [];
+  function show() { var o = $('bnOut'); o.innerHTML = ''; last.forEach(function (n) { o.appendChild(card(n)); }); }
+  function showFav() {
+    var f = $('bnFav'); f.innerHTML = ''; favs.forEach(function (n) { f.appendChild(card(n)); });
+    $('bnFavN').textContent = favs.length ? '(' + favs.length + ')' : ''; $('bnFavEmpty').hidden = favs.length > 0;
+    $('bnCopyFav').disabled = $('bnClearFav').disabled = !favs.length;
+  }
+  function saveFav() { try { localStorage.setItem(FAVKEY, JSON.stringify(favs)); } catch (e) {} }
+  $('bng').addEventListener('click', function (e) {
+    var st = e.target.closest('.bng-card button');
+    if (st) { var n = st.dataset.n, i = favs.indexOf(n); if (i >= 0) favs.splice(i, 1); else if (favs.length < 200) favs.unshift(n); saveFav(); show(); showFav(); return; }
+    var c = e.target.closest('.bng-card > div'); if (c) { copyText(c.parentNode.dataset.n); if (window.toast) toast('Copied ' + c.parentNode.dataset.n); }
+  });
+  $('bng').addEventListener('keydown', function (e) { var c = e.target.closest('.bng-card > div'); if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); c.click(); } });
+  $('bnGo').addEventListener('click', function () {
+    last = generate(); show();
+    if (!keys().length) say('', 'No keywords yet, so here are random ideas. Add a word about your business for better names.');
+    else if (!last.length) say('bad', 'No names fit. Choose a longer "Longest name" or use shorter keywords.');
+    else say('ok', last.length + ' ideas. Tap a name to copy it, or the star to keep it. Click again for new ideas.');
+  });
+  $('bnKeys').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('bnGo').click(); });
+  $('bnTlds').innerHTML = TLDS.map(function (t) { return '<label><input type="checkbox" value="' + t + '" data-nomemo' + (DEF_TLDS[t] ? ' checked' : '') + '>' + t + '</label>'; }).join('');
+  try { var st = JSON.parse(localStorage.getItem(FAVKEY + 'Tlds')); if (Array.isArray(st)) $('bnTlds').querySelectorAll('input').forEach(function (i) { i.checked = st.indexOf(i.value) >= 0; }); } catch (e) {}
+  $('bnTlds').addEventListener('change', function () { try { localStorage.setItem(FAVKEY + 'Tlds', JSON.stringify(tlds())); } catch (e) {} show(); showFav(); });
+  $('bnCopyFav').addEventListener('click', function () { copyText(favs.map(function (n) { var d = domains(n); return n + (d.length ? ' (' + d.join(', ') + ')' : ''); }).join('\n'), this); });
+  $('bnClearFav').addEventListener('click', function () { if (confirm('Remove all favourites?')) { favs = []; saveFav(); show(); showFav(); } });
+  try { var f = JSON.parse(localStorage.getItem(FAVKEY)); if (Array.isArray(f)) favs = f.filter(function (x) { return typeof x === 'string'; }).slice(0, 200); } catch (e) {}
+  showFav();
+})();
+</script>
