@@ -1,0 +1,272 @@
+<style>
+.cr-expr { font-family: var(--mono) !important; font-size: 22px !important; text-align: center; letter-spacing: .04em; }
+.cr-legend { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; text-align: center; font-size: 12px; color: var(--muted); margin-top: 6px; font-weight: 600; }
+.cr-legend.six { grid-template-columns: repeat(6, 1fr); }
+.cr-explain { margin-top: 14px; padding: 14px 16px; border-radius: 12px; background: var(--accent-soft); font-size: 18px; font-weight: 600; line-height: 1.45; overflow-wrap: anywhere; }
+.cr-explain.bad { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); font-size: 16px; }
+.cr-runs { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 6px; }
+.cr-runs li { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; font-size: 14.5px; }
+.cr-runs li span { color: var(--muted); font-size: 13.5px; }
+.cr-h { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 22px 0 6px; }
+.cr-h h2 { font-size: 17px; margin: 0; }
+.cr-row { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; margin-bottom: 10px; }
+.cr-row-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.cr-row-top b { min-width: 120px; font-size: 15px; }
+.cr-row-top select { width: auto; min-height: 38px; padding: 5px 10px; }
+.cr-row-top code { margin-inline-start: auto; font-family: var(--mono); font-size: 15px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 3px 10px; }
+.cr-ctl { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 14px; }
+.cr-ctl:empty { display: none; }
+.cr-ctl input[type=number], .cr-ctl select { width: 90px; min-height: 38px; padding: 5px 8px; }
+.cr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(40px, 1fr)); gap: 4px; width: 100%; }
+.cr-grid.wide { grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); }
+.cr-grid button { min-height: 34px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: 600 13px/1 inherit; font-family: inherit; cursor: pointer; padding: 0 2px; }
+.cr-grid button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+</style>
+<label for="crExpr">Cron expression</label>
+<input type="text" id="crExpr" class="cr-expr" autocomplete="off" autocapitalize="off" spellcheck="false" value="0 9 * * 1-5" aria-describedby="crLegend">
+<div class="cr-legend" id="crLegend"><span>minute</span><span>hour</span><span>day (month)</span><span>month</span><span>day (week)</span></div>
+<div class="cr-explain" id="crExplain" aria-live="polite"></div>
+<div class="btns"><button class="btn" id="crCp">Copy expression</button><button class="btn ghost" id="crReset">Reset</button></div>
+<div class="cr-h"><h2>Quick presets</h2></div>
+<div class="chiprow" id="crPresets"></div>
+<div class="cr-h"><h2>Next 5 runs</h2>
+  <div class="seg" role="group" aria-label="Time zone" id="crTz"><button type="button" data-tz="local" aria-pressed="true">My time</button><button type="button" data-tz="utc" aria-pressed="false">UTC</button></div>
+</div>
+<ol class="cr-runs" id="crRuns"></ol>
+<div class="cr-h"><h2>Build it step by step</h2></div>
+<div id="crBuilder"></div>
+<script>
+(function () {
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  var FIELDS = [
+    { key: 'min', label: 'Minute', min: 0, max: 59, unit: 'minute' },
+    { key: 'hour', label: 'Hour', min: 0, max: 23, unit: 'hour' },
+    { key: 'dom', label: 'Day of month', min: 1, max: 31, unit: 'day' },
+    { key: 'mon', label: 'Month', min: 1, max: 12, unit: 'month', names: ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'], nameBase: 1 },
+    { key: 'dow', label: 'Day of week', min: 0, max: 6, unit: 'weekday', names: ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'], nameBase: 0 }
+  ];
+  var SEC = { key: 'sec', label: 'Second', min: 0, max: 59, unit: 'second' };
+  var MACROS = { '@yearly': '0 0 1 1 *', '@annually': '0 0 1 1 *', '@monthly': '0 0 1 * *', '@weekly': '0 0 * * 0', '@daily': '0 0 * * *', '@midnight': '0 0 * * *', '@hourly': '0 * * * *' };
+  var PRESETS = [['Every minute', '* * * * *'], ['Every 5 minutes', '*/5 * * * *'], ['Every 15 minutes', '*/15 * * * *'], ['Every hour', '0 * * * *'], ['Every 6 hours', '0 */6 * * *'], ['Every day at midnight', '0 0 * * *'], ['Every day at 9:00', '0 9 * * *'], ['Weekdays at 9:00', '0 9 * * 1-5'], ['Weekends at 10:00', '0 10 * * 0,6'], ['Every Monday at 8:30', '30 8 * * 1'], ['1st of every month', '0 0 1 * *'], ['Every quarter', '0 0 1 1,4,7,10 *'], ['Every year on 1 January', '0 0 1 1 *']];
+  var tz = 'local';
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function nameVal(tok, f) {
+    var t = tok.toUpperCase();
+    if (f.names) { var i = f.names.indexOf(t); if (i !== -1) return i + f.nameBase; }
+    if (!/^\d+$/.test(t)) throw new Error('"' + tok + '" is not a valid value for ' + f.label.toLowerCase() + '.');
+    var n = +t;
+    if (f.key === 'dow' && n === 7) n = 0; // 7 is also Sunday
+    if (n < f.min || n > f.max) throw new Error(f.label + ' must be between ' + f.min + ' and ' + (f.key === 'dow' ? 7 : f.max) + ', not ' + tok + '.');
+    return n;
+  }
+  // Parse one field into a sorted list of allowed values.
+  function parseField(s, f) {
+    if (/#/.test(s) || /(^|[,\-\/])(L|LW|\d+[LW])(?=$|[,\-\/])/i.test(s)) throw new Error('"' + s + '": L, W and # are Quartz scheduler extras that standard cron does not support.');
+    var set = new Set();
+    s.split(',').forEach(function (part) {
+      if (part === '') throw new Error('There is an empty value in the ' + f.label.toLowerCase() + ' field (two commas in a row?).');
+      var m = /^(\*|\?|[A-Za-z0-9]+)(?:-([A-Za-z0-9]+))?(?:\/(\d+))?$/.exec(part);
+      if (!m) throw new Error('"' + part + '" is not valid in the ' + f.label.toLowerCase() + ' field.');
+      var step = m[3] ? +m[3] : 1, lo, hi;
+      if (m[3] !== undefined && step < 1) throw new Error('A step (/' + m[3] + ') must be 1 or more.');
+      if (m[1] === '*' || m[1] === '?') { if (m[2]) throw new Error('"' + part + '" is not valid.'); lo = f.min; hi = f.max; }
+      else { lo = nameVal(m[1], f); hi = m[2] !== undefined ? nameVal(m[2], f) : (m[3] ? f.max : lo); if (f.key === 'dow' && m[2] !== undefined && /^7$/.test(m[2])) hi = 7; }
+      if (hi < lo) { if (f.key === 'dow' || f.key === 'mon') { for (var v = lo; v <= f.max; v += step) set.add(v); for (v = f.min; v <= hi; v += step) set.add(v); return; } throw new Error('In "' + part + '" the first number must not be bigger than the second.'); }
+      for (var x = lo; x <= hi; x += step) set.add(f.key === 'dow' && x === 7 ? 0 : x);
+    });
+    return Array.from(set).sort(function (a, b) { return a - b; });
+  }
+  function parse(expr) {
+    var e = expr.trim().replace(/\s+/g, ' ');
+    if (!e) throw new Error('Type a cron expression, like 0 9 * * 1-5, or pick a preset.');
+    if (e.toLowerCase() === '@reboot') return { reboot: true };
+    if (e[0] === '@') { if (!MACROS[e.toLowerCase()]) throw new Error('Unknown shortcut ' + e + '. Use @yearly, @monthly, @weekly, @daily or @hourly.'); return parse(MACROS[e.toLowerCase()]); }
+    var p = e.split(' ');
+    if (p.length === 7) throw new Error('This has 7 fields. The last one is probably a year (Quartz format), which standard cron does not have. Remove it.');
+    if (p.length !== 5 && p.length !== 6) throw new Error('A cron expression needs 5 fields separated by spaces (minute hour day month weekday). This one has ' + p.length + '.');
+    var six = p.length === 6, fs = six ? [SEC].concat(FIELDS) : FIELDS, r = { six: six, raw: p, sets: {} };
+    fs.forEach(function (f, i) { r.sets[f.key] = parseField(p[i], f); r[f.key] = p[i]; });
+    if (!six) r.sets.sec = [0];
+    return r;
+  }
+
+  // ---------- plain-English description ----------
+  function list(a) { return a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+  function ord(n) { var s = ['th', 'st', 'nd', 'rd'], v = n % 100; return n + (s[(v - 20) % 10] || s[v] || s[0]); }
+  function valName(v, f) { return f.key === 'mon' ? MONTHS[v - 1] : f.key === 'dow' ? DAYS[v] : f.key === 'hour' ? pad(v) + ':00' : f.key === 'dom' ? ord(v) : String(v); }
+  function partText(part, f) {
+    var m = /^(\*|\?|[A-Za-z0-9]+)(?:-([A-Za-z0-9]+))?(?:\/(\d+))?$/.exec(part), plural = f.unit + 's';
+    if (m[1] === '*' || m[1] === '?') return m[3] && m[3] !== '1' ? 'every ' + (m[3] === '2' ? 'other ' + f.unit : m[3] + ' ' + plural) : 'every ' + f.unit;
+    var a = valName(nameVal(m[1], f), f);
+    if (m[2] !== undefined) { var b = valName(nameVal(m[2], f) === 0 && f.key === 'dow' && m[2] === '7' ? 0 : nameVal(m[2], f), f); return (m[3] && m[3] !== '1' ? 'every ' + m[3] + ' ' + plural + ' from ' : '') + a + ' through ' + b; }
+    if (m[3]) return 'every ' + m[3] + ' ' + plural + ' starting at ' + a;
+    return a;
+  }
+  function fieldText(s, f) { return list(s.split(',').map(function (p) { return partText(p, f); })); }
+  function isAll(s) { return s === '*' || s === '?'; }
+  function single(s) { return /^\d+$/.test(s); }
+  function describe(r) {
+    if (r.reboot) return 'Once, every time the computer starts (@reboot). There are no clock times to show.';
+    var out = '', f = {}; FIELDS.concat([SEC]).forEach(function (x) { f[x.key] = x; });
+    var secTxt = '';
+    if (r.six && r.sec !== '0') secTxt = isAll(r.sec) ? 'Every second' : /^\*\/\d+$/.test(r.sec) ? 'Every ' + r.sec.split('/')[1] + ' seconds' : 'At second ' + fieldText(r.sec, f.sec);
+    // time of day
+    if (single(r.min) && single(r.hour)) out = 'At ' + pad(+r.hour) + ':' + pad(+r.min);
+    else if (single(r.min) && /^[\d,]+$/.test(r.hour) && r.hour.split(',').length <= 8) out = 'At ' + list(r.hour.split(',').map(function (h) { return pad(+h) + ':' + pad(+r.min); }));
+    else {
+      var mt;
+      if (isAll(r.min)) mt = 'Every minute';
+      else if (/^(\*|0)\/\d+$/.test(r.min)) mt = 'Every ' + r.min.split('/')[1] + ' minutes';
+      else if (single(r.min)) mt = +r.min === 0 ? 'At the start of every hour' : 'At ' + r.min + ' minutes past the hour';
+      else mt = 'At minute ' + fieldText(r.min, f.min) + ' past the hour';
+      out = mt;
+      if (!isAll(r.hour)) {
+        if (single(r.hour)) out += ', between ' + pad(+r.hour) + ':00 and ' + pad(+r.hour) + ':59';
+        else if (/^\d+-\d+$/.test(r.hour)) { var hh = r.hour.split('-'); out += ', between ' + pad(+hh[0]) + ':00 and ' + pad(+hh[1]) + ':59'; }
+        else if (/^\*\/\d+$/.test(r.hour)) out += (mt === 'At the start of every hour' ? '' : ',') + ' every ' + r.hour.split('/')[1] + ' hours';
+        else out += ', in the hours ' + fieldText(r.hour, f.hour);
+      }
+      if (mt === 'At the start of every hour' && /^\*\/\d+$/.test(r.hour)) out = 'Every ' + r.hour.split('/')[1] + ' hours, on the hour';
+    }
+    if (secTxt) out = secTxt + ', ' + out.charAt(0).toLowerCase() + out.slice(1);
+    // days
+    var domAll = isAll(r.dom), dowAll = isAll(r.dow), dayTxt = '';
+    var domT = function () { return /^\*\/\d+$/.test(r.dom) ? 'every ' + r.dom.split('/')[1] + ' days' : 'on the ' + fieldText(r.dom, f.dom) + ' of the month'; };
+    var dowT = function () { var t = fieldText(r.dow, f.dow); return /^\*\/\d+$/.test(r.dow) ? t : 'on ' + t; };
+    if (!domAll && !dowAll) dayTxt = domT() + ', and also ' + dowT() + ' (cron runs when either matches)';
+    else if (!domAll) dayTxt = domT();
+    else if (!dowAll) dayTxt = dowT();
+    else if (isAll(r.mon)) dayTxt = 'every day';
+    out += dayTxt ? ', ' + dayTxt : '';
+    if (!isAll(r.mon)) out += /^\*\/\d+$/.test(r.mon) ? ', every ' + r.mon.split('/')[1] + ' months' : ', in ' + fieldText(r.mon, f.mon);
+    return out + '.';
+  }
+
+  // ---------- next run times ----------
+  function nextRuns(r, count) {
+    var res = [], utc = tz === 'utc', now = new Date(), S = r.sets;
+    var has = function (arr, v) { return arr.indexOf(v) !== -1; };
+    var domR = !isAll(r.dom), dowR = !isAll(r.dow);
+    var day = utc ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    for (var d = 0; d < 366 * 5 && res.length < count; d++) {
+      var y = utc ? day.getUTCFullYear() : day.getFullYear(), mo = (utc ? day.getUTCMonth() : day.getMonth()) + 1, dt = utc ? day.getUTCDate() : day.getDate(), wd = utc ? day.getUTCDay() : day.getDay();
+      if (has(S.mon, mo)) {
+        var a = has(S.dom, dt), b = has(S.dow, wd), ok = domR && dowR ? (a || b) : (a && b);
+        if (ok) {
+          for (var hi = 0; hi < S.hour.length && res.length < count; hi++) for (var mi = 0; mi < S.min.length && res.length < count; mi++) for (var si = 0; si < S.sec.length && res.length < count; si++) {
+            var h = S.hour[hi], m = S.min[mi], s = S.sec[si];
+            var t = utc ? new Date(Date.UTC(y, mo - 1, dt, h, m, s)) : new Date(y, mo - 1, dt, h, m, s);
+            if (!utc && (t.getHours() !== h || t.getDate() !== dt)) continue; // skipped by a daylight-saving change
+            if (t > now) res.push(t);
+          }
+        }
+      }
+      if (utc) day = new Date(day.getTime() + 86400000); else day = new Date(y, mo - 1, dt + 1);
+    }
+    return res;
+  }
+  function rel(t) {
+    var diff = (t - Date.now()) / 1000, rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    var u = [['year', 31557600], ['month', 2629800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+    for (var i = 0; i < u.length; i++) if (diff >= u[i][1] || u[i][0] === 'second') return rtf.format(Math.round(diff / u[i][1]), u[i][0]);
+  }
+
+  // ---------- builder ----------
+  var rows = {};
+  function buildRows() {
+    var box = $('crBuilder');
+    FIELDS.forEach(function (f) {
+      var row = document.createElement('div'); row.className = 'cr-row';
+      row.innerHTML = '<div class="cr-row-top"><b></b><select aria-label=""><option value="every">Every ' + f.unit + '</option><option value="step">Every N ' + f.unit + 's</option><option value="list">Specific ' + f.unit + 's</option><option value="range">From … to …</option><option value="custom" hidden>Custom</option></select><code></code></div><div class="cr-ctl"></div>';
+      row.querySelector('b').textContent = f.label; row.querySelector('select').setAttribute('aria-label', f.label + ' mode');
+      var st = { f: f, el: row, mode: 'every', step: f.key === 'min' ? 5 : 2, from: f.min, list: new Set([f.min]), r1: f.min, r2: f.max, start: f.min };
+      row.querySelector('select').addEventListener('change', function () { st.mode = this.value; drawCtl(st); fromBuilder(); });
+      rows[f.key] = st; box.appendChild(row);
+    });
+  }
+  function label(v, f) { return f.key === 'mon' ? MONTHS[v - 1].slice(0, 3) : f.key === 'dow' ? DAYS[v].slice(0, 3) : String(v); }
+  function opts(f) { var h = ''; for (var v = f.min; v <= f.max; v++) h += '<option value="' + v + '">' + label(v, f) + '</option>'; return h; }
+  function drawCtl(st) {
+    var c = st.el.querySelector('.cr-ctl'), f = st.f; c.textContent = '';
+    st.el.querySelector('select').value = st.mode;
+    if (st.mode === 'step') {
+      c.innerHTML = 'Every <input type="number" min="1" max="' + (f.max - f.min + 1) + '" aria-label="Every how many"> ' + f.unit + 's, starting at <select aria-label="Starting at">' + opts(f) + '</select>';
+      var n = c.querySelector('input'), s = c.querySelector('select'); n.value = st.step; s.value = st.start;
+      n.addEventListener('input', function () { var v = Math.round(+n.value); if (v >= 1) { st.step = Math.min(v, f.max - f.min + 1); fromBuilder(); } });
+      s.addEventListener('change', function () { st.start = +s.value; fromBuilder(); });
+    } else if (st.mode === 'range') {
+      c.innerHTML = 'From <select aria-label="From">' + opts(f) + '</select> to <select aria-label="To">' + opts(f) + '</select>';
+      var a = c.querySelectorAll('select'); a[0].value = st.r1; a[1].value = st.r2;
+      a[0].addEventListener('change', function () { st.r1 = +this.value; fromBuilder(); }); a[1].addEventListener('change', function () { st.r2 = +this.value; fromBuilder(); });
+    } else if (st.mode === 'list') {
+      var g = document.createElement('div'); g.className = 'cr-grid' + (f.key === 'mon' || f.key === 'dow' ? ' wide' : '');
+      for (var v = f.min; v <= f.max; v++) {
+        var b = document.createElement('button'); b.type = 'button'; b.textContent = label(v, f); b.dataset.v = v; b.setAttribute('aria-pressed', st.list.has(v) ? 'true' : 'false');
+        b.addEventListener('click', function () { var x = +this.dataset.v; if (st.list.has(x)) { if (st.list.size > 1) st.list.delete(x); } else st.list.add(x); this.setAttribute('aria-pressed', st.list.has(x) ? 'true' : 'false'); fromBuilder(); });
+        g.appendChild(b);
+      }
+      c.appendChild(g);
+    } else if (st.mode === 'custom') { c.textContent = 'This part uses a pattern the step-by-step builder cannot show. Edit it in the expression above, or pick another option here.'; }
+  }
+  function compress(vals) { // 1,2,3,5 -> 1-3,5
+    var out = [], i = 0;
+    while (i < vals.length) { var j = i; while (j + 1 < vals.length && vals[j + 1] === vals[j] + 1) j++; out.push(j - i >= 2 ? vals[i] + '-' + vals[j] : vals.slice(i, j + 1).join(',')); i = j + 1; }
+    return out.join(',');
+  }
+  function fieldOf(st) {
+    if (st.mode === 'every') return '*';
+    if (st.mode === 'step') return (st.start === st.f.min ? '*' : st.start) + '/' + st.step;
+    if (st.mode === 'range') return st.r1 === st.r2 ? String(st.r1) : st.r1 + '-' + st.r2;
+    if (st.mode === 'list') return compress(Array.from(st.list).sort(function (a, b) { return a - b; }));
+    return st.custom;
+  }
+  var secPart = '';
+  function fromBuilder() {
+    var parts = FIELDS.map(function (f) { var v = fieldOf(rows[f.key]); rows[f.key].el.querySelector('code').textContent = v; return v; });
+    $('crExpr').value = (secPart ? secPart + ' ' : '') + parts.join(' ');
+    update(false);
+  }
+  // Show an expression in the builder when each part is simple enough
+  function toBuilder(r) {
+    secPart = r.six ? r.sec : '';
+    FIELDS.forEach(function (f) {
+      var st = rows[f.key], s = r[f.key], m;
+      st.el.querySelector('code').textContent = s;
+      if (isAll(s)) st.mode = 'every';
+      else if ((m = /^(\*|\d+)\/(\d+)$/.exec(s))) { st.mode = 'step'; st.step = +m[2]; st.start = m[1] === '*' ? f.min : +m[1]; }
+      else if ((m = /^(\w+)-(\w+)$/.exec(s)) && r.sets[f.key].length > 1 && nameVal(m[1], f) < nameVal(m[2], f)) { st.mode = 'range'; st.r1 = nameVal(m[1], f); st.r2 = nameVal(m[2], f); }
+      else if (/^[\w,\-]+$/.test(s) && !/\//.test(s)) { st.mode = 'list'; st.list = new Set(r.sets[f.key]); }
+      else { st.mode = 'custom'; st.custom = s; }
+      drawCtl(st);
+    });
+  }
+  function update(syncBuilder) {
+    var ex = $('crExpr'), box = $('crExplain'), runs = $('crRuns'), r;
+    runs.textContent = '';
+    try { r = parse(ex.value); }
+    catch (e) { box.className = 'cr-explain bad'; box.textContent = e.message; ex.setAttribute('aria-invalid', 'true'); return; }
+    ex.removeAttribute('aria-invalid');
+    box.className = 'cr-explain'; box.textContent = describe(r);
+    $('crLegend').className = 'cr-legend' + (r.six ? ' six' : '');
+    $('crLegend').innerHTML = (r.six ? '<span>second</span>' : '') + '<span>minute</span><span>hour</span><span>day (month)</span><span>month</span><span>day (week)</span>';
+    if (r.reboot) return;
+    if (syncBuilder) toBuilder(r);
+    var list = nextRuns(r, 5), fmt = new Intl.DateTimeFormat(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', second: r.six ? '2-digit' : undefined, timeZone: tz === 'utc' ? 'UTC' : undefined, timeZoneName: 'short' });
+    if (!list.length) { var li = document.createElement('li'); li.textContent = 'This schedule never runs in the next 5 years (for example 30 February). Check the day and month.'; runs.appendChild(li); return; }
+    list.forEach(function (t) { var li = document.createElement('li'), a = document.createElement('b'), b = document.createElement('span'); a.textContent = fmt.format(t); b.textContent = rel(t); li.appendChild(a); li.appendChild(b); runs.appendChild(li); });
+  }
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = p[0];
+    b.addEventListener('click', function () { $('crExpr').value = p[1]; update(true); $('crExpr').dispatchEvent(new Event('change', { bubbles: true })); });
+    $('crPresets').appendChild(b);
+  });
+  var deb;
+  $('crExpr').addEventListener('input', function () { clearTimeout(deb); deb = setTimeout(function () { update(true); }, 120); });
+  $('crTz').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; tz = b.dataset.tz; [].forEach.call(this.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); update(false); });
+  $('crCp').addEventListener('click', function () { copyText($('crExpr').value.trim(), $('crCp')); });
+  $('crReset').addEventListener('click', function () { $('crExpr').value = '0 9 * * 1-5'; update(true); $('crExpr').dispatchEvent(new Event('change', { bubbles: true })); });
+  buildRows(); update(true);
+  setInterval(function () { if (document.visibilityState === 'visible' && !$('crExpr').getAttribute('aria-invalid')) update(false); }, 30000);
+})();
+</script>
