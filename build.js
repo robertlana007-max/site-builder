@@ -595,6 +595,11 @@ ${contact}` },
   amts.forEach(function (b) { b.addEventListener('click', function () { amts.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); own.value = ''; if (go.dataset.api) say(''); label(); }); });
   own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) (document.querySelector('.amt[data-amt="10"]') || amts[0]).setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
   label();
+  // Wake PayMeGate up while the visitor chooses an amount, so the checkout opens fast when they press Pay.
+  var woke = 0;
+  function wake() { if (!go.dataset.api || Date.now() - woke < 120000) return; woke = Date.now(); try { fetch(go.dataset.api.split('/checkout')[0] + '/methods',{ mode: 'no-cors', cache: 'no-store' }).catch(function () {}); } catch (e) {} }
+  wake();
+  ['pointerdown', 'focusin', 'keydown'].forEach(function (ev) { document.getElementById('payCard').addEventListener(ev, wake); });
   go.addEventListener('click', function () {
     var api = go.dataset.api;
     if (!api) { say(SOON); document.getElementById('paySoon').hidden = true; return; }
