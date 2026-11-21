@@ -1,0 +1,304 @@
+<style>
+.fin .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.fin input[type=month] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.fin table.sched td, .fin table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .fin .stats { grid-template-columns: 1fr 1fr; } .fin .stat { padding: 10px 12px; } }
+.fch { position: relative; margin: 16px 0 4px; }
+.fch canvas { display: block; width: 100%; height: 240px; touch-action: pan-y; }
+.fch-tip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); margin-top: 6px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.fch-tip b { color: var(--ink); }
+.fch-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+.emi .emi-presets { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; }
+.emi .emi-presets .btn { min-height: 38px; padding: 6px 14px; }
+.emi fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.emi legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.emi .emi-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+.emi .emi-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0 8px; }
+.emi .emi-head h3 { margin: 0; }
+.emi .stat.emi-good b { color: var(--ok); }
+.emi table.sched { min-width: 520px; }
+</style>
+<div class="fin emi" id="emi">
+<div class="emi-presets" role="group" aria-label="Loan type presets">
+  <button type="button" class="btn ghost" data-p="home">Home loan</button>
+  <button type="button" class="btn ghost" data-p="car">Car loan</button>
+  <button type="button" class="btn ghost" data-p="personal">Personal loan</button>
+  <button type="button" class="btn ghost" data-p="edu">Education loan</button>
+</div>
+<div class="fields">
+  <div><label for="emiCur">Currency</label><select id="emiCur" data-cur></select></div>
+  <div hidden><label for="emiSym">Your currency symbol</label><input type="text" id="emiSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div><label for="emiAmt">Loan amount</label><input type="number" id="emiAmt" min="0" step="any" inputmode="decimal" value="100000"></div>
+  <div><label for="emiRate">Interest rate (% per year)</label><input type="number" id="emiRate" min="0" step="any" inputmode="decimal" value="9"></div>
+</div>
+<div class="fields">
+  <div><label for="emiTerm">Loan term</label><input type="number" id="emiTerm" min="0" step="any" inputmode="decimal" value="5"></div>
+  <div><label for="emiUnit">Term in</label><select id="emiUnit"><option value="y">Years</option><option value="m">Months</option></select></div>
+  <div><label for="emiFee">Processing fee (optional)</label><input type="number" id="emiFee" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  <div><label for="emiStart">First payment month</label><input type="month" id="emiStart"></div>
+</div>
+<fieldset>
+  <legend>Prepayment (optional)</legend>
+  <div class="fields">
+    <div><label for="emiExtra">Extra every month</label><input type="number" id="emiExtra" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="emiLump">One-time prepayment</label><input type="number" id="emiLump" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="emiLumpAt">Paid in month number</label><input type="number" id="emiLumpAt" min="1" step="1" inputmode="numeric" value="12"></div>
+  </div>
+  <span class="emi-hint">Prepayments go straight to the loan balance. Your monthly payment stays the same, so the loan ends sooner.</span>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Monthly payment (EMI)</span><b id="emiPay">–</b></div>
+  <div class="stat"><span>Total interest</span><b id="emiInt">–</b></div>
+  <div class="stat"><span>Total paid</span><b id="emiTot">–</b></div>
+  <div class="stat emi-good" id="emiSaveBox" hidden><span>Interest saved</span><b id="emiSave">–</b></div>
+  <div class="stat" id="emiEndBox"><span>Loan paid off</span><b id="emiEnd">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="emi-head"><h3>Principal and interest by year</h3></div>
+<div class="fch"><canvas id="emiChart" role="img" aria-label="Bar chart of principal and interest paid each year"></canvas><div class="fch-tip" id="emiTip" aria-live="off"></div></div>
+<div class="emi-head"><h3>Repayment schedule</h3>
+  <div class="seg" role="group" aria-label="Schedule detail"><button type="button" data-v="y" aria-pressed="true">Yearly</button><button type="button" data-v="m" aria-pressed="false">Monthly</button></div>
+</div>
+<div class="scroll-x"><table class="sched"><thead><tr><th id="emiCol1">Year</th><th>Payment</th><th>Principal</th><th>Interest</th><th>Prepaid</th><th>Balance</th></tr></thead><tbody id="emiRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="emiCsv">Download schedule (CSV)</button><button type="button" class="btn ghost" id="emiCopy">Copy summary</button></div>
+<a id="dl" hidden></a>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  // ---------- small canvas chart (line or stacked bars), redraws on resize and theme change ----------
+  function Chart(cv, tip) {
+    var spec = null, geo = null, hover = -1;
+    function css(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+    function draw() {
+      if (!spec || !cv.isConnected) return;
+      var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      var ink = css('--muted', '#5f6b7a'), line = css('--line', '#e3e6eb'), font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      var L = spec.labels, n = L.length, S = spec.series, max = 0, min = 0;
+      if (!n) return;
+      for (var i = 0; i < n; i++) {
+        var stack = 0;
+        S.forEach(function (s) { var v = +s.data[i] || 0; if (spec.type === 'bar') stack += v; else { if (v > max) max = v; if (v < min) min = v; } });
+        if (spec.type === 'bar' && stack > max) max = stack;
+      }
+      if (max === min) max = min + 1;
+      // nice step
+      var raw = (max - min) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (s) { return s >= raw; });
+      var top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+      g.font = font;
+      var padL = 8 + Math.max(g.measureText(shortNum(top)).width, g.measureText(shortNum(bot)).width), padR = 10, padT = 10, padB = 24;
+      var pw = W - padL - padR, ph = H - padT - padB;
+      function Y(v) { return padT + ph - (v - bot) / (top - bot) * ph; }
+      g.strokeStyle = line; g.fillStyle = ink; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+      for (var v = bot; v <= top + step / 2; v += step) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(shortNum(v), padL - 6, y); }
+      var bw = pw / n, X = function (i) { return padL + bw * (i + .5); };
+      // x labels: as many as fit
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+      for (i = 0; i < n; i++) if (i % every === 0 || i === n - 1 && n - 1 - (Math.floor((n - 1) / every) * every) > every / 2) g.fillText(L[i], X(i), H - padB + 6);
+      if (spec.type === 'bar') {
+        var w = Math.max(1, Math.min(36, bw * .7));
+        for (i = 0; i < n; i++) {
+          var base = 0;
+          S.forEach(function (s) { var v = Math.max(0, +s.data[i] || 0); if (!v) return; g.fillStyle = s.color; var y1 = Y(base + v), y0 = Y(base); g.fillRect(X(i) - w / 2, y1, w, Math.max(0, y0 - y1 - (base ? 1 : 0))); base += v; });
+        }
+      } else {
+        S.forEach(function (s) {
+          g.beginPath();
+          for (var i = 0; i < n; i++) { var x = n === 1 ? padL + pw / 2 : padL + pw * i / (n - 1), y = Y(+s.data[i] || 0); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.strokeStyle = s.color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
+          if (s.fill && n > 1) { g.lineTo(padL + pw, Y(Math.max(bot, 0))); g.lineTo(padL, Y(Math.max(bot, 0))); g.closePath(); g.globalAlpha = .12; g.fillStyle = s.color; g.fill(); g.globalAlpha = 1; }
+        });
+      }
+      geo = { padL: padL, pw: pw, n: n, bw: bw, type: spec.type };
+      if (hover >= 0 && hover < n) {
+        var hx = spec.type === 'bar' ? X(hover) : (n === 1 ? padL + pw / 2 : padL + pw * hover / (n - 1));
+        g.strokeStyle = ink; g.globalAlpha = .5; g.beginPath(); g.moveTo(hx + .5, padT); g.lineTo(hx + .5, padT + ph); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    function showTip(i) {
+      if (!tip) return;
+      if (i < 0) { tip.hidden = true; return; }
+      tip.hidden = false;
+      tip.innerHTML = '<b>' + esc(spec.labels[i]) + '</b>' + spec.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ': ' + esc(spec.fmt ? spec.fmt(+s.data[i] || 0) : s.data[i]) + '</span>'; }).join('');
+    }
+    function pick(e) {
+      if (!geo) return;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left - geo.padL, i;
+      i = geo.type === 'bar' ? Math.floor(x / geo.bw) : Math.round(x / (geo.pw / Math.max(1, geo.n - 1)));
+      i = Math.max(0, Math.min(geo.n - 1, i));
+      if (i !== hover) { hover = i; draw(); showTip(i); }
+    }
+    cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+    cv.addEventListener('pointerleave', function () { hover = -1; draw(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(cv);
+    new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return { set: function (s) { spec = s; if (hover >= s.labels.length) hover = -1; draw(); if (tip) showTip(hover >= 0 ? hover : s.labels.length - 1); } };
+  }
+  var PRESETS = { home: [250000, 7.5, 20, 'y'], car: [30000, 8.5, 5, 'y'], personal: [10000, 13, 3, 'y'], edu: [40000, 9, 10, 'y'] };
+  var view = 'y', last = null;
+  var chart = Chart($('emiChart'), $('emiTip'));
+  function css(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+
+  // Month-by-month schedule. Returns null when the inputs cannot make a loan.
+  function schedule(P, yr, n, extra, lump, lumpAt) {
+    var r = yr / 1200, emi = r === 0 ? P / n : P * r / (1 - Math.pow(1 + r, -n));
+    var bal = P, rows = [], k = 0;
+    while (bal > 0.005 && k < 1200) {
+      k++;
+      var i = bal * r, pr = Math.min(emi - i, bal);
+      if (pr < 0) pr = 0;
+      bal -= pr;
+      var pre = 0;
+      if (bal > 0.005) { pre = Math.min(bal, (extra || 0) + (k === lumpAt ? lump || 0 : 0)); bal -= pre; }
+      rows.push({ k: k, pay: i + pr, prin: pr, int: i, pre: pre, bal: Math.max(0, bal) });
+      if (k >= n && bal > 0.005 && r === 0) break;
+    }
+    return { emi: emi, rows: rows };
+  }
+  function monthLabel(k) {
+    var s = $('emiStart').value, m = /^(\d{4})-(\d{2})$/.exec(s);
+    if (!m) return null;
+    var t = (+m[1]) * 12 + (+m[2] - 1) + k - 1;
+    return MONTHS[t % 12] + ' ' + Math.floor(t / 12);
+  }
+  function calc() {
+    var P = num('emiAmt'), yr = num('emiRate'), t = num('emiTerm'), unit = $('emiUnit').value;
+    var n = Math.round(unit === 'y' ? t * 12 : t), extra = num('emiExtra') || 0, lump = num('emiLump') || 0, at = Math.round(num('emiLumpAt') || 1), fee = num('emiFee') || 0;
+    var err = !(P > 0) ? 'Enter a loan amount above 0.' : !(yr >= 0) ? 'Enter an interest rate of 0 or more.' : yr > 100 ? 'The interest rate looks too high. Enter a yearly rate up to 100%.'
+      : !(n >= 1) ? 'Enter a loan term of at least 1 month.' : n > 1200 ? 'The longest term allowed is 100 years (1200 months).' : extra < 0 || lump < 0 || fee < 0 ? 'Prepayments and fees cannot be negative.' : '';
+    if (err) {
+      ['emiPay', 'emiInt', 'emiTot', 'emiEnd'].forEach(function (i) { $(i).textContent = '–'; }); $('emiSaveBox').hidden = true;
+      $('emiRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null; return say('bad', err);
+    }
+    var base = schedule(P, yr, n, 0, 0, 0), real = (extra || lump) ? schedule(P, yr, n, extra, lump, at) : base;
+    var sum = function (rows, f) { return rows.reduce(function (s, r) { return s + r[f]; }, 0); };
+    var intBase = sum(base.rows, 'int'), intReal = sum(real.rows, 'int'), paid = sum(real.rows, 'pay') + sum(real.rows, 'pre');
+    $('emiPay').textContent = money(base.emi);
+    $('emiInt').textContent = money(intReal);
+    $('emiTot').textContent = money(paid + fee);
+    var saved = intBase - intReal, mSaved = base.rows.length - real.rows.length;
+    $('emiSaveBox').hidden = !(extra || lump);
+    $('emiSave').textContent = money(Math.max(0, saved));
+    var months = real.rows.length, endLbl = monthLabel(months);
+    $('emiEnd').textContent = endLbl || (months + (months === 1 ? ' month' : ' months') + (months >= 12 ? ' (' + fmtNum(months / 12, 1) + ' yrs)' : ''));
+    var notes = [];
+    if (extra || lump) notes.push(mSaved > 0 ? 'Prepaying ends the loan ' + mSaved + (mSaved === 1 ? ' month' : ' months') + ' early and saves ' + money(Math.max(0, saved)) + ' in interest.' : 'The prepayment is too small or too late to shorten the loan by a full month.');
+    if (lump && at > base.rows.length) notes.push('The one-time prepayment month is after the loan ends, so it was not used.');
+    if (fee) notes.push('Total paid includes the processing fee of ' + money(fee) + '.');
+    say(notes.length ? 'ok' : '', notes.join(' '));
+    last = { P: P, yr: yr, n: n, emi: base.emi, rows: real.rows, intReal: intReal, paid: paid + fee, fee: fee, saved: saved, months: months };
+    table(); drawChart();
+  }
+  function years(rows) {
+    var out = [];
+    rows.forEach(function (r) {
+      var y = Math.ceil(r.k / 12), o = out[y - 1] || (out[y - 1] = { k: y, pay: 0, prin: 0, int: 0, pre: 0, bal: 0 });
+      o.pay += r.pay; o.prin += r.prin; o.int += r.int; o.pre += r.pre; o.bal = r.bal;
+    });
+    return out;
+  }
+  function table() {
+    if (!last) return;
+    var rows = view === 'y' ? years(last.rows) : last.rows;
+    $('emiCol1').textContent = view === 'y' ? 'Year' : 'Month';
+    $('emiRows').innerHTML = rows.map(function (r) {
+      var lbl = view === 'm' ? (monthLabel(r.k) || r.k) : r.k;
+      return '<tr><td>' + lbl + '</td><td>' + money(r.pay) + '</td><td>' + money(r.prin) + '</td><td>' + money(r.int) + '</td><td>' + (r.pre ? money(r.pre) : '–') + '</td><td>' + money(r.bal) + '</td></tr>';
+    }).join('');
+  }
+  function drawChart() {
+    if (!last) return;
+    var ys = years(last.rows);
+    chart.set({ type: 'bar', labels: ys.map(function (y) { return 'Y' + y.k; }), fmt: function (v) { return money(v, 0); },
+      series: [{ name: 'Principal', color: css('--accent', '#2563eb'), data: ys.map(function (y) { return y.prin + y.pre; }) }, { name: 'Interest', color: '#f59e0b', data: ys.map(function (y) { return y.int; }) }] });
+  }
+  document.querySelectorAll('.emi .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { view = b.dataset.v; document.querySelectorAll('.emi .seg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); table(); });
+  });
+  document.querySelectorAll('.emi-presets button').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var p = PRESETS[b.dataset.p];
+      $('emiAmt').value = p[0]; $('emiRate').value = p[1]; $('emiTerm').value = p[2]; $('emiUnit').value = p[3];
+      $('emiAmt').dispatchEvent(new Event('input', { bubbles: true }));
+      say('', b.textContent + ': typical example numbers filled in. Change them to match your offer.');
+    });
+  });
+  $('emiCsv').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    var lines = [['Month', 'Payment', 'Principal', 'Interest', 'Prepaid', 'Balance'].join(',')];
+    last.rows.forEach(function (r) { lines.push([monthLabel(r.k) || r.k, r.pay.toFixed(2), r.prin.toFixed(2), r.int.toFixed(2), r.pre.toFixed(2), r.bal.toFixed(2)].join(',')); });
+    var a = $('dl'); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/csv' })); a.download = 'loan-schedule.csv'; a.click();
+    say('ok', 'Saved loan-schedule.csv with ' + last.rows.length + ' monthly rows.');
+  });
+  $('emiCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    var t = 'Loan ' + money(last.P) + ' at ' + last.yr + '% for ' + last.n + ' months\nMonthly payment (EMI): ' + money(last.emi) + '\nTotal interest: ' + money(last.intReal) + '\nTotal paid: ' + money(last.paid) + '\nPaid off in ' + last.months + ' months';
+    if (last.saved > 0.5) t += '\nInterest saved by prepaying: ' + money(last.saved);
+    copyText(t, this);
+  });
+  $('emi').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  $('emi').addEventListener('change', function (e) { if (e.target.tagName === 'SELECT' || e.target.type === 'month') calc(); });
+  curWire(calc);
+  calc();
+})();
+</script>

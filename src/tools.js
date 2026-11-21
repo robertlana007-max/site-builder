@@ -567,14 +567,15 @@ module.exports = [
   {
     slug: 'number-to-words', cat: 'Text tools', name: 'Number to Words',
     title: 'Number to Words Converter - Spell Out Numbers & Check Amounts',
-    desc: 'Convert numbers into English words, or write an amount in dollars and cents for a check. Handles decimals and very large numbers.',
+    desc: 'Convert numbers into English words, or write a money amount for a check or cheque in your currency. Handles decimals, lakh/crore and huge numbers.',
     card: 'Spell out any number in English words.',
     intro: 'Turn digits into English words, for writing checks, contracts and invoices.',
-    steps: ['Type a number.', 'Choose a plain number or dollars and cents.', 'Click Copy.'],
+    steps: ['Type a number.', 'Choose a plain number or a money amount, and your currency.', 'Click Copy.'],
     faq: [
-      ['How do I write an amount on a check?', 'Choose "Dollars and cents". The cents are written as a fraction, for example "One thousand two hundred thirty-four dollars and 56/100".'],
+      ['How do I write an amount on a check or cheque?', 'Choose "Money amount" and your currency. The cents are written as a fraction, for example "One thousand two hundred thirty-four dollars and 56/100".'],
+      ['Can it write lakh and crore?', 'Yes. Set "Number style" to "Lakh and crore", so 12,50,000 becomes "Twelve lakh fifty thousand".'],
       ['How large a number can it handle?', 'Up to 18 digits, which is hundreds of quadrillions.'],
-      ['Does it use "and"?', 'No. It follows the American style, as in "one hundred five", which is the usual style on checks.']
+      ['Does it use "and"?', 'No. It writes "one hundred five" without "and", which is accepted on checks and cheques everywhere.']
     ]
   },
   {
@@ -809,9 +810,9 @@ module.exports = [
   {
     slug: 'time-zone-converter', cat: 'Time tools', name: 'Time Zone Converter',
     title: 'Time Zone Converter - Compare Times Around the World',
-    desc: 'Convert a date and time to many time zones at once: Pakistan, India, UAE, UK, US and more. Handles daylight saving correctly. Free and private.',
+    desc: 'Convert a date and time to many time zones at once: the Americas, Europe, Africa, the Middle East and Asia. Handles daylight saving. Free and private.',
     card: 'See one time in many time zones at once.',
-    intro: 'Pick a date, a time and a time zone, and see the same moment in Pakistan, India, the UAE, the UK, the US and any other zone you add. Daylight saving is handled for you.',
+    intro: 'Pick a date, a time and a time zone, and see the same moment in the Americas, Europe, Africa, the Middle East, Asia, Australia and any other zone you add. Daylight saving is handled for you.',
     steps: ['Press Now for the current time, or pick a date and time.', 'Choose the time zone that time is in.', 'Read the time in every zone in the list. +1 day means it is already the next day there.', 'Search to add more zones, remove the ones you do not need, then click Copy summary.'],
     faq: [
       ['Does it handle daylight saving time?', 'Yes. The converter uses the time zone rules built into your browser, so changes like the US clocks moving in March and November or Europe in March and October are applied for the exact date you pick.'],
@@ -1037,16 +1038,16 @@ module.exports = [
   },
   {
       slug: 'cgpa-to-percentage', cat: 'Study tools', name: 'CGPA to Percentage Converter',
-      title: 'CGPA to Percentage Converter - CBSE, VTU, Mumbai, Pakistan',
-      desc: 'Convert CGPA to percentage or percentage to CGPA with labelled formulas: 4.0 proportional, CBSE × 9.5, VTU, Mumbai University, Anna University or custom.',
+      title: 'CGPA to Percentage Converter - 4.0, 5.0 & 10-Point Scales',
+      desc: 'Convert CGPA to percentage or percentage to CGPA with labelled formulas: proportional 4.0, 5.0 and 10-point scales, CBSE and Delhi University × 9.5, VTU, GTU, Mumbai, Anna, Pakistan or your own.',
       card: 'CGPA to percentage and back, by formula.',
       intro: 'Convert a CGPA to a percentage, or a percentage to a CGPA, with the formula for your board or university written out next to the result.',
       steps: ['Choose CGPA → Percentage or Percentage → CGPA.', 'Pick the formula for your board or university, or enter a custom one.', 'Type your CGPA or percentage.', 'Read the result and the note about that formula.'],
       faq: [
         ['Is there one official formula for every university?', 'No. Each board and university sets its own rule or equivalence table. This tool shows common formulas for a quick estimate; the figure your university gives is the one that counts.'],
-        ['How do I convert a 4.0 CGPA to a percentage in Pakistan?', 'There is no single formula for every university. The simple proportional estimate is CGPA ÷ 4 × 100, but universities publish their own equivalence tables, so check yours before using the number on a form.'],
+        ['How do I convert a 4.0 CGPA to a percentage?', 'There is no single formula for every university. The simple proportional estimate is CGPA ÷ 4 × 100, so 3.2 becomes 80%. Many universities (for example in Pakistan, Bangladesh or the USA) publish their own equivalence tables, so check yours before using the number on a form.'],
         ['What is the CBSE formula?', 'Multiply the CGPA by 9.5. CBSE gave this for its CGPA grades, so 8.4 becomes 79.8%.'],
-        ['What are the VTU and Mumbai University formulas?', 'The commonly quoted VTU formula is (CGPA − 0.75) × 10, and the Mumbai University one is 7.1 × CGPA + 11. Rules can differ by scheme and year, so confirm yours.'],
+        ['What are the VTU, GTU and Mumbai University formulas?', 'The commonly quoted VTU (and MAKAUT) formula is (CGPA − 0.75) × 10, GTU uses (CGPA − 0.5) × 10, and Mumbai University 7.1 × CGPA + 11. Rules can differ by scheme and year, so confirm yours.'],
         ['Can I use my own university formula?', 'Yes. Choose Custom and enter the multiplier, the offset and the highest CGPA on your scale.']
       ],
       icon: '<path d="M4 7h7M4 12h4"/><path d="M14 17l6-10"/><circle cx="14.5" cy="8.5" r="1.5"/><circle cx="19.5" cy="15.5" r="1.5"/><path d="M4 17h7"/>'
@@ -1054,7 +1055,7 @@ module.exports = [
   {
       slug: 'marks-percentage-calculator', cat: 'Study tools', name: 'Marks Percentage Calculator',
       title: 'Marks Percentage Calculator - Total & Subject-Wise with Grade',
-      desc: 'Find your marks percentage from total or subject-wise marks, with Pakistan board grades (A1 to E), Indian divisions or your own grade cut-offs.',
+      desc: 'Find your marks percentage from total or subject-wise marks, with letter grades, UK degree classes, Pakistan board grades, Indian divisions or your own grade cut-offs.',
       card: 'Marks to percentage, grade and division.',
       intro: 'Turn your marks into a percentage, overall or subject by subject, and see your grade or division.',
       steps: ['Choose Total marks or Subject-wise.', 'Pick a grade or division scheme.', 'Enter marks obtained and total marks.', 'Read your percentage and grade.'],

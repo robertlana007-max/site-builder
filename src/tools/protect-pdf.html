@@ -1,0 +1,149 @@
+<style>
+.pp-pw { display: flex; gap: 8px; align-items: stretch; }
+.pp-pw input { flex: 1; min-width: 0; }
+.pp-pw .btn { flex: none; }
+.pp-meter { height: 6px; border-radius: 3px; background: var(--line); margin: 6px 0 2px; overflow: hidden; }
+.pp-meter i { display: block; height: 100%; width: 0; background: #dc2626; transition: width .2s; }
+.pp-hint { font-size: 13px; color: var(--muted); margin: 0 0 12px; min-height: 1.2em; }
+.pp-sec { margin-top: 6px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>The password is added on your device. The file and the password are never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<label for="pw">Password to open the PDF</label>
+<div class="pp-pw"><input type="password" id="pw" autocomplete="new-password" spellcheck="false" data-nomemo placeholder="Choose a password"><button type="button" class="btn ghost" id="show" aria-pressed="false">Show</button></div>
+<div class="pp-meter" aria-hidden="true"><i id="bar"></i></div>
+<p class="pp-hint" id="hint"></p>
+<label for="pw2">Type the password again</label>
+<input type="password" id="pw2" autocomplete="new-password" spellcheck="false" data-nomemo>
+<details class="more pp-sec" id="more">
+  <summary>Restrictions (optional): stop printing, copying or editing</summary>
+  <div class="checks">
+    <label><input type="checkbox" id="pPrint" checked> Allow printing</label>
+    <label><input type="checkbox" id="pCopy" checked> Allow copying text and pictures</label>
+    <label><input type="checkbox" id="pEdit" checked> Allow editing pages (add, delete, rotate, change content)</label>
+    <label><input type="checkbox" id="pNotes" checked> Allow comments and filling in forms</label>
+  </div>
+  <label for="owner">Owner password (needed to change the restrictions later)</label>
+  <input type="password" id="owner" autocomplete="new-password" spellcheck="false" data-nomemo placeholder="Leave empty to create a random one">
+  <p class="pp-hint">Restrictions are respected by Adobe Acrobat, browsers and most PDF readers, but some programs ignore them. Only the open password truly keeps people out.</p>
+</details>
+<div class="fields">
+  <div><label for="enc">Encryption</label><select id="enc"><option value="256" selected>AES 256-bit (strongest, recommended)</option><option value="128">AES 128-bit (for very old PDF readers)</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Protect PDF</button><a class="btn ghost" id="dl" hidden>Download protected PDF</a></div>
+<p class="msg" id="msg"></p>
+<p class="msg" id="ownerMsg" hidden></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, busy = false, wasm = null, MAXB = 1024 * 1024 * 1024;
+
+  // qpdf (compiled to WebAssembly) writes standard PDF encryption that every reader understands.
+  function loadScript() {
+    if (window.Module && window.Module.length !== undefined) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  function qpdf() {
+    return loadScript().then(function () {
+      if (wasm) return wasm;
+      return fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); });
+    }).catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); }).then(function (bin) {
+      var log = [];
+      return window.Module({ wasmBinary: bin, noInitialRun: true, print: function (t) { log.push(t); }, printErr: function (t) { log.push(t); } }).then(function (m) { m.log = log; return m; });
+    });
+  }
+  function run(m, args) {
+    m.log.length = 0;
+    var code;
+    try { code = m.callMain(args); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+    return { code: code, text: m.log.join('\n') };
+  }
+
+  function strength(p) {
+    if (!p) return [0, ''];
+    var kinds = [/[a-z]/, /[A-Z]/, /\d/, /[^A-Za-z0-9]/].filter(function (r) { return r.test(p); }).length;
+    var s = Math.min(4, Math.floor(p.length / 4)) + kinds - 1;
+    if (p.length < 6) return [1, 'Very weak. Use at least 8 characters.'];
+    if (s <= 3) return [2, 'Weak. Make it longer, or mix in numbers and symbols.'];
+    if (s <= 5) return [3, 'Good.'];
+    return [4, 'Strong.'];
+  }
+  function paint() {
+    var s = strength($('pw').value), bar = $('bar');
+    bar.style.width = s[0] * 25 + '%';
+    bar.style.background = ['#dc2626', '#dc2626', '#ea580c', '#ca8a04', '#16a34a'][s[0]];
+    $('hint').textContent = s[1];
+  }
+  ['pw', 'pw2', 'owner'].forEach(function (id) { $(id).addEventListener('input', function () { $('dl').hidden = true; $('ownerMsg').hidden = true; if (id === 'pw') paint(); }); });
+  ['pPrint', 'pCopy', 'pEdit', 'pNotes', 'enc'].forEach(function (id) { $(id).addEventListener('change', function () { $('dl').hidden = true; $('ownerMsg').hidden = true; }); });
+  $('show').addEventListener('click', function () {
+    var on = $('pw').type === 'password';
+    ['pw', 'pw2', 'owner'].forEach(function (id) { $(id).type = on ? 'text' : 'password'; });
+    $('show').textContent = on ? 'Hide' : 'Show'; $('show').setAttribute('aria-pressed', on);
+  });
+  ['pw', 'pw2'].forEach(function (id) { $(id).addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('go').click(); } }); });
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    file = null; bytes = null; $('go').disabled = true; $('dl').hidden = true; $('ownerMsg').hidden = true;
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    if (f.size > MAXB) return PT.say('bad', '"' + f.name + '" is larger than 1 GB, which is too big to open in a browser.');
+    busy = true; PT.say('', 'Checking ' + f.name + '…');
+    Promise.all([f.arrayBuffer(), qpdf()]).then(function (r) {
+      var b = new Uint8Array(r[0]), m = r[1];
+      if (new TextDecoder('latin1').decode(b.subarray(0, 1024)).indexOf('%PDF') === -1) throw new Error('"' + f.name + '" could not be read as a PDF.');
+      m.FS.writeFile('/in.pdf', b);
+      if (run(m, ['--requires-password', '/in.pdf']).code === 0) throw new Error('"' + f.name + '" already has a password. Remove it first with Unlock PDF, then add a new one here.');
+      if (run(m, ['--check', '/in.pdf']).code === 2) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
+      file = f; bytes = b; $('go').disabled = false;
+      PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Now choose a password.');
+    }).catch(function (e) { PT.say('bad', e && e.message || 'Something went wrong with this file.'); }).then(function () { busy = false; });
+  });
+
+  function randomPw() {
+    var a = new Uint8Array(18), abc = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
+    crypto.getRandomValues(a);
+    return Array.prototype.map.call(a, function (x) { return abc[x % abc.length]; }).join('');
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    var pw = $('pw').value, pw2 = $('pw2').value, owner = $('owner').value;
+    var allow = { print: $('pPrint').checked, copy: $('pCopy').checked, edit: $('pEdit').checked, notes: $('pNotes').checked };
+    var limited = !(allow.print && allow.copy && allow.edit && allow.notes);
+    if (!pw && !limited) { PT.say('bad', 'Type a password, or turn off at least one of the restrictions.'); $('pw').focus(); return; }
+    if (pw !== pw2) { PT.say('bad', 'The two passwords are not the same. Type them again.'); $('pw2').focus(); return; }
+    if (owner && owner === pw) { PT.say('bad', 'The owner password must be different from the open password, or anyone who can open the file could remove the restrictions.'); $('owner').focus(); return; }
+    var bits = $('enc').value, made = false;
+    if (!owner) { owner = randomPw(); made = limited; }
+    busy = true; $('ownerMsg').hidden = true;
+    PT.run(async function () {
+      PT.say('', 'Encrypting…');
+      var m = await qpdf();
+      m.FS.writeFile('/in.pdf', bytes);
+      var args = ['/in.pdf', '--encrypt', '--user-password=' + pw, '--owner-password=' + owner, '--bits=' + bits,
+        '--print=' + (allow.print ? 'full' : 'none'), '--extract=' + (allow.copy ? 'y' : 'n'),
+        '--modify-other=' + (allow.edit ? 'y' : 'n'), '--assemble=' + (allow.edit ? 'y' : 'n'),
+        '--annotate=' + (allow.notes ? 'y' : 'n'), '--form=' + (allow.notes ? 'y' : 'n')];
+      if (bits === '128') args.push('--use-aes=y');
+      args.push('--', '/out.pdf');
+      var r = run(m, args);
+      if (r.code === 2) throw new Error('This PDF could not be protected. It may be damaged.');
+      // Prove the result opens with the password before handing it over.
+      var chk = run(m, ['--password=' + pw, '--check', '/out.pdf']);
+      if (chk.code === 2) throw new Error('Something went wrong while checking the protected file. Please try again.');
+      var out = m.FS.readFile('/out.pdf');
+      PT.done(out, PT.base(file.name) + '-protected.pdf', 'application/pdf', pw ? 'Protected. The PDF now asks for your password' : 'Restrictions added. The PDF opens without a password');
+      if (made) {
+        $('ownerMsg').hidden = false; $('ownerMsg').className = 'msg';
+        $('ownerMsg').textContent = 'Owner password (keep it if you may want to lift the restrictions later): ' + owner;
+      }
+    }).then(function () { busy = false; });
+  });
+})();
+</script>

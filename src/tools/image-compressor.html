@@ -15,7 +15,7 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
-  var src = null, orig = 0, name = 'image', lastUrl = null, origFile = null, origUrl = null, job = 0;
+  var src = null, orig = 0, name = 'image', lastUrl = null, origFile = null, origUrl = null, job = 0, hasAlpha = false;
   function run() {
     if (!src) return;
     var mine = ++job;
@@ -37,7 +37,7 @@
       $('s3').textContent = pct > 0 ? pct + '%' : '0%';
       if (b.size < orig) {
         $('dl').href = lastUrl; $('dl').download = name + '-compressed.' + (type === 'image/webp' ? 'webp' : 'jpg'); $('dl').textContent = 'Download image';
-        $('msg').className = 'msg'; $('msg').textContent = w + ' × ' + h + ' px';
+        $('msg').className = 'msg'; $('msg').textContent = w + ' × ' + h + ' px' + (hasAlpha && type === 'image/jpeg' ? ' · JPG has no transparency, so see-through areas become white. Pick WebP to keep them.' : '');
       } else { // never hand out a bigger file than the one the person started with
         if (!origUrl) origUrl = URL.createObjectURL(origFile);
         $('prev').src = origUrl;
@@ -51,11 +51,20 @@
     // a new file: forget the last result so nothing from it can be downloaded by mistake
     src = null; job++; $('stats').hidden = true; $('prev').hidden = true; $('dl').hidden = true;
     if (origUrl) { URL.revokeObjectURL(origUrl); origUrl = null; }
-    if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'Please choose an image file.'; return; }
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool, then come back.'; return; }
+    if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'Please choose an image file (JPG, PNG, WebP, GIF or BMP).'; return; }
     orig = f.size; origFile = f; name = f.name.replace(/\.[^.]+$/, '');
     loadImage(f, function (img) {
-      if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image.'; return; }
-      src = img; run();
+      if (!img) { $('msg').className = 'msg bad'; $('msg').textContent = 'Could not read that image. It may be damaged, or in a format this browser cannot open. Please try a JPG, PNG, WebP, GIF or BMP file.'; return; }
+      src = img; hasAlpha = false;
+      if (/png|webp|gif/i.test(f.type)) { // does the picture have see-through pixels? (checked on a small copy)
+        var t = document.createElement('canvas'), k = Math.min(1, 256 / Math.max(img.naturalWidth, img.naturalHeight));
+        t.width = Math.max(1, Math.round(img.naturalWidth * k)); t.height = Math.max(1, Math.round(img.naturalHeight * k));
+        var tc = t.getContext('2d'); tc.drawImage(img, 0, 0, t.width, t.height);
+        var px = tc.getImageData(0, 0, t.width, t.height).data;
+        for (var i = 3; i < px.length; i += 4) if (px[i] < 250) { hasAlpha = true; break; }
+      }
+      run();
     });
   });
   $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; run(); });

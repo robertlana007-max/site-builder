@@ -135,6 +135,15 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     return 0.2126 * L(r) + 0.7152 * L(g) + 0.0722 * L(b) > 0.4 ? '#111111' : '#ffffff';
   }
 
+  // Chosen days in week order. The week starts after the longest run of days off, so a Sunday-to-Thursday
+  // or Saturday-to-Wednesday school week starts on Sunday or Saturday, and Monday-to-Friday on Monday.
+  function weekOrder(list) {
+    var d = list.slice().sort(function (a, b) { return a - b; });
+    if (d.length < 2 || d.length === 7) return d;
+    var best = 0, gap = -1;
+    for (var i = 0; i < d.length; i++) { var g = (d[i] - d[(i + d.length - 1) % d.length] + 7) % 7; if (g > gap) { gap = g; best = i; } }
+    return d.slice(best).concat(d.slice(0, best));
+  }
   // ---------- state ----------
   var st = { name: '', days: [0, 1, 2, 3, 4], clock: '24', periods: [], classes: [], gen: null };
   function generate(o) {
@@ -190,7 +199,7 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     return occ;
   }
   function draw() {
-    var t = $('ttTable'), days = st.days.slice().sort(), occ = occupancy();
+    var t = $('ttTable'), days = weekOrder(st.days), occ = occupancy();
     t.style.setProperty('--tt-n', Math.max(1, days.length));
     $('ttTitleOut').textContent = st.name;
     var h = '<thead><tr><th class="tt-time" scope="col">Time</th>';
@@ -286,7 +295,8 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     var oldTeach = st.periods.filter(function (p) { return !p.brk; }), newTeach = ps.filter(function (p) { return !p.brk; }), lost = 0;
     st.classes = st.classes.filter(function (c) { var i = oldTeach.findIndex(function (p) { return p.id === c.pid; }); if (i === -1 || i >= newTeach.length) { lost++; return false; } c.pid = newTeach[i].id; return true; });
     st.periods = ps; st.gen = o; drawPeriods(); draw(); save();
-    say(lost ? 'bad' : 'ok', 'Made ' + newTeach.length + ' periods.' + (lost ? ' ' + lost + (lost === 1 ? ' class was' : ' classes were') + ' removed because their period no longer exists.' : ''));
+    var lastEnd = ps[ps.length - 1].end, full = newTeach.length >= 20 && toMin(o.end) - lastEnd >= Math.max(5, +o.len || 45);
+    say(lost || full ? 'bad' : 'ok', 'Made ' + newTeach.length + ' periods.' + (full ? ' 20 is the most a day can have, so the day now ends at ' + show(lastEnd) + '.' : '') + (lost ? ' ' + lost + (lost === 1 ? ' class was' : ' classes were') + ' removed because their period no longer exists.' : ''));
   });
   $('ttClock').addEventListener('change', function () { st.clock = $('ttClock').value; draw(); save(); });
   $('ttName').addEventListener('input', function () { st.name = $('ttName').value; $('ttTitleOut').textContent = st.name; save(); });
@@ -352,7 +362,7 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
   }
   function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function render(scale) {
-    var days = st.days.slice().sort(), occ = occupancy();
+    var days = weekOrder(st.days), occ = occupancy();
     if (!days.length || !st.periods.length) return null;
     var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
     var TW = 120, DW = days.length > 5 ? 170 : 200, HH = 46, RH = 78, BH = 36, PAD = 24, TT = st.name ? 54 : 0;

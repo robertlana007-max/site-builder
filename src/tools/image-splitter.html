@@ -1,0 +1,148 @@
+<style>
+.sp-stage { position: relative; background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.sp-stage canvas { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto; }
+.sp-tiles { display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); margin-top: 14px; }
+.sp-tiles button { position: relative; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 4px; cursor: pointer; aspect-ratio: 1; display: flex; align-items: center; justify-content: center; }
+.sp-tiles img { max-width: 100%; max-height: 100%; display: block; }
+.sp-tiles b { position: absolute; top: 4px; inset-inline-start: 4px; background: rgba(0,0,0,.65); color: #fff; font-size: 12px; border-radius: 6px; padding: 1px 6px; }
+.sp-tiles button:hover { border-color: var(--accent); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>JPG, PNG, WebP or GIF. Your image never leaves your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="sp-stage" id="stage" hidden><canvas id="cv" aria-label="Preview with cut lines"></canvas></div>
+<div class="fields">
+  <div><label for="mode">How to split</label><select id="mode"><option value="grid">Grid (rows × columns)</option><option value="carousel">Instagram carousel (panorama)</option><option value="h">Horizontal strips</option><option value="v">Vertical strips</option></select></div>
+  <div id="rowsW"><label for="rows">Rows</label><input type="number" id="rows" min="1" max="20" value="3"></div>
+  <div id="colsW"><label for="cols">Columns</label><input type="number" id="cols" min="1" max="20" value="3"></div>
+  <div id="slidesW" hidden><label for="slides">Number of slides</label><input type="number" id="slides" min="2" max="20" value="3"></div>
+  <div id="shapeW" hidden><label for="shape">Slide shape</label><select id="shape"><option value="1">Square 1:1 (1080 × 1080)</option><option value="0.8">Portrait 4:5 (1080 × 1350)</option><option value="0.75">Portrait 3:4 (1080 × 1440)</option><option value="0">Keep my image as it is</option></select></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="keep">Same as original</option><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="q">Quality (JPG, WebP): <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+</div>
+<p class="msg" id="info" style="margin-top:0"></p>
+<div class="btns"><button class="btn" id="go" disabled>Split and download ZIP</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<div class="sp-tiles" id="tiles" aria-label="Pieces. Tap one to download it on its own."></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var img = null, file = null, busy = false, lastUrl = null, tileUrls = [];
+  var EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  function say(c, t) { PT.say(c, t); }
+  function clampInt(id, lo, hi, def) { var v = parseInt($(id).value, 10); if (!isFinite(v)) v = def; return Math.max(lo, Math.min(hi, v)); }
+
+  // The piece layout: a source crop (sx, sy, sw, sh), the cut positions, and an optional output size per piece.
+  function plan() {
+    var W = img.naturalWidth, H = img.naturalHeight, mode = $('mode').value, rows = 1, cols = 1, sx = 0, sy = 0, sw = W, sh = H, outW = 0;
+    if (mode === 'grid') { rows = clampInt('rows', 1, 20, 3); cols = clampInt('cols', 1, 20, 3); }
+    else if (mode === 'h') rows = clampInt('rows', 1, 20, 3);
+    else if (mode === 'v') cols = clampInt('cols', 1, 20, 3);
+    else {
+      cols = clampInt('slides', 2, 20, 3);
+      var r = +$('shape').value;
+      if (r > 0) { // crop the middle of the picture to exactly N slides of the chosen shape
+        var want = cols * r; // width / height of the whole strip
+        if (W / H > want) { sw = Math.round(H * want); sx = Math.round((W - sw) / 2); } else { sh = Math.round(W / want); sy = Math.round((H - sh) / 2); }
+        outW = Math.min(1080, Math.floor(sw / cols));
+      }
+    }
+    rows = Math.min(rows, sh); cols = Math.min(cols, sw); // never cut thinner than one pixel
+    var xs = [], ys = [], i;
+    for (i = 0; i <= cols; i++) xs.push(sx + Math.round(i * sw / cols));
+    for (i = 0; i <= rows; i++) ys.push(sy + Math.round(i * sh / rows));
+    return { rows: rows, cols: cols, xs: xs, ys: ys, sx: sx, sy: sy, sw: sw, sh: sh, outW: outW, ratio: +$('shape').value };
+  }
+  function pieceSize(p, c, r) {
+    var w = p.xs[c + 1] - p.xs[c], h = p.ys[r + 1] - p.ys[r];
+    if (p.outW && p.ratio > 0) return { w: p.outW, h: Math.round(p.outW / p.ratio) };
+    return { w: w, h: h };
+  }
+  function draw() {
+    $('dl').hidden = true; clearTiles();
+    if (!img) return;
+    syncUi();
+    var p = plan(), W = img.naturalWidth, H = img.naturalHeight, s = Math.min(1, 1000 / Math.max(W, H)), cv = $('cv');
+    cv.width = Math.max(1, Math.round(W * s)); cv.height = Math.max(1, Math.round(H * s));
+    var x = cv.getContext('2d'); x.drawImage(img, 0, 0, cv.width, cv.height);
+    if (p.sw < W || p.sh < H) { // dim the parts that will be cropped off
+      x.fillStyle = 'rgba(0,0,0,.55)';
+      x.fillRect(0, 0, cv.width, p.sy * s); x.fillRect(0, (p.sy + p.sh) * s, cv.width, cv.height);
+      x.fillRect(0, p.sy * s, p.sx * s, p.sh * s); x.fillRect((p.sx + p.sw) * s, p.sy * s, cv.width, p.sh * s);
+    }
+    x.lineWidth = Math.max(1.5, cv.width / 400);
+    var line = function (a, b, c, d) { x.beginPath(); x.moveTo(a, b); x.lineTo(c, d); x.strokeStyle = 'rgba(0,0,0,.6)'; x.setLineDash([]); x.stroke(); x.strokeStyle = '#fff'; x.setLineDash([8, 6]); x.stroke(); };
+    var k;
+    for (k = 1; k < p.cols; k++) line(p.xs[k] * s, p.sy * s, p.xs[k] * s, (p.sy + p.sh) * s);
+    for (k = 1; k < p.rows; k++) line(p.sx * s, p.ys[k] * s, (p.sx + p.sw) * s, p.ys[k] * s);
+    x.setLineDash([]);
+    var n = 0, fs = Math.max(12, Math.min(40, (p.sw * s / p.cols) / 5));
+    x.font = '700 ' + fs + 'px system-ui, sans-serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
+    for (var r = 0; r < p.rows; r++) for (var c = 0; c < p.cols; c++) {
+      n++; var cx = (p.xs[c] + p.xs[c + 1]) / 2 * s, cy = (p.ys[r] + p.ys[r + 1]) / 2 * s;
+      x.lineWidth = fs / 6; x.strokeStyle = 'rgba(0,0,0,.6)'; x.strokeText(n, cx, cy); x.fillStyle = '#fff'; x.fillText(n, cx, cy);
+    }
+    var ps = pieceSize(p, 0, 0);
+    $('info').textContent = (p.rows * p.cols) + ' pieces, each about ' + ps.w + ' × ' + ps.h + ' px.' + (p.sw < W || p.sh < H ? ' The darker part is cropped off so every slide has the same shape.' : '');
+  }
+  function syncUi() {
+    var m = $('mode').value;
+    $('rowsW').hidden = !(m === 'grid' || m === 'h'); $('colsW').hidden = !(m === 'grid' || m === 'v');
+    $('slidesW').hidden = $('shapeW').hidden = m !== 'carousel';
+    $('q').disabled = outType() === 'image/png';
+  }
+  function outType() { var f = $('fmt').value; if (f !== 'keep') return f; return file && EXT[file.type] ? file.type : 'image/png'; }
+  function piece(p, r, c, type) {
+    var sz = pieceSize(p, c, r), cv = document.createElement('canvas'); cv.width = sz.w; cv.height = sz.h;
+    var x = cv.getContext('2d'); if (type === 'image/jpeg') { x.fillStyle = '#fff'; x.fillRect(0, 0, sz.w, sz.h); }
+    x.imageSmoothingQuality = 'high';
+    x.drawImage(img, p.xs[c], p.ys[r], p.xs[c + 1] - p.xs[c], p.ys[r + 1] - p.ys[r], 0, 0, sz.w, sz.h);
+    return PT.blob(cv, type, $('q').value / 100).then(function (b) { cv.width = cv.height = 0; if (!b) throw new Error('Your browser could not save the pieces in this format. Try JPG or PNG.'); return b; });
+  }
+  function clearTiles() { tileUrls.forEach(URL.revokeObjectURL); tileUrls = []; $('tiles').innerHTML = ''; }
+  function offer(blob, name, note) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false;
+    a.click(); if (window.burst) burst(a);
+    say('ok', note + ' · ' + fmtBytes(blob.size) + '. If the download did not start, use the green button. Tap a piece below to save it on its own.');
+  }
+  $('go').addEventListener('click', async function () {
+    if (!img || busy) return;
+    busy = true; $('go').disabled = true; clearTiles();
+    try {
+      var p = plan(), type = outType(), ext = EXT[type], base = PT.base(file.name) || 'image', files = [], n = 0, total = p.rows * p.cols, pad = String(total).length;
+      for (var r = 0; r < p.rows; r++) for (var c = 0; c < p.cols; c++) {
+        n++; say('', 'Cutting piece ' + n + ' of ' + total + '…');
+        var b = await piece(p, r, c, type), e = EXT[b.type] || ext;
+        var name = base + '-' + String(n).padStart(pad, '0') + (p.rows > 1 && p.cols > 1 ? '-row' + (r + 1) + '-col' + (c + 1) : '') + '.' + e;
+        files.push({ name: name, data: new Uint8Array(await b.arrayBuffer()) });
+        var u = URL.createObjectURL(b); tileUrls.push(u);
+        var btn = document.createElement('a'); btn.href = u; btn.download = name; btn.title = 'Download ' + name;
+        var wrap = document.createElement('button'); wrap.type = 'button'; wrap.setAttribute('aria-label', 'Download piece ' + n);
+        var im = document.createElement('img'); im.src = u; im.alt = 'Piece ' + n; var tag = document.createElement('b'); tag.textContent = n;
+        wrap.appendChild(im); wrap.appendChild(tag);
+        (function (a) { wrap.addEventListener('click', function () { a.click(); }); })(btn);
+        $('tiles').appendChild(wrap);
+      }
+      offer(PT.zip(files), base + '-split-' + total + '.zip', 'Saved ' + total + ' pieces in a ZIP' + ($('mode').value === 'carousel' ? '. Post them in number order' : ''));
+    } catch (e) { say('bad', e && e.message ? e.message : 'Something went wrong while cutting the image.'); }
+    busy = false; $('go').disabled = !img;
+  });
+  PT.drop(false, function (f) {
+    if (busy) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP file.'); return; }
+    say('', 'Opening ' + f.name + '…');
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
+      img = im; file = f; $('stage').hidden = false; $('go').disabled = false;
+      say('', f.name + ' · ' + im.naturalWidth + ' × ' + im.naturalHeight + ' px. Choose how to split it, then press Split.');
+      draw();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) {
+    el.addEventListener('input', draw); el.addEventListener('change', draw);
+  });
+  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; });
+  $('qv').textContent = $('q').value; syncUi();
+})();
+</script>

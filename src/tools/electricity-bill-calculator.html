@@ -12,10 +12,22 @@
 @media (max-width: 520px) { .eb-tbl th, .eb-tbl td { padding: 6px 4px; } }
 </style>
 <div class="fields">
-  <div><label for="ebMode">How you are charged</label><select id="ebMode"><option value="slab">Slab rates (price changes with usage)</option><option value="flat">One flat rate per unit</option></select></div>
-  <div><label for="ebUnits">Units used (kWh)</label><input type="number" id="ebUnits" min="0" step="any" value="250" inputmode="decimal"></div>
-  <div><label for="ebCurr">Currency <small>(label only)</small></label><input type="text" id="ebCurr" maxlength="6" value="Rs"></div>
+  <div><label for="ebPreset">Start from</label><select id="ebPreset">
+    <option value="gen">My own rates (any country)</option>
+    <option value="us">United States, national average</option>
+    <option value="uk">United Kingdom, price cap</option>
+    <option value="inD">India, Delhi residential slabs</option>
+    <option value="bd">Bangladesh, residential slabs</option>
+    <option value="pkU">Pakistan, residential unprotected</option>
+    <option value="pkP">Pakistan, residential protected</option>
+    <option value="pkL">Pakistan, lifeline</option>
+  </select></div>
+  <div><label for="ebMode">How you are charged</label><select id="ebMode"><option value="flat">One flat rate per unit</option><option value="slab">Slab rates (price changes with usage)</option></select></div>
+  <div><label for="ebUnits">Units used (kWh)</label><input type="number" id="ebUnits" min="0" step="any" value="300" inputmode="decimal"></div>
+  <div><label for="ebCurr">Currency</label><select id="ebCurr"></select></div>
+  <div id="ebCurrOBox" hidden><label for="ebCurrO">Your currency symbol</label><input type="text" id="ebCurrO" maxlength="6" placeholder="e.g. KES"></div>
 </div>
+<p class="eb-note" id="ebPkNote" hidden></p>
 <details class="eb-box">
   <summary>Work out units from meter readings</summary>
   <div class="fields" style="margin-bottom:0">
@@ -27,34 +39,27 @@
 
 <div class="eb-sec" id="ebSlabSec">
   <div class="fields">
-    <div><label for="ebPreset">Rate table</label><select id="ebPreset">
-      <option value="pkU">Pakistan residential, unprotected</option>
-      <option value="pkP">Pakistan residential, protected (up to 200 units)</option>
-      <option value="pkL">Pakistan lifeline (up to 100 units)</option>
-      <option value="custom">My own slabs</option>
-    </select></div>
     <div><label for="ebMethod">How slabs are applied</label><select id="ebMethod">
       <option value="prog">Each slab at its own rate</option>
       <option value="prev1">One previous slab benefit</option>
       <option value="single">All units at the final slab's rate</option>
     </select></div>
   </div>
-  <p class="eb-note" id="ebPkNote"><b>Rates change often, so edit them.</b> The Pakistan presets are NEPRA base rates per unit notified in July 2024, before fuel adjustment (FCA), quarterly adjustment and taxes. Copy the current rates from your bill or your DISCO's website if they differ.</p>
   <p class="eb-note" id="ebMethodNote"></p>
   <div class="scroll-x"><table class="sched eb-tbl"><thead><tr><th>From unit</th><th>Up to unit</th><th>Rate per unit</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody id="ebRows"></tbody></table></div>
   <div class="btns"><button type="button" class="btn ghost" id="ebAdd">Add slab</button></div>
 </div>
 <div class="eb-sec" id="ebFlatSec" hidden>
-  <div class="fields"><div><label for="ebRate">Price per unit (kWh)</label><input type="number" id="ebRate" min="0" step="any" value="0.25" inputmode="decimal"></div></div>
+  <div class="fields"><div><label for="ebRate">Price per unit (kWh)</label><input type="number" id="ebRate" min="0" step="any" value="0.15" inputmode="decimal"></div></div>
 </div>
 
 <h3>Other charges and taxes</h3>
 <div class="fields">
   <div><label for="ebPerUnit">Extra per unit <small>(e.g. fuel adjustment)</small></label><input type="number" id="ebPerUnit" step="any" value="0" inputmode="decimal"></div>
   <div><label for="ebFixed">Fixed charges <small>(taxed)</small></label><input type="number" id="ebFixed" min="0" step="any" value="0" inputmode="decimal"></div>
-  <div><label for="ebTax">Sales tax / VAT %</label><input type="number" id="ebTax" min="0" step="any" value="18" inputmode="decimal"></div>
-  <div><label for="ebDuty">Electricity duty or other tax %</label><input type="number" id="ebDuty" min="0" step="any" value="1.5" inputmode="decimal"></div>
-  <div><label for="ebFlatFee">Charges with no tax <small>(e.g. TV fee)</small></label><input type="number" id="ebFlatFee" min="0" step="any" value="35" inputmode="decimal"></div>
+  <div><label for="ebTax">Sales tax / VAT %</label><input type="number" id="ebTax" min="0" step="any" value="0" inputmode="decimal"></div>
+  <div><label for="ebDuty">Electricity duty or other tax %</label><input type="number" id="ebDuty" min="0" step="any" value="0" inputmode="decimal"></div>
+  <div><label for="ebFlatFee">Charges with no tax <small>(e.g. TV fee)</small></label><input type="number" id="ebFlatFee" min="0" step="any" value="0" inputmode="decimal"></div>
 </div>
 <div class="stats">
   <div class="stat"><span>Energy charge</span><b id="ebEnergy">–</b></div>
@@ -69,53 +74,69 @@
 <div class="btns"><button type="button" class="btn ghost" id="ebCopy">Copy breakdown</button></div>
 <script>
 (function () {
-  // NEPRA residential base tariff, notified July 2024 (Rs per kWh, before FCA, QTA and taxes).
+  // ---- currency picker (guessed from the browser's region on a first visit) ----
+  var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
+  var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
+  'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ').forEach(function (c) { REG[c] = '€'; });
+  $('ebCurr').innerHTML = CUR.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+  try { var rg = (navigator.language || '').split('-')[1]; $('ebCurr').value = REG[(rg || '').toUpperCase()] || ''; } catch (e) {}
+  function cur() { var v = $('ebCurr').value; if (v === 'other') v = $('ebCurrO').value.trim(); return v ? v + ' ' : ''; }
+
+  // ---- presets: example published rates. They change, so the page says when they were set and asks people to check. ----
   var PRESETS = {
-    pkU: { method: 'prev1', rows: [[100, 16.48], [200, 22.95], [300, 27.14], [400, 32.03], [500, 35.24], [600, 36.66], [700, 37.80], [null, 42.72]] },
-    pkP: { method: 'prog', rows: [[100, 7.74], [200, 10.06]] },
-    pkL: { method: 'prog', rows: [[50, 3.95], [100, 7.74]] }
+    us: { mode: 'flat', cur: '$', rate: 0.17, tax: 0, duty: 0, fixed: 0, fee: 0, note: 'Average US home price, about 17 cents per kWh (EIA, 2024). Your state and utility can be much higher or lower, and most bills add a monthly customer charge. Edit the rate from your bill.' },
+    uk: { mode: 'flat', cur: '£', rate: 0.245, tax: 0, duty: 0, fixed: 18.3, fee: 0, note: 'Ofgem price cap for October–December 2024: 24.50p per kWh and a 60.99p daily standing charge (about £18.30 for 30 days), both already including 5% VAT. The cap changes every 3 months, so edit the numbers.' },
+    inD: { mode: 'slab', method: 'prog', cur: '₹', rows: [[200, 3], [400, 4.5], [800, 6.5], [1200, 7], [null, 8]], tax: 0, duty: 5, fixed: 0, fee: 0, note: 'Delhi (DERC) domestic energy rates per unit. Other Indian states have different slabs. Fixed charges depend on your sanctioned load, and subsidies may apply. Edit the table from your bill.' },
+    bd: { mode: 'slab', method: 'prog', cur: '৳', rows: [[75, 5.26], [200, 7.2], [300, 7.59], [400, 8.02], [600, 12.67], [null, 14.61]], tax: 5, duty: 0, fixed: 0, fee: 0, note: 'Bangladesh residential rates per unit from March 2024 (not the lifeline rate). Demand charge and meter rent are extra; add them as fixed charges. Edit if rates have changed.' },
+    pkU: { mode: 'slab', method: 'prev1', cur: 'Rs', rows: [[100, 16.48], [200, 22.95], [300, 27.14], [400, 32.03], [500, 35.24], [600, 36.66], [700, 37.80], [null, 42.72]], tax: 18, duty: 1.5, fixed: 0, fee: 35, note: 'NEPRA base rates notified in July 2024, before fuel adjustment (FCA), quarterly adjustment and income tax. Rates change often, so copy the current ones from your bill.' },
+    pkP: { mode: 'slab', method: 'prog', cur: 'Rs', rows: [[100, 7.74], [200, 10.06]], tax: 18, duty: 1.5, fixed: 0, fee: 35, note: 'NEPRA protected rates (homes under 200 units for 6 months), July 2024. Rates change often, so copy the current ones from your bill.' },
+    pkL: { mode: 'slab', method: 'prog', cur: 'Rs', rows: [[50, 3.95], [100, 7.74]], tax: 0, duty: 0, fixed: 0, fee: 0, note: 'NEPRA lifeline rates (up to 100 units, small connections), July 2024. Rates change often, so copy the current ones from your bill.' }
   };
+  var GEN_ROWS = [[100, 0.10], [300, 0.15], [null, 0.20]];
   var METHOD_NOTE = {
-    prog: 'Each slab is charged at its own rate. Example: 250 units = first 100 at slab 1 rate + next 100 at slab 2 rate + last 50 at slab 3 rate.',
-    prev1: 'Pakistan unprotected style: units up to the end of the previous slab all pay the previous slab\'s rate, and only the rest pays the current rate. Example: 250 units = 200 at the 101–200 rate + 50 at the 201–300 rate.',
+    prog: 'Each slab is charged at its own rate. Example with slabs 1–100, 101–200, 201–300: 250 units = 100 at the first rate + 100 at the second + 50 at the third.',
+    prev1: 'Units up to the end of the previous slab all pay the previous slab\'s rate, and only the rest pays the current rate (used in Pakistan for unprotected homes). Example: 250 units = 200 at the 101–200 rate + 50 at the 201–300 rate.',
     single: 'Every unit is charged at the rate of the slab your total falls in. Example: 250 units = 250 at the 201–300 rate.'
   };
   var rows = [], STORE = 'gtn-ebill-slabs';
-  function remember() { try { if (Prefs.get().rememberInputs) localStorage.setItem(STORE, JSON.stringify(rows)); } catch (e) {} }
-  function loadSaved() { try { var r = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(r) && r.length) return r.map(function (x) { return [x[0] === null || x[0] === '' ? null : +x[0], x[1] === '' ? '' : +x[1]]; }); } catch (e) {} return null; }
+  function remember() { try { if (Prefs.get().rememberInputs) localStorage.setItem(STORE, JSON.stringify({ p: $('ebPreset').value, rows: rows })); } catch (e) {} }
+  function saved(k) { try { var o = JSON.parse(localStorage.getItem(STORE)); if (o && o.p === k && Array.isArray(o.rows) && o.rows.length) return o.rows.map(function (x) { return [x[0] === null || x[0] === '' ? null : +x[0], x[1] === '' ? '' : +x[1]]; }); } catch (e) {} return null; }
   function n(v) { return v === '' || v == null ? NaN : +v; }
-  function cur() { var c = $('ebCurr').value.trim(); return c ? c + ' ' : ''; }
   function money(x) { return cur() + fmtNum(x, 2); }
-  function rate(x) { return fmtNum(x, 2); }
+  function num(x) { return Number(x).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: 4 }); }
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   function draw() {
     var html = '';
     rows.forEach(function (r, i) {
-      var from = i === 0 ? 1 : (isFinite(rows[i - 1][0]) && rows[i - 1][0] !== null ? fmtNum(rows[i - 1][0] + 1, 2) : '?');
       var last = i === rows.length - 1;
-      html += '<tr><td class="eb-from">' + (i === 0 ? '1' : from) + '</td>' +
+      html += '<tr><td class="eb-from">1</td>' +
         '<td><input type="number" data-nomemo data-i="' + i + '" data-k="0" min="0" step="any" inputmode="decimal" aria-label="Slab ' + (i + 1) + ' up to unit" placeholder="' + (last ? 'and above' : '') + '" value="' + (r[0] === null ? '' : esc(r[0])) + '"></td>' +
         '<td><input type="number" data-nomemo data-i="' + i + '" data-k="1" min="0" step="any" inputmode="decimal" aria-label="Slab ' + (i + 1) + ' rate per unit" value="' + esc(r[1]) + '"></td>' +
         '<td><button type="button" class="btn ghost eb-x" data-del="' + i + '" aria-label="Remove slab ' + (i + 1) + '"' + (rows.length < 2 ? ' disabled' : '') + '>✕</button></td></tr>';
     });
-    $('ebRows').innerHTML = html;
+    $('ebRows').innerHTML = html; froms();
   }
   function froms() { // refresh the "From" column without redrawing inputs (keeps focus while typing)
     var tds = $('ebRows').querySelectorAll('.eb-from');
-    rows.forEach(function (r, i) { if (!tds[i] || i === 0) return; var p = rows[i - 1][0]; tds[i].textContent = p === null || !isFinite(p) ? '?' : fmtNum(p + 1, 2); });
+    rows.forEach(function (r, i) { if (!tds[i] || i === 0) return; var p = rows[i - 1][0]; tds[i].textContent = p === null || !isFinite(p) ? '?' : num(p + 1); });
   }
-  function usePreset(k) {
-    if (PRESETS[k]) { rows = PRESETS[k].rows.map(function (r) { return r.slice(); }); $('ebMethod').value = PRESETS[k].method; }
-    else { rows = loadSaved() || rows; if (!rows.length) rows = [[100, 10], [null, 15]]; }
-    $('ebCurr').value = $('ebCurr').value || 'Rs';
+  function usePreset(k, apply) {
+    var P = PRESETS[k];
+    rows = saved(k) || (P && P.rows ? P.rows : GEN_ROWS).map(function (r) { return r.slice(); });
+    if (P && apply) {
+      $('ebMode').value = P.mode; if (P.method) $('ebMethod').value = P.method;
+      $('ebCurr').value = P.cur; if (P.rate != null) $('ebRate').value = P.rate;
+      $('ebTax').value = P.tax; $('ebDuty').value = P.duty; $('ebFixed').value = P.fixed; $('ebFlatFee').value = P.fee; $('ebPerUnit').value = 0;
+    }
+    $('ebPkNote').hidden = !P; $('ebPkNote').innerHTML = P ? '<b>Rates change, so check them.</b> ' + esc(P.note) : '';
     draw();
   }
 
   function calc() {
     var flat = $('ebMode').value === 'flat';
     $('ebSlabSec').hidden = flat; $('ebFlatSec').hidden = !flat;
-    $('ebPkNote').hidden = $('ebPreset').value === 'custom';
+    $('ebCurrOBox').hidden = $('ebCurr').value !== 'other';
     $('ebMethodNote').textContent = METHOD_NOTE[$('ebMethod').value];
     var ids = ['ebEnergy', 'ebOther', 'ebTaxes', 'ebTotal', 'ebAvg'], msg = $('ebMsg');
     function fail(t) { ids.forEach(function (i) { $(i).textContent = '–'; }); $('ebBreak').innerHTML = ''; msg.className = 'msg bad'; msg.textContent = t; }
@@ -129,22 +150,21 @@
       if (!(R >= 0)) return fail('Enter a price per unit of 0 or more.');
       energy = U * R; lines.push(['Energy', U, R, energy]);
     } else {
-      // validate the slab table
       for (var i = 0; i < rows.length; i++) {
         var to = rows[i][0], r = n(rows[i][1]), last = i === rows.length - 1;
         if (!(r >= 0)) return fail('Slab ' + (i + 1) + ' needs a rate of 0 or more.');
-        if (to === null || to === '' || isNaN(to)) { if (!last) return fail('Slab ' + (i + 1) + ' needs an "Up to unit" value. Only the last slab can be left empty (meaning "and above").'); }
+        if (to === null || isNaN(to)) { if (!last) return fail('Slab ' + (i + 1) + ' needs an "Up to unit" value. Only the last slab can be left empty (meaning "and above").'); }
         else if (!(to > (i ? rows[i - 1][0] : 0))) return fail('Slab ' + (i + 1) + ' must end at a higher unit than the slab before it.');
       }
-      var lim = rows.map(function (x) { return x[0] === null || x[0] === '' || isNaN(x[0]) ? Infinity : +x[0]; }), rt = rows.map(function (x) { return +x[1]; });
+      var lim = rows.map(function (x) { return x[0] === null || isNaN(x[0]) ? Infinity : +x[0]; }), rt = rows.map(function (x) { return +x[1]; });
       if (U > lim[lim.length - 1]) note = 'Your units go past the last slab, so the last slab\'s rate is used for the extra units. Leave the last "Up to unit" empty to mean "and above".';
       var k = 0; while (k < lim.length - 1 && U > lim[k]) k++; // slab the total falls in
-      var label = function (j) { var a = j ? lim[j - 1] + 1 : 1; return 'Slab ' + fmtNum(a, 2) + (lim[j] === Infinity ? '+' : '–' + fmtNum(lim[j], 2)); };
+      var label = function (j) { var a = j ? lim[j - 1] + 1 : 1; return 'Slab ' + num(a) + (lim[j] === Infinity ? '+' : '–' + num(lim[j])); };
       var m = $('ebMethod').value;
       if (m === 'single' || U === 0) { energy = U * rt[k]; lines.push([label(k) + (m === 'single' ? ' (all units)' : ''), U, rt[k], energy]); }
       else if (m === 'prev1' && k > 0) {
         var a = lim[k - 1], b = U - a;
-        lines.push(['First ' + fmtNum(a, 2) + ' units at ' + label(k - 1).toLowerCase() + ' rate', a, rt[k - 1], a * rt[k - 1]]);
+        lines.push(['First ' + num(a) + ' units at the ' + label(k - 1).replace('Slab', 'slab') + ' rate', a, rt[k - 1], a * rt[k - 1]]);
         lines.push([label(k), b, rt[k], b * rt[k]]);
         energy = a * rt[k - 1] + b * rt[k];
       } else {
@@ -160,13 +180,13 @@
     if (fx < 0 || tx < 0 || du < 0 || ff < 0) return fail('Fixed charges and tax rates cannot be negative.');
     if (tx > 100 || du > 100) return fail('A tax rate above 100% is almost certainly a typo.');
     var perUnit = U * pu, taxable = energy + perUnit + fx, t1 = taxable * tx / 100, t2 = taxable * du / 100;
-    if (perUnit) lines.push(['Extra per unit (e.g. fuel adjustment)', U, pu, perUnit]);
+    if (perUnit) lines.push(['Extra per unit', U, pu, perUnit]);
     if (fx) lines.push(['Fixed charges', '', '', fx]);
-    if (t1) lines.push(['Sales tax / VAT ' + fmtNum(tx, 2) + '%', '', '', t1]);
-    if (t2) lines.push(['Duty / other tax ' + fmtNum(du, 2) + '%', '', '', t2]);
+    if (t1) lines.push(['Sales tax / VAT ' + num(tx) + '%', '', '', t1]);
+    if (t2) lines.push(['Duty / other tax ' + num(du) + '%', '', '', t2]);
     if (ff) lines.push(['Charges with no tax', '', '', ff]);
     var total = taxable + t1 + t2 + ff;
-    if (total < 0) note = (note ? note + ' ' : '') + 'The total is below zero because the extra per-unit amount is a large negative adjustment.';
+    if (total < 0) note = (note ? note + ' ' : '') + 'The total is below zero because of a large negative per-unit adjustment.';
     $('ebEnergy').textContent = money(energy);
     $('ebOther').textContent = money(perUnit + fx + ff);
     $('ebTaxes').textContent = money(t1 + t2);
@@ -175,8 +195,8 @@
     msg.className = 'msg'; msg.textContent = note;
     lines.push(['Total', U, '', total]);
     $('ebBreak').innerHTML = lines.map(function (l, i) {
-      var tot = i === lines.length - 1, td = tot ? 'th' : 'td';
-      return '<tr><' + td + ' style="text-align:start">' + esc(l[0]) + '</' + td + '><' + td + '>' + (l[1] === '' ? '' : fmtNum(l[1], 2)) + '</' + td + '><' + td + '>' + (l[2] === '' ? '' : rate(l[2])) + '</' + td + '><' + td + '>' + money(l[3]) + '</' + td + '></tr>';
+      var td = i === lines.length - 1 ? 'th' : 'td';
+      return '<tr><' + td + ' style="text-align:start">' + esc(l[0]) + '</' + td + '><' + td + '>' + (l[1] === '' ? '' : num(l[1])) + '</' + td + '><' + td + '>' + (l[2] === '' ? '' : num(l[2])) + '</' + td + '><' + td + '>' + esc(money(l[3])) + '</' + td + '></tr>';
     }).join('');
   }
 
@@ -184,37 +204,36 @@
     var t = e.target; if (!t.dataset.i) return;
     var i = +t.dataset.i, k = +t.dataset.k, v = t.value;
     rows[i][k] = v === '' ? (k === 0 ? null : '') : +v;
-    if ($('ebPreset').value !== 'custom') $('ebPreset').value = 'custom';
     froms(); remember(); calc();
   });
   $('ebRows').addEventListener('click', function (e) {
     var b = e.target.closest('[data-del]'); if (!b || rows.length < 2) return;
-    rows.splice(+b.dataset.del, 1); rows[rows.length - 1][0] = rows[rows.length - 1][0]; $('ebPreset').value = 'custom';
-    draw(); remember(); calc();
+    rows.splice(+b.dataset.del, 1); draw(); remember(); calc();
   });
   $('ebAdd').addEventListener('click', function () {
+    if (rows.length >= 30) return;
     var last = rows[rows.length - 1], prevTo = rows.length > 1 ? +rows[rows.length - 2][0] || 0 : 0;
     if (last[0] === null) last[0] = prevTo + 100; // the old "and above" slab gets an end so the new one can follow it
     rows.push([null, last[1]]);
-    $('ebPreset').value = 'custom'; draw(); remember(); calc();
+    draw(); remember(); calc();
     var ins = $('ebRows').querySelectorAll('input'); ins[ins.length - 1].focus();
   });
-  $('ebPreset').addEventListener('change', function () { usePreset(this.value); calc(); });
+  $('ebPreset').addEventListener('change', function () { usePreset(this.value, true); calc(); });
   function readings() {
     var a = $('ebPrev').value, b = $('ebNow').value, m = $('ebRdMsg');
     if (a === '' || b === '') { m.textContent = ''; return; }
-    if (+b < +a) { m.className = 'msg bad'; m.textContent = 'The current reading should be bigger than the previous one. (If your meter rolled over, add the units by hand.)'; return; }
+    if (+b < +a) { m.className = 'msg bad'; m.textContent = 'The current reading should be bigger than the previous one. (If your meter rolled over, type the units yourself.)'; return; }
     var u = Math.round((+b - +a) * 1000) / 1000;
-    m.className = 'msg ok'; m.textContent = 'You used ' + fmtNum(u, 2) + ' units. Copied into "Units used".';
+    m.className = 'msg ok'; m.textContent = 'You used ' + num(u) + ' units. This is now in "Units used".';
     $('ebUnits').value = u; calc();
   }
   ['ebPrev', 'ebNow'].forEach(function (id) { $(id).addEventListener('input', readings); });
-  ['ebMode', 'ebUnits', 'ebCurr', 'ebMethod', 'ebRate', 'ebPerUnit', 'ebFixed', 'ebTax', 'ebDuty', 'ebFlatFee'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  ['ebMode', 'ebUnits', 'ebCurr', 'ebCurrO', 'ebMethod', 'ebRate', 'ebPerUnit', 'ebFixed', 'ebTax', 'ebDuty', 'ebFlatFee'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
   $('ebCopy').addEventListener('click', function () {
     var t = Array.prototype.map.call($('ebBreak').querySelectorAll('tr'), function (tr) { return Array.prototype.map.call(tr.children, function (c) { return c.textContent; }).filter(Boolean).join(' | '); }).join('\n');
     if (t) copyText('Electricity bill estimate\n' + t, this);
   });
-  usePreset($('ebPreset').value);
+  usePreset($('ebPreset').value, false);
   calc();
 })();
 </script>

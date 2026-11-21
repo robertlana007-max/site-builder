@@ -129,32 +129,45 @@
 <div class="scroll-x" id="lapBox" hidden style="margin-top:18px"><table class="sched"><thead><tr><th>Lap</th><th>Lap time</th><th>Total</th></tr></thead><tbody id="laps"></tbody></table></div>
 <script>
 (function () {
-  var running = false, startAt = 0, elapsed = 0, lastLap = 0, laps = 0, raf = 0;
+  // Date.now() is used (not performance.now) so a running stopwatch survives a reload: the start time is saved in this browser.
+  var KEY = 'gtn-stopwatch', running = false, startAt = 0, elapsed = 0, lastLap = 0, laps = [], raf = 0;
   function fmt(ms) {
     var cs = Math.floor(ms / 10), h = Math.floor(cs / 360000), m = Math.floor(cs / 6000) % 60, s = Math.floor(cs / 100) % 60, c = cs % 100;
     var p = function (x) { return String(x).padStart(2, '0'); };
     return (h ? p(h) + ':' : '') + p(m) + ':' + p(s) + '.' + p(c);
   }
-  function now() { return running ? elapsed + performance.now() - startAt : elapsed; }
-  function tick() { $('time').textContent = fmt(now()); if (running) raf = requestAnimationFrame(tick); }
+  function now() { return running ? elapsed + Math.max(0, Date.now() - startAt) : elapsed; }
+  function save() { try { if (!running && !elapsed) localStorage.removeItem(KEY); else localStorage.setItem(KEY, JSON.stringify({ running: running, startAt: startAt, elapsed: elapsed, lastLap: lastLap, laps: laps })); } catch (e) {} }
+  function tick() { $('time').textContent = fmt(now()); }
+  function loop() { tick(); if (running) raf = requestAnimationFrame(loop); }
+  function addRow(n, lap, total) {
+    var tr = document.createElement('tr');
+    [String(n), fmt(lap), fmt(total)].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+    $('laps').insertBefore(tr, $('laps').firstChild); $('lapBox').hidden = false;
+  }
+  function buttons() { $('go').textContent = running ? 'Pause' : elapsed ? 'Resume' : 'Start'; $('lap').disabled = !running; }
   $('go').addEventListener('click', function () {
-    if (running) { elapsed = now(); running = false; cancelAnimationFrame(raf); }
-    else { startAt = performance.now(); running = true; tick(); }
-    $('go').textContent = running ? 'Pause' : 'Resume';
-    $('lap').disabled = !running;
-    tick();
+    cancelAnimationFrame(raf);
+    if (running) { elapsed = now(); running = false; }
+    else { startAt = Date.now(); running = true; }
+    buttons(); save(); loop();
   });
   $('lap').addEventListener('click', function () {
-    var t = now(), tr = document.createElement('tr');
-    laps++;
-    [String(laps), fmt(t - lastLap), fmt(t)].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
-    $('laps').insertBefore(tr, $('laps').firstChild);
-    lastLap = t; $('lapBox').hidden = false;
+    var t = now(); laps.push([t - lastLap, t]); addRow(laps.length, t - lastLap, t); lastLap = t; save();
   });
   $('reset').addEventListener('click', function () {
-    running = false; cancelAnimationFrame(raf); elapsed = 0; lastLap = 0; laps = 0;
-    $('laps').innerHTML = ''; $('lapBox').hidden = true; $('go').textContent = 'Start'; $('lap').disabled = true; tick();
+    running = false; cancelAnimationFrame(raf); elapsed = 0; lastLap = 0; laps = [];
+    $('laps').innerHTML = ''; $('lapBox').hidden = true; buttons(); tick(); save();
   });
+  try {
+    var o = JSON.parse(localStorage.getItem(KEY));
+    if (o && typeof o.elapsed === 'number' && o.elapsed >= 0) {
+      running = !!o.running && o.startAt > 0 && o.startAt <= Date.now(); startAt = o.startAt || 0; elapsed = o.elapsed; lastLap = o.lastLap || 0;
+      laps = Array.isArray(o.laps) ? o.laps.filter(function (l) { return Array.isArray(l) && l.length === 2; }) : [];
+      laps.forEach(function (l, i) { addRow(i + 1, l[0], l[1]); });
+    }
+  } catch (e) {}
+  buttons(); loop();
 })();
 </script>
 
@@ -167,8 +180,8 @@
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Online Stopwatch</h2><ol class="tut"><li><h3>Click “Start”</h3><p>Click “Start” to begin. The big display counts up in the format minutes:seconds.hundredths, for example 00:12.47.</p></li><li><h3>Record laps</h3><p>While it is running, click “Lap” to save a split. A table appears below with “Lap”, “Lap time” and “Total”. The newest lap is at the top.</p></li><li><h3>Pause</h3><p>Click “Pause” to stop the clock. The display freezes and the “Lap” button is greyed out while paused.</p></li><li><h3>Resume</h3><p>Click “Resume” to continue counting from where you paused. The paused time is not counted.</p></li><li><h3>Reset</h3><p>Click “Reset” to set the display back to 00:00.00, clear all laps and hide the lap table. The button changes back to “Start”.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Hundredths of a second</b>The display shows time to 1/100 of a second.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Hours when needed</b>After one hour, hours appear at the front, for example 01:05:30.25.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Lap times</b>Each lap shows its own time and the total time since the start.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Newest lap first</b>The latest lap is always at the top of the table, so you do not need to scroll.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Pause and resume</b>Stop and continue without losing the time already measured.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>High-resolution clock</b>Time is measured from the device’s precise clock, so it stays accurate even if the page is in a background tab.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: timing three running laps</h2><p>Click “Start” as the runner sets off. At the end of the first lap the display reads 01:52.40, and you click “Lap”: row 1 shows a lap time of 01:52.40 and a total of 01:52.40. At the end of the second lap you click “Lap” at 03:47.15, so row 2 shows a lap time of 01:54.75 (03:47.15 minus 01:52.40) and a total of 03:47.15. After the third lap at 05:39.90, row 3 shows a lap time of 01:52.75. Click “Pause” to stop the clock, and read the table to see that lap 2 was the slowest.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>You cannot record a lap while paused. Click “Resume” first.</li><li>The “Total” column is the time on the main display at the moment you clicked “Lap”.</li><li>Keep the page open. Closing or reloading the tab clears the time and laps.</li><li>Human reaction time is about 0.2 seconds, so hundredths are only as good as your click.</li><li>On a phone, tap with the same finger each time for the most even lap times.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The “Lap” button does not respond</summary><p>It only works while the stopwatch is running. Click “Start” or “Resume” first.</p></details><details><summary>My laps disappeared</summary><p>“Reset” clears all laps. Write down or screenshot the table before you reset.</p></details><details><summary>The time was lost after reloading</summary><p>The stopwatch does not save its state. Reloading or closing the page starts from zero.</p></details><details><summary>I want to keep the lap list</summary><p>Select the table and copy it, or take a screenshot. There is no export button.</p></details></div></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>You cannot record a lap while paused. Click “Resume” first.</li><li>The “Total” column is the time on the main display at the moment you clicked “Lap”.</li><li>The time and laps are kept in this browser, so reloading the tab or coming back later carries on where you left off. Press Reset to clear them.</li><li>Human reaction time is about 0.2 seconds, so hundredths are only as good as your click.</li><li>On a phone, tap with the same finger each time for the most even lap times.</li></ul></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The “Lap” button does not respond</summary><p>It only works while the stopwatch is running. Click “Start” or “Resume” first.</p></details><details><summary>My laps disappeared</summary><p>“Reset” clears all laps. Write down or screenshot the table before you reset.</p></details><details><summary>The time was lost after reopening the page</summary><p>The stopwatch is saved in this browser only. A private window, a different browser or clearing site data starts from zero.</p></details><details><summary>I want to keep the lap list</summary><p>Select the table and copy it, or take a screenshot. There is no export button.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>How accurate is it?</summary><p>It uses your device's high-resolution clock and shows hundredths of a second.</p></details><details><summary>Does it keep running in another tab?</summary><p>Yes. The time is measured from the clock, so it stays correct even when the page is in the background.</p></details><details><summary>What is a lap time?</summary><p>The time since the previous lap. The Total column shows the time since you pressed Start.</p></details></div>

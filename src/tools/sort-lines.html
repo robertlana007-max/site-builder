@@ -1,0 +1,115 @@
+<label for="slIn">Your lines (one item per line)</label>
+<textarea id="slIn" data-nomemo spellcheck="false" class="plain" style="min-height:200px" placeholder="banana&#10;Apple&#10;cherry&#10;item10&#10;item2"></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="slOrder">Sort order</label>
+    <select id="slOrder">
+      <option value="az">A to Z (alphabetical)</option>
+      <option value="za">Z to A (reverse alphabetical)</option>
+      <option value="nat">Natural (item2 before item10)</option>
+      <option value="natd">Natural, reversed</option>
+      <option value="num">Numbers, smallest first</option>
+      <option value="numd">Numbers, largest first</option>
+      <option value="len">Length, shortest first</option>
+      <option value="lend">Length, longest first</option>
+      <option value="code">Character code (strict, like computers)</option>
+      <option value="rev">Reverse the current order</option>
+      <option value="shuf">Shuffle (random order)</option>
+      <option value="none">Keep the current order</option>
+    </select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="slCase" checked>Ignore upper/lower case</label>
+  <label><input type="checkbox" id="slUniq">Remove duplicates</label>
+  <label><input type="checkbox" id="slEmpty" checked>Remove empty lines</label>
+  <label><input type="checkbox" id="slTrim" checked>Trim spaces</label>
+</div>
+<div class="btns"><button class="btn" id="slGo">Sort lines</button><button class="btn ghost" id="slAgain" hidden>Shuffle again</button><button class="btn ghost" id="slClr">Clear</button></div>
+<p class="msg" id="slMsg"></p>
+<label for="slOut" style="margin-top:16px">Result</label>
+<textarea id="slOut" data-nomemo spellcheck="false" class="plain" style="min-height:200px" readonly placeholder="Sorted lines appear here."></textarea>
+<div class="btns">
+  <button class="btn ghost" id="slCp">Copy result</button>
+  <button class="btn ghost" id="slDl">Download .txt</button>
+  <button class="btn ghost" id="slUse">Use result as input</button>
+</div>
+<script>
+(function () {
+  var AUTO = 300000; // sort automatically while typing below this many characters
+  function say(cls, t) { $('slMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('slMsg').textContent = t; }
+  // First number in a line: handles -3, 1,234.5, 1.5e3 and 12,5 (comma as decimal) reasonably.
+  function numOf(s) {
+    var m = /[-+−]?(?:\d{1,3}(?:[,\u00a0\u202f]\d{3})+|\d+)(?:[.,]\d+)?(?:e[-+]?\d+)?/i.exec(s);
+    if (!m) return NaN;
+    var t = m[0].replace('−', '-'), parts;
+    if (/^[-+]?\d{1,3}([,\u00a0\u202f]\d{3})+([.]\d+)?/.test(t) && !/,\d{1,2}$/.test(t)) t = t.replace(/[,\u00a0\u202f]/g, '');
+    else t = t.replace(/[\u00a0\u202f]/g, '').replace(',', '.');
+    return parseFloat(t);
+  }
+  function sort(manual) {
+    var src = $('slIn').value;
+    if (!src) { $('slOut').value = ''; say('', manual ? 'Paste your lines first, one item per line.' : ''); return; }
+    var t0 = performance.now(), order = $('slOrder').value, ci = $('slCase').checked;
+    var lines = src.split(/\r\n|\r|\n/), n0 = lines.length;
+    if ($('slTrim').checked) lines = lines.map(function (l) { return l.trim(); });
+    if ($('slEmpty').checked) lines = lines.filter(function (l) { return l.trim() !== ''; });
+    var dups = 0;
+    if ($('slUniq').checked) {
+      var seen = new Set(), out = [];
+      for (var i = 0; i < lines.length; i++) { var k = ci ? lines[i].toLocaleLowerCase() : lines[i]; if (seen.has(k)) { dups++; continue; } seen.add(k); out.push(lines[i]); }
+      lines = out;
+    }
+    var col = new Intl.Collator(undefined, { sensitivity: ci ? 'accent' : 'variant', numeric: order === 'nat' || order === 'natd', caseFirst: 'upper' });
+    var cmp = col.compare;
+    if (order === 'az' || order === 'za' || order === 'nat' || order === 'natd') {
+      lines.sort(cmp); if (order === 'za' || order === 'natd') lines.reverse();
+    } else if (order === 'code') {
+      var keyed = lines.map(function (l) { return [ci ? l.toLowerCase() : l, l]; });
+      keyed.sort(function (a, b) { return a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0; });
+      lines = keyed.map(function (x) { return x[1]; });
+    } else if (order === 'num' || order === 'numd') {
+      var dir = order === 'num' ? 1 : -1, withN = lines.map(function (l, i) { return [numOf(l), i, l]; }), none = 0;
+      withN.sort(function (a, b) {
+        var an = isNaN(a[0]), bn = isNaN(b[0]);
+        if (an || bn) return an && bn ? a[1] - b[1] : an ? 1 : -1; // lines without a number go last, in their order
+        return (a[0] - b[0]) * dir || a[1] - b[1];
+      });
+      withN.forEach(function (x) { if (isNaN(x[0])) none++; });
+      lines = withN.map(function (x) { return x[2]; });
+      if (none) var noNum = none;
+    } else if (order === 'len' || order === 'lend') {
+      var d2 = order === 'len' ? 1 : -1, seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+      var len = function (s) { if (!seg || /^[\x00-\x7f]*$/.test(s)) return s.length; var c = 0; for (var x of seg.segment(s)) c++; return c; };
+      lines = lines.map(function (l, i) { return [len(l), i, l]; }).sort(function (a, b) { return (a[0] - b[0]) * d2 || cmp(a[2], b[2]) || a[1] - b[1]; }).map(function (x) { return x[2]; });
+    } else if (order === 'rev') {
+      lines.reverse();
+    } else if (order === 'shuf') {
+      var r = new Uint32Array(1);
+      for (var j = lines.length - 1; j > 0; j--) { crypto.getRandomValues(r); var p = r[0] % (j + 1), tmp = lines[j]; lines[j] = lines[p]; lines[p] = tmp; }
+    }
+    $('slOut').value = lines.join('\n');
+    $('slAgain').hidden = order !== 'shuf';
+    var ms = performance.now() - t0, parts = [fmtNum(n0, 0) + (n0 === 1 ? ' line in, ' : ' lines in, ') + fmtNum(lines.length, 0) + ' out.'];
+    if (dups) parts.push(fmtNum(dups, 0) + (dups === 1 ? ' duplicate removed.' : ' duplicates removed.'));
+    if (noNum) parts.push(fmtNum(noNum, 0) + (noNum === 1 ? ' line has' : ' lines have') + ' no number and went to the end.');
+    if (ms > 300) parts.push('Done in ' + (ms / 1000).toFixed(1) + ' s.');
+    say('ok', parts.join(' '));
+  }
+  var deb;
+  function auto() { clearTimeout(deb); if ($('slIn').value.length <= AUTO) deb = setTimeout(function () { sort(false); }, 200); else say('', 'Long list: click Sort lines when you are ready.'); }
+  $('slIn').addEventListener('input', auto);
+  ['slOrder', 'slCase', 'slUniq', 'slEmpty', 'slTrim'].forEach(function (id) { $(id).addEventListener('change', function () { if ($('slIn').value.length <= AUTO) sort(false); else say('', 'Click Sort lines to apply the new options.'); }); });
+  $('slGo').addEventListener('click', function () {
+    if ($('slIn').value.length > AUTO) { say('', 'Sorting…'); setTimeout(function () { sort(true); }, 30); } else sort(true);
+  });
+  $('slAgain').addEventListener('click', function () { sort(true); });
+  $('slClr').addEventListener('click', function () { $('slIn').value = ''; $('slOut').value = ''; say('', ''); $('slIn').focus(); });
+  $('slCp').addEventListener('click', function () { if ($('slOut').value) copyText($('slOut').value, $('slCp')); else say('', 'Nothing to copy yet. Paste your lines first.'); });
+  $('slDl').addEventListener('click', function () {
+    if (!$('slOut').value) { say('', 'Nothing to download yet. Paste your lines first.'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('slOut').value], { type: 'text/plain;charset=utf-8' })); a.download = 'sorted-lines.txt'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('slUse').addEventListener('click', function () { if (!$('slOut').value) return; $('slIn').value = $('slOut').value; say('ok', 'The result is now your input. Choose another sort to apply it on top.'); });
+  sort(false);
+})();
+</script>

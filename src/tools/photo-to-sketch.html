@@ -1,0 +1,224 @@
+<style>
+.ps-stage { position: relative; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; background: var(--bg); margin-bottom: 10px; line-height: 0; }
+.ps-stage canvas { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto; touch-action: pan-y; cursor: ew-resize; }
+.ps-cmp { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); margin-bottom: 14px; }
+.ps-cmp input { flex: 1; min-width: 0; }
+.ps-fx { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ps-fx button { font: 600 14px/1.2 inherit; font-family: inherit; min-height: 44px; padding: 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; }
+.ps-fx button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a photo here</b>JPG, PNG or WebP. Your photo is turned into art on your device and never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="ps-fx" role="group" aria-label="Effect">
+  <button type="button" data-fx="pencil" aria-pressed="true">✏️ Pencil sketch</button>
+  <button type="button" data-fx="colour">🖍️ Colour pencil</button>
+  <button type="button" data-fx="cartoon">🎨 Cartoon</button>
+  <button type="button" data-fx="oil">🖌️ Oil painting</button>
+  <button type="button" data-fx="poster">🟧 Posterize</button>
+  <button type="button" data-fx="lines">〰️ Line art</button>
+</div>
+<select id="fx" hidden aria-hidden="true" tabindex="-1"><option>pencil</option><option>colour</option><option>cartoon</option><option>oil</option><option>poster</option><option>lines</option></select>
+<div id="work" hidden>
+  <div class="ps-stage"><canvas id="cv" aria-label="Preview of the effect. Drag to compare with the original."></canvas></div>
+  <div class="ps-cmp"><span>Original</span><input type="range" id="cmp" min="0" max="100" value="0" aria-label="Compare with the original photo" data-nomemo><span>Effect</span></div>
+</div>
+<div class="fields">
+  <div><label for="a" id="aL">Strength</label><input type="range" id="a" min="1" max="100" value="50"></div>
+  <div><label for="b" id="bL">Detail</label><input type="range" id="b" min="1" max="100" value="50"></div>
+  <div><label for="mix">Effect amount: <span id="mixv">100</span>%</label><input type="range" id="mix" min="0" max="100" value="100"></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download artwork</button><button class="btn ghost" id="reset" type="button">Reset sliders</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var img = null, name = 'photo', lastUrl = null, busy = false, job = 0;
+  var PREV = 1000, MAX_AREA = 8000000; // the full-size artwork is capped so phones do not run out of memory
+  var LABELS = {
+    pencil: ['Darkness', 'Line softness'], colour: ['Darkness', 'Line softness'], cartoon: ['Line strength', 'Colour smoothness'],
+    oil: ['Brush size', 'Colour levels'], poster: ['Colour levels', 'Smoothing'], lines: ['Line strength', 'Detail']
+  };
+  function say(c, t) { PT.say(c, t); }
+
+  // ---------- image maths on Float32 planes ----------
+  function box(a, w, h, r) {
+    if (r < 1) return a;
+    var t = new Float32Array(w * h), o = new Float32Array(w * h), n = 2 * r + 1, x, y, s, i;
+    for (y = 0; y < h; y++) {
+      var row = y * w; s = a[row] * (r + 1); for (i = 1; i <= r; i++) s += a[row + Math.min(w - 1, i)];
+      for (x = 0; x < w; x++) { t[row + x] = s / n; s += a[row + Math.min(w - 1, x + r + 1)] - a[row + Math.max(0, x - r)]; }
+    }
+    for (x = 0; x < w; x++) {
+      s = t[x] * (r + 1); for (i = 1; i <= r; i++) s += t[Math.min(h - 1, i) * w + x];
+      for (y = 0; y < h; y++) { o[y * w + x] = s / n; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; }
+    }
+    return o;
+  }
+  function gauss(a, w, h, sigma) { // three box blurs look just like a Gaussian blur
+    if (sigma < 0.4) return a;
+    var wi = Math.floor(Math.sqrt(12 * sigma * sigma / 3 + 1)); if (wi % 2 === 0) wi--;
+    var m = Math.round((12 * sigma * sigma - 3 * wi * wi - 12 * wi - 9) / (-4 * wi - 4)), out = a;
+    for (var i = 0; i < 3; i++) out = box(out, w, h, Math.max(0, ((i < m ? wi : wi + 2) - 1) / 2));
+    return out;
+  }
+  function planes(d, n) {
+    var r = new Float32Array(n), g = new Float32Array(n), b = new Float32Array(n), l = new Float32Array(n);
+    for (var i = 0; i < n; i++) { r[i] = d[i * 4]; g[i] = d[i * 4 + 1]; b[i] = d[i * 4 + 2]; l[i] = 0.299 * r[i] + 0.587 * g[i] + 0.114 * b[i]; }
+    return { r: r, g: g, b: b, l: l };
+  }
+  function dodge(base, w, h, sigma) { var inv = new Float32Array(base.length), i; for (i = 0; i < base.length; i++) inv[i] = 255 - base[i]; var bl = gauss(inv, w, h, sigma), o = new Float32Array(base.length); for (i = 0; i < base.length; i++) o[i] = Math.min(255, base[i] * 255 / Math.max(1, 255 - bl[i])); return o; }
+  // Kuwahara filter: each pixel takes the average of the calmest of its four neighbouring squares, like brush strokes.
+  function kuwahara(P, w, h, r) {
+    var W1 = w + 1, n = W1 * (h + 1), sr = new Float64Array(n), sg = new Float64Array(n), sb = new Float64Array(n), sl = new Float64Array(n), sq = new Float64Array(n), x, y;
+    for (y = 0; y < h; y++) {
+      var ar = 0, ag = 0, ab = 0, al = 0, aq = 0;
+      for (x = 0; x < w; x++) {
+        var i = y * w + x, j = (y + 1) * W1 + x + 1, L = P.l[i];
+        ar += P.r[i]; ag += P.g[i]; ab += P.b[i]; al += L; aq += L * L;
+        sr[j] = sr[j - W1] + ar; sg[j] = sg[j - W1] + ag; sb[j] = sb[j - W1] + ab; sl[j] = sl[j - W1] + al; sq[j] = sq[j - W1] + aq;
+      }
+    }
+    function S(a, x0, y0, x1, y1) { return a[y1 * W1 + x1] - a[y0 * W1 + x1] - a[y1 * W1 + x0] + a[y0 * W1 + x0]; }
+    var out = { r: new Float32Array(w * h), g: new Float32Array(w * h), b: new Float32Array(w * h) };
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) {
+      var best = Infinity, bi = 0, bx0 = 0, by0 = 0, bx1 = 0, by1 = 0;
+      for (var q = 0; q < 4; q++) {
+        var x0 = q & 1 ? x : x - r, y0 = q & 2 ? y : y - r, x1 = x0 + r + 1, y1 = y0 + r + 1;
+        x0 = Math.max(0, x0); y0 = Math.max(0, y0); x1 = Math.min(w, x1); y1 = Math.min(h, y1);
+        var c = (x1 - x0) * (y1 - y0), m = S(sl, x0, y0, x1, y1) / c, v = S(sq, x0, y0, x1, y1) / c - m * m;
+        if (v < best) { best = v; bx0 = x0; by0 = y0; bx1 = x1; by1 = y1; bi = c; }
+      }
+      var k = y * w + x;
+      out.r[k] = S(sr, bx0, by0, bx1, by1) / bi; out.g[k] = S(sg, bx0, by0, bx1, by1) / bi; out.b[k] = S(sb, bx0, by0, bx1, by1) / bi;
+    }
+    return out;
+  }
+  function sobel(l, w, h) {
+    var o = new Float32Array(w * h);
+    for (var y = 1; y < h - 1; y++) for (var x = 1; x < w - 1; x++) {
+      var i = y * w + x, gx = l[i - w + 1] + 2 * l[i + 1] + l[i + w + 1] - l[i - w - 1] - 2 * l[i - 1] - l[i + w - 1];
+      var gy = l[i + w - 1] + 2 * l[i + w] + l[i + w + 1] - l[i - w - 1] - 2 * l[i - w] - l[i - w + 1];
+      o[i] = Math.sqrt(gx * gx + gy * gy);
+    }
+    return o;
+  }
+
+  // ---------- effects: sizes scale with the picture, so the preview matches the download ----------
+  function effect(src, w, h, fx, A, B) {
+    var n = w * h, d = src.data, P = planes(d, n), out = new ImageData(w, h), o = out.data, u = Math.max(w, h) / 1000, i, v;
+    function put(i, r, g, b) { o[i * 4] = r; o[i * 4 + 1] = g; o[i * 4 + 2] = b; o[i * 4 + 3] = d[i * 4 + 3]; }
+    if (fx === 'pencil' || fx === 'colour') {
+      var sig = (1 + B / 100 * 14) * u, gam = 1 + A / 100 * 3;
+      if (fx === 'pencil') { var s = dodge(P.l, w, h, sig); for (i = 0; i < n; i++) { v = 255 * Math.pow(s[i] / 255, gam); put(i, v, v, v); } }
+      else { // colour pencil: the pencil lines tinted with a lighter copy of the photo's colours
+        var sk = dodge(P.l, w, h, sig), lift = 0.2 + A / 100 * 0.3;
+        for (i = 0; i < n; i++) { var p2 = Math.pow(sk[i] / 255, gam); put(i, (255 - (255 - P.r[i]) * lift) * p2, (255 - (255 - P.g[i]) * lift) * p2, (255 - (255 - P.b[i]) * lift) * p2); }
+      }
+    } else if (fx === 'cartoon') {
+      var K = kuwahara(P, w, h, Math.max(1, Math.round((1 + B / 100 * 6) * u))), lv = 6, st = 255 / (lv - 1);
+      var e = sobel(gauss(P.l, w, h, 1.2 * u), w, h), th = 140 - A / 100 * 110, soft = th * 0.5;
+      for (i = 0; i < n; i++) {
+        var line = Math.min(1, Math.max(0, (e[i] - th + soft) / soft)), k = 1 - line * 0.9;
+        put(i, Math.round(K.r[i] / st) * st * 0.6 * k + K.r[i] * 0.4 * k, Math.round(K.g[i] / st) * st * 0.6 * k + K.g[i] * 0.4 * k, Math.round(K.b[i] / st) * st * 0.6 * k + K.b[i] * 0.4 * k);
+      }
+    } else if (fx === 'oil') {
+      var O = kuwahara(P, w, h, Math.max(1, Math.round((1 + A / 100 * 9) * u))), lv2 = Math.round(4 + B / 100 * 28), st2 = 255 / (lv2 - 1);
+      for (i = 0; i < n; i++) put(i, Math.round(O.r[i] / st2) * st2, Math.round(O.g[i] / st2) * st2, Math.round(O.b[i] / st2) * st2);
+    } else if (fx === 'poster') {
+      var lv3 = Math.round(2 + (100 - A) / 100 * 8), st3 = 255 / (lv3 - 1), sg = B / 100 * 3 * u;
+      var r2 = gauss(P.r, w, h, sg), g2 = gauss(P.g, w, h, sg), b2 = gauss(P.b, w, h, sg);
+      for (i = 0; i < n; i++) put(i, Math.round(r2[i] / st3) * st3, Math.round(g2[i] / st3) * st3, Math.round(b2[i] / st3) * st3);
+    } else { // line art: difference of two blurs, cut to clean black lines on white
+      var s1 = (0.6 + (100 - B) / 100 * 2.4) * u, g1 = gauss(P.l, w, h, s1), g3 = gauss(P.l, w, h, s1 * 1.6), t = 1 + (100 - A) / 100 * 6;
+      for (i = 0; i < n; i++) { var dd = g1[i] - g3[i]; v = dd > -t ? 255 : Math.max(0, 255 + (dd + t) * 40); put(i, v, v, v); }
+    }
+    var mix = +$('mix').value / 100;
+    if (mix < 1) for (i = 0; i < n * 4; i++) if ((i & 3) !== 3) o[i] = o[i] * mix + d[i] * (1 - mix);
+    return out;
+  }
+
+  var pv = null, raf = 0, timer = 0;
+  function preview() {
+    if (!img) return;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      var W = img.naturalWidth, H = img.naturalHeight, s = Math.min(1, PREV / Math.max(W, H)), w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s));
+      if (!pv || pv.w !== w || pv.h !== h || pv.img !== img) {
+        var c = document.createElement('canvas'); c.width = w; c.height = h; var x = c.getContext('2d', { willReadFrequently: true });
+        x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, w, h);
+        pv = { w: w, h: h, img: img, orig: c, src: x.getImageData(0, 0, w, h), fx: document.createElement('canvas') };
+        pv.fx.width = w; pv.fx.height = h; $('cv').width = w; $('cv').height = h;
+      }
+      // effect sizes are measured against the picture's own size, so this smaller preview matches the download
+      pv.fx.getContext('2d').putImageData(effect(pv.src, w, h, $('fx').value, +$('a').value, +$('b').value), 0, 0); draw();
+    }, 40);
+  }
+  function draw() {
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; if (!pv) return;
+      var ctx = $('cv').getContext('2d'), split = +$('cmp').value / 100 * pv.w;
+      ctx.drawImage(pv.fx, 0, 0);
+      if (split > 0) {
+        ctx.save(); ctx.beginPath(); ctx.rect(0, 0, split, pv.h); ctx.clip(); ctx.drawImage(pv.orig, 0, 0); ctx.restore();
+        ctx.fillStyle = '#fff'; ctx.fillRect(split - 1, 0, 2, pv.h); ctx.beginPath(); ctx.arc(split, pv.h / 2, 14, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.stroke();
+      }
+    });
+  }
+  function labels() {
+    var L = LABELS[$('fx').value];
+    $('aL').textContent = L[0]; $('bL').textContent = L[1];
+    Array.prototype.forEach.call(document.querySelectorAll('[data-fx]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-fx') === $('fx').value)); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-fx]'), function (b) {
+    b.addEventListener('click', function () { $('fx').value = b.getAttribute('data-fx'); $('fx').dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+  $('fx').addEventListener('change', function () { labels(); $('dl').hidden = true; preview(); });
+  ['a', 'b', 'mix'].forEach(function (id) { $(id).addEventListener('input', function () { $('mixv').textContent = $('mix').value; $('dl').hidden = true; preview(); }); });
+  $('cmp').addEventListener('input', draw);
+  var cv = $('cv'), dragging = false;
+  function at(e) { var r = cv.getBoundingClientRect(); $('cmp').value = Math.max(0, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100))); draw(); }
+  cv.addEventListener('pointerdown', function (e) { if (!pv) return; dragging = true; try { cv.setPointerCapture(e.pointerId); } catch (er) {} at(e); });
+  cv.addEventListener('pointermove', function (e) { if (dragging) at(e); });
+  cv.addEventListener('pointerup', function () { dragging = false; }); cv.addEventListener('pointercancel', function () { dragging = false; });
+  $('reset').addEventListener('click', function () { $('a').value = 50; $('b').value = 50; $('mix').value = 100; $('mixv').textContent = 100; preview(); });
+  PT.drop(false, function (f) {
+    if (busy) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP photo.'); return; }
+    var mine = ++job;
+    loadImage(f, function (im) {
+      if (mine !== job) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
+      img = im; name = PT.base(f.name) || 'photo'; pv = null; $('work').hidden = false; $('go').disabled = false; $('cmp').value = 0;
+      var big = im.naturalWidth * im.naturalHeight > MAX_AREA;
+      say('', f.name + ' · ' + im.naturalWidth + ' × ' + im.naturalHeight + ' px. Pick an effect and move the sliders.' + (big ? ' Very large photos are saved at about 8 megapixels.' : ''));
+      preview();
+    });
+  });
+  $('go').addEventListener('click', function () {
+    if (!img || busy) return;
+    busy = true; $('go').disabled = true; var label = $('go').textContent; $('go').textContent = 'Painting…'; say('', 'Making the full-size artwork. Big photos can take a few seconds…');
+    setTimeout(function () {
+      try {
+        var W = img.naturalWidth, H = img.naturalHeight, s = Math.min(1, Math.sqrt(MAX_AREA / (W * H))), w = Math.max(1, Math.round(W * s)), h = Math.max(1, Math.round(H * s));
+        var c = document.createElement('canvas'); c.width = w; c.height = h; var x = c.getContext('2d', { willReadFrequently: true });
+        x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, w, h);
+        x.putImageData(effect(x.getImageData(0, 0, w, h), w, h, $('fx').value, +$('a').value, +$('b').value), 0, 0);
+        var type = $('fmt').value;
+        PT.blob(c, type, 0.92).then(function (b) {
+          busy = false; $('go').disabled = false; $('go').textContent = label;
+          if (!b) { say('bad', 'Your browser could not save the picture. Try JPG.'); return; }
+          var fname = name + '-' + $('fx').value + '.' + ({ 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[b.type] || 'png');
+          if (lastUrl) URL.revokeObjectURL(lastUrl);
+          lastUrl = URL.createObjectURL(b);
+          var a = $('dl'); a.href = lastUrl; a.download = fname; a.textContent = 'Download ' + fname; a.hidden = false; a.click(); if (window.burst) burst(a);
+          say('ok', 'Saved ' + fname + ' (' + w + ' × ' + h + ' px, ' + fmtBytes(b.size) + '). If the download did not start, use the green button.');
+          c.width = c.height = 0;
+        });
+      } catch (e) { busy = false; $('go').disabled = false; $('go').textContent = label; say('bad', 'Not enough memory to make the full-size picture. Try a smaller photo.'); }
+    }, 30);
+  });
+  labels();
+})();
+</script>

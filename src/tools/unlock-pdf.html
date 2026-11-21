@@ -1,0 +1,118 @@
+<style>
+.ul-pw { display: flex; gap: 8px; align-items: stretch; }
+.ul-pw input { flex: 1; min-width: 0; }
+.ul-pw .btn { flex: none; }
+.ul-info { font-size: 14px; margin: 10px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+.ul-info b { display: block; margin-bottom: 4px; }
+.ul-info ul { margin: 4px 0 0; padding-left: 20px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a locked PDF here</b>The password is removed on your device. The file and the password are never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div id="pwBox" hidden>
+  <label for="pw">Password of this PDF</label>
+  <div class="ul-pw"><input type="password" id="pw" autocomplete="off" spellcheck="false" data-nomemo placeholder="Type the password you use to open it"><button type="button" class="btn ghost" id="show" aria-pressed="false">Show</button></div>
+</div>
+<div class="ul-info" id="info" hidden></div>
+<div class="btns"><button class="btn" id="go" disabled>Unlock PDF</button><a class="btn ghost" id="dl" hidden>Download unlocked PDF</a></div>
+<p class="msg" id="msg"></p>
+<p class="msg">Only unlock files that are yours or that you are allowed to change. This tool cannot find or break a password you do not know.</p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, needPw = false, busy = false, wasm = null, MAXB = 1024 * 1024 * 1024;
+
+  // qpdf (compiled to WebAssembly) does the real decryption: RC4 40/128-bit, AES-128 and AES-256.
+  function loadScript() {
+    if (window.Module && window.Module.length !== undefined) return Promise.resolve();
+    return new Promise(function (res, rej) {
+      var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js';
+      s.onload = res; s.onerror = function () { rej(new Error('The PDF engine could not load. Check your connection and reload the page.')); };
+      document.head.appendChild(s);
+    });
+  }
+  function qpdf() {
+    return loadScript().then(function () {
+      if (wasm) return wasm;
+      return fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); });
+    }).catch(function (e) { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); }).then(function (bin) {
+      var log = [];
+      return window.Module({ wasmBinary: bin, noInitialRun: true, print: function (t) { log.push(t); }, printErr: function (t) { log.push(t); } }).then(function (m) { m.log = log; return m; });
+    });
+  }
+  function run(m, args) {
+    m.log.length = 0;
+    var code;
+    try { code = m.callMain(args); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+    return { code: code, text: m.log.join('\n') };
+  }
+
+  function info(html) { $('info').hidden = !html; $('info').innerHTML = html || ''; }
+  function reset() { file = null; bytes = null; needPw = false; $('go').disabled = true; $('dl').hidden = true; $('pwBox').hidden = true; $('pw').value = ''; info(''); }
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    reset();
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    if (f.size > MAXB) return PT.say('bad', '"' + f.name + '" is larger than 1 GB, which is too big to open in a browser.');
+    busy = true; PT.say('', 'Checking ' + f.name + '…');
+    Promise.all([f.arrayBuffer(), qpdf()]).then(function (r) {
+      var b = new Uint8Array(r[0]), m = r[1], head = new TextDecoder('latin1').decode(b.subarray(0, 1024));
+      if (head.indexOf('%PDF') === -1) throw new Error('"' + f.name + '" could not be read as a PDF.');
+      m.FS.writeFile('/in.pdf', b);
+      var enc = run(m, ['--is-encrypted', '/in.pdf']);
+      if (enc.code === 2) {
+        var chk = run(m, ['--check', '/in.pdf']);
+        if (chk.code === 2) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
+        throw new Error('"' + f.name + '" has no password and no restrictions, so there is nothing to unlock.');
+      }
+      var req = run(m, ['--requires-password', '/in.pdf']);
+      file = f; bytes = b; needPw = req.code === 0;
+      var shown = run(m, needPw ? ['--show-encryption', '--password=', '/in.pdf'] : ['--show-encryption', '/in.pdf']).text;
+      var method = (/stream encryption method: (\w+)/.exec(shown) || [])[1] || '', R = +((/R = (\d)/.exec(shown) || [])[1] || 0);
+      var name = { AESv3: 'AES 256-bit', AESv2: 'AES 128-bit', RC4: R >= 3 ? 'RC4 128-bit' : 'RC4 40-bit' }[method] || 'standard';
+      if (needPw) {
+        $('pwBox').hidden = false; $('go').disabled = false;
+        info('<b>This PDF needs a password to open.</b>It uses ' + name + ' encryption. Type the password, then press Unlock PDF.');
+        PT.say('', f.name + ' · ' + fmtBytes(f.size));
+        setTimeout(function () { $('pw').focus(); }, 0);
+      } else {
+        var no = shown.split('\n').filter(function (l) { return /: not allowed/.test(l); }).map(function (l) { return l.replace(/: not allowed.*/, '').trim(); });
+        $('go').disabled = false;
+        info('<b>This PDF opens without a password, but it is locked against some changes.</b>' + (no.length ? 'Not allowed now: <ul>' + no.map(function (x) { return '<li>' + x.replace(/[<>&]/g, '') + '</li>'; }).join('') + '</ul>' : '') + 'Press Unlock PDF to remove these limits (' + name + ' encryption).');
+        PT.say('', f.name + ' · ' + fmtBytes(f.size));
+      }
+    }).catch(function (e) { reset(); PT.say('bad', e && e.message || 'Something went wrong with this file.'); }).then(function () { busy = false; });
+  });
+
+  $('show').addEventListener('click', function () {
+    var on = $('pw').type === 'password';
+    $('pw').type = on ? 'text' : 'password'; $('show').textContent = on ? 'Hide' : 'Show'; $('show').setAttribute('aria-pressed', on);
+  });
+  $('pw').addEventListener('input', function () { $('dl').hidden = true; });
+  $('pw').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('go').click(); } });
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    var pw = $('pw').value;
+    if (needPw && !pw) { PT.say('bad', 'Type the password first.'); $('pw').focus(); return; }
+    busy = true;
+    PT.run(async function () {
+      PT.say('', 'Unlocking…');
+      var m = await qpdf();
+      m.FS.writeFile('/in.pdf', bytes);
+      var r = run(m, ['--password=' + (needPw ? pw : ''), '--decrypt', '--remove-restrictions', '/in.pdf', '/out.pdf']);
+      if (r.code === 2 && /invalid password/i.test(r.text) && needPw && pw !== pw.trim()) {
+        r = run(m, ['--password=' + pw.trim(), '--decrypt', '--remove-restrictions', '/in.pdf', '/out.pdf']);
+      }
+      if (r.code === 2) {
+        if (/invalid password/i.test(r.text)) throw new Error('That password is not right. Check capital letters, and try again.');
+        throw new Error('This PDF could not be unlocked. It may be damaged.');
+      }
+      var out = m.FS.readFile('/out.pdf');
+      PT.done(out, PT.base(file.name) + '-unlocked.pdf', 'application/pdf', 'Unlocked. The new file opens without a password' + (r.code === 3 ? ' (the file had small errors, which were repaired)' : ''));
+      $('pw').value = '';
+    }).then(function () { busy = false; });
+  });
+})();
+</script>

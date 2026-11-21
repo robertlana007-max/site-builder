@@ -1,0 +1,413 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.mg-list li span small { color: var(--muted); margin-inline-start: 4px; }
+.mg-list li.mg-bad span { color: var(--bad); }
+.mg-total { font-size: 15px; margin: -6px 0 14px; color: var(--muted); }
+.mg-total b { color: var(--ink); }
+.mg-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 0; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop video clips here</b>Add two or more MP4, MOV, WebM or MKV clips, up to 1 GB in total. Nothing is uploaded.</div>
+<input type="file" id="file" accept="video/*,.mkv,.mov,.avi,.m4v,.3gp,.ts,.mts,.wmv,.flv" multiple hidden data-nomemo>
+<ul class="files mg-list" id="list"></ul>
+<p class="mg-total" id="total" hidden></p>
+<div id="opts" hidden>
+  <div class="fields">
+    <div><label for="size">Video size</label><select id="size"><option value="first">Same as the first clip</option><option value="1920x1080">1080p landscape (1920 × 1080)</option><option value="1280x720">720p landscape (1280 × 720)</option><option value="854x480">480p landscape (854 × 480)</option><option value="1080x1920">Portrait for phones (1080 × 1920)</option><option value="720x1280">Portrait, smaller (720 × 1280)</option><option value="1080x1080">Square (1080 × 1080)</option></select></div>
+    <div><label for="fit">When a clip has a different shape</label><select id="fit"><option value="pad">Fit it with black bars</option><option value="crop">Fill the frame (cut the edges)</option></select></div>
+    <div><label for="q">Quality</label><select id="q"><option value="18">High (bigger file)</option><option value="22" selected>Good (recommended)</option><option value="27">Smaller file</option></select></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="fast"> <span id="fastLabel">Fast join without re-encoding</span></label></div>
+  <p class="vt-hint" id="hint"></p>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Merge videos</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download merged video</a></div>
+<p class="msg" id="msg"></p>
+<video class="mg-video" id="result" controls playsinline hidden></video>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.max(0, s); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var MAX_TOTAL = 1024 * 1024 * 1024, MAX_CLIPS = 20;
+  var clips = [], busy = false, probing = false, cancelled = false, outUrl = null;
+  // clip: { file, info, err }
+  function say(c, t) { VT.say(c, t); }
+  function ok() { return clips.filter(function (c) { return c.info; }); }
+  function render(keep) {
+    var ul = $('list'); ul.innerHTML = '';
+    clips.forEach(function (c, i) {
+      var li = document.createElement('li'), name = document.createElement('span');
+      if (c.err) li.className = 'mg-bad';
+      name.textContent = (i + 1) + '. ' + c.file.name;
+      var sm = document.createElement('small');
+      sm.textContent = c.err ? '· ' + c.err : c.info ? '· ' + VT.clock(c.info.duration) + ' · ' + c.info.width + '×' + c.info.height + (c.info.audio ? '' : ' · no sound') : '· checking…';
+      name.appendChild(sm); name.title = name.textContent;
+      li.appendChild(name);
+      [['↑', 'Move up', i > 0, function () { clips.splice(i - 1, 0, clips.splice(i, 1)[0]); }],
+       ['↓', 'Move down', i < clips.length - 1, function () { clips.splice(i + 1, 0, clips.splice(i, 1)[0]); }],
+       ['✕', 'Remove', true, function () { clips.splice(i, 1); }]].forEach(function (b) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.textContent = b[0]; btn.setAttribute('aria-label', b[1] + ' ' + c.file.name); btn.disabled = !b[2] || busy;
+        btn.addEventListener('click', function () { if (busy) return; b[3](); render(); });
+        li.appendChild(btn);
+      });
+      ul.appendChild(li);
+    });
+    refresh(keep);
+  }
+  function sameKind(list) {
+    if (list.length < 2) return false;
+    var a = list[0].info, e = ext(list[0].file);
+    return list.every(function (c) {
+      var i = c.info;
+      return ext(c.file) === e && i.vcodec === a.vcodec && i.width === a.width && i.height === a.height && i.audio === a.audio && i.acodec === a.acodec && Math.abs((i.fps || 0) - (a.fps || 0)) < 0.5 && !i.rotate === !a.rotate;
+    });
+  }
+  function ext(f) { var m = /\.([a-z0-9]{2,4})$/i.exec(f.name); return m ? m[1].toLowerCase() : 'mp4'; }
+  function size() {
+    var v = $('size').value, first = ok()[0];
+    if (v === 'first') return first ? { w: first.info.width - first.info.width % 2, h: first.info.height - first.info.height % 2 } : null;
+    var m = v.split('x'); return { w: +m[0], h: +m[1] };
+  }
+  function refresh(keep) {
+    var good = ok(), bytes = clips.reduce(function (a, c) { return a + c.file.size; }, 0), dur = good.reduce(function (a, c) { return a + c.info.duration; }, 0);
+    if (!keep) { $('dl').hidden = true; $('result').hidden = true; }
+    $('opts').hidden = good.length < 2;
+    $('total').hidden = !clips.length;
+    $('total').innerHTML = '';
+    if (clips.length) {
+      var b = document.createElement('b'); b.textContent = good.length + (good.length === 1 ? ' clip' : ' clips');
+      $('total').appendChild(b); $('total').appendChild(document.createTextNode(' · ' + VT.clock(dur) + ' in total · ' + fmtBytes(bytes) + '. Use the arrows to set the order.'));
+    }
+    var same = sameKind(good);
+    $('fast').disabled = !same || busy;
+    if (!same) $('fast').checked = false;
+    $('fastLabel').textContent = same ? 'Fast join without re-encoding (all clips match, so this takes seconds and keeps the quality)' : 'Fast join is only possible when all clips have the same format, size and frame rate';
+    var fast = $('fast').checked;
+    ['size', 'fit', 'q'].forEach(function (id) { $(id).disabled = fast || busy; });
+    var bad = '';
+    if (bytes > MAX_TOTAL) bad = 'Together these clips are ' + fmtBytes(bytes) + '. The limit is 1 GB in total, because everything has to fit in your browser\'s memory. Remove a clip or make them smaller first.';
+    else if (good.length < 2) bad = clips.length ? 'Add at least one more clip.' : '';
+    if (!good.length || good.length < 2 || bad) $('hint').textContent = '';
+    else if (fast) $('hint').textContent = 'The clips are joined end to end exactly as they are.';
+    else {
+      var s = size(), mins = dur / 60;
+      $('hint').textContent = 'The clips are re-encoded to one ' + s.w + ' × ' + s.h + ' MP4 so they play smoothly one after another. ' +
+        (mins > 3 ? 'This is ' + Math.round(mins) + ' minutes of video, so it can take ' + Math.round(mins * (s.w * s.h > 1e6 ? 2 : 1)) + ' to ' + Math.round(mins * (s.w * s.h > 1e6 ? 6 : 3)) + ' minutes or more. Keep this tab open.' : 'Short clips take about as long as they play.');
+    }
+    $('go').disabled = busy || probing || good.length < 2 || !!bad;
+    if (!busy && !probing && !keep) say(bad && bytes > MAX_TOTAL ? 'bad' : '', bad);
+  }
+  ['size', 'fit', 'q', 'fast'].forEach(function (id) { $(id).addEventListener('change', function () { refresh(); }); });
+
+  function probeNext() {
+    if (probing) return;
+    var c = clips.filter(function (x) { return !x.info && !x.err; })[0];
+    if (!c) { refresh(); return; }
+    probing = true; refresh(); say('', 'Checking "' + c.file.name + '"…');
+    FF.probe(c.file, say).then(function (i) { c.info = i; }, function (e) { c.err = /could not be read|no video/i.test(e.message) ? (/no video/.test(e.message) ? 'no video track' : 'cannot be read') : 'could not be checked'; if (!/read|video/.test(e.message)) say('bad', e.message); })
+      .then(function () { probing = false; say('', ''); render(); probeNext(); });
+  }
+  // file input with "multiple": setupDrop gives only the first, so wire it here
+  function take(list) {
+    list = Array.prototype.slice.call(list); // copy before the input is cleared
+    $('file').value = '';
+    if (busy) { say('bad', 'Please wait until the merge is finished, or press Cancel.'); return; }
+    var skipped = 0;
+    Array.prototype.forEach.call(list, function (f) {
+      if (FF.check(f) || clips.length >= MAX_CLIPS) { skipped++; return; }
+      clips.push({ file: f });
+    });
+    render(); probeNext();
+    if (skipped) setTimeout(function () { say('bad', 'Skipped ' + skipped + (skipped === 1 ? ' file that is' : ' files that are') + ' not a video, empty, over 1 GB, or over the limit of ' + MAX_CLIPS + ' clips.'); }, 0);
+  }
+  var drop = $('drop');
+  drop.addEventListener('click', function () { $('file').click(); });
+  drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+  $('file').addEventListener('change', function () { take($('file').files); });
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { take(e.dataTransfer.files); });
+
+  $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+  $('go').addEventListener('click', function () {
+    var good = ok();
+    if (busy || good.length < 2) return;
+    busy = true; cancelled = false; render(true);
+    $('go').disabled = true; $('stop').hidden = false; VT.bar(0); $('result').hidden = true;
+    var fast = $('fast').checked && sameKind(good), s = size(), crf = $('q').value, fit = $('fit').value;
+    var files = good.map(function (c) { return c.file; }), total = good.reduce(function (a, c) { return a + c.info.duration; }, 0);
+    var anyAudio = good.some(function (c) { return c.info.audio; });
+    var fps = Math.min(60, Math.round(good[0].info.fps) || 30) || 30;
+    var e = fast ? ext(files[0]) : 'mp4';
+    var started = Date.now();
+    say('', fast ? 'Joining…' : 'Merging…');
+    FF.run(files, function (paths) {
+      if (fast) return ['-f', 'concat', '-safe', '0', '-i', '/merge-list.txt', '-map', '0', '-c', 'copy'].concat(/^(mp4|m4v|mov)$/.test(e) ? ['-movflags', '+faststart'] : []);
+      var a = [], g = [], cat = '';
+      paths.forEach(function (p) { a.push('-i', p); });
+      good.forEach(function (c, i) {
+        var shape = fit === 'pad'
+          ? 'scale=' + s.w + ':' + s.h + ':force_original_aspect_ratio=decrease,pad=' + s.w + ':' + s.h + ':(ow-iw)/2:(oh-ih)/2'
+          : 'scale=' + s.w + ':' + s.h + ':force_original_aspect_ratio=increase,crop=' + s.w + ':' + s.h;
+        g.push('[' + i + ':v:0]' + shape + ',setsar=1,fps=' + fps + ',format=yuv420p,setpts=PTS-STARTPTS[v' + i + ']');
+        if (anyAudio) {
+          var d = c.info.duration.toFixed(3);
+          g.push(c.info.audio ? '[' + i + ':a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS,apad,atrim=0:' + d + '[a' + i + ']'
+            : 'anullsrc=r=44100:cl=stereo,atrim=0:' + d + '[a' + i + ']');
+        }
+        cat += '[v' + i + ']' + (anyAudio ? '[a' + i + ']' : '');
+      });
+      g.push(cat + 'concat=n=' + good.length + ':v=1:a=' + (anyAudio ? 1 : 0) + '[v]' + (anyAudio ? '[a]' : ''));
+      a.push('-filter_complex', g.join(';'), '-map', '[v]');
+      if (anyAudio) a.push('-map', '[a]', '-c:a', 'aac', '-b:a', '160k');
+      a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', crf, '-movflags', '+faststart');
+      return a;
+    }, 'merged.' + e, total, function (p) {
+      VT.bar(p);
+      if (!/Downloading|Loading|Starting/.test($('msg').textContent)) say('', (fast ? 'Joining… ' : 'Merging… ') + Math.round(p * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, say, fast ? function (f, paths) {
+      return f.writeFile('/merge-list.txt', new TextEncoder().encode(paths.map(function (p) { return "file '" + p + "'"; }).join('\n') + '\n'));
+    } : null).then(function (data) {
+      var mime = { mp4: 'video/mp4', m4v: 'video/mp4', mov: 'video/quicktime', webm: 'video/webm', mkv: 'video/x-matroska' }[e] || 'video/' + e;
+      var u = VT.done(data, VT.base(files[0].name) + '-merged.' + e, mime);
+      if (outUrl !== u) { outUrl = u; $('result').src = u; $('result').hidden = false; }
+      say('ok', 'Merged ' + good.length + ' clips: ' + VT.clock(total) + ', ' + fmtBytes(data.length) + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (err) {
+      VT.bar(null);
+      if (cancelled || err.message === 'cancelled') say('', 'Cancelled. Change the clips or settings and try again whenever you like.');
+      else say('bad', err.message + (fast ? ' Untick "Fast join" and try again.' : ''));
+    }).then(function () { busy = false; $('stop').hidden = true; render(true); });
+  });
+})();
+</script>

@@ -1,0 +1,287 @@
+<style>
+.fin .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.fin input[type=month] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.fin table.sched td, .fin table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .fin .stats { grid-template-columns: 1fr 1fr; } .fin .stat { padding: 10px 12px; } }
+.itx fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 14px; min-width: 0; }
+.itx legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.itx .itx-note { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 0 0 14px; }
+.itx .itx-note a { color: var(--accent); }
+.itx .itx-head, .itx .itx-row { display: grid; grid-template-columns: 1fr 1fr 110px 44px; gap: 8px; align-items: center; }
+.itx .itx-head { font-size: 13px; font-weight: 600; color: var(--muted); margin-bottom: 4px; }
+.itx .itx-row { padding: 6px 0; border-top: 1px solid var(--line); }
+.itx .itx-from { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.itx .itx-above { font-size: 14px; color: var(--muted); padding-inline-start: 4px; }
+.itx .itx-del { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 9px; cursor: pointer; font-size: 18px; padding: 0; }
+.itx .itx-del:hover:not([disabled]) { border-color: var(--bad); color: var(--bad); }
+.itx .itx-del[disabled] { opacity: .35; cursor: default; }
+.itx [aria-invalid="true"] { border-color: var(--bad) !important; }
+.itx .itx-checks { display: flex; flex-wrap: wrap; gap: 8px 20px; margin: 0 0 12px; }
+.itx .itx-checks label { font-weight: 400; margin: 0; }
+.itx details { margin: 0 0 14px; }
+.itx summary { cursor: pointer; font-weight: 600; padding: 6px 0; }
+.itx .itx-bar { display: flex; height: 14px; border-radius: 7px; overflow: hidden; background: var(--line); margin: 14px 0 4px; }
+.itx .itx-bar i { display: block; height: 100%; }
+.itx .itx-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 13.5px; color: var(--muted); }
+.itx .itx-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; }
+@media (max-width: 560px) { .itx .itx-head, .itx .itx-row { grid-template-columns: minmax(0,.8fr) minmax(0,1.2fr) 64px 40px; gap: 6px; } .itx .itx-from { font-size: 12.5px; } .itx .itx-row input { padding: 9px 8px; } }
+</style>
+<div class="fin itx" id="itx">
+<div class="fields">
+  <div><label for="itxPreset">Tax rules</label><select id="itxPreset">
+    <option value="custom">Custom – enter your own slabs</option>
+    <option value="us26s">United States – federal, single (2026)</option>
+    <option value="us26m">United States – federal, married joint (2026)</option>
+    <option value="uk2627">United Kingdom – England, Wales, NI (2026-27)</option>
+    <option value="ca26">Canada – federal (2026)</option>
+    <option value="au2627">Australia – residents (2026-27)</option>
+    <option value="in2627">India – new regime (FY 2026-27)</option>
+    <option value="pk2027">Pakistan – salaried (tax year 2027)</option>
+    <option value="pk2026">Pakistan – salaried (tax year 2026)</option>
+    <option value="ae">United Arab Emirates – no income tax</option>
+  </select></div>
+  <div><label for="itxCur">Currency</label><select id="itxCur" data-cur></select></div>
+  <div hidden><label for="itxSym">Your currency symbol</label><input type="text" id="itxSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+</div>
+<p class="itx-note" id="itxNote"></p>
+<div class="fields">
+  <div><label for="itxInc">Your gross salary or income</label><input type="number" id="itxInc" min="0" step="any" inputmode="decimal" value="60000"></div>
+  <div><label for="itxPer">This amount is</label><select id="itxPer"><option value="y">Per year</option><option value="m">Per month</option></select></div>
+  <div><label for="itxOther">Other tax-free deductions (per year)</label><input type="number" id="itxOther" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Tax per year</span><b id="itxTaxY">–</b></div>
+  <div class="stat"><span>Tax per month</span><b id="itxTaxM">–</b></div>
+  <div class="stat"><span>Take-home per month</span><b id="itxNetM">–</b></div>
+  <div class="stat"><span>Take-home per year</span><b id="itxNetY">–</b></div>
+  <div class="stat"><span>Average tax rate</span><b id="itxEff">–</b></div>
+  <div class="stat"><span>Top (marginal) rate</span><b id="itxMarg">–</b></div>
+</div>
+<div class="itx-bar" id="itxBar" aria-hidden="true"></div>
+<div class="itx-legend" id="itxLegend"></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>How the tax is worked out</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Income band</th><th>Rate</th><th>Income in band</th><th>Tax</th></tr></thead><tbody id="itxRows"></tbody></table></div>
+<p class="msg" id="itxSteps"></p>
+<h3>Tax slabs (you can edit them)</h3>
+<p class="msg" style="margin-top:0">Change any limit or rate, add or remove slabs. Editing switches the rules to Custom, which is saved on this device.</p>
+<div class="itx-head" aria-hidden="true"><span>From</span><span>Up to</span><span>Rate %</span><span></span></div>
+<div id="itxSlabs"></div>
+<div class="btns" style="margin-bottom:16px"><button type="button" class="btn ghost" id="itxAdd">+ Add slab</button><button type="button" class="btn ghost" id="itxCopy">Copy result</button></div>
+<details id="itxMore">
+  <summary>Deductions, rebate, cess and levies</summary>
+  <div class="fields" style="margin-top:10px">
+    <div><label for="itxStd">Standard deduction / allowance (per year)</label><input type="number" id="itxStd" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="itxCess">Cess (% of tax)</label><input type="number" id="itxCess" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="itxLevy">Levy (% of taxable income)</label><input type="number" id="itxLevy" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <div class="fields">
+    <div><label for="itxSur">Surcharge (% of tax)</label><input type="number" id="itxSur" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="itxSurAt">…when taxable income is above</label><input type="number" id="itxSurAt" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+    <div><label for="itxReb">No tax if taxable income is up to (rebate)</label><input type="number" id="itxReb" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <div class="itx-checks"><label><input type="checkbox" id="itxRelief" data-nomemo>Marginal relief above the rebate limit (tax never more than the income above the limit)</label></div>
+</details>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  var CUSTOM = 'gtnTaxCustom';
+  // slabs: [upTo (null = and above), rate %]
+  var P = {
+    custom: { name: 'Custom', slabs: [[10000, 0], [40000, 10], [100000, 20], [null, 30]], note: 'Enter the tax slabs for your country below. Each slab taxes only the part of income inside it.' },
+    us26s: { cur: 'USD', name: 'United States federal income tax, single filer, tax year 2026', std: 16100, slabs: [[12400, 10], [50400, 12], [105700, 22], [201775, 24], [256225, 32], [640600, 35], [null, 37]],
+      note: 'Uses the $16,100 standard deduction. State and local tax, Social Security and Medicare (FICA) and tax credits are not included.', src: ['IRS', 'https://www.irs.gov/filing/federal-income-tax-rates-and-brackets'] },
+    us26m: { cur: 'USD', name: 'United States federal income tax, married filing jointly, tax year 2026', std: 32200, slabs: [[24800, 10], [100800, 12], [211400, 22], [403550, 24], [512450, 32], [768700, 35], [null, 37]],
+      note: 'Enter your combined income. Uses the $32,200 standard deduction. State tax, FICA and credits are not included.', src: ['IRS', 'https://www.irs.gov/filing/federal-income-tax-rates-and-brackets'] },
+    uk2627: { cur: 'GBP', name: 'United Kingdom income tax (England, Wales and Northern Ireland), 2026-27', slabs: [[12570, 0], [50270, 20], [100000, 40], [125140, 60], [null, 45]],
+      note: 'The 60% band from £100,000 to £125,140 is how the personal allowance is withdrawn. National Insurance, student loans and pension relief are not included. Scotland uses different rates.', src: ['GOV.UK', 'https://www.gov.uk/income-tax-rates'] },
+    ca26: { cur: 'CAD', name: 'Canada federal income tax, 2026', slabs: [[16452, 0], [58523, 14], [117045, 20.5], [181440, 26], [258482, 29], [null, 33]],
+      note: 'The basic personal amount is shown as a 0% band (it shrinks slightly above $181,440). Provincial or territorial tax, CPP and EI are not included.', src: ['Canada Revenue Agency', 'https://www.canada.ca/en/revenue-agency/services/tax/individuals/frequently-asked-questions-individuals/canadian-income-tax-rates-individuals-current-previous-years.html'] },
+    au2627: { cur: 'AUD', name: 'Australia resident income tax, 2026-27', levy: 2, slabs: [[18200, 0], [45000, 15], [135000, 30], [190000, 37], [null, 45]],
+      note: 'Includes the 2% Medicare levy. Low-income Medicare reductions, tax offsets and study-loan repayments are not included.', src: ['ATO', 'https://www.ato.gov.au/tax-rates-and-codes/tax-rates-australian-residents'] },
+    in2627: { cur: 'INR', name: 'India income tax, new regime, FY 2026-27', std: 75000, reb: 1200000, relief: true, cess: 4, slabs: [[400000, 0], [800000, 5], [1200000, 10], [1600000, 15], [2000000, 20], [2400000, 25], [null, 30]],
+      note: 'Includes the ₹75,000 standard deduction for salaried people, the rebate that makes taxable income up to ₹12 lakh tax-free (with marginal relief) and 4% health and education cess. Surcharge on income above ₹50 lakh is not included.', src: ['Income Tax Department', 'https://www.incometax.gov.in/'] },
+    pk2027: { cur: 'PKR', name: 'Pakistan salaried income tax, tax year 2027 (July 2026 to June 2027)', slabs: [[600000, 0], [1200000, 1], [2200000, 11], [3200000, 20], [4100000, 25], [5600000, 29], [7000000, 32], [null, 35]],
+      note: 'Salaried slabs from the Finance Act 2026. The surcharge on salaried income was removed for this year.', src: ['FBR', 'https://www.fbr.gov.pk/'] },
+    pk2026: { cur: 'PKR', name: 'Pakistan salaried income tax, tax year 2026 (July 2025 to June 2026)', sur: 9, surAt: 10000000, slabs: [[600000, 0], [1200000, 1], [2200000, 11], [3200000, 23], [4100000, 30], [null, 35]],
+      note: 'Salaried slabs from the Finance Act 2025, with the 9% surcharge on tax when taxable income is above Rs 10 million.', src: ['FBR', 'https://www.fbr.gov.pk/'] },
+    ae: { cur: 'AED', name: 'United Arab Emirates, no personal income tax', slabs: [[null, 0]], note: 'The UAE does not tax salaries. Social security contributions for UAE and GCC nationals are not included.', src: ['UAE Ministry of Finance', 'https://mof.gov.ae/'] }
+  };
+  var SAMPLE = { custom: 50000, us26s: 60000, us26m: 120000, uk2627: 40000, ca26: 70000, au2627: 80000, in2627: 1500000, pk2027: 2400000, pk2026: 2400000, ae: 120000 }, lastSample = 60000;
+  var REGION = { US: 'us26s', GB: 'uk2627', CA: 'ca26', AU: 'au2627', IN: 'in2627', PK: 'pk2027', AE: 'ae' };
+  var box = $('itxSlabs'), SET = ['itxStd', 'itxCess', 'itxLevy', 'itxSur', 'itxSurAt', 'itxReb'], last = null;
+
+  function addSlab(up, rate) {
+    var r = document.createElement('div'); r.className = 'itx-row';
+    r.innerHTML = '<div class="itx-from"></div><div class="itx-to"><input type="number" class="itx-up" data-nomemo min="0" step="any" inputmode="decimal" aria-label="Slab upper limit"><span class="itx-above">and above</span></div>' +
+      '<input type="number" class="itx-rate" data-nomemo min="0" max="100" step="any" inputmode="decimal" aria-label="Tax rate percent"><button type="button" class="itx-del" aria-label="Remove slab" title="Remove slab">×</button>';
+    r.querySelector('.itx-up').value = up == null ? '' : up;
+    r.querySelector('.itx-rate').value = rate == null ? '' : rate;
+    box.appendChild(r); return r;
+  }
+  function slabs() { return Array.prototype.map.call(box.children, function (r, i, all) { return [i === all.length - 1 ? null : num(r.querySelector('.itx-up')), num(r.querySelector('.itx-rate'))]; }); }
+  function setVal(id, v) { var e = $(id); if (e.type === 'checkbox') e.checked = !!v; else e.value = v ? v : ''; }
+  function apply(p) {
+    box.innerHTML = ''; p.slabs.forEach(function (s) { addSlab(s[0], s[1]); });
+    setVal('itxStd', p.std); setVal('itxCess', p.cess); setVal('itxLevy', p.levy); setVal('itxSur', p.sur); setVal('itxSurAt', p.surAt); setVal('itxReb', p.reb); setVal('itxRelief', p.relief);
+  }
+  function current() { var o = { slabs: slabs(), relief: $('itxRelief').checked }; SET.forEach(function (id) { o[id] = $(id).value; }); return o; }
+  function saveCustom() { var c = current(), s = { slabs: c.slabs, relief: c.relief }; SET.forEach(function (id) { s[id.slice(3).toLowerCase()] = c[id]; }); store(CUSTOM, JSON.stringify(s)); }
+  function loadCustom() { try { var c = JSON.parse(load(CUSTOM)); if (c && Array.isArray(c.slabs) && c.slabs.length) { c.surAt = c.surat; return c; } } catch (e) {} return P.custom; }
+  function note(key) {
+    var p = P[key], n = $('itxNote'); n.textContent = '';
+    var b = document.createElement('b'); b.textContent = key === 'custom' ? 'Custom slabs. ' : p.name + '. '; n.appendChild(b);
+    n.appendChild(document.createTextNode(p.note + ' '));
+    if (p.src) { n.appendChild(document.createTextNode('Rates change every year, so check the latest rules at ')); var a = document.createElement('a'); a.href = p.src[1]; a.target = '_blank'; a.rel = 'noopener'; a.textContent = p.src[0]; n.appendChild(a); n.appendChild(document.createTextNode('. This is an estimate, not tax advice.')); }
+    else n.appendChild(document.createTextNode('This is an estimate, not tax advice.'));
+  }
+  function choose(key, keepCur) {
+    if (!P[key]) key = 'custom';
+    apply(key === 'custom' ? loadCustom() : P[key]);
+    var inc = num('itxInc');
+    if (!(inc >= 0) || inc === lastSample || inc * 12 === lastSample) { $('itxInc').value = $('itxPer').value === 'm' ? Math.round(SAMPLE[key] / 12) : SAMPLE[key]; }
+    lastSample = SAMPLE[key];
+    if (!keepCur && P[key].cur) { $('itxCur').value = P[key].cur; $('itxCur').dispatchEvent(new Event('input', { bubbles: true })); }
+    note(key); calc();
+  }
+
+  function calc() {
+    var rows = Array.prototype.slice.call(box.children), sl = slabs(), err = '';
+    box.querySelectorAll('[aria-invalid]').forEach(function (e) { e.removeAttribute('aria-invalid'); });
+    var prev = 0;
+    rows.forEach(function (r, i) {
+      var up = sl[i][0], rate = sl[i][1], last1 = i === rows.length - 1;
+      r.querySelector('.itx-from').textContent = money(prev, 0);
+      r.querySelector('.itx-up').hidden = last1; r.querySelector('.itx-above').hidden = !last1;
+      r.querySelector('.itx-del').disabled = rows.length === 1;
+      if (!(rate >= 0 && rate <= 100)) { err = err || 'Each slab needs a rate from 0 to 100%.'; r.querySelector('.itx-rate').setAttribute('aria-invalid', 'true'); }
+      if (!last1) {
+        if (!(up > prev)) { err = err || 'Each "Up to" limit must be bigger than the one before it (slab ' + (i + 1) + ').'; r.querySelector('.itx-up').setAttribute('aria-invalid', 'true'); }
+        else prev = up;
+      }
+    });
+    var inc = num('itxInc'), gross = inc * ($('itxPer').value === 'm' ? 12 : 1), other = num('itxOther') || 0;
+    var std = num('itxStd') || 0, cess = num('itxCess') || 0, levy = num('itxLevy') || 0, sur = num('itxSur') || 0, surAt = num('itxSurAt') || 0, reb = num('itxReb') || 0;
+    if (!err && !(inc >= 0)) err = 'Enter your income (0 or more).';
+    if (!err && [other, std, cess, levy, sur, surAt, reb].some(function (v) { return v < 0; })) err = 'Deductions, cess, levy and surcharge cannot be negative.';
+    if (!err && inc > 1e13) err = 'That income is too large for this calculator.';
+    var outs = ['itxTaxY', 'itxTaxM', 'itxNetM', 'itxNetY', 'itxEff', 'itxMarg'];
+    if (err) { outs.forEach(function (i) { $(i).textContent = '–'; }); $('itxRows').innerHTML = ''; $('itxBar').innerHTML = ''; $('itxLegend').innerHTML = ''; $('itxSteps').textContent = ''; last = null; return say('bad', err); }
+    var taxable = Math.max(0, gross - std - other), tax = 0, lo = 0, html = '', marg = 0;
+    sl.forEach(function (s) {
+      var hi = s[0] == null ? Infinity : s[0], part = Math.max(0, Math.min(taxable, hi) - lo), t = part * s[1] / 100;
+      if (taxable > lo || (taxable === 0 && lo === 0)) marg = s[1];
+      html += '<tr><td>' + money(lo, 0) + (hi === Infinity ? ' and above' : ' – ' + money(hi, 0)) + '</td><td>' + fmtNum(s[1], 2) + '%</td><td>' + money(part) + '</td><td>' + money(t) + '</td></tr>';
+      tax += t; lo = hi;
+    });
+    var steps = [], slabTax = tax;
+    if (std || other) steps.push('Taxable income: ' + money(gross) + ' − ' + money(std + other) + ' deductions = ' + money(taxable) + '.');
+    if (reb && taxable <= reb) { if (tax > 0) steps.push('Rebate: taxable income is not above ' + money(reb, 0) + ', so the slab tax of ' + money(tax) + ' is cancelled.'); tax = 0; marg = 0; }
+    else if (reb && $('itxRelief').checked && tax > taxable - reb) { steps.push('Marginal relief: tax is capped at the income above ' + money(reb, 0) + ' (' + money(taxable - reb) + ').'); tax = taxable - reb; marg = 100; }
+    var surT = sur && taxable > surAt ? tax * sur / 100 : 0, cessT = (tax + surT) * cess / 100, levyT = taxable * levy / 100;
+    if (surT) steps.push('Surcharge ' + fmtNum(sur, 2) + '% of tax: ' + money(surT) + '.');
+    if (cessT) steps.push('Cess ' + fmtNum(cess, 2) + '% of tax: ' + money(cessT) + '.');
+    if (levyT) steps.push('Levy ' + fmtNum(levy, 2) + '% of taxable income: ' + money(levyT) + '.');
+    var total = tax + surT + cessT + levyT, net = gross - total;
+    $('itxRows').innerHTML = html + '<tr><td><b>Slab tax</b></td><td></td><td>' + money(taxable) + '</td><td><b>' + money(slabTax) + '</b></td></tr>';
+    $('itxTaxY').textContent = money(total); $('itxTaxM').textContent = money(total / 12);
+    $('itxNetM').textContent = money(net / 12); $('itxNetY').textContent = money(net);
+    $('itxEff').textContent = gross > 0 ? fmtNum(total / gross * 100, 2) + '%' : '0%';
+    var mr = marg === 100 ? 100 : marg * (1 + (surT ? sur / 100 : 0)) * (1 + cess / 100) + levy;
+    $('itxMarg').textContent = fmtNum(mr, 2) + '%';
+    $('itxSteps').textContent = steps.join(' ');
+    var parts = gross > 0 ? [[Math.max(0, net), 'Take-home', getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2563eb'], [total, 'Income tax', '#f59e0b']] : [];
+    $('itxBar').innerHTML = parts.map(function (p) { return '<i style="width:' + (p[0] / gross * 100) + '%;background:' + p[2] + '"></i>'; }).join('');
+    $('itxLegend').innerHTML = parts.map(function (p) { return '<span><i style="background:' + p[2] + '"></i>' + p[1] + ' ' + fmtNum(p[0] / gross * 100, 1) + '%</span>'; }).join('');
+    say(net < 0 ? 'bad' : '', net < 0 ? 'The tax is more than the income. Check the slabs and levies.' : gross === 0 ? 'Enter your income to see the tax.' : '');
+    last = { gross: gross, taxable: taxable, total: total, net: net, rules: $('itxPreset').value === 'custom' ? 'custom slabs' : P[$('itxPreset').value].name };
+  }
+  function toCustom() { if ($('itxPreset').value !== 'custom') { $('itxPreset').value = 'custom'; note('custom'); } saveCustom(); }
+  box.addEventListener('click', function (e) {
+    var b = e.target.closest('.itx-del'); if (!b || b.disabled) return;
+    b.closest('.itx-row').remove(); toCustom(); calc();
+  });
+  $('itxAdd').addEventListener('click', function () {
+    var sl = slabs(), lastRow = box.lastElementChild, top = 0;
+    sl.forEach(function (s) { if (s[0] > top) top = s[0]; });
+    // the new slab goes before the "and above" slab
+    var r = addSlab(top ? Math.round(top * 2) : 10000, lastRow ? sl[sl.length - 1][1] : 0);
+    if (lastRow) box.insertBefore(r, lastRow);
+    toCustom(); calc(); r.querySelector('.itx-up').focus();
+  });
+  $('itx').addEventListener('input', function (e) {
+    var t = e.target;
+    if (t.id === 'itxPreset') return;
+    if (t.closest('#itxSlabs') || SET.indexOf(t.id) !== -1 || t.id === 'itxRelief') toCustom();
+    calc();
+  });
+  $('itxPreset').addEventListener('change', function () { choose(this.value); });
+  $('itxRelief').addEventListener('change', function () { toCustom(); calc(); });
+  $('itxPer').addEventListener('change', calc);
+  $('itxCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Income tax estimate (' + last.rules + ')\nGross income: ' + money(last.gross) + ' a year\nTaxable income: ' + money(last.taxable) + '\nTax: ' + money(last.total) + ' a year (' + money(last.total / 12) + ' a month)\nTake-home: ' + money(last.net) + ' a year (' + money(last.net / 12) + ' a month)', this);
+  });
+  curWire(calc);
+  var m = /[-_]([a-z]{2})\b/i.exec((navigator.languages && navigator.languages[0]) || navigator.language || '');
+  var start = (m && REGION[m[1].toUpperCase()]) || 'us26s';
+  $('itxPreset').value = start;
+  choose(start);
+})();
+</script>

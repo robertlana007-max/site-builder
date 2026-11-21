@@ -14,16 +14,19 @@
   // Count characters as people see them, so an emoji like a flag or family counts as one.
   var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
   function chars(t) { if (!seg) return Array.from(t).length; var n = 0; for (var x of seg.segment(t)) n++; return n; }
+  var CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff]/g;
   function count() {
-    var t = $('txt').value, words = t.trim() ? t.trim().split(/\s+/).length : 0;
+    // Chinese and Japanese do not put spaces between words, so each of their characters counts as one word, like other counters do.
+    var t = $('txt').value, cjk = t.match(CJK), rest = t.replace(CJK, ' ').trim(), words = (cjk ? cjk.length : 0) + (rest ? rest.split(/\s+/).filter(function (w) { return /[\p{L}\p{N}\p{So}]/u.test(w); }).length : 0);
     $('w').textContent = fmtNum(words);
     $('c').textContent = fmtNum(chars(t));
     $('cn').textContent = fmtNum(chars(t.replace(/\s/g, '')));
     // A sentence ends at . ! ? only when a space or the end of the text follows, so 3.5 or example.com do not split it.
-    $('s').textContent = fmtNum(t.split(/[.!?؟]+['"”’)\]]*(?=\s|$)|[。！？]+/).filter(function (x) { return /[\p{L}\p{N}]/u.test(x); }).length);
+    $('s').textContent = fmtNum(t.split(/[.!?؟۔।॥]+['"”’)\]]*(?=\s|$)|[。！？]+/).filter(function (x) { return /[\p{L}\p{N}]/u.test(x); }).length);
     $('p').textContent = fmtNum(t.split(/\n+/).filter(function (x) { return x.trim(); }).length);
     var mins = words / 200;
-    $('r').textContent = words === 0 ? '0 min' : mins < 1 ? '< 1 min' : Math.round(mins) + ' min';
+    var rm = Math.round(mins);
+    $('r').textContent = words === 0 ? '0 min' : mins < 1 ? '< 1 min' : rm < 60 ? rm + ' min' : Math.floor(rm / 60) + ' h ' + (rm % 60) + ' min';
   }
   $('txt').addEventListener('input', count);
   $('clr').addEventListener('click', function () { $('txt').value = ''; count(); $('txt').focus(); });

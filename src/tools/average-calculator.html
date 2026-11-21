@@ -1,0 +1,184 @@
+<style>
+.av-tabs { margin-bottom: 14px; }
+.av-sec[hidden] { display: none; }
+.av-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.av-grid .stat b { font-size: 19px; }
+.av-grid .stat small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.av-ta { min-height: 120px; font-family: var(--mono); font-size: 15px; }
+.av-prop { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr) auto minmax(0, 1fr); gap: 6px; align-items: center; margin-bottom: 8px; }
+.av-prop span { font-weight: 700; color: var(--muted); }
+.av-prop input { min-width: 0; }
+.av-sub { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+</style>
+<div class="seg av-tabs" role="group" aria-label="Calculator"><button type="button" id="avT1" aria-pressed="true">Average</button><button type="button" id="avT2" aria-pressed="false">Ratio</button></div>
+
+<div class="av-sec" id="avS1">
+  <div class="seg" role="group" aria-label="Kind of average" style="margin-bottom:12px"><button type="button" id="avSimple" aria-pressed="true">Simple</button><button type="button" id="avWeighted" aria-pressed="false">Weighted</button></div>
+  <label for="avData" id="avLab">Your numbers</label>
+  <textarea id="avData" class="av-ta" data-nomemo spellcheck="false" placeholder="Type or paste numbers separated by commas, spaces or new lines, e.g. 12, 15, 15, 18, 20"></textarea>
+  <div class="btns"><button type="button" class="btn ghost" id="avEx">Try an example</button><button type="button" class="btn ghost" id="avCopy">Copy results</button><button type="button" class="btn ghost" id="avClr">Clear</button></div>
+  <p class="msg" id="avMsg"></p>
+  <div class="av-grid" id="avGrid"></div>
+</div>
+
+<div class="av-sec" id="avS2" hidden>
+  <h3 style="margin-top:0">Simplify a ratio</h3>
+  <div class="fields"><div><label for="rtIn">Ratio</label><input type="text" id="rtIn" data-nomemo value="12:18" placeholder="e.g. 12:18 or 1.5:2.25:3" autocomplete="off"></div></div>
+  <div class="out" id="rtOut">–</div>
+  <p class="msg" id="rtMsg"></p>
+  <div class="av-sub">
+  <h3>Solve a proportion (scale a ratio)</h3>
+  <p class="msg" style="margin-top:0">Fill in three boxes and leave the one you want empty.</p>
+  <div class="av-prop">
+    <input type="number" id="pA" data-nomemo step="any" aria-label="A" placeholder="A" value="3"><span>:</span>
+    <input type="number" id="pB" data-nomemo step="any" aria-label="B" placeholder="B" value="4"><span>=</span>
+    <input type="number" id="pC" data-nomemo step="any" aria-label="C" placeholder="C" value="15"><span>:</span>
+    <input type="number" id="pD" data-nomemo step="any" aria-label="D" placeholder="?">
+  </div>
+  <div class="out" id="pOut">–</div>
+  </div>
+  <div class="av-sub">
+  <h3>Share an amount in a ratio</h3>
+  <div class="fields">
+    <div><label for="shT">Amount to share</label><input type="number" id="shT" data-nomemo step="any" value="1000" inputmode="decimal"></div>
+    <div><label for="shR">Ratio</label><input type="text" id="shR" data-nomemo value="2:3:5" autocomplete="off"></div>
+  </div>
+  <div class="out" id="shOut">–</div>
+  </div>
+</div>
+<script>
+(function () {
+  // ---------- tabs ----------
+  function tab(k) { $('avT1').setAttribute('aria-pressed', k === 1); $('avT2').setAttribute('aria-pressed', k === 2); $('avS1').hidden = k !== 1; $('avS2').hidden = k !== 2; }
+  $('avT1').addEventListener('click', function () { tab(1); }); $('avT2').addEventListener('click', function () { tab(2); });
+  var weighted = false;
+  function mode(w) {
+    weighted = w; $('avSimple').setAttribute('aria-pressed', !w); $('avWeighted').setAttribute('aria-pressed', w);
+    $('avLab').textContent = w ? 'One value and its weight per line' : 'Your numbers';
+    $('avData').placeholder = w ? 'value weight, one pair per line, e.g.\n85 30\n72 20\n90 50' : 'Type or paste numbers separated by commas, spaces or new lines, e.g. 12, 15, 15, 18, 20';
+    avg();
+  }
+  $('avSimple').addEventListener('click', function () { mode(false); }); $('avWeighted').addEventListener('click', function () { mode(true); });
+
+  function fmt(v) {
+    if (v === null || !isFinite(v)) return '–';
+    var r = parseFloat(v.toPrecision(12)); if (r === 0) return '0';
+    var a = Math.abs(r);
+    if (a >= 1e15 || a < 1e-6) return r.toExponential(6).replace(/\.?0+e/, 'e');
+    return r.toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: 6 });
+  }
+  function num(t) { t = t.replace(/[−–]/g, '-'); return /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i.test(t) ? parseFloat(t) : NaN; }
+  var copyTxt = '';
+  function avg() {
+    var text = $('avData').value, msg = $('avMsg'), grid = $('avGrid'), vals = [], wts = [];
+    grid.innerHTML = ''; copyTxt = '';
+    if (!text.trim()) { msg.className = 'msg'; msg.textContent = ''; return; }
+    try {
+      if (!weighted) {
+        text.split(/[\s,;]+/).filter(Boolean).forEach(function (t) { var v = num(t); if (!isFinite(v)) throw new Error('"' + t + '" is not a number. Separate numbers with commas, spaces or new lines, and use a dot for decimals.'); vals.push(v); });
+      } else {
+        text.split(/\n/).forEach(function (line, i) {
+          if (!line.trim()) return;
+          var p = line.trim().split(/\s*[,;\t ]\s*|\s*[x×*]\s*/).filter(Boolean);
+          if (p.length !== 2) throw new Error('Line ' + (i + 1) + ' should be a value and a weight, like 85 30.');
+          var v = num(p[0]), w = num(p[1]);
+          if (!isFinite(v) || !isFinite(w)) throw new Error('Line ' + (i + 1) + ': "' + line.trim() + '" has something that is not a number.');
+          if (w < 0) throw new Error('Line ' + (i + 1) + ': weights cannot be negative.');
+          vals.push(v); wts.push(w);
+        });
+      }
+    } catch (e) { msg.className = 'msg bad'; msg.textContent = e.message; return; }
+    if (!vals.length) { msg.className = 'msg'; msg.textContent = ''; return; }
+    if (vals.length > 1000000) { msg.className = 'msg bad'; msg.textContent = 'Please use at most 1,000,000 numbers.'; return; }
+    msg.className = 'msg'; msg.textContent = '';
+    var n = vals.length, sum = 0, c = 0;
+    for (var i = 0; i < n; i++) { var y = vals[i] - c, t = sum + y; c = (t - sum) - y; sum = t; } // Kahan sum
+    var s = vals.slice().sort(function (a, b) { return a - b; }), mid = n >> 1, med = n % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
+    var counts = new Map(), best = 0; s.forEach(function (v) { var k = (counts.get(v) || 0) + 1; counts.set(v, k); if (k > best) best = k; });
+    var modes = []; counts.forEach(function (k, v) { if (k === best) modes.push(v); });
+    var modeTxt = best === 1 ? 'No mode' : modes.length > 6 ? modes.length + ' modes' : modes.map(fmt).join(', '), modeSub = best === 1 ? 'every value appears once' : 'appears ' + best + ' times';
+    var out = [];
+    if (weighted) {
+      var W = 0, SW = 0; vals.forEach(function (v, k) { W += wts[k]; SW += v * wts[k]; });
+      if (W === 0) { msg.className = 'msg bad'; msg.textContent = 'The weights add up to 0, so a weighted average cannot be found.'; return; }
+      out.push(['Weighted average', fmt(SW / W), 'Σ(value × weight) ÷ Σweight = ' + fmt(SW) + ' ÷ ' + fmt(W)]);
+      out.push(['Simple average', fmt(sum / n), 'ignoring the weights']);
+      out.push(['Total weight', fmt(W), '']);
+    } else out.push(['Mean (average)', fmt(sum / n), fmt(sum) + ' ÷ ' + n]);
+    out.push(['Median', fmt(med), n % 2 ? 'the middle value' : 'average of the two middle values']);
+    out.push(['Mode', modeTxt, modeSub]);
+    out.push(['Range', fmt(s[n - 1] - s[0]), fmt(s[n - 1]) + ' − ' + fmt(s[0])]);
+    out.push(['Count', fmtNum(n, 0), '']);
+    out.push(['Sum', fmt(sum), '']);
+    out.push(['Smallest', fmt(s[0]), '']); out.push(['Largest', fmt(s[n - 1]), '']);
+    if (s[0] > 0) {
+      var lg = 0, inv = 0; vals.forEach(function (v) { lg += Math.log(v); inv += 1 / v; });
+      out.push(['Geometric mean', fmt(Math.exp(lg / n)), 'for growth rates']); out.push(['Harmonic mean', fmt(n / inv), 'for average speeds']);
+    }
+    grid.innerHTML = out.map(function (o) { return '<div class="stat"><span>' + o[0] + '</span><b>' + o[1] + '</b>' + (o[2] ? '<small>' + o[2] + '</small>' : '') + '</div>'; }).join('');
+    copyTxt = out.map(function (o) { return o[0] + ': ' + o[1]; }).join('\n');
+  }
+  $('avData').addEventListener('input', avg);
+  $('avEx').addEventListener('click', function () { $('avData').value = weighted ? '85 30\n72 20\n90 50' : '12, 15, 15, 18, 20, 22, 15, 30'; avg(); });
+  $('avClr').addEventListener('click', function () { $('avData').value = ''; avg(); $('avData').focus(); });
+  $('avCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+
+  // ---------- ratio ----------
+  function gcd(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+  function decs(t) { var m = /\.(\d+)/.exec(t); return m ? m[1].length : 0; }
+  function parseRatio(text) {
+    var parts = text.replace(/[−–]/g, '-').split(/\s*(?::|∶|\/|\bto\b)\s*/i).map(function (x) { return x.trim(); }).filter(function (x) { return x !== ''; });
+    if (parts.length < 2) throw new Error('Write the ratio with colons, like 12:18 or 2:3:5.');
+    if (parts.length > 20) throw new Error('Please use at most 20 parts.');
+    var d = 0; parts.forEach(function (p) { if (!/^\d+(\.\d+)?$|^\.\d+$/.test(p)) throw new Error('"' + p + '" is not a positive number.'); d = Math.max(d, decs(p)); });
+    if (d > 9) throw new Error('Please use at most 9 decimal places.');
+    var ints = parts.map(function (p) { return Math.round(parseFloat(p) * Math.pow(10, d)); });
+    if (ints.some(function (v) { return !Number.isSafeInteger(v); })) throw new Error('Those numbers are too large.');
+    return { parts: parts.map(Number), ints: ints, d: d };
+  }
+  function simp() {
+    var o = $('rtOut'), m = $('rtMsg');
+    m.textContent = ''; m.className = 'msg';
+    if (!$('rtIn').value.trim()) { o.textContent = '–'; return; }
+    try {
+      var r = parseRatio($('rtIn').value);
+      if (r.ints.every(function (v) { return v === 0; })) throw new Error('At least one part must be more than 0.');
+      var g = r.ints.reduce(function (a, b) { return gcd(a, b); }), s = r.ints.map(function (v) { return v / g; });
+      var tot = s.reduce(function (a, b) { return a + b; }, 0);
+      o.textContent = s.join(' : ');
+      var lines = [];
+      if (r.d) lines.push('Decimals were multiplied by ' + fmtNum(Math.pow(10, r.d), 0) + ' first, then divided by the HCF ' + fmtNum(g, 0) + '.');
+      else lines.push('Divided every part by the highest common factor, ' + fmtNum(g, 0) + '.');
+      if (s[0] > 0 && s.length === 2) lines.push('Same as 1 : ' + fmt(s[1] / s[0]) + (s[1] > 0 ? ' or ' + fmt(s[0] / s[1]) + ' : 1' : '') + '. As a fraction: ' + s[0] + '/' + s[1] + '.');
+      lines.push('Shares: ' + s.map(function (v) { return fmt(v / tot * 100) + '%'; }).join(' / ') + '.');
+      m.textContent = lines.join(' ');
+    } catch (e) { o.textContent = '–'; m.className = 'msg bad'; m.textContent = e.message; }
+  }
+  function prop() {
+    var ids = ['pA', 'pB', 'pC', 'pD'], v = ids.map(function (id) { return $(id).value === '' ? null : +$(id).value; }), o = $('pOut');
+    var empty = v.filter(function (x) { return x === null; }).length;
+    if (empty !== 1) { o.textContent = empty === 0 ? 'Clear the box you want to work out.' : 'Fill in three of the four boxes.'; return; }
+    var k = v.indexOf(null), A = v[0], B = v[1], C = v[2], D = v[3], ans;
+    if (k === 0) { if (D === 0) { o.textContent = 'D cannot be 0.'; return; } ans = B * C / D; }
+    if (k === 1) { if (C === 0) { o.textContent = 'C cannot be 0.'; return; } ans = A * D / C; }
+    if (k === 2) { if (B === 0) { o.textContent = 'B cannot be 0.'; return; } ans = A * D / B; }
+    if (k === 3) { if (A === 0) { o.textContent = 'A cannot be 0.'; return; } ans = B * C / A; }
+    var w = v.slice(); w[k] = ans;
+    o.textContent = ['A', 'B', 'C', 'D'][k] + ' = ' + fmt(ans) + '   (' + fmt(w[0]) + ' : ' + fmt(w[1]) + ' = ' + fmt(w[2]) + ' : ' + fmt(w[3]) + ')';
+  }
+  function share() {
+    var o = $('shOut'), t = $('shT').value;
+    if (t === '' || !$('shR').value.trim()) { o.textContent = '–'; return; }
+    try {
+      var r = parseRatio($('shR').value), tot = r.parts.reduce(function (a, b) { return a + b; }, 0);
+      if (!(tot > 0)) throw new Error('At least one part must be more than 0.');
+      if (!isFinite(+t)) throw new Error('Enter an amount.');
+      o.textContent = r.parts.map(function (p, i) { return 'Part ' + (i + 1) + ': ' + fmt(+t * p / tot); }).join('  ·  ');
+    } catch (e) { o.textContent = e.message; }
+  }
+  $('rtIn').addEventListener('input', simp);
+  ['pA', 'pB', 'pC', 'pD'].forEach(function (id) { $(id).addEventListener('input', prop); });
+  $('shT').addEventListener('input', share); $('shR').addEventListener('input', share);
+  simp(); prop(); share(); avg();
+})();
+</script>

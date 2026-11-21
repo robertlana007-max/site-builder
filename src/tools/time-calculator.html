@@ -1,0 +1,156 @@
+<style>
+.tc-row { display: grid; grid-template-columns: 74px repeat(3, minmax(0, 1fr)) 40px; gap: 6px; align-items: end; margin-bottom: 8px; }
+.tc-row label { font-size: 12.5px; margin-bottom: 2px; }
+.tc-row input, .tc-row select { min-width: 0; width: 100%; }
+.tc-x { min-height: 44px; padding: 0; justify-content: center; width: 40px; }
+.tc-ts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(56px, auto) 40px; gap: 6px; align-items: end; margin-bottom: 8px; }
+.tc-ts label { font-size: 12.5px; margin-bottom: 2px; }
+.tc-ts input { min-width: 0; width: 100%; }
+.tc-ts input[type=time] { font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 6px; min-height: 44px; }
+.tc-ts output { font: 600 14px var(--mono); padding: 0 0 12px; text-align: end; white-space: nowrap; }
+.tc-sec { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 6px; }
+@media (max-width: 480px) {
+  .tc-row { grid-template-columns: 58px repeat(3, minmax(0, 1fr)) 36px; gap: 4px; }
+  .tc-ts { grid-template-columns: repeat(2, minmax(0, 1fr)) 64px; }
+  .tc-ts .tc-brk { grid-column: 1; } .tc-ts output { grid-column: 2; text-align: start; padding: 0 0 12px 4px; } .tc-ts .tc-x { grid-column: 3; grid-row: 2; justify-self: end; }
+  .tc-x { width: 36px; }
+}
+</style>
+<h3 style="margin-top:0">Add or subtract times</h3>
+<div id="tcRows"></div>
+<div class="btns"><button type="button" class="btn ghost" id="tcAdd">Add a line</button><button type="button" class="btn ghost" id="tcClr">Clear</button></div>
+<div class="stats">
+  <div class="stat"><span>Total (h:mm:ss)</span><b id="tcHms">–</b></div>
+  <div class="stat"><span>In days</span><b id="tcDays">–</b></div>
+  <div class="stat"><span>Decimal hours</span><b id="tcDec">–</b></div>
+  <div class="stat"><span>Total minutes</span><b id="tcMin">–</b></div>
+  <div class="stat"><span>Total seconds</span><b id="tcSec">–</b></div>
+</div>
+<p class="msg" id="tcMsg"></p>
+
+<div class="tc-sec">
+<h3>Timesheet: hours worked</h3>
+<div id="tsRows"></div>
+<div class="btns"><button type="button" class="btn ghost" id="tsAdd">Add a day</button></div>
+<div class="fields" style="margin-top:12px"><div><label for="tsRate">Pay per hour <small>(optional)</small></label><input type="number" id="tsRate" min="0" step="any" inputmode="decimal" placeholder="e.g. 15"></div></div>
+<div class="stats">
+  <div class="stat"><span>Total worked</span><b id="tsHm">–</b></div>
+  <div class="stat"><span>Decimal hours</span><b id="tsDec">–</b></div>
+  <div class="stat"><span>Pay</span><b id="tsPay">–</b></div>
+</div>
+<p class="msg" id="tsMsg">If the end time is earlier than the start time, the shift is counted as running past midnight.</p>
+</div>
+
+<div class="tc-sec">
+<h3>Convert decimal hours and h:mm</h3>
+<div class="fields">
+  <div><label for="cvDec">Decimal hours</label><input type="number" id="cvDec" data-nomemo step="any" inputmode="decimal" placeholder="7.75"></div>
+  <div><label for="cvHm">Hours:minutes(:seconds)</label><input type="text" id="cvHm" data-nomemo inputmode="numeric" placeholder="7:45" autocomplete="off"></div>
+</div>
+<div class="out" id="cvOut">–</div>
+</div>
+<script>
+(function () {
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function hms(sec) { var neg = sec < 0; sec = Math.round(Math.abs(sec)); var h = Math.floor(sec / 3600), m = Math.floor(sec % 3600 / 60), s = sec % 60; return (neg ? '−' : '') + fmtNum(h, 0) + ':' + pad(m) + ':' + pad(s); }
+  function dec(x, d) { return Number(x).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 4 : d }); }
+  // ---------- add / subtract ----------
+  var box = $('tcRows'), n = 0;
+  function row(sign, h, m, s) {
+    var i = n++, d = document.createElement('div'); d.className = 'tc-row';
+    d.innerHTML = '<div><label for="tcS' + i + '">Sign</label><select id="tcS' + i + '" data-nomemo><option value="1">+</option><option value="-1">−</option></select></div>' +
+      '<div><label for="tcH' + i + '">Hours</label><input type="number" id="tcH' + i + '" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>' +
+      '<div><label for="tcM' + i + '">Minutes</label><input type="number" id="tcM' + i + '" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>' +
+      '<div><label for="tcX' + i + '">Seconds</label><input type="number" id="tcX' + i + '" data-nomemo min="0" step="any" inputmode="decimal" placeholder="0"></div>' +
+      '<button type="button" class="btn ghost tc-x" aria-label="Remove this line">✕</button>';
+    box.appendChild(d);
+    d.querySelector('select').value = sign || 1;
+    var ins = d.querySelectorAll('input'); ins[0].value = h || ''; ins[1].value = m || ''; ins[2].value = s || '';
+    d.querySelector('.tc-x').addEventListener('click', function () { if (box.children.length > 1) d.remove(); else ins.forEach(function (x) { x.value = ''; }); calc(); });
+    return d;
+  }
+  function calc() {
+    var total = 0, bad = '', any = false;
+    box.querySelectorAll('.tc-row').forEach(function (r, k) {
+      var sg = +r.querySelector('select').value, ins = r.querySelectorAll('input'), part = 0;
+      [3600, 60, 1].forEach(function (mul, j) {
+        var v = ins[j].value; if (v === '') return; any = true;
+        var x = +v; if (!isFinite(x) || x < 0) bad = bad || 'Line ' + (k + 1) + ': use 0 or more. Choose − in Sign to subtract.';
+        else if (x > 1e9) bad = bad || 'Line ' + (k + 1) + ': that number is too big.';
+        else part += x * mul;
+      });
+      total += sg * part;
+    });
+    var ids = ['tcHms', 'tcDays', 'tcDec', 'tcMin', 'tcSec'], msg = $('tcMsg');
+    if (bad || !any) { ids.forEach(function (i) { $(i).textContent = '–'; }); msg.className = bad ? 'msg bad' : 'msg'; msg.textContent = bad || 'Type hours, minutes or seconds. Values above 59 are fine (90 minutes = 1:30:00).'; return; }
+    msg.className = 'msg'; msg.textContent = total < 0 ? 'The total is negative: you subtracted more than you added.' : '';
+    var a = Math.round(Math.abs(total)), sg = total < 0 ? '−' : '';
+    $('tcHms').textContent = hms(total);
+    $('tcDays').textContent = sg + Math.floor(a / 86400) + 'd ' + pad(Math.floor(a % 86400 / 3600)) + 'h ' + pad(Math.floor(a % 3600 / 60)) + 'm ' + pad(a % 60) + 's';
+    $('tcDec').textContent = dec(total / 3600);
+    $('tcMin').textContent = dec(total / 60, 2);
+    $('tcSec').textContent = fmtNum(Math.round(total), 0);
+  }
+  box.addEventListener('input', calc); box.addEventListener('change', calc);
+  row(1, 1, 45); row(1, 2, 30, 15);
+  $('tcAdd').addEventListener('click', function () { if (box.children.length >= 100) return; row(1).querySelector('input').focus(); calc(); });
+  $('tcClr').addEventListener('click', function () { box.innerHTML = ''; row(1); row(1); calc(); });
+  calc();
+
+  // ---------- timesheet ----------
+  var ts = $('tsRows'), tn = 0;
+  function trow(a, b, br) {
+    var i = tn++, d = document.createElement('div'); d.className = 'tc-ts';
+    d.innerHTML = '<div><label for="tsA' + i + '">Start</label><input type="time" id="tsA' + i + '" data-nomemo></div>' +
+      '<div><label for="tsB' + i + '">End</label><input type="time" id="tsB' + i + '" data-nomemo></div>' +
+      '<div class="tc-brk"><label for="tsC' + i + '">Break (min)</label><input type="number" id="tsC' + i + '" data-nomemo min="0" step="any" inputmode="numeric" placeholder="0"></div>' +
+      '<output aria-live="polite">–</output><button type="button" class="btn ghost tc-x" aria-label="Remove this day">✕</button>';
+    ts.appendChild(d);
+    var ins = d.querySelectorAll('input'); ins[0].value = a || ''; ins[1].value = b || ''; ins[2].value = br || '';
+    d.querySelector('.tc-x').addEventListener('click', function () { if (ts.children.length > 1) d.remove(); else ins.forEach(function (x) { x.value = ''; }); tcalc(); });
+    return d;
+  }
+  function mins(v) { var p = /^(\d\d):(\d\d)/.exec(v); return p ? +p[1] * 60 + +p[2] : NaN; }
+  function tcalc() {
+    var total = 0, bad = '', rows = 0;
+    ts.querySelectorAll('.tc-ts').forEach(function (r, k) {
+      var ins = r.querySelectorAll('input'), out = r.querySelector('output'), a = mins(ins[0].value), b = mins(ins[1].value), br = ins[2].value === '' ? 0 : +ins[2].value;
+      if (isNaN(a) || isNaN(b)) { out.textContent = '–'; return; }
+      var w = b - a; if (w <= 0) w += 1440; // overnight shift
+      if (!(br >= 0)) { bad = bad || 'Day ' + (k + 1) + ': the break cannot be negative.'; out.textContent = '–'; return; }
+      if (br > w) { bad = bad || 'Day ' + (k + 1) + ': the break is longer than the shift.'; out.textContent = '–'; return; }
+      w -= br; total += w; rows++;
+      out.textContent = Math.floor(w / 60) + ':' + pad(Math.round(w % 60));
+    });
+    var msg = $('tsMsg');
+    msg.className = bad ? 'msg bad' : 'msg'; msg.textContent = bad || 'If the end time is earlier than the start time, the shift is counted as running past midnight.';
+    if (!rows) { ['tsHm', 'tsDec', 'tsPay'].forEach(function (i) { $(i).textContent = '–'; }); return; }
+    $('tsHm').textContent = Math.floor(total / 60) + 'h ' + pad(Math.round(total % 60)) + 'm';
+    $('tsDec').textContent = dec(total / 60, 2);
+    var r = $('tsRate').value; $('tsPay').textContent = r === '' || !(+r >= 0) ? '–' : fmtNum(total / 60 * +r, 2);
+  }
+  ts.addEventListener('input', tcalc); $('tsRate').addEventListener('input', tcalc);
+  trow('09:00', '17:30', 30); trow('', '', '');
+  $('tsAdd').addEventListener('click', function () { if (ts.children.length >= 62) return; trow().querySelector('input').focus(); tcalc(); });
+  tcalc();
+
+  // ---------- converter ----------
+  function cvFromDec() {
+    var v = $('cvDec').value, o = $('cvOut');
+    if (v === '') { o.textContent = '–'; return; }
+    var x = +v; if (!isFinite(x) || Math.abs(x) > 1e9) { o.textContent = 'Enter a number of hours, like 7.75'; return; }
+    $('cvHm').value = '';
+    o.textContent = dec(x) + ' hours = ' + hms(x * 3600) + ' (' + dec(x * 60, 2) + ' minutes)';
+  }
+  function cvFromHm() {
+    var v = $('cvHm').value.trim(), o = $('cvOut');
+    if (!v) { o.textContent = '–'; return; }
+    var p = /^(-?)(\d+)(?::(\d{1,2}))?(?::(\d{1,2}(?:\.\d+)?))?$/.exec(v.replace(/\s+/g, '').replace(/h/i, ':').replace(/m(in)?$/i, '').replace(/:$/, ''));
+    if (!p || (p[3] && +p[3] > 59) || (p[4] && +p[4] >= 60)) { o.textContent = 'Write it as hours:minutes, like 7:45 or 1:05:30 (minutes and seconds below 60).'; return; }
+    $('cvDec').value = '';
+    var sec = (+p[2]) * 3600 + (+(p[3] || 0)) * 60 + (+(p[4] || 0)); if (p[1]) sec = -sec;
+    o.textContent = v + ' = ' + dec(sec / 3600) + ' hours (' + dec(sec / 60, 2) + ' minutes)';
+  }
+  $('cvDec').addEventListener('input', cvFromDec); $('cvHm').addEventListener('input', cvFromHm);
+})();
+</script>

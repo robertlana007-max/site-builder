@@ -1,0 +1,173 @@
+<style>
+.cp-wrap { display: grid; gap: 14px; }
+.cp-stage { border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; background: var(--bg); }
+.cp-stage canvas { max-width: 100%; max-height: 50vh; display: block; margin: 0 auto; cursor: crosshair; touch-action: manipulation; }
+.cp-bar { display: flex; height: 56px; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); }
+.cp-bar i { display: block; height: 100%; min-width: 4px; }
+.cp-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); }
+.cp-list li { display: flex; align-items: center; gap: 10px; border: 1px solid var(--line); border-radius: 12px; padding: 8px; background: var(--surface); min-width: 0; }
+.cp-sw { width: 52px; height: 52px; border-radius: 10px; flex: none; border: 1px solid rgba(0,0,0,.12); }
+.cp-txt { flex: 1; min-width: 0; font-size: 13.5px; line-height: 1.45; }
+.cp-txt b { font-family: var(--mono); font-size: 15px; display: block; }
+.cp-txt span { color: var(--muted); font-family: var(--mono); display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-cb { display: flex; flex-direction: column; gap: 4px; flex: none; }
+.cp-cb button { font: 600 12.5px/1 inherit; font-family: inherit; height: 30px; padding: 0 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.cp-cb button:hover { border-color: var(--accent); color: var(--accent); }
+.cp-pick { display: flex; align-items: center; gap: 10px; font-size: 14px; color: var(--muted); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>A photo, logo or screenshot (JPG, PNG, WebP or GIF). It stays on your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="fields">
+  <div><label for="k">Number of colours: <span id="kv">6</span></label><input type="range" id="k" min="2" max="16" value="6"></div>
+  <div><label for="order">Sort by</label><select id="order"><option value="count">Most used first</option><option value="light">Dark to light</option><option value="hue">Rainbow order</option></select></div>
+</div>
+<div class="cp-wrap" id="work" hidden>
+  <div class="cp-stage"><canvas id="cv" aria-label="Your image. Tap anywhere to pick that colour."></canvas></div>
+  <p class="cp-pick" id="pick">Tip: tap the picture to pick any single colour.</p>
+  <div class="cp-bar" id="bar" aria-hidden="true"></div>
+  <ul class="cp-list" id="list" aria-label="Colours found"></ul>
+</div>
+<div class="btns" id="acts" hidden>
+  <button class="btn" id="png">Download palette PNG</button>
+  <button class="btn ghost" id="cphex">Copy all HEX</button>
+  <button class="btn ghost" id="cpcss">Copy as CSS</button>
+  <a class="btn ghost" id="dl" hidden>Download</a>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var img = null, name = 'image', pix = null, palette = [], lastUrl = null, job = 0;
+  function say(c, t) { PT.say(c, t); }
+  function hex(c) { return '#' + c.map(function (v) { return ('0' + Math.round(v).toString(16)).slice(-2); }).join('').toUpperCase(); }
+  function hsl(c) {
+    var r = c[0] / 255, g = c[1] / 255, b = c[2] / 255, mx = Math.max(r, g, b), mn = Math.min(r, g, b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn;
+    if (d) { s = d / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; if (h < 0) h += 360; }
+    return [Math.round(h), Math.round(s * 100), Math.round(l * 100)];
+  }
+  function lum(c) { return 0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]; }
+
+  // Small seeded random so the same image always gives the same palette.
+  function rng(seed) { return function () { seed = (seed * 1664525 + 1013904223) >>> 0; return seed / 4294967296; }; }
+  function kmeans(data, n, k) {
+    var rand = rng(12345), cent = [], i, j, d, best, dist = new Float64Array(n);
+    // k-means++ start: spread the first guesses out
+    var f = Math.floor(rand() * n) * 3; cent.push([data[f], data[f + 1], data[f + 2]]);
+    while (cent.length < k) {
+      var sum = 0;
+      for (i = 0; i < n; i++) { best = Infinity; for (j = 0; j < cent.length; j++) { d = sq(data, i * 3, cent[j]); if (d < best) best = d; } dist[i] = best; sum += best; }
+      if (!sum) break; // fewer distinct colours than asked for
+      var t = rand() * sum; for (i = 0; i < n; i++) { t -= dist[i]; if (t <= 0) break; }
+      i = Math.min(i, n - 1); cent.push([data[i * 3], data[i * 3 + 1], data[i * 3 + 2]]);
+    }
+    k = cent.length;
+    var lab = new Int32Array(n), cnt;
+    for (var it = 0; it < 16; it++) {
+      var acc = []; cnt = new Int32Array(k); for (j = 0; j < k; j++) acc.push([0, 0, 0]);
+      var moved = 0;
+      for (i = 0; i < n; i++) {
+        best = Infinity; var bj = 0;
+        for (j = 0; j < k; j++) { d = sq(data, i * 3, cent[j]); if (d < best) { best = d; bj = j; } }
+        if (lab[i] !== bj) moved++; lab[i] = bj; cnt[bj]++; acc[bj][0] += data[i * 3]; acc[bj][1] += data[i * 3 + 1]; acc[bj][2] += data[i * 3 + 2];
+      }
+      for (j = 0; j < k; j++) if (cnt[j]) cent[j] = [acc[j][0] / cnt[j], acc[j][1] / cnt[j], acc[j][2] / cnt[j]];
+      if (it > 0 && moved < n / 1000) break;
+    }
+    var out = cent.map(function (c, j2) { return { c: c, n: cnt[j2] }; }).filter(function (p) { return p.n > 0; });
+    // merge colours that look the same, so a flat logo does not list 16 shades of one red
+    for (var a = 0; a < out.length; a++) for (var b = out.length - 1; b > a; b--) {
+      var p = out[a], q = out[b], dd = (p.c[0] - q.c[0]) * (p.c[0] - q.c[0]) + (p.c[1] - q.c[1]) * (p.c[1] - q.c[1]) + (p.c[2] - q.c[2]) * (p.c[2] - q.c[2]);
+      if (dd < 324) { var t2 = p.n + q.n; p.c = [0, 1, 2].map(function (m) { return (p.c[m] * p.n + q.c[m] * q.n) / t2; }); p.n = t2; out.splice(b, 1); }
+    }
+    return out.map(function (p) { return { c: p.c.map(Math.round), n: p.n }; });
+  }
+  function sq(a, o, c) { var x = a[o] - c[0], y = a[o + 1] - c[1], z = a[o + 2] - c[2]; return x * x + y * y + z * z; }
+
+  function analyse() {
+    if (!pix) return;
+    var k = +$('k').value, res = kmeans(pix.data, pix.n, k), total = res.reduce(function (a, p) { return a + p.n; }, 0);
+    var o = $('order').value;
+    res.sort(o === 'light' ? function (a, b) { return lum(a.c) - lum(b.c); } : o === 'hue' ? function (a, b) { var x = hsl(a.c), y = hsl(b.c); return (x[1] < 12 ? 400 : x[0]) - (y[1] < 12 ? 400 : y[0]) || lum(a.c) - lum(b.c); } : function (a, b) { return b.n - a.n; });
+    palette = res.map(function (p) { return { c: p.c, pct: p.n / total * 100 }; });
+    show();
+    say('ok', palette.length < k ? 'Found ' + palette.length + ' clearly different colours. Shades that look the same were joined.' : 'Found ' + palette.length + ' main colours. Tap a code to copy it.');
+  }
+  function show() {
+    var bar = $('bar'), ul = $('list'); bar.innerHTML = ''; ul.innerHTML = '';
+    palette.forEach(function (p) {
+      var h = hex(p.c), l = hsl(p.c), i = document.createElement('i'); i.style.background = h; i.style.flex = Math.max(p.pct, 1.5) + ' 1 0'; i.title = h; bar.appendChild(i);
+      var li = document.createElement('li'), sw = document.createElement('div'), tx = document.createElement('div'), cb = document.createElement('div');
+      sw.className = 'cp-sw'; sw.style.background = h; tx.className = 'cp-txt'; cb.className = 'cp-cb';
+      var b = document.createElement('b'), share = document.createElement('small'); b.textContent = h + ' '; share.style.cssText = 'font-weight:400;color:var(--muted)'; share.textContent = (p.pct < 1 ? '<1' : Math.round(p.pct)) + '%'; b.appendChild(share); var r = document.createElement('span'); r.textContent = 'rgb(' + p.c.join(', ') + ')';
+      var s = document.createElement('span'); s.textContent = 'hsl(' + l[0] + ', ' + l[1] + '%, ' + l[2] + '%)';
+      tx.appendChild(b); tx.appendChild(r); tx.appendChild(s);
+      [['HEX', h], ['RGB', 'rgb(' + p.c.join(', ') + ')']].forEach(function (x) {
+        var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Copy ' + x[0]; btn.setAttribute('aria-label', 'Copy ' + x[1]);
+        btn.addEventListener('click', function () { copyText(x[1], btn); }); cb.appendChild(btn);
+      });
+      li.appendChild(sw); li.appendChild(tx); li.appendChild(cb); ul.appendChild(li);
+    });
+    $('work').hidden = false; $('acts').hidden = false;
+  }
+  function load(f) {
+    var mine = ++job;
+    loadImage(f, function (im) {
+      if (mine !== job) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
+      img = im; name = PT.base(f.name) || 'image';
+      var W = im.naturalWidth, H = im.naturalHeight, s = Math.min(1, 900 / Math.max(W, H)), cv = $('cv');
+      cv.width = Math.max(1, Math.round(W * s)); cv.height = Math.max(1, Math.round(H * s));
+      var x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, cv.width, cv.height);
+      // analyse a small copy: about 20,000 pixels is plenty to find the main colours
+      var ss = Math.min(1, Math.sqrt(20000 / (W * H))), w = Math.max(1, Math.round(W * ss)), h = Math.max(1, Math.round(H * ss)), t = document.createElement('canvas');
+      t.width = w; t.height = h; var tx = t.getContext('2d', { willReadFrequently: true }); tx.drawImage(im, 0, 0, w, h);
+      var d = tx.getImageData(0, 0, w, h).data, arr = new Float32Array(w * h * 3), n = 0;
+      for (var i = 0; i < d.length; i += 4) { if (d[i + 3] < 128) continue; arr[n * 3] = d[i]; arr[n * 3 + 1] = d[i + 1]; arr[n * 3 + 2] = d[i + 2]; n++; }
+      if (!n) { say('bad', 'This image is completely see-through, so it has no colours to find.'); $('work').hidden = $('acts').hidden = true; return; }
+      pix = { data: arr, n: n };
+      $('work').hidden = false; $('pick').textContent = 'Tip: tap the picture to pick any single colour.';
+      say('', 'Finding colours…'); setTimeout(function () { if (mine === job) analyse(); }, 10);
+    });
+  }
+  PT.drop(false, function (f) {
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif|svg)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP file.'); return; }
+    load(f);
+  });
+  $('k').addEventListener('input', function () { $('kv').textContent = $('k').value; analyse(); });
+  $('order').addEventListener('change', analyse);
+  $('kv').textContent = $('k').value;
+  $('cv').addEventListener('click', function (e) {
+    var cv = $('cv'), r = cv.getBoundingClientRect(), x = Math.floor((e.clientX - r.left) * cv.width / r.width), y = Math.floor((e.clientY - r.top) * cv.height / r.height);
+    var d = cv.getContext('2d', { willReadFrequently: true }).getImageData(Math.max(0, Math.min(cv.width - 1, x)), Math.max(0, Math.min(cv.height - 1, y)), 1, 1).data, c = [d[0], d[1], d[2]], h = hex(c);
+    var p = $('pick'); p.innerHTML = '';
+    var sw = document.createElement('span'); sw.className = 'cp-sw'; sw.style.cssText = 'width:32px;height:32px;background:' + h;
+    var t = document.createElement('span'); t.textContent = 'Picked ' + h + ' · rgb(' + c.join(', ') + ')';
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'btn ghost'; b.style.cssText = 'min-height:34px;padding:4px 10px'; b.textContent = 'Copy';
+    b.addEventListener('click', function () { copyText(h, b); });
+    p.appendChild(sw); p.appendChild(t); p.appendChild(b);
+  });
+  $('cphex').addEventListener('click', function () { copyText(palette.map(function (p) { return hex(p.c); }).join(', '), $('cphex')); });
+  $('cpcss').addEventListener('click', function () { copyText(':root {\n' + palette.map(function (p, i) { return '  --color-' + (i + 1) + ': ' + hex(p.c) + ';'; }).join('\n') + '\n}', $('cpcss')); });
+  $('png').addEventListener('click', function () {
+    if (!palette.length) return;
+    var n = palette.length, cols = Math.min(n, 4), rows = Math.ceil(n / cols), cw = 300, ch = 260, c = document.createElement('canvas');
+    c.width = cols * cw; c.height = rows * ch + 120;
+    var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    var by = rows * ch; // a proportional strip along the bottom
+    var px = 0; palette.forEach(function (p) { var w = p.pct / 100 * c.width; x.fillStyle = hex(p.c); x.fillRect(px, by + 20, w + 1, 80); px += w; });
+    palette.forEach(function (p, i) {
+      var cx = (i % cols) * cw, cy = Math.floor(i / cols) * ch;
+      x.fillStyle = hex(p.c); x.fillRect(cx + 10, cy + 10, cw - 20, 170);
+      x.fillStyle = '#111'; x.font = '700 26px system-ui, sans-serif'; x.fillText(hex(p.c), cx + 14, cy + 214);
+      x.fillStyle = '#555'; x.font = '400 18px system-ui, sans-serif'; x.fillText('rgb(' + p.c.join(', ') + ')', cx + 14, cy + 242);
+    });
+    PT.blob(c, 'image/png').then(function (b) {
+      if (!b) { say('bad', 'Your browser could not save the palette.'); return; }
+      if (lastUrl) URL.revokeObjectURL(lastUrl);
+      lastUrl = URL.createObjectURL(b);
+      var a = $('dl'); a.href = lastUrl; a.download = name + '-palette.png'; a.textContent = 'Download ' + a.download; a.hidden = false; a.click(); if (window.burst) burst($('png'));
+      say('ok', 'Saved ' + a.download + ' (' + fmtBytes(b.size) + '). If the download did not start, use the green button.');
+    });
+  });
+})();
+</script>

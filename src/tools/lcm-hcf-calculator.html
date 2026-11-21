@@ -1,0 +1,124 @@
+<style>
+.lh-ta { min-height: 80px; font-family: var(--mono); font-size: 15px; }
+.lh-steps { font-family: var(--mono); font-size: 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px; overflow-x: auto; white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; }
+.lh-sec { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+.lh-res .stat b { font-size: 20px; }
+.lh-big { font-size: clamp(18px, 3.6vw, 24px); font-weight: 800; margin: 12px 0 4px; overflow-wrap: anywhere; }
+.lh-big.ok { color: var(--ok); }
+sup { font-size: .7em; }
+</style>
+<label for="lhIn">Whole numbers <small>(2 or more, separated by commas or spaces)</small></label>
+<textarea id="lhIn" class="lh-ta" data-nomemo spellcheck="false" placeholder="e.g. 12, 18, 30">12, 18, 30</textarea>
+<div class="stats lh-res">
+  <div class="stat"><span>HCF / GCD (highest common factor)</span><b id="lhH">–</b></div>
+  <div class="stat"><span>LCM (lowest common multiple)</span><b id="lhL">–</b></div>
+</div>
+<p class="msg" id="lhMsg"></p>
+<div class="btns"><button type="button" class="btn ghost" id="lhCopy">Copy answer and steps</button></div>
+<h3>Method 1: prime factors</h3>
+<div class="lh-steps" id="lhPf">–</div>
+<h3>Method 2: Euclid's division (for HCF)</h3>
+<div class="lh-steps" id="lhEu">–</div>
+
+<div class="lh-sec">
+<h3>Prime number checker and factorization</h3>
+<div class="fields"><div><label for="prIn">Number</label><input type="text" id="prIn" data-nomemo inputmode="numeric" value="97" autocomplete="off"></div></div>
+<p class="lh-big" id="prOut">–</p>
+<div class="stats lh-res">
+  <div class="stat"><span>Prime factorization</span><b id="prF">–</b></div>
+  <div class="stat"><span>Number of divisors</span><b id="prD">–</b></div>
+  <div class="stat"><span>Previous prime</span><b id="prP">–</b></div>
+  <div class="stat"><span>Next prime</span><b id="prN">–</b></div>
+</div>
+<p class="msg" id="prMsg"></p>
+</div>
+<script>
+(function () {
+  var MAXN = 9007199254740991, FACT_MAX = 1e12;
+  function g(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+  function gB(a, b) { while (b) { var t = a % b; a = b; b = t; } return a; }
+  function factor(n) { // trial division by 2, 3 and 6k ± 1
+    var f = [], add = function (p) { var e = 0; while (n % p === 0) { n /= p; e++; } if (e) f.push([p, e]); };
+    add(2); add(3);
+    for (var p = 5; p * p <= n; p += 6) { add(p); add(p + 2); }
+    if (n > 1) f.push([n, 1]);
+    return f;
+  }
+  function isPrime(n) { if (n < 2) return false; if (n < 4) return true; if (n % 2 === 0 || n % 3 === 0) return false; for (var p = 5; p * p <= n; p += 6) if (n % p === 0 || n % (p + 2) === 0) return false; return true; }
+  function show(f) { return f.length ? f.map(function (x) { return x[0] + (x[1] > 1 ? '<sup>' + x[1] + '</sup>' : ''); }).join(' × ') : '1'; }
+  function plain(f) { return f.length ? f.map(function (x) { return x[0] + (x[1] > 1 ? '^' + x[1] : ''); }).join(' × ') : '1'; }
+  function grp(s) { return s.replace(/\B(?=(\d{3})+(?!\d))/g, ','); }
+  var copyTxt = '';
+  function calc() {
+    var msg = $('lhMsg'), toks = $('lhIn').value.split(/[\s,;]+/).filter(Boolean), nums = [];
+    function fail(t) { $('lhH').textContent = '–'; $('lhL').textContent = '–'; $('lhPf').textContent = '–'; $('lhEu').textContent = '–'; msg.className = 'msg bad'; msg.textContent = t; copyTxt = ''; }
+    for (var i = 0; i < toks.length; i++) {
+      var t = toks[i].replace(/^\+/, '');
+      if (!/^\d+$/.test(t)) return fail('"' + toks[i] + '" is not a positive whole number. LCM and HCF work with whole numbers like 12 or 150.');
+      var v = Number(t); if (v === 0) return fail('0 is not allowed: every number divides 0, so the LCM and HCF are not useful.');
+      if (v > MAXN) return fail('"' + toks[i] + '" is too large. Use numbers up to 9,007,199,254,740,991.');
+      nums.push(v);
+    }
+    if (nums.length < 2) { $('lhH').textContent = '–'; $('lhL').textContent = '–'; $('lhPf').textContent = '–'; $('lhEu').textContent = '–'; msg.className = 'msg'; msg.textContent = nums.length ? 'Add at least one more number.' : 'Type two or more whole numbers.'; copyTxt = ''; return; }
+    if (nums.length > 100) return fail('Please use at most 100 numbers.');
+    var H = nums.reduce(g), L = BigInt(nums[0]);
+    for (var k = 1; k < nums.length; k++) { var b = BigInt(nums[k]); L = L / gB(L, b) * b; }
+    $('lhH').textContent = grp(String(H)); $('lhL').textContent = grp(L.toString());
+    msg.className = 'msg'; msg.textContent = H === 1 ? 'The HCF is 1, so these numbers are co-prime (they share no common factor).' : '';
+    // prime factor method
+    var pf = '';
+    if (Math.max.apply(null, nums) <= FACT_MAX) {
+      var fs = nums.map(factor), primes = {};
+      nums.forEach(function (n, i) { pf += n + ' = ' + plain(fs[i]) + '\n'; fs[i].forEach(function (x) { primes[x[0]] = 1; }); });
+      var ps = Object.keys(primes).map(Number).sort(function (a, b) { return a - b; }), lo = [], hi = [];
+      ps.forEach(function (p) {
+        var es = fs.map(function (f) { for (var j = 0; j < f.length; j++) if (f[j][0] === p) return f[j][1]; return 0; });
+        var mn = Math.min.apply(null, es), mx = Math.max.apply(null, es);
+        if (mn) lo.push([p, mn]); hi.push([p, mx]);
+      });
+      pf += '\nHCF = common primes with the SMALLEST power = ' + plain(lo) + ' = ' + H;
+      pf += '\nLCM = every prime with the LARGEST power = ' + plain(hi) + ' = ' + L.toString();
+    } else pf = 'Numbers above 1,000,000,000,000 are not broken into prime factors here (it would be slow). The answer above is still exact, using Euclid\'s method.';
+    $('lhPf').textContent = pf;
+    // Euclid
+    var eu = '', h = nums[0], lines = 0;
+    for (var m = 1; m < nums.length; m++) {
+      var a = Math.max(h, nums[m]), c = Math.min(h, nums[m]);
+      eu += (m > 1 ? '\n' : '') + 'HCF(' + h + ', ' + nums[m] + '):\n';
+      while (c) { var q = Math.floor(a / c), r = a % c; if (lines++ < 60) eu += '  ' + a + ' = ' + q + ' × ' + c + ' + ' + r + '\n'; a = c; c = r; }
+      eu += '  → ' + a + '\n'; h = a;
+    }
+    eu += '\nLCM uses: LCM(a, b) = a × b ÷ HCF(a, b), applied one number at a time.';
+    $('lhEu').textContent = eu;
+    copyTxt = 'Numbers: ' + nums.join(', ') + '\nHCF = ' + H + '\nLCM = ' + L.toString() + '\n\n' + pf + '\n\n' + eu;
+  }
+  $('lhIn').addEventListener('input', calc);
+  $('lhCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+  calc();
+
+  function prime() {
+    var raw = $('prIn').value.trim().replace(/[, _]/g, ''), out = $('prOut'), m = $('prMsg'), ids = ['prF', 'prD', 'prP', 'prN'];
+    function clear(t, bad) { out.textContent = '–'; out.className = 'lh-big'; ids.forEach(function (i) { $(i).textContent = '–'; }); m.className = bad ? 'msg bad' : 'msg'; m.textContent = t || ''; }
+    if (!raw) return clear('Type a whole number.');
+    if (!/^\d+$/.test(raw)) return clear('Type a positive whole number, like 97 or 1001.', true);
+    var n = Number(raw);
+    if (n > MAXN) return clear('Please use a number up to 9,007,199,254,740,991.', true);
+    m.className = 'msg'; m.textContent = '';
+    if (n < 2) { out.textContent = n + ' is neither prime nor composite.'; out.className = 'lh-big'; ids.forEach(function (i) { $(i).textContent = '–'; }); $('prN').textContent = '2'; return; }
+    var f = factor(n), p = f.length === 1 && f[0][1] === 1;
+    out.textContent = grp(String(n)) + (p ? ' is a prime number.' : ' is not prime (it is composite).');
+    out.className = 'lh-big' + (p ? ' ok' : '');
+    $('prF').innerHTML = show(f);
+    $('prD').textContent = grp(String(f.reduce(function (a, x) { return a * (x[1] + 1); }, 1)));
+    if (n > 1e13) { $('prP').textContent = '–'; $('prN').textContent = '–'; } else {
+    var lo = n - 1, steps = 0; while (lo >= 2 && !isPrime(lo) && steps++ < 2000) lo--;
+    $('prP').textContent = lo >= 2 && isPrime(lo) ? grp(String(lo)) : '–';
+    var hi = n + 1; steps = 0; while (hi <= MAXN && !isPrime(hi) && steps++ < 2000) hi++;
+    $('prN').textContent = hi <= MAXN && isPrime(hi) ? grp(String(hi)) : '–'; }
+    if (!p) m.textContent = 'Smallest factor other than 1: ' + f[0][0] + '. So ' + grp(String(n)) + ' = ' + f[0][0] + ' × ' + grp(String(n / f[0][0])) + '.';
+    if (n > 1e13) m.textContent = (m.textContent ? m.textContent + ' ' : '') + 'Previous and next primes are only shown for numbers up to 10 trillion.';
+  }
+  var pt; $('prIn').addEventListener('input', function () { clearTimeout(pt); pt = setTimeout(prime, 150); });
+  prime();
+})();
+</script>

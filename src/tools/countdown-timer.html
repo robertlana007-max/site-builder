@@ -16,7 +16,9 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
-  var running = false, endAt = 0, left = 0, timer = 0, title = document.title, audio = null;
+  var running = false, endAt = 0, left = 0, timer = 0, title = document.title, audio = null, KEY = 'gtn-countdown';
+  // A running or paused countdown is saved in this browser, so reloading the page does not lose it.
+  function save() { try { if (running || left > 0) localStorage.setItem(KEY, JSON.stringify({ running: running, endAt: endAt, left: left })); else localStorage.removeItem(KEY); } catch (e) {} }
   var p = function (x) { return String(x).padStart(2, '0'); };
   function fmt(ms) { var t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return (h ? p(h) + ':' : '') + p(m) + ':' + p(s); }
   function inputMs() {
@@ -36,7 +38,7 @@
     } catch (e) {}
   }
   function show(ms) { $('time').textContent = fmt(ms); if (running) document.title = fmt(ms) + ' · Timer'; }
-  function stop() { running = false; clearInterval(timer); document.title = title; $('go').textContent = 'Start'; }
+  function stop() { running = false; clearInterval(timer); document.title = title; $('go').textContent = 'Start'; save(); }
   function tick() {
     left = endAt - Date.now();
     if (left <= 0) {
@@ -49,19 +51,30 @@
     show(left);
   }
   $('go').addEventListener('click', function () {
-    if (running) { left = endAt - Date.now(); stop(); $('go').textContent = 'Resume'; return; }
+    if (running) { left = endAt - Date.now(); stop(); $('go').textContent = 'Resume'; save(); return; }
     if (left <= 0) left = inputMs();
     if (left <= 0) { $('msg').className = 'msg bad'; $('msg').textContent = 'Set a time longer than zero.'; return; }
     $('msg').textContent = '';
     try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {} // must be created on a click, even if the sound is ticked later
-    endAt = Date.now() + left; running = true; $('go').textContent = 'Pause';
+    endAt = Date.now() + left; running = true; $('go').textContent = 'Pause'; save();
     timer = setInterval(tick, 200); tick();
   });
-  function reset() { stop(); left = 0; $('msg').textContent = ''; show(inputMs()); }
+  function reset() { stop(); left = 0; save(); $('msg').textContent = ''; show(inputMs()); }
   $('reset').addEventListener('click', reset);
   ['h', 'm', 's'].forEach(function (id) { $(id).addEventListener('input', function () { if (!running) { left = 0; $('go').textContent = 'Start'; $('msg').textContent = ''; document.title = title; show(inputMs()); } else { $('msg').className = 'msg'; $('msg').textContent = 'Click Reset to use the new time.'; } }); });
   document.querySelectorAll('[data-min]').forEach(function (b) {
     b.addEventListener('click', function () { var t = +b.dataset.min; $('h').value = Math.floor(t / 60); $('m').value = t % 60; $('s').value = 0; reset(); });
   });
+  // after the site has restored the saved hour/minute/second boxes (it does that on DOMContentLoaded)
+  function restore() {
+    var o = null; try { o = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!o) return;
+    if (o.running && o.endAt > 0) {
+      left = o.endAt - Date.now();
+      if (left <= 0) { left = 0; save(); show(0); $('msg').className = 'msg ok'; $('msg').textContent = 'Time is up! The countdown finished while the page was closed.'; return; }
+      endAt = o.endAt; running = true; $('go').textContent = 'Pause'; timer = setInterval(tick, 200); tick();
+    } else if (o.left > 0) { left = o.left; show(left); $('go').textContent = 'Resume'; }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(restore, 0); }); else setTimeout(restore, 0);
 })();
 </script>

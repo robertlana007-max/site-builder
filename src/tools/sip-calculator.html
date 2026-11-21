@@ -1,0 +1,208 @@
+<style>
+.fin .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.fin input[type=month] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.fin table.sched td, .fin table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .fin .stats { grid-template-columns: 1fr 1fr; } .fin .stat { padding: 10px 12px; } }
+.fch { position: relative; margin: 16px 0 4px; }
+.fch canvas { display: block; width: 100%; height: 240px; touch-action: pan-y; }
+.fch-tip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); margin-top: 6px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.fch-tip b { color: var(--ink); }
+.fch-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+.sip .seg { margin: 0 0 16px; }
+.sip .sip-hint { font-size: 13px; color: var(--muted); display: block; margin-top: 4px; }
+</style>
+<div class="fin sip" id="sip">
+<div class="seg" role="group" aria-label="Investment type"><button type="button" data-mode="sip" aria-pressed="true">Monthly investment (SIP)</button><button type="button" data-mode="lump" aria-pressed="false">Lump sum</button></div>
+<select id="sipMode" hidden aria-hidden="true" tabindex="-1"><option value="sip">sip</option><option value="lump">lump</option></select>
+<div class="fields">
+  <div><label for="sipCur">Currency</label><select id="sipCur" data-cur></select></div>
+  <div hidden><label for="sipSym">Your currency symbol</label><input type="text" id="sipSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div id="sipAmtBox"><label for="sipAmt">Monthly investment</label><input type="number" id="sipAmt" min="0" step="any" inputmode="decimal" value="500"></div>
+  <div id="sipLumpBox" hidden><label for="sipLump">One-time investment</label><input type="number" id="sipLump" min="0" step="any" inputmode="decimal" value="10000"></div>
+</div>
+<div class="fields">
+  <div><label for="sipRate">Expected return (% per year)</label><input type="number" id="sipRate" step="any" inputmode="decimal" value="10"></div>
+  <div><label for="sipYears">Time period (years)</label><input type="number" id="sipYears" min="0" max="100" step="any" inputmode="decimal" value="15"></div>
+  <div id="sipStepBox"><label for="sipStep">Yearly step-up (%)</label><input type="number" id="sipStep" min="0" step="any" inputmode="decimal" placeholder="0"><span class="sip-hint">Raise the monthly amount each year, e.g. 10.</span></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>You invest</span><b id="sipInv">–</b></div>
+  <div class="stat"><span>Estimated gains</span><b id="sipGain">–</b></div>
+  <div class="stat"><span>Total value</span><b id="sipVal">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="fch"><canvas id="sipChart" role="img" aria-label="Line chart of amount invested and estimated value by year"></canvas><div class="fch-tip" id="sipTip"></div></div>
+<h3>Year by year</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Year</th><th id="sipColM">Monthly amount</th><th>Invested so far</th><th>Gains so far</th><th>Value</th></tr></thead><tbody id="sipRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="sipCopy">Copy summary</button></div>
+<p class="msg">Returns are not guaranteed. Markets go up and down; this shows what a steady average return would give.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  // ---------- small canvas chart (line or stacked bars), redraws on resize and theme change ----------
+  function Chart(cv, tip) {
+    var spec = null, geo = null, hover = -1;
+    function css(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+    function draw() {
+      if (!spec || !cv.isConnected) return;
+      var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      var ink = css('--muted', '#5f6b7a'), line = css('--line', '#e3e6eb'), font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      var L = spec.labels, n = L.length, S = spec.series, max = 0, min = 0;
+      if (!n) return;
+      for (var i = 0; i < n; i++) {
+        var stack = 0;
+        S.forEach(function (s) { var v = +s.data[i] || 0; if (spec.type === 'bar') stack += v; else { if (v > max) max = v; if (v < min) min = v; } });
+        if (spec.type === 'bar' && stack > max) max = stack;
+      }
+      if (max === min) max = min + 1;
+      // nice step
+      var raw = (max - min) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (s) { return s >= raw; });
+      var top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+      g.font = font;
+      var padL = 8 + Math.max(g.measureText(shortNum(top)).width, g.measureText(shortNum(bot)).width), padR = 10, padT = 10, padB = 24;
+      var pw = W - padL - padR, ph = H - padT - padB;
+      function Y(v) { return padT + ph - (v - bot) / (top - bot) * ph; }
+      g.strokeStyle = line; g.fillStyle = ink; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+      for (var v = bot; v <= top + step / 2; v += step) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(shortNum(v), padL - 6, y); }
+      var bw = pw / n, X = function (i) { return padL + bw * (i + .5); };
+      // x labels: as many as fit
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+      for (i = 0; i < n; i++) if (i % every === 0 || i === n - 1 && n - 1 - (Math.floor((n - 1) / every) * every) > every / 2) g.fillText(L[i], X(i), H - padB + 6);
+      if (spec.type === 'bar') {
+        var w = Math.max(1, Math.min(36, bw * .7));
+        for (i = 0; i < n; i++) {
+          var base = 0;
+          S.forEach(function (s) { var v = Math.max(0, +s.data[i] || 0); if (!v) return; g.fillStyle = s.color; var y1 = Y(base + v), y0 = Y(base); g.fillRect(X(i) - w / 2, y1, w, Math.max(0, y0 - y1 - (base ? 1 : 0))); base += v; });
+        }
+      } else {
+        S.forEach(function (s) {
+          g.beginPath();
+          for (var i = 0; i < n; i++) { var x = n === 1 ? padL + pw / 2 : padL + pw * i / (n - 1), y = Y(+s.data[i] || 0); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.strokeStyle = s.color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
+          if (s.fill && n > 1) { g.lineTo(padL + pw, Y(Math.max(bot, 0))); g.lineTo(padL, Y(Math.max(bot, 0))); g.closePath(); g.globalAlpha = .12; g.fillStyle = s.color; g.fill(); g.globalAlpha = 1; }
+        });
+      }
+      geo = { padL: padL, pw: pw, n: n, bw: bw, type: spec.type };
+      if (hover >= 0 && hover < n) {
+        var hx = spec.type === 'bar' ? X(hover) : (n === 1 ? padL + pw / 2 : padL + pw * hover / (n - 1));
+        g.strokeStyle = ink; g.globalAlpha = .5; g.beginPath(); g.moveTo(hx + .5, padT); g.lineTo(hx + .5, padT + ph); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    function showTip(i) {
+      if (!tip) return;
+      if (i < 0) { tip.hidden = true; return; }
+      tip.hidden = false;
+      tip.innerHTML = '<b>' + esc(spec.labels[i]) + '</b>' + spec.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ': ' + esc(spec.fmt ? spec.fmt(+s.data[i] || 0) : s.data[i]) + '</span>'; }).join('');
+    }
+    function pick(e) {
+      if (!geo) return;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left - geo.padL, i;
+      i = geo.type === 'bar' ? Math.floor(x / geo.bw) : Math.round(x / (geo.pw / Math.max(1, geo.n - 1)));
+      i = Math.max(0, Math.min(geo.n - 1, i));
+      if (i !== hover) { hover = i; draw(); showTip(i); }
+    }
+    cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+    cv.addEventListener('pointerleave', function () { hover = -1; draw(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(cv);
+    new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return { set: function (s) { spec = s; if (hover >= s.labels.length) hover = -1; draw(); if (tip) showTip(hover >= 0 ? hover : s.labels.length - 1); } };
+  }
+  var chart = Chart($('sipChart'), $('sipTip')), last = null;
+  function css(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  function mode() { return $('sipMode').value; }
+  function calc() {
+    var lump = mode() === 'lump';
+    $('sipAmtBox').hidden = lump; $('sipStepBox').hidden = !!lump; $('sipLumpBox').hidden = !lump; $('sipColM').hidden = lump;
+    document.querySelectorAll('.sip .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.mode === mode() ? 'true' : 'false'); });
+    var amt = num(lump ? 'sipLump' : 'sipAmt'), rate = num('sipRate'), yrs = num('sipYears'), step = lump ? 0 : (num('sipStep') || 0);
+    var err = !(amt > 0) ? 'Enter an amount above 0.' : !(rate > -100 && rate <= 100) ? 'Enter a yearly return between −99 and 100%.' : !(yrs > 0) ? 'Enter a time period above 0 years.' : yrs > 100 ? 'The longest period allowed is 100 years.' : step < 0 || step > 100 ? 'The step-up must be between 0 and 100%.' : amt > 1e13 ? 'That amount is too large.' : '';
+    if (err) { ['sipInv', 'sipGain', 'sipVal'].forEach(function (i) { $(i).textContent = '–'; }); $('sipRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null; return say('bad', err); }
+    var months = Math.round(yrs * 12), val = 0, inv = 0, pm = amt, rows = [], r = lump ? Math.pow(1 + rate / 100, 1 / 12) - 1 : rate / 1200;
+    if (lump) { val = amt; inv = amt; }
+    for (var k = 1; k <= months; k++) {
+      if (!lump) { if (k > 1 && (k - 1) % 12 === 0) pm *= 1 + step / 100; val += pm; inv += pm; }
+      val *= 1 + r;
+      if (k % 12 === 0 || k === months) rows.push({ y: Math.ceil(k / 12), pm: pm, inv: inv, val: val });
+    }
+    $('sipInv').textContent = money(inv); $('sipGain').textContent = money(val - inv); $('sipVal').textContent = money(val);
+    $('sipRows').innerHTML = rows.map(function (o) { return '<tr><td>' + o.y + '</td>' + (lump ? '' : '<td>' + money(o.pm) + '</td>') + '<td>' + money(o.inv) + '</td><td>' + money(o.val - o.inv) + '</td><td>' + money(o.val) + '</td></tr>'; }).join('');
+    var cr = [{ y: 0, inv: lump ? amt : 0, val: lump ? amt : 0 }].concat(rows);
+    chart.set({ type: 'line', labels: cr.map(function (o) { return o.y ? 'Y' + o.y : 'Start'; }), fmt: function (v) { return money(v, 0); },
+      series: [{ name: 'Value', color: css('--accent', '#2563eb'), data: cr.map(function (o) { return o.val; }), fill: true }, { name: 'Invested', color: '#f59e0b', data: cr.map(function (o) { return o.inv; }) }] });
+    var x = val / inv;
+    say('', 'Your money grows ' + fmtNum(x, 2) + ' times' + (months !== yrs * 12 ? ' (period rounded to ' + months + ' months)' : '') + (lump ? '. The return is compounded once a year.' : '. Returns are compounded monthly (yearly rate ÷ 12) and each payment is made at the start of the month, the same method most SIP calculators use.'));
+    last = { lump: lump, amt: amt, rate: rate, yrs: yrs, step: step, inv: inv, val: val };
+  }
+  document.querySelectorAll('.sip .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { $('sipMode').value = b.dataset.mode; $('sipMode').dispatchEvent(new Event('change', { bubbles: true })); });
+  });
+  $('sipCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText((last.lump ? 'Lump sum ' + money(last.amt) : 'Monthly investment ' + money(last.amt) + (last.step ? ' (+' + last.step + '% a year)' : '')) + ' at ' + last.rate + '% for ' + last.yrs + ' years\nInvested: ' + money(last.inv) + '\nEstimated gains: ' + money(last.val - last.inv) + '\nTotal value: ' + money(last.val), this);
+  });
+  $('sip').addEventListener('input', calc);
+  $('sip').addEventListener('change', calc);
+  curWire(calc);
+  calc();
+})();
+</script>

@@ -1,6 +1,10 @@
 <div class="fields">
   <div><label for="num">Number</label><input type="text" id="num" inputmode="decimal" placeholder="1,234.56" autocomplete="off"></div>
-  <div><label for="mode">Write as</label><select id="mode"><option value="n">Number</option><option value="usd">Dollars and cents (for checks)</option></select></div>
+  <div><label for="mode">Write as</label><select id="mode"><option value="n">Number</option><option value="usd">Money amount (for checks and cheques)</option></select></div>
+  <div id="curBox" hidden><label for="cur">Currency</label><select id="cur">
+    <option value="dollar">Dollars and cents</option><option value="euro">Euros and cents</option><option value="pound">Pounds and pence</option><option value="rupee">Rupees and paise</option><option value="riyal">Riyals and halalas</option><option value="dirham">Dirhams and fils</option><option value="naira">Naira and kobo</option><option value="rand">Rand and cents</option><option value="peso">Pesos and centavos</option><option value="shilling">Shillings and cents</option><option value="taka">Taka and paisa</option><option value="ringgit">Ringgit and sen</option>
+  </select></div>
+  <div><label for="sys">Number style</label><select id="sys"><option value="intl">Thousand, million, billion</option><option value="sa">Lakh and crore (South Asia)</option></select></div>
 </div>
 <div class="out" id="out" style="font-family:inherit;font-weight:500">–</div>
 <div class="btns"><button class="btn ghost" id="cp">Copy</button></div>
@@ -10,6 +14,8 @@
   var ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
   var TENS = ['', '', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
   var SCALE = ['', 'thousand', 'million', 'billion', 'trillion', 'quadrillion'];
+  // [one, many, one subunit, many subunits]
+  var CUR = { dollar: ['dollar', 'dollars'], euro: ['euro', 'euros'], pound: ['pound', 'pounds'], rupee: ['rupee', 'rupees'], riyal: ['riyal', 'riyals'], dirham: ['dirham', 'dirhams'], naira: ['naira', 'naira'], rand: ['rand', 'rand'], peso: ['peso', 'pesos'], shilling: ['shilling', 'shillings'], taka: ['taka', 'taka'], ringgit: ['ringgit', 'ringgit'] };
   function under1000(n) {
     var s = [];
     if (n >= 100) { s.push(ONES[Math.floor(n / 100)] + ' hundred'); n %= 100; }
@@ -20,14 +26,34 @@
   function words(digits) { // string of digits, any length up to 18
     digits = digits.replace(/^0+(?=\d)/, '');
     if (digits === '0') return 'zero';
+    if ($('sys').value === 'sa') return southAsian(digits);
     var groups = [], out = [];
     for (var i = digits.length; i > 0; i -= 3) groups.push(+digits.slice(Math.max(0, i - 3), i));
     for (var g = groups.length - 1; g >= 0; g--) if (groups[g]) out.push(under1000(groups[g]) + (SCALE[g] ? ' ' + SCALE[g] : ''));
     return out.join(' ');
   }
+  // 12,34,56,789 = twelve crore thirty-four lakh fifty-six thousand seven hundred eighty-nine. Above 99 crore the crores repeat (1,000 crore, 1 lakh crore).
+  function southAsian(d) {
+    var out = [];
+    if (d.length > 7) { var cr = d.slice(0, d.length - 7); d = d.slice(-7); if (/[1-9]/.test(cr)) out.push(southAsian(cr.replace(/^0+/, '')) + ' crore'); }
+    var n = +d, lakh = Math.floor(n / 100000) % 100, th = Math.floor(n / 1000) % 100, rest = n % 1000;
+    if (lakh) out.push(under1000(lakh) + ' lakh');
+    if (th) out.push(under1000(th) + ' thousand');
+    if (rest) out.push(under1000(rest));
+    return out.join(' ');
+  }
   function cap(s) { return s[0].toUpperCase() + s.slice(1); }
+  // Accept 1,234.56 and also 1.234,56 or 12,5 (a comma used as the decimal point, as in much of Europe and South America).
+  function clean(v) {
+    v = v.replace(/[\s'’_$€£¥₹₨﷼]/g, '').replace(/^(-?)\+/, '$1');
+    var dot = v.lastIndexOf('.'), com = v.lastIndexOf(',');
+    if (com > -1 && dot > -1) return com > dot ? v.replace(/\./g, '').replace(',', '.') : v.replace(/,/g, '');
+    if (com > -1 && (v.split(',').length === 2 && !/^-?\d{1,3},\d{3}$/.test(v)) && !/^-?\d{1,3}(,\d{2})+,\d{3}$/.test(v)) return v.replace(',', '.'); // 12,5 or 0,75
+    return v.replace(/,/g, '');
+  }
   function calc() {
-    var raw = $('num').value.replace(/[,\s$]/g, ''), m = raw.match(/^(-?)(\d*)(?:\.(\d*))?$/);
+    $('curBox').hidden = $('mode').value !== 'usd';
+    var raw = clean($('num').value), m = raw.match(/^(-?)(\d*)(?:\.(\d*))?$/);
     $('msg').textContent = '';
     if (raw === '') { $('out').textContent = '–'; return; }
     if (!m || (m[2] === '' && !m[3])) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'Enter a number using digits, for example 1234.56.'; return; }
@@ -35,18 +61,19 @@
     if (int.replace(/^0+/, '').length > 18) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'That number is too large. The limit is 18 digits.'; return; }
     var neg = m[1] && (/[1-9]/.test(int) || /[1-9]/.test(dec)) ? 'minus ' : '', s;
     if ($('mode').value === 'usd') {
-      // Cents are never rounded: 9.999 is not a dollar amount, so say so instead of guessing.
+      // Cents are never rounded: 9.999 is not a money amount, so say so instead of guessing.
       var c = dec.replace(/0+$/, '');
-      if (c.length > 2) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'Dollars and cents can have at most two decimal places, for example 9.99. Round the amount first.'; return; }
-      var cents = +(c + '00').slice(0, 2);
+      if (c.length > 2) { $('out').textContent = '–'; $('msg').className = 'msg bad'; $('msg').textContent = 'Money amounts can have at most two decimal places, for example 9.99. Round the amount first.'; return; }
+      var cents = +(c + '00').slice(0, 2), u = CUR[$('cur').value] || CUR.dollar;
       var d = words(int);
-      s = neg + d + (d === 'one' ? ' dollar' : ' dollars') + ' and ' + String(cents).padStart(2, '0') + '/100';
+      s = neg + d + ' ' + (d === 'one' ? u[0] : u[1]) + ' and ' + String(cents).padStart(2, '0') + '/100';
     } else {
       s = neg + words(int) + (dec ? ' point ' + dec.split('').map(function (c) { return ONES[+c]; }).join(' ') : '');
     }
     $('out').textContent = cap(s);
   }
-  $('num').addEventListener('input', calc); $('mode').addEventListener('input', calc);
+  $('num').addEventListener('input', calc); ['mode', 'cur', 'sys'].forEach(function (id) { $(id).addEventListener('input', calc); });
+  calc();
   $('cp').addEventListener('click', function () { if ($('out').textContent !== '–') copyText($('out').textContent, $('cp')); });
 })();
 </script>
