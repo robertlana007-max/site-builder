@@ -545,17 +545,24 @@ ${contact}` },
   <button type="button" role="tab" id="tabCrypto" aria-controls="payCrypto" aria-pressed="false"><span class="pp-ic" aria-hidden="true">🪙</span><span class="pp-tx"><b>Crypto</b><small>USDT, USDC, Bitcoin</small></span><span class="pp-ok" aria-hidden="true">✓</span></button>
 </div>
 <div class="paypanel" id="payCard" role="tabpanel" aria-labelledby="tabCard">
-  <p class="pay-soon" id="paySoon"${CARD.checkoutApi ? ' hidden' : ''}>⏳ Card payments open very soon. Until then, please use <b>Crypto</b>. Thank you! ❤</p>
+  <div class="pay-soon" id="paySoon"${CARD.checkoutApi ? ' hidden' : ''}>
+    <div class="pay-soon-ic" aria-hidden="true">⏳</div>
+    <b>Card payments are coming soon</b>
+    <p>We are setting up a simple way for everyone to give by card. Until then, you can support us with <b>Crypto</b>. Thank you! ❤</p>
+    <button class="btn" type="button" id="useCrypto">🪙 Use Crypto</button>
+  </div>
+  <div class="pay-form"${CARD.checkoutApi ? '' : ' hidden'}>
   <div class="pay-step"><span class="pay-n">1</span><b>Choose an amount</b></div>
   <div class="amts" role="group" aria-label="Amount">${(CARD.presets || []).map((a, i) => `<button type="button" class="amt" data-amt="${a}" aria-pressed="${i === Math.max(0, (CARD.presets || []).indexOf(10))}">$${a}</button>`).join('')}</div>
   <label class="amt-in amt-other"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="${CARD.min}" max="${CARD.max}" step="0.01" placeholder="Other amount" aria-label="Other amount in US dollars" data-nomemo></label>
   <div class="pay-step"><span class="pay-n">2</span><b>Your email</b><small>for your receipt</small></div>
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
-  <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}" data-test-api="${esc(CARD.checkoutApiLater || '')}">💳 Pay with Card</button>
+  <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
   <p class="pay-min">💳 <b>Minimum $<span id="payMin">${CARD.min}</span></b>: card companies do not accept smaller payments. Bigger gifts unlock more card options (Google Pay and Apple Pay from $10).</p>
   <p class="pay-next">Next: pick your card option on the secure page and pay. It takes about <b>1 minute</b>.</p>
   <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card.</p>
+  </div>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
 <div class="pay-step"><span class="pay-n">1</span><b>Pick a coin and copy its address</b></div>
@@ -580,6 +587,8 @@ ${contact}` },
   }
   tabs.card.addEventListener('click', function () { show('card'); });
   tabs.crypto.addEventListener('click', function () { show('crypto'); });
+  var uc = document.getElementById('useCrypto');
+  if (uc) uc.addEventListener('click', function () { show('crypto'); tabs.crypto.focus(); tabs.crypto.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
   if (location.hash === '#crypto') show('crypto');
 
   var MIN = ${Number(CARD.min) || 2}, MAX = ${Number(CARD.max) || 1000}, SOON = ${JSON.stringify(SOON)};
