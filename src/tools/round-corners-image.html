@@ -1,0 +1,102 @@
+<style>
+.rc-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.rc-stage canvas { max-width: 100%; max-height: 55vh; display: block; margin: 0 auto; }
+.rc-col { display: flex; gap: 8px; align-items: center; }
+.rc-col input[type=color] { width: 56px; height: 44px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); flex: none; }
+.rc-col label { margin: 0; font-weight: 400; font-size: 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>JPG, PNG, WebP or GIF. Your image never leaves your device.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="rc-stage" id="stage" hidden><canvas id="cv" aria-label="Preview with rounded corners"></canvas></div>
+<div class="fields">
+  <div><label for="shape">Shape</label><select id="shape"><option value="round">Rounded corners</option><option value="circle">Circle</option><option value="oval">Oval (whole image)</option></select></div>
+  <div id="radW"><label for="rad">Corner roundness: <span id="radv">12</span>%</label><input type="range" id="rad" min="0" max="50" value="12"></div>
+  <div id="posW" hidden><label for="pos">Circle position: <span id="posv">50</span>%</label><input type="range" id="pos" min="0" max="100" value="50"></div>
+  <div><label for="bw">Border: <span id="bwv">0</span>% of size</label><input type="range" id="bw" min="0" max="15" step="0.5" value="0"></div>
+  <div><label for="bc">Border colour</label><input type="color" id="bc" value="#ffffff"></div>
+  <div><label for="sh">Shadow: <span id="shv">0</span></label><input type="range" id="sh" min="0" max="10" value="0"></div>
+  <div><label for="bg">Background</label><div class="rc-col"><input type="color" id="bg" value="#ffffff" aria-label="Background colour"><label><input type="checkbox" id="trans" checked> See-through</label></div></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="image/png">PNG (keeps see-through corners)</option><option value="image/webp">WebP (smaller, see-through)</option><option value="image/jpeg">JPG (uses the background colour)</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download image</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var img = null, file = null, lastUrl = null, busy = false, MAX_AREA = 16000000, EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  function say(c, t) { PT.say(c, t); }
+  // Everything is measured in the picture's own pixels, so the preview and the download match.
+  function geom() {
+    var W = img.naturalWidth, H = img.naturalHeight, shape = $('shape').value, sx = 0, sy = 0, sw = W, sh = H;
+    if (shape === 'circle') { var d = Math.min(W, H), p = +$('pos').value / 100; sw = sh = d; sx = (W - d) * p; sy = (H - d) * p; }
+    var base = Math.min(sw, sh), bw = base * +$('bw').value / 100, shadow = +$('sh').value, blur = base * shadow * 0.012, pad = shadow ? Math.ceil(blur * 2.2) : 0;
+    return { sx: sx, sy: sy, sw: sw, sh: sh, bw: bw, blur: blur, pad: pad, W: Math.ceil(sw + 2 * pad), H: Math.ceil(sh + 2 * pad), shape: shape };
+  }
+  function path(ctx, x, y, w, h, shape) {
+    ctx.beginPath();
+    if (shape === 'round') {
+      var r = Math.min(w, h) * +$('rad').value / 100;
+      ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+    } else ctx.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  }
+  function render(ctx, g, s, type) {
+    var W = ctx.canvas.width, H = ctx.canvas.height, x = g.pad * s, y = g.pad * s, w = g.sw * s, h = g.sh * s;
+    ctx.clearRect(0, 0, W, H);
+    if (!$('trans').checked || type === 'image/jpeg') { ctx.fillStyle = $('bg').value; ctx.fillRect(0, 0, W, H); }
+    if (g.blur > 0) { // the shadow is drawn by a filled shape, then the photo goes on top
+      ctx.save(); ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = g.blur * s; ctx.shadowOffsetY = g.blur * s * 0.35;
+      path(ctx, x, y, w, h, g.shape); ctx.fillStyle = '#000'; ctx.fill(); ctx.restore();
+    }
+    ctx.save(); path(ctx, x, y, w, h, g.shape); ctx.clip();
+    ctx.imageSmoothingQuality = 'high'; ctx.drawImage(img, g.sx, g.sy, g.sw, g.sh, x, y, w, h);
+    if (g.bw > 0) { ctx.lineWidth = g.bw * s * 2; ctx.strokeStyle = $('bc').value; ctx.stroke(); } // half of it is clipped, so the border sits inside the edge
+    ctx.restore();
+  }
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true; syncUi();
+    if (!img || raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; var g = geom(), s = Math.min(1, 900 / Math.max(g.W, g.H)), cv = $('cv');
+      cv.width = Math.max(1, Math.round(g.W * s)); cv.height = Math.max(1, Math.round(g.H * s));
+      render(cv.getContext('2d'), g, s, $('fmt').value);
+    });
+  }
+  function syncUi() {
+    var sh = $('shape').value;
+    $('radW').hidden = sh !== 'round'; $('posW').hidden = sh !== 'circle' || !img || img.naturalWidth === img.naturalHeight;
+    $('trans').disabled = $('fmt').value === 'image/jpeg';
+    $('go').disabled = !img || busy;
+  }
+  PT.drop(false, function (f) {
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP file.'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
+      img = im; file = f; $('stage').hidden = false;
+      say('', f.name + ' · ' + im.naturalWidth + ' × ' + im.naturalHeight + ' px.'); draw();
+    });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) { el.addEventListener('input', draw); el.addEventListener('change', draw); });
+  [['rad', 'radv'], ['pos', 'posv'], ['bw', 'bwv'], ['sh', 'shv']].forEach(function (p) { var f = function () { $(p[1]).textContent = $(p[0]).value; }; $(p[0]).addEventListener('input', f); f(); });
+  $('go').addEventListener('click', function () {
+    if (!img || busy) return;
+    busy = true; syncUi(); say('', 'Saving…');
+    setTimeout(function () {
+      var g = geom(), s = Math.min(1, Math.sqrt(MAX_AREA / (g.W * g.H))), type = $('fmt').value, c = document.createElement('canvas');
+      c.width = Math.max(1, Math.floor(g.W * s)); c.height = Math.max(1, Math.floor(g.H * s));
+      render(c.getContext('2d'), g, s, type);
+      PT.blob(c, type, 0.92).then(function (b) {
+        busy = false; syncUi();
+        if (!b) { say('bad', 'Your browser could not save this image. Try PNG.'); return; }
+        var name = PT.base(file.name) + '-' + (g.shape === 'round' ? 'rounded' : g.shape) + '.' + (EXT[b.type] || 'png');
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
+        lastUrl = URL.createObjectURL(b);
+        var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false; a.click(); if (window.burst) burst(a);
+        say('ok', 'Saved ' + name + ' (' + c.width + ' × ' + c.height + ' px, ' + fmtBytes(b.size) + ').' + (s < 1 ? ' It was made smaller so phones can save it.' : '') + ' If the download did not start, use the green button.');
+        c.width = c.height = 0;
+      });
+    }, 20);
+  });
+  syncUi();
+})();
+</script>

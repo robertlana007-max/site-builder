@@ -1,0 +1,189 @@
+<style>
+.rf-strip { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin-bottom: 12px; }
+.rf-strip:empty { display: none; }
+.rf-th { position: relative; flex: none; width: 72px; height: 72px; border: 2px solid var(--line); border-radius: 10px; padding: 0; background: var(--bg) center / cover no-repeat; cursor: pointer; }
+.rf-th[aria-current="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.rf-th span { position: absolute; top: 2px; inset-inline-end: 2px; width: 24px; height: 24px; border-radius: 99px; background: rgba(0,0,0,.65); color: #fff; font-size: 13px; line-height: 24px; text-align: center; }
+.rf-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.rf-stage canvas { max-width: 100%; max-height: 55vh; display: block; margin: 0 auto; }
+.rf-tools { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+.rf-tools .btn { min-height: 40px; padding: 6px 12px; }
+.rf-ang { display: flex; gap: 10px; align-items: center; }
+.rf-ang input[type=number] { width: 90px; flex: none; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop images here</b>One or many JPG, PNG, WebP or GIF files. They stay on your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="rf-strip" id="strip" aria-label="Your images"></div>
+<div class="rf-stage" id="stage" hidden><canvas id="cv" aria-label="Preview of the rotated image"></canvas></div>
+<div class="rf-tools" role="group" aria-label="Rotate and flip">
+  <button type="button" class="btn ghost" id="left">⟲ Rotate left</button>
+  <button type="button" class="btn ghost" id="right">⟳ Rotate right</button>
+  <button type="button" class="btn ghost" id="half">↻ 180°</button>
+  <button type="button" class="btn ghost" id="fh">⇋ Flip horizontal</button>
+  <button type="button" class="btn ghost" id="fv">⇵ Flip vertical</button>
+  <button type="button" class="btn ghost" id="reset">Reset</button>
+</div>
+<div class="fields">
+  <div><label for="ang">Any angle: <span id="angv">0</span>°</label><div class="rf-ang"><input type="range" id="ang" min="-180" max="180" step="0.5" value="0" data-nomemo><input type="number" id="angn" min="-180" max="180" step="0.1" value="0" aria-label="Angle in degrees" data-nomemo></div></div>
+  <div><label for="corner">Corners (for tilted angles)</label><select id="corner"><option value="expand">Show whole image, fill corners</option><option value="crop">Crop off the empty corners</option></select></div>
+  <div><label for="fill">Corner fill</label><select id="fill"><option value="auto">Transparent (white for JPG)</option><option value="white">White</option><option value="black">Black</option><option value="custom">My colour</option></select></div>
+  <div id="colWrap" hidden><label for="col">Fill colour</label><input type="color" id="col" value="#ffffff"></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="keep">Same as original</option><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="q">Quality (JPG, WebP): <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+</div>
+<p class="msg" style="margin-top:0" id="note">The same rotation and flip are used for every image you add.</p>
+<div class="btns"><button class="btn" id="go" disabled>Download this image</button><button class="btn ghost" id="all" disabled hidden>Download all as ZIP</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var imgs = [], cur = 0, busy = false, theta = 0, flip = false, lastUrl = null;
+  var EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  var MAX_AREA = 16000000; // the largest canvas iPhones allow
+  function say(c, t) { PT.say(c, t); }
+  function norm(a) { a = ((a % 360) + 360) % 360; if (a > 180) a -= 360; return Math.round(a * 10) / 10; }
+
+  // Output geometry: the rotated image's bounding box, or the largest same-shape box that has no empty corners.
+  function geom(w, h) {
+    var r = theta * Math.PI / 180, c = Math.abs(Math.cos(r)), s = Math.abs(Math.sin(r));
+    if (Math.abs(theta % 90) < 1e-6) { var q = Math.round(theta / 90) % 2 !== 0; return { W: q ? h : w, H: q ? w : h }; }
+    if ($('corner').value === 'crop') {
+      // largest axis-aligned rectangle (with the original's own shape, turned the same way) inside the tilted image
+      var side = (Math.abs(norm(theta)) > 45 && Math.abs(norm(theta)) < 135);
+      var aw = side ? h : w, ah = side ? w : h, k = Math.min(w / (aw * c + ah * s), h / (aw * s + ah * c));
+      return { W: Math.max(1, Math.floor(aw * k)), H: Math.max(1, Math.floor(ah * k)) };
+    }
+    return { W: Math.ceil(w * c + h * s - 0.01), H: Math.ceil(w * s + h * c - 0.01) };
+  }
+  function fillFor(type) {
+    var f = $('fill').value;
+    if (f === 'white') return '#ffffff'; if (f === 'black') return '#000000'; if (f === 'custom') return $('col').value;
+    return type === 'image/jpeg' ? '#ffffff' : null;
+  }
+  function render(ctx, img, w, h, W, H, sc, fill) {
+    ctx.clearRect(0, 0, W, H);
+    if (fill) { ctx.fillStyle = fill; ctx.fillRect(0, 0, W, H); }
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(theta * Math.PI / 180); if (flip) ctx.scale(-1, 1);
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(img, -w * sc / 2, -h * sc / 2, w * sc, h * sc);
+    ctx.restore();
+  }
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true;
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; var it = imgs[cur]; if (!it) return;
+      var w = it.img.naturalWidth, h = it.img.naturalHeight, s = Math.min(1, 1000 / Math.max(w, h)), g = geom(w * s, h * s);
+      var cv = $('cv'); cv.width = Math.max(1, Math.round(g.W)); cv.height = Math.max(1, Math.round(g.H));
+      render(cv.getContext('2d'), it.img, w, h, cv.width, cv.height, s, fillFor(outType(it)));
+    });
+  }
+  function outType(it) { var f = $('fmt').value; if (f !== 'keep') return f; return EXT[it.file.type] ? it.file.type : 'image/png'; }
+  function encode(it) {
+    var w = it.img.naturalWidth, h = it.img.naturalHeight, g = geom(w, h), sc = 1;
+    if (g.W * g.H > MAX_AREA) sc = Math.sqrt(MAX_AREA / (g.W * g.H));
+    var W = Math.max(1, Math.floor(g.W * sc)), H = Math.max(1, Math.floor(g.H * sc));
+    var c = document.createElement('canvas'); c.width = W; c.height = H;
+    var ctx = c.getContext('2d'), type = outType(it);
+    if (!ctx) return Promise.reject(new Error('"' + it.file.name + '" is too large for your browser to rotate.'));
+    render(ctx, it.img, w, h, W, H, sc, fillFor(type));
+    return PT.blob(c, type, $('q').value / 100).then(function (b) {
+      c.width = c.height = 0;
+      if (!b) throw new Error('Your browser could not save "' + it.file.name + '". Try JPG or PNG, or a smaller image.');
+      var ext = b.type === type ? EXT[type] : (EXT[b.type] || 'png');
+      return { blob: b, name: PT.base(it.file.name) + '-rotated.' + ext, small: sc < 1, W: W, H: H };
+    });
+  }
+  function offer(blob, name, note) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false;
+    a.click(); if (window.burst) burst(a);
+    say('ok', note + ' · ' + fmtBytes(blob.size) + '. If the download did not start, use the green button.');
+  }
+  function strip() {
+    var s = $('strip'); s.innerHTML = '';
+    imgs.forEach(function (it, k) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'rf-th'; b.style.backgroundImage = 'url("' + it.url + '")';
+      b.setAttribute('aria-label', 'Show ' + it.file.name); b.setAttribute('aria-current', k === cur); b.title = it.file.name;
+      b.addEventListener('click', function () { cur = k; strip(); draw(); });
+      var x = document.createElement('span'); x.textContent = '✕'; x.setAttribute('role', 'button'); x.setAttribute('aria-label', 'Remove ' + it.file.name); x.tabIndex = 0;
+      var rm = function (e) { e.stopPropagation(); if (busy) return; URL.revokeObjectURL(it.url); imgs.splice(k, 1); if (cur >= imgs.length) cur = Math.max(0, imgs.length - 1); strip(); draw(); };
+      x.addEventListener('click', rm); x.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') rm(e); });
+      b.appendChild(x); s.appendChild(b);
+    });
+    if (imgs.length < 2) s.innerHTML = '';
+    $('stage').hidden = !imgs.length;
+    $('go').disabled = !imgs.length || busy;
+    $('all').hidden = imgs.length < 2; $('all').disabled = busy;
+    $('all').textContent = 'Download all ' + imgs.length + ' as ZIP';
+    if (!imgs.length) $('dl').hidden = true;
+  }
+  function loadImg(f) { return new Promise(function (res) { loadImage(f, res); }); }
+  PT.drop(true, async function (list) {
+    if (busy) return;
+    var bad = 0, broken = [];
+    for (var f of list) {
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; continue; }
+      var img = await loadImg(f);
+      if (!img || !img.naturalWidth) { broken.push(f.name); continue; }
+      imgs.push({ file: f, img: img, url: URL.createObjectURL(f) });
+    }
+    var added = list.length - bad - broken.length;
+    if (added) cur = imgs.length - added;
+    strip(); draw();
+    var notes = [];
+    if (added) notes.push(imgs.length === 1 ? imgs[0].img.naturalWidth + ' × ' + imgs[0].img.naturalHeight + ' px. Rotate or flip it, then download.' : imgs.length + ' images loaded. The same rotation is used for all of them.');
+    if (bad) notes.push('Skipped ' + bad + (bad === 1 ? ' file that is' : ' files that are') + ' not an image.');
+    if (broken.length) notes.push('Could not read ' + broken.join(', ') + '. It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).');
+    say(bad || broken.length ? 'bad' : '', notes.join(' '));
+  });
+
+  function setAngle(a) { theta = norm(a); $('ang').value = theta; $('angn').value = theta; $('angv').textContent = theta; syncUi(); draw(); }
+  function syncUi() {
+    var tilted = Math.abs(theta % 90) > 1e-6;
+    $('corner').disabled = !tilted;
+    $('colWrap').hidden = $('fill').value !== 'custom';
+    $('q').disabled = imgs.length > 0 && imgs.every(function (it) { return outType(it) === 'image/png'; });
+  }
+  $('left').addEventListener('click', function () { setAngle(theta - 90); });
+  $('right').addEventListener('click', function () { setAngle(theta + 90); });
+  $('half').addEventListener('click', function () { setAngle(theta + 180); });
+  // Flipping what you see: mirror the picture and mirror the angle too.
+  $('fh').addEventListener('click', function () { flip = !flip; setAngle(-theta); });
+  $('fv').addEventListener('click', function () { flip = !flip; setAngle(180 - theta); });
+  $('reset').addEventListener('click', function () { flip = false; setAngle(0); });
+  $('ang').addEventListener('input', function () { setAngle(+$('ang').value); });
+  $('angn').addEventListener('change', function () { var v = parseFloat($('angn').value); setAngle(isFinite(v) ? v : 0); });
+  ['corner', 'fill', 'col', 'fmt'].forEach(function (id) { $(id).addEventListener('input', function () { syncUi(); draw(); }); $(id).addEventListener('change', function () { syncUi(); draw(); }); });
+  $('q').addEventListener('input', function () { $('qv').textContent = $('q').value; $('dl').hidden = true; });
+  $('qv').textContent = $('q').value;
+
+  $('go').addEventListener('click', function () {
+    var it = imgs[cur]; if (!it || busy) return;
+    busy = true; strip(); say('', 'Saving…');
+    setTimeout(function () {
+      encode(it).then(function (r) { offer(r.blob, r.name, 'Saved ' + r.name + ' (' + r.W + ' × ' + r.H + ' px' + (r.small ? ', made smaller to fit your browser' : '') + ')'); }, function (e) { say('bad', e.message); })
+        .then(function () { busy = false; strip(); });
+    }, 20);
+  });
+  $('all').addEventListener('click', async function () {
+    if (busy || imgs.length < 2) return;
+    busy = true; strip();
+    try {
+      var files = [], used = {};
+      for (var k = 0; k < imgs.length; k++) {
+        say('', 'Rotating ' + (k + 1) + ' of ' + imgs.length + '…');
+        var r = await encode(imgs[k]), name = r.name, n = 2;
+        while (used[name.toLowerCase()]) name = r.name.replace(/(\.\w+)$/, '-' + (n++) + '$1');
+        used[name.toLowerCase()] = 1;
+        files.push({ name: name, data: new Uint8Array(await r.blob.arrayBuffer()) });
+      }
+      offer(PT.zip(files), 'rotated-images.zip', 'Saved ' + files.length + ' images in a ZIP');
+    } catch (e) { say('bad', e && e.message ? e.message : 'Something went wrong while saving.'); }
+    busy = false; strip();
+  });
+  syncUi();
+})();
+</script>

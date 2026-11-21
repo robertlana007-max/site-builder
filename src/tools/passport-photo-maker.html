@@ -1,0 +1,536 @@
+<style>
+.pp-spec { font-size: 14px; color: var(--muted); margin: -6px 0 14px; }
+.pp-spec b { color: var(--ink); }
+.pp-src { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
+.pp-src .drop { flex: 1 1 220px; margin: 0; padding: 22px 14px; }
+.pp-cam { border: 1px solid var(--line); border-radius: 12px; padding: 10px; margin-bottom: 14px; text-align: center; background: #000; }
+.pp-cam video { max-width: 100%; max-height: 60vh; transform: scaleX(-1); display: block; margin: 0 auto; border-radius: 8px; }
+.pp-cam .btns { justify-content: center; }
+.pp-edit { display: grid; gap: 16px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 760px) { .pp-edit { grid-template-columns: minmax(0, 360px) minmax(0, 1fr); align-items: start; } }
+.pp-frame { text-align: center; }
+.pp-frame canvas { max-width: 100%; height: auto; border-radius: 6px; box-shadow: 0 0 0 1px var(--line); touch-action: none; cursor: grab; background: #fff; }
+.pp-frame p { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+.pp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.pp-row > span { font-size: 14px; font-weight: 600; }
+.pp-sw { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.pp-sw button { min-width: 44px; height: 36px; padding: 0 10px; border-radius: 9px; border: 1px solid var(--line); cursor: pointer; font: 600 13px/1 inherit; font-family: inherit; color: #111; }
+.pp-sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); border-color: var(--accent); }
+.pp-sw input[type=color] { width: 44px; height: 36px; padding: 2px; border-radius: 9px; border: 1px solid var(--line); background: var(--field); }
+.pp-sheet { margin-top: 12px; text-align: center; }
+.pp-sheet canvas { max-width: 100%; max-height: 340px; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+.pp-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin-top: 14px; }
+.pp-box h3 { margin: 0 0 10px; font-size: 16px; }
+.pp-small .btn { min-height: 38px; padding: 6px 12px; }
+</style>
+<div class="fields">
+  <div><label for="country">Country and document</label><select id="country"></select></div>
+  <div id="custW" hidden><label for="cw">Custom width × height (mm)</label><div style="display:flex;gap:8px"><input type="number" id="cw" min="15" max="100" value="35" aria-label="Width in millimetres"><input type="number" id="ch" min="15" max="120" value="45" aria-label="Height in millimetres"></div></div>
+</div>
+<p class="pp-spec" id="spec"></p>
+<div class="pp-src">
+  <div class="drop" id="drop" tabindex="0" role="button"><b>Upload a photo</b>A clear, front-facing photo. It stays on your device.</div>
+  <div class="drop" id="camBtn" tabindex="0" role="button"><b>📷 Take a photo</b>Use your phone or computer camera.</div>
+</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<input type="file" id="snap" accept="image/*" capture="user" hidden data-nomemo>
+<div class="pp-cam" id="cam" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="btns"><button type="button" class="btn" id="shoot">Take photo</button><button type="button" class="btn ghost" id="camClose">Cancel</button></div>
+</div>
+<div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat">Getting ready…</p></div>
+<div id="work" hidden>
+  <div class="pp-edit">
+    <div class="pp-frame">
+      <canvas id="cv" width="350" height="450" aria-label="Your passport photo. Drag to move, pinch or use the slider to zoom."></canvas>
+      <p>Drag the photo to move it. Put the top of the head on the upper line and the chin on the lower line, with the eyes in the green band.</p>
+      <div class="checks" style="justify-content:center;margin:8px 0 0"><label><input type="checkbox" id="guides" checked> Show guides</label></div>
+    </div>
+    <div>
+      <div class="fields" style="margin-bottom:6px">
+        <div><label for="zoom">Zoom</label><input type="range" id="zoom" min="10" max="400" value="100" data-nomemo></div>
+        <div><label for="rot">Straighten: <span id="rotv">0</span>°</label><input type="range" id="rot" min="-15" max="15" step="0.5" value="0" data-nomemo></div>
+        <div><label for="bri">Brightness: <span id="briv">0</span></label><input type="range" id="bri" min="-40" max="40" value="0" data-nomemo></div>
+        <div><label for="con">Contrast: <span id="conv">0</span></label><input type="range" id="con" min="-40" max="40" value="0" data-nomemo></div>
+      </div>
+      <div class="pp-row pp-small"><button type="button" class="btn ghost" id="auto">Auto position</button><button type="button" class="btn ghost" id="center">Centre</button></div>
+      <div class="pp-row">
+        <span>Background</span>
+        <div class="pp-sw" role="group" aria-label="Background colour">
+          <button type="button" data-ppbg="keep" style="background:linear-gradient(135deg,#cbd5e1,#94a3b8)" title="Keep my background">Keep</button>
+          <button type="button" data-ppbg="#ffffff" style="background:#ffffff" title="White">White</button>
+          <button type="button" data-ppbg="#f5f2ea" style="background:#f5f2ea" title="Off-white">Off-white</button>
+          <button type="button" data-ppbg="#e6e8eb" style="background:#e6e8eb" title="Light grey">Grey</button>
+          <button type="button" data-ppbg="#cfe3f7" style="background:#cfe3f7" title="Light blue">Light blue</button>
+          <button type="button" data-ppbg="#3d7cc9" style="background:#3d7cc9;color:#fff" title="Blue">Blue</button>
+          <input type="color" id="bgc" value="#ffffff" aria-label="Any background colour" data-nomemo>
+        </div>
+      </div>
+      <p class="pp-spec" id="bgNote" style="margin-top:-4px"></p>
+    </div>
+  </div>
+
+  <div class="pp-box">
+    <h3>1. Single photo (for online forms)</h3>
+    <p class="pp-spec" id="oneInfo" style="margin:0 0 6px"></p>
+    <div class="btns" style="margin-top:6px"><button type="button" class="btn" id="dlOne">Download photo (JPG)</button></div>
+  </div>
+  <div class="pp-box">
+    <h3>2. Printable sheet with several copies</h3>
+    <div class="fields" style="margin-bottom:6px">
+      <div><label for="paper">Paper</label><select id="paper"><option value="4x6">4 × 6 in (10 × 15 cm photo print)</option><option value="5x7">5 × 7 in (13 × 18 cm)</option><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+      <div><label for="copies">Copies</label><select id="copies" data-nomemo></select></div>
+    </div>
+    <div class="checks"><label><input type="checkbox" id="cut" checked> Thin cutting lines</label></div>
+    <div class="pp-sheet"><canvas id="sheet" aria-label="Preview of the printable sheet"></canvas></div>
+    <div class="btns"><button type="button" class="btn" id="dlSheet">Download sheet (JPG)</button><button type="button" class="btn ghost" id="dlPdf">Download sheet (PDF)</button></div>
+    <p class="pp-spec" style="margin:10px 0 0">Print at 100% / “Actual size” (not “Fit to page”) so each photo comes out at the exact size. Photo shops print 4 × 6 in JPG sheets at the right size.</p>
+  </div>
+</div>
+<a class="btn ghost" id="dl" hidden>Download</a>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  // Sizes in millimetres. head = chin to top of hair; top = space above the head. Rules change: always check the official site.
+  var P = [
+    ['us', 'United States: passport and visa (2 × 2 in)', 50.8, 50.8, 25.4, 34.9, 5, 'White or off-white background. No glasses.'],
+    ['uk', 'United Kingdom: passport (35 × 45 mm)', 35, 45, 29, 34, 4.5, 'Plain cream or light grey background.'],
+    ['eu', 'EU / Schengen visa and passports (35 × 45 mm)', 35, 45, 32, 36, 3.5, 'Plain light background: white or light grey.'],
+    ['ca', 'Canada: passport (50 × 70 mm)', 50, 70, 31, 36, 12, 'Plain white or light-coloured background.'],
+    ['au', 'Australia: passport (35 × 45 mm)', 35, 45, 32, 36, 3.5, 'Plain white or light grey background.'],
+    ['in', 'India: passport (35 × 45 mm)', 35, 45, 31, 36, 3.5, 'Plain white background.'],
+    ['in2', 'India: visa and OCI (2 × 2 in)', 50.8, 50.8, 25.4, 35, 5, 'Plain white or light background.'],
+    ['cn', 'China: passport and visa (33 × 48 mm)', 33, 48, 28, 33, 4, 'White background.'],
+    ['jp', 'Japan: passport (35 × 45 mm)', 35, 45, 32, 36, 4, 'Plain background without shadows.'],
+    ['pk', 'Pakistan: passport and ID (35 × 45 mm)', 35, 45, 32, 36, 3.5, 'White background (some visas ask for blue: check).'],
+    ['sa', 'Saudi Arabia: visa and ID (40 × 60 mm)', 40, 60, 32, 40, 8, 'White background.'],
+    ['ae', 'United Arab Emirates: visa and ID (43 × 55 mm)', 43, 55, 32, 38, 6, 'White background.'],
+    ['br', 'Brazil: passport (50 × 70 mm)', 50, 70, 32, 40, 12, 'White background.'],
+    ['ng', 'Nigeria: passport (35 × 45 mm)', 35, 45, 32, 36, 3.5, 'White background.'],
+    ['custom', 'Custom size…', 35, 45, 0, 0, 0, '']
+  ];
+  var PAPER = { '4x6': [6, 4], '5x7': [7, 5], a4: [8.2677, 11.6929], letter: [8.5, 11] };
+  var DPI = 300, BASE = '../assets/vendor/onnx/';
+  var spec = null, src = null, SW = 0, SH = 0, mask = null, adj = null, comp = null, name = 'passport-photo', bg = '#ffffff', head = null;
+  var T = { cx: 0, cy: 0, s: 1, r: 0 }; // photo centre (source px) shown at the frame centre; s = output px per source px
+  var lastUrl = null, job = 0, busy = false;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function mm(v) { return v / 25.4 * DPI; }
+  function progress(frac, text) { $('notice').hidden = false; $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%'; $('stat').textContent = text; }
+
+  // ---------- presets ----------
+  P.forEach(function (p) { var o = document.createElement('option'); o.value = p[0]; o.textContent = p[1]; $('country').appendChild(o); });
+  function readSpec() {
+    var p = P.filter(function (x) { return x[0] === $('country').value; })[0] || P[0], c = p[0] === 'custom';
+    var w = c ? Math.max(15, Math.min(100, +$('cw').value || 35)) : p[2], h = c ? Math.max(15, Math.min(120, +$('ch').value || 45)) : p[3];
+    var hmin = c ? h * 0.66 : p[4], hmax = c ? h * 0.78 : p[5], top = c ? h * 0.09 : p[6];
+    spec = { id: p[0], w: w, h: h, hmin: hmin, hmax: hmax, top: top, note: p[7], W: Math.round(mm(w)), H: Math.round(mm(h)) };
+    $('custW').hidden = !c;
+    var inch = function (v) { return (v / 25.4).toFixed(2).replace(/\.?0+$/, '') + ' in'; };
+    $('spec').innerHTML = '';
+    var b = document.createElement('b'); b.textContent = (spec.w === spec.h && Math.abs(spec.w - 50.8) < 0.1 ? '2 × 2 in (51 × 51 mm)' : spec.w + ' × ' + spec.h + ' mm (' + inch(spec.w) + ' × ' + inch(spec.h) + ')');
+    $('spec').appendChild(b);
+    $('spec').appendChild(document.createTextNode(' · ' + spec.W + ' × ' + spec.H + ' px at 300 dpi · head (chin to top of hair) ' + fmt(hmin) + ' to ' + fmt(hmax) + ' mm. ' + (spec.note ? spec.note + ' ' : '') + 'Rules change, so check your government\'s photo rules before printing.'));
+    $('oneInfo').textContent = 'JPG, ' + spec.W + ' × ' + spec.H + ' px, 300 dpi.';
+    var cv = $('cv'), dw = 340, dh = Math.round(dw * spec.h / spec.w);
+    if (dh > 460) { dh = 460; dw = Math.round(dh * spec.w / spec.h); }
+    cv.width = dw * 2; cv.height = dh * 2; cv.style.width = dw + 'px';
+  }
+  function fmt(v) { return (Math.round(v * 10) / 10).toString(); }
+
+  // ---------- photo in ----------
+  function takeImage(im, fname) {
+    var w = im.naturalWidth || im.videoWidth || im.width, h = im.naturalHeight || im.videoHeight || im.height, s = Math.min(1, 1800 / Math.max(w, h));
+    SW = Math.max(1, Math.round(w * s)); SH = Math.max(1, Math.round(h * s));
+    src = canvas(SW, SH); var x = src.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(im, 0, 0, SW, SH);
+    name = (fname || 'photo').replace(/\.[^.]+$/, '') + '-passport';
+    mask = null; head = null; adj = null; comp = null;
+    $('work').hidden = false; $('bri').value = 0; $('con').value = 0; $('rot').value = 0; labels();
+    say('', SW < 500 || SH < 500 ? 'This photo is quite small, so the printed photo may look soft. A photo of at least 1000 px works best.' : '');
+    rebuild(); place(); draw();
+    if (bg !== 'keep') runMask(); else say('', 'Move and zoom the photo so the face fits the guides.');
+    if ($('cv').scrollIntoView) $('cv').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function take(f) {
+    if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not a photo. Please choose a JPG, PNG or WebP image.'); return; }
+    if (/hei[cf]/i.test(f.type) || /\.hei[cf]$/i.test(f.name)) { say('bad', 'HEIC photos from iPhone cannot be opened here. Convert it with the HEIC to JPG tool first, or take the photo with the camera button.'); return; }
+    say('', 'Opening ' + f.name + '…');
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open.'); return; }
+      takeImage(im, f.name);
+    });
+  }
+  (function () {
+    var drop = $('drop'), input = $('file');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; take(f); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { take(e.dataTransfer.files[0]); });
+    $('snap').addEventListener('change', function () { var f = $('snap').files[0]; $('snap').value = ''; take(f); });
+  })();
+
+  // ---------- camera ----------
+  var stream = null;
+  function stopCam() { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; $('cam').hidden = true; }
+  function openCam() {
+    var touch = matchMedia('(pointer: coarse)').matches;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { if (touch) { $('snap').click(); return; } say('bad', 'Your browser cannot open the camera here. Take a photo with your camera app, then use Upload a photo.'); return; }
+    say('', 'Opening the camera…');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      stream = s; $('video').srcObject = s; $('cam').hidden = false; say('', 'Face the camera, keep your head straight with a neutral face, then press Take photo. Stand in front of a plain wall with even light.');
+      if ($('cam').scrollIntoView) $('cam').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }).catch(function (e) {
+      var n = e && e.name;
+      if (n === 'NotAllowedError' || n === 'SecurityError') say('bad', 'Camera access was blocked. Allow the camera for this site in your browser settings (the camera icon in the address bar), or use Upload a photo.');
+      else if (n === 'NotFoundError' || n === 'OverconstrainedError') { if (touch) $('snap').click(); else say('bad', 'No camera was found on this device. Use Upload a photo instead.'); }
+      else if (n === 'NotSupportedError' || n === 'TypeError') { if (touch) $('snap').click(); else say('bad', 'Your browser cannot open the camera on this page. Take a photo with your camera app, then use Upload a photo.'); }
+      else if (n === 'NotReadableError') say('bad', 'The camera is being used by another app. Close it and try again.');
+      else say('bad', 'The camera could not be opened. Use Upload a photo instead.');
+    });
+  }
+  $('camBtn').addEventListener('click', openCam);
+  $('camBtn').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openCam(); } });
+  $('camClose').addEventListener('click', function () { stopCam(); say('', ''); });
+  $('shoot').addEventListener('click', function () {
+    var v = $('video'); if (!v.videoWidth) return;
+    var c = canvas(v.videoWidth, v.videoHeight); c.getContext('2d').drawImage(v, 0, 0);
+    stopCam(); takeImage(c, 'camera-photo');
+  });
+
+  // ---------- background removal (same small AI model as the background remover) ----------
+  var ortP = null, sessP = null;
+  function loadScript(url) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); }); }
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).catch(function () { throw new Error('net'); }).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() { return reader.read().then(function (d) { if (d.done) { var o = new Uint8Array(got), k = 0; parts.forEach(function (p) { o.set(p, k); k += p.length; }); return o.buffer; } parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump(); }); }
+      return pump();
+    });
+  }
+  function session(report) {
+    if (sessP) return sessP;
+    var a = 0, b = 0, total = 14848852 + 4574861;
+    function tell() { report((a + b) / total, 'Downloading the background tool (' + fmtBytes(a + b) + ' of about ' + fmtBytes(total) + '). This happens only once.'); }
+    tell();
+    sessP = Promise.all([loadScript(BASE + 'ort.wasm.min.js'), fetchBuf(BASE + 'ort-wasm-simd-threaded.wasm', 14848852, function (n) { a = n; tell(); }), fetchBuf(BASE + 'u2netp.onnx', 4574861, function (n) { b = n; tell(); })]).then(function (r) {
+      report(null, 'Starting…');
+      ort.env.wasm.wasmPaths = new URL(BASE, location.href).href; ort.env.wasm.wasmBinary = r[1];
+      ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1; ort.env.wasm.proxy = true; ort.env.logLevel = 'error';
+      return ort.InferenceSession.create(new Uint8Array(r[2]), { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    });
+    sessP.catch(function () { sessP = null; });
+    return sessP;
+  }
+  function resize(a, sw, sh, dw, dh) {
+    var out = new Float32Array(dw * dh), fx = sw / dw, fy = sh / dh, x0 = new Int32Array(dw), x1 = new Int32Array(dw), wx = new Float32Array(dw), x, y;
+    for (x = 0; x < dw; x++) { var u = Math.min(sw - 1, Math.max(0, (x + 0.5) * fx - 0.5)); x0[x] = u | 0; x1[x] = Math.min(sw - 1, x0[x] + 1); wx[x] = u - x0[x]; }
+    for (y = 0; y < dh; y++) {
+      var v = Math.min(sh - 1, Math.max(0, (y + 0.5) * fy - 0.5)), y0 = v | 0, y1 = Math.min(sh - 1, y0 + 1), wy = v - y0, r0 = y0 * sw, r1 = y1 * sw, o = y * dw;
+      for (x = 0; x < dw; x++) { var t = a[r0 + x0[x]] + (a[r0 + x1[x]] - a[r0 + x0[x]]) * wx[x], bb = a[r1 + x0[x]] + (a[r1 + x1[x]] - a[r1 + x0[x]]) * wx[x]; out[o + x] = t + (bb - t) * wy; }
+    }
+    return out;
+  }
+  function box(a, w, h, r) {
+    var t = new Float32Array(w * h), o = new Float32Array(w * h), n = 2 * r + 1, x, y, s, i;
+    for (y = 0; y < h; y++) { var row = y * w; s = a[row] * (r + 1); for (i = 1; i <= r; i++) s += a[row + Math.min(w - 1, i)]; for (x = 0; x < w; x++) { t[row + x] = s / n; s += a[row + Math.min(w - 1, x + r + 1)] - a[row + Math.max(0, x - r)]; } }
+    for (x = 0; x < w; x++) { s = t[x] * (r + 1); for (i = 1; i <= r; i++) s += t[Math.min(h - 1, i) * w + x]; for (y = 0; y < h; y++) { o[y * w + x] = s / n; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; } }
+    return o;
+  }
+  function guided(I, p, w, h, r, eps) {
+    var n = w * h, Ip = new Float32Array(n), II = new Float32Array(n), i;
+    for (i = 0; i < n; i++) { Ip[i] = I[i] * p[i]; II[i] = I[i] * I[i]; }
+    var mI = box(I, w, h, r), mp = box(p, w, h, r), mIp = box(Ip, w, h, r), mII = box(II, w, h, r);
+    for (i = 0; i < n; i++) { var a = (mIp[i] - mI[i] * mp[i]) / (mII[i] - mI[i] * mI[i] + eps); Ip[i] = a; II[i] = mp[i] - a * mI[i]; }
+    var ma = box(Ip, w, h, r), mb = box(II, w, h, r);
+    for (i = 0; i < n; i++) { var q = ma[i] * I[i] + mb[i]; p[i] = q < 0 ? 0 : q > 1 ? 1 : q; }
+    return p;
+  }
+  function runMask() {
+    if (mask || !src) { rebuild(); draw(); return; }
+    var mine = ++job; busy = true;
+    var settled = false;
+    session(function (f, t) { if (mine === job && !settled) progress(f, t); }).then(function (s) {
+      settled = true;
+      if (mine !== job) return;
+      progress(null, 'Replacing the background…');
+      var S = 320, c = canvas(S, S), x = c.getContext('2d', { willReadFrequently: true });
+      x.fillStyle = '#fff'; x.fillRect(0, 0, S, S); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, S, S);
+      var d = x.getImageData(0, 0, S, S).data, n = S * S, t = new Float32Array(3 * n), mean = [0.485, 0.456, 0.406], sd = [0.229, 0.224, 0.225], i, k, mx = 1;
+      for (i = 0; i < d.length; i += 4) mx = Math.max(mx, d[i], d[i + 1], d[i + 2]);
+      for (k = 0; k < 3; k++) for (i = 0; i < n; i++) t[k * n + i] = (d[i * 4 + k] / mx - mean[k]) / sd[k];
+      var feeds = {}; feeds[s.inputNames[0]] = new ort.Tensor('float32', t, [1, 3, S, S]);
+      return s.run(feeds).then(function (out) {
+        if (mine !== job) return;
+        var p = out[s.outputNames[0]].data, lo = Infinity, hi = -Infinity, prob = new Float32Array(n);
+        for (i = 0; i < n; i++) { if (p[i] < lo) lo = p[i]; if (p[i] > hi) hi = p[i]; }
+        for (i = 0; i < n; i++) prob[i] = hi > lo ? (p[i] - lo) / (hi - lo) : 0;
+        // refine the edge on the real photo, then make it full size
+        var sc = Math.min(1, 1024 / Math.max(SW, SH)), LW = Math.max(1, Math.round(SW * sc)), LH = Math.max(1, Math.round(SH * sc)), lc = canvas(LW, LH), lx = lc.getContext('2d', { willReadFrequently: true });
+        lx.drawImage(src, 0, 0, LW, LH);
+        var ld = lx.getImageData(0, 0, LW, LH).data, I = new Float32Array(LW * LH);
+        for (i = 0; i < I.length; i++) I[i] = (0.299 * ld[i * 4] + 0.587 * ld[i * 4 + 1] + 0.114 * ld[i * 4 + 2]) / 255;
+        var low = guided(I, resize(prob, S, S, LW, LH), LW, LH, Math.max(2, Math.round(4 * Math.max(LW, LH) / 1024)), 1e-3);
+        var full = resize(low, LW, LH, SW, SH), m = new Uint8ClampedArray(SW * SH);
+        for (i = 0; i < m.length; i++) { var v = (full[i] - 0.38) / 0.24; v = v < 0 ? 0 : v > 1 ? 1 : v; m[i] = v * v * (3 - 2 * v) * 255; }
+        mask = m; head = findHead();
+        busy = false; $('notice').hidden = true;
+        rebuild(); place(); draw();
+        say('ok', 'Background replaced. ' + (head ? 'The photo was placed automatically: check that the head fits the guides.' : 'Move and zoom the photo so the face fits the guides.'));
+      });
+    }).catch(function (e) {
+      settled = true;
+      if (mine !== job) return;
+      busy = false; $('notice').hidden = true; setBg('keep');
+      say('bad', (e && e.message === 'net' ? 'The background tool could not be downloaded (are you offline?).' : 'The background could not be replaced in this browser.') + ' Your own background is kept: stand in front of a plain light wall for the best result.');
+    });
+  }
+  // Rough head finder from the cut-out: keep only the biggest shape (the person), then find the top of the hair
+  // and the width of the head, which ends where the shoulders suddenly widen.
+  function findHead() {
+    var k = Math.min(1, 240 / Math.max(SW, SH)), w = Math.max(1, Math.round(SW * k)), h = Math.max(1, Math.round(SH * k)), n = w * h, bin = new Uint8Array(n), lab = new Int32Array(n), x, y, i;
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) bin[y * w + x] = mask[Math.min(SH - 1, Math.floor((y + 0.5) / k)) * SW + Math.min(SW - 1, Math.floor((x + 0.5) / k))] > 128 ? 1 : 0;
+    var best = 0, bestN = 0, next = 1, stack = [];
+    for (i = 0; i < n; i++) {
+      if (!bin[i] || lab[i]) continue;
+      var cnt = 0; lab[i] = next; stack.push(i);
+      while (stack.length) {
+        var j = stack.pop(), jx = j % w; cnt++;
+        if (jx > 0 && bin[j - 1] && !lab[j - 1]) { lab[j - 1] = next; stack.push(j - 1); }
+        if (jx < w - 1 && bin[j + 1] && !lab[j + 1]) { lab[j + 1] = next; stack.push(j + 1); }
+        if (j >= w && bin[j - w] && !lab[j - w]) { lab[j - w] = next; stack.push(j - w); }
+        if (j < n - w && bin[j + w] && !lab[j + w]) { lab[j + w] = next; stack.push(j + w); }
+      }
+      if (cnt > bestN) { bestN = cnt; best = next; }
+      next++;
+    }
+    if (!best || bestN < n * 0.02) return null;
+    var top = -1, maxW = 0, cxs = 0, cn = 0, neckW = 0, neckY = -1;
+    for (y = 0; y < h; y++) {
+      var a2 = -1, b2 = -1;
+      for (x = 0; x < w; x++) if (lab[y * w + x] === best) { if (a2 < 0) a2 = x; b2 = x; }
+      if (a2 < 0) { if (top >= 0) break; continue; }
+      var ww = b2 - a2 + 1;
+      if (top < 0) { if (ww < 2) continue; top = y; }
+      if (neckY < 0) {
+        if (ww > maxW) maxW = ww;
+        else if (ww < maxW * 0.85 && y - top > maxW * 0.6) { neckY = y; neckW = ww; } // the jaw and neck are narrower than the head
+        cxs += (a2 + b2 + 1) / 2; cn++;
+      } else {
+        if (ww < neckW) { neckW = ww; neckY = y; }
+        else if (ww > neckW * 1.25) break; // the shoulders start here
+      }
+      if (y - top > maxW * 1.8) break;
+    }
+    if (top < 0 || maxW < 3) return null;
+    var hh = maxW * 1.3;
+    if (neckY > 0) hh = Math.min(hh, (neckY - top) * 0.97);
+    return { top: top / k, h: hh / k, cx: cxs / cn / k };
+  }
+
+  // ---------- picture: brightness/contrast, then the new background ----------
+  var adjT = 0;
+  function rebuild() {
+    if (!src) return;
+    var b = +$('bri').value * 2.2, c = 1 + +$('con').value / 100, x = src.getContext('2d', { willReadFrequently: true }), id = x.getImageData(0, 0, SW, SH), d = id.data, keep = bg === 'keep' || !mask;
+    var col = keep ? null : [parseInt(bg.slice(1, 3), 16), parseInt(bg.slice(3, 5), 16), parseInt(bg.slice(5, 7), 16)];
+    var lut = new Uint8ClampedArray(256); for (var i = 0; i < 256; i++) lut[i] = (i - 128) * c + 128 + b;
+    for (i = 0; i < d.length; i += 4) {
+      var r = lut[d[i]], g = lut[d[i + 1]], bl = lut[d[i + 2]];
+      if (col) { var a = mask[i >> 2] / 255; r = r * a + col[0] * (1 - a); g = g * a + col[1] * (1 - a); bl = bl * a + col[2] * (1 - a); }
+      d[i] = r; d[i + 1] = g; d[i + 2] = bl; d[i + 3] = 255;
+    }
+    if (!comp || comp.width !== SW || comp.height !== SH) comp = canvas(SW, SH);
+    comp.getContext('2d').putImageData(id, 0, 0);
+  }
+  function fillCol() { return bg === 'keep' || !mask ? '#ffffff' : bg; }
+  // place the photo: on the head if we found it, otherwise fill the frame
+  function place() {
+    if (!src) return;
+    T.r = 0; $('rot').value = 0;
+    if (head) {
+      var want = mm((spec.hmin + spec.hmax) / 2), s = want / head.h;
+      T.s = s; T.cx = head.cx; T.cy = head.top + (spec.H / 2 - mm(spec.top)) / s;
+    } else { T.s = Math.max(spec.W / SW, spec.H / SH); T.cx = SW / 2; T.cy = SH / 2; }
+    syncZoom(); labels();
+  }
+  function zoomRange() { return { lo: Math.min(spec.W / SW, spec.H / SH) * 0.4, hi: Math.max(spec.W / SW, spec.H / SH) * 6 }; }
+  function syncZoom() { var z = zoomRange(); $('zoom').value = Math.round(Math.log(T.s / z.lo) / Math.log(z.hi / z.lo) * 390 + 10); }
+  function render(ctx, W, H) {
+    var k = W / spec.W;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.fillStyle = fillCol(); ctx.fillRect(0, 0, W, H);
+    ctx.save(); ctx.translate(W / 2, H / 2); ctx.rotate(T.r * Math.PI / 180); ctx.scale(T.s * k, T.s * k); ctx.translate(-T.cx, -T.cy);
+    ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high'; ctx.drawImage(comp, 0, 0); ctx.restore();
+  }
+  var raf = 0;
+  function draw() {
+    if (raf || !comp) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; var cv = $('cv'), x = cv.getContext('2d'), W = cv.width, H = cv.height, k = W / spec.W;
+      render(x, W, H);
+      if ($('guides').checked) {
+        var top = mm(spec.top) * k, hmin = mm(spec.hmin) * k, hmax = mm(spec.hmax) * k, hm = (hmin + hmax) / 2, cxp = W / 2, lw = Math.max(1.5, W / 250);
+        x.save(); x.lineWidth = lw;
+        // eye band: eyes sit a little under half way down the head
+        x.fillStyle = 'rgba(22,163,74,.16)'; x.fillRect(0, top + hmin * 0.42, W, (hmax - hmin) * 0.42 + hm * 0.1);
+        x.setLineDash([W / 40, W / 60]); x.strokeStyle = 'rgba(37,99,235,.9)';
+        [[top, 'Top of head'], [top + hmin, 'Chin (smallest)'], [top + hmax, 'Chin (largest)']].forEach(function (l, i) {
+          x.beginPath(); x.moveTo(0, l[0]); x.lineTo(W, l[0]); x.stroke();
+          x.font = '600 ' + Math.round(W / 26) + 'px system-ui, sans-serif'; x.fillStyle = 'rgba(37,99,235,.95)'; x.textAlign = 'left'; x.fillText(l[1], 6, l[0] + (i ? -6 : Math.round(W / 22)));
+        });
+        x.setLineDash([]); x.strokeStyle = 'rgba(255,255,255,.85)'; x.beginPath(); x.ellipse(cxp, top + hm / 2, hm * 0.37, hm / 2, 0, 0, Math.PI * 2); x.stroke();
+        x.strokeStyle = 'rgba(0,0,0,.25)'; x.beginPath(); x.moveTo(cxp, 0); x.lineTo(cxp, H); x.stroke();
+        x.restore();
+      }
+      drawSheet();
+    });
+  }
+  function labels() { $('rotv').textContent = $('rot').value; $('briv').textContent = $('bri').value; $('conv').textContent = $('con').value; }
+
+  // ---------- moving the photo ----------
+  var cv = $('cv'), ptrs = {}, last = null;
+  function toFrame(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) / r.width * spec.W, y: (e.clientY - r.top) / r.height * spec.H }; }
+  function pan(dx, dy) { var a = -T.r * Math.PI / 180, c = Math.cos(a), s = Math.sin(a); T.cx -= (dx * c - dy * s) / T.s; T.cy -= (dx * s + dy * c) / T.s; }
+  function zoomAt(f, p) { // zoom keeping the point under the finger still
+    var z = zoomRange(), ns = Math.max(z.lo, Math.min(z.hi, T.s * f)), dx = p.x - spec.W / 2, dy = p.y - spec.H / 2;
+    pan(dx, dy); T.s = ns; pan(-dx, -dy); syncZoom(); draw();
+  }
+  cv.addEventListener('pointerdown', function (e) { if (!comp) return; ptrs[e.pointerId] = toFrame(e); try { cv.setPointerCapture(e.pointerId); } catch (er) {} last = null; e.preventDefault(); });
+  cv.addEventListener('pointermove', function (e) {
+    if (!ptrs[e.pointerId]) return;
+    var p = toFrame(e), ids = Object.keys(ptrs);
+    if (ids.length === 1) { pan(p.x - ptrs[e.pointerId].x, p.y - ptrs[e.pointerId].y); ptrs[e.pointerId] = p; draw(); }
+    else if (ids.length >= 2) {
+      ptrs[e.pointerId] = p; var a = ptrs[ids[0]], b = ptrs[ids[1]], d = Math.hypot(a.x - b.x, a.y - b.y), m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (last) { pan(m.x - last.m.x, m.y - last.m.y); if (last.d > 0) zoomAt(d / last.d, m); }
+      last = { d: d, m: m }; draw();
+    }
+  });
+  function up(e) { delete ptrs[e.pointerId]; last = null; }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('wheel', function (e) { if (!comp) return; e.preventDefault(); zoomAt(Math.exp(-e.deltaY * 0.0015), toFrame(e)); }, { passive: false });
+  cv.addEventListener('keydown', function (e) {
+    var st = spec.W / 100, k = { ArrowLeft: [-st, 0], ArrowRight: [st, 0], ArrowUp: [0, -st], ArrowDown: [0, st] }[e.key];
+    if (k) { e.preventDefault(); pan(k[0], k[1]); draw(); } else if (e.key === '+' || e.key === '=') zoomAt(1.05, { x: spec.W / 2, y: spec.H / 2 }); else if (e.key === '-') zoomAt(1 / 1.05, { x: spec.W / 2, y: spec.H / 2 });
+  });
+  cv.tabIndex = 0;
+  $('zoom').addEventListener('input', function () { var z = zoomRange(), ns = z.lo * Math.pow(z.hi / z.lo, (+$('zoom').value - 10) / 390); zoomAt(ns / T.s, { x: spec.W / 2, y: spec.H / 2 }); });
+  $('rot').addEventListener('input', function () { T.r = +$('rot').value; labels(); draw(); });
+  var bt = 0;
+  ['bri', 'con'].forEach(function (id) { $(id).addEventListener('input', function () { labels(); clearTimeout(bt); bt = setTimeout(function () { rebuild(); draw(); }, 60); }); });
+  $('auto').addEventListener('click', function () { if (!src) return; if (!head) say('', bg === 'keep' ? 'Auto position works after the background is replaced. Pick a background colour, or move the photo by hand.' : 'The head could not be found automatically. Move and zoom the photo by hand.'); place(); draw(); });
+  $('center').addEventListener('click', function () { if (!src) return; T.cx = head ? head.cx : SW / 2; draw(); });
+  $('guides').addEventListener('change', draw);
+
+  // ---------- background choice ----------
+  function setBg(v) {
+    bg = v;
+    Array.prototype.forEach.call(document.querySelectorAll('[data-ppbg]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ppbg') === v)); });
+    $('bgNote').textContent = v === 'keep' ? 'Your own background is kept. Most countries want a plain, light background without shadows.' : 'The person is cut out by an AI on your device and placed on this colour.';
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ppbg]'), function (b) {
+    b.addEventListener('click', function () { setBg(b.getAttribute('data-ppbg')); if (!src) return; if (bg !== 'keep' && !mask) runMask(); else { rebuild(); draw(); } });
+  });
+  $('bgc').addEventListener('input', function () { setBg($('bgc').value); if (!src) return; if (!mask) runMask(); else { rebuild(); draw(); } });
+
+  // ---------- outputs ----------
+  function photoCanvas() { var c = canvas(spec.W, spec.H); render(c.getContext('2d'), spec.W, spec.H); return c; }
+  // Write 300 dpi into the JPG header so printers and forms read the right size.
+  function withDpi(blob) {
+    return blob.arrayBuffer().then(function (a) {
+      var u = new Uint8Array(a);
+      if (u[2] === 0xFF && u[3] === 0xE0 && String.fromCharCode(u[6], u[7], u[8], u[9]) === 'JFIF') { u[13] = 1; u[14] = DPI >> 8; u[15] = DPI & 255; u[16] = DPI >> 8; u[17] = DPI & 255; }
+      return new Blob([u], { type: 'image/jpeg' });
+    });
+  }
+  function jpg(c, q) { return new Promise(function (res) { c.toBlob(res, 'image/jpeg', q || 0.95); }).then(function (b) { if (!b) throw new Error('Your browser could not save the picture.'); return withDpi(b); }); }
+  function offer(blob, fname, note) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var a = $('dl'); a.href = lastUrl; a.download = fname; a.textContent = 'Download ' + fname; a.hidden = false; a.click(); if (window.burst) burst(a);
+    say('ok', note + ' · ' + fmtBytes(blob.size) + '. If the download did not start, use the green button below.');
+  }
+  function sheetLayout() {
+    var p = PAPER[$('paper').value], best = null;
+    // try roomy spacing first, then tighter spacing (2 × 2 in photos fit 6 to a 4 × 6 in print only edge to edge)
+    [[4, 2.5], [2, 1], [0, 0]].forEach(function (sp) {
+      [[p[0], p[1]], [p[1], p[0]]].forEach(function (o) {
+        var W = Math.round(o[0] * DPI), H = Math.round(o[1] * DPI), m = mm(sp[0]), g = mm(sp[1]), cols = Math.floor((W - 2 * m + g + 1) / (spec.W + g)), rows = Math.floor((H - 2 * m + g + 1) / (spec.H + g));
+        cols = Math.max(0, cols); rows = Math.max(0, rows);
+        if (!best || cols * rows > best.cols * best.rows) best = { W: W, H: H, cols: cols, rows: rows, g: g, inW: o[0], inH: o[1] };
+      });
+    });
+    return best;
+  }
+  function fillCopies() {
+    var L = sheetLayout(), max = L.cols * L.rows, sel = $('copies'), cur = sel.value, wasFull = !sel.options.length || sel.selectedIndex === 0;
+    sel.innerHTML = '';
+    if (!max) { var o0 = document.createElement('option'); o0.value = 0; o0.textContent = 'This photo is too big for this paper'; sel.appendChild(o0); return; }
+    for (var i = max; i >= 1; i--) { var o = document.createElement('option'); o.value = i; o.textContent = i === max ? i + ' (fill the sheet)' : String(i); sel.appendChild(o); }
+    sel.value = !wasFull && +cur > 0 && +cur <= max ? cur : String(max); // "fill the sheet" stays full when the paper or photo size changes
+  }
+  function sheetCanvas(scale) {
+    var L = sheetLayout(), n = Math.min(+$('copies').value || 0, L.cols * L.rows), s = scale || 1, c = canvas(Math.round(L.W * s), Math.round(L.H * s)), x = c.getContext('2d');
+    x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    if (!n) return { c: c, L: L, n: 0 };
+    var one = scale ? (function () { var t = canvas(Math.max(1, Math.round(spec.W * s)), Math.max(1, Math.round(spec.H * s))); render(t.getContext('2d'), t.width, t.height); return t; })() : photoCanvas();
+    var cols = L.cols, gw = cols * spec.W + (cols - 1) * L.g, ox = (L.W - gw) / 2, oy = (L.H - (L.rows * spec.H + (L.rows - 1) * L.g)) / 2;
+    for (var i = 0; i < n; i++) {
+      var px = (ox + (i % cols) * (spec.W + L.g)) * s, py = (oy + Math.floor(i / cols) * (spec.H + L.g)) * s;
+      x.drawImage(one, px, py, spec.W * s, spec.H * s);
+      if ($('cut').checked) { x.strokeStyle = '#b8bcc4'; x.lineWidth = Math.max(1, 2 * s); x.strokeRect(px - 1 * s, py - 1 * s, spec.W * s + 2 * s, spec.H * s + 2 * s); }
+    }
+    return { c: c, L: L, n: n };
+  }
+  var sheetT = 0;
+  function drawSheet() {
+    clearTimeout(sheetT);
+    sheetT = setTimeout(function () {
+      if (!comp) return;
+      var r = sheetCanvas(Math.min(1, 700 / Math.max(sheetLayout().W, sheetLayout().H))), cv2 = $('sheet');
+      cv2.width = r.c.width; cv2.height = r.c.height; cv2.getContext('2d').drawImage(r.c, 0, 0);
+      $('dlSheet').disabled = $('dlPdf').disabled = !r.n;
+    }, 120);
+  }
+  $('dlOne').addEventListener('click', function () {
+    if (!comp || busy) return;
+    jpg(photoCanvas()).then(function (b) { offer(b, name + '-' + spec.id + '.jpg', 'Saved your ' + spec.W + ' × ' + spec.H + ' px photo'); }, function (e) { say('bad', e.message); });
+  });
+  function paperName() { return { '4x6': '4x6in', '5x7': '5x7in', a4: 'A4', letter: 'letter' }[$('paper').value]; }
+  $('dlSheet').addEventListener('click', function () {
+    if (!comp || busy) return;
+    var r = sheetCanvas(); if (!r.n) return;
+    jpg(r.c, 0.95).then(function (b) { r.c.width = r.c.height = 0; offer(b, name + '-sheet-' + paperName() + '.jpg', 'Saved a ' + r.L.inW.toFixed(1).replace('.0', '') + ' × ' + r.L.inH.toFixed(1).replace('.0', '') + ' in sheet with ' + r.n + ' photos at 300 dpi'); }, function (e) { say('bad', e.message); });
+  });
+  var pdfP = null;
+  $('dlPdf').addEventListener('click', function () {
+    if (!comp || busy) return;
+    var r = sheetCanvas(); if (!r.n) return;
+    var btn = $('dlPdf'); btn.disabled = true; say('', 'Making the PDF…');
+    pdfP = pdfP || (window.PDFLib ? Promise.resolve() : loadScript('../assets/vendor/pdf-lib.min.js'));
+    pdfP.catch(function () { pdfP = null; });
+    Promise.all([pdfP, jpg(r.c, 0.95)]).then(function (a) {
+      return a[1].arrayBuffer().then(function (buf) {
+        return PDFLib.PDFDocument.create().then(function (doc) {
+          return doc.embedJpg(buf).then(function (im) {
+            var pg = doc.addPage([r.L.inW * 72, r.L.inH * 72]); pg.drawImage(im, { x: 0, y: 0, width: r.L.inW * 72, height: r.L.inH * 72 });
+            doc.setTitle('Passport photos'); return doc.save();
+          });
+        });
+      });
+    }).then(function (bytes) { offer(new Blob([bytes], { type: 'application/pdf' }), name + '-sheet-' + paperName() + '.pdf', 'Saved a PDF sheet with ' + r.n + ' photos. Print it at 100% (Actual size)'); }, function (e) { say('bad', e && e.message === 'net' ? 'The PDF maker could not be loaded. Use the JPG sheet instead.' : 'Could not make the PDF. Use the JPG sheet instead.'); })
+      .then(function () { btn.disabled = false; });
+  });
+  ['paper'].forEach(function (id) { $(id).addEventListener('change', function () { fillCopies(); drawSheet(); }); });
+  $('copies').addEventListener('change', drawSheet); $('cut').addEventListener('change', drawSheet);
+  function onSpec() { readSpec(); fillCopies(); if (src) { place(); draw(); } }
+  $('country').addEventListener('change', onSpec); $('cw').addEventListener('change', onSpec); $('ch').addEventListener('change', onSpec);
+  window.addEventListener('pagehide', stopCam);
+  setBg('#ffffff'); readSpec(); fillCopies();
+})();
+</script>

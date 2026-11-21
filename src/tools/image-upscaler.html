@@ -1,0 +1,325 @@
+<style>
+.up-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 14px; }
+.up-row > span { font-size: 14px; font-weight: 600; }
+.up-sub { font-size: 14px; color: var(--muted); margin: -6px 0 14px; }
+.up-stage { position: relative; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; line-height: 0; background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; }
+.up-stage canvas { display: block; margin: 0 auto; max-width: 100%; height: auto; touch-action: pan-y; cursor: ew-resize; }
+.up-tag { position: absolute; top: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(17, 24, 39, .72); color: #fff; font: 600 12px/1.4 system-ui, sans-serif; pointer-events: none; }
+.up-tag.l { left: 8px; } .up-tag.r { right: 8px; }
+.up-cmp { display: flex; align-items: center; gap: 10px; margin: 10px 0 4px; font-size: 14px; color: var(--muted); }
+.up-cmp input { flex: 1; min-width: 0; }
+.up-stop { margin-top: 10px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop an image here</b>JPG, PNG or WebP. It is enlarged on your device and never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="up-row">
+  <span>Enlarge</span>
+  <div class="seg" role="group" aria-label="How much bigger"><button type="button" data-scale="2" aria-pressed="true">2× bigger</button><button type="button" data-scale="4" aria-pressed="false">4× bigger</button></div>
+</div>
+<div class="up-row">
+  <span>Method</span>
+  <div class="seg" role="group" aria-label="Method"><button type="button" data-method="ai" aria-pressed="true">AI (sharpest)</button><button type="button" data-method="fast" aria-pressed="false">Fast (smooth)</button></div>
+</div>
+<select id="upx" hidden aria-hidden="true" tabindex="-1"><option>2</option><option>4</option></select>
+<select id="method" hidden aria-hidden="true" tabindex="-1"><option>ai</option><option>fast</option></select>
+<p class="up-sub" id="methodNote"></p>
+<div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat">Getting ready…</p><button type="button" class="btn ghost up-stop" id="stop">Stop</button></div>
+<div id="work" hidden>
+  <div class="up-row" style="margin-top:4px">
+    <span>View</span>
+    <div class="seg" role="group" aria-label="View"><button type="button" data-view="zoom" aria-pressed="true">Close-up (100%)</button><button type="button" data-view="all" aria-pressed="false">Whole picture</button></div>
+  </div>
+  <div class="up-stage" id="stage"><canvas id="cv" aria-label="Before and after. Drag to compare."></canvas><span class="up-tag l">Before</span><span class="up-tag r">After</span></div>
+  <div class="up-cmp"><span>Before</span><input type="range" id="cmp" min="0" max="100" value="50" aria-label="Compare before and after" data-nomemo><span>After</span></div>
+  <div class="fields" style="margin-top:12px">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="image/png">PNG (best quality)</option><option value="image/jpeg">JPG (smaller)</option><option value="image/webp">WebP (smaller)</option></select></div>
+    <div><label for="sharp">Extra sharpening: <span id="sharpv">0</span></label><input type="range" id="sharp" min="0" max="10" value="0"></div>
+  </div>
+  <div class="btns"><button class="btn" id="save">Download bigger image</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var BASE = '../assets/vendor/onnx/', MODEL = { file: 'realesr-general-x4v3.onnx', bytes: 2435209 };
+  var WASM = { gpu: ['ort.webgpu.min.js', 'ort-wasm-simd-threaded.asyncify.wasm', 28747738], cpu: ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852] };
+  var MAX_OUT = 16000000, AI_MAX_IN = 2000000, TILE = 128, PAD = 10;
+  var src = null, name = 'image', W = 0, H = 0, hasAlpha = false, out = null, outScale = 0, outMethod = '', job = 0, busy = false, stopped = false, lastUrl = null, note = '';
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function progress(frac, text) {
+    $('notice').hidden = false; $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%';
+    $('stat').textContent = text;
+  }
+  function loadScript(url) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); }); }
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).catch(function () { throw new Error('net'); }).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() { return reader.read().then(function (d) { if (d.done) { var o = new Uint8Array(got), k = 0; parts.forEach(function (p) { o.set(p, k); k += p.length; }); return o.buffer; } parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump(); }); }
+      return pump();
+    });
+  }
+
+  // ---------- AI engine (the same ONNX runtime as the background remover, so it is often cached already) ----------
+  var useGpu = false, gpuP = null, sessP = null;
+  function detect() {
+    return gpuP || (gpuP = Promise.resolve(navigator.gpu ? navigator.gpu.requestAdapter() : null).catch(function () { return null; }).then(function (ad) { useGpu = !!ad && !ad.isFallbackAdapter && !(ad.info && ad.info.isFallbackAdapter); }));
+  }
+  function session(report) {
+    if (sessP) return sessP;
+    sessP = detect().then(function () {
+      var w = WASM[useGpu ? 'gpu' : 'cpu'], a = 0, b = 0, total = w[2] + MODEL.bytes;
+      function tell() { report((a + b) / total, 'Downloading the AI engine (' + fmtBytes(a + b) + ' of about ' + fmtBytes(total) + '). This happens only once.'); }
+      tell();
+      return Promise.all([loadScript(BASE + w[0]), fetchBuf(BASE + w[1], w[2], function (n) { a = n; tell(); }), fetchBuf(BASE + MODEL.file, MODEL.bytes, function (n) { b = n; tell(); })]).then(function (r) {
+        report(null, 'Starting the AI engine…');
+        ort.env.wasm.wasmPaths = new URL(BASE, location.href).href; ort.env.wasm.wasmBinary = r[1];
+        ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+        ort.env.wasm.proxy = !useGpu; ort.env.logLevel = 'error';
+        var buf = new Uint8Array(r[2]), opts = { graphOptimizationLevel: 'all' };
+        var g = useGpu ? ort.InferenceSession.create(buf.slice(), Object.assign({ executionProviders: ['webgpu'] }, opts)).then(function (s) { s.ep = 'WebGPU'; return s; }, function () { return null; }) : Promise.resolve(null);
+        return g.then(function (s) { return s || ort.InferenceSession.create(buf, Object.assign({ executionProviders: ['wasm'] }, opts)).then(function (s2) { s2.ep = 'WebAssembly'; return s2; }); });
+      });
+    });
+    sessP.catch(function () { sessP = null; });
+    return sessP;
+  }
+  // Enlarge 4× in small overlapping tiles, so even big pictures fit in memory; the overlap hides the seams.
+  function aiUpscale(s, img, w, h, scale, mine, onTile) {
+    var outC = canvas(w * scale, h * scale), ox = outC.getContext('2d'), sx = img.getContext('2d', { willReadFrequently: true });
+    var cols = Math.ceil(w / TILE), rows = Math.ceil(h / TILE), total = cols * rows, n = 0, t0 = performance.now();
+    var tmp4 = canvas(1, 1), tmpS = canvas(1, 1);
+    function one(tx, ty) {
+      var x0 = tx * TILE, y0 = ty * TILE, x1 = Math.min(w, x0 + TILE), y1 = Math.min(h, y0 + TILE);
+      var px0 = Math.max(0, x0 - PAD), py0 = Math.max(0, y0 - PAD), px1 = Math.min(w, x1 + PAD), py1 = Math.min(h, y1 + PAD), tw = px1 - px0, th = py1 - py0;
+      var d = sx.getImageData(px0, py0, tw, th).data, nn = tw * th, t = new Float32Array(3 * nn);
+      for (var i = 0; i < nn; i++) { t[i] = d[i * 4] / 255; t[nn + i] = d[i * 4 + 1] / 255; t[2 * nn + i] = d[i * 4 + 2] / 255; }
+      var feeds = {}; feeds[s.inputNames[0]] = new ort.Tensor('float32', t, [1, 3, th, tw]);
+      return s.run(feeds).then(function (res) {
+        var o = res[s.outputNames[0]], p = o.data, W4 = tw * 4, H4 = th * 4, m = W4 * H4, id = new ImageData(W4, H4), q = id.data;
+        for (var k = 0; k < m; k++) {
+          var r = p[k] * 255, g = p[m + k] * 255, b = p[2 * m + k] * 255;
+          q[k * 4] = r; q[k * 4 + 1] = g; q[k * 4 + 2] = b; q[k * 4 + 3] = 255;
+        }
+        Object.keys(res).forEach(function (kk) { if (res[kk].dispose) res[kk].dispose(); });
+        tmp4.width = W4; tmp4.height = H4; tmp4.getContext('2d').putImageData(id, 0, 0);
+        var srcC = tmp4;
+        if (scale !== 4) { tmpS.width = tw * scale; tmpS.height = th * scale; var tx2 = tmpS.getContext('2d'); tx2.imageSmoothingQuality = 'high'; tx2.drawImage(tmp4, 0, 0, tmpS.width, tmpS.height); srcC = tmpS; }
+        // copy only the middle of the tile (without its overlap) into place
+        ox.drawImage(srcC, (x0 - px0) * scale, (y0 - py0) * scale, (x1 - x0) * scale, (y1 - y0) * scale, x0 * scale, y0 * scale, (x1 - x0) * scale, (y1 - y0) * scale);
+      });
+    }
+    var tx = 0, ty = 0;
+    function next() {
+      if (mine !== job || stopped) return Promise.reject(new Error('stopped'));
+      if (ty >= rows) return Promise.resolve(outC);
+      return one(tx, ty).then(function () {
+        n++; var el = (performance.now() - t0) / 1000, left = el / n * (total - n);
+        onTile(n / total, n, total, left);
+        if (++tx >= cols) { tx = 0; ty++; }
+        return new Promise(function (r) { setTimeout(r, 0); }).then(next);
+      });
+    }
+    return next();
+  }
+
+  // ---------- fast method: Lanczos-3 resampling, done in two passes ----------
+  function weights(sn, dn) {
+    var sc = dn / sn, a = 3, list = [];
+    for (var i = 0; i < dn; i++) {
+      var c = (i + 0.5) / sc - 0.5, lo = Math.floor(c) - a + 1, ws = [], sum = 0;
+      for (var j = lo; j < lo + 2 * a; j++) { var x = c - j, v = x === 0 ? 1 : Math.abs(x) >= a ? 0 : a * Math.sin(Math.PI * x) * Math.sin(Math.PI * x / a) / (Math.PI * Math.PI * x * x); ws.push(v); sum += v; }
+      list.push({ lo: lo, w: ws.map(function (v) { return v / sum; }) });
+    }
+    return list;
+  }
+  function lanczos(d, sw, sh, dw, dh) {
+    var wx = weights(sw, dw), wy = weights(sh, dh), mid = new Float32Array(dw * sh * 4), out = new Uint8ClampedArray(dw * dh * 4), x, y, k, c;
+    for (y = 0; y < sh; y++) for (x = 0; x < dw; x++) {
+      var e = wx[x], o = (y * dw + x) * 4, r = 0, g = 0, b = 0, al = 0;
+      for (k = 0; k < 6; k++) { var sxx = Math.min(sw - 1, Math.max(0, e.lo + k)), si = (y * sw + sxx) * 4, wv = e.w[k], aa = d[si + 3] * wv; r += d[si] * aa; g += d[si + 1] * aa; b += d[si + 2] * aa; al += aa; }
+      mid[o] = r; mid[o + 1] = g; mid[o + 2] = b; mid[o + 3] = al; // colours stay multiplied by alpha so see-through edges do not get dark rims
+    }
+    for (y = 0; y < dh; y++) {
+      var f = wy[y];
+      for (x = 0; x < dw; x++) {
+        var o2 = (y * dw + x) * 4, R = 0, G = 0, B = 0, A = 0;
+        for (k = 0; k < 6; k++) { var syy = Math.min(sh - 1, Math.max(0, f.lo + k)), mi = (syy * dw + x) * 4, w2 = f.w[k]; R += mid[mi] * w2; G += mid[mi + 1] * w2; B += mid[mi + 2] * w2; A += mid[mi + 3] * w2; }
+        if (A > 0.5) { out[o2] = R / A; out[o2 + 1] = G / A; out[o2 + 2] = B / A; }
+        out[o2 + 3] = A;
+      }
+    }
+    return out;
+  }
+  function fastUpscale(img, w, h, scale) {
+    var d = img.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, c = canvas(w * scale, h * scale);
+    c.getContext('2d').putImageData(new ImageData(lanczos(d, w, h, w * scale, h * scale), w * scale, h * scale), 0, 0);
+    return c;
+  }
+  // Put back the see-through parts after the AI step (the AI only works on colour).
+  function addAlpha(c, img, w, h, scale) {
+    var x = c.getContext('2d', { willReadFrequently: true }), W2 = w * scale, H2 = h * scale, o = x.getImageData(0, 0, W2, H2);
+    var a = lanczos(img.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h).data, w, h, W2, H2);
+    for (var i = 3; i < o.data.length; i += 4) o.data[i] = a[i];
+    x.putImageData(o, 0, 0);
+  }
+
+  // ---------- run ----------
+  function setSeg(attr, val) { Array.prototype.forEach.call(document.querySelectorAll('[' + attr + ']'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute(attr) === String(val))); }); }
+  function methodNote() {
+    $('methodNote').textContent = $('method').value === 'ai'
+      ? 'AI adds real detail and removes blur and JPG blocks. It takes from a few seconds to a few minutes, depending on your device and the picture size. The first time, about 17 MB of AI files download and then stay on your device.'
+      : 'Fast uses high-quality Lanczos resizing: instant and smooth, but it cannot invent new detail.';
+  }
+  function plan() {
+    var scale = +$('upx').value, w = W, h = H, f = 1, ai = $('method').value === 'ai';
+    if (ai && w * h > AI_MAX_IN) f = Math.sqrt(AI_MAX_IN / (w * h));
+    if (w * h * f * f * scale * scale > MAX_OUT) f = Math.min(f, Math.sqrt(MAX_OUT / (w * h * scale * scale)));
+    return { scale: scale, w: Math.max(1, Math.floor(w * f)), h: Math.max(1, Math.floor(h * f)), f: f, ai: ai };
+  }
+  function run() {
+    if (!src) return;
+    var mine = ++job, p = plan(), img = src;
+    stopped = false; busy = true; out = null; $('work').hidden = true; $('dl').hidden = true; say('', '');
+    if (p.f < 1) { img = canvas(p.w, p.h); var ix = img.getContext('2d', { willReadFrequently: true }); ix.imageSmoothingQuality = 'high'; ix.drawImage(src, 0, 0, p.w, p.h); }
+    note = p.f < 1 ? ' Your picture was first reduced to ' + p.w + ' × ' + p.h + ' px, ' + (p.ai && W * H > AI_MAX_IN ? 'the largest the AI can handle in a browser.' : 'so the result stays within what phones can save.') : '';
+    var t0 = performance.now();
+    function done(c, how) {
+      if (mine !== job) return;
+      busy = false; $('notice').hidden = true; out = c; outScale = p.scale; outMethod = how;
+      showResult();
+      var s = ((performance.now() - t0) / 1000).toFixed(1);
+      say('ok', 'Done: ' + c.width + ' × ' + c.height + ' px (' + p.scale + '× using ' + how + ', ' + s + ' s). Drag across the picture to compare.' + note);
+    }
+    if (!p.ai) {
+      progress(null, 'Enlarging…');
+      setTimeout(function () { if (mine !== job) return; try { done(fastUpscale(img, p.w, p.h, p.scale), 'Lanczos'); } catch (e) { fail('Not enough memory to enlarge this picture. Try 2× or a smaller picture.'); } }, 30);
+      return;
+    }
+    function fail(t) { if (mine !== job) return; busy = false; $('notice').hidden = true; say('bad', t); }
+    var settled = false; // once the engine has failed, a download still finishing in the background must not show progress again
+    session(function (f, t) { if (mine === job && !settled) progress(f, t); }).then(function (s) {
+      settled = true;
+      if (mine !== job) return;
+      progress(0, 'Enlarging with AI…');
+      return aiUpscale(s, img, p.w, p.h, p.scale, mine, function (f, n, total, left) {
+        if (mine !== job) return;
+        progress(f, 'Enlarging with AI: part ' + n + ' of ' + total + (n < total ? ', about ' + (left < 60 ? Math.max(1, Math.round(left)) + ' s' : Math.round(left / 60) + ' min') + ' left' : '') + '…');
+      }).then(function (c) { if (hasAlpha) addAlpha(c, img, p.w, p.h, p.scale); done(c, 'AI on ' + s.ep); });
+    }).catch(function (e) {
+      settled = true;
+      if (mine !== job) return;
+      if (e && e.message === 'stopped') { busy = false; $('notice').hidden = true; say('', 'Stopped. Choose Fast for an instant result, or press AI again to restart.'); return; }
+      // the AI could not run here: fall back to the fast method so the person still gets a result
+      progress(null, 'The AI could not run here, so the fast method is used instead…');
+      setTimeout(function () {
+        if (mine !== job) return;
+        try {
+          var c = fastUpscale(img, p.w, p.h, p.scale); done(c, 'Lanczos');
+          say('bad', (e && e.message === 'net' ? 'The AI files could not be downloaded (are you offline?).' : typeof WebAssembly === 'undefined' ? 'Your browser cannot run the AI (no WebAssembly).' : 'The AI could not run in this browser.') + ' Your picture was enlarged with the fast method instead: ' + c.width + ' × ' + c.height + ' px.');
+        } catch (er) { fail('Not enough memory to enlarge this picture. Try 2× or a smaller picture.'); }
+      }, 30);
+    });
+  }
+  $('stop').addEventListener('click', function () { stopped = true; $('stat').textContent = 'Stopping after this part…'; });
+
+  // ---------- compare view ----------
+  var view = 'zoom', raf = 0;
+  function showResult() {
+    $('work').hidden = false; drawCmp();
+    if ($('stage').scrollIntoView) $('stage').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  function drawCmp() {
+    if (raf || !out) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; if (!out) return;
+      var cv = $('cv'), ctx = cv.getContext('2d'), OW = out.width, OH = out.height, sx, sy, sw, sh, cw, ch;
+      if (view === 'zoom') { cw = Math.min(OW, 900); ch = Math.min(OH, 700); sx = (OW - cw) / 2; sy = (OH - ch) / 2; sw = cw; sh = ch; }
+      else { var s = Math.min(1, 1100 / Math.max(OW, OH)); cw = Math.round(OW * s); ch = Math.round(OH * s); sx = 0; sy = 0; sw = OW; sh = OH; }
+      cv.width = cw; cv.height = ch;
+      var split = +$('cmp').value / 100 * cw, k = W / OW; // before: the original picture, simply stretched
+      ctx.clearRect(0, 0, cw, ch); ctx.imageSmoothingEnabled = true; ctx.imageSmoothingQuality = 'high';
+      ctx.drawImage(out, sx, sy, sw, sh, 0, 0, cw, ch);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, split, ch); ctx.clip(); ctx.clearRect(0, 0, split, ch);
+      ctx.imageSmoothingQuality = 'low'; ctx.drawImage(src, sx * k, sy * k, sw * k, sh * k, 0, 0, cw, ch); ctx.restore();
+      ctx.fillStyle = '#fff'; ctx.fillRect(split - 1, 0, 2, ch); ctx.beginPath(); ctx.arc(split, ch / 2, 14, 0, 7); ctx.fill(); ctx.strokeStyle = 'rgba(0,0,0,.35)'; ctx.stroke();
+      ctx.fillStyle = '#111'; ctx.font = '600 13px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('‹ ›', split, ch / 2 + 1);
+    });
+  }
+  var cv = $('cv'), dragging = false;
+  function at(e) { var r = cv.getBoundingClientRect(); $('cmp').value = Math.max(0, Math.min(100, Math.round((e.clientX - r.left) / r.width * 100))); drawCmp(); }
+  cv.addEventListener('pointerdown', function (e) { dragging = true; try { cv.setPointerCapture(e.pointerId); } catch (er) {} at(e); });
+  cv.addEventListener('pointermove', function (e) { if (dragging) at(e); });
+  cv.addEventListener('pointerup', function () { dragging = false; }); cv.addEventListener('pointercancel', function () { dragging = false; });
+  $('cmp').addEventListener('input', drawCmp);
+
+  // ---------- controls ----------
+  Array.prototype.forEach.call(document.querySelectorAll('[data-scale]'), function (b) { b.addEventListener('click', function () { var v = b.getAttribute('data-scale'); if ($('upx').value === v) return; $('upx').value = v; $('upx').dispatchEvent(new Event('change', { bubbles: true })); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-method]'), function (b) { b.addEventListener('click', function () { var v = b.getAttribute('data-method'); if ($('method').value === v && !(v === 'ai' && !busy && !out && src)) return; $('method').value = v; $('method').dispatchEvent(new Event('change', { bubbles: true })); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) { b.addEventListener('click', function () { view = b.getAttribute('data-view'); setSeg('data-view', view); drawCmp(); }); });
+  $('upx').addEventListener('change', function () { setSeg('data-scale', $('upx').value); if (src) run(); });
+  $('method').addEventListener('change', function () { setSeg('data-method', $('method').value); methodNote(); if (src) run(); });
+  $('sharp').addEventListener('input', function () { $('sharpv').textContent = $('sharp').value; $('dl').hidden = true; });
+  $('fmt').addEventListener('change', function () { $('dl').hidden = true; });
+
+  function take(f) {
+    job++; src = null; out = null; busy = false; $('work').hidden = true; $('notice').hidden = true; $('dl').hidden = true;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP file.'); return; }
+    var mine = job; say('', 'Opening ' + f.name + '…');
+    loadImage(f, function (im) {
+      if (mine !== job) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
+      var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, Math.sqrt(MAX_OUT / (w * h)));
+      W = Math.max(1, Math.round(w * s)); H = Math.max(1, Math.round(h * s));
+      src = canvas(W, H); var x = src.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, W, H);
+      name = f.name.replace(/\.[^.]+$/, '') || 'image';
+      // does the picture have see-through parts? (checked on a small copy)
+      var t = canvas(Math.min(W, 256), Math.min(H, 256)), tx = t.getContext('2d', { willReadFrequently: true }); tx.drawImage(src, 0, 0, t.width, t.height);
+      var d = tx.getImageData(0, 0, t.width, t.height).data; hasAlpha = false; for (var i = 3; i < d.length; i += 4) if (d[i] < 250) { hasAlpha = true; break; }
+      if (hasAlpha) $('fmt').value = 'image/png';
+      run();
+    });
+  }
+  (function () {
+    var drop = $('drop'), input = $('file');
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; if (f) take(f); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { var f = e.dataTransfer.files[0]; if (f) take(f); });
+  })();
+
+  // ---------- save (with optional unsharp mask) ----------
+  function sharpen(c, amt) {
+    var x = c.getContext('2d', { willReadFrequently: true }), w = c.width, h = c.height, id = x.getImageData(0, 0, w, h), d = id.data, b = new Uint8ClampedArray(d), k = amt * 0.15, i, y, xx;
+    for (y = 1; y < h - 1; y++) for (xx = 1; xx < w - 1; xx++) {
+      i = (y * w + xx) * 4;
+      for (var ch = 0; ch < 3; ch++) { var j = i + ch, blur = (b[j - 4] + b[j + 4] + b[j - w * 4] + b[j + w * 4]) / 4; d[j] = b[j] + (b[j] - blur) * k; }
+    }
+    x.putImageData(id, 0, 0);
+  }
+  $('save').addEventListener('click', function () {
+    if (!out || busy) return;
+    var btn = $('save'), label = btn.textContent, type = $('fmt').value; btn.disabled = true; btn.textContent = 'Preparing…';
+    setTimeout(function () {
+      try {
+        var c = out, amt = +$('sharp').value;
+        if (amt) { c = canvas(out.width, out.height); c.getContext('2d').drawImage(out, 0, 0); sharpen(c, amt); }
+        if (type === 'image/jpeg' && hasAlpha) { var j = canvas(c.width, c.height), jx = j.getContext('2d'); jx.fillStyle = '#fff'; jx.fillRect(0, 0, j.width, j.height); jx.drawImage(c, 0, 0); c = j; }
+        c.toBlob(function (b) {
+          btn.disabled = false; btn.textContent = label;
+          if (!b) { say('bad', 'Your browser could not save a picture this big. Try JPG, or 2× instead of 4×.'); return; }
+          var fname = name + '-' + outScale + 'x.' + ({ 'image/png': 'png', 'image/jpeg': 'jpg', 'image/webp': 'webp' }[b.type] || 'png');
+          if (lastUrl) URL.revokeObjectURL(lastUrl);
+          lastUrl = URL.createObjectURL(b);
+          var a = $('dl'); a.href = lastUrl; a.download = fname; a.textContent = 'Download ' + fname; a.hidden = false; a.click(); if (window.burst) burst(a);
+          say('ok', 'Saved ' + fname + ' (' + out.width + ' × ' + out.height + ' px, ' + fmtBytes(b.size) + '). If the download did not start, use the green button.');
+        }, type, 0.92);
+      } catch (e) { btn.disabled = false; btn.textContent = label; say('bad', 'Not enough memory to save this picture. Try 2× or a smaller picture.'); }
+    }, 20);
+  });
+  methodNote();
+})();
+</script>

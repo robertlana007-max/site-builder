@@ -1,0 +1,154 @@
+<style>
+.mi-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
+.mi-stage canvas { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto; }
+.mi-list { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
+.mi-list li { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 14px; }
+.mi-list li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mi-list li button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; flex: none; }
+.mi-list li button:disabled { opacity: .35; cursor: default; }
+.mi-col { display: flex; gap: 8px; align-items: center; }
+.mi-col input[type=color] { width: 56px; height: 44px; padding: 3px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); flex: none; }
+.mi-col label { margin: 0; font-weight: 400; font-size: 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop images here</b>Add two or more JPG, PNG or WebP files. They stay on your device.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<ul class="mi-list" id="list" aria-label="Images in order"></ul>
+<div class="mi-stage" id="stage" hidden><canvas id="cv" aria-label="Preview of the merged image"></canvas></div>
+<div class="fields">
+  <div><label for="layout">Layout</label><select id="layout"><option value="h">Side by side (left to right)</option><option value="v">Top to bottom</option><option value="g">Grid</option></select></div>
+  <div id="colsW" hidden><label for="cols">Columns in the grid</label><input type="number" id="cols" min="1" max="20" value="2"></div>
+  <div><label for="match">Make them the same size</label><select id="match"><option value="large">Yes, match the largest</option><option value="small">Yes, match the smallest</option><option value="off">No, keep each size</option></select></div>
+  <div id="cellW" hidden><label for="cell">Grid cells</label><select id="cell"><option value="fit">Show each whole picture</option><option value="fill">Fill each cell (trim edges)</option></select></div>
+  <div id="alignW"><label for="align">Line up</label><select id="align"><option value="center">Centre</option><option value="start">Top / left</option><option value="end">Bottom / right</option></select></div>
+  <div><label for="gap">Space between: <span id="gapv">10</span> px</label><input type="range" id="gap" min="0" max="200" value="10"></div>
+  <div><label for="pad">Outer border: <span id="padv">0</span> px</label><input type="range" id="pad" min="0" max="200" value="0"></div>
+  <div><label for="bg">Background</label><div class="mi-col"><input type="color" id="bg" value="#ffffff" aria-label="Background colour"><label><input type="checkbox" id="trans"> See-through</label></div></div>
+  <div><label for="fmt">Save as</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="q">Quality (JPG, WebP): <span id="qv">92</span>%</label><input type="range" id="q" min="40" max="100" value="92"></div>
+</div>
+<p class="msg" id="info" style="margin-top:0"></p>
+<div class="btns"><button class="btn" id="go" disabled>Merge and download</button><button class="btn ghost" id="clear" hidden>Remove all</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var items = [], busy = false, lastUrl = null;
+  var MAX_AREA = 16000000, EXT = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' };
+  function say(c, t) { PT.say(c, t); }
+
+  // Layout in "full size" pixels: a box (x, y, w, h) per image plus the total size.
+  function layout() {
+    var mode = $('layout').value, match = $('match').value, gap = +$('gap').value, pad = +$('pad').value, align = $('align').value;
+    var cols = mode === 'h' ? items.length : mode === 'v' ? 1 : Math.max(1, Math.min(20, parseInt($('cols').value, 10) || 2));
+    var rows = Math.ceil(items.length / cols), dims = items.map(function (it) { return { w: it.img.naturalWidth, h: it.img.naturalHeight }; });
+    if (match !== 'off') { // same height side by side, same width otherwise
+      var key = mode === 'h' ? 'h' : 'w', vals = dims.map(function (d) { return d[key]; });
+      var t = match === 'large' ? Math.max.apply(null, vals) : Math.min.apply(null, vals);
+      if (mode === 'g') { // one tidy cell shape: the average shape of the pictures
+        var asp = dims.reduce(function (a, d) { return a + d.w / d.h; }, 0) / dims.length, cellW = t, cellH = Math.max(1, Math.round(t / asp)), fill = $('cell').value === 'fill';
+        dims = dims.map(function (d) {
+          var s2 = fill ? Math.max(cellW / d.w, cellH / d.h) : Math.min(cellW / d.w, cellH / d.h);
+          if (!fill) return { w: Math.max(1, Math.round(d.w * s2)), h: Math.max(1, Math.round(d.h * s2)), cw: cellW, ch: cellH };
+          var sw = cellW / s2, sh = cellH / s2; // the middle part of the picture that fills the cell
+          return { w: cellW, h: cellH, src: [(d.w - sw) / 2, (d.h - sh) / 2, sw, sh] };
+        });
+      } else dims = dims.map(function (d) { var s = t / d[key]; return { w: Math.max(1, Math.round(d.w * s)), h: Math.max(1, Math.round(d.h * s)) }; });
+    }
+    var colW = [], rowH = [], i;
+    for (i = 0; i < dims.length; i++) { var c = i % cols, r = Math.floor(i / cols); colW[c] = Math.max(colW[c] || 0, dims[i].cw || dims[i].w); rowH[r] = Math.max(rowH[r] || 0, dims[i].ch || dims[i].h); }
+    if (mode === 'g') { var cw = Math.max.apply(null, colW), rh = Math.max.apply(null, rowH); colW = colW.map(function () { return cw; }); rowH = rowH.map(function () { return rh; }); }
+    var xs = [pad], ys = [pad];
+    for (i = 0; i < cols; i++) xs.push(xs[i] + colW[i] + gap);
+    for (i = 0; i < rows; i++) ys.push(ys[i] + rowH[i] + gap);
+    var W = xs[cols] - gap + pad, H = ys[rows] - gap + pad;
+    var off = function (space, size) { return align === 'start' ? 0 : align === 'end' ? space - size : (space - size) / 2; };
+    var boxes = dims.map(function (d, k) {
+      var c2 = k % cols, r2 = Math.floor(k / cols);
+      if (mode === 'h') return { x: xs[c2], y: ys[r2] + off(rowH[r2], d.h), w: d.w, h: d.h };
+      if (mode === 'v') return { x: xs[c2] + off(colW[c2], d.w), y: ys[r2], w: d.w, h: d.h };
+      return { x: xs[c2] + (colW[c2] - d.w) / 2, y: ys[r2] + (rowH[r2] - d.h) / 2, w: d.w, h: d.h, src: d.src };
+    });
+    return { W: Math.max(1, W), H: Math.max(1, H), boxes: boxes };
+  }
+  function render(ctx, L, s, type) {
+    ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    if (!$('trans').checked || type === 'image/jpeg') { ctx.fillStyle = $('bg').value; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height); }
+    ctx.imageSmoothingQuality = 'high';
+    L.boxes.forEach(function (b, k) { if (b.src) ctx.drawImage(items[k].img, b.src[0], b.src[1], b.src[2], b.src[3], b.x * s, b.y * s, b.w * s, b.h * s); else ctx.drawImage(items[k].img, b.x * s, b.y * s, b.w * s, b.h * s); });
+  }
+  var raf = 0;
+  function draw() {
+    $('dl').hidden = true; syncUi();
+    if (raf) return;
+    raf = requestAnimationFrame(function () {
+      raf = 0; $('stage').hidden = !items.length; if (!items.length) { $('info').textContent = ''; return; }
+      var L = layout(), s = Math.min(1, 1200 / Math.max(L.W, L.H)), cv = $('cv');
+      cv.width = Math.max(1, Math.round(L.W * s)); cv.height = Math.max(1, Math.round(L.H * s));
+      render(cv.getContext('2d'), L, s, $('fmt').value);
+      var big = L.W * L.H > MAX_AREA, f = big ? Math.sqrt(MAX_AREA / (L.W * L.H)) : 1;
+      $('info').textContent = 'Result: ' + Math.floor(L.W * f) + ' × ' + Math.floor(L.H * f) + ' px' + (big ? ' (made smaller so phones can save it)' : '') + '.' + (items.length < 2 ? ' Add at least one more image.' : '');
+    });
+  }
+  function syncUi() {
+    var m = $('layout').value;
+    $('colsW').hidden = m !== 'g'; $('alignW').hidden = m === 'g'; $('cellW').hidden = m !== 'g' || $('match').value === 'off';
+    $('trans').disabled = $('fmt').value === 'image/jpeg'; $('q').disabled = $('fmt').value === 'image/png';
+    $('go').disabled = items.length < 2 || busy; $('clear').hidden = !items.length;
+  }
+  function list() {
+    var ul = $('list'); ul.innerHTML = '';
+    items.forEach(function (it, i) {
+      var li = document.createElement('li'), name = document.createElement('span');
+      name.textContent = (i + 1) + '. ' + it.name + ' (' + it.img.naturalWidth + ' × ' + it.img.naturalHeight + ')';
+      li.appendChild(name);
+      [['↑', 'Move up', i > 0, function () { items.splice(i - 1, 0, items.splice(i, 1)[0]); }],
+       ['↓', 'Move down', i < items.length - 1, function () { items.splice(i + 1, 0, items.splice(i, 1)[0]); }],
+       ['✕', 'Remove', true, function () { items.splice(i, 1); }]].forEach(function (b) {
+        var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0]; btn.setAttribute('aria-label', b[1] + ' ' + it.name); btn.disabled = !b[2];
+        btn.addEventListener('click', function () { if (busy) return; b[3](); list(); draw(); });
+        li.appendChild(btn);
+      });
+      ul.appendChild(li);
+    });
+  }
+  function loadImg(f) { return new Promise(function (res) { loadImage(f, res); }); }
+  PT.drop(true, async function (files) {
+    if (busy) return;
+    var bad = 0, broken = [];
+    for (var f of files) {
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; continue; }
+      var im = await loadImg(f);
+      if (!im || !im.naturalWidth) { broken.push(f.name); continue; }
+      items.push({ name: f.name, size: f.size, img: im });
+    }
+    list(); draw();
+    var n = [];
+    if (items.length) n.push(items.length + (items.length === 1 ? ' image. Add at least one more.' : ' images. Use the arrows to change the order.'));
+    if (bad) n.push('Skipped ' + bad + (bad === 1 ? ' file that is' : ' files that are') + ' not an image.');
+    if (broken.length) n.push('Could not read ' + broken.join(', ') + '.');
+    say(bad || broken.length ? 'bad' : '', n.join(' '));
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) { el.addEventListener('input', draw); el.addEventListener('change', draw); });
+  [['gap', 'gapv'], ['pad', 'padv'], ['q', 'qv']].forEach(function (p) { var f = function () { $(p[1]).textContent = $(p[0]).value; }; $(p[0]).addEventListener('input', f); f(); });
+  $('clear').addEventListener('click', function () { if (busy) return; items = []; list(); draw(); say('', ''); });
+  $('go').addEventListener('click', function () {
+    if (busy || items.length < 2) return;
+    busy = true; syncUi(); say('', 'Merging…');
+    setTimeout(function () {
+      var L = layout(), s = Math.min(1, Math.sqrt(MAX_AREA / (L.W * L.H))), type = $('fmt').value, c = document.createElement('canvas');
+      c.width = Math.max(1, Math.floor(L.W * s)); c.height = Math.max(1, Math.floor(L.H * s));
+      render(c.getContext('2d'), L, s, type);
+      PT.blob(c, type, $('q').value / 100).then(function (b) {
+        c.width = c.height = 0; busy = false; syncUi();
+        if (!b) { say('bad', 'Your browser could not save this image. Try JPG, or fewer or smaller images.'); return; }
+        var name = 'merged-' + items.length + '-images.' + (EXT[b.type] || 'png');
+        if (lastUrl) URL.revokeObjectURL(lastUrl);
+        lastUrl = URL.createObjectURL(b);
+        var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false; a.click(); if (window.burst) burst(a);
+        say('ok', 'Saved ' + name + ' (' + Math.floor(L.W * s) + ' × ' + Math.floor(L.H * s) + ' px, ' + fmtBytes(b.size) + '). If the download did not start, use the green button.');
+      });
+    }, 20);
+  });
+  syncUi();
+})();
+</script>

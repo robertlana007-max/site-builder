@@ -3065,5 +3065,183 @@ module.exports = [
         ['Is my PDF uploaded?', 'No. Everything runs in your browser on your device.']
       ],
       icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="12" cy="14" r="3.5"/><path d="M12 10.5v7a3.5 3.5 0 0 0 0-7z" fill="currentColor"/>'
+  },
+  {
+      slug: 'passport-photo-maker', cat: 'Image tools', name: 'Passport Photo Maker',
+      title: 'Passport Photo Maker - Free Passport & Visa Photos Online',
+      desc: 'Make passport and visa photos for the US, UK, EU, Canada, India, China and more. White background, head guides, 4×6 or A4 print sheet. No upload.',
+      card: 'Passport and visa photos for any country, ready to print.',
+      intro: 'Make a passport or visa photo at home. Choose your country, upload or take a photo, line the face up with the guides, swap the background for white or another colour, and download a single photo or a sheet of copies to print. Your photo never leaves your device.',
+      steps: ['Choose your country and document, for example United States 2 × 2 in or EU / Schengen 35 × 45 mm.', 'Upload a photo or press Take a photo to use your camera.', 'Pick a background colour, then drag and zoom so the top of the head and the chin sit on the guide lines.', 'Download the single photo for online forms, or a 4 × 6 in or A4 sheet with several copies to print.'],
+      faq: [
+        ['Which countries are included?', 'The United States, United Kingdom, EU and Schengen countries, Canada, Australia, India (passport and visa), China, Japan, Pakistan, Saudi Arabia, the United Arab Emirates, Brazil and Nigeria, plus a custom size for anything else.'],
+        ['Will my photo be accepted?', 'The tool gets the size, head height and background right, but the office also checks things like lighting, shadows, expression and glasses. Rules change, so always compare with your government\'s official photo rules before you print or submit.'],
+        ['How do I print it at the right size?', 'Download the 4 × 6 in sheet and print it as a normal 4 × 6 in (10 × 15 cm) photo at any photo shop or kiosk, or print the A4 / Letter PDF at 100% (Actual size), never Fit to page.'],
+        ['How is the background replaced?', 'A small AI model runs in your browser, cuts out the person and puts them on the colour you pick. It downloads once (about 19 MB) and then stays on your device.'],
+        ['Is my photo uploaded?', 'No. Everything, including the background removal, happens in your browser. Nothing is sent to a server.'],
+        ['Can I use my phone camera?', 'Yes. Press Take a photo. Stand in front of a plain wall in even daylight, look straight at the camera with a neutral face, and ask someone else to take it if you can.']
+      ],
+      icon: '<rect x="5" y="2" width="14" height="20" rx="2"/><circle cx="12" cy="10" r="3"/><path d="M7.5 18c.8-2.2 2.5-3.3 4.5-3.3s3.7 1.1 4.5 3.3"/>'
+  },
+  {
+      slug: 'image-upscaler', cat: 'Image tools', name: 'Image Upscaler',
+      title: 'AI Image Upscaler - Enlarge Photos 2x or 4x Free, No Upload',
+      desc: 'Make small or blurry pictures 2× or 4× bigger with AI that adds detail, or with fast Lanczos resizing. Before/after slider. Free and private.',
+      card: 'Enlarge small pictures 2× or 4× with AI.',
+      intro: 'Make a small picture bigger and sharper. Choose 2× or 4×, and an AI model running in your browser adds real detail and removes blur and JPG blocks. A fast mode gives an instant smooth result. Nothing is uploaded.',
+      steps: ['Choose or drop a JPG, PNG or WebP picture.', 'Pick 2× or 4× bigger, and AI (sharpest) or Fast (smooth).', 'Wait for the progress bar, then drag across the picture to compare before and after.', 'Choose PNG, JPG or WebP and press Download bigger image.'],
+      faq: [
+        ['How does the AI upscaler work?', 'It uses Real-ESRGAN, a well-known open-source model for enlarging photos. It runs inside your browser with WebAssembly or WebGPU, so your picture never leaves your device.'],
+        ['How long does it take?', 'A small picture takes a few seconds. A 1000 × 1000 px picture can take one to two minutes on a laptop and longer on an older phone, because all the work happens on your device. A timer shows how long is left, and you can stop at any time.'],
+        ['Is there a size limit?', 'Yes. The AI works on pictures up to about 2 megapixels and the result is kept under 16 megapixels so phones can save it. Bigger pictures are reduced first, and the tool tells you when it does.'],
+        ['What is the difference between AI and Fast?', 'Fast uses Lanczos resizing: instant and smooth but it cannot invent detail. AI rebuilds edges, textures and text, so results look much sharper, but it is slower.'],
+        ['Does it keep transparency?', 'Yes. See-through parts of PNG pictures are kept and enlarged smoothly. Save as PNG or WebP to keep them.'],
+        ['Is it really free and private?', 'Yes. There is no upload, no sign-up and no watermark. The AI files download once (about 17 MB) and then stay in your browser.']
+      ],
+      icon: '<rect x="3" y="11" width="10" height="10" rx="1"/><path d="M14 3h7v7M21 3l-8 8"/>'
+  },
+  {
+      slug: 'rotate-flip-image', cat: 'Image tools', name: 'Rotate & Flip Image',
+      title: 'Rotate Image Online - Rotate 90°, Any Angle & Flip, Free',
+      desc: 'Rotate pictures 90°, 180° or any angle and flip them horizontally or vertically. Batch rotate many images and download a ZIP. No upload.',
+      card: 'Rotate by any angle and mirror pictures in bulk.',
+      intro: 'Turn sideways photos the right way up, straighten a tilted horizon or mirror a picture. Rotate by 90 or 180 degrees or by any angle, flip horizontally or vertically, and apply the same change to many pictures at once. Nothing is uploaded.',
+      steps: ['Choose or drop one or more pictures.', 'Press Rotate left, Rotate right, 180° or a Flip button, or set any angle with the slider.', 'For tilted angles, choose whether to fill or crop the empty corners.', 'Download this image, or all of them as a ZIP.'],
+      faq: [
+        ['Can I rotate many pictures at once?', 'Yes. Add as many as you like. The same rotation and flip are used for all of them, and "Download all as ZIP" saves them together.'],
+        ['Does rotating reduce quality?', 'PNG keeps every pixel exactly. JPG and WebP are saved again at the quality you choose (92% by default), which looks the same to the eye.'],
+        ['How do I straighten a crooked photo?', 'Move the "Any angle" slider or type an angle such as 2.5, then choose "Crop off the empty corners" so no blank triangles are left.'],
+        ['What happens to the corners when I rotate by an odd angle?', 'Either the picture is made bigger so all of it shows, with corners filled transparent, white, black or your colour, or the corners are cropped away.'],
+        ['Is my picture uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 3v6h-6"/><path d="M12 8v8M8 12h8" stroke-dasharray="2 2"/>'
+  },
+  {
+      slug: 'image-splitter', cat: 'Image tools', name: 'Image Splitter',
+      title: 'Image Splitter - Split Image into Grid, Strips or Carousel',
+      desc: 'Cut a picture into a grid of rows and columns, equal strips, or a seamless Instagram carousel panorama. Download all pieces in a ZIP. Free, no upload.',
+      card: 'Cut a picture into a grid, strips or carousel slides.',
+      intro: 'Split one picture into equal pieces: a 3 × 3 grid, horizontal or vertical strips, or slides for a seamless Instagram carousel. The pieces are numbered and saved in a ZIP. Your picture never leaves your device.',
+      steps: ['Choose or drop a picture.', 'Pick how to split: grid, Instagram carousel, horizontal strips or vertical strips.', 'Set the rows, columns or number of slides and check the cut lines on the preview.', 'Press Split and download ZIP, or tap a piece to save it on its own.'],
+      faq: [
+        ['How do I make a seamless Instagram carousel?', 'Choose "Instagram carousel (panorama)", the number of slides and the slide shape. The middle of your picture is cropped to fit exactly, then cut into slides of 1080 px wide. Post them in number order.'],
+        ['Are the pieces exactly equal?', 'Yes, to the nearest pixel. If the size does not divide evenly, some pieces are one pixel wider or taller, so no part of the picture is lost.'],
+        ['Does splitting reduce quality?', 'No for PNG. JPG and WebP pieces use the quality you choose. Grid and strip pieces are cut from the full-size picture.'],
+        ['How many pieces can I make?', 'Up to 20 rows and 20 columns, so up to 400 pieces.'],
+        ['Is my picture uploaded?', 'No. It is cut in your browser.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/>'
+  },
+  {
+      slug: 'merge-images', cat: 'Image tools', name: 'Merge Images',
+      title: 'Merge Images Online - Combine Photos Side by Side or Grid',
+      desc: 'Join two or more pictures side by side, top to bottom or in a grid. Match sizes, add spacing, borders and a background colour. Free, no upload.',
+      card: 'Join pictures side by side, stacked or in a grid.',
+      intro: 'Combine several pictures into one. Put them side by side, stack them top to bottom or arrange them in a grid, make them the same size, and add space and a background colour between them. Your pictures never leave your device.',
+      steps: ['Choose or drop two or more pictures.', 'Use the arrows to put them in order.', 'Pick a layout and adjust size matching, spacing, border and background.', 'Choose JPG, PNG or WebP and press Merge and download.'],
+      faq: [
+        ['How many pictures can I merge?', 'As many as you like. Very large results are reduced to about 16 megapixels so phones can save them, and the size is shown before you download.'],
+        ['Can the pictures be different sizes?', 'Yes. "Make them the same size" scales them to match the largest or smallest, or choose "No, keep each size" and line them up at the top, centre or bottom.'],
+        ['Can I make a before-and-after picture?', 'Yes. Add two pictures, choose "Side by side" and a small space between them.'],
+        ['Can the background be see-through?', 'Yes. Tick "See-through" and save as PNG or WebP.'],
+        ['Are my pictures uploaded?', 'No. They are joined in your browser.']
+      ],
+      icon: '<rect x="2" y="5" width="9" height="14" rx="1"/><rect x="13" y="5" width="9" height="14" rx="1"/>'
+  },
+  {
+      slug: 'photo-to-sketch', cat: 'Image tools', name: 'Photo to Sketch',
+      title: 'Photo to Sketch - Pencil, Cartoon & Oil Painting Effects Free',
+      desc: 'Turn photos into pencil sketches, colour pencil drawings, cartoons, oil paintings, posters or line art. Adjust strength and compare. No upload.',
+      card: 'Turn photos into sketches, cartoons and paintings.',
+      intro: 'Turn a photo into art. Choose pencil sketch, colour pencil, cartoon, oil painting, posterize or line art, adjust the sliders, drag to compare with the original and download the full-size picture. Your photo never leaves your device.',
+      steps: ['Choose or drop a photo.', 'Pick an effect: pencil sketch, colour pencil, cartoon, oil painting, posterize or line art.', 'Move the sliders and drag across the picture to compare with the original.', 'Choose JPG, PNG or WebP and press Download artwork.'],
+      faq: [
+        ['Which effects are there?', 'Pencil sketch, colour pencil, cartoon, oil painting, posterize and line art. Each has two sliders, and "Effect amount" blends with the original photo.'],
+        ['Does it use AI?', 'No. The effects are classic image filters running in your browser, so they are fast and work offline.'],
+        ['What size is the result?', 'The same size as your photo, up to about 8 megapixels. Larger photos are saved at about 8 megapixels so phones do not run out of memory.'],
+        ['Which photos work best?', 'Clear, well-lit photos with a simple background. Portraits, pets and buildings look great as sketches and line art.'],
+        ['Is my photo uploaded?', 'No. Everything happens on your device.']
+      ],
+      icon: '<path d="M3 21l3.5-1 12-12a2.1 2.1 0 0 0-3-3l-12 12z"/><path d="M14 6l3 3M14 21h7"/>'
+  },
+  {
+      slug: 'exif-remover', cat: 'Image tools', name: 'EXIF Remover',
+      title: 'EXIF Remover - View & Remove Photo Metadata and GPS Location',
+      desc: 'See hidden photo data such as camera, date and GPS location, then remove all metadata without losing quality. Batch clean and ZIP. No upload.',
+      card: 'See and remove hidden photo data like GPS location.',
+      intro: 'Photos hide extra data: the camera, the date and often the exact place they were taken. See what your photos contain, then remove it all before you share them. JPG, PNG and WebP are cleaned without changing a single pixel. Nothing is uploaded.',
+      steps: ['Choose or drop one or more photos.', 'Read what each photo contains, including any GPS location.', 'Press Remove metadata and download, or Clean all and download ZIP.', 'Share the clean copies instead of the originals.'],
+      faq: [
+        ['What is EXIF data?', 'Extra information saved inside a photo by the camera or phone: make and model, date and time, settings like exposure and ISO, and often GPS coordinates of where it was taken. Editing apps add more, such as XMP and comments.'],
+        ['Does removing it lower the quality?', 'No. JPG, PNG and WebP files are cleaned by removing the data blocks only, so the picture itself is not re-compressed. Other formats are saved as a fresh PNG.'],
+        ['Will my phone photos end up sideways?', 'No. If a photo uses the rotation setting, a tiny block with only the rotation is kept, so it still shows the right way up. It holds no personal information.'],
+        ['What about the colour profile?', 'It is kept by default because it holds no personal data and keeps colours correct. Untick the box to remove it too.'],
+        ['Are my photos uploaded?', 'No. They are read and cleaned in your browser.']
+      ],
+      icon: '<path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><path d="M9 7l6 6M15 7l-6 6"/>'
+  },
+  {
+      slug: 'svg-to-png', cat: 'Image tools', name: 'SVG to PNG Converter',
+      title: 'SVG to PNG Converter - SVG to JPG at Any Size, PNG to SVG',
+      desc: 'Convert SVG to sharp PNG, JPG or WebP at any size, or paste SVG code. Second tab turns PNG or JPG logos into SVG vectors. Free, no upload.',
+      card: 'SVG to PNG or JPG at any size, and PNG to SVG.',
+      intro: 'Turn an SVG file or SVG code into a crisp PNG, JPG or WebP at exactly the size you need, with a see-through or coloured background. The second tab does the opposite: it traces a PNG or JPG logo into a scalable SVG. Nothing is uploaded.',
+      steps: ['Choose the SVG → PNG / JPG tab and drop an SVG file or paste SVG code.', 'Pick a scale or an exact width or height, the format and the background.', 'Press Convert and download.', 'For PNG / JPG → SVG, open the second tab, drop a picture, adjust colours and detail, and download the SVG.'],
+      faq: [
+        ['Will the PNG be sharp?', 'Yes. The SVG is drawn directly at the size you choose, not enlarged from a small picture, so edges stay crisp even at 8× or 4000 px.'],
+        ['What is the largest size?', 'Up to 16,000 px on the longest side and about 40 megapixels in total, which is the limit browsers can handle.'],
+        ['Why do some parts of my SVG not show?', 'Pictures or fonts linked from the internet inside the SVG are not loaded, for privacy and security. Embed images in the SVG, or convert text to outlines in your design app.'],
+        ['How good is PNG to SVG?', 'Tracing works best on logos, icons, signatures and drawings with clear shapes and few colours. Photos become large files with a painted look.'],
+        ['Are my files uploaded?', 'No. Converting and tracing happen in your browser.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M8.5 16.5l2-3 1.5 2 1.5-2.5 2 3.5z"/>'
+  },
+  {
+      slug: 'favicon-generator', cat: 'Image tools', name: 'Favicon Generator',
+      title: 'Favicon Generator - favicon.ico, Apple & Android Icons Free',
+      desc: 'Make favicon.ico, apple-touch-icon, Android icons and site.webmanifest from an image, text or emoji. Get the HTML code and a ZIP. No upload.',
+      card: 'Make favicon.ico and app icons from an image or text.',
+      intro: 'Create every icon a website needs in one go: favicon.ico with 16, 32 and 48 px sizes, PNG favicons, the Apple touch icon, Android icons and the web manifest. Start from your logo, a few letters or an emoji, then copy the ready-made HTML. Nothing is uploaded.',
+      steps: ['Choose Image, Text or Emoji and add your logo, letters or emoji.', 'Pick the shape, background colour and padding, and check the previews.', 'Type your website name and theme colour.', 'Download all as a ZIP and paste the HTML code into the head of your pages.'],
+      faq: [
+        ['What files do I get?', 'favicon.ico (16, 32 and 48 px), favicon-16x16.png, favicon-32x32.png, favicon-48x48.png, apple-touch-icon.png (180 px), android-chrome-192x192.png, android-chrome-512x512.png, site.webmanifest and a text file with the HTML code.'],
+        ['Where do I put the files?', 'Unzip them into the main (root) folder of your website, next to your home page, then paste the HTML code into the <head> of every page.'],
+        ['Why does the Apple icon have a background?', 'iPhones put black behind see-through icons, so the Apple touch icon always gets a solid background: your colour, or white if you chose see-through.'],
+        ['What picture works best?', 'A square logo of at least 512 × 512 px with simple shapes. Fine detail disappears at 16 px, so a single letter or symbol often works better.'],
+        ['Is my logo uploaded?', 'No. All icons are made in your browser.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/><rect x="6" y="12" width="4" height="4" rx="1"/><path d="M13 13h5M13 16h3"/>'
+  },
+  {
+      slug: 'color-palette-from-image', cat: 'Image tools', name: 'Color Palette from Image',
+      title: 'Color Palette from Image - Extract HEX & RGB Colors Free',
+      desc: 'Find the main colours in any photo or logo. Get HEX, RGB and HSL codes, copy them or as CSS, pick any pixel and download a palette PNG. No upload.',
+      card: 'Find the main colours in a picture, with HEX codes.',
+      intro: 'Find the main colours of any photo, logo or screenshot. Choose how many colours you want, copy their HEX or RGB codes, tap the picture to pick any single colour, and download the palette as a PNG. Nothing is uploaded.',
+      steps: ['Choose or drop a picture.', 'Pick how many colours to find and how to sort them.', 'Copy any HEX or RGB code, or tap the picture to pick a single colour.', 'Copy all codes or CSS variables, or download the palette PNG.'],
+      faq: [
+        ['How are the colours found?', 'The tool groups similar pixels together (k-means clustering) and shows the average colour of each group, with the share of the picture it covers.'],
+        ['Why do I get fewer colours than I asked for?', 'Shades that look the same are joined, so a flat logo with three colours shows three, not sixteen near-identical shades.'],
+        ['Does it ignore transparent parts?', 'Yes. See-through pixels in PNG and WebP pictures are left out.'],
+        ['Can I pick the exact colour of one spot?', 'Yes. Tap or click anywhere on the picture to read that pixel\'s HEX and RGB code.'],
+        ['Is my picture uploaded?', 'No. The colours are found in your browser.']
+      ],
+      icon: '<path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.7-.9 1.4-1.8-.3-.9.3-1.8 1.3-1.8H17a4 4 0 0 0 4-4c0-5.5-4-10.4-9-10.4z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>'
+  },
+  {
+      slug: 'round-corners-image', cat: 'Image tools', name: 'Round Corners Image',
+      title: 'Round Image Corners Online - Circle Crop, Border & Shadow',
+      desc: 'Give pictures rounded corners or crop them to a circle or oval. Add a border and soft shadow, and save a transparent PNG. Free, no upload.',
+      card: 'Rounded corners, circle crops, borders and shadows.',
+      intro: 'Round the corners of any picture, or crop it into a circle or an oval. Add a coloured border and a soft shadow, and save a PNG with see-through corners, ready for websites, slides and profile pictures. Nothing is uploaded.',
+      steps: ['Choose or drop a picture.', 'Pick Rounded corners, Circle or Oval and set the roundness.', 'Add a border and shadow if you like, and choose the background.', 'Choose PNG, WebP or JPG and press Download image.'],
+      faq: [
+        ['Will the corners be see-through?', 'Yes, when you save as PNG or WebP with "See-through" ticked. JPG cannot be see-through, so it uses the background colour.'],
+        ['How do I make a round profile picture?', 'Choose "Circle". The largest circle from the middle is used; for a wide or tall picture, move "Circle position" to centre the face.'],
+        ['Does it lower the quality?', 'No. The picture is used at full size (up to about 16 megapixels) and PNG keeps every pixel.'],
+        ['What does the shadow do?', 'It adds a soft drop shadow under the picture and makes the canvas a little bigger so the shadow fits.'],
+        ['Is my picture uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="6"/><circle cx="12" cy="12" r="4"/>'
   }
 ];
