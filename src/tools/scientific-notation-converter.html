@@ -1,0 +1,132 @@
+<style>
+.snc .snc-out { display: grid; gap: 10px; margin-top: 16px; }
+.snc .snc-row { display: flex; align-items: center; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.snc .snc-row div { flex: 1; min-width: 0; }
+.snc .snc-row span { display: block; font-size: 13px; color: var(--muted); }
+.snc .snc-row b { display: block; font: 600 20px/1.35 var(--mono, ui-monospace, monospace); overflow-wrap: anywhere; }
+.snc .snc-row button { flex: none; }
+.snc .snc-sig { font: 600 22px/1.6 var(--mono, ui-monospace, monospace); overflow-wrap: anywhere; margin: 6px 0; }
+.snc .snc-sig .s { color: var(--accent); border-bottom: 3px solid var(--accent); }
+.snc .snc-sig .n { color: var(--muted); }
+.snc .snc-sig .a { color: #b7791f; border-bottom: 3px dotted #b7791f; }
+.snc h3 { font-size: 15px; margin: 20px 0 6px; }
+.snc .snc-ex { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+.snc .snc-ex button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 4px 12px; cursor: pointer; min-height: 34px; }
+.snc .snc-ex button:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+<div class="snc" id="snc">
+<label for="snIn">Number in any form</label>
+<input type="text" id="snIn" inputmode="text" maxlength="400" autocomplete="off" spellcheck="false" placeholder="e.g. 0.000452, 6.02 × 10^23, 3.1e-7 or 45,000,000">
+<div class="snc-ex" id="snEx"><button type="button">299792458</button><button type="button">0.0000056</button><button type="button">6.022 × 10^23</button><button type="button">1.6e-19</button><button type="button">-4500</button><button type="button">45.0300</button></div>
+<div class="fields">
+  <div><label for="snSig">Significant figures</label><select id="snSig"><option value="keep">Keep as typed</option><option>1</option><option>2</option><option selected>3</option><option>4</option><option>5</option><option>6</option><option>8</option><option>10</option><option>15</option></select></div>
+  <div><label for="snSym">Multiply sign</label><select id="snSym"><option value="×">× (school)</option><option value="·">· (dot)</option><option value="x">x (plain text)</option></select></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="snc-out" id="snOut"></div>
+<h3>Significant figures in what you typed</h3>
+<div class="snc-sig" id="snSigView">–</div>
+<p class="msg" id="snSigTxt" style="margin-top:0"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  var SUP = { '-': '⁻', '0': '⁰', '1': '¹', '2': '²', '3': '³', '4': '⁴', '5': '⁵', '6': '⁶', '7': '⁷', '8': '⁸', '9': '⁹' };
+  var SI = { '-30': ['q', 'quecto'], '-27': ['r', 'ronto'], '-24': ['y', 'yocto'], '-21': ['z', 'zepto'], '-18': ['a', 'atto'], '-15': ['f', 'femto'], '-12': ['p', 'pico'], '-9': ['n', 'nano'], '-6': ['µ', 'micro'], '-3': ['m', 'milli'], '0': ['', ''], '3': ['k', 'kilo'], '6': ['M', 'mega'], '9': ['G', 'giga'], '12': ['T', 'tera'], '15': ['P', 'peta'], '18': ['E', 'exa'], '21': ['Z', 'zetta'], '24': ['Y', 'yotta'], '27': ['R', 'ronna'], '30': ['Q', 'quetta'] };
+  function sup(n) { return String(n).split('').map(function (c) { return SUP[c] || c; }).join(''); }
+  function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  // Read a number into { neg, digits (string of significant digit candidates), exp } where value = 0.digits... handled as: value = digits × 10^exp
+  function parse(raw) {
+    var s = String(raw).trim().replace(/[\s_']/g, '').replace(/[−–]/g, '-').replace(/\*\*/g, '^').replace(/[⁰¹²³⁴⁵⁶⁷⁸⁹⁻]+/g, function (m) { return '^' + m.split('').map(function (c) { for (var k in SUP) if (SUP[k] === c) return k; return c; }).join(''); });
+    if (!s) return null;
+    var m = /^([+-]?)(\d[\d,]*\.?\d*|\.\d+)(?:(?:[eE])([+-]?\d+)|(?:[x×·*]10\^?\(?([+-]?\d+)\)?))?$/.exec(s);
+    if (!m) { var m2 = /^([+-]?)10\^\(?([+-]?\d+)\)?$/.exec(s); if (m2) m = [s, m2[1], '1', m2[2]]; }
+    if (!m) return null;
+    var num = m[2];
+    if (/,/.test(num)) { if (/^\d{1,3}(,\d{3})+(\.\d*)?$/.test(num)) num = num.replace(/,/g, ''); else if (/^\d+,\d+$/.test(num) && !/\./.test(num)) num = num.replace(',', '.'); else return null; }
+    var e = parseInt(m[3] != null ? m[3] : m[4] != null ? m[4] : '0', 10);
+    if (Math.abs(e) > 1e6) return { big: true };
+    var parts = num.split('.'), ip = parts[0] || '', fp = parts[1] || '', hasPt = num.indexOf('.') >= 0;
+    var all = ip + fp, exp = e - fp.length, lead = all.match(/^0*/)[0].length, digits = all.slice(lead);
+    return { neg: m[1] === '-', digits: digits, exp: exp, ip: ip, fp: fp, hasPt: hasPt, sciIn: m[3] != null || m[4] != null, zero: !digits.replace(/0/g, '').length };
+  }
+  // count significant figures the usual school way
+  function sigInfo(p) {
+    if (p.zero) return { n: p.hasPt && p.fp ? p.fp.length : 1, amb: false };
+    var d = p.digits;
+    if (p.sciIn || p.hasPt) return { n: d.length, amb: false }; // trailing zeros after a decimal point count
+    var t = d.length - d.replace(/0+$/, '').length;
+    return { n: d.length - t, amb: t > 0, max: d.length };
+  }
+  function roundDigits(d, n) { // round digit string d to n digits, half up; returns { d, carry }
+    if (d.length <= n) return { d: d + '0'.repeat(n - d.length), shift: 0 };
+    var keep = d.slice(0, n), up = +d[n] >= 5;
+    if (!up) return { d: keep, shift: 0 };
+    var r = (BigInt(keep) + BigInt(1)).toString();
+    if (r.length > n) return { d: r.slice(0, n), shift: 1 };
+    return { d: r, shift: 0 };
+  }
+  function convert() {
+    var raw = $('snIn').value, p = parse(raw), out = $('snOut'), x = $('snSym').value, msg = $('msg');
+    out.innerHTML = ''; $('snSigView').textContent = '–'; $('snSigTxt').textContent = '';
+    msg.className = 'msg';
+    if (!raw.trim()) { msg.textContent = 'Type a number above, in normal or scientific form.'; return; }
+    if (!p) { msg.className = 'msg bad'; msg.textContent = 'That does not look like a number. Try 0.00045, 4.5 × 10^-4 or 4.5e-4.'; return; }
+    if (p.big) { msg.className = 'msg bad'; msg.textContent = 'That power of ten is too large to work with here.'; return; }
+    msg.textContent = '';
+    var si = sigInfo(p), sel = $('snSig').value, n = sel === 'keep' ? Math.max(1, si.n) : +sel, sign = p.neg && !p.zero ? '−' : '', plainSign = p.neg && !p.zero ? '-' : '';
+    var mant, E;
+    if (p.zero) { mant = '0' + (n > 1 ? '.' + '0'.repeat(n - 1) : ''); E = 0; }
+    else {
+      var r = roundDigits(p.digits, n);
+      E = p.digits.length - 1 + p.exp + r.shift;
+      mant = r.d[0] + (n > 1 ? '.' + r.d.slice(1) : '');
+    }
+    var md = mant.replace('.', ''), eng = E - (((E % 3) + 3) % 3), shift = E - eng;
+    var engM = md.slice(0, 1 + shift).padEnd(1 + shift, '0') + (md.length > 1 + shift ? '.' + md.slice(1 + shift) : '');
+    // standard (decimal) form from the rounded digits
+    var dec, point = E + 1;
+    if (Math.abs(E) > 300) dec = null;
+    else if (point <= 0) dec = '0.' + '0'.repeat(-point) + md;
+    else if (point >= md.length) dec = md + '0'.repeat(point - md.length);
+    else dec = md.slice(0, point) + '.' + md.slice(point);
+    if (dec && point > 0) { var di = dec.split('.'); di[0] = di[0].replace(/\B(?=(\d{3})+(?!\d))/g, ','); dec = di.join('.'); }
+    var rows = [
+      ['Scientific notation', sign + mant + ' ' + x + ' 10' + sup(E), plainSign + mant + ' x 10^' + E],
+      ['E notation (calculators, Excel, code)', plainSign + mant + 'E' + (E < 0 ? '' : '+') + E, plainSign + mant + 'E' + (E < 0 ? '' : '+') + E],
+      ['Engineering notation', sign + engM + ' ' + x + ' 10' + sup(eng), plainSign + engM + ' x 10^' + eng],
+      ['Standard form (decimal)', dec == null ? 'Too long to write out (' + Math.abs(E) + ' zeros)' : sign + dec, dec == null ? '' : plainSign + dec.replace(/,/g, '')]
+    ];
+    if (SI[eng] && eng !== 0) rows.splice(3, 0, ['With an SI prefix', sign + engM + ' ' + SI[eng][0] + '  (' + SI[eng][1] + ')', plainSign + engM + ' ' + SI[eng][0]]);
+    rows.forEach(function (r) {
+      var d = document.createElement('div'); d.className = 'snc-row';
+      d.innerHTML = '<div><span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b></div>' + (r[2] ? '<button type="button" class="btn ghost">Copy</button>' : '');
+      if (r[2]) d.querySelector('button').addEventListener('click', function () { copyText(r[1].indexOf('Too long') === 0 ? r[2] : (x === 'x' ? r[2] : r[1]), this); });
+      out.appendChild(d);
+    });
+    if (sel !== 'keep' && !p.zero && n < si.n) { msg.textContent = 'Rounded from ' + si.n + ' to ' + n + ' significant figures (5 and above rounds up).'; }
+    else if (sel !== 'keep' && n > si.n && !p.zero) { msg.textContent = 'You asked for more significant figures than you typed, so zeros were added. Only do this if you really know those digits.'; }
+    // highlight significant digits of the input
+    var shown = (p.neg ? '−' : '') + (p.ip || (p.hasPt ? '' : '')) + (p.hasPt ? '.' : '') + p.fp, html = '', seenNZ = false, lastNZ = -1, digitsOnly = (p.ip + p.fp);
+    for (var i = digitsOnly.length - 1; i >= 0; i--) if (digitsOnly[i] !== '0') { lastNZ = i; break; }
+    var idx = 0;
+    shown.split('').forEach(function (ch) {
+      if (!/\d/.test(ch)) { html += '<span>' + esc(ch) + '</span>'; return; }
+      var cls;
+      if (p.zero) cls = p.hasPt && idx >= p.ip.length ? 's' : (idx === digitsOnly.length - 1 && !p.fp ? 's' : 'n');
+      else if (ch !== '0') { cls = 's'; seenNZ = true; }
+      else if (!seenNZ) cls = 'n';
+      else if (idx < lastNZ) cls = 's';
+      else cls = p.hasPt || p.sciIn ? 's' : 'a';
+      html += '<span class="' + cls + '">' + ch + '</span>'; idx++;
+    });
+    if (p.sciIn) html += '<span class="n"> ' + x + ' 10' + esc(sup(p.exp + p.fp.length)) + '</span>';
+    $('snSigView').innerHTML = html;
+    $('snSigTxt').textContent = p.zero ? 'Zero: only zeros written after a decimal point count as significant.' : si.amb ? si.n + ' significant figures, or up to ' + si.max + ' if the trailing zeros were measured (dotted). Write it in scientific notation, like ' + mant.replace(/\.?0+$/, '') + ' × 10' + sup(E) + ', to make it clear.' : si.n + ' significant figure' + (si.n === 1 ? '' : 's') + ' (underlined). Leading zeros never count; zeros between digits always count; trailing zeros count when there is a decimal point.';
+  }
+  $('snIn').addEventListener('input', convert); $('snSig').addEventListener('change', convert); $('snSym').addEventListener('change', convert);
+  $('snEx').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $('snIn').value = b.textContent; $('snSig').value = 'keep'; convert(); });
+  if (!$('snIn').value) $('snIn').value = '0.000452';
+  convert();
+})();
+</script>

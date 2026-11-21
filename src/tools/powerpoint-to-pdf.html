@@ -1,0 +1,852 @@
+<style>
+.p2p-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; margin-top: 12px; }
+.p2p-thumbs figure { margin: 0; font-size: 12px; color: var(--muted); text-align: center; }
+.p2p-thumbs img { width: 100%; height: auto; display: block; border: 1px solid var(--line); border-radius: 6px; background: #fff; margin-bottom: 3px; }
+.p2p-skip { font-size: 13px; color: var(--muted); margin: 6px 0 0; padding-left: 18px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PowerPoint file (.pptx) here</b>Every slide becomes a PDF page, on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept=".pptx,.ppsx,.potx,.pptm,application/vnd.openxmlformats-officedocument.presentationml.presentation" hidden>
+<div class="checks"><label><input type="checkbox" id="hidden"> Include hidden slides</label></div>
+<div class="btns"><button class="btn" id="go" disabled>Make PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<ul class="p2p-skip" id="skips" hidden></ul>
+<div class="p2p-thumbs" id="thumbs"></div>
+<p class="msg">Text, pictures, shapes, tables, backgrounds and SmartArt are drawn on the page with the Noto Sans font, so text can look a little different from your fonts and may wrap differently. Animations, transitions, videos and sound are left out (a video shows its cover picture). Charts, 3D models, equations and some special effects cannot be drawn and are marked on the page. For an exact copy, use File › Export › PDF in PowerPoint, Keynote or LibreOffice.</p>
+<script src="../assets/vendor/jszip/jszip.min.js"></script>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, busy = false, fontBytes = null, thumbUrls = [], EMU = 12700; // EMU per point
+  var PL = PDFLib;
+
+  // ---------- small XML helpers (namespace-free, by local name) ----------
+  function kids(el, name) { var out = []; if (!el) return out; for (var c = el.firstElementChild; c; c = c.nextElementSibling) if (!name || c.localName === name) out.push(c); return out; }
+  function kid(el, name) { if (!el) return null; for (var c = el.firstElementChild; c; c = c.nextElementSibling) if (c.localName === name) return c; return null; }
+  function path(el, p) { p.split('/').forEach(function (n) { el = kid(el, n); }); return el; }
+  function attr(el, n, d) { if (!el) return d; var v = el.getAttribute(n); return v === null ? d : v; }
+  function nattr(el, n, d) { var v = attr(el, n, null); return v === null || isNaN(+v) ? d : +v; }
+  function rid(el, n) { if (!el) return null; for (var i = 0; i < el.attributes.length; i++) { var a = el.attributes[i]; if (a.localName === n && /relationships/.test(a.namespaceURI || '')) return a.value; } return attr(el, 'r:' + n, null); }
+
+  // ---------- package ----------
+  var zip, parts = {};
+  async function xml(p) {
+    if (parts[p] !== undefined) return parts[p];
+    var f = zip.file(p);
+    if (!f) return (parts[p] = null);
+    var doc = new DOMParser().parseFromString(await f.async('string'), 'application/xml');
+    return (parts[p] = doc.getElementsByTagName('parsererror').length ? null : doc.documentElement);
+  }
+  function resolve(base, target) {
+    if (/^\//.test(target)) return target.slice(1);
+    var dir = base.split('/'); dir.pop();
+    target.split('/').forEach(function (s) { if (s === '..') dir.pop(); else if (s !== '.') dir.push(s); });
+    return dir.join('/');
+  }
+  async function rels(p) {
+    var i = p.lastIndexOf('/'), rp = p.slice(0, i) + '/_rels/' + p.slice(i + 1) + '.rels', r = await xml(rp), out = {};
+    kids(r, 'Relationship').forEach(function (x) { out[attr(x, 'Id')] = { type: attr(x, 'Type', ''), target: attr(x, 'TargetMode') === 'External' ? null : resolve(p, attr(x, 'Target', '')) }; });
+    return out;
+  }
+  function relOfType(rs, re) { for (var k in rs) if (re.test(rs[k].type)) return rs[k].target; return null; }
+
+  // ---------- colours ----------
+  function hexRgb(h) { h = (h || '000000').replace('#', ''); return { r: parseInt(h.slice(0, 2), 16) / 255, g: parseInt(h.slice(2, 4), 16) / 255, b: parseInt(h.slice(4, 6), 16) / 255, a: 1 }; }
+  var PRESET = { black: '000000', white: 'FFFFFF', red: 'FF0000', green: '008000', blue: '0000FF', yellow: 'FFFF00', gray: '808080', grey: '808080', orange: 'FFA500', darkBlue: '00008B', darkRed: '8B0000', darkGreen: '006400', lightGray: 'D3D3D3', navy: '000080', purple: '800080' };
+  function toHsl(c) { var mx = Math.max(c.r, c.g, c.b), mn = Math.min(c.r, c.g, c.b), l = (mx + mn) / 2, h = 0, s = 0, d = mx - mn; if (d) { s = l > 0.5 ? d / (2 - mx - mn) : d / (mx + mn); h = mx === c.r ? (c.g - c.b) / d + (c.g < c.b ? 6 : 0) : mx === c.g ? (c.b - c.r) / d + 2 : (c.r - c.g) / d + 4; h /= 6; } return [h, s, l]; }
+  function fromHsl(h, s, l, a) { function f(p, q, t) { if (t < 0) t += 1; if (t > 1) t -= 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; } if (!s) return { r: l, g: l, b: l, a: a }; var q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q; return { r: f(p, q, h + 1 / 3), g: f(p, q, h), b: f(p, q, h - 1 / 3), a: a }; }
+  function clamp(v) { return Math.max(0, Math.min(1, v)); }
+  // ctx: { theme, map, ph } ; el is an element that holds one colour child (solidFill, fgClr, a:fontRef …)
+  function color(el, ctx) {
+    if (!el) return null;
+    var c = null, node = null;
+    for (var ch = el.firstElementChild; ch && !c; ch = ch.nextElementSibling) {
+      var n = ch.localName; node = ch;
+      if (n === 'srgbClr') c = hexRgb(attr(ch, 'val'));
+      else if (n === 'sysClr') c = hexRgb(attr(ch, 'lastClr', attr(ch, 'val') === 'window' ? 'FFFFFF' : '000000'));
+      else if (n === 'prstClr') c = hexRgb(PRESET[attr(ch, 'val')] || '000000');
+      else if (n === 'scrgbClr') c = { r: nattr(ch, 'r', 0) / 1e5, g: nattr(ch, 'g', 0) / 1e5, b: nattr(ch, 'b', 0) / 1e5, a: 1 };
+      else if (n === 'hslClr') c = fromHsl(nattr(ch, 'hue', 0) / 21600000, nattr(ch, 'sat', 0) / 1e5, nattr(ch, 'lum', 0) / 1e5, 1);
+      else if (n === 'schemeClr') {
+        var v = attr(ch, 'val');
+        if (v === 'phClr') c = ctx.ph ? Object.assign({}, ctx.ph) : hexRgb('000000');
+        else { v = ctx.map[v] || v; c = Object.assign({}, ctx.theme.colors[v] || hexRgb('000000')); }
+      }
+    }
+    if (!c) return null;
+    kids(node).forEach(function (m) {
+      var v = nattr(m, 'val', 0) / 1e5, hsl;
+      switch (m.localName) {
+        case 'alpha': c.a = v; break;
+        case 'lumMod': hsl = toHsl(c); c = fromHsl(hsl[0], hsl[1], clamp(hsl[2] * v), c.a); break;
+        case 'lumOff': hsl = toHsl(c); c = fromHsl(hsl[0], hsl[1], clamp(hsl[2] + v), c.a); break;
+        case 'satMod': hsl = toHsl(c); c = fromHsl(hsl[0], clamp(hsl[1] * v), hsl[2], c.a); break;
+        case 'tint': c = { r: c.r + (1 - c.r) * (1 - v), g: c.g + (1 - c.g) * (1 - v), b: c.b + (1 - c.b) * (1 - v), a: c.a }; break;
+        case 'shade': c = { r: c.r * v, g: c.g * v, b: c.b * v, a: c.a }; break;
+      }
+    });
+    return c;
+  }
+  function rgb(c) { return PL.rgb(clamp(c.r), clamp(c.g), clamp(c.b)); }
+  function css(c) { return 'rgb(' + Math.round(clamp(c.r) * 255) + ',' + Math.round(clamp(c.g) * 255) + ',' + Math.round(clamp(c.b) * 255) + ')'; }
+
+  // ---------- fills and lines ----------
+  // returns null (no fill), {c: colour} or {img: rId}
+  function fillOf(el, ctx) {
+    if (!el) return undefined;
+    for (var ch = el.firstElementChild; ch; ch = ch.nextElementSibling) {
+      var n = ch.localName;
+      if (n === 'noFill') return null;
+      if (n === 'solidFill') return { c: color(ch, ctx) };
+      if (n === 'gradFill') {
+        var stops = kids(kid(ch, 'gsLst'), 'gs').map(function (g) { return color(g, ctx); }).filter(Boolean);
+        if (!stops.length) return null;
+        var s = { r: 0, g: 0, b: 0, a: 0 }; stops.forEach(function (c) { s.r += c.r; s.g += c.g; s.b += c.b; s.a += c.a; });
+        return { c: { r: s.r / stops.length, g: s.g / stops.length, b: s.b / stops.length, a: s.a / stops.length } };
+      }
+      if (n === 'pattFill') return { c: color(kid(ch, 'fgClr'), ctx) || hexRgb('000000') };
+      if (n === 'blipFill') { var b = kid(ch, 'blip'); return { img: rid(b, 'embed'), src: kid(ch, 'srcRect') }; }
+      if (n === 'grpFill') return ctx.grpFill === undefined ? null : ctx.grpFill;
+    }
+    return undefined;
+  }
+  function themeFill(idx, refEl, ctx) {
+    if (!idx) return null;
+    var list = idx >= 1000 ? ctx.theme.bgFills : ctx.theme.fills, f = list[(idx >= 1000 ? idx - 1000 : idx) - 1];
+    if (!f) return refEl ? { c: color(refEl, ctx) } : null;
+    var sub = Object.assign({}, ctx, { ph: color(refEl, ctx) });
+    var wrap = document.implementation.createDocument(null, 'w', null).documentElement; wrap.appendChild(f.cloneNode(true));
+    return fillOf(wrap, sub);
+  }
+  function lineOf(spPr, style, ctx) {
+    var ln = kid(spPr, 'ln'), out = { c: null, w: 0.75, dash: null, head: null, tail: null };
+    var ref = kid(style, 'lnRef'), idx = nattr(ref, 'idx', 0);
+    if (idx && ctx.theme.lines[idx - 1]) {
+      var tl = ctx.theme.lines[idx - 1], sub = Object.assign({}, ctx, { ph: color(ref, ctx) });
+      out.w = nattr(tl, 'w', 9525) / EMU;
+      var f = fillOf(tl, sub); out.c = f && f.c ? f.c : null;
+    }
+    if (ln) {
+      if (ln.getAttribute('w') !== null) out.w = nattr(ln, 'w', 9525) / EMU;
+      var lf = fillOf(ln, ctx);
+      if (lf !== undefined) out.c = lf && lf.c ? lf.c : null;
+      var d = attr(kid(ln, 'prstDash'), 'val', 'solid');
+      if (d !== 'solid') out.dash = /dot/i.test(d) && !/dash/i.test(d) ? [1, 2] : [4, 3];
+      ['headEnd', 'tailEnd'].forEach(function (k) { var e = kid(ln, k), t = attr(e, 'type', 'none'); if (t !== 'none') out[k === 'headEnd' ? 'head' : 'tail'] = { t: t, w: attr(e, 'w', 'med'), l: attr(e, 'len', 'med') }; });
+    }
+    if (!out.c || out.w <= 0) return null;
+    return out;
+  }
+
+  // ---------- shape outlines as SVG paths in the shape's own box (w × h points, y down) ----------
+  function adj(geom, name, d) { var gd = kids(kid(geom, 'avLst'), 'gd').filter(function (g) { return attr(g, 'name') === name; })[0]; if (!gd) return d; var m = /val\s+(-?\d+)/.exec(attr(gd, 'fmla', '')); return m ? +m[1] : d; }
+  function f2(n) { return (Math.round(n * 100) / 100).toString(); }
+  function poly(pts) { return 'M ' + pts.map(function (p) { return f2(p[0]) + ' ' + f2(p[1]); }).join(' L ') + ' Z'; }
+  function ellipsePath(cx, cy, rx, ry) { return 'M ' + f2(cx - rx) + ' ' + f2(cy) + ' A ' + f2(rx) + ' ' + f2(ry) + ' 0 1 1 ' + f2(cx + rx) + ' ' + f2(cy) + ' A ' + f2(rx) + ' ' + f2(ry) + ' 0 1 1 ' + f2(cx - rx) + ' ' + f2(cy) + ' Z'; }
+  function roundRect(w, h, r) { r = Math.max(0, Math.min(r, w / 2, h / 2)); if (!r) return poly([[0, 0], [w, 0], [w, h], [0, h]]); return 'M ' + f2(r) + ' 0 L ' + f2(w - r) + ' 0 A ' + f2(r) + ' ' + f2(r) + ' 0 0 1 ' + f2(w) + ' ' + f2(r) + ' L ' + f2(w) + ' ' + f2(h - r) + ' A ' + f2(r) + ' ' + f2(r) + ' 0 0 1 ' + f2(w - r) + ' ' + f2(h) + ' L ' + f2(r) + ' ' + f2(h) + ' A ' + f2(r) + ' ' + f2(r) + ' 0 0 1 0 ' + f2(h - r) + ' L 0 ' + f2(r) + ' A ' + f2(r) + ' ' + f2(r) + ' 0 0 1 ' + f2(r) + ' 0 Z'; }
+  function star(w, h, n, inner) { var pts = []; for (var i = 0; i < n * 2; i++) { var a = -Math.PI / 2 + i * Math.PI / n, r = i % 2 ? inner : 1; pts.push([w / 2 + Math.cos(a) * r * w / 2, h / 2 + Math.sin(a) * r * h / 2]); } return poly(pts); }
+  function regular(w, h, n) { var pts = []; for (var i = 0; i < n; i++) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; pts.push([w / 2 + Math.cos(a) * w / 2, h / 2 + Math.sin(a) * h / 2]); } return poly(pts); }
+  var LINES = /^(line|straightConnector1|bentConnector[2-5]|curvedConnector[2-5]|lineInv)$/;
+  function presetPath(g, w, h) {
+    var p = attr(g, 'prst', 'rect'), ss = Math.min(w, h);
+    switch (p) {
+      case 'rect': case 'flowChartProcess': case 'wedgeRectCallout': case 'borderCallout1': case 'textBox': case 'frame': return poly([[0, 0], [w, 0], [w, h], [0, h]]);
+      case 'roundRect': case 'flowChartAlternateProcess': case 'wedgeRoundRectCallout': return roundRect(w, h, ss * adj(g, 'adj', 16667) / 1e5);
+      case 'round2SameRect': case 'round1Rect': case 'snipRoundRect': return roundRect(w, h, ss * adj(g, 'adj1', 16667) / 1e5);
+      case 'flowChartTerminator': return roundRect(w, h, ss / 2);
+      case 'ellipse': case 'flowChartConnector': case 'wedgeEllipseCallout': case 'cloud': case 'cloudCallout': case 'donut': case 'pie': case 'chord': case 'arc': case 'blockArc': case 'smileyFace': case 'flowChartOnlineStorage': return ellipsePath(w / 2, h / 2, w / 2, h / 2);
+      case 'triangle': case 'flowChartExtract': { var a = adj(g, 'adj', 50000) / 1e5; return poly([[w * a, 0], [w, h], [0, h]]); }
+      case 'flowChartMerge': return poly([[0, 0], [w, 0], [w / 2, h]]);
+      case 'rtTriangle': return poly([[0, 0], [w, h], [0, h]]);
+      case 'diamond': case 'flowChartDecision': return poly([[w / 2, 0], [w, h / 2], [w / 2, h], [0, h / 2]]);
+      case 'parallelogram': case 'flowChartInputOutput': { var o = ss * adj(g, 'adj', 25000) / 1e5; return poly([[o, 0], [w, 0], [w - o, h], [0, h]]); }
+      case 'trapezoid': case 'flowChartManualOperation': { var t = ss * adj(g, 'adj', 25000) / 1e5; return poly([[t, 0], [w - t, 0], [w, h], [0, h]]); }
+      case 'pentagon': case 'homePlate': { var hp = ss * adj(g, 'adj', 50000) / 1e5; return p === 'pentagon' && !kid(g, 'avLst') ? regular(w, h, 5) : poly([[0, 0], [w - hp, 0], [w, h / 2], [w - hp, h], [0, h]]); }
+      case 'chevron': { var cv = ss * adj(g, 'adj', 50000) / 1e5; return poly([[0, 0], [w - cv, 0], [w, h / 2], [w - cv, h], [0, h], [cv, h / 2]]); }
+      case 'hexagon': { var hx = ss * adj(g, 'adj', 25000) / 1e5; return poly([[hx, 0], [w - hx, 0], [w, h / 2], [w - hx, h], [hx, h], [0, h / 2]]); }
+      case 'octagon': { var oc = ss * adj(g, 'adj', 29289) / 1e5; return poly([[oc, 0], [w - oc, 0], [w, oc], [w, h - oc], [w - oc, h], [oc, h], [0, h - oc], [0, oc]]); }
+      case 'heptagon': return regular(w, h, 7);
+      case 'decagon': return regular(w, h, 10);
+      case 'dodecagon': return regular(w, h, 12);
+      case 'star4': return star(w, h, 4, 0.25); case 'star5': return star(w, h, 5, 0.38); case 'star6': return star(w, h, 6, 0.5);
+      case 'star7': return star(w, h, 7, 0.5); case 'star8': return star(w, h, 8, 0.6); case 'star10': return star(w, h, 10, 0.6); case 'star12': return star(w, h, 12, 0.6); case 'star16': case 'star24': case 'star32': return star(w, h, 16, 0.7);
+      case 'plus': case 'mathPlus': { var pc = ss * adj(g, 'adj', 25000) / 1e5; return poly([[pc, 0], [w - pc, 0], [w - pc, pc], [w, pc], [w, h - pc], [w - pc, h - pc], [w - pc, h], [pc, h], [pc, h - pc], [0, h - pc], [0, pc], [pc, pc]].map(function (q, i) { return i % 3 === 0 ? q : q; })); }
+      case 'rightArrow': case 'leftArrow': case 'upArrow': case 'downArrow': case 'notchedRightArrow': case 'stripedRightArrow': {
+        var a1 = adj(g, 'adj1', 50000) / 1e5, a2 = adj(g, 'adj2', 50000) / 1e5, vert = /up|down/.test(p), L = vert ? h : w, T = vert ? w : h, head = Math.min(L, ss * a2), sh = T * a1;
+        var pts = [[0, (T - sh) / 2], [L - head, (T - sh) / 2], [L - head, 0], [L, T / 2], [L - head, T], [L - head, (T + sh) / 2], [0, (T + sh) / 2]];
+        if (p === 'leftArrow') pts = pts.map(function (q) { return [L - q[0], q[1]]; });
+        if (p === 'downArrow') pts = pts.map(function (q) { return [q[1], q[0]]; });
+        if (p === 'upArrow') pts = pts.map(function (q) { return [q[1], L - q[0]]; });
+        return poly(pts);
+      }
+      case 'leftRightArrow': { var hh = Math.min(w / 2, ss * adj(g, 'adj2', 50000) / 1e5), s2 = h * adj(g, 'adj1', 50000) / 1e5; return poly([[0, h / 2], [hh, 0], [hh, (h - s2) / 2], [w - hh, (h - s2) / 2], [w - hh, 0], [w, h / 2], [w - hh, h], [w - hh, (h + s2) / 2], [hh, (h + s2) / 2], [hh, h]]); }
+      case 'snip1Rect': { var sn = ss * adj(g, 'adj', 16667) / 1e5; return poly([[0, 0], [w - sn, 0], [w, sn], [w, h], [0, h]]); }
+      case 'snip2SameRect': { var s3 = ss * adj(g, 'adj1', 16667) / 1e5; return poly([[s3, 0], [w - s3, 0], [w, s3], [w, h], [0, h], [0, s3]]); }
+      case 'flowChartDocument': return 'M 0 0 L ' + f2(w) + ' 0 L ' + f2(w) + ' ' + f2(h * 0.83) + ' C ' + f2(w * 0.7) + ' ' + f2(h * 0.7) + ' ' + f2(w * 0.3) + ' ' + f2(h * 1.1) + ' 0 ' + f2(h * 0.9) + ' Z';
+      case 'can': case 'flowChartMagneticDisk': return roundRect(w, h, Math.min(w / 2, h * 0.15));
+      case 'heart': return 'M ' + f2(w / 2) + ' ' + f2(h * 0.25) + ' C ' + f2(w * 0.5) + ' ' + f2(-h * 0.1) + ' ' + f2(-w * 0.1) + ' ' + f2(h * 0.05) + ' ' + f2(w * 0.05) + ' ' + f2(h * 0.4) + ' L ' + f2(w / 2) + ' ' + f2(h) + ' L ' + f2(w * 0.95) + ' ' + f2(h * 0.4) + ' C ' + f2(w * 1.1) + ' ' + f2(h * 0.05) + ' ' + f2(w * 0.5) + ' ' + f2(-h * 0.1) + ' ' + f2(w / 2) + ' ' + f2(h * 0.25) + ' Z';
+      default:
+        if (LINES.test(p)) return 'M 0 0 L ' + f2(w) + ' ' + f2(h);
+        return poly([[0, 0], [w, 0], [w, h], [0, h]]);
+    }
+  }
+  function customPath(g, w, h) {
+    var out = [];
+    kids(kid(g, 'pathLst'), 'path').forEach(function (pp) {
+      var pw = nattr(pp, 'w', 0) || w, ph = nattr(pp, 'h', 0) || h, sx = w / (pw || 1), sy = h / (ph || 1), cx = 0, cy = 0, d = [];
+      function pt(e) { return [nattr(e, 'x', 0) * sx, nattr(e, 'y', 0) * sy]; }
+      kids(pp).forEach(function (c) {
+        var pts = kids(c, 'pt').map(pt);
+        switch (c.localName) {
+          case 'moveTo': if (pts[0]) { d.push('M ' + f2(pts[0][0]) + ' ' + f2(pts[0][1])); cx = pts[0][0]; cy = pts[0][1]; } break;
+          case 'lnTo': if (pts[0]) { d.push('L ' + f2(pts[0][0]) + ' ' + f2(pts[0][1])); cx = pts[0][0]; cy = pts[0][1]; } break;
+          case 'cubicBezTo': if (pts.length === 3) { d.push('C ' + pts.map(function (q) { return f2(q[0]) + ' ' + f2(q[1]); }).join(' ')); cx = pts[2][0]; cy = pts[2][1]; } break;
+          case 'quadBezTo': if (pts.length === 2) { d.push('Q ' + pts.map(function (q) { return f2(q[0]) + ' ' + f2(q[1]); }).join(' ')); cx = pts[1][0]; cy = pts[1][1]; } break;
+          case 'arcTo': {
+            var wr = nattr(c, 'wR', 0) * sx, hr = nattr(c, 'hR', 0) * sy, st = nattr(c, 'stAng', 0) / 60000 * Math.PI / 180, sw = nattr(c, 'swAng', 0) / 60000 * Math.PI / 180;
+            if (!wr || !hr || !sw) break;
+            var ox = cx - wr * Math.cos(st), oy = cy - hr * Math.sin(st), ex = ox + wr * Math.cos(st + sw), ey = oy + hr * Math.sin(st + sw);
+            if (Math.abs(sw) >= 2 * Math.PI - 1e-3) { var mx = ox + wr * Math.cos(st + Math.PI), my = oy + hr * Math.sin(st + Math.PI); d.push('A ' + f2(wr) + ' ' + f2(hr) + ' 0 0 1 ' + f2(mx) + ' ' + f2(my)); }
+            d.push('A ' + f2(wr) + ' ' + f2(hr) + ' 0 ' + (Math.abs(sw) > Math.PI ? 1 : 0) + ' ' + (sw > 0 ? 1 : 0) + ' ' + f2(ex) + ' ' + f2(ey));
+            cx = ex; cy = ey; break;
+          }
+          case 'close': d.push('Z'); break;
+        }
+      });
+      if (d.length) out.push({ d: d.join(' '), fill: attr(pp, 'fill', 'norm') !== 'none', stroke: attr(pp, 'stroke', '1') !== '0' && attr(pp, 'stroke', 'true') !== 'false' });
+    });
+    return out;
+  }
+
+  // ---------- 2D matrices (a b c d e f), slide space is y-down ----------
+  function mul(m, n) { return [m[0] * n[0] + m[2] * n[1], m[1] * n[0] + m[3] * n[1], m[0] * n[2] + m[2] * n[3], m[1] * n[2] + m[3] * n[3], m[0] * n[4] + m[2] * n[5] + m[4], m[1] * n[4] + m[3] * n[5] + m[5]]; }
+  function boxMatrix(x, y, w, h, rot, fh, fv) {
+    var r = rot * Math.PI / 180, cos = Math.cos(r), sin = Math.sin(r);
+    var m = [1, 0, 0, 1, x + w / 2, y + h / 2];
+    m = mul(m, [cos, sin, -sin, cos, 0, 0]);
+    m = mul(m, [fh ? -1 : 1, 0, 0, fv ? -1 : 1, 0, 0]);
+    return mul(m, [1, 0, 0, 1, -w / 2, -h / 2]);
+  }
+  function xfrmOf(el) {
+    if (!el) return null;
+    var off = kid(el, 'off'), ext = kid(el, 'ext');
+    if (!off || !ext) return null;
+    return { x: nattr(off, 'x', 0) / EMU, y: nattr(off, 'y', 0) / EMU, w: nattr(ext, 'cx', 0) / EMU, h: nattr(ext, 'cy', 0) / EMU, rot: nattr(el, 'rot', 0) / 60000, fh: attr(el, 'flipH') === '1', fv: attr(el, 'flipV') === '1' };
+  }
+
+  // ---------- text styles ----------
+  function lvlProps(listEl, lvl) {
+    if (!listEl) return null;
+    return kid(listEl, 'lvl' + (lvl + 1) + 'pPr') || (lvl === -1 ? kid(listEl, 'defPPr') : null);
+  }
+  function mergeP(target, pPr, ctx) {
+    if (!pPr) return target;
+    ['algn', 'marL', 'indent'].forEach(function (k) { if (pPr.getAttribute(k) !== null) target[k] = attr(pPr, k); });
+    var ls = kid(pPr, 'lnSpc'); if (ls) { var p = kid(ls, 'spcPct'), q = kid(ls, 'spcPts'); target.lnSpc = p ? { pct: nattr(p, 'val', 100000) / 1e5 } : q ? { pts: nattr(q, 'val', 0) / 100 } : target.lnSpc; }
+    ['spcBef', 'spcAft'].forEach(function (k) { var s = kid(pPr, k); if (s) { var p = kid(s, 'spcPct'), q = kid(s, 'spcPts'); target[k] = p ? { pct: nattr(p, 'val', 0) / 1e5 } : q ? { pts: nattr(q, 'val', 0) / 100 } : target[k]; } });
+    if (kid(pPr, 'buNone')) target.bu = null;
+    if (kid(pPr, 'buChar')) target.bu = { ch: attr(kid(pPr, 'buChar'), 'char', '•') };
+    if (kid(pPr, 'buAutoNum')) target.bu = { num: attr(kid(pPr, 'buAutoNum'), 'type', 'arabicPeriod'), start: nattr(kid(pPr, 'buAutoNum'), 'startAt', 1) };
+    if (kid(pPr, 'buClr')) target.buClr = color(kid(pPr, 'buClr'), ctx);
+    if (kid(pPr, 'buSzPct')) target.buSz = nattr(kid(pPr, 'buSzPct'), 'val', 100000) / 1e5;
+    var d = kid(pPr, 'defRPr'); if (d) target.r = mergeR(Object.assign({}, target.r), d, ctx);
+    return target;
+  }
+  function mergeR(t, rPr, ctx) {
+    if (!rPr) return t;
+    if (rPr.getAttribute('sz') !== null) t.sz = nattr(rPr, 'sz', 1800) / 100;
+    if (rPr.getAttribute('b') !== null) t.b = /^(1|true)$/.test(attr(rPr, 'b'));
+    if (rPr.getAttribute('i') !== null) t.i = /^(1|true)$/.test(attr(rPr, 'i'));
+    if (rPr.getAttribute('u') !== null) t.u = attr(rPr, 'u') !== 'none';
+    if (rPr.getAttribute('strike') !== null) t.s = attr(rPr, 'strike') !== 'noStrike';
+    if (rPr.getAttribute('cap') !== null) t.cap = attr(rPr, 'cap');
+    if (rPr.getAttribute('baseline') !== null) t.base = nattr(rPr, 'baseline', 0) / 1e5;
+    var f = fillOf(rPr, ctx); if (f && f.c) t.c = f.c; else if (f === null) t.c = null;
+    var hl = kid(rPr, 'highlight'); if (hl) t.hl = color(hl, ctx);
+    return t;
+  }
+
+  // ---------- drawing context ----------
+  function Ctx(o) { Object.assign(this, o); }
+
+  function pdfMatrix(m, H) { // slide y-down -> PDF, followed by the flip that pdf-lib's own drawing expects
+    var toPdf = [1, 0, 0, -1, 0, H];
+    return mul(mul(toPdf, m), [1, 0, 0, -1, 0, 0]);
+  }
+  function withMatrix(page, m, H, fn) {
+    var M = pdfMatrix(m, H);
+    page.pushOperators(PL.pushGraphicsState(), PL.concatTransformationMatrix(M[0], M[1], M[2], M[3], M[4], M[5]));
+    var r = fn();
+    var end = function () { page.pushOperators(PL.popGraphicsState()); };
+    if (r && r.then) return r.then(function (v) { end(); return v; });
+    end(); return r;
+  }
+
+  function opts(f) { return f && f.c ? { color: rgb(f.c), opacity: clamp(f.c.a) } : {}; }
+
+  // ---------- main renderer ----------
+  async function convert(f) {
+    parts = {};
+    zip = await JSZip.loadAsync(f);
+    var presPath = 'ppt/presentation.xml', pres = await xml(presPath);
+    if (!pres) { var ct = await xml('[Content_Types].xml'); kids(ct, 'Override').forEach(function (o) { if (/presentation\.main|slideshow\.main|template\.main/.test(attr(o, 'ContentType', ''))) presPath = attr(o, 'PartName').replace(/^\//, ''); }); pres = await xml(presPath); }
+    if (!pres) throw new Error('"' + f.name + '" is not a PowerPoint presentation.');
+    var sz = kid(pres, 'sldSz'), W = nattr(sz, 'cx', 12192000) / EMU, H = nattr(sz, 'cy', 6858000) / EMU;
+    var prels = await rels(presPath), defStyle = kid(pres, 'defaultTextStyle');
+    var slides = kids(kid(pres, 'sldIdLst'), 'sldId').map(function (s) { var r = prels[rid(s, 'id')]; return r && r.target; }).filter(Boolean);
+    if (!slides.length) throw new Error('"' + f.name + '" has no slides.');
+
+    var doc = await PL.PDFDocument.create(), fb = await loadFonts();
+    doc.registerFontkit(fontkit);
+    var FR = await doc.embedFont(fb[0], { subset: true }), FB = await doc.embedFont(fb[1], { subset: true }), have = {};
+    FR.getCharacterSet().forEach(function (c) { have[c] = 1; });
+    var widthCache = [{}, {}], mctx = document.createElement('canvas').getContext('2d');
+    function ok(s) { for (var i = 0; i < s.length; i++) { var cp = s.codePointAt(i); if (cp > 0xffff) i++; if (cp >= 32 && !have[cp]) return false; } return true; }
+    function tw(s, b, size) {
+      if (!ok(s)) { mctx.font = (b ? 'bold ' : '') + '40px sans-serif'; return mctx.measureText(s).width / 40 * size; }
+      var c = widthCache[b ? 1 : 0], fnt = b ? FB : FR, w = 0;
+      for (var i = 0; i < s.length; i++) { var ch = s[i], v = c[ch]; if (v === undefined) { try { v = c[ch] = fnt.widthOfTextAtSize(ch, 1); } catch (e) { v = c[ch] = 0.5; } } w += v; }
+      return w * size;
+    }
+    var imgCache = {}, fallImgs = {}, skipped = [], includeHidden = $('hidden').checked, done = 0, slideNo = 0;
+    function skip(n, what) { var key = n + '|' + what, s = skipped.filter(function (x) { return x.k === key; })[0]; if (s) s.n++; else skipped.push({ k: key, slide: n, what: what, n: 1 }); }
+
+    async function image(partPath) {
+      if (!partPath) return null;
+      if (imgCache[partPath] !== undefined) return imgCache[partPath];
+      var zf = zip.file(partPath); if (!zf) return (imgCache[partPath] = null);
+      var bytes = await zf.async('uint8array'), im = null;
+      try {
+        if (bytes[0] === 0xFF && bytes[1] === 0xD8) im = await doc.embedJpg(bytes);
+        else if (bytes[0] === 0x89 && bytes[1] === 0x50) im = await doc.embedPng(bytes);
+      } catch (e) { im = null; }
+      if (!im) { // GIF, BMP, WebP, SVG, odd PNGs: let the browser decode and re-encode as PNG
+        try {
+          var type = /\.svg$/i.test(partPath) ? 'image/svg+xml' : '';
+          var url = URL.createObjectURL(new Blob([bytes], { type: type }));
+          var el = await new Promise(function (res, rej) { var i = new Image(); i.onload = function () { res(i); }; i.onerror = rej; i.src = url; });
+          var c = document.createElement('canvas'), wv = el.naturalWidth || 800, hv = el.naturalHeight || 600, k = Math.min(1, 4000 / Math.max(wv, hv));
+          c.width = Math.max(1, Math.round(wv * k)); c.height = Math.max(1, Math.round(hv * k));
+          c.getContext('2d').drawImage(el, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+          var blob = await PT.blob(c, 'image/png'); c.width = c.height = 0;
+          im = await doc.embedPng(new Uint8Array(await blob.arrayBuffer()));
+        } catch (e) { im = null; }
+      }
+      return (imgCache[partPath] = im);
+    }
+    async function fallbackText(page, s, x, y, size, b, i, c) {
+      var key = (b ? 'b' : '') + (i ? 'i' : '') + size + css(c) + '|' + s, img = fallImgs[key];
+      if (!img) {
+        var k = 4, fnt = (i ? 'italic ' : '') + (b ? 'bold ' : '') + Math.round(size * k) + 'px sans-serif', cv = document.createElement('canvas'), cx = cv.getContext('2d');
+        cx.font = fnt; var w = Math.ceil(cx.measureText(s).width) + 4, h = Math.ceil(size * k * 1.45);
+        cv.width = Math.max(1, w); cv.height = h; cx.font = fnt; cx.fillStyle = css(c); cx.fillText(s, 2, Math.round(size * k * 1.1));
+        var blob = await PT.blob(cv, 'image/png');
+        img = fallImgs[key] = { im: await doc.embedPng(new Uint8Array(await blob.arrayBuffer())), w: w / k, h: h / k };
+      }
+      page.drawImage(img.im, { x: x - 0.5, y: y + size * 1.1 - img.h, width: img.w, height: img.h, opacity: clamp(c.a) });
+    }
+
+    function numText(type, n) {
+      var s = String(n);
+      if (/alpha/i.test(type)) { s = ''; var v = n; while (v > 0) { v--; s = String.fromCharCode(97 + v % 26) + s; v = Math.floor(v / 26); } if (/Uc/.test(type)) s = s.toUpperCase(); }
+      else if (/roman/i.test(type)) { s = ''; var r = n; [[1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'], [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i']].forEach(function (p) { while (r >= p[0]) { s += p[1]; r -= p[0]; } }); if (/Uc/.test(type)) s = s.toUpperCase(); }
+      if (/ParenBoth/.test(type)) return '(' + s + ')';
+      if (/ParenR/.test(type)) return s + ')';
+      if (/Period/.test(type)) return s + '.';
+      return s;
+    }
+
+    // Lay out and draw a text body inside a w × h box. styles: list of lstStyle-like elements, lowest priority first.
+    async function drawText(page, m, txBody, w, h, styles, bodyPrs, ctx, defColor, opt) {
+      if (!txBody) return;
+      var paras = kids(txBody, 'p');
+      if (!paras.some(function (p) { return kids(p, 'r').concat(kids(p, 'fld')).some(function (r) { return (kid(r, 't') || {}).textContent; }); })) return;
+      var bp = {}; bodyPrs.concat([kid(txBody, 'bodyPr')]).forEach(function (b) { if (!b) return; for (var i = 0; i < b.attributes.length; i++) bp[b.attributes[i].localName] = b.attributes[i].value; var na = kid(b, 'normAutofit'); if (na) { bp.fontScale = attr(na, 'fontScale', '100000'); bp.lnRed = attr(na, 'lnSpcReduction', '0'); } if (kid(b, 'noAutofit') || kid(b, 'spAutoFit')) { bp.fontScale = '100000'; bp.lnRed = '0'; } });
+      function ins(k, d) { return bp[k] === undefined ? d / EMU : +bp[k] / EMU; }
+      var L = ins('lIns', 91440), R = ins('rIns', 91440), T = ins('tIns', 45720), B = ins('bIns', 45720);
+      var scale = +(bp.fontScale || 100000) / 1e5, lnRed = +(bp.lnRed || 0) / 1e5, noWrap = bp.wrap === 'none', anchor = bp.anchor || 't';
+      var vert = bp.vert && bp.vert !== 'horz';
+      if (opt && opt.box) { L = opt.box.L; R = opt.box.R; T = opt.box.T; B = opt.box.B; }
+      var availW = Math.max(4, w - L - R);
+      var counters = {}, lines = [], totalH = 0, lstStyle = kid(txBody, 'lstStyle');
+      for (var pi = 0; pi < paras.length; pi++) {
+        var p = paras[pi], pPr = kid(p, 'pPr'), lvl = nattr(pPr, 'lvl', 0);
+        var P = { algn: 'l', marL: 0, indent: 0, bu: null, r: { sz: 18, b: false, i: false, u: false, c: defColor } };
+        styles.concat([lstStyle]).forEach(function (st) { if (st) { mergeP(P, kid(st, 'defPPr'), ctx); mergeP(P, lvlProps(st, lvl), ctx); } if (st === lstStyle && opt && opt.fontColor) P.r.c = opt.fontColor; });
+        if (!lstStyle && opt && opt.fontColor) P.r.c = opt.fontColor;
+        mergeP(P, pPr, ctx);
+        var size0 = P.r.sz * scale, runs = [];
+        kids(p).forEach(function (r) {
+          if (r.localName === 'r' || r.localName === 'fld') {
+            var st = mergeR(Object.assign({}, P.r), kid(r, 'rPr'), ctx), t = (kid(r, 't') || {}).textContent || '';
+            if (r.localName === 'fld' && /slidenum/i.test(attr(r, 'type', ''))) t = String(slideNo);
+            if (st.cap === 'all') t = t.toUpperCase();
+            if (t) runs.push({ t: t.replace(/\t/g, '    ').replace(/[\u000b\r\n]/g, ' '), st: st });
+          } else if (r.localName === 'br') runs.push({ br: true, st: mergeR(Object.assign({}, P.r), kid(r, 'rPr'), ctx) });
+        });
+        var endSz = P.r.sz; var epr = kid(p, 'endParaRPr'); if (epr && epr.getAttribute('sz')) endSz = nattr(epr, 'sz', 1800) / 100;
+        var marL = +P.marL / EMU, indent = +P.indent / EMU, hasText = runs.some(function (r) { return r.t && r.t.trim(); });
+        var bullet = null;
+        if (P.bu && hasText) {
+          var bsz = (runs[0] ? runs[0].st.sz : P.r.sz) * scale * (P.buSz || 1);
+          if (P.bu.num) { var key = lvl + P.bu.num; counters[key] = (counters[key] === undefined ? P.bu.start : counters[key] + 1); bullet = { t: numText(P.bu.num, counters[key]), sz: bsz }; }
+          else { var ch = P.bu.ch; if (!/[•–—▪-●‣⁃∙·◦>*\-➢✓✔]/.test(ch) || !ok(ch)) ch = /[§üØ]/.test(P.bu.ch) ? '▪' : '•'; bullet = { t: ch, sz: bsz }; }
+          bullet.c = P.buClr || (runs[0] ? runs[0].st.c : defColor) || defColor;
+        } else if (!P.bu) Object.keys(counters).forEach(function (k) { if (k.indexOf(String(lvl)) === 0) delete counters[k]; });
+        // break runs into words
+        var tokens = [];
+        runs.forEach(function (r) {
+          if (r.br) { tokens.push({ br: true, st: r.st }); return; }
+          (noWrap ? [r.t] : r.t.split(/(\s+)/)).forEach(function (piece) { if (piece) tokens.push({ t: piece, st: r.st, sp: /^\s+$/.test(piece) }); });
+        });
+        var firstX = marL + indent;
+        if (bullet) { bullet.w = tw(bullet.t, false, bullet.sz); firstX = Math.max(marL, marL + indent + bullet.w + bullet.sz * 0.35); }
+        var cur = { items: [], w: 0, max: 0, x0: firstX, bullet: bullet, P: P }, plines = [];
+        function push() { plines.push(cur); cur = { items: [], w: 0, max: 0, x0: marL, P: P }; }
+        tokens.forEach(function (tk) {
+          if (tk.br) { cur.max = Math.max(cur.max, tk.st.sz * scale); push(); return; }
+          var size = tk.st.sz * scale * (tk.st.base ? 0.65 : 1), wv = tw(tk.t, tk.st.b, size), room = availW - cur.x0;
+          if (!noWrap && !tk.sp && cur.w + wv > room + 0.5 && cur.items.some(function (i) { return !i.sp; })) {
+            while (cur.items.length && cur.items[cur.items.length - 1].sp) { cur.w -= cur.items.pop().w; }
+            push(); room = availW - cur.x0;
+          }
+          if (tk.sp && !cur.items.length && plines.length) return;
+          if (!noWrap && !tk.sp && wv > room) { // a single word longer than the line: split it
+            var part = '';
+            for (var ci = 0; ci < tk.t.length; ci++) {
+              var tryW = tw(part + tk.t[ci], tk.st.b, size);
+              if (tryW + cur.w > room && (part || cur.items.length)) { if (part) { cur.items.push({ t: part, st: tk.st, w: tw(part, tk.st.b, size), size: size }); cur.max = Math.max(cur.max, size); } push(); room = availW - cur.x0; part = ''; }
+              part += tk.t[ci];
+            }
+            if (part) { var pw = tw(part, tk.st.b, size); cur.items.push({ t: part, st: tk.st, w: pw, size: size }); cur.w += pw; cur.max = Math.max(cur.max, size); }
+            return;
+          }
+          cur.items.push({ t: tk.t, st: tk.st, w: wv, size: size, sp: tk.sp }); cur.w += wv; cur.max = Math.max(cur.max, size);
+        });
+        while (cur.items.length && cur.items[cur.items.length - 1].sp) cur.w -= cur.items.pop().w;
+        if (!cur.max) cur.max = endSz * scale;
+        push();
+        var sp = P.lnSpc, bef = P.spcBef, aft = P.spcAft;
+        plines.forEach(function (ln, li) {
+          var base = ln.max || size0;
+          var lh = sp && sp.pts ? sp.pts : base * 1.2 * ((sp && sp.pct) || 1) * (1 - lnRed);
+          ln.h = lh;
+          ln.before = li === 0 && pi > 0 && bef ? (bef.pts !== undefined ? bef.pts : bef.pct * base * 1.2) : 0;
+          ln.after = li === plines.length - 1 && aft ? (aft.pts !== undefined ? aft.pts : aft.pct * base * 1.2) : 0;
+          totalH += ln.before + ln.h + ln.after; lines.push(ln);
+        });
+      }
+      var y0 = T;
+      if (anchor === 'ctr') y0 = T + (h - T - B - totalH) / 2;
+      else if (anchor === 'b') y0 = h - B - totalH;
+      var tm = m;
+      if (vert) { // vertical text: rotate the box
+        var rot = bp.vert === 'vert270' ? -90 : 90;
+        tm = mul(m, boxMatrix(0, 0, w, h, rot, false, false));
+      }
+      await withMatrix(page, tm, H, async function () {
+        var y = y0;
+        for (var i = 0; i < lines.length; i++) {
+          var ln = lines[i]; y += ln.before;
+          var base = y + ln.h - (ln.max || 0) * 0.27;
+          var room = availW - ln.x0, algn = ln.P.algn, x = L + ln.x0;
+          if (algn === 'ctr') x += (room - ln.w) / 2; else if (algn === 'r') x += room - ln.w;
+          if (ln.bullet) {
+            var bx = L + (+ln.P.marL / EMU) + (+ln.P.indent / EMU);
+            if (algn === 'ctr' || algn === 'r') bx = x - tw(ln.bullet.t + ' ', false, ln.bullet.sz);
+            await word(ln.bullet.t, bx, base, ln.bullet.sz, { b: false, i: false, c: ln.bullet.c });
+          }
+          var gaps = 0, extra = 0;
+          if (algn === 'just' && i < lines.length - 1 && lines[i + 1].P === ln.P) { gaps = ln.items.filter(function (it) { return it.sp; }).length; extra = gaps ? (room - ln.w) / gaps : 0; if (extra > ln.max) extra = 0; }
+          for (var k = 0; k < ln.items.length; k++) {
+            var it = ln.items[k];
+            if (!it.sp) {
+              var yb = base - (it.st.base ? it.st.base * ln.max : 0);
+              await word(it.t, x, yb, it.size, it.st, it.w);
+            } else if (it.st.u && k > 0 && k < ln.items.length - 1) await word('', x, base, it.size, it.st, it.w + extra);
+            x += it.w + (it.sp ? extra : 0);
+          }
+          y += ln.h + ln.after;
+        }
+      });
+      async function word(t, x, yb, size, st, wv) {
+        var c = st.c || defColor || { r: 0, g: 0, b: 0, a: 1 };
+        if (st.hl && t) page.drawRectangle({ x: x, y: -yb - size * 0.25, width: wv || tw(t, st.b, size), height: size * 1.2, color: rgb(st.hl) });
+        if (t) {
+          if (ok(t)) page.drawText(t, { x: x, y: -yb, size: size, font: st.b ? FB : FR, color: rgb(c), opacity: clamp(c.a), ySkew: st.i ? PL.degrees(12) : undefined });
+          else await fallbackText(page, t, x, -yb, size, st.b, st.i, c);
+        }
+        var w2 = wv || tw(t, st.b, size);
+        if (st.u) page.drawLine({ start: { x: x, y: -yb - size * 0.12 }, end: { x: x + w2, y: -yb - size * 0.12 }, thickness: Math.max(0.5, size / 16), color: rgb(c), opacity: clamp(c.a) });
+        if (st.s) page.drawLine({ start: { x: x, y: -yb + size * 0.3 }, end: { x: x + w2, y: -yb + size * 0.3 }, thickness: Math.max(0.5, size / 16), color: rgb(c), opacity: clamp(c.a) });
+      }
+    }
+
+    function drawOutline(page, d, fill, line, closed) {
+      var o = {};
+      if (fill && fill.c && closed) { o.color = rgb(fill.c); o.opacity = clamp(fill.c.a); }
+      if (line) { o.borderColor = rgb(line.c); o.borderWidth = line.w; o.borderOpacity = clamp(line.c.a); if (line.dash) o.borderDashArray = line.dash.map(function (v) { return v * Math.max(1, line.w); }); }
+      if (o.color || o.borderColor) page.drawSvgPath(d, Object.assign({ x: 0, y: 0 }, o));
+    }
+    function arrowHead(page, x1, y1, x2, y2, line, end) {
+      var mul2 = { sm: 2, med: 3, lg: 5 }, len = line.w * (mul2[end.l] || 3) + 2, wid = line.w * (mul2[end.w] || 3) + 2, a = Math.atan2(y2 - y1, x2 - x1);
+      var bx = x2 - Math.cos(a) * len, by = y2 - Math.sin(a) * len, px = -Math.sin(a) * wid / 2, py = Math.cos(a) * wid / 2;
+      var d = end.t === 'oval' ? ellipsePath(x2, y2, wid / 2, wid / 2) : poly([[x2, y2], [bx + px, by + py], [bx - px, by - py]]);
+      page.drawSvgPath(d, { x: 0, y: 0, color: rgb(line.c), opacity: clamp(line.c.a) });
+    }
+
+    // Placeholder lookup on layout/master
+    function phOf(sp) { var nv = kid(sp, 'nvSpPr') || kid(sp, 'nvPicPr') || kid(sp, 'nvGraphicFramePr') || kid(sp, 'nvGrpSpPr'), ph = path(nv || sp, 'nvPr/ph'); return ph ? { type: attr(ph, 'type', 'obj'), idx: attr(ph, 'idx', null) } : null; }
+    function norm(t) { return t === 'ctrTitle' ? 'title' : t === 'subTitle' || t === 'obj' ? 'body' : t; }
+    function findPh(tree, ph) {
+      if (!tree || !ph) return null;
+      var all = []; (function walk(n) { kids(n).forEach(function (c) { if (c.localName === 'sp' || c.localName === 'pic') { var p = phOf(c); if (p) all.push({ el: c, p: p }); } else if (c.localName === 'grpSp') walk(c); }); })(tree);
+      var hit = null;
+      if (ph.idx !== null) hit = all.filter(function (a) { return a.p.idx === ph.idx; })[0];
+      if (!hit) hit = all.filter(function (a) { return a.p.type === ph.type; })[0];
+      if (!hit) hit = all.filter(function (a) { return norm(a.p.type) === norm(ph.type); })[0];
+      return hit ? hit.el : null;
+    }
+
+    // Draw one shape tree (slide, layout or master), m = parent matrix
+    async function drawTree(page, tree, m, ctx, info) {
+      for (var el = tree && tree.firstElementChild; el; el = el.nextElementSibling) await drawNode(page, el, m, ctx, info);
+    }
+    async function drawNode(page, el, m, ctx, info) {
+      var n = el.localName;
+      if (n === 'AlternateContent') { var fbk = kid(el, 'Fallback') || kid(el, 'Choice'); if (fbk) for (var c = fbk.firstElementChild; c; c = c.nextElementSibling) await drawNode(page, c, m, ctx, info); return; }
+      if (n === 'sp' || n === 'cxnSp') return drawShape(page, el, m, ctx, info);
+      if (n === 'pic') return drawPic(page, el, m, ctx, info);
+      if (n === 'grpSp') {
+        var gp = kid(el, 'grpSpPr'), xf = kid(gp, 'xfrm'), x = xfrmOf(xf);
+        var gm = m;
+        if (x) {
+          var cho = kid(xf, 'chOff'), che = kid(xf, 'chExt'), cx = nattr(cho, 'x', 0) / EMU, cy = nattr(cho, 'y', 0) / EMU, cw = nattr(che, 'cx', 0) / EMU || x.w, chh = nattr(che, 'cy', 0) / EMU || x.h;
+          gm = mul(m, mul(boxMatrix(x.x, x.y, x.w, x.h, x.rot, x.fh, x.fv), [x.w / (cw || 1), 0, 0, x.h / (chh || 1), -cx * x.w / (cw || 1), -cy * x.h / (chh || 1)]));
+        }
+        var sub = new Ctx(Object.assign({}, ctx)); var gf = fillOf(gp, ctx); if (gf !== undefined) sub.grpFill = gf;
+        for (var k = el.firstElementChild; k; k = k.nextElementSibling) if (k.localName !== 'nvGrpSpPr' && k.localName !== 'grpSpPr') await drawNode(page, k, gm, sub, info);
+        return;
+      }
+      if (n === 'graphicFrame') return drawFrame(page, el, m, ctx, info);
+      if (n === 'contentPart') { skip(info.n, 'ink drawing'); }
+    }
+
+    async function drawShape(page, sp, m, ctx, info) {
+      var spPr = kid(sp, 'spPr'), style = kid(sp, 'style'), ph = info.layer === 'slide' ? phOf(sp) : null;
+      var lph = ph ? findPh(info.layoutTree, ph) : null, mph = ph ? findPh(info.masterTree, ph) : null;
+      if (info.layer !== 'slide' && phOf(sp)) return; // placeholders on layouts/masters only show prompt text
+      var x = xfrmOf(kid(spPr, 'xfrm')) || (lph && xfrmOf(kid(kid(lph, 'spPr'), 'xfrm'))) || (mph && xfrmOf(kid(kid(mph, 'spPr'), 'xfrm')));
+      if (!x) return;
+      var sm = mul(m, boxMatrix(x.x, x.y, x.w, x.h, x.rot, x.fh, x.fv));
+      var geom = kid(spPr, 'custGeom') || kid(spPr, 'prstGeom') || (lph && (kid(kid(lph, 'spPr'), 'prstGeom'))) || null;
+      var fill = fillOf(spPr, ctx);
+      if (fill === undefined && lph) fill = fillOf(kid(lph, 'spPr'), ctx);
+      if (fill === undefined && style) { var fr = kid(style, 'fillRef'); fill = themeFill(nattr(fr, 'idx', 0), fr, ctx); }
+      var line = lineOf(spPr, style, ctx);
+      if (!kid(spPr, 'ln') && lph) { var l2 = lineOf(kid(lph, 'spPr'), null, ctx); if (l2) line = l2; }
+      var isLine = geom && geom.localName === 'prstGeom' && LINES.test(attr(geom, 'prst', ''));
+      if (sp.localName === 'cxnSp' && !geom) isLine = true;
+      if (fill || line) {
+        if (fill && fill.img) {
+          var im = await image(info.rels[fill.img] && info.rels[fill.img].target);
+          if (im) withMatrix(page, sm, H, function () {
+            page.pushOperators(PL.pushGraphicsState(), PL.rectangle(0, -x.h, x.w, x.h), PL.clip(), PL.endPath());
+            page.drawImage(im, { x: 0, y: -x.h, width: x.w, height: x.h });
+            page.pushOperators(PL.popGraphicsState());
+          });
+          fill = null;
+        }
+        withMatrix(page, sm, H, function () {
+          if (geom && geom.localName === 'custGeom') customPath(geom, x.w, x.h).forEach(function (pp) { drawOutline(page, pp.d, pp.fill ? fill : null, pp.stroke ? line : null, true); });
+          else if (isLine || sp.localName === 'cxnSp') {
+            if (line) {
+              var bent = /bentConnector/.test(attr(geom, 'prst', ''));
+              var d = bent ? 'M 0 0 L ' + f2(x.w / 2) + ' 0 L ' + f2(x.w / 2) + ' ' + f2(x.h) + ' L ' + f2(x.w) + ' ' + f2(x.h) : 'M 0 0 L ' + f2(x.w) + ' ' + f2(x.h);
+              drawOutline(page, d, null, line, false);
+              if (line.tail) bent ? arrowHead(page, x.w / 2, x.h, x.w, x.h, line, line.tail) : arrowHead(page, 0, 0, x.w, x.h, line, line.tail);
+              if (line.head) bent ? arrowHead(page, x.w / 2, 0, 0, 0, line, line.head) : arrowHead(page, x.w, x.h, 0, 0, line, line.head);
+            }
+          } else drawOutline(page, presetPath(geom, x.w, x.h), fill, line, true);
+        });
+      }
+      // text
+      var tx = kid(sp, 'txBody');
+      if (tx) {
+        var styles = [defStyle], bodyPrs = [];
+        if (ph) {
+          var t = norm(ph.type), ts = kid(info.master, 'txStyles');
+          styles.push(t === 'title' ? kid(ts, 'titleStyle') : t === 'body' ? kid(ts, 'bodyStyle') : kid(ts, 'otherStyle'));
+          if (mph) { styles.push(path(mph, 'txBody/lstStyle')); bodyPrs.push(path(mph, 'txBody/bodyPr')); }
+          if (lph) { styles.push(path(lph, 'txBody/lstStyle')); bodyPrs.push(path(lph, 'txBody/bodyPr')); }
+        } else styles.push(kid(kid(info.master, 'txStyles'), 'otherStyle'));
+        var fontRef = kid(style, 'fontRef'), refColor = fontRef && color(fontRef, ctx), defColor = refColor || ctx.text;
+        var tm = mul(m, boxMatrix(x.x, x.y, x.w, x.h, x.rot + (x.fv ? 180 : 0), false, false));
+        var txX = kid(sp, 'txXfrm'), tb = txX && xfrmOf(txX);
+        if (tb) tm = mul(m, boxMatrix(tb.x, tb.y, tb.w, tb.h, tb.rot, false, false));
+        await drawText(page, tm, tx, tb ? tb.w : x.w, tb ? tb.h : x.h, styles, bodyPrs, ctx, defColor, refColor ? { fontColor: refColor } : null);
+      }
+    }
+
+    async function drawPic(page, pic, m, ctx, info) {
+      var spPr = kid(pic, 'spPr'), x = xfrmOf(kid(spPr, 'xfrm')), ph = info.layer === 'slide' ? phOf(pic) : null;
+      if (!x && ph) { var l = findPh(info.layoutTree, ph) || findPh(info.masterTree, ph); x = l && xfrmOf(kid(kid(l, 'spPr'), 'xfrm')); }
+      if (!x) return;
+      var bf = kid(pic, 'blipFill'), blip = kid(bf, 'blip'), id = rid(blip, 'embed'), target = id && info.rels[id] && info.rels[id].target;
+      var im = await image(target);
+      var sm = mul(m, boxMatrix(x.x, x.y, x.w, x.h, x.rot, x.fh, x.fv));
+      if (!im) {
+        if (target) skip(info.n, /\.(emf|wmf)$/i.test(target) ? 'picture in Windows EMF/WMF format' : 'picture in an unsupported format');
+        else if (rid(blip, 'link')) skip(info.n, 'linked picture (not inside the file)');
+        withMatrix(page, sm, H, function () { page.drawRectangle({ x: 0, y: -x.h, width: x.w, height: x.h, color: PL.rgb(0.93, 0.94, 0.95), borderColor: PL.rgb(0.75, 0.77, 0.8), borderWidth: 0.5 }); });
+        return;
+      }
+      var src = kid(bf, 'srcRect'), l = nattr(src, 'l', 0) / 1e5, t = nattr(src, 't', 0) / 1e5, r = nattr(src, 'r', 0) / 1e5, b = nattr(src, 'b', 0) / 1e5;
+      var fw = x.w / Math.max(0.01, 1 - l - r), fh = x.h / Math.max(0.01, 1 - t - b);
+      var alpha = kid(blip, 'alphaModFix'), op = alpha ? nattr(alpha, 'amt', 100000) / 1e5 : 1;
+      var geom = kid(spPr, 'prstGeom'), round = geom && /ellipse|roundRect/.test(attr(geom, 'prst', ''));
+      withMatrix(page, sm, H, function () {
+        page.pushOperators(PL.pushGraphicsState(), PL.rectangle(0, -x.h, x.w, x.h), PL.clip(), PL.endPath());
+        page.drawImage(im, { x: -l * fw, y: -(x.h + b * fh), width: fw, height: fh, opacity: op });
+        page.pushOperators(PL.popGraphicsState());
+        var line = lineOf(spPr, kid(pic, 'style'), ctx);
+        if (line) drawOutline(page, round ? presetPath(geom, x.w, x.h) : poly([[0, 0], [x.w, 0], [x.w, x.h], [0, x.h]]), null, line, true);
+      });
+    }
+
+    async function drawFrame(page, gf, m, ctx, info) {
+      var x = xfrmOf(kid(gf, 'xfrm')); if (!x) return;
+      var gd = path(gf, 'graphic/graphicData'), uri = attr(gd, 'uri', '');
+      var sm = mul(m, boxMatrix(x.x, x.y, x.w, x.h, x.rot, x.fh, x.fv));
+      if (/table/.test(uri)) return drawTable(page, kid(gd, 'tbl'), sm, x, ctx, info);
+      if (/diagram/.test(uri)) { // SmartArt: PowerPoint stores a ready-made drawing of it
+        var ids = kid(gd, 'relIds'), dm = rid(ids, 'dm'), dataPath = dm && info.rels[dm] && info.rels[dm].target, drawPath = null;
+        if (dataPath) {
+          var data = await xml(dataPath), ext = data && data.getElementsByTagNameNS('*', 'dataModelExt')[0], rr = ext && attr(ext, 'relId');
+          if (rr && info.rels[rr]) drawPath = info.rels[rr].target;
+          if (!drawPath) drawPath = relOfType(info.rels, /diagramDrawing/);
+        }
+        var drawing = drawPath && await xml(drawPath);
+        if (drawing) {
+          var tree = kid(drawing, 'spTree'), drels = await rels(drawPath);
+          await drawTree(page, tree, mul(m, [1, 0, 0, 1, x.x, x.y]), ctx, Object.assign({}, info, { rels: drels, layer: 'diagram' }));
+          return;
+        }
+        skip(info.n, 'SmartArt graphic');
+      } else if (/chart/.test(uri)) skip(info.n, 'chart');
+      else if (/ole/.test(uri)) {
+        var oleP = gd.getElementsByTagNameNS('*', 'pic')[0];
+        if (oleP) { var pc = oleP.cloneNode(true), sx = kid(pc, 'spPr'); if (sx && !kid(sx, 'xfrm')) { var xx = kid(gf, 'xfrm').cloneNode(true); sx.insertBefore(xx, sx.firstChild); } return drawPic(page, pc, m, ctx, info); }
+        skip(info.n, 'embedded object');
+      } else skip(info.n, 'special object');
+      withMatrix(page, sm, H, function () {
+        page.drawRectangle({ x: 0, y: -x.h, width: x.w, height: x.h, color: PL.rgb(0.96, 0.96, 0.97), borderColor: PL.rgb(0.7, 0.72, 0.76), borderWidth: 0.75, borderDashArray: [4, 3] });
+        var label = /chart/.test(uri) ? 'Chart (not shown)' : 'Object (not shown)', s = Math.max(6, Math.min(14, x.h / 6)), lw = FR.widthOfTextAtSize(label, s);
+        page.drawText(label, { x: (x.w - lw) / 2, y: -x.h / 2 - s / 3, size: s, font: FR, color: PL.rgb(0.45, 0.47, 0.5) });
+      });
+    }
+
+    async function drawTable(page, tbl, sm, x, ctx, info) {
+      if (!tbl) return;
+      curTableM = sm;
+      var tp = kid(tbl, 'tblPr'), firstRow = attr(tp, 'firstRow') === '1', band = attr(tp, 'bandRow') === '1';
+      var hasStyle = !!kid(tp, 'tableStyleId') || firstRow || band;
+      var acc = ctx.theme.colors.accent1 || hexRgb('4472C4');
+      var cols = kids(kid(tbl, 'tblGrid'), 'gridCol').map(function (g) { return nattr(g, 'w', 0) / EMU; });
+      var rows = kids(tbl, 'tr'), y = 0;
+      var cellText = [], heights = rows.map(function (tr) { return nattr(tr, 'h', 0) / EMU; });
+      // grow rows to fit their text (rough estimate)
+      rows.forEach(function (tr, ri) {
+        var cx = 0;
+        kids(tr, 'tc').forEach(function (tc, ci) {
+          var span = nattr(tc, 'gridSpan', 1), w = 0; for (var s = 0; s < span; s++) w += cols[ci + s] || 0;
+          var paras = path(tc, 'txBody') ? kids(path(tc, 'txBody'), 'p') : [], need = 0;
+          paras.forEach(function (p) {
+            var txt = Array.prototype.map.call(p.getElementsByTagNameNS('*', 't'), function (t) { return t.textContent; }).join(''), rp = p.getElementsByTagNameNS('*', 'rPr')[0], sz = rp && rp.getAttribute('sz') ? +rp.getAttribute('sz') / 100 : 18;
+            var lw = Math.max(10, w - 14.4), lines = Math.max(1, Math.ceil(tw(txt, false, sz) / lw * 1.05));
+            need += lines * sz * 1.2;
+          });
+          heights[ri] = Math.max(heights[ri], need + 7.2);
+        });
+      });
+      await withMatrix(page, sm, H, async function () {
+        for (var ri = 0; ri < rows.length; ri++) {
+          var tr = rows[ri], cx = 0, tcs = kids(tr, 'tc');
+          for (var ci = 0; ci < tcs.length; ci++) {
+            var tc = tcs[ci], span = nattr(tc, 'gridSpan', 1), w = 0;
+            for (var s = 0; s < span; s++) w += cols[ci + s] || 0;
+            if (attr(tc, 'hMerge') === '1' || attr(tc, 'vMerge') === '1') { cx += cols[ci] || 0; continue; }
+            var rs = nattr(tc, 'rowSpan', 1), h = 0; for (var r2 = 0; r2 < rs; r2++) h += heights[ri + r2] || 0;
+            var tcPr = kid(tc, 'tcPr'), f = fillOf(tcPr, ctx);
+            var head = firstRow && ri === 0;
+            if (f === undefined && hasStyle) f = head ? { c: acc } : band ? { c: (ri - (firstRow ? 1 : 0)) % 2 === 0 ? mix(acc, 0.8) : mix(acc, 0.9) } : null;
+            if (f && f.c) page.drawRectangle({ x: cx, y: -y - h, width: w, height: h, color: rgb(f.c), opacity: clamp(f.c.a) });
+            var anyBorder = false;
+            [['lnL', cx, y, cx, y + h], ['lnR', cx + w, y, cx + w, y + h], ['lnT', cx, y, cx + w, y], ['lnB', cx, y + h, cx + w, y + h]].forEach(function (bd) {
+              var ln = kid(tcPr, bd[0]); if (!ln) return;
+              var lf = fillOf(ln, ctx); if (!lf || !lf.c) return; anyBorder = true;
+              page.drawLine({ start: { x: bd[1], y: -bd[2] }, end: { x: bd[3], y: -bd[4] }, thickness: nattr(ln, 'w', 12700) / EMU, color: rgb(lf.c) });
+            });
+            if (!anyBorder && hasStyle) page.drawRectangle({ x: cx, y: -y - h, width: w, height: h, borderColor: PL.rgb(1, 1, 1), borderWidth: 1 });
+            else if (!anyBorder && !hasStyle) page.drawRectangle({ x: cx, y: -y - h, width: w, height: h, borderColor: PL.rgb(0.6, 0.62, 0.66), borderWidth: 0.5 });
+            var cellM = mul(sm, [1, 0, 0, 1, cx, y]);
+            var box = { L: nattr(tcPr, 'marL', 91440) / EMU, R: nattr(tcPr, 'marR', 91440) / EMU, T: nattr(tcPr, 'marT', 45720) / EMU, B: nattr(tcPr, 'marB', 45720) / EMU };
+            var anch = attr(tcPr, 'anchor', 't'), fake = document.implementation.createDocument(null, 'b', null).documentElement; fake.setAttribute('anchor', anch);
+            var tcCtx = Object.assign({}, ctx);
+            var tColor = head ? hexRgb('FFFFFF') : ctx.text;
+            var bodyEl = kid(tc, 'txBody');
+            if (bodyEl && head) { // header text is bold in the default style
+              bodyEl = bodyEl.cloneNode(true);
+              Array.prototype.forEach.call(bodyEl.getElementsByTagNameNS('*', 'r'), function (r) { var rp = kid(r, 'rPr'); if (rp && rp.getAttribute('b') === null) rp.setAttribute('b', '1'); if (!rp) { rp = bodyEl.ownerDocument.createElementNS(r.namespaceURI, 'a:rPr'); rp.setAttribute('b', '1'); r.insertBefore(rp, r.firstChild); } });
+            }
+            await drawTextNoWrap(page, cellM, bodyEl, w, h, box, fake, tcCtx, tColor);
+            cx += w;
+          }
+          y += heights[ri];
+        }
+      });
+      function mix(c, k) { return { r: c.r + (1 - c.r) * k, g: c.g + (1 - c.g) * k, b: c.b + (1 - c.b) * k, a: 1 }; }
+    }
+    // tables are drawn inside the table's own matrix, which is already pushed
+    async function drawTextNoWrap(page, cellM, body, w, h, box, anchorEl, ctx, color0) {
+      if (!body) return;
+      // draw relative to the slide: undo the pushed table matrix by giving drawText the full matrix and popping temporarily
+      page.pushOperators(PL.popGraphicsState());
+      await drawText(page, cellM, body, w, h, [defStyle, kid(kid(curMaster, 'txStyles'), 'otherStyle')], [anchorEl], ctx, color0, { box: box });
+      var M = pdfMatrix(curTableM, H);
+      page.pushOperators(PL.pushGraphicsState(), PL.concatTransformationMatrix(M[0], M[1], M[2], M[3], M[4], M[5]));
+    }
+    var curMaster = null, curTableM = null;
+
+    async function background(page, bgEl, ctx, info) {
+      if (!bgEl) return false;
+      var bgPr = kid(bgEl, 'bgPr'), ref = kid(bgEl, 'bgRef'), f;
+      if (bgPr) f = fillOf(bgPr, ctx);
+      else if (ref) f = themeFill(nattr(ref, 'idx', 0), ref, ctx);
+      if (f === undefined) return false;
+      if (f && f.img) {
+        var im = await image(info.rels[f.img] && info.rels[f.img].target);
+        if (im) { page.drawImage(im, { x: 0, y: 0, width: W, height: H }); return true; }
+        return false;
+      }
+      if (f && f.c) page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(f.c), opacity: clamp(f.c.a) });
+      return true;
+    }
+
+    async function themeOf(p) {
+      var t = await xml(p), out = { colors: {}, fills: [], bgFills: [], lines: [] };
+      var cs = t && t.getElementsByTagNameNS('*', 'clrScheme')[0];
+      kids(cs).forEach(function (c) { var w = document.implementation.createDocument(null, 'x', null).documentElement; w.appendChild(c.firstElementChild ? c.firstElementChild.cloneNode(true) : c.cloneNode(true)); out.colors[c.localName] = color(w, { theme: { colors: {} }, map: {} }) || hexRgb('000000'); });
+      var fmt = t && t.getElementsByTagNameNS('*', 'fmtScheme')[0];
+      out.fills = kids(kid(fmt, 'fillStyleLst')); out.bgFills = kids(kid(fmt, 'bgFillStyleLst')); out.lines = kids(kid(fmt, 'lnStyleLst'));
+      return out;
+    }
+
+    var masters = {};
+    async function master(p) {
+      if (masters[p]) return masters[p];
+      var x = await xml(p), r = await rels(p), th = await themeOf(relOfType(r, /\/theme$/) || 'ppt/theme/theme1.xml');
+      var cm = kid(x, 'clrMap'), map = {};
+      if (cm) for (var i = 0; i < cm.attributes.length; i++) map[cm.attributes[i].localName] = cm.attributes[i].value;
+      return (masters[p] = { el: x, rels: r, theme: th, map: map });
+    }
+
+    var total = slides.length;
+    for (var si = 0; si < slides.length; si++) {
+      var sp = slides[si], sx = await xml(sp);
+      if (!sx) { skip(si + 1, 'slide that could not be read'); continue; }
+      if (attr(sx, 'show') === '0' && !includeHidden) continue;
+      slideNo = si + 1;
+      PT.say('', 'Drawing slide ' + (si + 1) + ' of ' + total + '…');
+      await new Promise(function (r) { setTimeout(r, 0); });
+      var srels = await rels(sp), layoutPath = relOfType(srels, /slideLayout$/), lx = layoutPath ? await xml(layoutPath) : null;
+      var lrels = layoutPath ? await rels(layoutPath) : {}, masterPath = relOfType(lrels, /slideMaster$/), M = masterPath ? await master(masterPath) : { el: null, rels: {}, theme: await themeOf('ppt/theme/theme1.xml'), map: {} };
+      curMaster = M.el;
+      var map = Object.assign({}, M.map);
+      [lx, sx].forEach(function (x) { var o = path(x, 'clrMapOvr/overrideClrMapping'); if (o) for (var i = 0; i < o.attributes.length; i++) map[o.attributes[i].localName] = o.attributes[i].value; });
+      var ctx = new Ctx({ theme: M.theme, map: map });
+      ctx.text = M.theme.colors[map.tx1 || 'dk1'] || hexRgb('000000');
+      var page = doc.addPage([W, H]);
+      var info = { n: si + 1, master: M.el, masterTree: path(M.el, 'cSld/spTree'), layoutTree: path(lx, 'cSld/spTree') };
+      page.drawRectangle({ x: 0, y: 0, width: W, height: H, color: rgb(M.theme.colors[map.bg1 || 'lt1'] || hexRgb('FFFFFF')) });
+      (await background(page, path(sx, 'cSld/bg'), ctx, Object.assign({}, info, { rels: srels }))) ||
+        (await background(page, path(lx, 'cSld/bg'), ctx, Object.assign({}, info, { rels: lrels }))) ||
+        (await background(page, path(M.el, 'cSld/bg'), ctx, Object.assign({}, info, { rels: M.rels })));
+      var I = [1, 0, 0, 1, 0, 0];
+      var showMaster = attr(sx, 'showMasterSp') !== '0', showLayoutMaster = attr(lx, 'showMasterSp') !== '0';
+      if (showMaster && showLayoutMaster && M.el) await drawTree(page, path(M.el, 'cSld/spTree'), I, ctx, Object.assign({}, info, { rels: M.rels, layer: 'master' }));
+      if (showMaster && lx) await drawTree(page, path(lx, 'cSld/spTree'), I, ctx, Object.assign({}, info, { rels: lrels, layer: 'layout' }));
+      await drawTree(page, path(sx, 'cSld/spTree'), I, ctx, Object.assign({}, info, { rels: srels, layer: 'slide' }));
+      if (kid(sx, 'timing') && sx.getElementsByTagNameNS('*', 'anim').length + sx.getElementsByTagNameNS('*', 'animEffect').length) skip(si + 1, 'animation (the slide is shown in its final state)');
+      done++;
+    }
+    if (!done) throw new Error('All slides in "' + f.name + '" are hidden. Tick "Include hidden slides" and try again.');
+    doc.setTitle(PT.base(f.name)); doc.setCreator('GetToolNest');
+    return { bytes: await doc.save(), pages: done, skipped: skipped };
+  }
+
+  function loadFonts() {
+    if (fontBytes) return Promise.resolve(fontBytes);
+    return Promise.all(['400', '700'].map(function (w) { return fetch('../assets/vendor/fonts/noto-sans-subset-' + w + '.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }); }))
+      .then(function (b) { return (fontBytes = b); })
+      .catch(function () { throw new Error('The font could not load. Check your connection and reload the page.'); });
+  }
+
+  var thumbToken = 0;
+  function clearThumbs() { thumbToken++; thumbUrls.forEach(function (u) { URL.revokeObjectURL(u); }); thumbUrls = []; $('thumbs').innerHTML = ''; $('skips').hidden = true; $('skips').innerHTML = ''; }
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    clearThumbs(); $('dl').hidden = true; $('go').disabled = true; file = null;
+    var ext = ((f.name.match(/\.([^.]+)$/) || [])[1] || '').toLowerCase();
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (ext === 'ppt' || ext === 'pps') return PT.say('bad', '"' + f.name + '" is an old .ppt file, which this tool cannot read. Open it in PowerPoint, Google Slides or LibreOffice, save it as .pptx, then try again.');
+    if (ext === 'key' || ext === 'odp') return PT.say('bad', '"' + f.name + '" is a ' + (ext === 'key' ? 'Keynote' : 'LibreOffice Impress') + ' file. Export it as PowerPoint (.pptx) first, or export it straight to PDF from that program.');
+    f.slice(0, 8).arrayBuffer().then(function (h) {
+      var b = new Uint8Array(h);
+      if (b[0] === 0xD0 && b[1] === 0xCF) throw new Error(ext === 'pptx' ? '"' + f.name + '" is password protected. Open it in PowerPoint, remove the password (File › Info › Protect Presentation), save, and try again.' : '"' + f.name + '" is an old .ppt file, which this tool cannot read. Save it as .pptx first.');
+      if (!(b[0] === 0x50 && b[1] === 0x4B)) throw new Error('"' + f.name + '" is not a PowerPoint .pptx file.');
+      file = f; $('go').disabled = false;
+      PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Press Make PDF.');
+    }).catch(function (e) { PT.say('bad', e.message); });
+  });
+  $('hidden').addEventListener('change', function () { $('dl').hidden = true; });
+
+  async function thumbs(bytes, tk) {
+    var pdf = await PT.render(new File([bytes], 'slides.pdf', { type: 'application/pdf' })), n = Math.min(pdf.numPages, 24);
+    for (var i = 1; i <= n; i++) {
+      var r = await PT.pageCanvas(pdf, i, 240 / (await pdf.getPage(i)).getViewport({ scale: 1 }).width), blob = await PT.blob(r.canvas, 'image/png');
+      if (tk !== thumbToken) { pdf.destroy(); return; }
+      if (!blob) continue;
+      var url = URL.createObjectURL(blob), fig = document.createElement('figure'), img = document.createElement('img'), cap = document.createElement('figcaption');
+      thumbUrls.push(url); img.src = url; img.alt = 'Slide ' + i; cap.textContent = 'Page ' + i;
+      fig.appendChild(img); fig.appendChild(cap); $('thumbs').appendChild(fig);
+    }
+    pdf.destroy();
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    var result = null;
+    PT.run(async function () {
+      clearThumbs();
+      PT.say('', 'Opening ' + file.name + '…');
+      var r;
+      try { r = await convert(file); }
+      catch (e) { if (e && /^"|^All slides|^The font/.test(e.message)) throw e; console.warn(e); throw new Error('"' + file.name + '" could not be converted. It may be damaged or use features this tool cannot read.'); }
+      result = r;
+      PT.done(r.bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'Your PDF is ready: ' + r.pages + (r.pages === 1 ? ' page' : ' pages'));
+      if (r.skipped.length) {
+        var ul = $('skips');
+        r.skipped.forEach(function (s) { var li = document.createElement('li'); li.textContent = 'Slide ' + s.slide + ': ' + (s.n > 1 ? s.n + ' × ' : '') + s.what + (/animation/.test(s.what) ? '' : ' could not be drawn'); ul.appendChild(li); });
+        ul.hidden = false;
+      }
+    }).then(function () {
+      busy = false;
+      if (result) thumbs(result.bytes, thumbToken).catch(function () {});
+    });
+  });
+})();
+</script>

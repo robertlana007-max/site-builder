@@ -1,0 +1,208 @@
+<style>
+.cm-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin: 12px 0; }
+.cm-opts label { font-weight: 400; font-size: 14.5px; margin: 0; }
+.cm-opts select { width: auto; min-height: 38px; padding: 5px 10px; }
+#cmIn, #cmOut { min-height: 240px; font-size: 13px; white-space: pre; overflow-wrap: normal; overflow-x: auto; tab-size: 4; }
+#cmOut { white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+<div class="fields" style="margin-bottom:10px">
+  <div><label>Language</label>
+    <div class="seg" role="group" aria-label="Language" id="cmLang"><button type="button" data-l="auto" aria-pressed="true">Auto</button><button type="button" data-l="html" aria-pressed="false">HTML</button><button type="button" data-l="css" aria-pressed="false">CSS</button><button type="button" data-l="js" aria-pressed="false">JavaScript</button></div></div>
+</div>
+<label for="cmIn">Your code</label>
+<textarea id="cmIn" data-nomemo spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste HTML, CSS or JavaScript here."></textarea>
+<div class="btns" style="margin-top:8px">
+  <button class="btn ghost" id="cmOpen">Open file</button>
+  <button class="btn ghost" id="cmClr">Clear</button>
+  <input type="file" id="cmFile" accept=".html,.htm,.css,.js,.mjs,.cjs,.svg,.xml,.txt,text/*" hidden data-nomemo>
+</div>
+<div class="cm-opts">
+  <label><input type="checkbox" id="cmMangle" checked>Shorten variable names (JavaScript)</label>
+  <label><input type="checkbox" id="cmLic" checked>Keep licence comments (/*! … */)</label>
+  <label><input type="checkbox" id="cmInline" checked>Also minify CSS and JS inside HTML</label>
+  <label for="cmIndent">Beautify indent</label>
+  <select id="cmIndent"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="tab">Tab</option></select>
+</div>
+<div class="btns">
+  <button class="btn" id="cmMin">Minify</button>
+  <button class="btn" id="cmBeau">Beautify</button>
+</div>
+<p class="msg" id="cmMsg"></p>
+<div class="stats">
+  <div class="stat"><span>Before</span><b id="cmB">0 B</b></div>
+  <div class="stat"><span>After</span><b id="cmA">0 B</b></div>
+  <div class="stat"><span>Saved</span><b id="cmS">0%</b></div>
+</div>
+<label for="cmOut" style="margin-top:16px">Result</label>
+<textarea id="cmOut" data-nomemo readonly spellcheck="false" placeholder="The minified or beautified code appears here."></textarea>
+<div class="btns">
+  <button class="btn" id="cmCp">Copy result</button>
+  <button class="btn ghost" id="cmDl">Download</button>
+  <button class="btn ghost" id="cmUse">Use result as input</button>
+</div>
+<script src="../assets/vendor/js-beautify/beautifier.min.js"></script>
+<script>
+(function () {
+  var lang = 'auto', lastLang = 'js', busy = false;
+  function say(cls, t) { $('cmMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('cmMsg').textContent = t; }
+  function size(s) { return new Blob([s]).size; }
+  function detect(code) {
+    var s = code.trim().replace(/^(?:\/\*[\s\S]*?\*\/\s*|\/\/[^\n]*\n\s*)+/, '');
+    if (/^</.test(s)) return 'html';
+    if (/^(@(charset|import|media|font-face|keyframes|supports|layer|tailwind)|[#.:\[*a-z][^{};()=]*\{\s*[-a-z]+\s*:)/i.test(s) && !/\b(function|const|let|var|return|=>)\b/.test(s.slice(0, 2000))) return 'css';
+    return 'js';
+  }
+  var NAMES = { html: 'HTML', css: 'CSS', js: 'JavaScript' };
+
+  // ---------- CSS: remove comments and spaces the browser does not need, never touching strings ----------
+  function minCSS(css, keepLic) {
+    var out = '', i = 0, n = css.length;
+    while (i < n) {
+      var c = css[i];
+      if (c === '"' || c === '\'') {
+        var j = i + 1; while (j < n && css[j] !== c) { if (css[j] === '\\') j++; j++; }
+        out += css.slice(i, j + 1); i = j + 1; continue;
+      }
+      if (c === '/' && css[i + 1] === '*') {
+        var e = css.indexOf('*/', i + 2); if (e === -1) e = n;
+        if (keepLic && css[i + 2] === '!') { out += css.slice(i, e + 2) + '\n'; i = e + 2; while (i < n && /\s/.test(css[i])) i++; continue; }
+        i = e + 2; continue;
+      }
+      if (/\s/.test(c)) { while (i < n && /\s/.test(css[i])) i++; out += ' '; continue; }
+      out += c; i++;
+    }
+    // drop spaces around punctuation, except inside strings (protected by splitting on them)
+    return out.split(/("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*'|\/\*![\s\S]*?\*\/)/).map(function (part, k) {
+      if (k % 2) return part;
+      return part.replace(/\s*([{};,>~])\s*/g, '$1').replace(/\s+:(?=[^{};]*[;}])/g, ':').replace(/:\s+/g, ':').replace(/;}/g, '}').replace(/\s*!important/g, '!important')
+        .replace(/(^|[ :,(])0(?:px|em|rem|pt|cm|mm|in|pc|ex|ch|vw|vh|vmin|vmax)(?=[ ;,)}]|$)/g, '$10').replace(/(^|[ :,(])0+(\.\d)/g, '$1$2');
+    }).join('').trim();
+  }
+  // ---------- HTML ----------
+  var BLOCK = /^(html|head|body|title|meta|link|base|script|style|noscript|template|div|p|ul|ol|li|dl|dt|dd|table|thead|tbody|tfoot|tr|td|th|caption|colgroup|col|section|article|aside|header|footer|nav|main|h[1-6]|hr|br|form|fieldset|legend|figure|figcaption|blockquote|pre|address|details|summary|dialog|option|optgroup|select|svg|canvas|video|audio|source|track|picture|iframe|object|!doctype)$/i;
+  function tagName(t) { var m = /^<\/?\s*([!\w-]+)/.exec(t); return m ? m[1] : ''; }
+  function minHTML(html, opt) {
+    var keep = [], tasks = [];
+    var hold = function (s) { keep.push(s); return '\u0000' + (keep.length - 1) + '\u0000'; };
+    // protect blocks whose whitespace matters, and minify inline CSS/JS
+    html = html.replace(/<(pre|textarea)\b[\s\S]*?<\/\1\s*>/gi, hold);
+    html = html.replace(/<style\b([^>]*)>([\s\S]*?)<\/style\s*>/gi, function (m, attrs, body) { return hold('<style' + attrs.replace(/\s+/g, ' ').replace(/\s+$/, '') + '>' + (opt.inline ? minCSS(body, opt.lic) : body) + '</style>'); });
+    html = html.replace(/<script\b([^>]*)>([\s\S]*?)<\/script\s*>/gi, function (m, attrs, body) {
+      var a = attrs.replace(/\s+/g, ' ').replace(/\s+$/, ''), type = (/\btype\s*=\s*["']?([^"'\s>]+)/i.exec(attrs) || [])[1] || '';
+      var idx = keep.length; keep.push('');
+      if (opt.inline && /ld\+json|^application\/json$/i.test(type)) { try { body = JSON.stringify(JSON.parse(body)); } catch (e) {} }
+      else if (opt.inline && body.trim() && (!type || /javascript|module|ecmascript/i.test(type))) tasks.push({ idx: idx, a: a, code: body, module: /module/i.test(type) });
+      keep[idx] = '<script' + a + '>' + body + '<\/script>';
+      return '\u0000' + idx + '\u0000';
+    });
+    html = html.replace(/<!--(?!\[if|!|<!)[\s\S]*?-->/g, '');
+    var parts = html.split(/(<(?:[^>"']|"[^"]*"|'[^']*')*>|\u0000\d+\u0000)/), out = [];
+    parts.forEach(function (p, k) {
+      if (k % 2) {
+        if (p[0] === '\u0000') { out.push(p); return; }
+        // inside a tag: collapse spaces outside quoted values
+        out.push(p.replace(/("[^"]*"|'[^']*')|\s+/g, function (m, q) { return q || ' '; }).replace(/\s+(\/?>)$/, '$1').replace(/^<\s+/, '<'));
+      } else out.push(p.replace(/\s+/g, ' '));
+    });
+    // remove whitespace-only text next to block-level tags
+    for (var k = 0; k < out.length; k += 2) {
+      if (out[k] !== ' ') continue;
+      var prev = out[k - 1] || '', next = out[k + 1] || '', isB = function (t) { return t[0] === '\u0000' || BLOCK.test(tagName(t)); };
+      if (!prev || !next || isB(prev) || isB(next)) out[k] = '';
+    }
+    var res = out.join('').trim();
+    return { html: res, keep: keep, tasks: tasks };
+  }
+  function restore(r) { return r.html.replace(/\u0000(\d+)\u0000/g, function (m, i) { return r.keep[+i]; }); }
+
+  // ---------- JavaScript minifying runs in a worker with Terser, so big files do not freeze the page ----------
+  var worker = null, wid = 0, waiting = {};
+  function jsWorker() {
+    if (worker) return worker;
+    var src = 'importScripts(' + JSON.stringify(new URL('../assets/vendor/terser/terser.min.js', location.href).href) + ');' +
+      'onmessage=function(e){var d=e.data;Terser.minify(d.code,d.opt).then(function(r){postMessage({id:d.id,code:r.code});},function(err){postMessage({id:d.id,error:String(err.message||err),line:err.line,col:err.col});});};';
+    worker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+    worker.onmessage = function (e) { var cb = waiting[e.data.id]; delete waiting[e.data.id]; if (cb) cb(e.data); };
+    worker.onerror = function (e) { e.preventDefault(); Object.keys(waiting).forEach(function (k) { waiting[k]({ error: 'The JavaScript minifier could not start. Check your connection and reload the page.' }); }); waiting = {}; worker = null; };
+    return worker;
+  }
+  function minJS(code, module) {
+    return new Promise(function (resolve) {
+      var id = ++wid; waiting[id] = resolve;
+      jsWorker().postMessage({ id: id, code: code, opt: { compress: { passes: 2 }, mangle: $('cmMangle').checked, module: !!module, format: { comments: $('cmLic').checked ? 'some' : false } } });
+    });
+  }
+  function done(src, out, kind, what) {
+    $('cmOut').value = out; lastLang = kind;
+    var b = size(src), a = size(out);
+    $('cmB').textContent = fmtBytes(b); $('cmA').textContent = fmtBytes(a);
+    $('cmS').textContent = b ? (b >= a ? fmtNum((1 - a / b) * 100, 1) + '%' : '+' + fmtNum((a / b - 1) * 100, 1) + '%') : '0%';
+    say('ok', what + ' ' + NAMES[kind] + (lang === 'auto' ? ' (detected)' : '') + '.');
+  }
+  function setBusy(on) { busy = on; $('cmMin').disabled = on; $('cmBeau').disabled = on; }
+  $('cmMin').addEventListener('click', function () {
+    var src = $('cmIn').value;
+    if (!src.trim()) { say('bad', 'Paste some code first.'); return; }
+    if (busy) return;
+    var kind = lang === 'auto' ? detect(src) : lang, t0 = performance.now();
+    if (kind === 'css') { done(src, minCSS(src, $('cmLic').checked), 'css', 'Minified'); return; }
+    setBusy(true); say('', 'Minifying…');
+    if (kind === 'js') {
+      minJS(src, /^\s*(import|export)\b/m.test(src)).then(function (r) {
+        setBusy(false);
+        if (r.error) { say('bad', 'Could not minify: ' + r.error + (r.line ? ' (line ' + r.line + ', column ' + ((r.col || 0) + 1) + ')' : '') + '. Check that this is valid JavaScript' + (lang === 'auto' ? ', or choose the right language above' : '') + '.'); return; }
+        done(src, r.code, 'js', 'Minified');
+      });
+      return;
+    }
+    var r = minHTML(src, { inline: $('cmInline').checked, lic: $('cmLic').checked }), failed = 0;
+    Promise.all(r.tasks.map(function (t) {
+      return minJS(t.code, t.module).then(function (m) { if (m.error) failed++; else r.keep[t.idx] = '<script' + t.a + '>' + m.code + '<\/script>'; });
+    })).then(function () {
+      setBusy(false);
+      done(src, restore(r), 'html', 'Minified');
+      if (failed) say('bad', 'Minified the HTML. ' + failed + (failed === 1 ? ' script was' : ' scripts were') + ' left as they were because of a JavaScript error inside.');
+    });
+  });
+  $('cmBeau').addEventListener('click', function () {
+    var src = $('cmIn').value;
+    if (!src.trim()) { say('bad', 'Paste some code first.'); return; }
+    if (typeof beautifier === 'undefined') { say('bad', 'The beautifier did not load. Check your connection and reload the page.'); return; }
+    var kind = lang === 'auto' ? detect(src) : lang, ind = $('cmIndent').value;
+    var o = { indent_size: ind === 'tab' ? 1 : +ind, indent_char: ind === 'tab' ? '\t' : ' ', indent_with_tabs: ind === 'tab', preserve_newlines: true, max_preserve_newlines: 2, end_with_newline: true, wrap_line_length: 0, indent_inner_html: false, extra_liners: [] };
+    setBusy(true); say('', 'Beautifying…');
+    setTimeout(function () {
+      try { done(src, kind === 'css' ? beautifier.css(src, o) : kind === 'html' ? beautifier.html(src, o) : beautifier.js(src, o), kind, 'Beautified'); }
+      catch (e) { say('bad', 'Could not beautify: ' + (e.message || e)); }
+      setBusy(false);
+    }, 20);
+  });
+  $('cmLang').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    lang = b.dataset.l;
+    [].forEach.call(this.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+  });
+  $('cmCp').addEventListener('click', function () { if ($('cmOut').value) copyText($('cmOut').value, $('cmCp')); else say('', 'There is no result to copy yet.'); });
+  $('cmDl').addEventListener('click', function () {
+    var v = $('cmOut').value; if (!v) { say('', 'There is no result to download yet.'); return; }
+    var min = /^Minified/.test($('cmMsg').textContent), ext = lastLang === 'js' ? 'js' : lastLang, type = { js: 'text/javascript', css: 'text/css', html: 'text/html' }[lastLang];
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([v], { type: type + ';charset=utf-8' })); a.download = (min ? 'code.min.' : 'code.') + ext; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('cmUse').addEventListener('click', function () { if ($('cmOut').value) { $('cmIn').value = $('cmOut').value; say('', 'The result is now your input.'); } });
+  $('cmClr').addEventListener('click', function () { $('cmIn').value = ''; $('cmOut').value = ''; ['cmB', 'cmA'].forEach(function (id) { $(id).textContent = '0 B'; }); $('cmS').textContent = '0%'; say('', ''); $('cmIn').focus(); });
+  $('cmOpen').addEventListener('click', function () { $('cmFile').click(); });
+  $('cmFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 20 * 1048576) { say('bad', 'That file is ' + fmtBytes(f.size) + '. Please use a file under 20 MB.'); return; }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) { say('bad', 'That does not look like a code file.'); return; }
+      $('cmIn').value = t;
+      var ext = ((/\.(\w+)$/.exec(f.name) || [])[1] || '').toLowerCase(), l = /^html?$|^svg$/.test(ext) ? 'html' : ext === 'css' ? 'css' : /^[mc]?js$/.test(ext) ? 'js' : 'auto';
+      $('cmLang').querySelector('[data-l="' + l + '"]').click();
+      say('ok', 'Opened ' + f.name + ' (' + fmtBytes(f.size) + '). Press Minify or Beautify.');
+    });
+  });
+})();
+</script>
