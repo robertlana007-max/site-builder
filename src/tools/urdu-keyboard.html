@@ -1,0 +1,383 @@
+<style>
+@font-face { font-family: 'GTN Nastaliq'; font-style: normal; font-weight: 400; font-display: swap; src: url(../assets/vendor/fonts/noto-nastaliq-urdu-arabic-400-normal.woff2) format('woff2'); }
+.uk-out { font-family: 'GTN Nastaliq', 'Noto Nastaliq Urdu', 'Jameel Noori Nastaleeq', 'Urdu Typesetting', serif; font-size: 26px; line-height: 2.3; min-height: 210px; direction: rtl; text-align: right; }
+.uk-out.naskh { font-family: 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI', Tahoma, 'Noto Sans Arabic', sans-serif; line-height: 1.8; }
+.uk-top { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-bottom: 12px; }
+.uk-top .seg { flex-wrap: wrap; }
+.uk-sug { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-height: 44px; margin: 8px 0; direction: rtl; }
+.uk-sug button { font-family: 'GTN Nastaliq', 'Noto Nastaliq Urdu', serif; font-size: 20px; line-height: 1.9; padding: 0 14px; min-height: 40px; border: 1px solid var(--line); border-radius: 999px; background: var(--bg); color: var(--ink); cursor: pointer; }
+.uk-sug button:first-of-type { border-color: var(--accent); background: var(--accent-soft); }
+.uk-sug .uk-rom { font-family: var(--mono); font-size: 14px; color: var(--muted); direction: ltr; margin-inline-start: 6px; }
+.uk-kb { margin-top: 4px; padding: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); user-select: none; -webkit-user-select: none; touch-action: manipulation; }
+.uk-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 4px; direction: ltr; }
+.uk-row:last-child { margin-bottom: 0; }
+.uk-k { flex: 1 1 0; min-width: 0; max-width: 58px; height: 52px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 0; position: relative; }
+.uk-k:active, .uk-k.down { background: var(--accent-soft); border-color: var(--accent); }
+.uk-k b { font-family: 'Noto Naskh Arabic', 'Geeza Pro', 'Segoe UI', Tahoma, sans-serif; font-size: 21px; font-weight: 500; line-height: 1.1; }
+.uk-k i { font-style: normal; font-size: 10px; color: var(--muted); position: absolute; top: 2px; left: 4px; font-family: var(--mono); }
+.uk-k.w2 { max-width: 96px; flex-grow: 1.6; font-size: 13px; font-weight: 600; }
+.uk-k.sp { max-width: 320px; flex-grow: 5; font-size: 13px; }
+.uk-k.on { background: var(--accent); color: var(--on-accent); }
+.uk-k.on i { color: inherit; }
+@media (max-width: 480px) { .uk-k { height: 46px; } .uk-k b { font-size: 18px; } .uk-k i { display: none; } .uk-row { gap: 3px; } .uk-kb { padding: 5px; margin-inline: -6px; } }
+.uk-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-top: 12px; font-size: 14px; }
+.uk-opts select { width: auto; min-height: 38px; padding: 5px 10px; }
+.uk-opts label { display: inline; font-weight: 400; margin: 0; }
+</style>
+<div class="uk-top">
+  <div class="seg" role="group" aria-label="Typing mode" id="ukMode">
+    <button type="button" data-m="roman" aria-pressed="true">Roman Urdu → Urdu</button>
+    <button type="button" data-m="phon" aria-pressed="false">Phonetic keyboard</button>
+    <button type="button" data-m="off" aria-pressed="false">My own keyboard</button>
+  </div>
+</div>
+<p class="msg" id="ukHelp" style="margin:0 0 10px"></p>
+<label for="ukOut">Urdu text</label>
+<textarea id="ukOut" class="uk-out" data-nomemo dir="rtl" lang="ur" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="یہاں لکھیں"></textarea>
+<div class="uk-sug" id="ukSug" aria-live="polite"></div>
+<div class="uk-kb" id="ukKb" aria-label="On-screen Urdu keyboard"></div>
+<div class="btns" style="margin-top:4px">
+  <button class="btn" id="ukCopy">Copy Urdu text</button>
+  <button class="btn ghost" id="ukConv">Convert Roman words</button>
+  <button class="btn ghost" id="ukDl">Download .txt</button>
+  <button class="btn ghost" id="ukClr">Clear</button>
+</div>
+<p class="msg" id="ukMsg"></p>
+<div class="stats">
+  <div class="stat"><span>Words</span><b id="ukW">0</b></div>
+  <div class="stat"><span>Characters</span><b id="ukC">0</b></div>
+</div>
+<div class="uk-opts">
+  <label for="ukFont">Font</label>
+  <select id="ukFont"><option value="nastaliq">Nastaliq (traditional)</option><option value="naskh">Naskh (simple)</option></select>
+  <label for="ukSize">Size</label>
+  <select id="ukSize"><option value="20">Small</option><option value="26" selected>Medium</option><option value="34">Large</option><option value="44">Extra large</option></select>
+  <label><input type="checkbox" id="ukDigits">Urdu digits ۱۲۳</label>
+  <label><input type="checkbox" id="ukNoKb">Hide the phone keyboard (use the keys below)</label>
+</div>
+<script>
+(function () {
+  var ta = $('ukOut'), mode = 'roman', shift = false;
+  function say(cls, t) { $('ukMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('ukMsg').textContent = t; }
+
+  // ---------- phonetic layout: each Latin key types the Urdu letter that sounds like it; Shift gives the second letter ----------
+  var KEYS = {
+    q: 'ق', w: 'و', e: 'ع', r: 'ر', t: 'ت', y: 'ے', u: 'ء', i: 'ی', o: 'ہ', p: 'پ',
+    a: 'ا', s: 'س', d: 'د', f: 'ف', g: 'گ', h: 'ح', j: 'ج', k: 'ک', l: 'ل',
+    z: 'ز', x: 'ش', c: 'چ', v: 'ط', b: 'ب', n: 'ن', m: 'م',
+    Q: 'ْ', W: 'ّ', E: 'ٰ', R: 'ڑ', T: 'ٹ', Y: 'َ', U: 'ئ', I: 'ِ', O: 'ۃ', P: 'ُ',
+    A: 'آ', S: 'ص', D: 'ڈ', F: 'ً', G: 'غ', H: 'ھ', J: 'ض', K: 'خ', L: 'ۂ',
+    Z: 'ذ', X: 'ژ', C: 'ث', V: 'ظ', B: 'ۓ', N: 'ں', M: 'ؤ',
+    ',': '،', '.': '۔', '?': '؟', ';': '؛', '%': '٪'
+  };
+  var UDIG = '۰۱۲۳۴۵۶۷۸۹';
+  var ROWS = [['1', '2', '3', '4', '5', '6', '7', '8', '9', '0'], ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'], ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l'], ['SHIFT', 'z', 'x', 'c', 'v', 'b', 'n', 'm', 'BACK'], ['ZWNJ', ',', 'SPACE', '.', '?', 'ENTER']];
+  function keyOut(k) {
+    if (/^[0-9]$/.test(k)) return $('ukDigits').checked ? UDIG[+k] : k;
+    return KEYS[k] || k;
+  }
+
+  // ---------- Roman Urdu to Urdu: a dictionary of common words first, then sound rules ----------
+  var DICT_SRC = 'main|mein|mai|men|mien=میں hum|ham=ہم tum=تم aap|ap=آپ tu|tuu|to=تو woh|wo|vo|voh|wuh|woh=وہ yeh|ye|yah=یہ ' +
+    'mera=میرا meri=میری mere|meray=میرے tera=تیرا teri=تیری tere|teray=تیرے hamara|humara=ہمارا hamari|humari=ہماری hamare|humare=ہمارے ' +
+    'tumhara=تمہارا tumhari=تمہاری tumhare=تمہارے aapka|apka=آپ_کا aapki|apki=آپ_کی aapke|apke=آپ_کے aapko|apko=آپ_کو ' +
+    'uska|iska=اس_کا uski|iski=اس_کی uske|iske=اس_کے usko|isko=اس_کو unka|inka=ان_کا unki|inki=ان_کی unke|inke=ان_کے unko|inko=ان_کو ' +
+    'mujhe|mujhay|mjhe=مجھے mujh=مجھ tujhe=تجھے humein|hamein|hume|hamen|humen=ہمیں tumhein|tumhe|tumhen=تمہیں unhein|unhe|unhen|inhein|inhe=انہیں use|usay|ise|isay=اسے ' +
+    'us|is=اس un|in=ان koi=کوئی kuch|kuchh|kuj=کچھ sab=سب sabhi=سبھی har=ہر apna=اپنا apni=اپنی apne|apnay=اپنے khud=خود kisi=کسی kis=کس jis=جس jo=جو ' +
+    'ka=کا ki=کی ke|kay=کے ko=کو se|say=سے par|pe|pr|per=پر tak=تک liye|liay|lie|liya_=لیے saath|sath=ساتھ baad=بعد pehle|pehlay|pahle=پہلے ' +
+    'andar=اندر bahar|baahar=باہر upar|oopar=اوپر neeche|niche=نیچے paas|pas=پاس beech|bich=بیچ wala|waala=والا wali|waali=والی wale|walay|waale=والے ' +
+    'hai|he|hy|hae|hay=ہے hain|hen|hein=ہیں hun|hoon|hu|hoo=ہوں ho=ہو tha|thaa=تھا thi|thee=تھی the|thay=تھے thin|theen=تھیں ' +
+    'hoga=ہوگا hogi=ہوگی honge|hongay=ہوں_گے hona=ہونا hota=ہوتا hoti=ہوتی hote|hotay=ہوتے hua|huwa|howa=ہوا hui|huwi|hoi=ہوئی hue|huay|huwe|hoe=ہوئے ' +
+    'gaya|gya=گیا gayi|gai|gyi=گئی gaye|gae|gye|gaey=گئے raha|rha=رہا rahi|rhi=رہی rahe|rhe|rahay=رہے sakta=سکتا sakti=سکتی sakte|saktay=سکتے ' +
+    'chahiye|chahiyay|chahie|chahye=چاہیے chahta=چاہتا chahti=چاہتی chahte=چاہتے ' +
+    'karna=کرنا karo=کرو karta=کرتا karti=کرتی karte|kartay=کرتے kar|kr=کر kiya|kia|kya|kyaa=کیا karen|karein|krein|karain=کریں karega=کرے_گا karegi=کرے_گی ' +
+    'jana|jaana=جانا jao|jaao=جاؤ ja|jaa=جا jata|jaata=جاتا jati|jaati=جاتی jate|jaate|jatay=جاتے aana|ana=آنا aao|ao=آؤ aa=آ aaya|aya=آیا aayi|ayi|aai=آئی aaye|aye|aae=آئے ' +
+    'dena=دینا do=دو diya|dia=دیا di=دی de|day=دے lena=لینا lo=لو liya|lia=لیا li=لی le|lay=لے ' +
+    'dekhna=دیکھنا dekho=دیکھو dekh=دیکھ dekha=دیکھا dekhi=دیکھی kehna|kahna=کہنا kaha=کہا kaho=کہو keh|kah=کہ kehte|kahte=کہتے kehta|kahta=کہتا kehti|kahti=کہتی ' +
+    'bolna=بولنا bolo=بولو bola=بولا boli=بولی sunna=سننا suno=سنو suna=سنا suni=سنی samajh|samaj=سمجھ samjha=سمجھا samjho=سمجھو samajhna=سمجھنا ' +
+    'sochna=سوچنا socha=سوچا socho=سوچو likhna=لکھنا likho=لکھو likha=لکھا likh=لکھ parhna|padhna=پڑھنا parho|padho=پڑھو parha|padha=پڑھا parh|padh=پڑھ ' +
+    'khana|khaana=کھانا khao|khaao=کھاؤ khaya=کھایا piyo|pio=پیو pina|peena=پینا sona=سونا so=سو uthna=اٹھنا utho=اٹھو baithna=بیٹھنا baitho|betho=بیٹھو ' +
+    'chalna=چلنا chalo=چلو chala=چلا chali=چلی chale|chalay=چلے milna=ملنا milo=ملو mila=ملا mili=ملی mile|milay=ملے rehna|rahna=رہنا raho=رہو reh|rah=رہ ' +
+    'pata|pta=پتا pucho|poocho=پوچھو puchna|poochna=پوچھنا poocha|pucha=پوچھا batao|bataao=بتاؤ batana=بتانا bataya=بتایا ' +
+    'khelna=کھیلنا khel=کھیل kholna=کھولنا kholo=کھولو khula=کھلا khara|khada=کھڑا rakho=رکھو rakh=رکھ rakhna=رکھنا laga=لگا lagta=لگتا lagti=لگتی lagi=لگی lage=لگے ' +
+    'mat=مت na=نہ nahi|nahin|nhi|nahee|nahin=نہیں haan|han|haa=ہاں ji|jee=جی theek|thik|teek|thek=ٹھیک accha|acha|achha|achcha|acha=اچھا achi|achhi|acchi=اچھی ache|achhe|acche|achay=اچھے ' +
+    'bura=برا buri=بری bure|buray=برے kaise|kese|kaisay|kesay=کیسے kaisa|kesa=کیسا kaisi|kesi=کیسی kaun|kon=کون kab=کب kahan|kahaan|kahaa=کہاں kahin|kaheen=کہیں ' +
+    'kyun|kyon|kiyon|kyu|kyoon|kiun=کیوں kitna=کتنا kitni=کتنی kitne=کتنے jab=جب tab=تب jahan|jahaan=جہاں yahan|yahaan|yaha=یہاں wahan|wahaan|vahan|waha=وہاں ' +
+    'ab=اب phir|fir|phr=پھر abhi=ابھی kabhi=کبھی sirf=صرف bhi|b=بھی aur|or=اور lekin|lakin|laikin=لیکن magar=مگر agar=اگر ya=یا kyunke|kyunki|kyonki|kiunke|kyuke=کیونکہ isliye|islie=اس_لیے ' +
+    'bohat|bahut|bohot|boht|bht|buhat=بہت zyada|ziyada|zayada=زیادہ kam=کم thoda|thora=تھوڑا thodi|thori=تھوڑی bilkul=بالکل shayad=شاید zaroor|zarur=ضرور hamesha=ہمیشہ ' +
+    'aaj|aj=آج kal=کل parson=پرسوں raat|rat=رات din=دن subah|subha=صبح shaam|sham=شام dopahar=دوپہر waqt|waqat=وقت saal|sal=سال mahina=مہینہ hafta=ہفتہ ghanta=گھنٹہ jaldi=جلدی der=دیر intezar|intazar|intizar=انتظار ' +
+    'jaise|jese=جیسے jaisa|jesa=جیسا aise|aese|aisay|esay=ایسے aisa|esa=ایسا aisi|esi=ایسی waise|wese=ویسے waisa|wesa=ویسا ' +
+    'mujhse=مجھ_سے tumse=تم_سے aapse|apse=آپ_سے hamse|humse=ہم_سے isse|usse=اس_سے sabse=سب_سے ' +
+    'ghar=گھر pani|paani=پانی dost=دوست dosti=دوستی pyar|pyaar=پیار mohabbat|muhabbat=محبت ishq=عشق dil=دل zindagi|zindgi=زندگی duniya|dunya=دنیا log=لوگ logon=لوگوں ' +
+    'insaan|insan=انسان aadmi|admi=آدمی aurat=عورت bachcha|bacha|baccha=بچہ bachche|bache|bacche=بچے maa|ma=ماں ammi|ami=امی abbu|abu=ابو baap=باپ bhai=بھائی behan|bahan=بہن ' +
+    'beta=بیٹا beti=بیٹی shohar=شوہر biwi|biwee=بیوی khandan|khaandaan=خاندان naam|nam=نام kaam=کام baat|bat=بات baatein|baaten|batain=باتیں sawal|sawaal=سوال jawab|jawaab=جواب ' +
+    'kitab|kitaab=کتاب school|skool=اسکول sabaq=سبق ustad|ustaad=استاد ilm=علم shehar|shahar|sheher=شہر mulk=ملک pakistan=پاکستان hindustan=ہندوستان urdu=اردو zuban|zaban|zubaan=زبان ' +
+    'khush=خوش khushi=خوشی gham|ghum=غم dard=درد sehat|sehet=صحت khuda=خدا allah=اللہ rasool=رسول namaz|namaaz=نماز roza=روزہ eid=عید ramzan|ramazan=رمضان masjid=مسجد dua=دعا ' +
+    'shukriya|shukria|shukriyah=شکریہ meherbani|mehrbani|meharbani=مہربانی maaf|muaf=معاف maafi=معافی salam|salaam=سلام assalam|assalamu|asalam=السلام alaikum|alaykum|alekum=علیکم ' +
+    'hafiz=حافظ inshallah|inshaallah=ان_شاء_اللہ mashallah|mashaallah=ماشاء_اللہ alhamdulillah=الحمدللہ subhanallah=سبحان_اللہ jazakallah=جزاک_اللہ adaab|adab=آداب khushamdeed=خوش_آمدید ' +
+    'khabar=خبر akhbar=اخبار kahani=کہانی sach=سچ jhoot|jhooth|jhut=جھوٹ khwab|khawab=خواب khayal|khyal|khayaal=خیال sapna=سپنا raasta|rasta=راستہ gaadi|gari|gaari=گاڑی ' +
+    'paisa|pesa=پیسہ paise|pese|paisay=پیسے rupay|rupaye|rupee=روپے kapre|kapde=کپڑے chai|chaye|chaai=چائے doodh|dudh=دودھ roti=روٹی chawal=چاول gosht=گوشت phal=پھل phool|phul=پھول ' +
+    'darakht=درخت aasman|asman|aasmaan=آسمان zameen|zamin=زمین suraj|sooraj=سورج chand|chaand=چاند sitara=ستارہ barish|baarish=بارش hawa=ہوا garmi=گرمی sardi=سردی mausam|mosam=موسم ' +
+    'aankh|ankh=آنکھ aankhen|ankhen|aankhein=آنکھیں haath|hath=ہاتھ sar=سر chehra|chehra=چہرہ safar=سفر naukri|nokri=نوکری daftar=دفتر bazaar|bazar=بازار dukaan|dukan=دکان ' +
+    'mehman|mehmaan=مہمان shaadi|shadi=شادی mubarak=مبارک saalgirah|salgira|salgirah=سالگرہ tohfa=تحفہ khoobsurat|khubsurat=خوبصورت pyara=پیارا pyari=پیاری pyare=پیارے ' +
+    'bara|bada=بڑا bari|badi=بڑی bare|bade=بڑے chota|chhota=چھوٹا choti|chhoti=چھوٹی chote|chhote=چھوٹے naya=نیا nayi|nai=نئی naye|naey=نئے purana=پرانا purani=پرانی ' +
+    'sasta=سستا mehnga|mehenga|mehanga=مہنگا garam|garm=گرم thanda=ٹھنڈا thandi=ٹھنڈی asaan|aasan|aasaan=آسان mushkil=مشکل zaroori|zaruri=ضروری sahi|sahee=صحیح ghalat|galat=غلط ' +
+    'pehla=پہلا doosra|dusra=دوسرا teesra|tisra=تیسرا aakhri|akhri=آخری ek|aik=ایک teen=تین char|chaar=چار paanch|panch=پانچ chhe|chay|chhay=چھ saat=سات aath=آٹھ nau=نو das=دس ' +
+    'sau=سو hazar|hazaar=ہزار lakh=لاکھ crore|karor=کروڑ pasand=پسند nafrat=نفرت yaad|yad=یاد bhool|bhul=بھول umeed|umid=امید dar=ڈر sabr|sabar=صبر izzat=عزت sharm=شرم ' +
+    'himmat=ہمت taqat|taaqat=طاقت haq=حق sukoon|sukun=سکون aman|amn=امن jung|jang=جنگ watan=وطن qaum=قوم zinda=زندہ maut|mout=موت jaan|jan=جان rooh|ruh=روح shukar|shukr=شکر ' +
+    'kalam|qalam=قلم kaghaz|kagaz=کاغذ phone|fon=فون computer=کمپیوٹر internet=انٹرنیٹ video=ویڈیو message|msg=میسج please|plz=پلیز sorry=سوری thanks=تھینکس ok|okay=اوکے ' +
+    'bas=بس chup=چپ sath|saath=ساتھ andaz|andaaz=انداز mazaa|maza=مزہ mazay|maze=مزے dekhte=دیکھتے dekhta=دیکھتا sunte=سنتے jaanta|janta=جانتا jaanti|janti=جانتی jaante|jante=جانتے ' +
+    'mujhko=مجھ_کو tumko=تم_کو humko=ہم_کو sakoon=سکون kuchh=کچھ kaafi|kafi=کافی sach=سچ jhooti=جھوٹی allahhafiz=اللہ_حافظ khudahafiz=خدا_حافظ ' +
+    'pakistani=پاکستانی larka|ladka=لڑکا larki|ladki=لڑکی larke|ladke=لڑکے kamra=کمرہ mehfil=محفل khushboo|khushbu=خوشبو musafir=مسافر taleem=تعلیم sitare=ستارے insaniyat=انسانیت mulaqat|mulaqaat=ملاقات ' +
+    'tasveer|tasvir=تصویر shair|shayar=شاعر shayari|shairi=شاعری ghazal=غزل nazm=نظم khat=خط tareekh|tarikh=تاریخ jawan|jawaan=جوان buzurg=بزرگ mumkin=ممکن fikar|fikr=فکر pareshan|preshan=پریشان';
+  var DICT = new Map();
+  DICT_SRC.split(' ').forEach(function (pair) {
+    var eq = pair.indexOf('='); if (eq < 1) return;
+    var urdu = pair.slice(eq + 1).replace(/_/g, ' ');
+    pair.slice(0, eq).split('|').forEach(function (r) { if (r && !DICT.has(r)) DICT.set(r, urdu); });
+  });
+
+  var CLUSTERS = [['chh', 'چھ'], ['kh', 'خ'], ['gh', 'غ'], ['sh', 'ش'], ['ch', 'چ'], ['zh', 'ژ'], ['th', 'تھ'], ['dh', 'دھ'], ['bh', 'بھ'], ['ph', 'پھ'], ['jh', 'جھ'], ['rh', 'ڑھ']];
+  var CONS = { b: 'ب', p: 'پ', t: 'ت', d: 'د', j: 'ج', c: 'ک', f: 'ف', g: 'گ', h: 'ہ', k: 'ک', l: 'ل', m: 'م', n: 'ن', q: 'ق', r: 'ر', s: 'س', v: 'و', w: 'و', x: 'کس', y: 'ی', z: 'ز' };
+  var RETRO = { t: 'ٹ', d: 'ڈ', r: 'ڑ', th: 'ٹھ', dh: 'ڈھ' };
+  var VGROUPS = ['aa', 'ai', 'au', 'ee', 'ei', 'ii', 'oo', 'ou', 'uu', 'a', 'e', 'i', 'o', 'u'];
+  var V = { // [start of word, middle, end of word]
+    aa: ['آ', 'ا', 'ا'], a: ['ا', '', 'ا'], ai: ['ای', 'ی', 'ے'], au: ['او', 'و', 'و'], ee: ['ای', 'ی', 'ی'], ei: ['ای', 'ی', 'ے'], ii: ['ای', 'ی', 'ی'],
+    e: ['ای', 'ی', 'ے'], i: ['ا', '', 'ی'], o: ['او', 'و', 'و'], oo: ['او', 'و', 'و'], ou: ['او', 'و', 'و'], u: ['ا', '', 'و'], uu: ['او', 'و', 'و']
+  };
+  var NASAL = { e: 1, ai: 1, ei: 1, o: 1 }; // a final n after these vowels is a nasal noon (karen, hain, logon)
+  function isV(c) { return c === 'a' || c === 'e' || c === 'i' || c === 'o' || c === 'u'; }
+  // opt: { kh: true -> 'kh' is کھ, retro: true -> t d r are ٹ ڈ ڑ, ah: true -> a final 'a' is ہ }
+  function rules(word, opt) {
+    var s = word.replace(/['’]/g, ''), lo = s.toLowerCase(), n = lo.length, out = '', i = 0, lastV = null, prevVowelGroup = false;
+    while (i < n) {
+      var c = lo[i];
+      if (isV(c)) {
+        var g = null;
+        for (var k = 0; k < VGROUPS.length; k++) if (lo.substr(i, VGROUPS[k].length) === VGROUPS[k]) { g = VGROUPS[k]; break; }
+        var end = i + g.length, atEnd = end >= n, nasalNext = end === n - 1 && lo[end] === 'n';
+        var pos = i === 0 ? 0 : atEnd ? 2 : 1, piece = V[g][pos];
+        if (pos === 1 && (g === 'i' || g === 'u') && end < n && isV(lo[end])) piece = g === 'i' ? 'ی' : 'و'; // dia, hua
+        if (pos === 1 && (g === 'e' || g === 'a') && lo[end] === 'h' && (end + 1 >= n || !isV(lo[end + 1]))) piece = ''; // kehna, yeh
+        if (pos === 2 && g === 'a' && opt.ah && n > 3) piece = 'ہ';
+        if (pos === 1 && g === 'a' && opt.longA && end + 1 < n && !isV(lo[end]) && lo[end] !== 'h' && isV(lo[end + 1])) piece = 'ا'; // pakistani, musafir
+        if (pos === 2 && prevVowelGroup) { // two vowel sounds in a row: hamza (jao, gai, hue)
+          if (g === 'o' || g === 'u') piece = 'ؤ'; else if (g === 'i' || g === 'ee') piece = 'ئی'; else if (g === 'e' || g === 'ai') piece = 'ئے';
+        }
+        if (nasalNext && pos === 1 && g === 'ai') piece = 'ی';
+        out += piece; lastV = g; prevVowelGroup = true; i = end;
+        continue;
+      }
+      prevVowelGroup = false;
+      if (!/[a-z]/.test(c)) { out += s[i]; i++; continue; }
+      // a doubled consonant is written once (abba, kutta); also c before ch (accha)
+      if (i > 0 && !isV(lo[i - 1]) && (lo[i - 1] === c) && c !== 'h') { i++; continue; }
+      if (c === 'c' && lo[i + 1] === 'c' && lo[i + 2] === 'h') { i++; continue; }
+      var hit = null;
+      for (var j = 0; j < CLUSTERS.length; j++) if (lo.substr(i, CLUSTERS[j][0].length) === CLUSTERS[j][0]) { hit = CLUSTERS[j]; break; }
+      var upper = s[i] !== lo[i] && i > 0; // a capital T, D or R inside a word means ٹ ڈ ڑ
+      if (hit) {
+        var u = hit[1];
+        if (hit[0] === 'kh' && (opt.kh || i + 2 >= n)) u = 'کھ'; // final kh is usually کھ (dekh, likh, rakh)
+        if (hit[0] === 'gh' && opt.kh) u = 'گھ';
+        if ((upper || opt.retro) && RETRO[hit[0]]) u = RETRO[hit[0]];
+        out += u; i += hit[0].length; continue;
+      }
+      var ch = CONS[c] || c;
+      if ((upper || opt.retro) && RETRO[c] && !(c === 'r' && i === 0)) ch = RETRO[c];
+      if (c === 'n' && i === n - 1 && i > 0 && NASAL[lastV] && isV(lo[i - 1])) ch = 'ں';
+      out += ch; i++;
+    }
+    return out;
+  }
+  function candidates(word) {
+    var lo = word.toLowerCase().replace(/[’]/g, '\''), list = [], add = function (x) { if (x && list.indexOf(x) === -1) list.push(x); };
+    if (/^[a-z']+$/.test(lo)) {
+      add(DICT.get(lo) || DICT.get(lo.replace(/'/g, '')));
+      add(rules(word, {}));
+      add(rules(word, { longA: true }));
+      add(rules(word, { kh: true }));
+      add(rules(word, { retro: true }));
+      add(rules(word, { ah: true }));
+    }
+    return list.slice(0, 5);
+  }
+  var cache = new Map();
+  function convert(word) {
+    if (cache.has(word)) return cache.get(word);
+    var lo = word.toLowerCase().replace(/’/g, '\''), u = /^[a-z']+$/.test(lo) ? (DICT.get(lo) || DICT.get(lo.replace(/'/g, '')) || rules(word, {})) : word;
+    if (cache.size > 20000) cache.clear();
+    cache.set(word, u); return u;
+  }
+  function digits(s) { return $('ukDigits').checked ? s.replace(/[0-9]/g, function (d) { return UDIG[+d]; }) : s; }
+  var PUNCT = { ',': '،', '.': '۔', '?': '؟', ';': '؛' };
+
+  // ---------- inserting text while keeping the undo history where the browser allows it ----------
+  var savedSel = [0, 0];
+  function insert(text, back) {
+    var focused = document.activeElement === ta;
+    if (!focused) { ta.setSelectionRange(savedSel[0], savedSel[1]); }
+    var a = ta.selectionStart, b = ta.selectionEnd;
+    if (back) { if (a === b) { if (a === 0) return; a = a - prevLen(ta.value, a); } ta.setSelectionRange(a, b); text = ''; }
+    var ok = false;
+    if (focused) { try { ok = document.execCommand(text ? 'insertText' : 'delete', false, text); } catch (e) {} }
+    if (!ok) { ta.setRangeText(text, a, b, 'end'); }
+    savedSel = [ta.selectionStart, ta.selectionEnd];
+    stats(); suggest();
+  }
+  // length of the character before the cursor: a whole emoji or surrogate pair, or a letter with its marks
+  function prevLen(v, at) {
+    var c = v.charCodeAt(at - 1);
+    if (c >= 0xdc00 && c <= 0xdfff && at > 1) return 2;
+    return 1;
+  }
+  ta.addEventListener('select', function () { savedSel = [ta.selectionStart, ta.selectionEnd]; });
+  ta.addEventListener('keyup', function () { savedSel = [ta.selectionStart, ta.selectionEnd]; });
+  ta.addEventListener('click', function () { savedSel = [ta.selectionStart, ta.selectionEnd]; suggest(); });
+
+  // Phonetic mode: turn each typed Latin character into its Urdu letter before it reaches the box.
+  ta.addEventListener('beforeinput', function (e) {
+    if (mode !== 'phon' || e.inputType !== 'insertText' || !e.data || e.isComposing) return;
+    var out = '', changed = false;
+    for (var ch of e.data) { var m = keyOut(ch); if (m !== ch) changed = true; out += m; }
+    if (!changed) return;
+    e.preventDefault();
+    insert(out);
+  });
+  // Roman mode: when a word is finished (space, punctuation or Enter), the Roman word before it becomes Urdu.
+  ta.addEventListener('input', function (e) {
+    if (mode === 'roman' && !e.isComposing && (e.inputType === 'insertText' || e.inputType === 'insertLineBreak' || e.inputType === 'insertParagraph')) {
+      var d = e.inputType === 'insertText' ? e.data : '\n';
+      if (d && /[\s,.?;!:)\]]$/.test(d)) finishWord(d.slice(-1));
+    }
+    savedSel = [ta.selectionStart, ta.selectionEnd];
+    if ($('ukMsg').textContent) say('', '');
+    stats(); suggest();
+  });
+  function finishWord(endCh) {
+    var v = ta.value, at = ta.selectionStart, before = v.slice(0, at - 1), m = /[A-Za-z'’]+$/.exec(before);
+    var punct = PUNCT[endCh] && (m || /[\u0600-\u06ff]\s*$/.test(before)) ? PUNCT[endCh] : endCh;
+    if (!m && punct === endCh) return;
+    var start = m ? at - 1 - m[0].length : at - 1, word = m ? convert(m[0]) : '';
+    ta.setRangeText(word + punct, start, at, 'end');
+  }
+  // Live suggestions for the Roman word at the cursor
+  function currentWord() {
+    if (mode !== 'roman') return null;
+    var at = ta.selectionStart; if (at !== ta.selectionEnd) return null;
+    var m = /[A-Za-z'’]+$/.exec(ta.value.slice(0, at));
+    return m ? { word: m[0], start: at - m[0].length, end: at } : null;
+  }
+  function suggest() {
+    var box = $('ukSug'), cw = currentWord();
+    box.textContent = '';
+    if (!cw) return;
+    candidates(cw.word).forEach(function (c) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = c; b.lang = 'ur';
+      b.addEventListener('pointerdown', function (e) { e.preventDefault(); });
+      b.addEventListener('click', function () {
+        var w = currentWord(); if (!w) return;
+        ta.setRangeText(c + ' ', w.start, w.end, 'end'); savedSel = [ta.selectionStart, ta.selectionEnd];
+        stats(); suggest(); if (!$('ukNoKb').checked) ta.focus();
+      });
+      box.appendChild(b);
+    });
+    var r = document.createElement('span'); r.className = 'uk-rom'; r.textContent = cw.word + ' →'; box.insertBefore(r, box.firstChild);
+  }
+  $('ukConv').addEventListener('click', function () {
+    var n = 0;
+    ta.value = ta.value.replace(/[A-Za-z'’]+/g, function (w) { var u = convert(w); if (u !== w) n++; return u; })
+      .replace(/([\u0600-\u06ff])\s*([,.?;])(?=\s|$)/g, function (m, a, p) { return a + PUNCT[p]; });
+    ta.value = digits(ta.value);
+    stats(); suggest();
+    say(n ? 'ok' : '', n ? 'Converted ' + n + (n === 1 ? ' Roman word.' : ' Roman words.') + ' Tap a word you want to change and retype it if needed.' : 'There are no Roman (English letter) words to convert.');
+  });
+
+  // ---------- on-screen keyboard ----------
+  function drawKb() {
+    var kb = $('ukKb'); kb.textContent = '';
+    ROWS.forEach(function (row) {
+      var r = document.createElement('div'); r.className = 'uk-row';
+      row.forEach(function (k) {
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'uk-k'; b.dataset.k = k;
+        if (k === 'SHIFT') { b.className += ' w2' + (shift ? ' on' : ''); b.textContent = '⇧ Shift'; b.setAttribute('aria-pressed', shift ? 'true' : 'false'); }
+        else if (k === 'BACK') { b.className += ' w2'; b.textContent = '⌫'; b.setAttribute('aria-label', 'Backspace'); }
+        else if (k === 'SPACE') { b.className += ' sp'; b.textContent = 'Space'; }
+        else if (k === 'ENTER') { b.className += ' w2'; b.textContent = '↵'; b.setAttribute('aria-label', 'New line'); }
+        else if (k === 'ZWNJ') { b.className += ' w2'; b.textContent = 'ZWNJ'; b.title = 'Zero-width non-joiner: stops two letters from joining'; }
+        else {
+          var key = shift && /[a-z]/.test(k) ? k.toUpperCase() : shift && k === ',' ? ',' : k, out = keyOut(key);
+          if (shift && k === '.') out = '!';
+          var bb = document.createElement('b'); bb.textContent = /^[\u064b-\u0670]$/.test(out) ? '\u25cc' + out : out;
+          var ii = document.createElement('i'); ii.textContent = key;
+          b.appendChild(ii); b.appendChild(bb); b.setAttribute('aria-label', out); b.dataset.out = out;
+        }
+        r.appendChild(b);
+      });
+      kb.appendChild(r);
+    });
+  }
+  var repeat = null;
+  function press(b) {
+    var k = b.dataset.k;
+    if (k === 'SHIFT') { shift = !shift; drawKb(); return; }
+    if (k === 'BACK') { insert('', true); return; }
+    if (k === 'SPACE') {
+      if (mode === 'roman' && currentWord()) { var w = currentWord(); ta.setRangeText(convert(w.word) + ' ', w.start, w.end, 'end'); savedSel = [ta.selectionStart, ta.selectionEnd]; stats(); suggest(); return; }
+      insert(' '); return;
+    }
+    if (k === 'ENTER') { insert('\n'); return; }
+    if (k === 'ZWNJ') { insert('\u200c'); return; }
+    insert(b.dataset.out);
+    if (shift) { shift = false; drawKb(); }
+  }
+  $('ukKb').addEventListener('pointerdown', function (e) {
+    var b = e.target.closest('.uk-k'); if (!b) return;
+    e.preventDefault(); // keep the cursor in the text box
+    b.classList.add('down'); setTimeout(function () { b.classList.remove('down'); }, 120);
+    press(b);
+    if (b.dataset.k === 'BACK') { clearTimeout(repeat); repeat = setTimeout(function rep() { insert('', true); repeat = setTimeout(rep, 70); }, 450); }
+  });
+  ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { $('ukKb').addEventListener(ev, function () { clearTimeout(repeat); }); });
+  $('ukKb').addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { var b = e.target.closest('.uk-k'); if (b) { e.preventDefault(); press(b); } } });
+
+  // ---------- modes and options ----------
+  var HELP = {
+    roman: 'Type Urdu in English letters, like "aap kaise hain". Each word turns into Urdu when you press space. Tap a suggestion to pick a different spelling.',
+    phon: 'Your computer keys type Urdu letters that sound alike: a = ا, b = ب, s = س. Hold Shift for more letters (Shift+t = ٹ, Shift+n = ں). The keys below show every letter.',
+    off: 'Type with your own Urdu keyboard, or tap the keys below.'
+  };
+  function setMode(m) {
+    mode = m;
+    [].forEach.call($('ukMode').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.m === m ? 'true' : 'false'); });
+    $('ukHelp').textContent = HELP[m];
+    $('ukConv').hidden = m !== 'roman';
+    try { localStorage.setItem('gtn-uk-mode', m); } catch (e) {}
+    suggest();
+  }
+  $('ukMode').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) setMode(b.dataset.m); });
+  function look() {
+    ta.classList.toggle('naskh', $('ukFont').value === 'naskh');
+    ta.style.fontSize = $('ukSize').value + 'px';
+    if ($('ukNoKb').checked) ta.setAttribute('inputmode', 'none'); else ta.removeAttribute('inputmode');
+  }
+  ['ukFont', 'ukSize', 'ukNoKb'].forEach(function (id) { $(id).addEventListener('change', look); });
+  $('ukDigits').addEventListener('change', drawKb);
+  function stats() {
+    var v = ta.value;
+    $('ukW').textContent = fmtNum(v.trim() ? v.trim().split(/\s+/).length : 0, 0);
+    $('ukC').textContent = fmtNum(Array.from(v.replace(/\u200c/g, '')).length, 0);
+  }
+  $('ukCopy').addEventListener('click', function () { if (ta.value) copyText(ta.value, $('ukCopy')); else say('', 'Nothing to copy yet. Type something first.'); });
+  $('ukDl').addEventListener('click', function () {
+    if (!ta.value) { say('', 'Nothing to download yet. Type something first.'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + ta.value], { type: 'text/plain;charset=utf-8' })); a.download = 'urdu-text.txt'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('ukClr').addEventListener('click', function () { ta.value = ''; savedSel = [0, 0]; stats(); suggest(); say('', ''); if (!$('ukNoKb').checked) ta.focus(); });
+  var saved = null; try { saved = localStorage.getItem('gtn-uk-mode'); } catch (e) {}
+  setMode(HELP[saved] ? saved : 'roman');
+  drawKb(); look(); stats();
+  window.ukTranslit = convert; // handy for testing in the console
+})();
+</script>

@@ -1,0 +1,139 @@
+<style>
+.ub-out { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-family: var(--mono); font-size: 14px; overflow-wrap: anywhere; word-break: break-all; min-height: 50px; }
+.ub-out b { color: var(--accent); font-weight: 700; }
+.ub-qr { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; margin-top: 16px; }
+.ub-qr canvas { width: 168px; height: 168px; border: 1px solid var(--line); border-radius: 10px; background: #fff; image-rendering: pixelated; }
+.ub-h { font-size: 17px; margin: 22px 0 8px; }
+.ub-recent { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.ub-recent li { display: flex; gap: 8px; align-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 6px 8px 6px 12px; min-width: 0; }
+.ub-recent code { flex: 1; min-width: 0; font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ub-recent .btn { padding: 5px 11px; min-height: 34px; flex: none; }
+.ub-req { color: var(--bad); }
+</style>
+<div class="fields" style="grid-template-columns:1fr">
+  <div><label for="ubUrl">Website URL <span class="ub-req">*</span></label><input type="text" id="ubUrl" inputmode="url" autocomplete="off" spellcheck="false" placeholder="https://example.com/landing-page"></div>
+</div>
+<label>Quick presets</label>
+<div class="chiprow" id="ubPresets" style="margin-bottom:16px"></div>
+<div class="fields">
+  <div><label for="ubSrc">Source (utm_source) <span class="ub-req">*</span></label><input type="text" id="ubSrc" autocomplete="off" spellcheck="false" placeholder="facebook, newsletter, google"></div>
+  <div><label for="ubMed">Medium (utm_medium) <span class="ub-req">*</span></label><input type="text" id="ubMed" autocomplete="off" spellcheck="false" placeholder="cpc, email, social, qr"></div>
+  <div><label for="ubCamp">Campaign name (utm_campaign) <span class="ub-req">*</span></label><input type="text" id="ubCamp" autocomplete="off" spellcheck="false" placeholder="spring_sale"></div>
+  <div><label for="ubId">Campaign ID (utm_id)</label><input type="text" id="ubId" autocomplete="off" spellcheck="false" placeholder="optional, e.g. 2026-q2-01"></div>
+  <div><label for="ubTerm">Term (utm_term)</label><input type="text" id="ubTerm" autocomplete="off" spellcheck="false" placeholder="optional: paid keyword"></div>
+  <div><label for="ubCont">Content (utm_content)</label><input type="text" id="ubCont" autocomplete="off" spellcheck="false" placeholder="optional: banner_a, text_link"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="ubLower" checked>Make values lower case</label>
+  <label for="ubSpace" style="display:inline-flex;align-items:center;gap:8px">Replace spaces with <select id="ubSpace" style="width:auto;min-height:36px;padding:4px 8px"><option value="_">_ (underscore)</option><option value="-">- (hyphen)</option><option value="%20">%20 (keep spaces)</option><option value="+">+</option></select></label>
+</div>
+<label>Your campaign URL</label>
+<div class="ub-out" id="ubOut" aria-live="polite"></div>
+<p class="msg" id="ubMsg"></p>
+<div class="btns">
+  <button class="btn" id="ubCp">Copy URL</button>
+  <a class="btn ghost" id="ubTest" target="_blank" rel="noopener noreferrer">Open to test</a>
+  <button class="btn ghost" id="ubClr">Clear</button>
+</div>
+<div class="ub-qr">
+  <canvas id="ubQr" width="512" height="512" aria-label="QR code of the campaign URL"></canvas>
+  <div><p class="msg" style="margin:0 0 8px;max-width:340px">Print this QR code on posters, flyers or packaging. Scans are counted with the same campaign tags.</p><a class="btn ghost" id="ubQrDl" download="campaign-qr.png">Download QR (PNG)</a></div>
+</div>
+<h2 class="ub-h">Recent links <span class="msg" style="font-size:13px">kept on this device only</span></h2>
+<ul class="ub-recent" id="ubRecent"></ul>
+<div class="btns"><button class="btn ghost" id="ubRecentClr">Clear recent links</button></div>
+<script src="../assets/vendor/qrcode.js"></script>
+<script>
+(function () {
+  var PRESETS = [
+    ['Facebook ad', 'facebook', 'paid_social'], ['Instagram bio', 'instagram', 'social'], ['Instagram story', 'instagram', 'story'], ['TikTok', 'tiktok', 'social'],
+    ['X (Twitter)', 'x', 'social'], ['LinkedIn', 'linkedin', 'social'], ['YouTube', 'youtube', 'video'], ['WhatsApp', 'whatsapp', 'messaging'],
+    ['Telegram', 'telegram', 'messaging'], ['Email newsletter', 'newsletter', 'email'], ['Google Ads', 'google', 'cpc'], ['Bing Ads', 'bing', 'cpc'],
+    ['Print QR code', 'print', 'qr'], ['Affiliate', 'partner_name', 'affiliate'], ['SMS', 'sms', 'sms']
+  ];
+  var KEY = 'gtn-utm-recent', last = '';
+  PRESETS.forEach(function (p) {
+    var b = document.createElement('button'); b.type = 'button'; b.className = 'chip'; b.textContent = p[0];
+    b.addEventListener('click', function () { $('ubSrc').value = p[1]; $('ubMed').value = p[2]; build(); if (!$('ubCamp').value) $('ubCamp').focus(); toast('Filled source and medium for ' + p[0]); });
+    $('ubPresets').appendChild(b);
+  });
+  function say(cls, t) { $('ubMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('ubMsg').textContent = t; }
+  function clean(v) {
+    v = v.trim(); if ($('ubLower').checked) v = v.toLowerCase();
+    var sp = $('ubSpace').value;
+    return sp === '%20' ? v.replace(/\s+/g, ' ') : v.replace(/\s+/g, sp === '+' ? ' ' : sp);
+  }
+  function enc(v) { var e = encodeURIComponent(v); return $('ubSpace').value === '+' ? e.replace(/%20/g, '+') : e; }
+  function build() {
+    var raw = $('ubUrl').value.trim(), out = $('ubOut');
+    out.textContent = ''; $('ubTest').removeAttribute('href'); $('ubQrDl').removeAttribute('href'); last = '';
+    var ctx = $('ubQr').getContext('2d'); ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 512, 512);
+    if (!raw) { say('', 'Enter your website URL, then fill in source, medium and campaign.'); return; }
+    if (!/^[a-z][a-z0-9+.-]*:\/\//i.test(raw)) raw = 'https://' + raw.replace(/^\/+/, '');
+    var u;
+    try { u = new URL(raw); } catch (e) { say('bad', 'That does not look like a web address. Try something like https://example.com/page'); return; }
+    if (!/^https?:$/.test(u.protocol) || !/\./.test(u.hostname) && u.hostname !== 'localhost') { say('bad', 'Use a normal web address that starts with https:// and has a domain such as example.com.'); return; }
+    var fields = [['utm_source', 'ubSrc'], ['utm_medium', 'ubMed'], ['utm_campaign', 'ubCamp'], ['utm_id', 'ubId'], ['utm_term', 'ubTerm'], ['utm_content', 'ubCont']];
+    // keep the page's own parameters, but replace any old utm_ values
+    var keep = u.search.replace(/^\?/, '').split('&').filter(function (p) { return p && !/^utm_(source|medium|campaign|id|term|content)=/i.test(p); });
+    var added = [], missing = [];
+    fields.forEach(function (f) {
+      var v = clean($(f[1]).value);
+      if (v) added.push([f[0], v]);
+      else if (f[0] === 'utm_source' || f[0] === 'utm_medium' || f[0] === 'utm_campaign') missing.push(f[0]);
+    });
+    var base = u.origin + u.pathname, query = keep.concat(added.map(function (a) { return a[0] + '=' + enc(a[1]); })).join('&');
+    var full = base + (query ? '?' + query : '') + u.hash;
+    last = full;
+    // show the URL with the campaign values highlighted
+    out.appendChild(document.createTextNode(base + (query ? '?' : '')));
+    keep.forEach(function (p, i) { out.appendChild(document.createTextNode((i ? '&' : '') + p)); });
+    added.forEach(function (a, i) { out.appendChild(document.createTextNode((i || keep.length ? '&' : '') + a[0] + '=')); var b = document.createElement('b'); b.textContent = enc(a[1]); out.appendChild(b); });
+    out.appendChild(document.createTextNode(u.hash));
+    $('ubTest').href = full;
+    var notes = [];
+    if (missing.length) notes.push('Add ' + missing.join(', ') + ' so analytics tools can group your visits.');
+    if (u.protocol === 'http:') notes.push('Your link uses http://. Use https:// if your site supports it.');
+    if (/[A-Z]/.test($('ubSrc').value + $('ubMed').value + $('ubCamp').value) && !$('ubLower').checked) notes.push('Analytics tools treat Facebook and facebook as different sources; lower case keeps reports tidy.');
+    if (u.hash && /[?&]/.test(u.hash)) notes.push('Your link has parameters after #. Tags placed before the # are the ones analytics tools read.');
+    say(missing.length ? 'bad' : 'ok', notes.length ? notes.join(' ') : 'Ready. Copy the link or download the QR code.');
+    // QR code
+    try {
+      var qr = qrcode(0, full.length > 600 ? 'L' : 'M'); qr.addData(full, 'Byte'); qr.make();
+      var n = qr.getModuleCount(), cell = Math.floor(512 / (n + 8)), off = Math.floor((512 - cell * n) / 2);
+      ctx.fillStyle = '#000';
+      for (var r = 0; r < n; r++) for (var c = 0; c < n; c++) if (qr.isDark(r, c)) ctx.fillRect(off + c * cell, off + r * cell, cell, cell);
+      $('ubQrDl').href = $('ubQr').toDataURL('image/png');
+    } catch (e) { say('bad', ($('ubMsg').className.indexOf('ok') !== -1 ? 'Your link is ready to copy, but it' : $('ubMsg').textContent + ' The link') + ' is too long for a QR code. Shorten it or remove extra parameters.'); }
+  }
+  if (window.qrcode) qrcode.stringToBytes = function (s) { return Array.from(new TextEncoder().encode(s)); };
+  function recent() { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch (e) { return []; } }
+  function saveRecent(url) {
+    var list = recent().filter(function (x) { return x !== url; }); list.unshift(url); list = list.slice(0, 10);
+    try { localStorage.setItem(KEY, JSON.stringify(list)); } catch (e) {}
+    showRecent();
+  }
+  function showRecent() {
+    var ul = $('ubRecent'), list = recent(); ul.textContent = '';
+    if (!list.length) { var li = document.createElement('li'); li.textContent = 'Links you copy appear here.'; li.style.color = 'var(--muted)'; ul.appendChild(li); }
+    list.forEach(function (url) {
+      var li = document.createElement('li'), c = document.createElement('code'), b = document.createElement('button');
+      c.textContent = url; c.title = url; b.className = 'btn ghost'; b.textContent = 'Copy';
+      b.addEventListener('click', function () { copyText(url, b); });
+      li.appendChild(c); li.appendChild(b); ul.appendChild(li);
+    });
+    $('ubRecentClr').hidden = !list.length;
+  }
+  ['ubUrl', 'ubSrc', 'ubMed', 'ubCamp', 'ubId', 'ubTerm', 'ubCont'].forEach(function (id) { $(id).addEventListener('input', build); });
+  $('ubLower').addEventListener('change', build); $('ubSpace').addEventListener('change', build);
+  $('ubCp').addEventListener('click', function () {
+    if (!last) { say('bad', 'Enter your website URL first.'); $('ubUrl').focus(); return; }
+    copyText(last, $('ubCp')); saveRecent(last);
+  });
+  $('ubTest').addEventListener('click', function (e) { if (!last) { e.preventDefault(); say('bad', 'Enter your website URL first.'); } });
+  $('ubQrDl').addEventListener('click', function (e) { if (!last) { e.preventDefault(); say('bad', 'Enter your website URL first.'); } });
+  $('ubClr').addEventListener('click', function () { ['ubUrl', 'ubSrc', 'ubMed', 'ubCamp', 'ubId', 'ubTerm', 'ubCont'].forEach(function (id) { $(id).value = ''; $(id).dispatchEvent(new Event('input', { bubbles: true })); }); build(); $('ubUrl').focus(); });
+  $('ubRecentClr').addEventListener('click', function () { try { localStorage.removeItem(KEY); } catch (e) {} showRecent(); });
+  build(); showRecent();
+})();
+</script>

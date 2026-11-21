@@ -1,0 +1,217 @@
+<style>
+.mc-wrap { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 760px) { .mc-wrap { grid-template-columns: minmax(0, 1fr); } }
+.mc-wrap textarea { min-height: 170px; }
+#mcMorse { font-family: var(--mono); font-size: 17px; letter-spacing: .04em; }
+.mc-light { display: flex; align-items: center; justify-content: center; gap: 16px; margin-top: 16px; padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.mc-lamp { width: 74px; height: 74px; border-radius: 50%; background: #1f2937; border: 3px solid #374151; flex: none; transition: none; }
+.mc-lamp.on { background: #fde047; border-color: #facc15; box-shadow: 0 0 30px 8px rgba(250, 204, 21, .6); }
+.mc-now { font-family: var(--mono); font-size: 26px; font-weight: 700; min-width: 2ch; text-align: center; }
+.mc-now small { display: block; font-size: 15px; color: var(--muted); font-weight: 500; }
+.mc-full { position: fixed; inset: 0; z-index: 999; background: #000; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+.mc-full.on { background: #fff; }
+.mc-full span { position: absolute; bottom: 20px; color: #888; font: 14px system-ui, sans-serif; }
+.mc-rng { display: flex; align-items: center; gap: 10px; }
+.mc-rng output { min-width: 4.5em; font-weight: 600; font-size: 14px; }
+</style>
+<div class="mc-wrap">
+  <div><label for="mcText">Text</label><textarea id="mcText" data-nomemo class="plain" placeholder="Type text here, e.g. SOS">SOS</textarea></div>
+  <div><label for="mcMorse">Morse code</label><textarea id="mcMorse" data-nomemo spellcheck="false" placeholder="... --- ...  (letters split by spaces, words by /)"></textarea></div>
+</div>
+<p class="msg" id="mcMsg"></p>
+<div class="fields" style="margin-top:14px">
+  <div><label for="mcWpm">Speed</label><div class="mc-rng"><input type="range" id="mcWpm" min="5" max="40" value="18"><output id="mcWpmO">18 WPM</output></div></div>
+  <div><label for="mcHz">Tone</label><div class="mc-rng"><input type="range" id="mcHz" min="300" max="1200" step="10" value="650"><output id="mcHzO">650 Hz</output></div></div>
+  <div><label for="mcVol">Volume</label><div class="mc-rng"><input type="range" id="mcVol" min="0" max="100" value="60"><output id="mcVolO">60%</output></div></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="mcSound" checked>Sound</label>
+  <label><input type="checkbox" id="mcFlash" checked>Flash light</label>
+  <label><input type="checkbox" id="mcVib">Vibrate (phones)</label>
+  <label><input type="checkbox" id="mcFarn">Extra space between letters (easier to learn)</label>
+</div>
+<div class="btns">
+  <button class="btn" id="mcPlay">▶ Play</button>
+  <button class="btn ghost" id="mcStop" disabled>■ Stop</button>
+  <button class="btn ghost" id="mcScreen">Full-screen flash</button>
+  <button class="btn ghost" id="mcWav">Download sound (.wav)</button>
+</div>
+<div class="mc-light" aria-hidden="true"><div class="mc-lamp" id="mcLamp"></div><div class="mc-now" id="mcNow">&nbsp;<small>&nbsp;</small></div></div>
+<div class="btns">
+  <button class="btn ghost" id="mcCpT">Copy text</button>
+  <button class="btn ghost" id="mcCpM">Copy Morse</button>
+  <button class="btn ghost" id="mcClr">Clear</button>
+</div>
+<script>
+(function () {
+  var T = {
+    A: '.-', B: '-...', C: '-.-.', D: '-..', E: '.', F: '..-.', G: '--.', H: '....', I: '..', J: '.---', K: '-.-', L: '.-..', M: '--', N: '-.', O: '---', P: '.--.', Q: '--.-', R: '.-.', S: '...', T: '-', U: '..-', V: '...-', W: '.--', X: '-..-', Y: '-.--', Z: '--..',
+    0: '-----', 1: '.----', 2: '..---', 3: '...--', 4: '....-', 5: '.....', 6: '-....', 7: '--...', 8: '---..', 9: '----.',
+    '.': '.-.-.-', ',': '--..--', '?': '..--..', '\'': '.----.', '!': '-.-.--', '/': '-..-.', '(': '-.--.', ')': '-.--.-', '&': '.-...', ':': '---...', ';': '-.-.-.', '=': '-...-', '+': '.-.-.', '-': '-....-', '_': '..--.-', '"': '.-..-.', '$': '...-..-', '@': '.--.-.',
+    'À': '.--.-', 'Ä': '.-.-', 'Å': '.--.-', 'Ç': '-.-..', 'Ð': '..--.', 'È': '.-..-', 'É': '..-..', 'Ñ': '--.--', 'Ö': '---.', 'Ü': '..--', 'Þ': '.--..', 'Ĝ': '--.-.', 'Ĥ': '----', 'Ĵ': '.---.', 'Ŝ': '...-.', 'Ź': '--..-.', 'Ż': '--..-'
+  };
+  var R = {}; Object.keys(T).forEach(function (k) { if (!(T[k] in R)) R[T[k]] = k; });
+  R['.--.-'] = 'À'; R['----'] = 'CH';
+  // fold other accents to the base letter when there is no own code (ê -> E)
+  function fold(c) { return c.normalize('NFD').replace(/[\u0300-\u036f]/g, ''); }
+  var lock = false;
+  function say(cls, t) { $('mcMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('mcMsg').textContent = t; }
+  function toMorse(text) {
+    var bad = new Set(), words = text.toUpperCase().replace(/[’‘]/g, '\'').replace(/[“”]/g, '"').trim().split(/\s+/);
+    var out = words.map(function (w) {
+      return Array.from(w).map(function (c) {
+        if (T[c]) return T[c];
+        var f = fold(c);
+        if (f.length === 1 && T[f]) return T[f];
+        if (c) bad.add(c); return '';
+      }).filter(Boolean).join(' ');
+    }).filter(Boolean).join(' / ');
+    return { out: out, bad: bad };
+  }
+  function toText(m) {
+    var bad = 0;
+    m = m.replace(/[•·∙⋅*]/g, '.').replace(/[−–—_]/g, '-').replace(/\|/g, '/').trim();
+    var out = m.split(/\s*\/\s*|\s{3,}|\n+/).map(function (w) {
+      return w.trim().split(/\s+/).map(function (code) { if (!code) return ''; if (R[code]) return R[code]; bad++; return '#'; }).join('');
+    }).join(' ');
+    return { out: out, bad: bad };
+  }
+  function fromText() {
+    if (lock) return;
+    var r = toMorse($('mcText').value);
+    lock = true; $('mcMorse').value = r.out; lock = false;
+    say(r.bad.size ? 'bad' : '', r.bad.size ? 'No Morse code for: ' + Array.from(r.bad).slice(0, 20).join(' ') + ' — these were left out.' : '');
+  }
+  function fromMorse() {
+    if (lock) return;
+    var v = $('mcMorse').value;
+    if (/[^.\-•·∙⋅*−–—_\s\/|]/.test(v)) { say('bad', 'Morse code can only contain dots (.), dashes (-), spaces and / between words.'); return; }
+    var r = toText(v);
+    lock = true; $('mcText').value = r.out; lock = false;
+    say(r.bad ? 'bad' : '', r.bad ? r.bad + (r.bad === 1 ? ' code is' : ' codes are') + ' not valid Morse and shown as #.' : '');
+  }
+  $('mcText').addEventListener('input', fromText);
+  $('mcMorse').addEventListener('input', fromMorse);
+
+  // ---------- timing: 1 unit = 1200 / WPM ms (PARIS standard); dash 3, gap 1, letters 3, words 7 ----------
+  function timeline() {
+    var morse = $('mcMorse').value.trim(), unit = 1.2 / +$('mcWpm').value, farn = $('mcFarn').checked ? 3 : 1;
+    var ev = [], t = 0, labels = toText(morse);
+    var words = morse.replace(/[•·∙⋅*]/g, '.').replace(/[−–—_]/g, '-').split(/\s*\/\s*|\s{3,}|\n+/);
+    words.forEach(function (w, wi) {
+      var letters = w.trim().split(/\s+/).filter(Boolean);
+      letters.forEach(function (code, li) {
+        var label = R[code] || '#';
+        Array.from(code).forEach(function (s, si) {
+          var d = (s === '-' ? 3 : 1) * unit;
+          ev.push({ t: t, d: d, ch: label, code: code });
+          t += d + (si < code.length - 1 ? unit : 0);
+        });
+        if (li < letters.length - 1) t += 3 * unit * farn;
+      });
+      if (wi < words.length - 1 && letters.length) t += 7 * unit * farn;
+    });
+    return { ev: ev, end: t + unit, unit: unit };
+  }
+  var ctx = null, osc = null, gain = null, playing = null, raf = 0, sched = 0, full = null;
+  function stop() {
+    if (!playing) return;
+    cancelAnimationFrame(raf); clearInterval(sched);
+    if (gain) { gain.gain.cancelScheduledValues(0); gain.gain.setValueAtTime(0, ctx.currentTime); }
+    if (osc) { try { osc.stop(); } catch (e) {} osc = null; }
+    if (navigator.vibrate) try { navigator.vibrate(0); } catch (e) {}
+    playing = null;
+    lamp(false, '', '');
+    $('mcPlay').disabled = false; $('mcStop').disabled = true;
+    if (full) { full.remove(); full = null; }
+  }
+  function lamp(on, ch, code) {
+    $('mcLamp').classList.toggle('on', on && $('mcFlash').checked);
+    if (full) full.classList.toggle('on', on && $('mcFlash').checked);
+    var n = $('mcNow'); n.firstChild.textContent = ch || '\u00a0'; n.lastChild.textContent = code || '\u00a0';
+  }
+  function play(fullscreen) {
+    stop();
+    if (!$('mcMorse').value.trim()) { say('bad', 'Type some text or Morse code first.'); return; }
+    var tl = timeline();
+    if (!tl.ev.length) { say('bad', 'There is nothing to play.'); return; }
+    var sound = $('mcSound').checked;
+    if (fullscreen) {
+      full = document.createElement('div'); full.className = 'mc-full'; full.innerHTML = '<span>Tap anywhere to stop</span>';
+      full.addEventListener('click', stop); document.body.appendChild(full);
+    }
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!ctx && AC) ctx = new AC();
+    if (ctx && ctx.state === 'suspended') ctx.resume();
+    var start = (ctx ? ctx.currentTime : performance.now() / 1000) + 0.15, idx = 0, ramp = Math.min(0.005, tl.unit / 4);
+    if (ctx && sound) {
+      osc = ctx.createOscillator(); gain = ctx.createGain();
+      osc.frequency.value = +$('mcHz').value; gain.gain.value = 0;
+      osc.connect(gain); gain.connect(ctx.destination); osc.start();
+    }
+    var vol = +$('mcVol').value / 100;
+    // schedule sound a little ahead of time, in small batches, so even a very long message starts at once
+    function feed() {
+      if (!osc) return;
+      var now = ctx.currentTime;
+      while (idx < tl.ev.length && start + tl.ev[idx].t < now + 1.5) {
+        var e = tl.ev[idx++], a = start + e.t;
+        gain.gain.setValueAtTime(0, a); gain.gain.linearRampToValueAtTime(vol, a + ramp);
+        gain.gain.setValueAtTime(vol, a + e.d - ramp); gain.gain.linearRampToValueAtTime(0, a + e.d);
+      }
+    }
+    if (osc) { feed(); sched = setInterval(feed, 250); }
+    if ($('mcVib').checked && navigator.vibrate) {
+      var pat = [], last = 0;
+      tl.ev.slice(0, 400).forEach(function (e) { pat.push(Math.round((e.t - last) * 1000), Math.round(e.d * 1000)); last = e.t + e.d; });
+      pat[0] = Math.max(pat[0], 1); try { navigator.vibrate(pat); } catch (er) {}
+    }
+    playing = { tl: tl, start: start };
+    $('mcPlay').disabled = true; $('mcStop').disabled = false;
+    var k = 0;
+    (function frame() {
+      if (!playing) return;
+      var now = (ctx ? ctx.currentTime : performance.now() / 1000) - start, on = false, cur = null;
+      while (k < tl.ev.length && tl.ev[k].t + tl.ev[k].d < now) k++;
+      if (k < tl.ev.length) { cur = tl.ev[k]; on = now >= cur.t; }
+      lamp(on, cur ? cur.ch : '', cur ? cur.code : '');
+      if (now > tl.end) { stop(); return; }
+      raf = requestAnimationFrame(frame);
+    })();
+    var secs = tl.end;
+    say('', 'Playing ' + (secs < 90 ? Math.round(secs) + ' seconds' : Math.round(secs / 60) + ' minutes') + ' of Morse code.');
+  }
+  $('mcPlay').addEventListener('click', function () { play(false); });
+  $('mcScreen').addEventListener('click', function () { play(true); });
+  $('mcStop').addEventListener('click', stop);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') stop(); });
+
+  // ---------- WAV download: 16-bit mono at 8 kHz keeps files small ----------
+  $('mcWav').addEventListener('click', function () {
+    if (!$('mcMorse').value.trim()) { say('bad', 'Type some text or Morse code first.'); return; }
+    var tl = timeline();
+    if (tl.end > 600) { say('bad', 'That would be ' + Math.round(tl.end / 60) + ' minutes of sound. Downloads are limited to 10 minutes; shorten the text or raise the speed.'); return; }
+    var rate = 8000, n = Math.ceil((tl.end + 0.2) * rate), buf = new ArrayBuffer(44 + n * 2), v = new DataView(buf), hz = +$('mcHz').value, vol = +$('mcVol').value / 100 || 0.6, ramp = Math.round(0.005 * rate);
+    var str = function (o, s) { for (var i = 0; i < s.length; i++) v.setUint8(o + i, s.charCodeAt(i)); };
+    str(0, 'RIFF'); v.setUint32(4, 36 + n * 2, true); str(8, 'WAVE'); str(12, 'fmt '); v.setUint32(16, 16, true); v.setUint16(20, 1, true); v.setUint16(22, 1, true);
+    v.setUint32(24, rate, true); v.setUint32(28, rate * 2, true); v.setUint16(32, 2, true); v.setUint16(34, 16, true); str(36, 'data'); v.setUint32(40, n * 2, true);
+    tl.ev.forEach(function (e) {
+      var s0 = Math.round((e.t + 0.1) * rate), len = Math.round(e.d * rate);
+      for (var i = 0; i < len; i++) {
+        var env = Math.min(1, i / ramp, (len - i) / ramp), x = Math.sin(2 * Math.PI * hz * i / rate) * env * vol * 0.9;
+        v.setInt16(44 + (s0 + i) * 2, Math.round(x * 32767), true);
+      }
+    });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' })); a.download = 'morse-code.wav'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    say('ok', 'Downloaded ' + fmtBytes(buf.byteLength) + ' of sound (' + Math.round(tl.end) + ' seconds).');
+  });
+
+  function sync(id, fmt) { var r = $(id); r.addEventListener('input', function () { $(id + 'O').textContent = fmt(r.value); if (id === 'mcHz' && osc) osc.frequency.value = +r.value; }); $(id + 'O').textContent = fmt(r.value); }
+  sync('mcWpm', function (x) { return x + ' WPM'; }); sync('mcHz', function (x) { return x + ' Hz'; }); sync('mcVol', function (x) { return x + '%'; });
+  $('mcCpT').addEventListener('click', function () { if ($('mcText').value) copyText($('mcText').value, $('mcCpT')); });
+  $('mcCpM').addEventListener('click', function () { if ($('mcMorse').value) copyText($('mcMorse').value, $('mcCpM')); });
+  $('mcClr').addEventListener('click', function () { stop(); $('mcText').value = ''; $('mcMorse').value = ''; say('', ''); $('mcText').focus(); });
+  fromText();
+})();
+</script>

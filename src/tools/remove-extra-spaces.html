@@ -1,0 +1,135 @@
+<style>
+.rs-sub { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; margin: -6px 0 14px 26px; font-size: 14px; }
+.rs-sub select, .rs-sub input[type=text] { width: auto; min-height: 36px; padding: 5px 10px; }
+.rs-sub input[type=text] { width: 90px; font-family: var(--mono); }
+.rs-sub label { display: inline; font-weight: 400; margin: 0; }
+.rs-grp { margin-bottom: 4px; }
+.rs-grp > label { font-weight: 400; font-size: 15px; margin: 0 0 12px; }
+@media (min-width: 700px) { .rs-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px; } }
+</style>
+<label for="rsIn">Your text</label>
+<textarea id="rsIn" data-nomemo class="plain" style="min-height:190px" placeholder="Paste text with extra spaces, tabs or broken lines here."></textarea>
+<div class="rs-cols" style="margin-top:14px">
+  <div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsTrim" checked>Trim spaces at the start and end of each line</label></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsColl" checked>Turn double spaces into one space</label></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsTabs">Change tabs to spaces</label></div>
+    <div class="rs-sub" id="rsTabsSub" hidden><label for="rsTabW">Tab width</label><select id="rsTabW"><option>2</option><option selected>4</option><option>8</option><option value="1">1 (single space)</option></select></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsOdd" checked>Fix invisible and odd spaces (non-breaking, zero-width)</label></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsPunct">Remove spaces before , . ! ? ; :</label></div>
+  </div>
+  <div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsBlank" checked>Turn several empty lines into one</label></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsEmpty">Remove all empty lines</label></div>
+    <div class="rs-grp"><label><input type="checkbox" id="rsJoin">Join lines (remove line breaks)</label></div>
+    <div class="rs-sub" id="rsJoinSub" hidden>
+      <label for="rsSep">Join with</label>
+      <select id="rsSep"><option value=" ">a space</option><option value="">nothing</option><option value=", ">comma and space</option><option value=",">comma</option><option value="; ">semicolon</option><option value="|">vertical bar |</option><option value="custom">custom…</option></select>
+      <input type="text" id="rsCustom" hidden placeholder=" - " aria-label="Custom separator" data-nomemo>
+      <label><input type="checkbox" id="rsPara" checked>Keep paragraphs</label>
+    </div>
+  </div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Characters before</span><b id="rsB">0</b></div>
+  <div class="stat"><span>Characters after</span><b id="rsA">0</b></div>
+  <div class="stat"><span>Removed</span><b id="rsR">0</b></div>
+  <div class="stat"><span>Lines after</span><b id="rsL">0</b></div>
+</div>
+<label for="rsOut" style="margin-top:16px">Clean text</label>
+<textarea id="rsOut" data-nomemo class="plain" style="min-height:190px" readonly placeholder="The cleaned text appears here as you type."></textarea>
+<div class="btns">
+  <button class="btn" id="rsCp">Copy clean text</button>
+  <button class="btn ghost" id="rsDl">Download .txt</button>
+  <button class="btn ghost" id="rsSample">Try an example</button>
+  <button class="btn ghost" id="rsClr">Clear</button>
+</div>
+<p class="msg" id="rsMsg"></p>
+<script>
+(function () {
+  function say(cls, t) { $('rsMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('rsMsg').textContent = t; }
+  // Expand tabs to the next tab stop, so columns stay lined up.
+  function expandTabs(line, w) {
+    if (line.indexOf('\t') === -1) return line;
+    if (w === 1) return line.replace(/\t/g, ' ');
+    var out = '', col = 0;
+    for (var i = 0; i < line.length; i++) {
+      var c = line[i];
+      if (c === '\t') { var n = w - (col % w); out += ' '.repeat(n); col += n; }
+      else { out += c; col++; }
+    }
+    return out;
+  }
+  function clean(t) {
+    t = t.replace(/\r\n?/g, '\n');
+    if ($('rsOdd').checked) {
+      // zero-width space, word joiner, BOM and soft hyphen are removed; ZWJ/ZWNJ are kept because emoji and many scripts need them
+      t = t.replace(/[\u200b\u2060\ufeff\u00ad]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ').replace(/[\u2028\u2029\u0085\v\f]/g, '\n');
+    }
+    var lines = t.split('\n');
+    // collapse first (a run that contains a tab becomes one tab), then expand tabs, so expanded tabs keep their columns
+    var trimOn = $('rsTrim').checked;
+    if ($('rsColl').checked) lines = lines.map(function (l) {
+      var lead = trimOn ? '' : /^[ \t]*/.exec(l)[0]; // without trimming, keep indentation as it is
+      return lead + l.slice(lead.length).replace(/[ \t]{2,}/g, function (m) { return m.indexOf('\t') !== -1 ? '\t' : ' '; });
+    });
+    if ($('rsTabs').checked) { var w = +$('rsTabW').value; lines = lines.map(function (l) { return expandTabs(l, w); }); }
+    if ($('rsTrim').checked) lines = lines.map(function (l) { return l.replace(/^[ \t]+|[ \t]+$/g, ''); });
+    if ($('rsPunct').checked) lines = lines.map(function (l) { return l.replace(/[ \t]+([,.!?;:،؛؟。、])/g, '$1'); });
+    if ($('rsEmpty').checked) lines = lines.filter(function (l) { return l.trim() !== ''; });
+    else if ($('rsBlank').checked) {
+      var out = [], blank = 0;
+      lines.forEach(function (l) { if (l.trim() === '') { if (++blank === 1) out.push(''); } else { blank = 0; out.push(l); } });
+      while (out.length && out[0] === '') out.shift();
+      while (out.length && out[out.length - 1] === '') out.pop();
+      lines = out;
+    }
+    if ($('rsJoin').checked) {
+      var sep = $('rsSep').value === 'custom' ? $('rsCustom').value : $('rsSep').value;
+      var joinPart = function (arr) { return arr.map(function (l) { return sep.trim() || sep === '' ? l.trim() : l; }).filter(function (l) { return l !== ''; }).join(sep); };
+      if ($('rsPara').checked && !$('rsEmpty').checked) {
+        var paras = [], cur = [];
+        lines.forEach(function (l) { if (l.trim() === '') { if (cur.length) paras.push(cur); cur = []; } else cur.push(l); });
+        if (cur.length) paras.push(cur);
+        lines = paras.map(joinPart).join('\n\n').split('\n');
+      } else lines = [joinPart(lines)];
+      // a space separator must not create double spaces when lines already end in one
+      if ($('rsColl').checked) lines = lines.map(function (l) { return l.replace(/ {2,}/g, ' '); });
+    }
+    return lines.join('\n');
+  }
+  var deb;
+  function run() {
+    var src = $('rsIn').value, out = clean(src);
+    $('rsOut').value = out;
+    $('rsB').textContent = fmtNum(src.length, 0);
+    $('rsA').textContent = fmtNum(out.length, 0);
+    $('rsR').textContent = fmtNum(Math.max(0, src.length - out.length), 0);
+    $('rsL').textContent = fmtNum(out ? out.split('\n').length : 0, 0);
+    if (src && !src.trim()) say('', 'Your text only contains spaces and line breaks, so nothing is left.'); else if ($('rsMsg').className !== 'msg ok') say('', '');
+  }
+  function schedule() { clearTimeout(deb); deb = setTimeout(run, $('rsIn').value.length > 500000 ? 300 : 60); }
+  function subs() {
+    $('rsTabsSub').hidden = !$('rsTabs').checked;
+    $('rsJoinSub').hidden = !$('rsJoin').checked;
+    $('rsCustom').hidden = $('rsSep').value !== 'custom';
+    $('rsBlank').disabled = $('rsEmpty').checked;
+    $('rsPara').disabled = $('rsEmpty').checked;
+  }
+  $('rsIn').addEventListener('input', function () { say('', ''); schedule(); });
+  ['rsTrim', 'rsColl', 'rsTabs', 'rsTabW', 'rsOdd', 'rsPunct', 'rsBlank', 'rsEmpty', 'rsJoin', 'rsSep', 'rsPara'].forEach(function (id) { $(id).addEventListener('change', function () { subs(); run(); }); });
+  $('rsCustom').addEventListener('input', schedule);
+  $('rsCp').addEventListener('click', function () { if ($('rsOut').value) copyText($('rsOut').value, $('rsCp')); else say('', 'Nothing to copy yet. Paste your text first.'); });
+  $('rsDl').addEventListener('click', function () {
+    if (!$('rsOut').value) { say('', 'Nothing to download yet. Paste your text first.'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('rsOut').value], { type: 'text/plain;charset=utf-8' })); a.download = 'clean-text.txt'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('rsSample').addEventListener('click', function () {
+    $('rsIn').value = '   This   text was   copied from\na PDF ,  so the lines\nbreak in odd places .\n\n\n\nA new  paragraph\u00a0with\ta tab   starts here.   ';
+    say('ok', 'Example loaded. Try ticking Join lines to fix the broken lines.'); run();
+  });
+  $('rsClr').addEventListener('click', function () { $('rsIn').value = ''; say('', ''); run(); $('rsIn').focus(); });
+  subs(); run();
+})();
+</script>

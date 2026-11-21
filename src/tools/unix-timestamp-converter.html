@@ -1,0 +1,176 @@
+<style>
+.ut-now { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.ut-now > div { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; }
+.ut-now span { font-size: 13px; color: var(--muted); font-weight: 600; display: block; }
+.ut-now b { font-family: var(--mono); font-size: 20px; overflow-wrap: anywhere; }
+.ut-now .btn { padding: 6px 12px; min-height: 36px; flex: none; }
+.ut-h { font-size: 17px; margin: 22px 0 10px; }
+.ut-res { display: grid; grid-template-columns: minmax(0, 1fr); gap: 0; }
+.ut-res .kv > span { width: 120px; }
+@media (max-width: 600px) { .ut-res .kv { flex-wrap: wrap; gap: 4px 8px; margin-top: 12px; } .ut-res .kv > span { width: 100%; } }
+#utBatchOut { white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+</style>
+<div class="ut-now">
+  <div><div><span>Current Unix time (seconds)</span><b id="utNowS">0</b></div><button class="btn ghost" id="utCpS">Copy</button></div>
+  <div><div><span>Milliseconds</span><b id="utNowMs">0</b></div><button class="btn ghost" id="utCpMs">Copy</button></div>
+</div>
+<h2 class="ut-h">Timestamp to date</h2>
+<div class="fields">
+  <div><label for="utTs">Unix timestamp</label><input type="text" id="utTs" inputmode="numeric" autocomplete="off" spellcheck="false" placeholder="e.g. 1767225600" style="font-family:var(--mono)"></div>
+  <div><label for="utUnit">Unit</label><select id="utUnit"><option value="auto">Detect automatically</option><option value="s">Seconds</option><option value="ms">Milliseconds</option><option value="us">Microseconds</option><option value="ns">Nanoseconds</option></select></div>
+  <div><label for="utZone">Also show in time zone</label><select id="utZone"></select></div>
+</div>
+<div class="btns" style="margin:0 0 6px"><button class="btn ghost" id="utUseNow">Use current time</button></div>
+<p class="msg" id="utMsg"></p>
+<div class="ut-res" id="utRes"></div>
+<h2 class="ut-h">Date to timestamp</h2>
+<div class="fields">
+  <div><label for="utDate">Date and time</label><input type="datetime-local" id="utDate" step="1" data-nomemo style="width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:9px 12px;min-height:44px"></div>
+  <div><label for="utDZone">Time zone of this date</label><select id="utDZone"></select></div>
+</div>
+<p class="msg" id="utMsg2"></p>
+<div class="ut-res" id="utRes2"></div>
+<h2 class="ut-h">Convert many at once</h2>
+<label for="utBatch">One timestamp per line (seconds or milliseconds)</label>
+<textarea id="utBatch" data-nomemo spellcheck="false" style="min-height:120px" placeholder="1700000000&#10;1767225600000"></textarea>
+<div class="btns"><button class="btn" id="utBatchGo">Convert list</button><button class="btn ghost" id="utBatchCp">Copy result</button></div>
+<textarea id="utBatchOut" data-nomemo readonly spellcheck="false" style="min-height:120px;margin-top:12px" placeholder="Timestamp → ISO date (UTC) and your local time"></textarea>
+<script>
+(function () {
+  var LOCAL = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
+  var zones = [];
+  try { zones = Intl.supportedValuesOf('timeZone'); } catch (e) { zones = ['UTC', 'Europe/London', 'Europe/Paris', 'America/New_York', 'America/Los_Angeles', 'Asia/Tokyo', 'Asia/Kolkata', 'Australia/Sydney']; }
+  // some browsers still list old names; show the current ones (both work in Intl)
+  var MODERN = { 'Asia/Calcutta': 'Asia/Kolkata', 'Asia/Katmandu': 'Asia/Kathmandu', 'Asia/Saigon': 'Asia/Ho_Chi_Minh', 'Asia/Rangoon': 'Asia/Yangon', 'Europe/Kiev': 'Europe/Kyiv', 'America/Godthab': 'America/Nuuk', 'Atlantic/Faeroe': 'Atlantic/Faroe', 'Pacific/Truk': 'Pacific/Chuuk', 'Pacific/Ponape': 'Pacific/Pohnpei', 'America/Buenos_Aires': 'America/Argentina/Buenos_Aires' };
+  zones = zones.map(function (z) { var m = MODERN[z]; if (!m) return z; try { new Intl.DateTimeFormat('en', { timeZone: m }); return m; } catch (e) { return z; } }).sort();
+  if (zones.indexOf('UTC') === -1) zones.unshift('UTC');
+  LOCAL = MODERN[LOCAL] || LOCAL;
+  function fill(sel, first) {
+    [['local', 'Your time zone (' + LOCAL + ')'], ['UTC', 'UTC']].concat(zones.filter(function (z) { return z !== 'UTC'; }).map(function (z) { return [z, z.replace(/_/g, ' ')]; })).forEach(function (o) {
+      var op = document.createElement('option'); op.value = o[0]; op.textContent = o[1]; sel.appendChild(op);
+    });
+    sel.value = first;
+  }
+  fill($('utZone'), 'UTC'); fill($('utDZone'), 'local');
+  function zoneOf(v) { return v === 'local' ? LOCAL : v; }
+  function say(id, cls, t) { $(id).className = 'msg' + (cls ? ' ' + cls : ''); $(id).textContent = t; }
+
+  // ---------- live clock ----------
+  function tick() { var ms = Date.now(); $('utNowS').textContent = Math.floor(ms / 1000); $('utNowMs').textContent = ms; }
+  tick(); setInterval(tick, 250);
+  $('utCpS').addEventListener('click', function () { copyText(String(Math.floor(Date.now() / 1000)), $('utCpS')); });
+  $('utCpMs').addEventListener('click', function () { copyText(String(Date.now()), $('utCpMs')); });
+
+  // ---------- helpers ----------
+  function fmt(ms, tz, opts) {
+    return new Intl.DateTimeFormat(undefined, Object.assign({ timeZone: tz, year: 'numeric', month: 'long', day: 'numeric', weekday: 'long', hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' }, opts || {})).format(new Date(ms));
+  }
+  // offset of a time zone at a moment, in minutes (east of UTC is positive)
+  function offset(ms, tz) {
+    var p = {}, d = new Date(ms);
+    new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', era: 'short' }).formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+    var y = +p.year; if (p.era === 'BC' || p.era === 'B') y = 1 - y;
+    var asUTC = Date.UTC(2000, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second); var t = new Date(asUTC); t.setUTCFullYear(y);
+    return Math.round((t.getTime() - (ms - ((ms % 1000) + 1000) % 1000)) / 60000);
+  }
+  function isoIn(ms, tz) {
+    var off = offset(ms, tz), local = new Date(ms + off * 60000).toISOString().replace('Z', '');
+    var sign = off >= 0 ? '+' : '-', a = Math.abs(off);
+    return local + (tz === 'UTC' ? 'Z' : sign + String(Math.floor(a / 60)).padStart(2, '0') + ':' + String(a % 60).padStart(2, '0'));
+  }
+  function relative(ms) {
+    var diff = (ms - Date.now()) / 1000, a = Math.abs(diff), rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    var units = [['year', 31557600], ['month', 2629800], ['week', 604800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+    for (var i = 0; i < units.length; i++) if (a >= units[i][1] || units[i][0] === 'second') return rtf.format(Math.round(diff / units[i][1]), units[i][0]);
+  }
+  function row(box, label, value) {
+    var d = document.createElement('div'), s = document.createElement('span'), c = document.createElement('code'), b = document.createElement('button');
+    d.className = 'kv'; s.textContent = label; c.textContent = value; b.className = 'btn ghost'; b.textContent = 'Copy';
+    b.addEventListener('click', function () { copyText(value, b); });
+    d.appendChild(s); d.appendChild(c); d.appendChild(b); box.appendChild(d);
+  }
+  var MAXMS = 8.64e15;
+  // Parse a timestamp and pick its unit from the number of digits: 10 = seconds, 13 = ms, 16 = µs, 19 = ns.
+  function parseTs(raw, unit) {
+    var t = raw.trim().replace(/[\s,_']/g, '');
+    if (!t) return null;
+    if (!/^[-+]?\d+(\.\d+)?$/.test(t)) return { err: 'A Unix timestamp is a whole number of seconds, like 1767225600. Remove letters and other characters.' };
+    var neg = t[0] === '-', digits = t.replace(/^[-+]/, '').split('.')[0].replace(/^0+(?=\d)/, '').length, u = unit;
+    if (u === 'auto') u = digits <= 11 ? 's' : digits <= 14 ? 'ms' : digits <= 17 ? 'us' : 'ns';
+    var ms;
+    if (u === 'ns' || u === 'us') {
+      var big; try { big = BigInt(t.split('.')[0]); } catch (e) { return { err: 'That number could not be read.' }; }
+      ms = Number(big / (u === 'ns' ? 1000000n : 1000n));
+    } else ms = u === 's' ? Number(t) * 1000 : Number(t);
+    if (!isFinite(ms) || Math.abs(ms) > MAXMS) return { err: 'That timestamp is outside the range dates can have (about 270,000 years before or after 1970). Check the unit.' };
+    return { ms: ms, unit: u, neg: neg };
+  }
+  var NAMES = { s: 'seconds', ms: 'milliseconds', us: 'microseconds', ns: 'nanoseconds' };
+  function showTs() {
+    var box = $('utRes'); box.textContent = '';
+    var r = parseTs($('utTs').value, $('utUnit').value);
+    if (!r) { say('utMsg', '', 'Type a timestamp, or press Use current time.'); return; }
+    if (r.err) { say('utMsg', 'bad', r.err); return; }
+    var ms = Math.floor(r.ms), zone = zoneOf($('utZone').value);
+    say('utMsg', 'ok', 'Read as ' + NAMES[r.unit] + ($('utUnit').value === 'auto' ? ' (detected from the number of digits)' : '') + '.');
+    row(box, 'Your time', fmt(ms, LOCAL));
+    row(box, 'UTC', fmt(ms, 'UTC'));
+    if (zone !== LOCAL && zone !== 'UTC') row(box, zone.split('/').pop().replace(/_/g, ' '), fmt(ms, zone));
+    row(box, 'ISO 8601 (UTC)', new Date(ms).toISOString());
+    row(box, 'ISO 8601 (' + (zone === 'UTC' ? 'your zone' : 'zone') + ')', isoIn(ms, zone === 'UTC' ? LOCAL : zone));
+    row(box, 'RFC 2822', new Date(ms).toUTCString().replace('GMT', '+0000'));
+    row(box, 'Relative', relative(ms));
+    row(box, 'Seconds', String(Math.floor(ms / 1000)));
+    row(box, 'Milliseconds', String(ms));
+    var y = new Date(ms).getUTCFullYear();
+    if (Math.floor(ms / 1000) > 2147483647) say('utMsg', 'ok', $('utMsg').textContent + ' Note: this is after 19 January 2038, so it does not fit in old 32-bit systems.');
+    if (y < 1900 || y > 9999) say('utMsg', 'ok', $('utMsg').textContent + ' This date is very far from today; check that the unit is right.');
+  }
+  $('utTs').addEventListener('input', showTs);
+  $('utUnit').addEventListener('change', showTs);
+  $('utZone').addEventListener('change', showTs);
+  $('utUseNow').addEventListener('click', function () { $('utTs').value = Math.floor(Date.now() / 1000); $('utUnit').value = 'auto'; showTs(); });
+
+  // ---------- date to timestamp (the date is read as wall-clock time in the chosen zone) ----------
+  function showDate() {
+    var box = $('utRes2'); box.textContent = '';
+    var v = $('utDate').value;
+    if (!v) { say('utMsg2', '', 'Pick a date and time.'); return; }
+    var m = /^(\d{4,6})-(\d\d)-(\d\d)T(\d\d):(\d\d)(?::(\d\d)(?:\.(\d+))?)?$/.exec(v);
+    if (!m) { say('utMsg2', 'bad', 'That date could not be read.'); return; }
+    var tz = zoneOf($('utDZone').value), guess = Date.UTC(2000, +m[2] - 1, +m[3], +m[4], +m[5], +(m[6] || 0), +((m[7] || '0') + '00').slice(0, 3));
+    var g = new Date(guess); g.setUTCFullYear(+m[1]); guess = g.getTime();
+    // find the moment whose wall-clock time in tz is the typed one (two passes handle daylight-saving changes)
+    var ms = guess - offset(guess, tz) * 60000; ms = guess - offset(ms, tz) * 60000;
+    var back = isoIn(ms, tz).slice(0, 16), typed = v.slice(0, 16);
+    say('utMsg2', back.replace(/^0+/, '') === typed.replace(/^0+/, '') ? 'ok' : 'bad', back.replace(/^0+/, '') === typed.replace(/^0+/, '') ? 'Converted using ' + tz.replace(/_/g, ' ') + ' (UTC' + isoIn(ms, tz).slice(-6).replace('Z', '+00:00') + ').' : 'This time does not exist in ' + tz.replace(/_/g, ' ') + ' (the clocks jump forward that day), so the next valid time was used.');
+    row(box, 'Seconds', String(Math.floor(ms / 1000)));
+    row(box, 'Milliseconds', String(ms));
+    row(box, 'ISO 8601 (UTC)', new Date(ms).toISOString());
+    row(box, 'Your time', fmt(ms, LOCAL));
+  }
+  $('utDate').addEventListener('input', showDate);
+  $('utDZone').addEventListener('change', showDate);
+
+  // ---------- batch ----------
+  $('utBatchGo').addEventListener('click', function () {
+    var lines = $('utBatch').value.split(/\r?\n/), bad = 0, out = [], n = 0, lf = new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' });
+    if (!$('utBatch').value.trim()) { $('utBatchOut').value = ''; return; }
+    lines.slice(0, 100000).forEach(function (l) {
+      if (!l.trim()) { out.push(''); return; }
+      var r = parseTs(l, 'auto');
+      if (!r || r.err) { bad++; out.push(l.trim() + '\t(not a timestamp)'); return; }
+      n++; out.push(l.trim() + '\t' + new Date(Math.floor(r.ms)).toISOString() + '\t' + lf.format(new Date(Math.floor(r.ms))));
+    });
+    $('utBatchOut').value = out.join('\n');
+    if (bad) toast(bad + (bad === 1 ? ' line is' : ' lines are') + ' not a timestamp');
+  });
+  $('utBatchCp').addEventListener('click', function () { if ($('utBatchOut').value) copyText($('utBatchOut').value, $('utBatchCp')); });
+
+  // start with the current time on both sides
+  $('utTs').value = $('utTs').value || Math.floor(Date.now() / 1000);
+  var now = new Date(), pad = function (x) { return String(x).padStart(2, '0'); };
+  $('utDate').value = now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate()) + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes()) + ':' + pad(now.getSeconds());
+  showTs(); showDate();
+})();
+</script>

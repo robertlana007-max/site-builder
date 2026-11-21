@@ -1,0 +1,111 @@
+<style>
+#sqIn, #sqOut { min-height: 220px; font-size: 13.5px; white-space: pre; overflow-wrap: normal; overflow-x: auto; tab-size: 4; }
+</style>
+<label for="sqIn">Your SQL</label>
+<textarea id="sqIn" data-nomemo spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="select id, name from users where active = 1 order by name"></textarea>
+<div class="btns" style="margin-top:8px">
+  <button class="btn ghost" id="sqOpen">Open .sql file</button>
+  <button class="btn ghost" id="sqSample">Load sample</button>
+  <button class="btn ghost" id="sqClr">Clear</button>
+  <input type="file" id="sqFile" accept=".sql,.txt,text/plain,application/sql" hidden data-nomemo>
+</div>
+<div class="fields" style="margin-top:14px">
+  <div><label for="sqDialect">SQL dialect</label><select id="sqDialect">
+    <option value="sql">Standard SQL</option><option value="mysql">MySQL</option><option value="mariadb">MariaDB</option><option value="postgresql">PostgreSQL</option><option value="sqlite">SQLite</option><option value="transactsql">SQL Server (T-SQL)</option><option value="plsql">Oracle PL/SQL</option><option value="bigquery">Google BigQuery</option><option value="snowflake">Snowflake</option><option value="redshift">Amazon Redshift</option><option value="clickhouse">ClickHouse</option><option value="duckdb">DuckDB</option><option value="db2">IBM Db2</option><option value="db2i">IBM Db2 for i</option><option value="hive">Apache Hive</option><option value="spark">Spark SQL</option><option value="trino">Trino / Presto</option><option value="tidb">TiDB</option><option value="singlestoredb">SingleStore</option><option value="n1ql">Couchbase N1QL</option>
+  </select></div>
+  <div><label for="sqKw">Keywords</label><select id="sqKw"><option value="upper">UPPER CASE</option><option value="lower">lower case</option><option value="preserve">Keep as typed</option></select></div>
+  <div><label for="sqFn">Function names</label><select id="sqFn"><option value="preserve">Keep as typed</option><option value="upper">UPPER CASE</option><option value="lower">lower case</option></select></div>
+  <div><label for="sqInd">Indent</label><select id="sqInd"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="tab">Tab</option></select></div>
+  <div><label for="sqStyle">Layout</label><select id="sqStyle"><option value="standard">Standard</option><option value="tabularLeft">Aligned columns (left)</option><option value="tabularRight">Aligned columns (right)</option></select></div>
+  <div><label for="sqAnd">AND / OR</label><select id="sqAnd"><option value="before">At the start of the line</option><option value="after">At the end of the line</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="sqDense">No spaces around operators (a=b)</label>
+  <label><input type="checkbox" id="sqSemi">Semicolon on its own line</label>
+</div>
+<div class="btns" style="margin-top:0">
+  <button class="btn" id="sqGo">Format SQL</button>
+  <button class="btn ghost" id="sqMin">Compact to one line</button>
+</div>
+<p class="msg" id="sqMsg"></p>
+<label for="sqOut" style="margin-top:14px">Result</label>
+<textarea id="sqOut" data-nomemo readonly spellcheck="false" placeholder="Formatted SQL appears here."></textarea>
+<div class="btns">
+  <button class="btn" id="sqCp">Copy SQL</button>
+  <button class="btn ghost" id="sqDl">Download .sql</button>
+</div>
+<script src="../assets/vendor/sql-formatter/sql-formatter.min.js"></script>
+<script>
+(function () {
+  var AUTO = 300000, deb;
+  function say(cls, t) { $('sqMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('sqMsg').textContent = t; }
+  function fmt(manual) {
+    var src = $('sqIn').value;
+    if (!src.trim()) { $('sqOut').value = ''; say('', manual ? 'Paste some SQL first, or press Load sample.' : ''); return; }
+    if (typeof sqlFormatter === 'undefined') { say('bad', 'The formatter did not load. Check your connection and reload the page.'); return; }
+    var ind = $('sqInd').value, t0 = performance.now();
+    try {
+      $('sqOut').value = sqlFormatter.format(src, {
+        language: $('sqDialect').value, keywordCase: $('sqKw').value, functionCase: $('sqFn').value, dataTypeCase: $('sqKw').value,
+        tabWidth: ind === 'tab' ? 4 : +ind, useTabs: ind === 'tab', indentStyle: $('sqStyle').value, logicalOperatorNewline: $('sqAnd').value,
+        denseOperators: $('sqDense').checked, newlineBeforeSemicolon: $('sqSemi').checked, linesBetweenQueries: 1
+      });
+      var ms = performance.now() - t0;
+      say('ok', 'Formatted as ' + $('sqDialect').selectedOptions[0].textContent + '.' + (ms > 500 ? ' Took ' + (ms / 1000).toFixed(1) + ' s.' : ''));
+    } catch (e) {
+      $('sqOut').value = '';
+      var msg = String(e.message || e).split('\n')[0].trim(); if (!/[.!?]$/.test(msg)) msg += '.';
+      say('bad', 'Could not format: ' + msg + ($('sqDialect').value === 'sql' ? ' Try choosing your database under SQL dialect; Standard SQL does not know every database\'s syntax.' : ' Check the SQL near that spot, or try another dialect.'));
+    }
+  }
+  // Put everything on one line, keeping strings, quoted names and comments intact.
+  function compact(src) {
+    var out = '', i = 0, n = src.length, ws = false;
+    var push = function (s) { if (ws && out && !/[\s(]$/.test(out) && !/^[),;]/.test(s)) out += ' '; ws = false; out += s; };
+    while (i < n) {
+      var c = src[i], j;
+      if (c === '\'' || c === '"' || c === '`' || (c === '[' && $('sqDialect').value === 'transactsql')) {
+        var close = c === '[' ? ']' : c; j = i + 1;
+        while (j < n) { if (src[j] === close) { if (src[j + 1] === close) { j += 2; continue; } break; } if (src[j] === '\\' && c !== '[' && /mysql|mariadb|bigquery|spark|hive|tidb|singlestoredb|clickhouse/.test($('sqDialect').value)) j++; j++; }
+        push(src.slice(i, j + 1)); i = j + 1; continue;
+      }
+      if (c === '$' && /^\$\w*\$/.test(src.slice(i, i + 40))) { var tag = /^\$\w*\$/.exec(src.slice(i))[0]; j = src.indexOf(tag, i + tag.length); j = j === -1 ? n : j + tag.length; push(src.slice(i, j)); i = j; continue; }
+      if (c === '-' && src[i + 1] === '-' || c === '#' && /mysql|mariadb/.test($('sqDialect').value)) { j = src.indexOf('\n', i); if (j === -1) j = n; var body = src.slice(i + (c === '#' ? 1 : 2), j).replace(/\*\//g, '* /').trim(); if (body) push('/* ' + body + ' */'); ws = true; i = j; continue; }
+      if (c === '/' && src[i + 1] === '*') { j = src.indexOf('*/', i + 2); j = j === -1 ? n : j + 2; push(src.slice(i, j).replace(/\s+/g, ' ')); i = j; continue; }
+      if (/\s/.test(c)) { ws = true; i++; continue; }
+      push(c); i++;
+    }
+    return out.trim();
+  }
+  function schedule() { clearTimeout(deb); if ($('sqIn').value.length <= AUTO) deb = setTimeout(function () { fmt(false); }, 250); else say('', 'Long SQL: press Format SQL when ready.'); }
+  $('sqIn').addEventListener('input', schedule);
+  ['sqDialect', 'sqKw', 'sqFn', 'sqInd', 'sqStyle', 'sqAnd', 'sqDense', 'sqSemi'].forEach(function (id) { $(id).addEventListener('change', function () { if ($('sqIn').value.length <= AUTO) fmt(false); }); });
+  $('sqGo').addEventListener('click', function () { say('', 'Formatting…'); setTimeout(function () { fmt(true); }, 20); });
+  $('sqMin').addEventListener('click', function () {
+    var src = $('sqIn').value;
+    if (!src.trim()) { say('', 'Paste some SQL first.'); return; }
+    $('sqOut').value = compact(src); say('ok', 'Compacted to one line. Line comments were turned into /* */ comments so nothing breaks.');
+  });
+  $('sqCp').addEventListener('click', function () { if ($('sqOut').value) copyText($('sqOut').value, $('sqCp')); else say('', 'There is no result to copy yet.'); });
+  $('sqDl').addEventListener('click', function () {
+    if (!$('sqOut').value) { say('', 'There is no result to download yet.'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('sqOut').value + '\n'], { type: 'application/sql;charset=utf-8' })); a.download = 'query.sql'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('sqClr').addEventListener('click', function () { $('sqIn').value = ''; $('sqOut').value = ''; say('', ''); $('sqIn').focus(); });
+  $('sqSample').addEventListener('click', function () {
+    $('sqIn').value = "select c.id, c.name, count(o.id) as orders, sum(o.total) as revenue from customers c left join orders o on o.customer_id = c.id and o.status <> 'cancelled' where c.country in ('BR', 'IN', 'NG', 'DE') and c.created_at >= '2026-01-01' group by c.id, c.name having count(o.id) > 2 order by revenue desc limit 20;";
+    fmt(true);
+  });
+  $('sqOpen').addEventListener('click', function () { $('sqFile').click(); });
+  $('sqFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 20 * 1048576) { say('bad', 'That file is ' + fmtBytes(f.size) + '. Please use a file under 20 MB.'); return; }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) { say('bad', 'That does not look like a text .sql file.'); return; }
+      $('sqIn').value = t; say('', 'Opened ' + f.name + '.'); if (t.length <= AUTO) fmt(true);
+    });
+  });
+})();
+</script>

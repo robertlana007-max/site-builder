@@ -1,0 +1,149 @@
+<style>
+.jw-tok { font-family: var(--mono); font-size: 14px; word-break: break-all; min-height: 120px; }
+.jw-col { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin: 6px 0 0; font-family: var(--mono); font-size: 13.5px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 420px; overflow: auto; }
+.jw-h { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-top: 18px; flex-wrap: wrap; }
+.jw-h b { font-size: 15px; }
+.jw-h .btn { padding: 6px 12px; min-height: 36px; }
+.jw-k { color: #b45309; } .jw-s { color: #047857; } .jw-n { color: #1d4ed8; } .jw-l { color: #7c3aed; }
+[data-theme="dark"] .jw-k { color: #fbbf24; } [data-theme="dark"] .jw-s { color: #6ee7b7; } [data-theme="dark"] .jw-n { color: #93c5fd; } [data-theme="dark"] .jw-l { color: #c4b5fd; }
+.jw-parts span { word-break: break-all; }
+.jw-p1 { color: #dc2626; } .jw-p2 { color: #7c3aed; } .jw-p3 { color: #0891b2; }
+[data-theme="dark"] .jw-p1 { color: #f87171; } [data-theme="dark"] .jw-p2 { color: #c4b5fd; } [data-theme="dark"] .jw-p3 { color: #67e8f9; }
+.jw-claims { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 6px; }
+.jw-claims td { padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.jw-claims td:first-child { font-family: var(--mono); font-weight: 700; white-space: nowrap; width: 1%; }
+.jw-claims td:nth-child(2) { color: var(--muted); }
+.jw-badge { display: inline-block; padding: 4px 12px; border-radius: 999px; font-weight: 700; font-size: 14px; margin-top: 12px; }
+.jw-badge.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.jw-badge.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.jw-badge.wait { background: color-mix(in srgb, #d97706 15%, transparent); color: #b45309; }
+.jw-note { margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--bg); border: 1px dashed var(--line); font-size: 14px; color: var(--muted); }
+</style>
+<label for="jwIn">JSON Web Token (JWT)</label>
+<textarea id="jwIn" class="jw-tok" data-nomemo spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="Paste a token like eyJhbGciOi... (the word Bearer in front is fine)"></textarea>
+<div class="btns" style="margin-top:8px"><button class="btn ghost" id="jwSample">Load example token</button><button class="btn ghost" id="jwClr">Clear</button></div>
+<p class="msg" id="jwMsg"></p>
+<div id="jwOut" hidden>
+  <div id="jwBadge"></div>
+  <div class="jw-h"><b>Colour-coded token</b></div>
+  <div class="jw-col jw-parts" id="jwParts"></div>
+  <div class="jw-h"><b>Header <span class="msg" style="font-size:13px">algorithm and token type</span></b><button class="btn ghost" id="jwCpH">Copy</button></div>
+  <pre class="jw-col" id="jwHead"></pre>
+  <div class="jw-h"><b>Payload <span class="msg" style="font-size:13px">the data (claims)</span></b><button class="btn ghost" id="jwCpP">Copy</button></div>
+  <pre class="jw-col" id="jwPay"></pre>
+  <div class="jw-h"><b>Claims explained</b></div>
+  <table class="jw-claims"><tbody id="jwClaims"></tbody></table>
+  <div class="jw-h"><b>Signature</b></div>
+  <pre class="jw-col" id="jwSig"></pre>
+  <p class="jw-note">⚠ The signature is <b>not checked</b>. Anyone can create a token with any content, so never trust the data above until your server verifies the signature with the right key. Decoding happens only in your browser; the token is not sent anywhere.</p>
+</div>
+<script>
+(function () {
+  var CLAIMS = { iss: 'Issuer: who created the token', sub: 'Subject: who the token is about (usually a user ID)', aud: 'Audience: who the token is meant for', exp: 'Expires at', nbf: 'Not valid before', iat: 'Issued at', jti: 'Token ID: a unique ID for this token', name: 'Full name', email: 'Email address', email_verified: 'Email has been verified', scope: 'Permissions (scopes)', scp: 'Permissions (scopes)', roles: 'Roles', azp: 'Authorised party: the app that asked for the token', sid: 'Session ID', nonce: 'Value that links the token to a login request', auth_time: 'Time the user logged in', preferred_username: 'User name', given_name: 'First name', family_name: 'Last name', locale: 'Language and region', tid: 'Tenant (organisation) ID', client_id: 'App (client) ID', typ: 'Token type', alg: 'Signing algorithm', kid: 'Key ID: which key signed the token', cty: 'Content type', enc: 'Encryption method', zip: 'Compression', x5t: 'Certificate thumbprint', jku: 'URL of the signing keys' };
+  var ALGS = { HS256: 'HMAC with SHA-256 (shared secret)', HS384: 'HMAC with SHA-384 (shared secret)', HS512: 'HMAC with SHA-512 (shared secret)', RS256: 'RSA with SHA-256 (public/private key)', RS384: 'RSA with SHA-384', RS512: 'RSA with SHA-512', ES256: 'ECDSA P-256 with SHA-256', ES384: 'ECDSA P-384 with SHA-384', ES512: 'ECDSA P-521 with SHA-512', PS256: 'RSA-PSS with SHA-256', PS384: 'RSA-PSS with SHA-384', PS512: 'RSA-PSS with SHA-512', EdDSA: 'Edwards-curve signature (Ed25519)', none: 'No signature at all (unsafe)' };
+  var TIMES = { exp: 1, nbf: 1, iat: 1, auth_time: 1, updated_at: 1 };
+  var cur = { h: '', p: '' };
+  function say(cls, t) { $('jwMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('jwMsg').textContent = t; }
+  function b64urlDecode(s) {
+    if (!/^[A-Za-z0-9_\-+/]*=*$/.test(s)) throw new Error('contains characters that are not allowed in a token');
+    s = s.replace(/-/g, '+').replace(/_/g, '/').replace(/=+$/, '');
+    if (s.length % 4 === 1) throw new Error('has the wrong length');
+    while (s.length % 4) s += '=';
+    var bin = atob(s), bytes = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    return bytes;
+  }
+  function text(bytes) { return new TextDecoder('utf-8', { fatal: false }).decode(bytes); }
+  // pretty JSON with simple colouring, built from text nodes so nothing in the token can run as HTML
+  function paint(el, value) {
+    el.textContent = '';
+    var json = JSON.stringify(value, null, 2), re = /("(?:[^"\\]|\\.)*")(\s*:)?|\b(true|false|null)\b|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?/g, at = 0, m;
+    while ((m = re.exec(json))) {
+      if (m.index > at) el.appendChild(document.createTextNode(json.slice(at, m.index)));
+      var sp = document.createElement('span');
+      if (m[1]) { sp.className = m[2] ? 'jw-k' : 'jw-s'; sp.textContent = m[1]; el.appendChild(sp); if (m[2]) el.appendChild(document.createTextNode(m[2])); }
+      else { sp.className = m[3] ? 'jw-l' : 'jw-n'; sp.textContent = m[0]; el.appendChild(sp); }
+      at = re.lastIndex;
+    }
+    el.appendChild(document.createTextNode(json.slice(at)));
+  }
+  function when(sec) {
+    var d = new Date(sec * 1000);
+    if (isNaN(d)) return 'not a valid time';
+    return new Intl.DateTimeFormat(undefined, { dateStyle: 'full', timeStyle: 'long' }).format(d) + ' (' + rel(sec * 1000) + ')';
+  }
+  function rel(ms) {
+    var diff = (ms - Date.now()) / 1000, a = Math.abs(diff), rtf = new Intl.RelativeTimeFormat(undefined, { numeric: 'auto' });
+    var u = [['year', 31557600], ['month', 2629800], ['day', 86400], ['hour', 3600], ['minute', 60], ['second', 1]];
+    for (var i = 0; i < u.length; i++) if (a >= u[i][1] || u[i][0] === 'second') return rtf.format(Math.round(diff / u[i][1]), u[i][0]);
+  }
+  function claimRow(k, v, desc) {
+    var tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td'), c = document.createElement('td');
+    a.textContent = k; b.textContent = desc || ''; c.textContent = v;
+    tr.appendChild(a); tr.appendChild(b); tr.appendChild(c); $('jwClaims').appendChild(tr);
+  }
+  function decode() {
+    var raw = $('jwIn').value.trim().replace(/^(bearer|jwt)\s+/i, '').replace(/^["']|["']$/g, '').replace(/\s+/g, '');
+    $('jwOut').hidden = true;
+    if (!raw) { say('', ''); return; }
+    var parts = raw.split('.');
+    if (parts.length === 5) { say('bad', 'This is an encrypted token (JWE). Its header can be read but the content cannot be decoded without the private key.'); }
+    else if (parts.length !== 3) { say('bad', 'A JWT has three parts separated by dots (header.payload.signature). This one has ' + parts.length + (parts.length === 1 ? ' part' : ' parts') + '. Make sure you copied the whole token.'); return; }
+    var header, payload, ptext;
+    try { header = JSON.parse(text(b64urlDecode(parts[0]))); }
+    catch (e) { say('bad', 'The header (first part) could not be decoded: it ' + (e instanceof SyntaxError ? 'is not valid JSON' : e.message) + '. Check that the token is complete and not cut off.'); return; }
+    if (parts.length === 5) { $('jwOut').hidden = false; paint($('jwHead'), header); cur.h = JSON.stringify(header, null, 2); $('jwPay').textContent = '(encrypted)'; $('jwSig').textContent = ''; $('jwClaims').textContent = ''; $('jwBadge').textContent = ''; showParts(parts); return; }
+    try { ptext = text(b64urlDecode(parts[1])); }
+    catch (e) { say('bad', 'The payload (middle part) ' + e.message + '. Check that the token is complete.'); return; }
+    try { payload = JSON.parse(ptext); } catch (e) { payload = null; }
+    $('jwOut').hidden = false;
+    showParts(parts);
+    paint($('jwHead'), header); cur.h = JSON.stringify(header, null, 2);
+    if (payload !== null && typeof payload === 'object') { paint($('jwPay'), payload); cur.p = JSON.stringify(payload, null, 2); }
+    else { $('jwPay').textContent = ptext; cur.p = ptext; }
+    $('jwSig').textContent = parts[2] ? parts[2] + '\n\n' + (function () { try { return b64urlDecode(parts[2]).length + ' bytes'; } catch (e) { return 'not valid base64url'; } })() : '(empty: this token is not signed)';
+    // claims
+    $('jwClaims').textContent = '';
+    if (header.alg) claimRow('alg', header.alg, ALGS[header.alg] || 'Signing algorithm');
+    if (header.kid) claimRow('kid', header.kid, CLAIMS.kid);
+    var badge = $('jwBadge'); badge.textContent = '';
+    var notes = [];
+    if (payload && typeof payload === 'object' && !Array.isArray(payload)) {
+      Object.keys(payload).forEach(function (k) {
+        var v = payload[k], shown = typeof v === 'object' ? JSON.stringify(v) : String(v);
+        if (TIMES[k] && typeof v === 'number') shown = v + ' → ' + when(v);
+        if (CLAIMS[k] || TIMES[k]) claimRow(k, shown, CLAIMS[k] || 'Time');
+      });
+      var now = Date.now() / 1000, b = document.createElement('span'); b.className = 'jw-badge';
+      if (typeof payload.exp === 'number') {
+        if (payload.exp < now) { b.className += ' bad'; b.textContent = 'Expired ' + rel(payload.exp * 1000); }
+        else if (typeof payload.nbf === 'number' && payload.nbf > now) { b.className += ' wait'; b.textContent = 'Not valid yet: starts ' + rel(payload.nbf * 1000); }
+        else { b.className += ' ok'; b.textContent = 'Not expired: expires ' + rel(payload.exp * 1000); }
+      } else if (typeof payload.nbf === 'number' && payload.nbf > now) { b.className += ' wait'; b.textContent = 'Not valid yet: starts ' + rel(payload.nbf * 1000); }
+      else { b.className += ' wait'; b.textContent = 'No expiry time (exp): this token never expires by itself'; }
+      badge.appendChild(b);
+      if (typeof payload.exp === 'number' && payload.exp > 1e11) notes.push('exp looks like milliseconds; the standard uses seconds.');
+    } else notes.push('The payload is not a JSON object, so no claims are shown.');
+    if (header.alg === 'none' || !parts[2]) notes.push('This token has no signature, so anyone could have changed it.');
+    say(notes.length ? 'bad' : 'ok', notes.length ? notes.join(' ') : 'Decoded. Remember: the signature is not verified here.');
+  }
+  function showParts(parts) {
+    var el = $('jwParts'); el.textContent = '';
+    parts.forEach(function (p, i) {
+      if (i) el.appendChild(document.createTextNode('.'));
+      var s = document.createElement('span'); s.className = 'jw-p' + Math.min(i + 1, 3); s.textContent = p.length > 4000 ? p.slice(0, 4000) + '…' : p; el.appendChild(s);
+    });
+  }
+  $('jwIn').addEventListener('input', decode);
+  $('jwCpH').addEventListener('click', function () { copyText(cur.h, $('jwCpH')); });
+  $('jwCpP').addEventListener('click', function () { copyText(cur.p, $('jwCpP')); });
+  $('jwClr').addEventListener('click', function () { $('jwIn').value = ''; decode(); $('jwIn').focus(); });
+  $('jwSample').addEventListener('click', function () {
+    // an example token made here with made-up data and a dummy signature
+    var enc = function (o) { var b = new TextEncoder().encode(JSON.stringify(o)), s = ''; b.forEach(function (x) { s += String.fromCharCode(x); }); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); };
+    var now = Math.floor(Date.now() / 1000);
+    $('jwIn').value = enc({ alg: 'HS256', typ: 'JWT' }) + '.' + enc({ sub: '1234567890', name: 'Alex Example', email: 'alex@example.com', roles: ['reader', 'editor'], iat: now - 600, exp: now + 3000, iss: 'https://auth.example.com' }) + '.' + 'c2lnbmF0dXJlLW5vdC1yZWFsLWp1c3QtYW4tZXhhbXBsZQ';
+    decode();
+  });
+})();
+</script>

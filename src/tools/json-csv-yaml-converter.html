@@ -1,0 +1,234 @@
+<style>
+.jc-bar { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: flex-end; margin: 14px 0; }
+.jc-bar > div { min-width: 0; }
+.jc-bar select { width: auto; min-width: 150px; }
+.jc-arrow { font-size: 22px; color: var(--muted); padding-bottom: 8px; }
+.jc-opts { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; margin-bottom: 8px; }
+.jc-opts label { font-weight: 400; font-size: 14.5px; margin: 0; }
+.jc-opts select { width: auto; min-height: 38px; padding: 5px 10px; display: inline-block; }
+#jcIn, #jcOut { min-height: 240px; font-size: 13.5px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+</style>
+<div class="btns" style="margin:0 0 12px">
+  <button class="btn ghost" id="jcOpen">Open file</button>
+  <button class="btn ghost" id="jcSample">Load sample</button>
+  <input type="file" id="jcFile" accept=".json,.csv,.tsv,.yaml,.yml,.txt,application/json,text/csv,text/plain" hidden data-nomemo>
+</div>
+<label for="jcIn">Input</label>
+<textarea id="jcIn" data-nomemo spellcheck="false" placeholder='Paste JSON, CSV or YAML here, e.g. [{"name":"Ana","age":31}]'></textarea>
+<div class="jc-bar">
+  <div><label for="jcFrom">From</label><select id="jcFrom"><option value="auto">Detect automatically</option><option value="json">JSON</option><option value="csv">CSV / TSV</option><option value="yaml">YAML</option></select></div>
+  <div class="jc-arrow" aria-hidden="true">→</div>
+  <div><label>To</label><div class="seg" role="group" aria-label="Convert to" id="jcTo"><button type="button" data-f="json" aria-pressed="false">JSON</button><button type="button" data-f="csv" aria-pressed="true">CSV</button><button type="button" data-f="yaml" aria-pressed="false">YAML</button></div></div>
+</div>
+<div class="jc-opts">
+  <label for="jcDelim">CSV separator</label>
+  <select id="jcDelim"><option value="auto">Detect (comma when writing)</option><option value=",">Comma ,</option><option value=";">Semicolon ;</option><option value="&#9;">Tab</option><option value="|">Pipe |</option></select>
+  <label for="jcIndent">JSON indent</label>
+  <select id="jcIndent"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="tab">Tab</option><option value="0">Minified</option></select>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="jcHead" checked>CSV first row is column names</label>
+  <label><input type="checkbox" id="jcFlat" checked>Flatten nested data into columns (address.city)</label>
+  <label><input type="checkbox" id="jcNest" checked>Rebuild nested data from column names with dots</label>
+  <label><input type="checkbox" id="jcTypes" checked>Read numbers and true/false in CSV</label>
+</div>
+<div class="btns" style="margin-top:0"><button class="btn" id="jcGo">Convert</button><button class="btn ghost" id="jcSwap" title="Use the result as the new input">⇅ Use result as input</button></div>
+<p class="msg" id="jcMsg"></p>
+<label for="jcOut" style="margin-top:14px">Result</label>
+<textarea id="jcOut" data-nomemo spellcheck="false" readonly placeholder="The converted data appears here."></textarea>
+<div class="btns">
+  <button class="btn" id="jcCp">Copy result</button>
+  <button class="btn ghost" id="jcDl">Download</button>
+  <button class="btn ghost" id="jcClr">Clear</button>
+</div>
+<script src="../assets/vendor/js-yaml/js-yaml.min.js"></script>
+<script>
+(function () {
+  var to = 'csv', AUTO = 1000000, fromUsed = '';
+  function say(cls, t) { $('jcMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('jcMsg').textContent = t; }
+
+  // ---------- CSV ----------
+  function guessDelim(text) {
+    var first = '', q = false;
+    for (var i = 0; i < text.length && i < 20000; i++) { var c = text[i]; if (c === '"') q = !q; else if (!q && (c === '\n' || c === '\r')) break; else if (!q) first += c; }
+    var best = ',', most = 0;
+    [',', ';', '\t', '|'].forEach(function (d) { var n = first.split(d).length - 1; if (n > most) { most = n; best = d; } });
+    return best;
+  }
+  function parseCSV(text, d) {
+    var rows = [], row = [], f = '', i = 0, q = false, n = text.length;
+    if (text.charCodeAt(0) === 0xfeff) i = 1;
+    for (; i < n; i++) {
+      var c = text[i];
+      if (q) {
+        if (c === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+        else f += c;
+      } else if (c === '"' && f === '') q = true;
+      else if (c === d) { row.push(f); f = ''; }
+      else if (c === '\n' || c === '\r') { if (c === '\r' && text[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+      else f += c;
+    }
+    if (q) throw new Error('A quoted value is not closed. Check for a missing " character.');
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows.filter(function (r) { return !(r.length === 1 && r[0] === ''); });
+  }
+  function typed(s) {
+    if (!$('jcTypes').checked) return s;
+    if (/^-?(0|[1-9]\d{0,14})(\.\d+)?([eE][+-]?\d+)?$/.test(s)) return Number(s);
+    if (s === 'true' || s === 'TRUE') return true;
+    if (s === 'false' || s === 'FALSE') return false;
+    if (s === 'null') return null;
+    return s;
+  }
+  function unflatten(o) {
+    var out = {};
+    Object.keys(o).forEach(function (k) {
+      var parts = k.split('.'), cur = out;
+      if (parts.some(function (p) { return p === ''; }) || parts.length === 1) { out[k] = o[k]; return; }
+      for (var i = 0; i < parts.length - 1; i++) {
+        var p = parts[i], nextIsIndex = /^\d+$/.test(parts[i + 1]);
+        if (cur[p] === undefined || cur[p] === null || typeof cur[p] !== 'object') cur[p] = nextIsIndex ? [] : {};
+        cur = cur[p];
+      }
+      cur[parts[parts.length - 1]] = o[k];
+    });
+    return out;
+  }
+  function csvToData(text, d) {
+    var rows = parseCSV(text, d);
+    if (!rows.length) return [];
+    if (!$('jcHead').checked) return rows.map(function (r) { return r.map(typed); });
+    var head = rows[0].map(function (h, i) { return h.trim() || 'column' + (i + 1); }), seen = {};
+    head = head.map(function (h) { if (seen[h]) { seen[h]++; return h + '_' + seen[h]; } seen[h] = 1; return h; });
+    return rows.slice(1).map(function (r) {
+      var o = {};
+      head.forEach(function (h, i) { o[h] = i < r.length ? typed(r[i]) : ''; });
+      return $('jcNest').checked ? unflatten(o) : o;
+    });
+  }
+  function flatten(v, pre, out) {
+    if (v !== null && typeof v === 'object' && !(Array.isArray(v) && v.length === 0) && Object.keys(v).length) {
+      Object.keys(v).forEach(function (k) { flatten(v[k], pre ? pre + '.' + k : k, out); });
+    } else if (!(v !== null && typeof v === 'object' && pre)) out[pre || 'value'] = v; // empty lists and objects inside an item add no column
+    return out;
+  }
+  function cell(v, d) {
+    if (v === null || v === undefined) return '';
+    if (typeof v === 'object') v = JSON.stringify(v);
+    v = String(v);
+    return (v.indexOf(d) !== -1 || /["\r\n]/.test(v) || /^\s|\s$/.test(v)) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  function dataToCSV(data, d) {
+    var note = '';
+    if (data && typeof data === 'object' && !Array.isArray(data)) {
+      var keys = Object.keys(data), arrKey = keys.filter(function (k) { return Array.isArray(data[k]) && data[k].length && typeof data[k][0] === 'object'; });
+      if (keys.length === 1 && arrKey.length === 1) { note = 'Used the list inside "' + arrKey[0] + '" as the rows.'; data = data[arrKey[0]]; }
+      else data = [data];
+    }
+    if (!Array.isArray(data)) data = [data];
+    if (data.length && data.every(Array.isArray)) return { text: data.map(function (r) { return r.map(function (c) { return cell(c, d); }).join(d); }).join('\n'), rows: data.length, cols: Math.max.apply(null, data.map(function (r) { return r.length; })), note: note };
+    var cols = [], idx = {}, flat = data.map(function (item) {
+      var o = item !== null && typeof item === 'object' && !Array.isArray(item) ? ($('jcFlat').checked ? flatten(item, '', {}) : item) : { value: item };
+      Object.keys(o).forEach(function (k) { if (!(k in idx)) { idx[k] = cols.length; cols.push(k); } });
+      return o;
+    });
+    var lines = [cols.map(function (c) { return cell(c, d); }).join(d)];
+    flat.forEach(function (o) { lines.push(cols.map(function (c) { return cell(o[c], d); }).join(d)); });
+    return { text: lines.join('\n'), rows: flat.length, cols: cols.length, note: note };
+  }
+
+  // ---------- reading ----------
+  function detect(t) {
+    var s = t.replace(/^\ufeff/, '').trim();
+    if (/^[\[{]/.test(s)) return 'json';
+    var first = s.split(/\r?\n/).filter(function (l) { return l.trim() && !/^#/.test(l.trim()); })[0] || '';
+    if (/^---(\s|$)/.test(first) || /^-\s/.test(first) || /^["']?[^,;\t|"']+["']?:(\s|$)/.test(first)) return 'yaml';
+    return 'csv';
+  }
+  function jsonError(t, e) {
+    var msg = e.message, at = /position (\d+)/.exec(msg);
+    if (at && !/line \d+/.test(msg)) { var before = t.slice(0, +at[1]).split('\n'); msg += ' (line ' + before.length + ', column ' + (before[before.length - 1].length + 1) + ')'; }
+    return msg;
+  }
+  function read(t, kind) {
+    if (kind === 'json') { try { return JSON.parse(t.replace(/^\ufeff/, '')); } catch (e) { throw new Error('This is not valid JSON: ' + jsonError(t, e)); } }
+    if (kind === 'yaml') {
+      try { var docs = jsyaml.loadAll(t.replace(/^\ufeff/, '')); return docs.length === 1 ? docs[0] : docs; }
+      catch (e) { throw new Error('This is not valid YAML: ' + String(e.message || e).split('\n')[0]); }
+    }
+    var d = $('jcDelim').value === 'auto' ? guessDelim(t) : $('jcDelim').value;
+    return csvToData(t, d);
+  }
+  function convert(manual) {
+    var t = $('jcIn').value;
+    if (!t.trim()) { $('jcOut').value = ''; say('', manual ? 'Paste JSON, CSV or YAML first, or press Load sample.' : ''); return; }
+    var kind = $('jcFrom').value === 'auto' ? detect(t) : $('jcFrom').value, data, out, info = '';
+    fromUsed = kind;
+    try { data = read(t, kind); } catch (e) { $('jcOut').value = ''; say('bad', e.message); return; }
+    if (data === undefined) { $('jcOut').value = ''; say('bad', 'The input is empty.'); return; }
+    try {
+      if (to === 'json') { var ind = $('jcIndent').value; out = JSON.stringify(data, null, ind === 'tab' ? '\t' : +ind); }
+      else if (to === 'yaml') out = jsyaml.dump(data, { lineWidth: -1, noRefs: true });
+      else {
+        var d = $('jcDelim').value === 'auto' ? (kind === 'csv' ? guessDelim(t) : ',') : $('jcDelim').value, r = dataToCSV(data, d);
+        out = r.text; info = fmtNum(r.rows, 0) + (r.rows === 1 ? ' row, ' : ' rows, ') + fmtNum(r.cols, 0) + (r.cols === 1 ? ' column. ' : ' columns. ') + r.note;
+      }
+    } catch (e) { $('jcOut').value = ''; say('bad', 'Could not convert: ' + (e.message || e)); return; }
+    $('jcOut').value = out;
+    var names = { json: 'JSON', csv: 'CSV', yaml: 'YAML' };
+    if (!info && Array.isArray(data)) info = fmtNum(data.length, 0) + (data.length === 1 ? ' item. ' : ' items. ');
+    say('ok', 'Converted ' + names[kind] + ' to ' + names[to] + '. ' + info + (kind === to ? 'Input and output are the same format, so the data was just re-formatted.' : ''));
+  }
+  var deb;
+  function auto() { clearTimeout(deb); if ($('jcIn').value.length <= AUTO) deb = setTimeout(function () { convert(false); }, 250); else say('', 'Large input: press Convert when ready.'); }
+  function rerun() { if ($('jcIn').value.length <= AUTO) convert(false); else say('', 'Press Convert to apply the new options.'); }
+  $('jcIn').addEventListener('input', auto);
+  ['jcFrom', 'jcDelim', 'jcIndent', 'jcHead', 'jcFlat', 'jcNest', 'jcTypes'].forEach(function (id) { $(id).addEventListener('change', rerun); });
+  $('jcTo').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    to = b.dataset.f;
+    [].forEach.call(this.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    rerun();
+  });
+  $('jcGo').addEventListener('click', function () { say('', 'Converting…'); setTimeout(function () { convert(true); }, 20); });
+  $('jcSwap').addEventListener('click', function () {
+    if (!$('jcOut').value) { say('', 'There is no result to use yet.'); return; }
+    $('jcIn').value = $('jcOut').value; $('jcFrom').value = 'auto';
+    var next = to === 'json' ? 'csv' : 'json';
+    $('jcTo').querySelector('[data-f="' + next + '"]').click();
+  });
+  $('jcCp').addEventListener('click', function () { if ($('jcOut').value) copyText($('jcOut').value, $('jcCp')); else say('', 'There is no result to copy yet.'); });
+  $('jcDl').addEventListener('click', function () {
+    if (!$('jcOut').value) { say('', 'There is no result to download yet.'); return; }
+    var ext = to === 'yaml' ? 'yaml' : to, type = { json: 'application/json', csv: 'text/csv', yaml: 'application/yaml' }[to];
+    var body = to === 'csv' ? '\ufeff' + $('jcOut').value.replace(/\n/g, '\r\n') : $('jcOut').value;
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: type + ';charset=utf-8' })); a.download = 'converted.' + ext; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    burst($('jcDl'));
+  });
+  $('jcClr').addEventListener('click', function () { $('jcIn').value = ''; $('jcOut').value = ''; say('', ''); $('jcIn').focus(); });
+  $('jcSample').addEventListener('click', function () {
+    $('jcIn').value = JSON.stringify([
+      { id: 1, name: 'Ana Silva', email: 'ana@example.com', active: true, address: { city: 'Lisbon', country: 'Portugal' }, tags: ['admin', 'sales'] },
+      { id: 2, name: 'Kenji Sato', email: 'kenji@example.com', active: false, address: { city: 'Osaka', country: 'Japan' }, tags: ['support'] },
+      { id: 3, name: 'Amara Okafor', email: 'amara@example.com', active: true, address: { city: 'Lagos', country: 'Nigeria' }, tags: [] }
+    ], null, 2);
+    $('jcFrom').value = 'auto'; convert(true);
+  });
+  $('jcOpen').addEventListener('click', function () { $('jcFile').click(); });
+  $('jcFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 100 * 1048576) { say('bad', 'That file is ' + fmtBytes(f.size) + '. Please use a file under 100 MB.'); return; }
+    if (/\.(xlsx?|ods|numbers)$/i.test(f.name)) { say('bad', 'That is a spreadsheet file. Save it as CSV first, or use the Excel CSV Converter.'); return; }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) { say('bad', 'That does not look like a text file. Open a .json, .csv or .yaml file.'); return; }
+      $('jcIn').value = t;
+      var ext = (/\.(\w+)$/.exec(f.name) || [])[1] || '';
+      $('jcFrom').value = /^json$/i.test(ext) ? 'json' : /^(csv|tsv)$/i.test(ext) ? 'csv' : /^ya?ml$/i.test(ext) ? 'yaml' : 'auto';
+      if (/^json$/i.test(ext) && to === 'json') $('jcTo').querySelector('[data-f="csv"]').click(); else convert(true);
+    });
+  });
+  if (typeof jsyaml === 'undefined') say('bad', 'The YAML part of this tool did not load. Check your connection and reload the page.');
+})();
+</script>

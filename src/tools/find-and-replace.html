@@ -1,0 +1,199 @@
+<style>
+.fr-hl { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-family: var(--mono); font-size: 14px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; min-height: 46px; margin: 0; }
+.fr-hl mark { background: color-mix(in srgb, #facc15 55%, transparent); color: inherit; border-radius: 3px; box-shadow: 0 0 0 1px color-mix(in srgb, #ca8a04 60%, transparent); }
+.fr-hl mark.cur { background: color-mix(in srgb, #fb923c 70%, transparent); }
+.fr-hl mark.zero { display: inline-block; width: 2px; height: 1.1em; vertical-align: text-bottom; background: #ea580c; box-shadow: none; }
+.fr-h { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 18px; margin-bottom: 6px; }
+.fr-h b { font-size: 15px; }
+.fr-in { font-family: var(--mono); }
+</style>
+<label for="frText">Your text</label>
+<textarea id="frText" data-nomemo spellcheck="false" style="min-height:200px" placeholder="Paste or type the text you want to search in."></textarea>
+<div class="btns" style="margin:8px 0 16px">
+  <button class="btn ghost" id="frOpen">Open text file</button>
+  <input type="file" id="frFile" accept=".txt,.csv,.md,.html,.htm,.css,.js,.json,.xml,.log,.srt,.vtt,.yml,.yaml,.ini,.tsv,text/*" hidden data-nomemo>
+</div>
+<div class="fields">
+  <div><label for="frFind">Find</label><input type="text" id="frFind" class="fr-in" data-nomemo autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Word or phrase to find"></div>
+  <div><label for="frRep">Replace with</label><input type="text" id="frRep" class="fr-in" data-nomemo autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Leave empty to delete matches"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="frCase">Match case</label>
+  <label><input type="checkbox" id="frWord">Whole words only</label>
+  <label><input type="checkbox" id="frRe">Use regular expression</label>
+  <label><input type="checkbox" id="frEsc">Read \n as new line and \t as tab</label>
+</div>
+<div class="stats">
+  <div class="stat"><span>Matches</span><b id="frN">0</b></div>
+  <div class="stat"><span>Lines with a match</span><b id="frL">0</b></div>
+  <div class="stat"><span>Characters</span><b id="frC">0</b></div>
+</div>
+<div class="btns">
+  <button class="btn" id="frAll">Replace all</button>
+  <button class="btn ghost" id="frPrev" title="Select the previous match in the text box">◀ Previous</button>
+  <button class="btn ghost" id="frNext" title="Select the next match in the text box">Next ▶</button>
+  <button class="btn ghost" id="frOne">Replace this one</button>
+  <button class="btn ghost" id="frUndo" disabled>Undo</button>
+</div>
+<p class="msg" id="frMsg"></p>
+<div class="fr-h"><b>Matches highlighted</b><span class="msg" id="frNote" style="margin:0;font-size:13px"></span></div>
+<pre class="fr-hl" id="frHl" aria-live="polite"></pre>
+<div class="btns">
+  <button class="btn ghost" id="frCopy">Copy text</button>
+  <button class="btn ghost" id="frDl">Download .txt</button>
+  <button class="btn ghost" id="frClear">Clear</button>
+</div>
+<script>
+(function () {
+  var MAXMARKS = 5000, PREVIEW = 200000, TIMEOUT = 3000;
+  // The search runs in a Web Worker, so a slow regular expression or a huge text can never freeze the page.
+  var SRC = '(' + function () {
+    onmessage = function (e) {
+      var d = e.data, re, out = { id: d.id };
+      try { re = new RegExp(d.pat, d.flags); } catch (err) { out.error = String(err.message || err); postMessage(out); return; }
+      var text = d.text, pos = [], total = 0, lines = 0, lastLine = -1, m, uni = d.flags.indexOf('u') !== -1;
+      // line starts, to count lines that contain a match without splitting a huge text
+      var nl = []; for (var i = text.indexOf('\n'); i !== -1; i = text.indexOf('\n', i + 1)) nl.push(i);
+      var li = 0;
+      re.lastIndex = 0;
+      while ((m = re.exec(text)) !== null) {
+        total++;
+        if (pos.length < d.max * 2) pos.push(m.index, m[0].length);
+        while (li < nl.length && nl[li] < m.index) li++;
+        if (li !== lastLine) { lines++; lastLine = li; }
+        if (m[0] === '') { var cp = uni ? text.codePointAt(re.lastIndex) : 0; re.lastIndex += cp > 0xffff ? 2 : 1; if (re.lastIndex > text.length) break; }
+      }
+      out.pos = pos; out.total = total; out.lines = lines;
+      if (d.rep !== null) out.result = d.literal ? text.replace(re, function () { return d.rep; }) : text.replace(re, d.rep);
+      postMessage(out);
+    };
+  } + ')()';
+  var url = URL.createObjectURL(new Blob([SRC], { type: 'text/javascript' }));
+  var worker = null, job = 0, busy = null, timer = null, deb = null, last = null, cur = -1, undo = null;
+
+  function say(cls, t) { $('frMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('frMsg').textContent = t; }
+  function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function unescape(s) { return s.replace(/\\(\\|n|t|r)/g, function (m, c) { return c === 'n' ? '\n' : c === 't' ? '\t' : c === 'r' ? '\r' : '\\'; }); }
+  // Build the search pattern from the options. Whole words use Unicode letters, so it works in every language.
+  function build() {
+    var f = $('frFind').value, regex = $('frRe').checked;
+    if (!f) return null;
+    if (!regex && $('frEsc').checked) f = unescape(f);
+    var src = regex ? f : esc(f), flags = 'g' + ($('frCase').checked ? '' : 'i') + (regex ? 'm' : '');
+    if ($('frWord').checked) {
+      var wrapped = '(?<![\\p{L}\\p{N}\\p{M}_])(?:' + src + ')(?![\\p{L}\\p{N}\\p{M}_])';
+      try { new RegExp(wrapped, flags + 'u'); return { pat: wrapped, flags: flags + 'u' }; }
+      catch (e) { return { pat: '\\b(?:' + src + ')\\b', flags: flags }; }
+    }
+    if (!regex) flags += 'u';
+    return { pat: src, flags: flags };
+  }
+  function repValue() {
+    var r = $('frRep').value;
+    return $('frEsc').checked ? (($('frRe').checked) ? r.replace(/\\n/g, '\n').replace(/\\t/g, '\t') : unescape(r)) : r;
+  }
+  function fresh() { if (worker) worker.terminate(); worker = new Worker(url); worker.onmessage = got; worker.onerror = function (e) { e.preventDefault(); clearTimeout(timer); busy = null; say('bad', 'The search could not run: ' + (e.message || 'unknown error')); }; }
+  function run(withReplace) {
+    var text = $('frText').value, p = build();
+    $('frC').textContent = fmtNum(text.length, 0);
+    if (!p) { last = null; cur = -1; $('frN').textContent = '0'; $('frL').textContent = '0'; paint(text, []); say('', text ? 'Type a word or phrase in Find.' : ''); return; }
+    if (busy !== null || !worker) fresh();
+    var id = ++job; busy = id;
+    worker.postMessage({ id: id, pat: p.pat, flags: p.flags, text: text, max: MAXMARKS, rep: withReplace ? repValue() : null, literal: !$('frRe').checked });
+    worker.lastText = text; worker.replacing = withReplace;
+    clearTimeout(timer);
+    timer = setTimeout(function () {
+      if (busy !== id) return;
+      busy = null; worker.terminate(); worker = null; last = null;
+      say('bad', 'Stopped: this search took more than ' + TIMEOUT / 1000 + ' seconds, so it was cancelled to keep the page working. If you use a regular expression, avoid nested repeats like (a+)+ or (.*)*.');
+    }, TIMEOUT);
+  }
+  function got(e) {
+    var d = e.data;
+    if (d.id !== job) return;
+    clearTimeout(timer); busy = null;
+    if (d.error) { last = null; $('frN').textContent = '0'; $('frL').textContent = '0'; paint($('frText').value, []); say('bad', 'That regular expression is not valid: ' + d.error.replace(/^Invalid regular expression: \/[\s\S]*\/[a-z]*: /, '') + '.'); return; }
+    if (d.result !== undefined) {
+      if (d.total === 0) { say('', 'Nothing to replace: no matches found.'); return; }
+      undo = $('frText').value; $('frUndo').disabled = false;
+      $('frText').value = d.result;
+      say('ok', 'Replaced ' + fmtNum(d.total, 0) + (d.total === 1 ? ' match.' : ' matches.') + ' Press Undo to go back.');
+      cur = -1; run(false); return;
+    }
+    last = d; if (cur >= d.pos.length / 2) cur = -1;
+    $('frN').textContent = fmtNum(d.total, 0); $('frL').textContent = fmtNum(d.lines, 0);
+    paint($('frText').value, d.pos);
+    if ($('frMsg').className.indexOf('ok') === -1 || !d.total) say('', d.total ? '' : 'No matches found.' + ($('frCase').checked || $('frWord').checked ? ' Try turning off Match case or Whole words only.' : ''));
+  }
+  function paint(text, pos) {
+    var hl = $('frHl'), frag = document.createDocumentFragment(), at = 0, lim = Math.min(text.length, PREVIEW), k;
+    for (k = 0; k < pos.length; k += 2) {
+      var i = pos[k], n = pos[k + 1];
+      if (i >= lim) break;
+      if (i > at) frag.appendChild(document.createTextNode(text.slice(at, i)));
+      var mk = document.createElement('mark');
+      if (n === 0) mk.className = 'zero'; else mk.textContent = text.substr(i, n);
+      if (k / 2 === cur) mk.className += ' cur';
+      frag.appendChild(mk); at = Math.max(at, i + n);
+    }
+    if (at < lim) frag.appendChild(document.createTextNode(text.slice(at, lim)));
+    hl.textContent = ''; hl.appendChild(frag);
+    var notes = [];
+    if (text.length > PREVIEW) notes.push('Preview shows the first ' + fmtNum(PREVIEW, 0) + ' characters');
+    if (last && last.total > MAXMARKS) notes.push('first ' + fmtNum(MAXMARKS, 0) + ' matches highlighted');
+    $('frNote').textContent = notes.join('; ') + (notes.length ? '. Replace all works on everything.' : '');
+    if (!text) hl.textContent = '';
+  }
+  function schedule() { clearTimeout(deb); $('frMsg').className = 'msg'; deb = setTimeout(function () { run(false); }, $('frText').value.length > 1e6 ? 400 : 150); }
+  function go(dir) {
+    if (!last || !last.total) { say('', $('frFind').value ? 'No matches to go to.' : 'Type a word or phrase in Find.'); return; }
+    var n = last.pos.length / 2;
+    cur = cur < 0 ? (dir > 0 ? 0 : n - 1) : (cur + dir + n) % n;
+    var t = $('frText'), i = last.pos[cur * 2], len = last.pos[cur * 2 + 1];
+    t.focus(); t.setSelectionRange(i, i + len);
+    // scroll the selection into view in the text box
+    var lines = t.value.slice(0, i).split('\n').length, lh = parseFloat(getComputedStyle(t).lineHeight) || 20;
+    t.scrollTop = Math.max(0, (lines - 3) * lh);
+    paint(t.value, last.pos);
+    var mk = $('frHl').querySelector('mark.cur'); if (mk) mk.scrollIntoView({ block: 'nearest' });
+    say('', 'Match ' + fmtNum(cur + 1, 0) + ' of ' + fmtNum(last.total, 0) + (last.total > n ? ' (Previous and Next move through the first ' + fmtNum(n, 0) + ')' : '') + '.');
+  }
+  $('frNext').addEventListener('click', function () { go(1); });
+  $('frPrev').addEventListener('click', function () { go(-1); });
+  $('frOne').addEventListener('click', function () {
+    if (!last || cur < 0) { go(1); if (!last || !last.total) return; say('', 'This match is selected. Press Replace this one again to replace it.'); return; }
+    var t = $('frText'), i = last.pos[cur * 2], len = last.pos[cur * 2 + 1], p = build(), piece = t.value.substr(i, len), rep = repValue();
+    if ($('frRe').checked) { try { var re = new RegExp(p.pat, p.flags.replace('g', '')); rep = piece.replace(re, rep); } catch (e) { return; } }
+    undo = t.value; $('frUndo').disabled = false;
+    t.value = t.value.slice(0, i) + rep + t.value.slice(i + len);
+    t.focus(); t.setSelectionRange(i, i + rep.length);
+    cur = cur - 1; say('ok', 'Replaced 1 match.'); run(false);
+  });
+  $('frAll').addEventListener('click', function () {
+    if (!$('frText').value) { say('bad', 'Paste or type some text first.'); return; }
+    if (!$('frFind').value) { say('bad', 'Type what you want to find.'); $('frFind').focus(); return; }
+    run(true);
+  });
+  $('frUndo').addEventListener('click', function () { if (undo === null) return; $('frText').value = undo; undo = null; $('frUndo').disabled = true; cur = -1; say('', 'Undone.'); run(false); });
+  ['frFind', 'frText'].forEach(function (id) { $(id).addEventListener('input', function () { cur = -1; schedule(); }); });
+  ['frCase', 'frWord', 'frRe', 'frEsc'].forEach(function (id) { $(id).addEventListener('change', function () { cur = -1; schedule(); }); });
+  $('frCopy').addEventListener('click', function () { if ($('frText').value) copyText($('frText').value, $('frCopy')); else say('', 'There is no text to copy yet.'); });
+  $('frDl').addEventListener('click', function () {
+    if (!$('frText').value) { say('', 'There is no text to download yet.'); return; }
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('frText').value], { type: 'text/plain;charset=utf-8' })); a.download = 'text.txt'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('frClear').addEventListener('click', function () { undo = $('frText').value || null; $('frUndo').disabled = !undo; $('frText').value = ''; cur = -1; run(false); $('frText').focus(); });
+  $('frOpen').addEventListener('click', function () { $('frFile').click(); });
+  $('frFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 50 * 1048576) { say('bad', 'That file is ' + fmtBytes(f.size) + '. Please use a text file under 50 MB.'); return; }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) { say('bad', 'That does not look like a text file. Open a plain text file such as .txt, .csv or .html.'); return; }
+      $('frText').value = t; cur = -1; run(false); say('ok', 'Opened ' + f.name + ' (' + fmtBytes(f.size) + ').');
+    });
+  });
+  run(false);
+})();
+</script>
