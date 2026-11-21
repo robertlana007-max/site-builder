@@ -147,20 +147,25 @@
       var text = $('text').value.trim();
       if (!text) throw new Error('Type the watermark text.');
       var doc = await PT.open(file), font = await doc.embedFont(PDFLib.StandardFonts.HelveticaBold), c = COL[$('col').value];
+      // Letters the standard PDF font does not have (Arabic, Chinese, emoji…) are drawn by the browser as a picture instead.
+      var pic = null;
       try { font.widthOfTextAtSize(text, 10); }
-      catch (e) { throw new Error('The watermark can only use Latin letters, numbers and common symbols.'); }
+      catch (e) {
+        var t = await PT.textPng(text, 100, 'rgb(' + c.map(function (v) { return Math.round(v * 255); }).join(',') + ')', 'bold');
+        pic = { img: await doc.embedPng(t.png), w: t.w / 100, h: t.h / 100 }; // size for a font size of 1
+      }
       var diag = $('style').value === 'diag';
       doc.getPages().forEach(function (p) {
         // work on the page as it is shown, so pages with a built-in rotation get the same upright watermark
         var v = PT.view(p), ang = diag ? Math.atan2(v.height, v.width) : 0;
         // Size the text to span about 70% of the diagonal (or width), then center it on the page.
         var span = (diag ? Math.hypot(v.width, v.height) : v.width) * 0.7;
-        var size = Math.min(span / font.widthOfTextAtSize(text, 1), v.height / 4), w = font.widthOfTextAtSize(text, size), h = size * 0.7;
+        var unit = pic ? pic.w : font.widthOfTextAtSize(text, 1);
+        var size = Math.min(span / unit, v.height / 4), w = unit * size, h = pic ? pic.h * size : size * 0.7;
         var at = v.at(v.width / 2 - (w / 2) * Math.cos(ang) + (h / 2) * Math.sin(ang), v.height / 2 - (w / 2) * Math.sin(ang) - (h / 2) * Math.cos(ang));
-        p.drawText(text, {
-          x: at.x, y: at.y,
-          size: size, font: font, color: PDFLib.rgb(c[0], c[1], c[2]), opacity: +$('op').value, rotate: PDFLib.degrees(v.angle + ang * 180 / Math.PI)
-        });
+        var rot = PDFLib.degrees(v.angle + ang * 180 / Math.PI), op = +$('op').value;
+        if (pic) p.drawImage(pic.img, { x: at.x, y: at.y, width: w, height: h, opacity: op, rotate: rot });
+        else p.drawText(text, { x: at.x, y: at.y, size: size, font: font, color: PDFLib.rgb(c[0], c[1], c[2]), opacity: op, rotate: rot });
       });
       var n = doc.getPageCount();
       PT.done(await doc.save(), PT.base(file.name) + '-watermark.pdf', 'application/pdf', 'Watermarked ' + n + (n === 1 ? ' page' : ' pages'));
@@ -179,7 +184,7 @@
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Your own text</b>Any word or short phrase up to 60 characters.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Two styles</b>Diagonal across the page or straight across the middle.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Automatic sizing</b>The text is sized to about 70% of the page diagonal (or width), and never taller than a quarter of the page, then centered.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Three strengths</b>Light, Medium or Strong see-through levels.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Three colors</b>Gray, red or blue.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Every page</b>All pages are marked in one click, and pages of different sizes each get a watermark that fits.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a draft contract</h2><p>Peter has contract.pdf with 8 A4 pages and wants to send it for review. He types DRAFT - NOT FOR SIGNING, keeps &quot;Diagonal across the page&quot;, picks &quot;Light&quot; and &quot;Red&quot;. He clicks &quot;Add watermark&quot; and sees &quot;Watermarked 8 pages&quot;. In contract-watermark.pdf, the red text runs corner to corner on every page, faint enough that the contract stays easy to read.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Short words like DRAFT look bigger and bolder because the tool fits the text to the page. Long phrases come out smaller.</li><li>Use &quot;Light&quot; for documents people must read carefully, and &quot;Strong&quot; for samples you want to protect more.</li><li>Keep a copy of the original file without a watermark. The watermark cannot be removed with this tool.</li><li>Running the tool twice adds a second watermark on top of the first. Start again from the original if you want to change it.</li><li>A watermark discourages copying but does not lock the file. For real protection, share only what is needed.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The message says &quot;Type the watermark text&quot;</summary><p>The text box is empty or only has spaces. Type a word and try again.</p></details><details><summary>The message says only Latin letters can be used</summary><p>The built-in font supports Latin letters, numbers and common symbols. Write the watermark without other scripts or emoji.</p></details><details><summary>The watermark is hard to see</summary><p>Choose &quot;Strong&quot; or a stronger color such as red, and add the watermark again to the original file.</p></details><details><summary>The watermark covers the content too much</summary><p>Choose &quot;Light&quot; and use gray, then run it again on the original file.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The message says &quot;Type the watermark text&quot;</summary><p>The text box is empty or only has spaces. Type a word and try again.</p></details><details><summary>The watermark is hard to see</summary><p>Choose &quot;Strong&quot; or a stronger color such as red, and add the watermark again to the original file.</p></details><details><summary>The watermark covers the content too much</summary><p>Choose &quot;Light&quot; and use gray, then run it again on the original file.</p></details><details><summary>Text in Arabic, Chinese or emoji cannot be selected in the result</summary><p>Letters outside the standard PDF font are added as a picture of the text. It looks the same and is see-through, but it cannot be copied as text.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Can someone remove the watermark?</summary><p>It becomes part of each page, but a person with PDF editing software could remove it. It discourages casual copying rather than preventing it.</p></details><details><summary>Which characters can I use?</summary><p>Latin letters, numbers and common symbols. Other scripts are not supported by the built-in font.</p></details><details><summary>Does it hide the text underneath?</summary><p>No. The watermark is see-through. Use Light if the page must stay easy to read.</p></details></div>

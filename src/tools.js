@@ -361,7 +361,7 @@ module.exports = [
     intro: 'Pick a color or type a code to convert between HEX, RGB and HSL.',
     steps: ['Use the color picker or type a HEX, RGB or HSL value.', 'Check the preview.', 'Click Copy next to the format you need.'],
     faq: [
-      ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), and HSL such as hsl(243, 75%, 59%).'],
+      ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), HSL such as hsl(243, 75%, 59%), and color names such as red or teal. Codes with transparency (rgba, #rrggbbaa) also work; the result shows the solid color.'],
       ['What is the difference between RGB and HSL?', 'RGB describes a color by its red, green and blue light. HSL describes it by hue, saturation and lightness, which is easier to adjust by eye.'],
       ['Why does HSL change slightly when converted back?', 'HSL values are rounded to whole numbers, so a round trip can shift a color by one step.']
     ]

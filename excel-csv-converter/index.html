@@ -236,7 +236,7 @@
           if (data && !Array.isArray(data)) { var k = Object.keys(data).filter(function (x) { return Array.isArray(data[x]); })[0]; if (k) data = data[k]; }
           if (!Array.isArray(data) || !data.length) throw new Error('The JSON needs to be a list of rows, for example [{"name":"Ann","age":31}, …].');
           var ws = Array.isArray(data[0]) ? XLSX.utils.aoa_to_sheet(data) : XLSX.utils.json_to_sheet(data.map(function (r) {
-            var o = {}; Object.keys(r || {}).forEach(function (key) { var v = r[key]; o[key] = v !== null && typeof v === 'object' ? JSON.stringify(v) : v; }); return o;
+            var o = {}; Object.keys(r || {}).forEach(function (key) { var v = r[key]; o[key] = v === null ? '' : typeof v === 'object' ? JSON.stringify(v) : v; }); return o;
           }));
           wb = XLSX.utils.book_new(); XLSX.utils.book_append_sheet(wb, ws, 'Sheet1'); srcKind = 'json';
         } else {
@@ -305,6 +305,7 @@
   // Dates as the spreadsheet shows them (2024-03-15, plus the time if there is one), never shifted by time zones.
   function dateText(d) {
     if (isNaN(d)) return '';
+    d = new Date(Math.round(d.getTime() / 1000) * 1000); // spreadsheet times are stored as fractions of a day, so 14:30 can come back as 14:29:59.999
     var p = function (n) { return String(n).padStart(2, '0'); }, t = d.getHours() || d.getMinutes() || d.getSeconds();
     return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + (t ? ' ' + p(d.getHours()) + ':' + p(d.getMinutes()) + ':' + p(d.getSeconds()) : '');
   }
@@ -318,6 +319,7 @@
   }
   $('go').addEventListener('click', function () {
     if (!wb) return;
+    if (!Object.keys(sheet()).some(function (k) { return k[0] !== '!'; }) && $('fmt').value !== 'xlsx' && $('fmt').value !== 'ods') { say('bad', 'This sheet is empty, so there is nothing to convert. Choose another sheet.'); return; }
     var f = $('fmt').value, ws = sheet(), sName = $('sheet').value, one = wb.SheetNames.length > 1 ? '-' + sName.replace(/[\\\/:*?"<>|]+/g, '_') : '';
     $('go').disabled = true; say('', 'Converting…');
     setTimeout(function () {
