@@ -3,89 +3,70 @@
 The website is static (GitHub Pages), so card payments go through a small Cloudflare Worker:
 
 ```
-Support page  --(amount only)-->  Cloudflare Worker  --(X-API-Key, secret)-->  PayMeGate /v1/orders
-      ^                                                                              |
-      +---- thank-you.html  <----  PayMeGate hosted checkout  <---- checkout URL ----+
+Support page --(amount, email)--> Cloudflare Worker --(X-API-Key)--> api.paymegate.com/v1/orders
+     ^                                                                        |
+     +--- thank-you.html?ref=…  <--- PayMeGate hosted checkout  <--- checkoutUrl
 ```
 
-- `paymegate-worker.js` – the Worker. Keys live only in Cloudflare secrets, never in this repo.
+- `paymegate-worker.js` – the Worker. The API key lives only in Cloudflare secrets, never in this repo.
 - The Support page reads the Worker address from `config.json` → `card.checkoutApi`.
-  While it is empty, the Card tab shows "Card payments are being set up…" and the Crypto tab works as before.
-- Success / return URL: `https://gettoolnest.xyz/thank-you.html`
-- Cancel URL: `https://gettoolnest.xyz/donate/`
+  While it is empty, the Card tab says "Card payments are being set up…" and Crypto works as before.
+- PayMeGate has a single `backUrl` (no separate cancel URL), so people who close the checkout also land on
+  `thank-you.html`. The page then shows a small "Closed the payment page without paying? Nothing was charged" note.
+- Minimum $2 (Stripe on PayMeGate). Google Pay / Apple Pay need $10+. Fees: 1% PayMeGate + provider fee. Payouts in USDC.
 
-## Steps
+## Status
 
-1. **PayMeGate** – create an API key, turn on card payments, and copy the exact API field names (prompt 1 below).
-2. **Cloudflare** – create the Worker, paste `paymegate-worker.js`, add the secrets (prompt 2 below).
-3. **Fix field names** – if the docs differ from `buildOrder()` / `readCheckoutUrl()` in the Worker, change only those two functions.
-4. **Website** – put the Worker address plus `/checkout` in `config.json` → `card.checkoutApi`
-   (for example `https://gettoolnest-pay.yourname.workers.dev/checkout`), run `node build.js`, commit and push.
-5. **Test** – make a $1 payment in PayMeGate test mode; you should land on the thank-you page.
+- [x] PayMeGate: sandbox API key `gettoolnest-worker` created, Back URL set to https://gettoolnest.xyz/thank-you.html
+- [ ] PayMeGate: add a payout wallet (EVM 0x address from a wallet you control, not an exchange)
+- [ ] Cloudflare Worker created, code pasted, secrets added (prompt below)
+- [ ] `config.json` → `card.checkoutApi` set, site rebuilt and pushed
+- [ ] Sandbox test payment → lands on thank-you page
+- [ ] Switch to a live key in Cloudflare
+
+## Worker variables
+
+| Name | Type | Value |
+|---|---|---|
+| `PAYMEGATE_API_KEY` | Secret | the `pmg_test_…` key now, the live key later |
+| `PAYMEGATE_METHODS` | Text (optional) | card method keys, e.g. `stripe`. Empty = all methods. Open `https://<worker>/methods` to see your keys. |
+| `PAYMEGATE_SECRET_KEY` | Secret (optional) | webhook `signingSecret`, only if you add a webhook |
 
 ---
 
-## Prompt 1 – paste into the Claude Chrome extension (PayMeGate dashboard)
+## Prompt – Claude Chrome extension (Cloudflare dashboard)
 
 ```
-I am logged in to my PayMeGate merchant dashboard (paymegate.com). Help me prepare it for
-one-off card donations on my website gettoolnest.xyz. Do NOT show or read out any secret key
-values on screen in your replies; just tell me where they are.
+I am logged in to dash.cloudflare.com (create a free account first if I am not).
+Help me create a Cloudflare Worker for card donations. Never type or reveal secret values
+yourself; when a secret is needed, stop and let me paste it.
 
-1. Open the developer docs (https://www.paymegate.com/developers/api, or the API / Developers
-   link in the dashboard) and write down VERBATIM:
-   a. The API base URL for live and for test mode.
-   b. How requests are authenticated (header name, e.g. X-API-Key) and whether there is a
-      separate secret key / webhook signing secret.
-   c. For POST /v1/orders (create order): every request field name and type, especially:
-      amount (dollars as a string like "10.00", or cents as an integer?), currency,
-      externalId, description, payment methods (the exact value for CARD ONLY),
-      success / return URL, cancel URL, webhook / callback URL, customer email.
-   d. The response field that holds the hosted checkout URL, and the order id field.
-   e. Webhooks: event name for a paid order, the signature header name, and exactly how the
-      signature is computed (HMAC-SHA256 of the raw body? with which secret?).
-   f. Minimum and maximum card amount in USD, and card fees.
-2. In the dashboard, check that card payments are enabled for my account. If there is a
-   setting to enable "Card" as a payment method, enable it. Tell me if my account needs
-   verification first.
-3. Create an API key (test mode first if available) named "gettoolnest-worker" with only the
-   permission to create orders (and read orders if needed). Tell me where it is shown so I can
-   copy it myself; I will paste it straight into Cloudflare.
-4. If the dashboard has fields for a default Success / Return URL, set it to
-   https://gettoolnest.xyz/thank-you.html and the Cancel URL to https://gettoolnest.xyz/donate/
-5. If the dashboard has a Webhook URL field, leave it for now (I will add the Worker URL later)
-   unless I give it to you.
-6. Check the terms: are donations / voluntary tips for a free website allowed?
-
-Finally give me a short summary of 1a–1f and 6 (field names exactly as written in the docs),
-with no key values in it.
+1. Go to Workers & Pages → Create → Create Worker (Start with Hello World). Name it
+   "gettoolnest-pay" and click Deploy.
+2. Click "Edit code", select everything in the editor and delete it, then STOP: I will paste
+   my code (paymegate-worker.js). When I say "pasted", click Deploy.
+3. Go to the worker → Settings → Variables and Secrets → Add:
+   - PAYMEGATE_API_KEY, type Secret: STOP and let me paste the value.
+   Click Deploy / Save.
+4. Tell me the worker's address (like https://gettoolnest-pay.<something>.workers.dev).
+5. Open https://<that address>/methods in a new tab. It lists my PayMeGate payment methods.
+   Tell me every method "key" (or id) and its name, and which of them are card / Stripe /
+   Google Pay / Apple Pay. Do not copy anything that looks like a secret.
+6. Open https://<that address>/checkout in a new tab. It should say {"error":"Not found"}
+   (expected: it only accepts POST from gettoolnest.xyz). Tell me what it shows.
 ```
 
-## Prompt 2 – paste into the Claude Chrome extension (Cloudflare dashboard)
+## Prompt – Claude Chrome extension (PayMeGate payout wallet)
 
 ```
-I am logged in to dash.cloudflare.com. Help me create a Cloudflare Worker for card donations.
-Never type or reveal secret values yourself; when a secret is needed, stop and let me paste it.
-
-1. Go to Workers & Pages → Create → Create Worker. Name it "gettoolnest-pay" and deploy the
-   default Hello World worker.
-2. Click "Edit code", delete everything in the editor, and stop: I will paste my code
-   (paymegate-worker.js). After I say "pasted", click Deploy.
-3. Go to the worker's Settings → Variables and Secrets and add:
-   - PAYMEGATE_API_BASE  (type: Text)   value: <I will tell you the base URL from PayMeGate docs>
-   - PAYMEGATE_API_KEY   (type: Secret) – stop and let me paste the value
-   - PAYMEGATE_SECRET_KEY (type: Secret) – stop and let me paste the value (only if PayMeGate
-     gave me a webhook signing secret)
-   Save and deploy.
-4. Copy the worker's address (like https://gettoolnest-pay.<something>.workers.dev) and tell me.
-5. Open https://<that address>/checkout in a new tab: it should say {"error":"Not found"}
-   (that is expected because it only accepts POST from gettoolnest.xyz). Tell me what it shows.
+In my PayMeGate dashboard, open Get Started (step 1) or the wallet settings. I will tell you
+the EVM (0x…) address of a wallet I control myself. Paste it exactly, double-check every
+character against what I gave you, save it, and tell me which network/token payouts use (USDC on
+which chain). Do not change anything else.
 ```
 
-## Prompt 3 – optional, after the Worker is live (PayMeGate webhook)
+## Later: going live
 
-```
-In my PayMeGate dashboard, open the webhook settings and set the webhook URL to
-https://<my worker address>/webhook for the "order paid" event. Save it, send a test event if
-there is a button for that, and tell me whether it was delivered (HTTP 200).
-```
+1. In PayMeGate, turn the Sandbox switch off and create a live key named `gettoolnest-worker-live`
+   (same single basic permission).
+2. In Cloudflare, replace the `PAYMEGATE_API_KEY` secret with the live key and deploy.

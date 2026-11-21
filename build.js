@@ -466,7 +466,7 @@ const analytics = cfg.googleAnalyticsId
   ? `<p>We use Google Analytics to count visits and see which tools are popular. It sets cookies and collects information such as your approximate location, device type and the pages you view.</p>`
   : `<p>We do not use analytics cookies.</p>`;
 
-const CARD = Object.assign({ presets: [5, 10, 25, 50], min: 1, max: 1000 }, cfg.card || {});
+const CARD = Object.assign({ presets: [5, 10, 25, 50], min: 2, max: 1000 }, cfg.card || {});
 const SOON = 'Card payments are being set up and will open very soon. Until then you can use the Crypto tab. Thank you for your patience! ❤';
 const pages = [
   { slug: 'about', title: 'About', desc: `What ${cfg.siteName} is and why the tools are free and private.`, html: `
@@ -545,7 +545,12 @@ ${contact}` },
   <p class="setnote" style="margin-top:0">Choose an amount, or type your own. You pay on PayMeGate's secure checkout page; we never see your card details.</p>
   <div class="amts" role="group" aria-label="Amount">${(CARD.presets || []).map((a, i) => `<button type="button" class="amt" data-amt="${a}" aria-pressed="${i === 1}">$${a}</button>`).join('')}</div>
   <label class="amt-own"><span>Or your own amount (US$)</span><span class="amt-in"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="${CARD.min}" max="${CARD.max}" step="0.01" placeholder="e.g. 15" data-nomemo></span></label>
+  <div class="pay-who">
+    <label class="amt-own"><span>Your email <small>(for your receipt)</small></span><span class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" data-nomemo></span></label>
+    <label class="amt-own"><span>Your name <small>(optional)</small></span><span class="amt-in"><input type="text" id="payName" autocomplete="name" maxlength="100" placeholder="So we can thank you by name" data-nomemo></span></label>
+  </div>
   <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}">💳 Pay with Card</button>
+  <p class="setnote">Minimum $${CARD.min}. Google Pay and Apple Pay show up for gifts of $10 or more.</p>
   <p class="msg" id="payMsg" role="status" aria-live="polite"${CARD.checkoutApi ? ' hidden' : ''}>${CARD.checkoutApi ? '' : SOON}</p>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
@@ -572,7 +577,7 @@ ${contact}` },
   tabs.crypto.addEventListener('click', function () { show('crypto'); });
   if (location.hash === '#crypto') show('crypto');
 
-  var MIN = ${Number(CARD.min) || 1}, MAX = ${Number(CARD.max) || 1000}, SOON = ${JSON.stringify(SOON)};
+  var MIN = ${Number(CARD.min) || 2}, MAX = ${Number(CARD.max) || 1000}, SOON = ${JSON.stringify(SOON)};
   var own = document.getElementById('amtOwn'), go = document.getElementById('payGo'), msg = document.getElementById('payMsg');
   var amts = document.querySelectorAll('.amt');
   function say(text, cls) { msg.hidden = !text; msg.textContent = text || ''; msg.className = 'msg' + (cls ? ' ' + cls : ''); }
@@ -590,8 +595,10 @@ ${contact}` },
     if (!api) { say(SOON); return; }
     var a = amount();
     if (!isFinite(a) || a < MIN || a > MAX) { say('Please choose an amount between $' + MIN + ' and $' + MAX + '.', 'bad'); own.focus(); return; }
+    var em = document.getElementById('payEmail'), email = em.value.trim(), name = document.getElementById('payName').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { say('Please enter your email address. The payment page needs it to send your receipt.', 'bad'); em.focus(); return; }
     go.disabled = true; say('Opening the secure checkout…');
-    fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: a }) })
+    fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: a, email: email, name: name }) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.url) throw new Error(d.error || 'The checkout could not be opened. Please try again.'); location.href = d.url; }); })
       .catch(function (e) { go.disabled = false; say(e && e.message && e.message !== 'Failed to fetch' ? e.message : 'Could not reach the payment service. Please check your internet and try again.', 'bad'); });
   });
@@ -676,10 +683,12 @@ write('404.html', layout({
     <div class="btns"><button class="btn" type="button" id="tyCopy">🔗 Copy Website Link</button><a class="btn ghost" href="./">← Back to Tools</a></div>
   </div>
 
+  <p class="setnote ty-note" id="tyNote" hidden>Closed the payment page without paying? No problem, nothing was charged. You can <a href="donate/">try again</a> any time, and we are just as grateful you thought of us. ❤</p>
   <p class="ty-sign">With love and gratitude,<br><b>The ${esc(cfg.siteName)} family</b> ❤</p>
 </section>
 <script>
 (function () {
+  if (/[?&]ref=/.test(location.search)) document.getElementById('tyNote').hidden = false;
   var b = document.getElementById('tyCopy');
   b.addEventListener('click', function () { copyText(${JSON.stringify(SITE + '/')}, b); });
   if (window.burst) setTimeout(function () { burst(document.querySelector('.ty-heart')); }, 300);
