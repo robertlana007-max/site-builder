@@ -3243,5 +3243,229 @@ module.exports = [
         ['Is my picture uploaded?', 'No. Everything happens in your browser.']
       ],
       icon: '<rect x="3" y="3" width="18" height="18" rx="6"/><circle cx="12" cy="12" r="4"/>'
+  },
+  {
+    slug: 'find-and-replace', cat: 'Text tools', name: 'Find and Replace',
+    title: 'Find and Replace Text Online - Regex, Match Case, Whole Word',
+    desc: 'Find and replace words in any text. Match case, whole words, regular expressions, highlighted matches and a live count. Free and private, in your browser.',
+    card: 'Find and replace words in any text, with regex.',
+    intro: 'Paste your text, type what to find and what to put instead. Every match is highlighted and counted as you type, and Replace all changes them in one click, with Undo if you change your mind.',
+    steps: ['Paste your text or open a text file.', 'Type the word or phrase to find, and what to replace it with.', 'Tick Match case, Whole words only or Use regular expression if you need them.', 'Click Replace all (or step through with Next and Replace this one), then copy or download the text.'],
+    faq: [
+      ['Does whole word work with accents and other languages?', 'Yes. A word edge is any character that is not a letter, digit or mark in any alphabet, so café, niño, Привет and عربی are matched as whole words correctly.'],
+      ['How do I replace line breaks?', 'Tick Read \\n as new line and \\t as tab, then type \\n in Find or Replace with. With regular expressions on, \\n always means a line break.'],
+      ['Can I use $1 for groups?', 'Yes, when Use regular expression is ticked: $1, $2 and $<name> insert captured groups and $& inserts the whole match. Without regex, the replacement is inserted exactly as typed.'],
+      ['Is there a size limit?', 'No fixed limit. Texts of several megabytes work; the preview highlights the first 200,000 characters but Replace all changes the whole text.'],
+      ['Is my text uploaded?', 'No. Searching and replacing happen in your browser and nothing is sent or saved.']
+    ],
+    icon: '<circle cx="10" cy="10" r="6"/><path d="M14.5 14.5L20 20M7.5 10h5"/>'
+  },
+  {
+    slug: 'sort-lines', cat: 'Text tools', name: 'Sort Lines',
+    title: 'Sort Lines Online - A to Z, Numbers, Length, Shuffle',
+    desc: 'Sort lines of text A to Z, Z to A, by number, by length or in natural order. Shuffle, reverse, remove duplicates and empty lines. Free, in your browser.',
+    card: 'Sort any list A to Z, by number, length or shuffle.',
+    intro: 'Paste a list with one item per line and choose how to sort it: alphabetically, by the numbers in each line, by length, in natural order or at random. Duplicates, empty lines and stray spaces can be removed at the same time.',
+    steps: ['Paste your list, one item on each line.', 'Choose a sort order, such as A to Z, Numbers or Shuffle.', 'Tick the clean-up options you want, like Remove duplicates.', 'Copy the result or download it as a .txt file.'],
+    faq: [
+      ['Does it sort accented letters and other alphabets correctly?', 'Yes. Alphabetical sorting follows the rules of your browser\'s language, so É sorts next to E, and Cyrillic, Greek, Arabic-script and other alphabets sort in their natural order.'],
+      ['What is natural order?', 'Numbers inside text are compared by value, so item2 comes before item10, and file9 before file10. Plain A to Z would put item10 first.'],
+      ['How does sorting by numbers work?', 'The first number in each line is used, including negatives, decimals and thousands separators like 1,234.5. Lines without a number are kept at the end in their original order.'],
+      ['Is the shuffle really random?', 'Yes. It uses your browser\'s secure random number generator and a fair Fisher-Yates shuffle, so every order is equally likely.'],
+      ['How long can my list be?', 'Hundreds of thousands of lines work. Very long lists are sorted when you click Sort lines instead of while typing.']
+    ],
+    icon: '<path d="M3 6h10M3 12h7M3 18h4M17 4v16M14 17l3 3 3-3"/>'
+  },
+  {
+    slug: 'remove-extra-spaces', cat: 'Text tools', name: 'Remove Extra Spaces',
+    title: 'Remove Extra Spaces and Line Breaks from Text Online',
+    desc: 'Remove double spaces, trim lines, delete empty lines, join broken lines, change tabs to spaces and fix invisible spaces. Free, instant and private.',
+    card: 'Remove double spaces, empty lines and line breaks.',
+    intro: 'Paste messy text, for example from a PDF, email or website, and get clean text instantly. Double spaces, stray tabs, invisible characters and broken lines are fixed as you type.',
+    steps: ['Paste your text into the top box.', 'Tick the clean-up options you want, such as Join lines or Remove all empty lines.', 'Check the clean text and the count of removed characters.', 'Copy the clean text or download it as a .txt file.'],
+    faq: [
+      ['How do I fix text copied from a PDF?', 'Tick Join lines (remove line breaks) and keep Keep paragraphs on. Lines inside each paragraph are joined with a space, and the gaps between paragraphs stay.'],
+      ['What are invisible or odd spaces?', 'Characters such as non-breaking spaces, zero-width spaces and byte-order marks that look like nothing but break searches and formulas. They are turned into normal spaces or removed. Joiners needed by emoji and many scripts are kept.'],
+      ['Will it change the text inside my lines?', 'Only spaces and line breaks change. Words, punctuation and letters stay exactly as they were, unless you tick Remove spaces before punctuation.'],
+      ['Do tabs keep columns lined up?', 'Yes. Change tabs to spaces fills each tab up to the next tab stop of the width you choose, so tables made with tabs stay aligned.'],
+      ['Is my text uploaded?', 'No. Everything happens in your browser.']
+    ],
+    icon: '<path d="M4 7h16M4 12h10M4 17h6"/><path d="M16 15l4 4M20 15l-4 4"/>'
+  },
+  {
+    slug: 'word-frequency-counter', cat: 'Text tools', name: 'Word Frequency Counter',
+    title: 'Word Frequency Counter - Most Used Words and Phrases',
+    desc: 'Find the most used words and 2 or 3-word phrases in any text. Skip common words, see counts and percentages, and download the list as CSV.',
+    card: 'See the most used words and phrases in any text.',
+    intro: 'Paste any text to see which words and phrases appear most often, with counts, percentages and a bar chart. Common English words like "the" and "and" can be skipped so the important words stand out.',
+    steps: ['Paste your text or open a text file.', 'Choose single words, 2-word or 3-word phrases.', 'Adjust the filters, such as skipping common words or short words.', 'Read the ranked list, then download it as CSV or copy it.'],
+    faq: [
+      ['Does it work for languages other than English?', 'Yes. Words are found in any alphabet, including accented Latin, Cyrillic, Greek, Arabic, Urdu and Hindi. Chinese, Japanese and Thai, which are written without spaces, are split into words by your browser. The common-word filter is for English only, but you can add your own words to skip.'],
+      ['How are phrases counted?', 'Phrases are runs of 2 or 3 words next to each other that do not cross a full stop, comma or line break. A phrase may have a common word in the middle, like "piece of cake", but not at the start or end.'],
+      ['What does Share mean?', 'The percentage of all counted words (or phrases) that this word makes up, after filters are applied.'],
+      ['Will the CSV open in Excel?', 'Yes. The file is UTF-8 with a marker that tells Excel and other spreadsheet apps to show every alphabet correctly.'],
+      ['Is my text uploaded?', 'No. All counting happens in your browser.']
+    ],
+    icon: '<path d="M4 20V10M9 20V4M14 20v-7M19 20v-11"/>'
+  },
+  {
+    slug: 'morse-code-translator', cat: 'Text tools', name: 'Morse Code Translator',
+    title: 'Morse Code Translator - Text to Morse with Sound and Light',
+    desc: 'Translate text to Morse code and Morse back to text. Play it as sound, flash a light, adjust speed and tone, and download a WAV file. Free and private.',
+    card: 'Translate text and Morse code, with sound and light.',
+    intro: 'Type text to get Morse code, or type dots and dashes to read them as text. Press Play to hear it, watch the light flash, or download the sound. Speed and tone are adjustable for practice.',
+    steps: ['Type text in the Text box, or dots and dashes in the Morse code box.', 'Set the speed in words per minute and the tone.', 'Press Play to hear and see the code, or Full-screen flash to signal with your screen.', 'Copy the result or download the sound as a .wav file.'],
+    faq: [
+      ['How do I type Morse code?', 'Use a full stop for a dot and a hyphen for a dash. Put a space between letters and a slash (/) or three spaces between words, for example .... .. / - .... . .-. .'],
+      ['Which characters are supported?', 'Letters A to Z, digits, common punctuation (. , ? \' ! / ( ) & : ; = + - _ " $ @) and international letters such as Ä, É, Ñ, Ö and Ü. Other accented letters use their base letter. Characters with no Morse code are listed and left out.'],
+      ['What does WPM mean?', 'Words per minute, using the standard word PARIS. At 20 WPM one dot lasts 60 milliseconds. Beginners usually start between 5 and 15 WPM.'],
+      ['What is the extra space option?', 'It is the Farnsworth method: letters are sent at full speed but the gaps between letters and words are longer, which makes learning by ear easier.'],
+      ['Why is there no sound on my phone?', 'Check that your phone is not on silent mode and the volume is up. On iPhone, the ring/silent switch mutes web audio.']
+    ],
+    icon: '<circle cx="5" cy="12" r="1.5"/><path d="M9 12h5"/><circle cx="18" cy="12" r="1.5"/><path d="M3 6h18M3 18h18"/>'
+  },
+  {
+    slug: 'urdu-keyboard', cat: 'Text tools', name: 'Urdu Keyboard',
+    title: 'Urdu Keyboard Online - Type Urdu in Roman or Phonetic Keys',
+    desc: 'Type Urdu online with an on-screen phonetic keyboard, or write Roman Urdu like "aap kaise hain" and get Urdu script as you type. Nastaliq font, copy, free.',
+    card: 'Type Urdu with Roman letters or on-screen keys.',
+    intro: 'Write Urdu on any computer or phone without installing anything. Type Urdu words in English letters and they turn into Urdu script, use your keyboard as a phonetic Urdu keyboard, or tap the on-screen keys. Copy the result into messages, documents or social media.',
+    steps: ['Choose a typing mode: Roman Urdu, Phonetic keyboard or My own keyboard.', 'Type, or tap the on-screen Urdu keys.', 'In Roman Urdu mode, press space to convert each word, or tap a suggestion for a different spelling.', 'Copy the Urdu text or download it as a .txt file.'],
+    faq: [
+      ['How does Roman Urdu typing work?', 'Type a word the way you would in a text message, like "shukriya" or "kya haal hai". When you press space or punctuation it becomes Urdu script. Hundreds of common words are spelled from a word list, and other words follow sound rules. Suggestions above the keyboard offer other spellings.'],
+      ['What is the phonetic keyboard?', 'Each key types the Urdu letter that sounds like it: a = ا, b = ب, p = پ, s = س, k = ک. Shift gives the related letter, such as Shift+t = ٹ, Shift+d = ڈ, Shift+r = ڑ, Shift+n = ں and Shift+h = ھ. The on-screen keyboard shows every key.'],
+      ['Which font does it use?', 'Nastaliq, the traditional Urdu style, using the free Noto Nastaliq Urdu font that loads with the page, or a simpler Naskh style. The text you copy is normal Unicode Urdu and works in any app.'],
+      ['Can I use it on my phone?', 'Yes. Tick Hide the phone keyboard to type only with the on-screen Urdu keys, or use Roman Urdu mode with your normal phone keyboard.'],
+      ['Is my text saved or sent anywhere?', 'No. Everything you type stays in your browser.']
+    ],
+    icon: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 15h8"/><path d="M15 3c-1 1.5-3 1.5-4 0"/>'
+  },
+  {
+    slug: 'json-csv-yaml-converter', cat: 'Developer tools', name: 'JSON CSV YAML Converter',
+    title: 'JSON to CSV, CSV to JSON, YAML Converter - Free Online',
+    desc: 'Convert between JSON, CSV and YAML in any direction. Flattens nested data into columns and rebuilds it, detects separators, and downloads the result.',
+    card: 'Convert JSON, CSV and YAML in any direction.',
+    intro: 'Paste or open JSON, CSV or YAML and convert it to any of the other two formats. Nested objects become columns like address.city in CSV and are rebuilt when you convert back. Everything runs in your browser.',
+    steps: ['Paste your data, open a file, or press Load sample.', 'Check the From format (it is detected automatically) and choose JSON, CSV or YAML under To.', 'Adjust options such as the CSV separator, JSON indent or flattening.', 'Copy the result or download it as a file.'],
+    faq: [
+      ['How is nested JSON turned into CSV?', 'Each nested value gets its own column named with dots, such as address.city, and list items get numbered columns like tags.0 and tags.1. Converting that CSV back to JSON rebuilds the nested objects and lists.'],
+      ['Which CSV separators are supported?', 'Comma, semicolon, tab and pipe. When reading, the separator is detected from the first line. Quoted values with separators, quotes and line breaks inside them are handled correctly.'],
+      ['Why did 00123 stay as text?', 'Values with leading zeros, like postcodes and phone numbers, are kept as text so no digits are lost. Untick Read numbers and true/false in CSV to keep every value as text.'],
+      ['Are very large numbers safe?', 'JSON numbers longer than about 15 digits lose precision in any browser. Store long IDs as text (in quotes) to keep them exact.'],
+      ['Is my data uploaded?', 'No. Converting happens in your browser and nothing is sent anywhere.']
+    ],
+    icon: '<path d="M4 4h6v6H4zM14 14h6v6h-6z"/><path d="M14 7h3a3 3 0 0 1 3 3v1M10 17H7a3 3 0 0 1-3-3v-1"/><path d="M18 9l2 2 2-2M6 15l-2-2-2 2"/>'
+  },
+  {
+    slug: 'unix-timestamp-converter', cat: 'Developer tools', name: 'Unix Timestamp Converter',
+    title: 'Unix Timestamp Converter - Epoch to Date and Date to Epoch',
+    desc: 'Convert Unix epoch timestamps in seconds, milliseconds, microseconds or nanoseconds to dates in UTC, your time zone or any zone, and dates back to epoch.',
+    card: 'Convert Unix epoch time to dates and back.',
+    intro: 'See the current Unix time live, turn any timestamp into a readable date in UTC, your own time zone or any other zone, and turn a date and time back into a timestamp. A batch box converts whole lists from logs.',
+    steps: ['Paste a timestamp, or press Use current time.', 'Read the date in your time zone, UTC, ISO 8601 and other formats, and copy what you need.', 'To go the other way, pick a date, time and time zone to get the timestamp.', 'Paste many timestamps in the list box to convert them all at once.'],
+    faq: [
+      ['What is a Unix timestamp?', 'The number of seconds since 1 January 1970 at 00:00:00 UTC, also called epoch time or POSIX time. It is the same everywhere in the world, which is why computers use it to store moments in time.'],
+      ['Seconds or milliseconds: how does it know?', 'From the number of digits. Today a timestamp in seconds has 10 digits, in milliseconds 13, in microseconds 16 and in nanoseconds 19. You can also choose the unit yourself.'],
+      ['What is the year 2038 problem?', 'Old systems store the timestamp in a signed 32-bit number, which runs out on 19 January 2038 at 03:14:07 UTC. The tool warns you when a timestamp is past that point.'],
+      ['How are daylight-saving changes handled?', 'Time zones use your browser\'s up-to-date time zone database, so summer time is applied automatically. If you pick a time that is skipped when clocks go forward, the tool tells you.'],
+      ['Can I use negative timestamps?', 'Yes. Negative numbers are dates before 1970, for example -86400 is 31 December 1969.']
+    ],
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M3 3l3 3M21 3l-3 3"/>'
+  },
+  {
+    slug: 'jwt-decoder', cat: 'Developer tools', name: 'JWT Decoder',
+    title: 'JWT Decoder - Decode JSON Web Tokens Online, Privately',
+    desc: 'Decode a JWT to read its header and payload, see when it expires, and get each claim explained. Runs in your browser; the token is never sent anywhere.',
+    card: 'Decode JSON Web Tokens and check their expiry.',
+    intro: 'Paste a JSON Web Token to see its header and payload as readable JSON, whether it has expired, and what each claim such as exp, iat, sub and aud means. The token never leaves your browser. The signature is not verified.',
+    steps: ['Paste the token (with or without the word Bearer).', 'Read the expiry badge at the top.', 'Check the header, payload and the claims explained in plain words.', 'Copy the header or payload JSON if you need it.'],
+    faq: [
+      ['Does this check if the token is genuine?', 'No. It only decodes the token. Anyone can create a token with any content, so the signature must be verified on your server with the correct secret or public key before you trust the data.'],
+      ['Is it safe to paste a real token?', 'Decoding happens entirely in your browser and the token is not sent or stored. Still, a valid token works like a password until it expires, so avoid sharing it and prefer expired or test tokens.'],
+      ['Why does it say the token is encrypted?', 'Tokens with five parts are encrypted JWE tokens. Their header can be read, but the content needs the private key and cannot be decoded here.'],
+      ['What do exp, iat and nbf mean?', 'exp is when the token expires, iat when it was issued, and nbf the time before which it must not be accepted. They are Unix timestamps in seconds and are shown as dates in your time zone.'],
+      ['Which algorithms are recognised?', 'All common ones: HS256/384/512, RS256/384/512, PS256/384/512, ES256/384/512 and EdDSA. Tokens with alg none are flagged because they are not signed.']
+    ],
+    icon: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M8 15h.01M12 15h.01M16 15h.01"/>'
+  },
+  {
+    slug: 'code-minifier', cat: 'Developer tools', name: 'Code Minifier & Beautifier',
+    title: 'Minify and Beautify HTML, CSS and JavaScript Online',
+    desc: 'Minify HTML, CSS and JavaScript to make files smaller, or beautify minified code to make it readable. Uses Terser for JavaScript. Free and private.',
+    card: 'Minify or beautify HTML, CSS and JavaScript.',
+    intro: 'Paste HTML, CSS or JavaScript and press Minify to remove spaces, comments and long names so the file loads faster, or Beautify to turn minified code back into neatly indented code. The language is detected for you.',
+    steps: ['Paste your code or open a .html, .css or .js file.', 'Leave the language on Auto or pick HTML, CSS or JavaScript.', 'Press Minify for a smaller file, or Beautify for readable code.', 'Check the size saved, then copy or download the result.'],
+    faq: [
+      ['Is minified JavaScript safe to use?', 'Yes. JavaScript is minified with Terser, the same tool used by most website build systems. It only makes changes that keep the code working. If your code has a syntax error, it tells you the line and column instead.'],
+      ['What does Shorten variable names do?', 'It renames local variables and function parameters to short names like a and b, which saves a lot of space. Global names and object properties are never renamed, so other scripts keep working.'],
+      ['What is removed from HTML?', 'Comments and the spaces between tags that the browser ignores. Text inside pre and textarea is kept exactly, and spaces between inline words are kept so the page looks the same. Inline CSS and JavaScript are minified too.'],
+      ['Why keep licence comments?', 'Comments that start with /*! usually hold a copyright or licence notice that must stay with the code. Untick the option to remove them as well.'],
+      ['Is my code uploaded?', 'No. Minifying and beautifying run in your browser.']
+    ],
+    icon: '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6"/><path d="M11 12h2"/>'
+  },
+  {
+    slug: 'sql-formatter', cat: 'Developer tools', name: 'SQL Formatter',
+    title: 'SQL Formatter - Beautify SQL for MySQL, PostgreSQL and More',
+    desc: 'Format messy SQL into clean, indented queries for MySQL, PostgreSQL, SQL Server, Oracle, SQLite, BigQuery and 15 more dialects. Or compact it to one line.',
+    card: 'Format SQL queries for 20 database dialects.',
+    intro: 'Paste a long or messy SQL query and get it back neatly indented, with keywords in the case you like. Choose your database dialect so its special syntax is understood, or compact a query to a single line.',
+    steps: ['Paste your SQL, open a .sql file, or press Load sample.', 'Choose your database under SQL dialect.', 'Pick keyword case, indent and layout; the result updates instantly.', 'Copy the formatted SQL or download it as a .sql file.'],
+    faq: [
+      ['Which databases are supported?', 'Standard SQL, MySQL, MariaDB, PostgreSQL, SQLite, SQL Server (T-SQL), Oracle PL/SQL, BigQuery, Snowflake, Redshift, ClickHouse, DuckDB, Db2, Db2 for i, Hive, Spark SQL, Trino/Presto, TiDB, SingleStore and Couchbase N1QL.'],
+      ['Why does it say Could not format?', 'The query uses syntax the chosen dialect does not know, such as [square bracket] names outside SQL Server, or it has a typo. Pick your database under SQL dialect, then check the line and column in the message.'],
+      ['Does formatting change what my query does?', 'No. Only spaces, line breaks and the letter case of keywords change. Strings, quoted names and comments stay exactly as written.'],
+      ['What does Compact to one line do?', 'It removes line breaks and extra spaces so the query fits on one line, for example for a log or a config file. Line comments (--) become /* */ comments so the rest of the query is not commented out.'],
+      ['Is my SQL sent to a server?', 'No. Formatting runs in your browser with the open-source sql-formatter library.']
+    ],
+    icon: '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"/><path d="M4 11v6c0 1.7 3.6 3 8 3M15 17h6M15 20h4"/>'
+  },
+  {
+    slug: 'meta-tag-generator', cat: 'Developer tools', name: 'Meta Tag Generator',
+    title: 'Meta Tag Generator - SEO, Open Graph and X Card Preview',
+    desc: 'Create SEO title, description, Open Graph and X (Twitter) card meta tags with a live Google and social media preview. Copy the HTML in one click.',
+    card: 'Make SEO and social meta tags with live previews.',
+    intro: 'Fill in your page title, description, link and share image to get ready-to-paste meta tags for search engines and social media. Live previews show how your page will look in Google results and when shared on Facebook, LinkedIn, WhatsApp and X.',
+    steps: ['Type your page title and description.', 'Add the page URL, site name and a share image link.', 'Check the Google and social previews and the list of checks.', 'Copy the HTML and paste it inside the <head> of your page.'],
+    faq: [
+      ['How long should the title and description be?', 'Aim for 30 to 60 characters for the title, since Google cuts titles at about 600 pixels, and 70 to 160 characters for the description. The counters turn green when you are in range.'],
+      ['What size should the share image be?', '1200 × 630 pixels (a 1.91:1 ratio) works for Facebook, LinkedIn, WhatsApp and X large cards. The tool loads your image and tells you its real size.'],
+      ['What are Open Graph tags?', 'og: tags are read by Facebook, LinkedIn, WhatsApp, Telegram, Slack, Discord and many other apps to build the preview card when someone shares your link.'],
+      ['Will these tags improve my ranking?', 'A good title and description help people choose your result and make shared links more attractive. They do not guarantee a higher ranking, which mainly depends on your content.'],
+      ['Why do social apps still show my old preview?', 'They cache previews. After changing the tags, use the platform\'s sharing debugger (for example the Facebook Sharing Debugger or LinkedIn Post Inspector) to refresh it.']
+    ],
+    icon: '<path d="M4 7V4h16v3M9 20h6M12 4v16"/><path d="M17 13l3 3-3 3M7 13l-3 3 3 3"/>'
+  },
+  {
+    slug: 'utm-builder', cat: 'Developer tools', name: 'UTM Builder',
+    title: 'UTM Builder - Campaign URL Builder with QR Code',
+    desc: 'Build campaign links with utm_source, utm_medium and utm_campaign tags for any analytics tool. Presets for social, email and ads, plus a QR code. Free.',
+    card: 'Build tracked campaign links with a QR code.',
+    intro: 'Add UTM tags to any link so your analytics tool shows exactly which post, email, ad or poster brought each visitor. Pick a preset, type a campaign name, and copy the link or download it as a QR code.',
+    steps: ['Paste the web page you want to link to.', 'Pick a preset such as Instagram bio or Email newsletter, or fill in source and medium yourself.', 'Type a campaign name and, if you like, term and content.', 'Copy the finished link, test it, or download the QR code.'],
+    faq: [
+      ['What are UTM tags?', 'Short labels added to the end of a link, like ?utm_source=newsletter&utm_medium=email&utm_campaign=spring_sale. Analytics tools such as Google Analytics, Matomo, Plausible and many others read them to show where visitors came from.'],
+      ['Which fields do I need?', 'Source (where the link is placed, like facebook or newsletter), medium (the type of channel, like social, email or cpc) and campaign (your promotion name). Term, content and ID are optional extras.'],
+      ['Why make everything lower case?', 'Analytics tools treat Facebook and facebook as two different sources. Using lower case and the same words every time keeps reports clean.'],
+      ['What happens to parameters already in my link?', 'They are kept. Only old utm_ values are replaced, and anything after # stays at the end where it belongs.'],
+      ['Is my data stored?', 'The last 10 links you copy are kept in your own browser so you can copy them again. They are never uploaded; press Clear recent links to remove them.']
+    ],
+    icon: '<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/><path d="M18 17v4M16 19h4"/>'
+  },
+  {
+    slug: 'cron-generator', cat: 'Developer tools', name: 'Cron Expression Generator',
+    title: 'Cron Expression Generator and Explainer - Next Run Times',
+    desc: 'Build cron schedules with simple menus, explain any cron expression in plain English, and see the next 5 run times in your time zone or UTC.',
+    card: 'Build and explain cron schedules, see next runs.',
+    intro: 'Create a cron expression by picking minutes, hours, days and months, or paste one to read it in plain English. The next five run times are listed in your own time zone or in UTC, so you can be sure a job runs when you expect.',
+    steps: ['Pick a preset, type an expression, or build one step by step.', 'Read the plain-English explanation.', 'Check the next 5 run times in your time or UTC.', 'Copy the expression into your crontab, CI pipeline or scheduler.'],
+    faq: [
+      ['What do the five fields mean?', 'In order: minute (0-59), hour (0-23), day of the month (1-31), month (1-12 or JAN-DEC) and day of the week (0-7 or SUN-SAT, where 0 and 7 are both Sunday). * means every value.'],
+      ['What do */5, 1-5 and 1,15 mean?', '*/5 means every 5th value (every 5 minutes), 1-5 is a range (Monday to Friday), and 1,15 is a list (the 1st and 15th). They can be combined, like 0-30/10.'],
+      ['Why does my job run on more days than expected?', 'When both day of the month and day of the week are set, standard cron runs the job when either one matches, not only when both do. The explanation points this out.'],
+      ['Does it support seconds and @daily?', 'Yes. Six fields are read as seconds first (as in many job libraries), and shortcuts like @hourly, @daily, @weekly, @monthly, @yearly and @reboot are explained. Quartz extras such as L, W and # are not part of standard cron and are flagged.'],
+      ['Which time zone does cron use?', 'The time zone of the server where it runs, often UTC. Switch Next 5 runs to UTC to check a server schedule, or to My time to see it in your local time.']
+    ],
+    icon: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5M9 2h6M12 2v3"/><path d="M19 5l1.5-1.5"/>'
   }
 ];
