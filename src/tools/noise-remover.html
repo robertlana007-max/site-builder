@@ -1,0 +1,566 @@
+<style>
+.nr-name { margin: 0 0 12px; font-weight: 600; overflow-wrap: anywhere; }
+.nr-sub { font-size: 14px; color: var(--muted); margin: 6px 0 14px; }
+.nr-check { display: flex; align-items: center; gap: 8px; font-size: 15px; margin: 4px 0 14px; cursor: pointer; }
+.nr-check input { width: 18px; height: 18px; margin: 0; flex: none; }
+.nr-ab { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+.nr-ab .seg { flex-wrap: wrap; }
+.nr-ab-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; }
+.nr-ab-row .btn { min-height: 40px; padding: 8px 16px; }
+.nr-seek { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.nr-seek input { flex: 1; min-width: 0; }
+.nr-wave { display: block; width: 100%; height: 70px; margin-top: 10px; border-radius: 8px; background: var(--field, transparent); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a voice recording or a video here</b>MP3, WAV, M4A, OGG, WebM, MP4, MOV and more. It is cleaned on your device and never uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm,.mp4,.m4v,.mov,.mkv,.3gp,.avi,.amr,.wma" hidden data-nomemo>
+<div id="work" hidden>
+  <p class="nr-name" id="fname"></p>
+  <div class="fields">
+    <div><label for="strength">Strength: <span id="sv">100</span>%</label><input type="range" id="strength" min="0" max="100" step="5" value="100"></div>
+    <div><label for="gate">Pauses between words</label><select id="gate"><option value="0">Leave as cleaned</option><option value="1" selected>Make them quieter</option><option value="2">Make them silent</option></select></div>
+  </div>
+  <label class="nr-check"><input type="checkbox" id="norm" checked> Make the voice louder (normalise the volume)</label>
+  <p class="nr-sub">Works best on speech: fans, hum, traffic, wind, keyboard and room noise. It is not made for music, which may sound thin.</p>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Remove noise</button><button class="btn ghost" type="button" id="stop" hidden>Stop</button></div>
+<p class="msg" id="msg" aria-live="polite"></p>
+<div id="result" hidden>
+  <div class="nr-ab">
+    <div class="nr-ab-row">
+      <button class="btn" type="button" id="play">▶ Play</button>
+      <div class="seg" role="group" aria-label="Which version to hear">
+        <button type="button" data-ab="orig" aria-pressed="false">Before</button>
+        <button type="button" data-ab="clean" aria-pressed="true">After</button>
+      </div>
+    </div>
+    <div class="nr-seek"><span id="tNow">0:00</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position" data-nomemo><span id="tAll">0:00</span></div>
+    <canvas class="nr-wave" id="wave" aria-label="Waveform: grey is the original, coloured is the cleaned sound"></canvas>
+    <p class="nr-sub" style="margin-bottom:0">Switch between Before and After while it plays to compare. Moving the sliders above updates the result straight away.</p>
+  </div>
+  <div class="fields">
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp3">MP3 audio</option><option value="wav">WAV audio (best quality, big file)</option><option value="video" hidden>Video with the cleaned sound</option></select></div>
+    <div id="kbpsBox"><label for="kbps">MP3 quality</label><select id="kbps"><option value="96">96 kbps (small, fine for speech)</option><option value="128" selected>128 kbps (good)</option><option value="192">192 kbps (very good)</option></select></div>
+  </div>
+  <div class="btns"><button class="btn" id="save">Make MP3</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+</div>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+(function () {
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  var RATE = 48000, FRAME = 480, MAX_SEC = 3600;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(Math.min(1, p) * 100) + '%'; }
+  function clock(s) { s = Math.max(0, Math.floor(s)); var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+  function isVideoFile(f) { return /^video\//.test(f.type) || /\.(mp4|m4v|mov|mkv|webm|avi|3gp|wmv|flv|ts|mts)$/i.test(f.name) && !/^audio\//.test(f.type); }
+
+  // ---------- RNNoise (Xiph, BSD licence) compiled to WebAssembly ----------
+  var rnP = null;
+  function getRN() {
+    if (!rnP) {
+      rnP = import(new URL('../assets/vendor/rnnoise/rnnoise.js', location.href).href).then(function (m) { return m.default(); });
+      rnP.catch(function () { rnP = null; });
+    }
+    return rnP;
+  }
+
+  var file = null, isVideo = false, dry = null, wet = null, vad = null, out = null, len = 0, nch = 1, busy = false, stopFlag = false, job = 0, dlUrl = null, mixNote = '';
+
+  function decodeWith(data) {
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) return Promise.reject(new Error('old'));
+    return new Promise(function (res, rej) { var p = new OAC(1, 1, RATE).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+  }
+  // When the browser cannot decode the sound (for example AC-3 in an MKV), let the video engine turn it into WAV first.
+  function decodeViaEngine(f) {
+    say('', 'Your browser cannot read this sound format directly, so the video engine is converting it first…');
+    return FF.run(f, function (inp) { return ['-i', inp, '-vn', '-ac', '2', '-ar', String(RATE), '-c:a', 'pcm_s16le', '-f', 'wav']; }, 'sound.wav', 0, function () {}, say)
+      .then(function (bytes) { return decodeWith(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length)); });
+  }
+
+  function reset() {
+    stopPlay(); dry = wet = vad = out = null; outBuf = origBuf = null; len = 0;
+    $('work').hidden = true; $('result').hidden = true; $('dl').hidden = true; $('go').disabled = true;
+  }
+
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { toast('Please wait until the current file is finished, or press Stop.'); return; }
+    var mine = ++job; reset(); file = f;
+    var okType = /^(audio|video)\//.test(f.type) || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm|mp4|m4v|mov|mkv|3gp|avi|amr|wma|wmv|flv|ts|mts)$/i.test(f.name);
+    if (!okType) { say('bad', '"' + f.name + '" is not an audio or video file. Choose a recording such as MP3, WAV, M4A or a video such as MP4.'); return; }
+    if (!f.size) { say('bad', '"' + f.name + '" is empty.'); return; }
+    if (f.size > 1024 * 1048576) { say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 1 GB are too big to clean inside a browser. Trim it first.'); return; }
+    isVideo = isVideoFile(f);
+    busy = true; say('', 'Reading "' + f.name + '"…');
+    f.arrayBuffer().then(function (data) {
+      return decodeWith(data).catch(function (e) {
+        if (e && e.message === 'old') throw e;
+        // only videos and unusual sound formats are worth a second try with the video engine
+        if (!isVideo && !/\.(wma|amr|ac3|ec3|dts|mka|caf|aiff?)$/i.test(f.name)) throw new Error('decode');
+        return decodeViaEngine(f).catch(function () { throw new Error('decode'); });
+      });
+    }).then(function (b) {
+      if (mine !== job) return;
+      if (!b || !b.length || b.duration < 0.05) throw new Error('nosound');
+      if (b.duration > MAX_SEC) throw new Error('long');
+      len = b.length; nch = Math.min(2, b.numberOfChannels); mixNote = '';
+      // long stereo recordings are cleaned as mono to stay within the memory of a phone
+      if (nch === 2 && b.duration > 1200) { nch = 1; mixNote = ' Long recording, so it is cleaned as mono.'; }
+      dry = [];
+      if (nch === 1 && b.numberOfChannels > 1) {
+        var a0 = b.getChannelData(0), a1 = b.getChannelData(1), m = new Float32Array(len);
+        for (var i = 0; i < len; i++) m[i] = (a0[i] + a1[i]) * 0.5;
+        dry.push(m);
+      } else for (var k = 0; k < nch; k++) dry.push(b.getChannelData(k));
+      busy = false;
+      $('fname').textContent = f.name + ' · ' + fmtBytes(f.size) + ' · ' + clock(b.duration) + (isVideo ? ' · video' : '') + (nch === 2 ? ' · stereo' : ' · mono');
+      $('work').hidden = false; $('go').disabled = false;
+      say('', 'Ready. Press Remove noise. It takes roughly one second for every 30 to 60 seconds of sound.' + mixNote);
+    }).catch(function (e) {
+      if (mine !== job) return;
+      busy = false; file = null;
+      var m = e && e.message;
+      if (m === 'old') return say('bad', 'This browser is too old for this tool. Please use a current Chrome, Edge, Firefox or Safari.');
+      if (m === 'long') return say('bad', 'This recording is longer than 1 hour. Please cut it into shorter parts first, for example with the Audio Cutter tool.');
+      if (m === 'nosound') return say('bad', '"' + f.name + '" has no sound to clean.');
+      if (e instanceof RangeError || (e && e.name === 'NotReadableError')) return say('bad', 'Your device ran out of memory reading this file. Try a shorter recording.');
+      say('bad', 'Could not read the sound in "' + f.name + '". The file may be damaged, have no sound track, or use a format this browser cannot open. Try converting it to MP3 or WAV first.');
+    });
+  });
+
+  // ---------- cleaning ----------
+  $('go').addEventListener('click', function () {
+    if (!dry || busy) return;
+    busy = true; stopFlag = false; stopPlay();
+    $('go').disabled = true; $('stop').hidden = false; $('result').hidden = true; bar(0);
+    say('', 'Loading the noise remover…');
+    var mine = job, t0 = Date.now();
+    getRN().then(function (M) {
+      var frames = Math.ceil((len + FRAME) / FRAME), total = frames * nch, doneFrames = 0;
+      var ptr = M._malloc(FRAME * 4), w = [], v = new Float32Array(frames);
+      for (var k = 0; k < nch; k++) w.push(new Float32Array(len));
+      var c = 0, fr = 0, st = M._rnnoise_create(0);
+      say('', 'Removing noise… 0%');
+      return new Promise(function (resolve, reject) {
+        function finish(err) { try { if (st) M._rnnoise_destroy(st); st = 0; M._free(ptr); } catch (x) {} if (err) reject(err); else resolve({ w: w, v: v }); }
+        (function tick() {
+          if (stopFlag || mine !== job) return finish(new Error('stopped'));
+          try {
+            var src = dry[c], dst = w[c], t = performance.now();
+            while (performance.now() - t < 30) {
+              var heap = M.HEAPF32, base = ptr >> 2, at = fr * FRAME, i, x;
+              for (i = 0; i < FRAME; i++) { x = at + i < len ? src[at + i] : 0; heap[base + i] = x * 32768; }
+              var p = M._rnnoise_process_frame(st, ptr, ptr);
+              heap = M.HEAPF32;
+              if (p > v[fr]) v[fr] = p;
+              // RNNoise output is one frame (10 ms) late: write it one frame earlier
+              var o = at - FRAME;
+              for (i = 0; i < FRAME; i++) { var j = o + i; if (j >= 0 && j < len) dst[j] = heap[base + i] / 32768; }
+              fr++; doneFrames++;
+              if (fr >= frames) {
+                fr = 0; c++;
+                M._rnnoise_destroy(st);
+                if (c >= nch) { st = 0; return finish(); }
+                st = M._rnnoise_create(0);
+                break;
+              }
+            }
+          } catch (e) { return finish(e); }
+          var pct = doneFrames / total; bar(pct);
+          say('', 'Removing noise… ' + Math.round(pct * 100) + '%');
+          setTimeout(tick, 0);
+        })();
+      });
+    }).then(function (r) {
+      if (mine !== job) return;
+      wet = r.w; vad = r.v;
+      remix();
+      busy = false; $('go').disabled = false; $('stop').hidden = true; bar(null);
+      $('result').hidden = false; setupOutputs();
+      var secs = ((Date.now() - t0) / 1000).toFixed(1);
+      say('ok', 'Done in ' + secs + ' s. Press Play and switch between Before and After to compare, then save it.');
+      if ($('result').scrollIntoView) $('result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }).catch(function (e) {
+      busy = false; $('go').disabled = !dry; $('stop').hidden = true; bar(null);
+      if (e && e.message === 'stopped') return say('', 'Stopped. Press Remove noise to start again.');
+      if (e instanceof RangeError) return say('bad', 'Your device ran out of memory. Try a shorter recording.');
+      say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which this tool needs. Please update your browser.' : 'The noise remover could not be loaded or stopped with an error. Check your connection, reload the page and try again.');
+    });
+  });
+  $('stop').addEventListener('click', function () { stopFlag = true; });
+
+  // Mix the cleaned and original sound, quieten pauses and normalise. Fast enough to run on every slider move.
+  var remixTimer = 0;
+  function remix() {
+    if (!wet) return;
+    var s = +$('strength').value / 100, gate = +$('gate').value, norm = $('norm').checked;
+    var floor = gate === 2 ? 0 : gate === 1 ? 0.3 : 1;
+    // gain per 10 ms frame: open while there is speech, held 250 ms after it, smooth ramps
+    var frames = vad.length, g = new Float32Array(frames + 1), hold = 0, cur = 1, i, k;
+    for (i = 0; i < frames; i++) {
+      var speech = vad[i] > 0.5 || (i + 1 < frames && vad[i + 1] > 0.5) || (i + 2 < frames && vad[i + 2] > 0.5);
+      if (speech) hold = 25; else if (hold > 0) hold--;
+      var target = hold > 0 ? 1 : floor;
+      cur += (target - cur) * (target > cur ? 0.6 : 0.12);
+      g[i] = cur;
+    }
+    g[frames] = cur;
+    if (!out || out.length !== nch) { out = []; for (k = 0; k < nch; k++) out.push(new Float32Array(len)); }
+    var peak = 0;
+    for (k = 0; k < nch; k++) {
+      var d = dry[k], w = wet[k], o = out[k];
+      for (i = 0; i < len; i++) {
+        var f = i / FRAME, fi = f | 0, gg = g[fi] + (g[fi + 1] - g[fi]) * (f - fi);
+        var x = (w[i] * s + d[i] * (1 - s)) * (floor < 1 ? gg : 1);
+        o[i] = x; if (x > peak) peak = x; else if (-x > peak) peak = -x;
+      }
+    }
+    var gain = norm && peak > 1e-4 ? Math.min(10, 0.89 / peak) : (peak > 1 ? 1 / peak : 1);
+    if (gain !== 1) for (k = 0; k < nch; k++) { var oo = out[k]; for (i = 0; i < len; i++) oo[i] *= gain; }
+    $('sv').textContent = $('strength').value;
+    if (outBuf) for (k = 0; k < nch; k++) copyInto(outBuf, out[k], k);
+    drawWave();
+    $('dl').hidden = true;
+    if (playing) { var at = position(); startAt(at); }
+  }
+  function scheduleRemix() { $('sv').textContent = $('strength').value; if (!wet) return; clearTimeout(remixTimer); remixTimer = setTimeout(remix, 60); }
+  ['strength', 'gate', 'norm'].forEach(function (id) { $(id).addEventListener('input', scheduleRemix); $(id).addEventListener('change', scheduleRemix); });
+
+  // ---------- before / after player ----------
+  var actx = null, origBuf = null, outBuf = null, node = null, playing = false, startedAt = 0, offset = 0, which = 'clean', raf = 0;
+  function copyInto(buf, data, ch) { if (buf.copyToChannel) buf.copyToChannel(data, ch); else buf.getChannelData(ch).set(data); }
+  function makeBuf(chs) { var b = actx.createBuffer(chs.length, len, RATE); chs.forEach(function (c, k) { copyInto(b, c, k); }); return b; }
+  function ensureAudio() {
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return false;
+    if (!actx) actx = new AC();
+    if (!origBuf) origBuf = makeBuf(dry);
+    if (!outBuf) outBuf = makeBuf(out);
+    return true;
+  }
+  function position() { return playing ? Math.min(len / RATE, offset + actx.currentTime - startedAt) : offset; }
+  function startAt(t) {
+    if (node) { node.onended = null; try { node.stop(); } catch (e) {} node = null; }
+    if (t >= len / RATE - 0.05) t = 0;
+    node = actx.createBufferSource(); node.buffer = which === 'orig' ? origBuf : outBuf; node.connect(actx.destination);
+    node.onended = function () { if (playing && position() >= len / RATE - 0.1) { stopPlay(); offset = 0; showPos(); } };
+    offset = t; startedAt = actx.currentTime; node.start(0, t); playing = true;
+    $('play').textContent = '❚❚ Pause';
+    cancelAnimationFrame(raf); (function loop() { showPos(); if (playing) raf = requestAnimationFrame(loop); })();
+  }
+  function stopPlay() {
+    if (playing && actx) offset = position();
+    playing = false; cancelAnimationFrame(raf);
+    if (node) { node.onended = null; try { node.stop(); } catch (e) {} node = null; }
+    $('play').textContent = '▶ Play';
+  }
+  function showPos() {
+    var d = len / RATE || 1, p = position();
+    $('tNow').textContent = clock(p); $('tAll').textContent = clock(d);
+    if (!seeking) $('seek').value = Math.round(p / d * 1000);
+  }
+  var seeking = false;
+  $('play').addEventListener('click', function () {
+    if (!out) return;
+    if (playing) return stopPlay();
+    if (!ensureAudio()) return say('bad', 'This browser cannot play the preview. You can still save the file.');
+    if (actx.resume) actx.resume();
+    startAt(offset);
+  });
+  $('seek').addEventListener('input', function () { seeking = true; offset = +$('seek').value / 1000 * len / RATE; $('tNow').textContent = clock(offset); });
+  $('seek').addEventListener('change', function () { seeking = false; var t = +$('seek').value / 1000 * len / RATE; if (playing) startAt(t); else { offset = t; showPos(); } });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-ab]'), function (b) {
+    b.addEventListener('click', function () {
+      which = b.getAttribute('data-ab');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-ab]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      if (playing) startAt(position());
+    });
+  });
+
+  function drawWave() {
+    var cv = $('wave'), w = Math.max(200, cv.clientWidth || 600), h = 70, dpr = window.devicePixelRatio || 1;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    var x = cv.getContext('2d'); x.setTransform(dpr, 0, 0, dpr, 0, 0); x.clearRect(0, 0, w, h);
+    var css = getComputedStyle(document.documentElement), acc = (css.getPropertyValue('--accent') || '#2563eb').trim() || '#2563eb';
+    function lane(data, color) {
+      var step = len / w; x.fillStyle = color;
+      for (var px = 0; px < w; px++) {
+        var a = Math.floor(px * step), b = Math.min(len, Math.floor((px + 1) * step)), m = 0;
+        for (var i = a; i < b; i += 8) { var s = data[i]; if (s < 0) s = -s; if (s > m) m = s; }
+        var hh = Math.max(1, Math.min(1, m) * (h / 2 - 2)); x.fillRect(px, h / 2 - hh, 1, hh * 2);
+      }
+    }
+    lane(dry[0], 'rgba(140,140,150,.45)'); lane(out[0], acc);
+  }
+
+  // ---------- saving ----------
+  var outUrl = null;
+  function setupOutputs() {
+    var vOpt = $('fmt').querySelector('option[value=video]');
+    vOpt.hidden = !isVideo; vOpt.disabled = !isVideo;
+    if (setupOutputs.file !== file) { setupOutputs.file = file; if (isVideo) $('fmt').value = 'video'; else if ($('fmt').value === 'video') $('fmt').value = 'mp3'; }
+    fmtChanged();
+  }
+  function fmtChanged() {
+    var f = $('fmt').value; $('kbpsBox').hidden = f !== 'mp3'; $('dl').hidden = true;
+    $('save').textContent = f === 'mp3' ? 'Make MP3' : f === 'wav' ? 'Make WAV' : 'Make video';
+  }
+  $('fmt').addEventListener('change', fmtChanged); $('kbps').addEventListener('change', function () { $('dl').hidden = true; });
+
+  function videoOut(wavFile) {
+    var ext = (/\.([a-z0-9]{1,5})$/i.exec(file.name) || [])[1] || 'mp4';
+    ext = ext.toLowerCase();
+    var webm = ext === 'webm', mp4ish = /^(mp4|m4v|mov|3gp)$/.test(ext);
+    var outExt = webm ? 'webm' : mp4ish ? (ext === 'mov' ? 'mov' : 'mp4') : 'mkv';
+    var dur = len / RATE;
+    return FF.run([file, wavFile], function (p) {
+      return ['-i', p[0], '-i', p[1], '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy'].concat(webm ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '160k'], ['-shortest']);
+    }, 'clean.' + outExt, dur, function (p) { bar(p); say('', 'Putting the clean sound into the video… ' + Math.round(p * 100) + '%'); }, say).then(function (data) {
+      return { blob: new Blob([data], { type: webm ? 'video/webm' : outExt === 'mkv' ? 'video/x-matroska' : outExt === 'mov' ? 'video/quicktime' : 'video/mp4' }), ext: outExt };
+    });
+  }
+  $('save').addEventListener('click', function () {
+    if (!out || busy) return;
+    var f = $('fmt').value, base = (file.name.replace(/\.[^.]+$/, '') || 'recording') + '-clean';
+    busy = true; stopPlay(); $('save').disabled = true; $('go').disabled = true; $('dl').hidden = true; bar(0);
+    var p;
+    if (f === 'mp3') {
+      say('', 'Making the MP3…');
+      p = encodeMp3(out, RATE, +$('kbps').value, function (x) { bar(x); }).then(function (b) { return { blob: b, ext: 'mp3' }; });
+    } else if (f === 'wav') {
+      say('', 'Making the WAV…');
+      p = new Promise(function (r) { setTimeout(function () { r({ blob: wavBlob(out, RATE), ext: 'wav' }); }, 30); });
+    } else {
+      say('', 'Getting the video engine ready…'); $('stop').hidden = false;
+      p = videoOut(new File([wavBlob(out, RATE)], 'clean.wav', { type: 'audio/wav' }));
+    }
+    p.then(function (r) {
+      if (outUrl) URL.revokeObjectURL(outUrl);
+      outUrl = URL.createObjectURL(r.blob);
+      var a = $('dl'); a.href = outUrl; a.download = base + '.' + r.ext; a.textContent = 'Download ' + r.ext.toUpperCase() + ' (' + fmtBytes(r.blob.size) + ')'; a.hidden = false;
+      say('ok', 'Your cleaned ' + (f === 'video' ? 'video' : 'recording') + ' is ready: ' + a.download);
+    }).catch(function (e) {
+      if (e && e.message === 'cancelled') return say('', 'Stopped.');
+      say('bad', (e && e.message) || 'Saving failed. Try WAV or a shorter recording.');
+    }).then(function () { busy = false; bar(null); $('save').disabled = false; $('go').disabled = !dry; $('stop').hidden = true; });
+  });
+  $('stop').addEventListener('click', function () { if (busy && $('fmt').value === 'video' && !$('result').hidden) FF.cancel(); });
+  window.addEventListener('resize', function () { if (out && !$('result').hidden) drawWave(); });
+})();
+</script>
