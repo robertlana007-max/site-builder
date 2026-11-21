@@ -135,14 +135,19 @@
 </div>
 <script>
 (function () {
-  function words(t) { return t.replace(/([a-z0-9])([A-Z])/g, '$1 $2').split(/[^A-Za-z0-9À-￿]+/).filter(Boolean); }
+  // Apostrophes inside a word are dropped (don't -> dont), so they do not split it in two.
+  function words(t) { return t.replace(/(\p{L})['’](?=\p{L})/gu, '$1').replace(/(\p{Ll}|\p{N})(\p{Lu})/gu, '$1 $2').split(/[^\p{L}\p{M}\p{N}]+/u).filter(Boolean); }
+  // A word starts after a space, dash, slash or bracket, plus any opening quotes; never after an apostrophe inside a word.
+  var START = /(^|[\s\-\/(\[{])(["'“‘«(\[]*)([\p{L}\p{N}])/gu;
   // Convert each line on its own, so a list stays a list.
   function lines(f) { return function (t) { return t.split('\n').map(f).join('\n'); }; }
   var M = {
     upper: function (t) { return t.toUpperCase(); },
     lower: function (t) { return t.toLowerCase(); },
-    title: function (t) { return t.toLowerCase().replace(/(^|[\s\-(\["'])(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); },
-    sentence: function (t) { return t.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)(\S)/g, function (m, a, b) { return a + b.toUpperCase(); }); },
+    title: function (t) { return t.toLowerCase().replace(START, function (m, a, q, b) { return a + q + b.toUpperCase(); }); },
+    sentence: function (t) {
+      return t.toLowerCase().replace(/(^\s*|[.!?]\s+|\n\s*)(["'“‘«(\[]*)([\p{L}\p{N}])/gu, function (m, a, q, b) { return a + q + b.toUpperCase(); });
+    },
     camel: lines(function (t) { return words(t).map(function (w, i) { w = w.toLowerCase(); return i ? w[0].toUpperCase() + w.slice(1) : w; }).join(''); }),
     snake: lines(function (t) { return words(t).join('_').toLowerCase(); }),
     kebab: lines(function (t) { return words(t).join('-').toLowerCase(); })

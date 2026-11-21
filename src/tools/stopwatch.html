@@ -7,31 +7,44 @@
 <div class="scroll-x" id="lapBox" hidden style="margin-top:18px"><table class="sched"><thead><tr><th>Lap</th><th>Lap time</th><th>Total</th></tr></thead><tbody id="laps"></tbody></table></div>
 <script>
 (function () {
-  var running = false, startAt = 0, elapsed = 0, lastLap = 0, laps = 0, raf = 0;
+  // Date.now() is used (not performance.now) so a running stopwatch survives a reload: the start time is saved in this browser.
+  var KEY = 'gtn-stopwatch', running = false, startAt = 0, elapsed = 0, lastLap = 0, laps = [], raf = 0;
   function fmt(ms) {
     var cs = Math.floor(ms / 10), h = Math.floor(cs / 360000), m = Math.floor(cs / 6000) % 60, s = Math.floor(cs / 100) % 60, c = cs % 100;
     var p = function (x) { return String(x).padStart(2, '0'); };
     return (h ? p(h) + ':' : '') + p(m) + ':' + p(s) + '.' + p(c);
   }
-  function now() { return running ? elapsed + performance.now() - startAt : elapsed; }
-  function tick() { $('time').textContent = fmt(now()); if (running) raf = requestAnimationFrame(tick); }
+  function now() { return running ? elapsed + Math.max(0, Date.now() - startAt) : elapsed; }
+  function save() { try { if (!running && !elapsed) localStorage.removeItem(KEY); else localStorage.setItem(KEY, JSON.stringify({ running: running, startAt: startAt, elapsed: elapsed, lastLap: lastLap, laps: laps })); } catch (e) {} }
+  function tick() { $('time').textContent = fmt(now()); }
+  function loop() { tick(); if (running) raf = requestAnimationFrame(loop); }
+  function addRow(n, lap, total) {
+    var tr = document.createElement('tr');
+    [String(n), fmt(lap), fmt(total)].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+    $('laps').insertBefore(tr, $('laps').firstChild); $('lapBox').hidden = false;
+  }
+  function buttons() { $('go').textContent = running ? 'Pause' : elapsed ? 'Resume' : 'Start'; $('lap').disabled = !running; }
   $('go').addEventListener('click', function () {
-    if (running) { elapsed = now(); running = false; cancelAnimationFrame(raf); }
-    else { startAt = performance.now(); running = true; tick(); }
-    $('go').textContent = running ? 'Pause' : 'Resume';
-    $('lap').disabled = !running;
-    tick();
+    cancelAnimationFrame(raf);
+    if (running) { elapsed = now(); running = false; }
+    else { startAt = Date.now(); running = true; }
+    buttons(); save(); loop();
   });
   $('lap').addEventListener('click', function () {
-    var t = now(), tr = document.createElement('tr');
-    laps++;
-    [String(laps), fmt(t - lastLap), fmt(t)].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
-    $('laps').insertBefore(tr, $('laps').firstChild);
-    lastLap = t; $('lapBox').hidden = false;
+    var t = now(); laps.push([t - lastLap, t]); addRow(laps.length, t - lastLap, t); lastLap = t; save();
   });
   $('reset').addEventListener('click', function () {
-    running = false; cancelAnimationFrame(raf); elapsed = 0; lastLap = 0; laps = 0;
-    $('laps').innerHTML = ''; $('lapBox').hidden = true; $('go').textContent = 'Start'; $('lap').disabled = true; tick();
+    running = false; cancelAnimationFrame(raf); elapsed = 0; lastLap = 0; laps = [];
+    $('laps').innerHTML = ''; $('lapBox').hidden = true; buttons(); tick(); save();
   });
+  try {
+    var o = JSON.parse(localStorage.getItem(KEY));
+    if (o && typeof o.elapsed === 'number' && o.elapsed >= 0) {
+      running = !!o.running && o.startAt > 0 && o.startAt <= Date.now(); startAt = o.startAt || 0; elapsed = o.elapsed; lastLap = o.lastLap || 0;
+      laps = Array.isArray(o.laps) ? o.laps.filter(function (l) { return Array.isArray(l) && l.length === 2; }) : [];
+      laps.forEach(function (l, i) { addRow(i + 1, l[0], l[1]); });
+    }
+  } catch (e) {}
+  buttons(); loop();
 })();
 </script>

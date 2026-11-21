@@ -138,7 +138,9 @@
 <p class="msg" id="msg"></p>
 <script>
 (function () {
-  var running = false, endAt = 0, left = 0, timer = 0, title = document.title, audio = null;
+  var running = false, endAt = 0, left = 0, timer = 0, title = document.title, audio = null, KEY = 'gtn-countdown';
+  // A running or paused countdown is saved in this browser, so reloading the page does not lose it.
+  function save() { try { if (running || left > 0) localStorage.setItem(KEY, JSON.stringify({ running: running, endAt: endAt, left: left })); else localStorage.removeItem(KEY); } catch (e) {} }
   var p = function (x) { return String(x).padStart(2, '0'); };
   function fmt(ms) { var t = Math.ceil(ms / 1000), h = Math.floor(t / 3600), m = Math.floor(t / 60) % 60, s = t % 60; return (h ? p(h) + ':' : '') + p(m) + ':' + p(s); }
   function inputMs() {
@@ -158,7 +160,7 @@
     } catch (e) {}
   }
   function show(ms) { $('time').textContent = fmt(ms); if (running) document.title = fmt(ms) + ' · Timer'; }
-  function stop() { running = false; clearInterval(timer); document.title = title; $('go').textContent = 'Start'; }
+  function stop() { running = false; clearInterval(timer); document.title = title; $('go').textContent = 'Start'; save(); }
   function tick() {
     left = endAt - Date.now();
     if (left <= 0) {
@@ -171,20 +173,31 @@
     show(left);
   }
   $('go').addEventListener('click', function () {
-    if (running) { left = endAt - Date.now(); stop(); $('go').textContent = 'Resume'; return; }
+    if (running) { left = endAt - Date.now(); stop(); $('go').textContent = 'Resume'; save(); return; }
     if (left <= 0) left = inputMs();
     if (left <= 0) { $('msg').className = 'msg bad'; $('msg').textContent = 'Set a time longer than zero.'; return; }
     $('msg').textContent = '';
     try { audio = audio || new (window.AudioContext || window.webkitAudioContext)(); audio.resume(); } catch (e) {} // must be created on a click, even if the sound is ticked later
-    endAt = Date.now() + left; running = true; $('go').textContent = 'Pause';
+    endAt = Date.now() + left; running = true; $('go').textContent = 'Pause'; save();
     timer = setInterval(tick, 200); tick();
   });
-  function reset() { stop(); left = 0; $('msg').textContent = ''; show(inputMs()); }
+  function reset() { stop(); left = 0; save(); $('msg').textContent = ''; show(inputMs()); }
   $('reset').addEventListener('click', reset);
   ['h', 'm', 's'].forEach(function (id) { $(id).addEventListener('input', function () { if (!running) { left = 0; $('go').textContent = 'Start'; $('msg').textContent = ''; document.title = title; show(inputMs()); } else { $('msg').className = 'msg'; $('msg').textContent = 'Click Reset to use the new time.'; } }); });
   document.querySelectorAll('[data-min]').forEach(function (b) {
     b.addEventListener('click', function () { var t = +b.dataset.min; $('h').value = Math.floor(t / 60); $('m').value = t % 60; $('s').value = 0; reset(); });
   });
+  // after the site has restored the saved hour/minute/second boxes (it does that on DOMContentLoaded)
+  function restore() {
+    var o = null; try { o = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+    if (!o) return;
+    if (o.running && o.endAt > 0) {
+      left = o.endAt - Date.now();
+      if (left <= 0) { left = 0; save(); show(0); $('msg').className = 'msg ok'; $('msg').textContent = 'Time is up! The countdown finished while the page was closed.'; return; }
+      endAt = o.endAt; running = true; $('go').textContent = 'Pause'; timer = setInterval(tick, 200); tick();
+    } else if (o.left > 0) { left = o.left; show(left); $('go').textContent = 'Resume'; }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { setTimeout(restore, 0); }); else setTimeout(restore, 0);
 })();
 </script>
 
@@ -197,8 +210,8 @@
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Online Timer</h2><ol class="tut"><li><h3>Set the time</h3><p>Type numbers in “Hours”, “Minutes” and “Seconds”. The big display above shows the time you set. The boxes are added together, so 90 minutes becomes 1:30:00. The longest time is 99:59:59.</p></li><li><h3>Or tap a preset</h3><p>Click “1 min”, “5 min”, “10 min”, “25 min” or “1 hour” to fill the boxes at once. A preset also stops and resets any running timer.</p></li><li><h3>Check the sound option</h3><p>“Play a sound when time is up” is ticked by default. Untick it for a silent timer that only shows a message.</p></li><li><h3>Click “Start”</h3><p>Click “Start”. The display counts down and the browser tab title shows the time left, so you can see it from another tab.</p></li><li><h3>Pause and resume</h3><p>Click “Pause” to stop the countdown. The button changes to “Resume”. Click it to continue from the same point.</p></li><li><h3>When time is up</h3><p>The display shows 00:00, the message says “Time is up!”, the tab title changes to “Time is up!”, and three short beeps play if the sound option is ticked.</p></li><li><h3>Reset</h3><p>Click “Reset” to stop the timer and go back to the time in the boxes, ready to start again.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Hours, minutes and seconds</b>Set any time from 1 second up to 99 hours, 59 minutes and 59 seconds.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Five quick presets</b>One click sets 1, 5, 10 or 25 minutes, or 1 hour.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Alarm sound</b>Three short beeps play at the end. You can turn this off with the checkbox.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Time in the browser tab</b>The tab title shows the remaining time, so you can work in another tab and still see it.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Pause and resume</b>Stop the countdown and continue later without losing time.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Accurate in the background</b>The timer uses the real clock, so it stays correct even if the browser slows the page in a background tab.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a 25-minute study session</h2><p>Click the “25 min” preset. The boxes change to 0 hours, 25 minutes and 0 seconds, and the display shows 25:00. Click “Start”. One second later the display and the tab title show 24:59. After 10 minutes you click “Pause” at 15:00, and later click “Resume”, and it continues from 15:00. When it reaches zero, the message “Time is up!” appears and you hear three beeps. Click “5 min” for your break, and then “Start” again.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Keep the page open. Closing the tab or the browser stops the timer.</li><li>Hours are only shown in the display when the time is one hour or more, for example 01:30:00.</li><li>On phones, keep the screen on. A locked phone may pause sounds from web pages.</li><li>Click “Start” once before you walk away. The sound is unlocked by your click, which many browsers require.</li><li>Use the presets as a quick start, then change the boxes if you need a time like 7 minutes 30 seconds.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>“Set a time longer than zero.”</summary><p>All three boxes are 0 or empty. Enter a time or click a preset.</p></details><details><summary>The timer stopped when I closed or reloaded the tab</summary><p>The timer lives in the page. Closing or reloading it clears the countdown. Keep the tab open until the time is up.</p></details><details><summary>My paused time was lost</summary><p>Changing the hours, minutes or seconds boxes while paused, or clicking “Reset” or a preset, starts again from the boxes. Click “Resume” without editing the boxes to continue. If you change the boxes while the timer runs, click “Reset” to use the new time.</p></details><details><summary>I typed 75 minutes and it shows 01:15:00</summary><p>This is correct. The boxes are added together, so 75 minutes is 1 hour 15 minutes.</p></details></div></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Keep the page open so the sound can play. If you reload the page, the countdown carries on from where it was.</li><li>Hours are only shown in the display when the time is one hour or more, for example 01:30:00.</li><li>On phones, keep the screen on. A locked phone may pause sounds from web pages.</li><li>Click “Start” once before you walk away. The sound is unlocked by your click, which many browsers require.</li><li>Use the presets as a quick start, then change the boxes if you need a time like 7 minutes 30 seconds.</li></ul></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>“Set a time longer than zero.”</summary><p>All three boxes are 0 or empty. Enter a time or click a preset.</p></details><details><summary>No sound played when I had closed the tab</summary><p>The countdown is remembered in this browser, but the sound can only play while the page is open. If it ended while the page was closed, you see &quot;Time is up!&quot; when you come back. Keep the tab open until the time is up.</p></details><details><summary>My paused time was lost</summary><p>Changing the hours, minutes or seconds boxes while paused, or clicking “Reset” or a preset, starts again from the boxes. Click “Resume” without editing the boxes to continue. If you change the boxes while the timer runs, click “Reset” to use the new time.</p></details><details><summary>I typed 75 minutes and it shows 01:15:00</summary><p>This is correct. The boxes are added together, so 75 minutes is 1 hour 15 minutes.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Does the timer work if I switch tabs?</summary><p>Yes. It keeps the correct time in the background as long as the page stays open.</p></details><details><summary>Why did I not hear the alarm?</summary><p>Check that your device is not muted and the sound option is ticked. Phones may silence a page while the screen is locked.</p></details><details><summary>Can I pause it?</summary><p>Yes. Click Pause, then Resume to continue from where you stopped.</p></details></div>

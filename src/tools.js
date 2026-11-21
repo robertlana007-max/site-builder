@@ -567,14 +567,15 @@ module.exports = [
   {
     slug: 'number-to-words', cat: 'Text tools', name: 'Number to Words',
     title: 'Number to Words Converter - Spell Out Numbers & Check Amounts',
-    desc: 'Convert numbers into English words, or write an amount in dollars and cents for a check. Handles decimals and very large numbers.',
+    desc: 'Convert numbers into English words, or write a money amount for a check or cheque in your currency. Handles decimals, lakh/crore and huge numbers.',
     card: 'Spell out any number in English words.',
     intro: 'Turn digits into English words, for writing checks, contracts and invoices.',
-    steps: ['Type a number.', 'Choose a plain number or dollars and cents.', 'Click Copy.'],
+    steps: ['Type a number.', 'Choose a plain number or a money amount, and your currency.', 'Click Copy.'],
     faq: [
-      ['How do I write an amount on a check?', 'Choose "Dollars and cents". The cents are written as a fraction, for example "One thousand two hundred thirty-four dollars and 56/100".'],
+      ['How do I write an amount on a check or cheque?', 'Choose "Money amount" and your currency. The cents are written as a fraction, for example "One thousand two hundred thirty-four dollars and 56/100".'],
+      ['Can it write lakh and crore?', 'Yes. Set "Number style" to "Lakh and crore", so 12,50,000 becomes "Twelve lakh fifty thousand".'],
       ['How large a number can it handle?', 'Up to 18 digits, which is hundreds of quadrillions.'],
-      ['Does it use "and"?', 'No. It follows the American style, as in "one hundred five", which is the usual style on checks.']
+      ['Does it use "and"?', 'No. It writes "one hundred five" without "and", which is accepted on checks and cheques everywhere.']
     ]
   },
   {
@@ -809,9 +810,9 @@ module.exports = [
   {
     slug: 'time-zone-converter', cat: 'Time tools', name: 'Time Zone Converter',
     title: 'Time Zone Converter - Compare Times Around the World',
-    desc: 'Convert a date and time to many time zones at once: Pakistan, India, UAE, UK, US and more. Handles daylight saving correctly. Free and private.',
+    desc: 'Convert a date and time to many time zones at once: the Americas, Europe, Africa, the Middle East and Asia. Handles daylight saving. Free and private.',
     card: 'See one time in many time zones at once.',
-    intro: 'Pick a date, a time and a time zone, and see the same moment in Pakistan, India, the UAE, the UK, the US and any other zone you add. Daylight saving is handled for you.',
+    intro: 'Pick a date, a time and a time zone, and see the same moment in the Americas, Europe, Africa, the Middle East, Asia, Australia and any other zone you add. Daylight saving is handled for you.',
     steps: ['Press Now for the current time, or pick a date and time.', 'Choose the time zone that time is in.', 'Read the time in every zone in the list. +1 day means it is already the next day there.', 'Search to add more zones, remove the ones you do not need, then click Copy summary.'],
     faq: [
       ['Does it handle daylight saving time?', 'Yes. The converter uses the time zone rules built into your browser, so changes like the US clocks moving in March and November or Europe in March and October are applied for the exact date you pick.'],
