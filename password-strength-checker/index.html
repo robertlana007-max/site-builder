@@ -388,16 +388,25 @@
     function analyse(pw) {
       memo = new Map();
       // long passwords are checked in pieces of 100 characters to keep it fast; the guesses multiply
-      var r = { lg: 0, seq: [] };
+      var r = { lg: 0, seq: [] }, rep = pw.length > MAX_ANALYSE ? /^([\s\S]{1,100}?)\1+$/.exec(pw) : null, seen = {};
+      if (rep) { // one short chunk repeated many times (aaaa…, abcabc…): as easy as the chunk, times the number of repeats
+        var base = estimate(rep[1]), cnt = pw.length / rep[1].length;
+        return finish({ lg: base.lg + L10(cnt), seq: [{ pattern: 'repeat', i: 0, j: pw.length - 1, token: pw, base: rep[1], count: cnt }] });
+      }
       for (var at = 0; at < pw.length; at += MAX_ANALYSE) {
-        var part = estimate(pw.slice(at, at + MAX_ANALYSE));
+        var chunk = pw.slice(at, at + MAX_ANALYSE), part = estimate(chunk);
+        if (seen[chunk]) part = { lg: L10(2), seq: [{ pattern: 'repeat', i: 0, j: chunk.length - 1, token: chunk, base: chunk, count: 2 }] }; // a piece seen before adds almost nothing
+        seen[chunk] = 1;
         r.lg += part.lg;
         part.seq.forEach(function (m) { var c = Object.assign({}, m); c.i += at; c.j += at; r.seq.push(c); });
       }
+      return finish(r);
+      function finish(r) {
       var lg = r.lg;
       var ct = charTypes(pw), common = PW.get(pw.toLowerCase()) || 0, sc = score(lg);
       if (common) sc = 0;
       return { lg: lg, bits: lg * Math.log2(10), seq: r.seq, score: sc, common: common, rawBits: pw.length * (ct.pool ? Math.log2(ct.pool) : 0), types: ct.types, pool: ct.pool, length: Array.from(pw).length };
+      }
     }
     // seconds to crack, as log10, for each attack: 100/hour, 10/s, 1e4/s, 1e10/s
     var RATES = [100 / 3600, 10, 1e4, 1e10];

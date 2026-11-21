@@ -205,6 +205,7 @@
 <div class="ct-out ct-ref" id="ctRef" aria-live="polite"></div>
 <span class="ct-lbl" id="ctInLbl">In-text citation</span>
 <div class="ct-out" id="ctIn"></div>
+<p class="msg bad" id="ctWarn" hidden></p>
 <div class="btns ct-btns">
   <button type="button" class="btn" id="ctAdd">Add to my list</button>
   <button type="button" class="btn ghost" id="ctCopyRef">Copy reference</button>
@@ -447,9 +448,13 @@
     var n = A.map(function (a) { return esc(short ? surname(a) : fullName(a)); });
     return n.length === 1 ? n[0] : n.length === 2 ? n[0] + ' and ' + n[1] : n[0] + ' et al.';
   }
+  // Chicago short title: the key words of the main title, at most four, without a leading article or a dangling small word
   function shortTitle(t) {
-    var main = String(t).split(/[:?!]\s/)[0].replace(/^(the|a|an)\s+/i, ''), w = main.split(/\s+/);
-    return w.length > 4 ? w.slice(0, 4).join(' ') : main;
+    var main = String(t).trim().split(/[:.]\s/)[0].replace(/([?!])\s.*$/, '$1').replace(/\.$/, ''), w = main.split(/\s+/);
+    if (w.length > 2 && /^(the|a|an)$/i.test(w[0])) w.shift();
+    if (w.length > 4) { w = w.slice(0, 4); while (w.length > 1 && /^(a|an|the|of|and|or|for|in|on|to|with|from|by|at|as|into|about)$/i.test(w[w.length - 1])) w.pop(); }
+    var out = w.join(' ');
+    return out.charAt(0).toUpperCase() + out.slice(1);
   }
   function chiPub(c) { var p = join([esc(c.place), esc(c.publisher)], ': '); return p; }
   function chicagoBib(c, ad) {
@@ -588,11 +593,16 @@
     $('ctCaseHint').textContent = CASE[st];
     $('ctListTitle').textContent = LIST_TITLE[st];
     if (!s.title.trim()) {
-      current = null;
+      current = null; $('ctWarn').hidden = true;
       $('ctRef').innerHTML = '<span style="color:var(--muted);font-family:inherit">Type a title to see the citation.</span>'; $('ctIn').textContent = '–';
       return;
     }
-    var r = format(s, st); current = r;
+    var r = format(s, st), warn = []; current = r;
+    var T0 = TYPES[s.type].f, yr = s.year.trim(), doi = s.doi.trim().replace(/^doi:\s*/i, '').replace(/^https?:\/\/(dx\.)?doi\.org\//i, ''), url = s.url.trim();
+    if (yr && !/^(\d{3,4}[a-z]?|\d{4}[–-]\d{2,4}|n\.\s?d\.|no date|in press|forthcoming)$/i.test(yr)) warn.push('The year should be a number such as 2024. Leave it empty if there is no date.');
+    if (T0.indexOf('doi') !== -1 && doi && !/^10\.\d{4,9}\/\S+$/.test(doi)) warn.push('A DOI starts with 10. and has a slash, for example 10.1037/ppm0000185.');
+    if (T0.indexOf('url') !== -1 && url && (/\s/.test(url) || !/^(https?:\/\/)?[^\s\/]+\.[^\s\/]{2,}/i.test(url))) warn.push('The URL does not look like a web address. Copy it from your browser’s address bar.');
+    $('ctWarn').hidden = !warn.length; $('ctWarn').textContent = warn.join(' ');
     $('ctRef').innerHTML = r.ref;
     if (st === 'chicago-nb') {
       $('ctRefLbl').textContent = 'Bibliography entry'; $('ctInLbl').textContent = 'Footnote (first time, then shortened)';

@@ -25,6 +25,9 @@
 <div class="fields">
   <div><label for="mkScheme">Grade or division scheme</label>
     <select id="mkScheme">
+      <option value="none">No grade (percentage only)</option>
+      <option value="letter">Letter grades (A 90%, B 80%, C 70%, D 60%)</option>
+      <option value="uk">UK degree classes (First, 2:1, 2:2, Third)</option>
       <option value="pk">Pakistan boards (A1, A, B, C, D, E)</option>
       <option value="in">India divisions (First, Second, Third)</option>
       <option value="custom">Custom grades</option>
@@ -62,6 +65,9 @@
   var M = {
     // bands from highest to lowest: [label, minimum %]. Below the last band = fail label.
     SCHEMES: {
+      none: { bands: [], fail: '', label: 'Grade', pass: null },
+      letter: { bands: [['A', 90], ['B', 80], ['C', 70], ['D', 60]], fail: 'F (Fail)', label: 'Grade', pass: 60 },
+      uk: { bands: [['First', 70], ['Upper second (2:1)', 60], ['Lower second (2:2)', 50], ['Third', 40]], fail: 'Fail', label: 'Class', pass: 40 },
       pk: { bands: [['A1', 80], ['A', 70], ['B', 60], ['C', 50], ['D', 40], ['E', 33]], fail: 'F (Fail)', label: 'Grade', pass: 33 },
       in: { bands: [['First Division', 60], ['Second Division', 45], ['Third Division', 33]], fail: 'Fail', label: 'Division', pass: 33 }
     },
@@ -86,7 +92,7 @@
   var st = { rows: [], bands: DEFBANDS.map(function (b) { return b.slice(); }) }, saved = false;
   function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
   function blank() { return { n: '', o: '', t: '100' }; }
-  function defaults() { st.rows = ['English', 'Urdu / Hindi', 'Mathematics', 'Physics', 'Chemistry'].map(function (n) { return { n: n, o: '', t: '100' }; }); }
+  function defaults() { st.rows = ['English', 'Mathematics', 'Science', 'Second language', 'Social studies'].map(function (n) { return { n: n, o: '', t: '100' }; }); }
   try {
     var s = JSON.parse(localStorage.getItem(KEY));
     if (s && Array.isArray(s.rows)) { st.rows = s.rows.map(function (r) { return { n: String(r.n || ''), o: String(r.o == null ? '' : r.o), t: String(r.t == null ? '' : r.t) }; }); saved = true; }
@@ -139,7 +145,8 @@
     $('mkOne').hidden = mode !== 'one'; $('mkSubj').hidden = mode !== 'subj';
     $('mkCustomBox').hidden = $('mkScheme').value !== 'custom';
     $('mkGL').textContent = sc.label;
-    $('mkSchemeInfo').textContent = $('mkScheme').value === 'custom' ? '' : sc.bands.map(function (b, i) { return b[0] + ': ' + (i ? b[1] + '% to under ' + sc.bands[i - 1][1] + '%' : b[1] + '% or more'); }).join(' · ') + ' · ' + sc.fail + ': below ' + sc.bands[sc.bands.length - 1][1] + '%. Boards and universities can have extra rules, such as passing every subject.';
+    $('mkG').parentNode.hidden = $('mkScheme').value === 'none';
+    $('mkSchemeInfo').textContent = $('mkScheme').value === 'custom' || !sc.bands.length ? '' : sc.bands.map(function (b, i) { return b[0] + ': ' + (i ? b[1] + '% to under ' + sc.bands[i - 1][1] + '%' : b[1] + '% or more'); }).join(' · ') + ' · ' + sc.fail + ': below ' + sc.bands[sc.bands.length - 1][1] + '%. Boards and universities can have extra rules, such as passing every subject.';
     var O = NaN, T = NaN;
     if (mode === 'one') {
       var o = num($('mkObt').value), t = num($('mkTot').value), err = M.check(o, t);
@@ -155,13 +162,13 @@
         var name = r.n.trim() || 'Subject ' + (i + 1);
         if (err) { if (out) out.textContent = '–'; if (err !== 'empty' && !(err === 'Total must be more than 0' && r.t === '')) warn.push(name + ': ' + err.toLowerCase() + '.'); return; }
         any = true; O += o; T += t;
-        var p = M.pct(o, t), g = M.grade(p, sc.bands, sc.fail);
+        var p = M.pct(o, t), g = sc.bands.length ? M.grade(p, sc.bands, sc.fail) : '';
         if (sc.pass != null && p < sc.pass - 1e-9) low.push(name);
         if (out) out.innerHTML = f2(p) + '%' + (g ? '<small>' + esc(g) + '</small>' : '');
       });
       if (!any) { O = NaN; T = NaN; }
     }
-    var P = M.pct(O, T), g = M.grade(P, sc.bands, sc.fail);
+    var P = M.pct(O, T), g = sc.bands.length ? M.grade(P, sc.bands, sc.fail) : '';
     $('mkPct').textContent = isNaN(P) ? '–' : f2(P) + '%';
     $('mkGrade').textContent = isNaN(P) || !g ? ' ' : sc.label + ': ' + g;
     $('mkO').textContent = isNaN(P) ? '–' : fmtNum(O);

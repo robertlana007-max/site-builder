@@ -287,7 +287,7 @@ unnecessary|Do not buy unnecessary things.|not needed
     if (x.d) h.appendChild(el('p', null, 'Meaning: ' + x.d));
     var b = x.s ? blank(x.w, x.s) : '';
     if (b) h.appendChild(el('p', null, 'Sentence: ' + b));
-    var letters = x.w.replace(/[^A-Za-z]/g, '').length;
+    var letters = x.w.replace(/[^\p{L}]/gu, '').length;
     h.appendChild(el('p', 'msg', (!x.d && !b ? 'Starts with "' + x.w.charAt(0) + '". ' : '') + letters + ' letters' + (/\s/.test(x.w) ? ', more than one word' : '') + '.'));
     h.hidden = false;
   }
@@ -302,6 +302,8 @@ unnecessary|Do not buy unnecessary things.|not needed
     $('sptIn').focus({ preventScroll: true });
     if (audio) setTimeout(function () { if (T && T.words[T.at] === x) speak(x.w); }, first ? 250 : 150);
   }
+  // British and American spellings are both right
+  var ALT = { favourite: ['favorite'], favorite: ['favourite'] };
   function norm(s) { return s.trim().replace(/[‘’ʼ]/g, "'").replace(/\s+/g, ' ').toLowerCase(); }
   function diff(want, got) { // mark the letters of the right spelling that were wrong or missing
     var w = $('sptFbWord'); if (!w) return;
@@ -322,10 +324,10 @@ unnecessary|Do not buy unnecessary things.|not needed
     if (T.state === 'done') return next();
     var x = T.words[T.at], v = $('sptIn').value;
     if (!skip && !v.trim()) { $('sptFb').className = 'spt-fb'; $('sptFb').textContent = audio ? 'Type the word you heard, then press Check.' : 'Type the word, then press Check.'; $('sptIn').focus(); return; }
-    var ok = !skip && norm(v) === norm(x.w);
+    var ok = !skip && (norm(v) === norm(x.w) || (ALT[norm(x.w)] || []).indexOf(norm(v)) !== -1);
     T.answered++; T.state = 'done';
     var fb = $('sptFb'); fb.textContent = '';
-    if (ok) { T.right++; fb.className = 'spt-fb good'; fb.textContent = '✓ Correct: ' + x.w; $('sptCard').className = 'spt-card ok'; }
+    if (ok) { T.right++; fb.className = 'spt-fb good'; fb.textContent = '✓ Correct: ' + v.trim() + (norm(v) !== norm(x.w) ? ' (also spelled ' + x.w + ')' : ''); $('sptCard').className = 'spt-card ok'; }
     else {
       T.wrong.push({ x: x, got: skip ? '' : v.trim() });
       fb.className = 'spt-fb bad'; $('sptCard').className = 'spt-card no';

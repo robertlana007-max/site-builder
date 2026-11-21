@@ -1038,8 +1038,8 @@ module.exports = [
   },
   {
       slug: 'cgpa-to-percentage', cat: 'Study tools', name: 'CGPA to Percentage Converter',
-      title: 'CGPA to Percentage Converter - CBSE, VTU, Mumbai, Pakistan',
-      desc: 'Convert CGPA to percentage or percentage to CGPA with labelled formulas: 4.0 proportional, CBSE × 9.5, VTU, Mumbai University, Anna University or custom.',
+      title: 'CGPA to Percentage Converter - 4.0, 5.0 & 10-Point Scales',
+      desc: 'Convert CGPA to percentage or percentage to CGPA with labelled formulas: proportional 4.0, 5.0 and 10-point scales, CBSE and Delhi University × 9.5, VTU, GTU, Mumbai, Anna, Pakistan or your own.',
       card: 'CGPA to percentage and back, by formula.',
       intro: 'Convert a CGPA to a percentage, or a percentage to a CGPA, with the formula for your board or university written out next to the result.',
       steps: ['Choose CGPA → Percentage or Percentage → CGPA.', 'Pick the formula for your board or university, or enter a custom one.', 'Type your CGPA or percentage.', 'Read the result and the note about that formula.'],
@@ -1055,7 +1055,7 @@ module.exports = [
   {
       slug: 'marks-percentage-calculator', cat: 'Study tools', name: 'Marks Percentage Calculator',
       title: 'Marks Percentage Calculator - Total & Subject-Wise with Grade',
-      desc: 'Find your marks percentage from total or subject-wise marks, with Pakistan board grades (A1 to E), Indian divisions or your own grade cut-offs.',
+      desc: 'Find your marks percentage from total or subject-wise marks, with letter grades, UK degree classes, Pakistan board grades, Indian divisions or your own grade cut-offs.',
       card: 'Marks to percentage, grade and division.',
       intro: 'Turn your marks into a percentage, overall or subject by subject, and see your grade or division.',
       steps: ['Choose Total marks or Subject-wise.', 'Pick a grade or division scheme.', 'Enter marks obtained and total marks.', 'Read your percentage and grade.'],

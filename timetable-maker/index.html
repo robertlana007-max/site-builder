@@ -257,6 +257,15 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     return 0.2126 * L(r) + 0.7152 * L(g) + 0.0722 * L(b) > 0.4 ? '#111111' : '#ffffff';
   }
 
+  // Chosen days in week order. The week starts after the longest run of days off, so a Sunday-to-Thursday
+  // or Saturday-to-Wednesday school week starts on Sunday or Saturday, and Monday-to-Friday on Monday.
+  function weekOrder(list) {
+    var d = list.slice().sort(function (a, b) { return a - b; });
+    if (d.length < 2 || d.length === 7) return d;
+    var best = 0, gap = -1;
+    for (var i = 0; i < d.length; i++) { var g = (d[i] - d[(i + d.length - 1) % d.length] + 7) % 7; if (g > gap) { gap = g; best = i; } }
+    return d.slice(best).concat(d.slice(0, best));
+  }
   // ---------- state ----------
   var st = { name: '', days: [0, 1, 2, 3, 4], clock: '24', periods: [], classes: [], gen: null };
   function generate(o) {
@@ -312,7 +321,7 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     return occ;
   }
   function draw() {
-    var t = $('ttTable'), days = st.days.slice().sort(), occ = occupancy();
+    var t = $('ttTable'), days = weekOrder(st.days), occ = occupancy();
     t.style.setProperty('--tt-n', Math.max(1, days.length));
     $('ttTitleOut').textContent = st.name;
     var h = '<thead><tr><th class="tt-time" scope="col">Time</th>';
@@ -408,7 +417,8 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
     var oldTeach = st.periods.filter(function (p) { return !p.brk; }), newTeach = ps.filter(function (p) { return !p.brk; }), lost = 0;
     st.classes = st.classes.filter(function (c) { var i = oldTeach.findIndex(function (p) { return p.id === c.pid; }); if (i === -1 || i >= newTeach.length) { lost++; return false; } c.pid = newTeach[i].id; return true; });
     st.periods = ps; st.gen = o; drawPeriods(); draw(); save();
-    say(lost ? 'bad' : 'ok', 'Made ' + newTeach.length + ' periods.' + (lost ? ' ' + lost + (lost === 1 ? ' class was' : ' classes were') + ' removed because their period no longer exists.' : ''));
+    var lastEnd = ps[ps.length - 1].end, full = newTeach.length >= 20 && toMin(o.end) - lastEnd >= Math.max(5, +o.len || 45);
+    say(lost || full ? 'bad' : 'ok', 'Made ' + newTeach.length + ' periods.' + (full ? ' 20 is the most a day can have, so the day now ends at ' + show(lastEnd) + '.' : '') + (lost ? ' ' + lost + (lost === 1 ? ' class was' : ' classes were') + ' removed because their period no longer exists.' : ''));
   });
   $('ttClock').addEventListener('change', function () { st.clock = $('ttClock').value; draw(); save(); });
   $('ttName').addEventListener('input', function () { st.name = $('ttName').value; $('ttTitleOut').textContent = st.name; save(); });
@@ -474,7 +484,7 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
   }
   function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
   function render(scale) {
-    var days = st.days.slice().sort(), occ = occupancy();
+    var days = weekOrder(st.days), occ = occupancy();
     if (!days.length || !st.periods.length) return null;
     var FONT = 'system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif';
     var TW = 120, DW = days.length > 5 ? 170 : 200, HH = 46, RH = 78, BH = 36, PAD = 24, TT = st.name ? 54 : 0;
@@ -593,7 +603,7 @@ table.tt th.tt-time { position: sticky; left: 0; z-index: 1; }
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Timetable Maker</h2><ol class="tut"><li><h3>Name it and pick the days</h3><p>Type a title such as “Class 9B”, then tick the days you need. Monday to Friday are ticked to start with.</p></li><li><h3>Set the times</h3><p>Open “Times and periods”. Enter when the day starts and ends, the period length, and where the short break and lunch go, then click “Make periods from these times”.</p></li><li><h3>Adjust any period</h3><p>In the period list you can rename a row, change its start and end times, tick “Break” to make it a break row, or remove it. Use “+ Add period” and “+ Add break” to add rows at the end.</p></li><li><h3>Add a class</h3><p>Click an empty cell (the + sign). Type the subject, room and teacher, choose a colour and how many periods it lasts, then click “Save”.</p></li><li><h3>Edit or delete</h3><p>Click a class to change it or click “Delete”. Typing a subject you used before fills in its room, teacher and colour.</p></li><li><h3>Download or print</h3><p>Click “Download PNG” for a picture, “Download PDF” for an A4 page, or “Print”.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Any days</b>Choose any days from Monday to Sunday.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Regular or custom periods</b>Generate periods from a start time, end time and length, or set every period by hand.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Break and lunch rows</b>Breaks run across all days and are shown in the picture and PDF.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Double and triple lessons</b>A class can span several periods, up to the next break.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Colours</b>Twelve ready colours plus a colour picker; text stays readable on dark colours.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>PNG, PDF and print</b>A sharp picture, an A4 PDF made on your device, and a clean print layout.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Phone friendly</b>On small screens the table scrolls sideways inside its box, with the times kept in view.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a Monday to Friday school week</h2><p>Keep the start time 08:00, end time 15:00 and period length 45 minutes, with a short break after period 2 for 15 minutes and lunch after period 4 for 45 minutes. Click “Make periods from these times”: you get 8 periods from 08:00–08:45 to 14:15–15:00, a break at 09:30–09:45 and lunch at 11:15–12:00. Click the cell for Monday, Period 1, type “Mathematics”, room “R12”, teacher “Ms Khan”, choose “2 periods (double)” and save. The class now fills 08:00–09:30 on Monday. Add the rest of the week, then click “Download PDF” to get an A4 landscape page.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Set up your periods before adding classes. If you change the times later, classes keep their period number.</li><li>Use the same colour for each subject so the week is easy to read at a glance.</li><li>Switch the clock to 12-hour if you prefer times like 1:30 pm.</li><li>A class cannot run through a break. Add it again after the break instead.</li><li>For printing, choose landscape and turn on “Background graphics” in the print window if colours are missing.</li></ul></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Set up your periods before adding classes. If you change the times later, classes keep their period number.</li><li>School week from Sunday to Thursday, or Saturday to Wednesday? Tick those days and the timetable starts on the first school day of your week.</li><li>Use the same colour for each subject so the week is easy to read at a glance.</li><li>Switch the clock to 12-hour if you prefer times like 1:30 pm.</li><li>A class cannot run through a break. Add it again after the break instead.</li><li>For printing, choose landscape and turn on “Background graphics” in the print window if colours are missing.</li></ul></section>
 <section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>I cannot choose 2 periods</summary><p>The next row is a break or already has a class on that day, or it is the last period. Move or delete the class below first.</p></details><details><summary>Some classes disappeared after I made new periods</summary><p>The new times have fewer periods, so classes in periods that no longer exist were removed. Add more periods or a later end time.</p></details><details><summary>The table is cut off on my phone</summary><p>Swipe the table sideways to see the other days. The downloads always show the whole week.</p></details><details><summary>Colours are missing when I print</summary><p>Your browser is not printing backgrounds. Tick “Background graphics” in the print settings, or download the PDF and print that.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
