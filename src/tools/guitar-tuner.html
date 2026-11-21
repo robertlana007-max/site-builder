@@ -1,0 +1,230 @@
+<style>
+.gt-gauge { position: relative; max-width: 420px; margin: 0 auto; }
+.gt-gauge svg { display: block; width: 100%; height: auto; overflow: visible; }
+.gt-needle { transform-origin: 150px 160px; transition: transform .12s linear; }
+.gt-note { text-align: center; margin: -6px 0 4px; line-height: 1; }
+.gt-note b { font-size: clamp(56px, 15vw, 84px); font-weight: 700; letter-spacing: -.02em; }
+.gt-note sub { font-size: 22px; font-weight: 600; color: var(--muted); vertical-align: baseline; margin-inline-start: 2px; }
+.gt-read { text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; min-height: 1.5em; margin: 6px 0 2px; }
+.gt-tell { text-align: center; font-weight: 700; font-size: 18px; min-height: 1.5em; margin: 0 0 14px; }
+.gt-tell.ok { color: var(--ok); } .gt-tell.off { color: var(--bad); }
+.gt-strings { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; margin: 0 0 6px; }
+.gt-strings button { min-width: 46px; height: 52px; padding: 0 6px; border-radius: 12px; border: 2px solid var(--line); background: var(--bg); color: var(--ink); font: 700 17px/1 inherit; font-family: inherit; cursor: pointer; }
+.gt-strings button small { display: block; font-size: 11px; font-weight: 600; color: var(--muted); margin-top: 3px; }
+.gt-strings button.near { border-color: var(--accent); }
+.gt-strings button.good { border-color: var(--ok); background: color-mix(in srgb, var(--ok) 14%, var(--surface)); }
+.gt-strings button.lock { box-shadow: 0 0 0 3px var(--accent-soft); border-color: var(--accent); }
+.gt-snote { text-align: center; font-size: 13px; color: var(--muted); margin: 0 0 16px; }
+.gt-lvl { height: 6px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 0 auto 14px; max-width: 420px; }
+.gt-lvl i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+</style>
+<div class="notice bad" id="unsup" hidden><p id="unsupText"></p></div>
+<div class="gt-gauge" aria-hidden="true">
+  <svg viewBox="0 0 300 175">
+    <path d="M25 160 A125 125 0 0 1 275 160" fill="none" stroke="var(--line)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M140.2 35.4 A125 125 0 0 1 159.8 35.4" fill="none" stroke="var(--ok)" stroke-width="10"/>
+    <g stroke="var(--muted)" stroke-width="2" id="ticks"></g>
+    <text x="22" y="174" font-size="12" fill="var(--muted)" text-anchor="middle">−50</text>
+    <text x="150" y="22" font-size="12" fill="var(--muted)" text-anchor="middle">0</text>
+    <text x="278" y="174" font-size="12" fill="var(--muted)" text-anchor="middle">+50</text>
+    <g class="gt-needle" id="needle"><line x1="150" y1="160" x2="150" y2="48" stroke="var(--ink)" stroke-width="4" stroke-linecap="round"/></g>
+    <circle cx="150" cy="160" r="9" fill="var(--ink)"/>
+  </svg>
+</div>
+<div class="gt-note" aria-live="polite"><b id="note">–</b><sub id="oct"></sub></div>
+<p class="gt-read" id="read">Press Start tuner and play one string.</p>
+<p class="gt-tell" id="tell"></p>
+<div class="gt-lvl" title="Microphone level"><i id="lvl"></i></div>
+<div class="gt-strings" id="strings"></div>
+<p class="gt-snote" id="snote">The string you play is found automatically. Tap a string to lock it and hear its note.</p>
+<div class="btns" style="margin:0 0 16px"><button class="btn" id="go" type="button">🎤 Start tuner</button></div>
+<div class="fields">
+  <div><label for="tuning">Instrument and tuning</label><select id="tuning">
+    <optgroup label="Guitar">
+      <option value="std">Guitar: Standard (E A D G B E)</option>
+      <option value="dropd">Guitar: Drop D (D A D G B E)</option>
+      <option value="half">Guitar: Half step down (E♭ A♭ D♭ G♭ B♭ E♭)</option>
+      <option value="dstd">Guitar: Full step down (D G C F A D)</option>
+      <option value="dropc">Guitar: Drop C (C G C F A D)</option>
+      <option value="openg">Guitar: Open G (D G D G B D)</option>
+      <option value="opend">Guitar: Open D (D A D F♯ A D)</option>
+      <option value="opene">Guitar: Open E (E B E G♯ B E)</option>
+      <option value="dadgad">Guitar: DADGAD</option>
+    </optgroup>
+    <optgroup label="Other instruments">
+      <option value="bass4">Bass: 4-string (E A D G)</option>
+      <option value="bass5">Bass: 5-string (B E A D G)</option>
+      <option value="uke">Ukulele (G C E A)</option>
+      <option value="violin">Violin (G D A E)</option>
+    </optgroup>
+    <optgroup label="Any note">
+      <option value="chrom">Chromatic (any instrument or voice)</option>
+    </optgroup>
+  </select></div>
+  <div><label for="a4">Reference pitch A4 (Hz)</label><input type="number" id="a4" min="415" max="466" step="1" value="440" inputmode="numeric"></div>
+</div>
+<p class="msg" id="msg">The sound is analysed on your device. Nothing is recorded or uploaded.</p>
+<script>
+(function () {
+  var md = navigator.mediaDevices, AC = window.AudioContext || window.webkitAudioContext;
+  var N = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+  var FLAT = { 'C♯': 'D♭', 'D♯': 'E♭', 'F♯': 'G♭', 'G♯': 'A♭', 'A♯': 'B♭' };
+  // strings as MIDI note numbers, low to high
+  var T = {
+    std: [40, 45, 50, 55, 59, 64], dropd: [38, 45, 50, 55, 59, 64], half: [39, 44, 49, 54, 58, 63], dstd: [38, 43, 48, 53, 57, 62],
+    dropc: [36, 43, 48, 53, 57, 62], openg: [38, 43, 50, 55, 59, 62], opend: [38, 45, 50, 54, 57, 62], opene: [40, 47, 52, 56, 59, 64],
+    dadgad: [38, 45, 50, 55, 57, 62], bass4: [28, 33, 38, 43], bass5: [23, 28, 33, 38, 43], uke: [67, 60, 64, 69], violin: [55, 62, 69, 76], chrom: []
+  };
+  var stream = null, actx = null, an = null, buf = null, timer = null, hist = [], lock = null, tone = null, quiet = 0, starting = false;
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t; }
+  function a4() { var v = +$('a4').value; return v >= 415 && v <= 466 ? v : 440; }
+  function freqOf(m) { return a4() * Math.pow(2, (m - 69) / 12); }
+  function nameOf(m, flat) { var n = N[((m % 12) + 12) % 12]; return flat && FLAT[n] ? FLAT[n] : n; }
+  function octOf(m) { return Math.floor(m / 12) - 1; }
+  function unsupported(t) { $('unsup').hidden = false; $('unsupText').textContent = t; $('go').disabled = true; }
+  if (!window.isSecureContext) unsupported('The microphone only works on a secure (https) page. Open this tool from its https:// address.');
+  else if (!md || !md.getUserMedia || !AC) unsupported('This browser cannot use the microphone. Update it, or try Chrome, Edge, Firefox or Safari.');
+
+  // gauge ticks
+  (function () {
+    var g = $('ticks'), s = '';
+    for (var c = -50; c <= 50; c += 10) { var a = c / 50 * 70 * Math.PI / 180, x1 = 150 + Math.sin(a) * 112, y1 = 160 - Math.cos(a) * 112, x2 = 150 + Math.sin(a) * (c % 50 ? 104 : 98), y2 = 160 - Math.cos(a) * (c % 50 ? 104 : 98); s += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) + '" y2="' + y2.toFixed(1) + '"/>'; }
+    g.innerHTML = s;
+  })();
+  function needle(c) { $('needle').style.transform = 'rotate(' + (Math.max(-50, Math.min(50, c)) / 50 * 70).toFixed(1) + 'deg)'; }
+
+  function flatTuning() { return $('tuning').value === 'half'; }
+  function drawStrings() {
+    var list = T[$('tuning').value] || [], box = $('strings');
+    box.innerHTML = ''; lock = null;
+    $('snote').hidden = !list.length;
+    $('snote').textContent = 'The string you play is found automatically. Tap a string to lock it and hear its note.';
+    list.forEach(function (m, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.m = m;
+      b.innerHTML = '';
+      b.appendChild(document.createTextNode(nameOf(m, flatTuning())));
+      var sm = document.createElement('small'); sm.textContent = octOf(m); b.appendChild(sm);
+      b.setAttribute('aria-label', 'String ' + (list.length - i) + ': ' + nameOf(m, flatTuning()) + octOf(m) + ', ' + freqOf(m).toFixed(1) + ' hertz. Tap to lock and hear it.');
+      b.addEventListener('click', function () {
+        lock = lock === m ? null : m;
+        Array.prototype.forEach.call(box.children, function (x) { x.classList.toggle('lock', +x.dataset.m === lock); });
+        if (lock != null) play(m);
+        $('snote').textContent = lock != null ? 'Locked to ' + nameOf(m, flatTuning()) + octOf(m) + ' (' + freqOf(m).toFixed(1) + ' Hz). Tap it again to go back to automatic.' : 'The string you play is found automatically. Tap a string to lock it and hear its note.';
+      });
+      box.appendChild(b);
+    });
+  }
+  $('tuning').addEventListener('change', function () { drawStrings(); hist = []; });
+  $('a4').addEventListener('change', function () { if (!(+$('a4').value >= 415 && +$('a4').value <= 466)) $('a4').value = 440; drawStrings(); });
+
+  // a reference note: a plucked-sounding tone for 2 seconds
+  function play(m) {
+    if (!AC) return;
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    if (tone) { try { tone.stop(); } catch (e) {} }
+    var t = actx.currentTime, o = actx.createOscillator(), g = actx.createGain(), lp = actx.createBiquadFilter();
+    o.type = 'sawtooth'; o.frequency.value = freqOf(m); lp.type = 'lowpass'; lp.frequency.value = Math.min(4000, freqOf(m) * 6);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.3, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 2);
+    o.connect(lp); lp.connect(g); g.connect(actx.destination); o.start(t); o.stop(t + 2.05); tone = o;
+    hist = []; quiet = 0;
+  }
+
+  // ---------- pitch detection (YIN) ----------
+  var yb = null;
+  function yin(x, sr, fmin, fmax) {
+    var maxT = Math.min(Math.floor(sr / fmin), x.length >> 1), minT = Math.max(2, Math.floor(sr / fmax)), W = Math.min(2048, x.length - maxT);
+    if (!yb || yb.length < maxT + 2) yb = new Float32Array(maxT + 2);
+    var d = yb, sum = 0, tau, best = -1;
+    d[0] = 1;
+    for (tau = 1; tau <= maxT; tau++) {
+      var s = 0;
+      for (var i = 0; i < W; i++) { var v = x[i] - x[i + tau]; s += v * v; }
+      sum += s; d[tau] = sum ? s * tau / sum : 1;
+    }
+    for (tau = minT; tau < maxT; tau++) {
+      if (d[tau] < 0.12) { while (tau + 1 < maxT && d[tau + 1] < d[tau]) tau++; best = tau; break; }
+    }
+    if (best < 0) { // no clear dip: take the deepest one if it is good enough
+      var m = 1; for (tau = minT; tau < maxT; tau++) if (d[tau] < m) { m = d[tau]; best = tau; }
+      if (m > 0.3) return { f: 0, clarity: 0 };
+    }
+    var a = d[best - 1], b = d[best], c = d[best + 1], den = a + c - 2 * b, shift = den ? (a - c) / (2 * den) : 0;
+    if (Math.abs(shift) > 1) shift = 0;
+    return { f: sr / (best + shift), clarity: 1 - b };
+  }
+  function median(a) { var s = a.slice().sort(function (p, q) { return p - q; }); return s[s.length >> 1]; }
+  function frame() {
+    an.getFloatTimeDomainData(buf);
+    var rms = 0; for (var i = 0; i < buf.length; i++) rms += buf[i] * buf[i]; rms = Math.sqrt(rms / buf.length);
+    $('lvl').style.width = Math.min(100, Math.round(Math.max(0, (20 * Math.log10(rms + 1e-9) + 60) / 60 * 100))) + '%';
+    var tuning = $('tuning').value, low = /bass/.test(tuning) ? 25 : tuning === 'chrom' ? 30 : 55, high = tuning === 'chrom' ? 2000 : tuning === 'violin' || tuning === 'uke' ? 1500 : 1000;
+    var r = rms > 0.006 ? yin(buf, actx.sampleRate, low, high) : { f: 0 };
+    if (!r.f) { if (++quiet > 12) { hist = []; show(null); } return; }
+    quiet = 0;
+    hist.push(r.f); if (hist.length > 5) hist.shift();
+    // a big jump means a new string: start fresh
+    var med = median(hist);
+    if (Math.abs(1200 * Math.log2(r.f / med)) > 80) { hist = [r.f]; med = r.f; }
+    show(med);
+  }
+  function show(f) {
+    var kids = $('strings').children;
+    if (!f) {
+      $('note').textContent = '–'; $('oct').textContent = ''; $('read').textContent = stream ? 'Listening… play one string.' : 'Press Start tuner and play one string.';
+      $('tell').textContent = ''; $('tell').className = 'gt-tell'; needle(0);
+      for (var k = 0; k < kids.length; k++) kids[k].classList.remove('near', 'good');
+      return;
+    }
+    var midi = 69 + 12 * Math.log2(f / a4()), list = T[$('tuning').value], target;
+    if (lock != null) target = lock;
+    else if (list.length) { target = list[0]; list.forEach(function (m) { if (Math.abs(midi - m) < Math.abs(midi - target)) target = m; }); }
+    else target = Math.round(midi);
+    var cents = (midi - target) * 100;
+    $('note').textContent = nameOf(target, flatTuning()); $('oct').textContent = octOf(target);
+    $('read').textContent = f.toFixed(1) + ' Hz · target ' + freqOf(target).toFixed(1) + ' Hz · ' + (cents >= 0 ? '+' : '−') + Math.abs(cents).toFixed(0) + ' cents';
+    needle(cents);
+    var good = Math.abs(cents) <= 5, el = $('tell');
+    if (Math.abs(cents) > 300 && list.length) { el.textContent = 'Far from ' + nameOf(target, flatTuning()) + ' — is this the right string?'; el.className = 'gt-tell off'; }
+    else { el.textContent = good ? '✓ In tune' : cents < 0 ? '↑ Too low: tighten (tune up)' : '↓ Too high: loosen (tune down)'; el.className = 'gt-tell ' + (good ? 'ok' : 'off'); }
+    for (var j = 0; j < kids.length; j++) { var on = +kids[j].dataset.m === target; kids[j].classList.toggle('near', on && !good); kids[j].classList.toggle('good', on && good); }
+  }
+
+  // ---------- microphone ----------
+  function why(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Microphone access was blocked. Click the lock or microphone icon next to the web address, allow the microphone, then press Start tuner again. On a phone, also check that your browser may use the microphone in the phone settings.';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No microphone was found. Plug one in, or check that your headset is connected, then try again.';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'The microphone is busy or could not start. Close other apps or tabs that use it (calls, recorders), then try again.';
+    if (n === 'NotSupportedError' || n === 'TypeError') return 'This browser cannot open the microphone on this page. Make sure the page address starts with https://, or try another browser.';
+    return 'The microphone could not start' + (e && e.message ? ': ' + e.message : '.');
+  }
+  function stop() {
+    clearInterval(timer); timer = null;
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; hist = []; show(null); $('lvl').style.width = '0';
+    $('go').textContent = '🎤 Start tuner'; say('', 'Tuner stopped. The microphone is off.');
+  }
+  $('go').addEventListener('click', function () {
+    if (stream) return stop();
+    if (starting) return;
+    starting = true;
+    if (!actx) actx = new AC();
+    var r = actx.resume ? actx.resume() : null;
+    say('', 'Asking for the microphone… allow it when your browser asks.');
+    md.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false } }).then(function (s) {
+      starting = false; stream = s;
+      var src = actx.createMediaStreamSource(s);
+      an = actx.createAnalyser(); an.fftSize = 4096; buf = new Float32Array(an.fftSize);
+      src.connect(an);
+      s.getAudioTracks().forEach(function (t) { t.addEventListener('ended', function () { if (stream === s) { stop(); say('bad', 'The microphone was disconnected. Press Start tuner to try again.'); } }); });
+      timer = setInterval(frame, 50);
+      $('go').textContent = '■ Stop tuner'; show(null);
+      say('', 'Listening. Play one string at a time and let it ring. Keep the phone or computer close to the guitar.');
+      if (r && r.catch) r.catch(function () {});
+    }, function (e) { starting = false; say('bad', why(e)); });
+  });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && stream && actx.state === 'suspended') actx.resume(); });
+  drawStrings();
+})();
+</script>

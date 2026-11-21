@@ -2503,5 +2503,175 @@ module.exports = [
     [ 'Is it the same as a khata book?', 'Yes. It works like a simple khata or IOU notebook for personal and small shop credit.' ]
   ],
       icon: '<path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M18 8h2v12h-2"/><path d="M8 9h6M8 13h6"/><path d="M8 17l2-2M10 17l-2-2"/>'
+  },
+  {
+    slug: 'audio-cutter', cat: 'Media tools', name: 'Audio Cutter',
+    title: 'Audio Cutter - Cut MP3 & Make Ringtones Online Free',
+    desc: 'Cut any song or audio file on a waveform, add fade in and fade out, and save as MP3, WAV or iPhone M4R ringtone. Works in your browser, no upload.',
+    card: 'Cut songs and make ringtones with fades.',
+    intro: 'Open a song, drag the start and end on its waveform, add a gentle fade in and fade out, and save the part you want as an MP3, WAV or iPhone ringtone. Everything happens on your own device.',
+    steps: ['Click the box or drop a song, voice note or video onto it.', 'Drag the edges on the waveform, or type the start and end times. Press Play selection to listen.', 'Choose the fade in, fade out and the format: MP3, M4R (iPhone ringtone) or WAV.', 'Press Cut and save, then Download.'],
+    faq: [
+      ['Is my song uploaded?', 'No. The file is opened and cut inside your browser, so it never leaves your phone or computer.'],
+      ['How do I make a ringtone?', 'Open the song, press "Ringtone: 30 seconds" and drag the highlighted part to your favourite section. Save as MP3 for Android, or as M4R for iPhone.'],
+      ['How do I put the M4R ringtone on my iPhone?', 'Connect the iPhone to a computer and drag the M4R file onto it in Finder (Mac) or Apple Devices / iTunes (Windows). Then choose it in Settings, Sounds & Haptics, Ringtone. iPhone ringtones can be at most 40 seconds.'],
+      ['Which files can I open?', 'MP3, M4A, WAV, OGG, FLAC and the sound of videos such as MP4 and WebM, as long as your browser can decode the sound. Chrome and Edge open the most formats.'],
+      ['Does cutting lower the quality?', 'WAV keeps the exact quality. MP3 and M4R are compressed again; at 192 kbps or more the difference is very hard to hear.'],
+      ['Is there a length limit?', 'Files up to 1 GB are accepted, but the whole sound is held in memory, so very long recordings can be slow on a phone.']
+    ],
+    icon: '<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M20 4L8.12 15.88M14.47 14.48L20 20M8.12 8.12L12 12"/>'
+  },
+  {
+    slug: 'audio-converter', cat: 'Media tools', name: 'Audio Converter',
+    title: 'Audio Converter - MP3, WAV, M4A, OGG, FLAC Online Free',
+    desc: 'Convert audio files to MP3, WAV, M4A (AAC), OGG or FLAC. Choose the bitrate, convert many files at once and download a ZIP. Runs in your browser.',
+    card: 'Convert audio to MP3, WAV, M4A, OGG or FLAC.',
+    intro: 'Convert songs, voice notes and recordings between MP3, WAV, M4A (AAC), OGG and FLAC. Add many files at once, pick the quality, and download each file or all of them as a ZIP. Nothing is uploaded.',
+    steps: ['Click the box or drop one or more audio or video files onto it.', 'Choose the format to convert to and the quality.', 'Optionally change the channels (stereo or mono) and sample rate.', 'Press Convert, then download each file or all of them as a ZIP.'],
+    faq: [
+      ['Are my files uploaded?', 'No. The files are converted inside your browser by a WebAssembly build of FFmpeg, so they stay on your device.'],
+      ['Which formats can I convert from?', 'MP3, WAV, M4A, AAC, OGG, OPUS, FLAC, WMA, AMR, AIFF and the sound of videos such as MP4, MOV, MKV and WebM.'],
+      ['Which format should I choose?', 'MP3 plays everywhere. M4A (AAC) sounds a little better at the same size and suits iPhone and Apple Music. FLAC and WAV keep the full quality; FLAC files are about half the size of WAV.'],
+      ['Can I convert many files at once?', 'Yes, up to 50 files at a time. They are converted one after another, and you can download them all as one ZIP.'],
+      ['Why is the first conversion slow?', 'The converter engine (about 32 MB) downloads the first time you use it. After that your browser keeps it, so it starts quickly.'],
+      ['Does converting MP3 to WAV or FLAC improve quality?', 'No. It only makes a bigger file without loss from now on; detail already removed by MP3 cannot come back.']
+    ],
+    icon: '<path d="M4 7h12l-3-3M20 17H8l3 3"/><circle cx="19" cy="7" r="2"/><circle cx="5" cy="17" r="2"/>'
+  },
+  {
+    slug: 'merge-videos', cat: 'Media tools', name: 'Merge Videos',
+    title: 'Merge Videos Online - Join MP4 Clips Free, No Upload',
+    desc: 'Join several video clips into one MP4 in the order you choose. Clips of different sizes are fitted automatically. Free, private, runs in your browser.',
+    card: 'Join several video clips into one video.',
+    intro: 'Put several video clips together into one video. Set the order, choose the size, and the clips are joined into a single MP4 on your own device. Matching clips can be joined in seconds without losing quality.',
+    steps: ['Click the box or drop two or more video clips onto it.', 'Use the arrows to put the clips in the right order.', 'Choose the video size and how clips of a different shape should fit.', 'Press Merge videos, then Download.'],
+    faq: [
+      ['Are my videos uploaded?', 'No. The clips are joined inside your browser with a WebAssembly build of FFmpeg, so they never leave your device.'],
+      ['Can I join clips of different sizes or formats?', 'Yes. Every clip is resized to the size you choose, with black bars or a slight crop for clips of a different shape, and the result is one standard MP4.'],
+      ['What is fast join?', 'When all clips have the same format, size and frame rate (for example clips from the same phone), they can be joined end to end without re-encoding. This takes seconds and keeps the exact quality.'],
+      ['How long does merging take?', 'Re-encoding runs on your device, so it depends on its speed. A minute of 720p video often takes one to three minutes on a computer, longer on a phone or at 1080p.'],
+      ['Is there a size limit?', 'Up to 20 clips and 1 GB in total, because everything has to fit in your browser\'s memory.'],
+      ['What happens to clips without sound?', 'Silence is added for those clips, so the sound of the other clips stays in sync.']
+    ],
+    icon: '<rect x="2" y="6" width="8" height="12" rx="1"/><rect x="14" y="6" width="8" height="12" rx="1"/><path d="M10 12h4"/>'
+  },
+  {
+    slug: 'video-speed-changer', cat: 'Media tools', name: 'Video Speed Changer',
+    title: 'Video Speed Changer - Speed Up or Slow Down Video Free',
+    desc: 'Make a video faster or slower, from 0.25x slow motion to 4x, and keep the normal voice pitch. Save as MP4. Free, private, runs in your browser.',
+    card: 'Speed up or slow down a video, 0.25x to 4x.',
+    intro: 'Speed up a long video or make slow motion from 0.25x to 4x. The sound changes speed too, and keeps its normal pitch so voices do not sound like chipmunks. The new video is saved as an MP4 on your device.',
+    steps: ['Click the box or drop a video onto it.', 'Pick a speed such as 0.5x or 2x, or type your own between 0.25 and 4.', 'Choose what happens to the sound, and check the speed in the player.', 'Press Change speed, then Download.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The video is processed in your browser with a WebAssembly build of FFmpeg and never leaves your device.'],
+      ['Does the voice sound strange when sped up?', 'Not by default. "Keep the normal voice pitch" changes the speed without making voices higher or lower. Choose "Change speed and pitch" if you want the chipmunk or deep-voice effect.'],
+      ['Which speeds can I use?', 'Any speed from 0.25x (four times slower) to 4x (four times faster), for example 0.5, 1.25 or 1.75.'],
+      ['Is slow motion smooth?', 'Frames are repeated to slow the video down, so very slow speeds can look a little steppy, especially if the video was not filmed at a high frame rate.'],
+      ['How long does it take?', 'The video is re-encoded on your device, which often takes about as long as the new video plays, more on a phone.'],
+      ['Is there a size limit?', 'Videos up to 1 GB. The video engine (about 32 MB) downloads the first time you use any of the video tools. After that your browser keeps it, so it starts quickly.']
+    ],
+    icon: '<path d="M12 14l4-4"/><path d="M3.34 19a10 10 0 1 1 17.32 0"/>'
+  },
+  {
+    slug: 'mute-video', cat: 'Media tools', name: 'Mute Video',
+    title: 'Mute Video - Remove Audio from Video Online Free',
+    desc: 'Remove the sound from an MP4, MOV, WebM or MKV video in seconds without losing quality. Free, private and runs in your browser, no upload.',
+    card: 'Remove the sound from a video in seconds.',
+    intro: 'Take the sound track out of a video and keep the picture exactly as it is. The video is copied without re-encoding, so it takes only seconds and the quality does not change. Nothing is uploaded.',
+    steps: ['Click the box or drop a video onto it.', 'Keep "Fast, no quality loss" (or choose a standard MP4).', 'Press Remove sound.', 'Download your silent video.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The sound is removed inside your browser, so the video never leaves your device.'],
+      ['Does removing the sound reduce the quality?', 'No. In fast mode the picture is copied exactly as it is, without re-encoding.'],
+      ['Which formats work?', 'MP4, MOV, M4V, WebM, MKV, AVI, 3GP and more. Fast mode keeps the same format; if that is not possible, a standard MP4 is made instead.'],
+      ['Why is the silent file smaller?', 'The sound track is part of the file size. Removing it makes the file a little smaller.'],
+      ['Can I remove only part of the sound?', 'Not with this tool. To keep only part of a video without sound, use the Video Trimmer and tick "Remove sound".'],
+      ['Is there a size limit?', 'Videos up to 1 GB. The video engine (about 32 MB) downloads the first time you use any of the video tools. After that your browser keeps it, so it starts quickly.']
+    ],
+    icon: '<polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="22" y1="9" x2="16" y2="15"/><line x1="16" y1="9" x2="22" y2="15"/>'
+  },
+  {
+    slug: 'rotate-video', cat: 'Media tools', name: 'Rotate Video',
+    title: 'Rotate Video Online - Turn 90°, 180° or Flip Free',
+    desc: 'Rotate a sideways or upside-down video by 90 or 180 degrees, or mirror and flip it. Preview first, save as MP4. Free and private, no upload.',
+    card: 'Turn a sideways video upright or mirror it.',
+    intro: 'Fix a video that was filmed sideways or upside down, or mirror it. See the result before you save, then download it as an MP4 that plays the right way up everywhere. Nothing is uploaded.',
+    steps: ['Click the box or drop a video onto it.', 'Choose 90° right, 90° left, upside down, mirror or flip, and check the preview.', 'Press Rotate video.', 'Download the turned video.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The video is turned inside your browser, so it never leaves your device.'],
+      ['Which way should I turn it?', 'Look at the preview: it shows the result before you save. Choose 90° right if the top of the picture is on the left, and 90° left if it is on the right.'],
+      ['What is the difference between mirror and flip?', 'Mirror swaps left and right, like a selfie camera. Flip turns the picture upside down as if seen in a lake, without swapping left and right.'],
+      ['Does it lose quality?', 'The video is re-encoded to MP4. With "Good" or "High" quality the difference is very hard to see.'],
+      ['Will it play the right way on every device?', 'Yes. The picture itself is turned, not just a rotation flag, so all players show it the same way.'],
+      ['How long does it take?', 'About as long as the video plays on a computer, longer on a phone. The video engine (about 32 MB) downloads the first time you use any of the video tools. After that your browser keeps it, so it starts quickly.']
+    ],
+    icon: '<path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"/><path d="M21 3v5h-5"/><rect x="8" y="9" width="8" height="6" rx="1"/>'
+  },
+  {
+    slug: 'video-to-images', cat: 'Media tools', name: 'Video to Images',
+    title: 'Video to Images - Extract Frames as JPG or PNG Free',
+    desc: 'Save frames from a video as JPG or PNG pictures: one every few seconds, a set number, or at the exact times you choose. Download all as ZIP. No upload.',
+    card: 'Save video frames as JPG or PNG pictures.',
+    intro: 'Turn moments of a video into pictures. Take a frame every few seconds, a set number spread over the video, or at the exact times you choose, as JPG or PNG. Download one picture or all of them as a ZIP. Nothing is uploaded.',
+    steps: ['Click the box or drop a video onto it.', 'Choose which pictures: every few seconds, a set number, or at times you choose.', 'Pick JPG or PNG and the picture size.', 'Press Get pictures, then tap a picture or download them all as a ZIP.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The pictures are taken inside your browser, so the video never leaves your device.'],
+      ['What quality are the pictures?', 'Each picture is a full frame at the size of the video (or smaller if you choose). PNG is an exact copy of the frame; JPG is much smaller and looks almost the same.'],
+      ['How many pictures can I take?', 'Up to 300 at a time. For more, run it again on another part of the video.'],
+      ['How do I get a picture at an exact moment?', 'Choose "At times I choose", play the video, pause at the moment you want and press "Add the player\'s current time". Repeat for each picture.'],
+      ['Why are some pictures blurry?', 'Frames from fast movement are often blurred in the video itself. Try a time a fraction of a second earlier or later.'],
+      ['Which video formats work?', 'Anything your browser can play is handled instantly. Other formats such as some MKV or AVI files use the video engine, which downloads once (about 32 MB) and is slower.']
+    ],
+    icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5"/>'
+  },
+  {
+    slug: 'metronome', cat: 'Media tools', name: 'Metronome',
+    title: 'Online Metronome - Free, Accurate, With Tap Tempo',
+    desc: 'A free, accurate online metronome from 20 to 300 BPM with tap tempo, time signatures, accents, subdivisions, sounds and a visual beat. Works on phones.',
+    card: 'Keep time with an accurate metronome.',
+    intro: 'Practise in time with an accurate metronome. Set the tempo from 20 to 300 BPM or tap it, choose the time signature, accent the first beat, add subdivisions, and follow the lit-up beat on screen.',
+    steps: ['Set the tempo with the slider, the − and + buttons, the box, or Tap tempo.', 'Choose the time signature and, if you like, clicks between beats.', 'Tap a beat circle to make it accented, normal or silent.', 'Press Start (or the space bar) and play along.'],
+    faq: [
+      ['How accurate is this metronome?', 'Very accurate. The clicks are scheduled on your device\'s audio clock in advance, not with an ordinary timer, so they stay steady even when the page is busy.'],
+      ['How does tap tempo work?', 'Tap the "Tap tempo" button in time with the music at least twice. The tempo is the average of your last few taps.'],
+      ['Can I use it on my phone?', 'Yes. On iPhone, turn off silent mode, otherwise the clicks are muted. The screen is kept awake while it plays where the browser allows it.'],
+      ['What do the beat circles do?', 'They light up on each beat. Tap one to change it between accented (louder, higher), normal and silent, for example to practise with gaps.'],
+      ['What are clicks between beats?', 'Subdivisions: quieter clicks that split each beat into 2 (eighth notes), 3 (triplets) or 4 (sixteenth notes).'],
+      ['How does 6/8 work?', 'Each click is an eighth note. Beats 1 and 4 are accented so you feel the two main pulses of the bar.']
+    ],
+    icon: '<path d="M9 3h6l4 18H5z"/><path d="M12 16l5-10"/><path d="M7.5 14h9"/>'
+  },
+  {
+    slug: 'guitar-tuner', cat: 'Media tools', name: 'Guitar Tuner',
+    title: 'Online Guitar Tuner - Free Tuner With Microphone',
+    desc: 'Tune your guitar with your microphone: standard, Drop D and other tunings, bass, ukulele, violin and a chromatic mode. See the note and cents live.',
+    card: 'Tune a guitar, bass or ukulele with your mic.',
+    intro: 'Tune your guitar using your phone or computer microphone. Play a string and see the note, how many cents it is off, and whether to tune up or down. Standard and alternate tunings, bass, ukulele, violin and a chromatic mode are included.',
+    steps: ['Press Start tuner and allow the microphone.', 'Choose your instrument and tuning.', 'Play one string and let it ring.', 'Turn the peg until the needle is in the green and it says In tune.'],
+    faq: [
+      ['Is the sound from my microphone recorded or uploaded?', 'No. The sound is analysed live on your device and is never recorded or sent anywhere.'],
+      ['Which tunings are included?', 'Guitar standard, Drop D, half step down, full step down, Drop C, Open G, Open D, Open E and DADGAD; 4 and 5 string bass; ukulele; violin; and a chromatic mode for any note.'],
+      ['What does "cents" mean?', 'A cent is one hundredth of a semitone. Within 5 cents of the target sounds in tune to almost everyone.'],
+      ['The tuner shows the wrong string', 'It picks the string closest to the note it hears. If a string is very far out of tune, tap the string you are tuning to lock it.'],
+      ['Can I hear the right note?', 'Yes. Tap a string button to hear its reference note for two seconds.'],
+      ['What is the reference pitch?', 'Most music uses A4 = 440 Hz. Change it if you play with a piano or band tuned slightly differently, for example 432 or 442 Hz.']
+    ],
+    icon: '<path d="M19 3l2 2-5.5 5.5"/><path d="M13.5 8.5a4 4 0 0 0-5.6.4L4 13a3.5 3.5 0 0 0 0 5l2 2a3.5 3.5 0 0 0 5 0l4.1-3.9a4 4 0 0 0 .4-5.6z"/><circle cx="9.5" cy="14.5" r="1.5"/>'
+  },
+  {
+    slug: 'speech-to-text', cat: 'Media tools', name: 'Speech to Text',
+    title: 'Speech to Text Online - Free Voice Typing, 90+ Languages',
+    desc: 'Type with your voice in English, Urdu, Hindi, Arabic, Spanish, French, Chinese and 90+ languages. Live transcript, punctuation, copy and save as TXT.',
+    card: 'Type with your voice in 90+ languages.',
+    intro: 'Speak and watch your words appear as text. Choose from over 90 languages and accents, including English, Urdu, Hindi, Arabic, Spanish, French, Chinese and Bengali. Add punctuation, edit the text, then copy it or save it as a TXT file.',
+    steps: ['Choose the language you will speak.', 'Press Start dictation and allow the microphone.', 'Speak clearly; your words appear in the box. Add punctuation with your voice (English) or the buttons.', 'Press Stop, edit if needed, then Copy text or Download .txt.'],
+    faq: [
+      ['Which browsers does it work in?', 'Chrome and Edge on computers and Android phones, and Safari on Mac, iPhone and iPad. Firefox does not support speech recognition yet.'],
+      ['Which languages can I use?', 'More than 90 languages and regional accents, including English, Spanish, French, German, Portuguese, Arabic, Urdu, Hindi, Bengali, Chinese, Japanese, Russian, Indonesian and Turkish. The list starts with your browser\'s language.'],
+      ['Is my voice sent anywhere?', 'Your browser\'s speech service turns speech into text: Chrome uses Google, Edge uses Microsoft and Safari uses Apple, so an internet connection is needed. This website does not receive or store your voice or text.'],
+      ['How do I add commas and full stops?', 'In English, say "comma", "full stop" or "period", "question mark", "new line" or "new paragraph". In any language you can tap the punctuation buttons, including ۔ ، ؟ for Urdu and । for Hindi.'],
+      ['Why does it stop by itself?', 'Browsers end listening after a pause. The tool starts listening again automatically until you press Stop, or stops after a long silence.'],
+      ['Can I edit the text?', 'Yes. The text box is a normal text area: click anywhere to fix words while you dictate or afterwards.']
+    ],
+    icon: '<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/><path d="M8 21h8"/>'
   }
 ];
