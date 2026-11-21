@@ -8,6 +8,8 @@
 // Variables and secrets (Cloudflare → Workers → gettoolnest-pay → Settings → Variables and Secrets):
 //   PAYMEGATE_API_KEY     (Secret)  merchant API key (pmg_test_… for sandbox, live key later). Sent as X-API-Key.
 //   PAYMEGATE_SECRET_KEY  (Secret)  optional: the webhook signingSecret (only if you set up a webhook).
+//   TELEGRAM_BOT_TOKEN    (Secret)  optional: your Telegram bot token, for a phone message on every gift.
+//   TELEGRAM_CHAT_ID      (Text)    optional: your Telegram chat id (where the message goes).
 //   PAYMEGATE_METHODS     (Text)    optional: comma-separated payment method keys, e.g. "stripe".
 //                                   Leave empty for the card methods in CARD_METHODS. See GET /methods below.
 //
@@ -57,6 +59,7 @@ export default {
     if (url.pathname === '/webhook' && request.method === 'POST') return webhook(request, env);
     if (url.pathname === '/methods' && request.method === 'GET') return listMethods(env);
     if (url.pathname === '/status' && request.method === 'GET') return orderStatus(url, env, origin);
+    if (url.pathname === '/notify-test' && request.method === 'GET') return notifyTest(url, env);
     if (request.method !== 'POST' || url.pathname !== '/checkout') return json({ error: 'Not found' }, 404, origin);
     if (!ALLOWED_ORIGINS.includes(origin)) return json({ error: 'This address only works from gettoolnest.xyz.' }, 403, origin);
     if (!env.PAYMEGATE_API_KEY) return json({ error: 'Card payments are not set up yet.' }, 503, origin);
@@ -134,9 +137,9 @@ async function listMethods(env) {
   return new Response(text, { status: res.status, headers: { 'Content-Type': 'application/json' } });
 }
 
-// POST /webhook: optional. PayMeGate sends "order.paid" here once you register
-// https://<worker>/webhook (needs a key with the webhooks:write permission).
-// Donations need no delivery, so this only checks the signature and logs the payment.
+// POST /webhook: PayMeGate sends a signed "order.paid" event here (set the webhook URL to
+// https://<worker>/webhook in PayMeGate). The Worker checks the signature, reads the order,
+// and sends the owner a Telegram message: who gave, how much, and when.
 async function webhook(request, env) {
   const raw = await request.text();
   if (!env.PAYMEGATE_SECRET_KEY) return new Response('Webhook secret not set', { status: 503 });
@@ -148,10 +151,65 @@ async function webhook(request, env) {
   const mac = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(ts + '.' + raw)));
   const expected = btoa(String.fromCharCode(...mac)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
   if (!timingSafeEqual(sig.trim(), expected)) return new Response('Bad signature', { status: 401 });
+
   let evt = {};
   try { evt = JSON.parse(raw); } catch (e) {}
-  console.log('PayMeGate webhook', request.headers.get('X-Paymegate-Event-Id') || '', evt.type || evt.event || '', raw.slice(0, 500));
+  const type = String(evt.type || evt.event || evt.eventType || '');
+  console.log('PayMeGate webhook', request.headers.get('X-Paymegate-Event-Id') || '', type, raw.slice(0, 500));
+  if (!/paid/i.test(type)) return new Response('ok');
+
+  // Take the details from the event, then ask PayMeGate for the full order (more reliable).
+  const d = evt.data || evt.payload || evt;
+  let order = d.order || d;
+  const id = order.orderUUID || order.uuid || order.id || d.orderUUID || '';
+  if (id && env.PAYMEGATE_API_KEY) {
+    try {
+      const r = await fetch(API + '/v1/orders/' + encodeURIComponent(id), { headers: { 'Accept': 'application/json', 'X-API-Key': env.PAYMEGATE_API_KEY } });
+      if (r.ok) { const j = await r.json(); const o = (j.data && (j.data.order || j.data)) || j; if (o && typeof o === 'object') order = Object.assign({}, order, o); }
+    } catch (e) {}
+  }
+  await notifyOwner(env, giftText(order, id));
   return new Response('ok');
+}
+
+function giftText(o, id) {
+  const c = o.customer || {};
+  const amount = o.amount != null ? o.amount : (o.totalAmount != null ? o.totalAmount : '?');
+  const cur = o.currency || 'USD';
+  const who = [c.fullName || o.customerName, c.email || o.customerEmail].filter(Boolean).join(' · ') || 'unknown';
+  const method = o.paymentMethodKey || o.paymentMethod || o.provider || '';
+  const when = new Date().toLocaleString('en-GB', { timeZone: 'Asia/Karachi', dateStyle: 'medium', timeStyle: 'short' });
+  return [
+    '💰 New gift received on GetToolNest!',
+    '',
+    'Amount: ' + amount + ' ' + cur,
+    'From: ' + who,
+    method ? 'Paid with: ' + method : '',
+    'Time: ' + when + ' (Pakistan)',
+    id ? 'Order: ' + id : '',
+    '',
+    'Remember to thank them! ❤'
+  ].filter((l, i, a) => l !== '' || (a[i - 1] !== '' && i < a.length - 1)).join('\n');
+}
+
+// Sends a Telegram message to the owner. Needs TELEGRAM_BOT_TOKEN (Secret) and TELEGRAM_CHAT_ID (Text).
+async function notifyOwner(env, text) {
+  if (!env.TELEGRAM_BOT_TOKEN || !env.TELEGRAM_CHAT_ID) { console.log('No Telegram set up:', text); return false; }
+  try {
+    const r = await fetch('https://api.telegram.org/bot' + env.TELEGRAM_BOT_TOKEN + '/sendMessage', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: env.TELEGRAM_CHAT_ID, text, disable_web_page_preview: true })
+    });
+    if (!r.ok) console.log('Telegram error', r.status, (await r.text()).slice(0, 300));
+    return r.ok;
+  } catch (e) { console.log('Telegram failed', String(e)); return false; }
+}
+
+// GET /notify-test?chat=<your TELEGRAM_CHAT_ID>: sends a sample message so you can check Telegram works.
+async function notifyTest(url, env) {
+  if (!env.TELEGRAM_CHAT_ID || url.searchParams.get('chat') !== String(env.TELEGRAM_CHAT_ID)) return new Response('Not found', { status: 404 });
+  const ok = await notifyOwner(env, giftText({ amount: '10.00', currency: 'USD', customer: { fullName: 'Test Person', email: 'test@example.com' }, paymentMethodKey: 'stripe' }, 'TEST-ONLY'));
+  return new Response(ok ? 'Sent! Check Telegram.' : 'Could not send. Check TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID, and that you pressed Start in your bot.', { status: ok ? 200 : 500 });
 }
 function timingSafeEqual(a, b) {
   if (a.length !== b.length) return false;
