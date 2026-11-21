@@ -109,7 +109,7 @@
   function flatten(v, pre, out) {
     if (v !== null && typeof v === 'object' && !(Array.isArray(v) && v.length === 0) && Object.keys(v).length) {
       Object.keys(v).forEach(function (k) { flatten(v[k], pre ? pre + '.' + k : k, out); });
-    } else out[pre || 'value'] = v;
+    } else if (!(v !== null && typeof v === 'object' && pre)) out[pre || 'value'] = v; // empty lists and objects inside an item add no column
     return out;
   }
   function cell(v, d) {
@@ -139,7 +139,7 @@
 
   // ---------- reading ----------
   function detect(t) {
-    var s = t.replace(/^﻿/, '').trim();
+    var s = t.replace(/^\ufeff/, '').trim();
     if (/^[\[{]/.test(s)) return 'json';
     var first = s.split(/\r?\n/).filter(function (l) { return l.trim() && !/^#/.test(l.trim()); })[0] || '';
     if (/^---(\s|$)/.test(first) || /^-\s/.test(first) || /^["']?[^,;\t|"']+["']?:(\s|$)/.test(first)) return 'yaml';
@@ -151,9 +151,9 @@
     return msg;
   }
   function read(t, kind) {
-    if (kind === 'json') { try { return JSON.parse(t.replace(/^﻿/, '')); } catch (e) { throw new Error('This is not valid JSON: ' + jsonError(t, e)); } }
+    if (kind === 'json') { try { return JSON.parse(t.replace(/^\ufeff/, '')); } catch (e) { throw new Error('This is not valid JSON: ' + jsonError(t, e)); } }
     if (kind === 'yaml') {
-      try { var docs = jsyaml.loadAll(t.replace(/^﻿/, '')); return docs.length === 1 ? docs[0] : docs; }
+      try { var docs = jsyaml.loadAll(t.replace(/^\ufeff/, '')); return docs.length === 1 ? docs[0] : docs; }
       catch (e) { throw new Error('This is not valid YAML: ' + String(e.message || e).split('\n')[0]); }
     }
     var d = $('jcDelim').value === 'auto' ? guessDelim(t) : $('jcDelim').value;
@@ -201,7 +201,7 @@
   $('jcDl').addEventListener('click', function () {
     if (!$('jcOut').value) { say('', 'There is no result to download yet.'); return; }
     var ext = to === 'yaml' ? 'yaml' : to, type = { json: 'application/json', csv: 'text/csv', yaml: 'application/yaml' }[to];
-    var body = to === 'csv' ? '﻿' + $('jcOut').value.replace(/\n/g, '\r\n') : $('jcOut').value;
+    var body = to === 'csv' ? '\ufeff' + $('jcOut').value.replace(/\n/g, '\r\n') : $('jcOut').value;
     var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([body], { type: type + ';charset=utf-8' })); a.download = 'converted.' + ext; a.click();
     setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
     burst($('jcDl'));
