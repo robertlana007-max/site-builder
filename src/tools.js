@@ -2660,7 +2660,7 @@ module.exports = [
   {
     slug: 'speech-to-text', cat: 'Media tools', name: 'Speech to Text',
     title: 'Speech to Text Online - Free Voice Typing, 90+ Languages',
-    desc: 'Type with your voice in English, Urdu, Hindi, Arabic, Spanish, French, Chinese and 90+ languages. Live transcript, punctuation, copy and save as TXT.',
+    desc: 'Type with your voice in English, Spanish, French, Arabic, Hindi, Chinese, Japanese and 90+ languages. Live transcript, punctuation, copy and save as TXT.',
     card: 'Type with your voice in 90+ languages.',
     intro: 'Speak and watch your words appear as text. Choose from over 90 languages and accents, including English, Urdu, Hindi, Arabic, Spanish, French, Chinese and Bengali. Add punctuation, edit the text, then copy it or save it as a TXT file.',
     steps: ['Choose the language you will speak.', 'Press Start dictation and allow the microphone.', 'Speak clearly; your words appear in the box. Add punctuation with your voice (English) or the buttons.', 'Press Stop, edit if needed, then Copy text or Download .txt.'],
@@ -3323,22 +3323,6 @@ module.exports = [
       ['Why is there no sound on my phone?', 'Check that your phone is not on silent mode and the volume is up. On iPhone, the ring/silent switch mutes web audio.']
     ],
     icon: '<circle cx="5" cy="12" r="1.5"/><path d="M9 12h5"/><circle cx="18" cy="12" r="1.5"/><path d="M3 6h18M3 18h18"/>'
-  },
-  {
-    slug: 'urdu-keyboard', cat: 'Text tools', name: 'Urdu Keyboard',
-    title: 'Urdu Keyboard Online - Type Urdu in Roman or Phonetic Keys',
-    desc: 'Type Urdu online with an on-screen phonetic keyboard, or write Roman Urdu like "aap kaise hain" and get Urdu script as you type. Nastaliq font, copy, free.',
-    card: 'Type Urdu with Roman letters or on-screen keys.',
-    intro: 'Write Urdu on any computer or phone without installing anything. Type Urdu words in English letters and they turn into Urdu script, use your keyboard as a phonetic Urdu keyboard, or tap the on-screen keys. Copy the result into messages, documents or social media.',
-    steps: ['Choose a typing mode: Roman Urdu, Phonetic keyboard or My own keyboard.', 'Type, or tap the on-screen Urdu keys.', 'In Roman Urdu mode, press space to convert each word, or tap a suggestion for a different spelling.', 'Copy the Urdu text or download it as a .txt file.'],
-    faq: [
-      ['How does Roman Urdu typing work?', 'Type a word the way you would in a text message, like "shukriya" or "kya haal hai". When you press space or punctuation it becomes Urdu script. Hundreds of common words are spelled from a word list, and other words follow sound rules. Suggestions above the keyboard offer other spellings.'],
-      ['What is the phonetic keyboard?', 'Each key types the Urdu letter that sounds like it: a = ا, b = ب, p = پ, s = س, k = ک. Shift gives the related letter, such as Shift+t = ٹ, Shift+d = ڈ, Shift+r = ڑ, Shift+n = ں and Shift+h = ھ. The on-screen keyboard shows every key.'],
-      ['Which font does it use?', 'Nastaliq, the traditional Urdu style, using the free Noto Nastaliq Urdu font that loads with the page, or a simpler Naskh style. The text you copy is normal Unicode Urdu and works in any app.'],
-      ['Can I use it on my phone?', 'Yes. Tick Hide the phone keyboard to type only with the on-screen Urdu keys, or use Roman Urdu mode with your normal phone keyboard.'],
-      ['Is my text saved or sent anywhere?', 'No. Everything you type stays in your browser.']
-    ],
-    icon: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 15h8"/><path d="M15 3c-1 1.5-3 1.5-4 0"/>'
   },
   {
     slug: 'json-csv-yaml-converter', cat: 'Developer tools', name: 'JSON CSV YAML Converter',
