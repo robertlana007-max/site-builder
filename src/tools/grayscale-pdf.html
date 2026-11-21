@@ -1,0 +1,131 @@
+<style>
+.gp-prev { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 12px; }
+.gp-prev figure { margin: 0; flex: 1 1 140px; max-width: 260px; text-align: center; font-size: 13px; color: var(--muted); }
+.gp-prev img { width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; display: block; margin-bottom: 4px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>It is turned grey on your device and never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="mode">How to convert</label><select id="mode">
+    <option value="layer" selected>Keep text selectable (fast, small file)</option>
+    <option value="raster">Rebuild pages as grey images (strongest)</option>
+  </select></div>
+  <div id="toneBox" hidden><label for="tone">Colour</label><select id="tone"><option value="gray">Shades of grey</option><option value="bw">Pure black and white (scans, text)</option></select></div>
+  <div id="dpiBox" hidden><label for="dpi">Quality</label><select id="dpi"><option value="150">Good (150 dpi, smaller file)</option><option value="200" selected>High (200 dpi)</option><option value="300">Print (300 dpi, bigger file)</option></select></div>
+</div>
+<p class="msg" id="modeNote"></p>
+<div class="btns"><button class="btn" id="go" disabled>Convert to greyscale</button><a class="btn ghost" id="dl" hidden>Download grey PDF</a></div>
+<p class="msg" id="msg"></p>
+<div class="gp-prev" id="prev" hidden></div>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, pages = 0, busy = false, last = null, token = 0, prevUrls = [], MAXPAGES = 500;
+  var NOTES = {
+    layer: 'Every page keeps its real text, links and sharp vector drawings, and shows in grey in all modern PDF readers and when printed. The colour data is still inside the file underneath a grey filter, so a print shop’s colour check may still see colour. Comments, highlights and form fields on top of the page keep their colour.',
+    raster: 'Each page is redrawn as a grey picture, so every bit of colour is really gone and print shops see a true greyscale file. Text can no longer be selected or searched, and the file may get bigger.'
+  };
+  function syncMode() {
+    var r = $('mode').value === 'raster';
+    $('toneBox').hidden = !r; $('dpiBox').hidden = !r;
+    $('modeNote').textContent = NOTES[$('mode').value];
+  }
+  $('mode').addEventListener('change', syncMode); syncMode();
+  function clearPrev() { token++; prevUrls.forEach(function (u) { URL.revokeObjectURL(u); }); prevUrls = []; $('prev').innerHTML = ''; $('prev').hidden = true; }
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    file = null; $('go').disabled = true; $('dl').hidden = true; clearPrev();
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    PT.say('', 'Opening ' + f.name + '…');
+    PT.open(f).then(function (doc) {
+      pages = doc.getPageCount();
+      if (!pages) throw new Error('"' + f.name + '" has no pages.');
+      file = f; $('go').disabled = false;
+      PT.say('', f.name + ' · ' + fmtBytes(f.size) + ' · ' + pages + (pages === 1 ? ' page' : ' pages'));
+    }).catch(function (e) { PT.say('bad', e.message); });
+  });
+
+  // Paint a grey "saturation" filter over every page. Blending with a grey colour removes all colour
+  // but keeps the brightness, so text and vector shapes stay real.
+  async function layer() {
+    var doc = await PT.open(file), PL = PDFLib, ctx = doc.context;
+    var gs = ctx.register(ctx.obj({ Type: 'ExtGState', BM: 'Saturation', ca: 1, CA: 1 }));
+    doc.getPages().forEach(function (pg, i) {
+      var b = pg.getMediaBox(), c = pg.getCropBox();
+      var x0 = Math.min(b.x, c.x) - 10, y0 = Math.min(b.y, c.y) - 10, w = Math.max(b.width, c.width) + Math.abs(b.x - c.x) + 20, h = Math.max(b.height, c.height) + Math.abs(b.y - c.y) + 20;
+      // White paper underneath, so empty areas stay white instead of blending with "nothing".
+      var white = ctx.register(ctx.stream('q 1 g ' + x0 + ' ' + y0 + ' ' + w + ' ' + h + ' re f Q\n'));
+      var old = pg.node.get(PL.PDFName.of('Contents')), arr = ctx.obj([white]);
+      if (old instanceof PL.PDFArray) { for (var k = 0; k < old.size(); k++) arr.push(old.get(k)); }
+      else if (old) arr.push(old);
+      pg.node.set(PL.PDFName.of('Contents'), arr);
+      var name = pg.node.newExtGState('GTNGrey', gs);
+      pg.pushOperators(PL.pushGraphicsState(), PL.setGraphicsState(name), PL.setFillingGrayscaleColor(0.5), PL.rectangle(x0, y0, w, h), PL.fill(), PL.popGraphicsState());
+    });
+    return doc.save();
+  }
+
+  async function raster() {
+    var pdf = await PT.render(file), n = pdf.numPages, out = await PDFLib.PDFDocument.create();
+    var scale = +$('dpi').value / 72, bw = $('tone').value === 'bw';
+    if (n > MAXPAGES) throw new Error('This PDF has ' + n + ' pages. The limit for this mode is ' + MAXPAGES + '. Use "Keep text selectable", or split the PDF first.');
+    for (var i = 1; i <= n; i++) {
+      PT.say('', 'Converting page ' + i + ' of ' + n + '…');
+      var page = await pdf.getPage(i), vp1 = page.getViewport({ scale: 1 }), s = scale;
+      if (vp1.width * vp1.height * s * s > 16000000) s = Math.sqrt(16000000 / (vp1.width * vp1.height));
+      var vp = page.getViewport({ scale: s }), c = document.createElement('canvas');
+      c.width = Math.max(1, Math.floor(vp.width)); c.height = Math.max(1, Math.floor(vp.height));
+      var cx = c.getContext('2d');
+      await page.render({ canvasContext: cx, viewport: vp }).promise;
+      page.cleanup();
+      var img = cx.getImageData(0, 0, c.width, c.height), d = img.data;
+      for (var p = 0; p < d.length; p += 4) {
+        var y = 0.299 * d[p] + 0.587 * d[p + 1] + 0.114 * d[p + 2];
+        if (bw) y = y < 160 ? 0 : 255;
+        d[p] = d[p + 1] = d[p + 2] = y;
+      }
+      cx.putImageData(img, 0, 0);
+      var blob = await PT.blob(c, bw ? 'image/png' : 'image/jpeg', 0.85);
+      c.width = c.height = 0;
+      if (!blob) throw new Error('Page ' + i + ' is too large. Choose a lower quality.');
+      var bytes = new Uint8Array(await blob.arrayBuffer());
+      var im = bw ? await out.embedPng(bytes) : await out.embedJpg(bytes);
+      var np = out.addPage([vp1.width, vp1.height]);
+      np.drawImage(im, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+    }
+    return out.save();
+  }
+
+  async function preview(bytes, tk) {
+    clearPrev(); token = tk;
+    var pdf = await PT.render(new File([bytes], 'grey.pdf', { type: 'application/pdf' })), n = Math.min(pdf.numPages, 3);
+    for (var i = 1; i <= n; i++) {
+      var r = await PT.pageCanvas(pdf, i, 0.5), blob = await PT.blob(r.canvas, 'image/png');
+      if (tk !== token) return;
+      if (!blob) continue;
+      var url = URL.createObjectURL(blob), fig = document.createElement('figure'), img = document.createElement('img'), cap = document.createElement('figcaption');
+      prevUrls.push(url); img.src = url; img.alt = 'Preview of page ' + i; cap.textContent = 'Page ' + i;
+      fig.appendChild(img); fig.appendChild(cap); $('prev').appendChild(fig);
+    }
+    $('prev').hidden = !n;
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    PT.run(async function () {
+      var bytes = $('mode').value === 'raster' ? await raster() : await layer();
+      PT.done(bytes, PT.base(file.name) + '-grey.pdf', 'application/pdf', 'Your grey PDF is ready (' + pages + (pages === 1 ? ' page)' : ' pages)'));
+      last = bytes;
+    }).then(function () {
+      busy = false;
+      var b = last; last = null;
+      if (b) preview(b, ++token).catch(function () { /* the preview is only a nice extra */ });
+    });
+  });
+})();
+</script>

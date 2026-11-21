@@ -1,0 +1,351 @@
+<style>
+.e2p-prev { max-height: 320px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin: 6px 0 4px; background: var(--surface); }
+.e2p-prev table { border-collapse: collapse; font-size: 13px; font-variant-numeric: tabular-nums; }
+.e2p-prev td { border: 1px solid var(--line); padding: 4px 8px; white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; }
+.e2p-prev tr:first-child td { font-weight: 600; background: var(--bg); }
+.e2p-prev td.n { text-align: right; }
+.e2p-note { font-size: 13px; color: var(--muted); margin: 0 0 12px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a spreadsheet here</b>Excel (.xlsx, .xls), OpenDocument (.ods) or CSV. It is turned into a PDF on your device and never uploaded.</div>
+<input type="file" id="file" accept=".xlsx,.xlsm,.xls,.xlsb,.ods,.csv,.tsv,.txt,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/vnd.oasis.opendocument.spreadsheet,text/csv,text/tab-separated-values" hidden>
+<div id="loaded" hidden>
+  <div class="fields">
+    <div id="sheetBox"><label for="sheet">Sheets</label><select id="sheet" data-nomemo></select></div>
+    <div><label for="size">Paper size</label><select id="size"><option value="a4">A4</option><option value="letter">Letter</option><option value="legal">Legal</option><option value="a3">A3</option></select></div>
+    <div><label for="orient">Orientation</label><select id="orient"><option value="auto">Automatic</option><option value="portrait">Portrait (tall)</option><option value="landscape">Landscape (wide)</option></select></div>
+    <div><label for="fit">Wide tables</label><select id="fit"><option value="fit">Shrink to fit the page width</option><option value="split">Keep text size, continue columns on extra pages</option></select></div>
+    <div><label for="fs">Text size</label><select id="fs"><option value="7">Small (7 pt)</option><option value="9" selected>Normal (9 pt)</option><option value="11">Large (11 pt)</option></select></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="head" checked> First row holds the column names (bold, repeated on every page)</label>
+    <label><input type="checkbox" id="grid" checked> Draw cell borders</label>
+    <label><input type="checkbox" id="zebra"> Shade every other row</label>
+    <label><input type="checkbox" id="title" checked> Show the sheet name and page numbers</label>
+  </div>
+  <p class="e2p-note" id="note"></p>
+  <h3 style="margin-top:4px">Preview</h3>
+  <div class="e2p-prev" id="prev"></div>
+  <p class="e2p-note" id="prevNote"></p>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Make PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/xlsx/xlsx.full.min.js"></script>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var wb = null, file = null, busy = false, fontBytes = null, MAXCELLS = 1500000;
+  var SIZES = { a4: [595.28, 841.89], letter: [612, 792], legal: [612, 1008], a3: [841.89, 1190.55] };
+
+  // ---------- reading ----------
+  function decode(buf) {
+    var b = new Uint8Array(buf);
+    if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return new TextDecoder('utf-8').decode(b.subarray(3));
+    if (b[0] === 0xFF && b[1] === 0xFE) return new TextDecoder('utf-16le').decode(b.subarray(2));
+    if (b[0] === 0xFE && b[1] === 0xFF) return new TextDecoder('utf-16be').decode(b.subarray(2));
+    try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { return new TextDecoder('windows-1252').decode(b); }
+  }
+  function sniff(text) {
+    var lines = text.split(/\r\n|\n|\r/).slice(0, 30).filter(function (l) { return l.length; }), best = ',', score = -1;
+    [',', ';', '\t', '|'].forEach(function (d) {
+      var counts = lines.map(function (l) { var n = 0, q = false; for (var i = 0; i < l.length; i++) { var c = l[i]; if (c === '"') q = !q; else if (c === d && !q) n++; } return n; });
+      if (!counts.length || !counts[0]) return;
+      var same = counts.filter(function (n) { return n === counts[0]; }).length, s = same * 100 + counts[0];
+      if (s > score) { score = s; best = d; }
+    });
+    return best;
+  }
+  function parseCsv(text, d) {
+    var rows = [], row = [], cell = '', q = false, i = 0, n = text.length;
+    while (i < n) {
+      var c = text[i];
+      if (q) { if (c === '"') { if (text[i + 1] === '"') { cell += '"'; i += 2; continue; } q = false; i++; continue; } cell += c; i++; continue; }
+      if (c === '"' && cell === '') { q = true; i++; continue; }
+      if (c === d) { row.push(cell); cell = ''; i++; continue; }
+      if (c === '\r' || c === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; i += (c === '\r' && text[i + 1] === '\n') ? 2 : 1; continue; }
+      cell += c; i++;
+    }
+    if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+    return rows;
+  }
+  var NUMRE = /^[-+(]?[$€£¥₹]?\s?[-+]?(\d{1,3}([,.\s']\d{3})*|\d+)([.,]\d+)?\s?%?\)?$/;
+
+  // Sheet -> { rows: [[{t, num, fill}]], cols, merges } using the text exactly as Excel shows it.
+  function grid(name) {
+    var ws = wb.Sheets[name];
+    if (!ws) return null;
+    if (ws.__rows) return ws.__rows;
+    var out = { rows: [], ncol: 0, spans: {}, name: name };
+    if (!ws['!ref']) return (ws.__rows = out);
+    var R = XLSX.utils.decode_range(ws['!ref']), hidC = {}, hidR = {};
+    (ws['!cols'] || []).forEach(function (c, i) { if (c && c.hidden) hidC[i] = 1; });
+    (ws['!rows'] || []).forEach(function (r, i) { if (r && r.hidden) hidR[i] = 1; });
+    // Only the area that really holds something (sheets often claim a huge range).
+    var maxR = -1, maxC = -1, minR = Infinity, minC = Infinity;
+    Object.keys(ws).forEach(function (k) {
+      if (k[0] === '!') return;
+      var c = ws[k]; if (!c || (c.v === undefined || c.v === null || c.v === '') && !c.w) return;
+      var a = XLSX.utils.decode_cell(k);
+      if (a.r > maxR) maxR = a.r; if (a.c > maxC) maxC = a.c; if (a.r < minR) minR = a.r; if (a.c < minC) minC = a.c;
+    });
+    if (maxR < 0) return (ws.__rows = out);
+    minR = Math.max(minR, R.s.r); minC = Math.max(minC, R.s.c);
+    var cols = []; for (var c = minC; c <= maxC; c++) if (!hidC[c]) cols.push(c);
+    var colPos = {}; cols.forEach(function (c, i) { colPos[c] = i; });
+    var covered = {};
+    (ws['!merges'] || []).forEach(function (m) {
+      if (m.s.r > maxR || m.s.c > maxC) return;
+      var span = 0; for (var c = m.s.c; c <= Math.min(m.e.c, maxC); c++) if (!hidC[c]) span++;
+      out.spans[m.s.r + ':' + m.s.c] = span;
+      for (var r = m.s.r; r <= m.e.r; r++) for (var cc = m.s.c; cc <= m.e.c; cc++) if (r !== m.s.r || cc !== m.s.c) covered[r + ':' + cc] = r === m.s.r ? 'h' : 'v';
+    });
+    for (var r = minR; r <= maxR; r++) {
+      if (hidR[r]) continue;
+      var row = [];
+      cols.forEach(function (c) {
+        var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })], t = '', num = false, fill = null;
+        if (cell) {
+          if (cell.w !== undefined && cell.w !== null) t = String(cell.w);
+          else if (cell.v !== undefined && cell.v !== null) { try { t = XLSX.utils.format_cell(cell); } catch (e) { t = String(cell.v); } }
+          num = cell.t === 'n' || cell.t === 'd' || (cell.t === 's' && ws.__csv && NUMRE.test(t.trim()));
+          if (cell.t === 'e') t = cell.w || '#ERROR';
+          if (cell.s && cell.s.patternType === 'solid' && cell.s.fgColor && /^[0-9A-F]{6,8}$/i.test(cell.s.fgColor.rgb || '')) fill = cell.s.fgColor.rgb.slice(-6);
+        }
+        var key = r + ':' + c, cov = covered[key];
+        row.push({ t: t.replace(/\r\n?/g, '\n'), num: num, fill: fill, span: out.spans[key] || 1, hide: cov === 'h' });
+      });
+      out.rows.push(row);
+    }
+    // drop empty rows at the end and in between? keep inner blank rows (they are part of the layout), trim trailing ones
+    out.ncol = cols.length;
+    return (ws.__rows = out);
+  }
+
+  function reset() { wb = null; file = null; $('loaded').hidden = true; $('go').disabled = true; $('dl').hidden = true; }
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    reset();
+    var ext = ((f.name.match(/\.([^.]+)$/) || [])[1] || '').toLowerCase();
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (/^(pdf|docx?|pptx?|zip|rar|7z|png|jpe?g|gif|webp|heic|mp3|mp4|mov|exe)$/.test(ext)) return PT.say('bad', '"' + f.name + '" is not a spreadsheet. Choose an Excel, OpenDocument or CSV file.');
+    if (f.size > 200 * 1024 * 1024) return PT.say('bad', '"' + f.name + '" is larger than 200 MB, which is too big to convert in a browser.');
+    PT.say('', 'Reading ' + f.name + '…');
+    f.arrayBuffer().then(function (buf) {
+      var b = new Uint8Array(buf), isZip = b[0] === 0x50 && b[1] === 0x4B, isOle = b[0] === 0xD0 && b[1] === 0xCF;
+      if (isZip || isOle || /^(xlsx|xlsm|xlsb|xls|ods)$/.test(ext)) {
+        try { wb = XLSX.read(b, { type: 'array', cellStyles: true, cellDates: false, cellNF: true }); }
+        catch (e) {
+          if (/password|encrypt/i.test(String(e && e.message))) throw new Error('"' + f.name + '" is password protected. Open it in your spreadsheet program, remove the password, save, and try again.');
+          throw new Error('"' + f.name + '" could not be read as a spreadsheet. It may be damaged.');
+        }
+      } else {
+        var text = decode(buf);
+        if (text.indexOf('\u0000') !== -1) throw new Error('"' + f.name + '" does not look like a spreadsheet or CSV file.');
+        var rows = parseCsv(text, ext === 'tsv' ? '\t' : sniff(text));
+        if (!rows.length) throw new Error('"' + f.name + '" has no rows.');
+        wb = XLSX.utils.book_new();
+        var ws = XLSX.utils.aoa_to_sheet(rows); ws.__csv = true;
+        XLSX.utils.book_append_sheet(wb, ws, PT.base(f.name).slice(0, 31) || 'Sheet1');
+      }
+      if (!wb || !wb.SheetNames.length) throw new Error('No sheets were found in "' + f.name + '".');
+      var names = wb.SheetNames.filter(function (n) { return grid(n) && grid(n).rows.length; });
+      if (!names.length) throw new Error('Every sheet in "' + f.name + '" is empty.');
+      var sel = $('sheet'); sel.innerHTML = '';
+      if (names.length > 1) { var all = document.createElement('option'); all.value = '*'; all.textContent = 'All sheets (' + names.length + ')'; sel.appendChild(all); }
+      names.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
+      $('sheetBox').hidden = names.length < 2;
+      file = f; $('loaded').hidden = false; $('go').disabled = false;
+      $('note').textContent = (isZip || isOle) ? 'Formulas show their last calculated values. Cell fill colours are kept; charts, pictures and fonts are not.' : '';
+      preview();
+      PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Check the options, then press Make PDF.');
+    }).catch(function (e) { reset(); PT.say('bad', e && e.message || 'This file could not be read.'); });
+  });
+
+  function chosen() { var v = $('sheet').value; return v === '*' ? Array.prototype.slice.call($('sheet').options, 1).map(function (o) { return o.value; }) : [v]; }
+  function preview() {
+    var g = grid(chosen()[0]), tb = document.createElement('table'), max = Math.min(g.rows.length, 30);
+    for (var r = 0; r < max; r++) {
+      var tr = document.createElement('tr');
+      g.rows[r].slice(0, 30).forEach(function (c) { if (c.hide) return; var td = document.createElement('td'); td.textContent = c.t; if (c.num) td.className = 'n'; if (c.span > 1) td.colSpan = c.span; tr.appendChild(td); });
+      tb.appendChild(tr);
+    }
+    $('prev').innerHTML = ''; $('prev').appendChild(tb);
+    $('prevNote').textContent = (chosen().length > 1 ? 'Showing "' + g.name + '". ' : '') + g.rows.length + (g.rows.length === 1 ? ' row' : ' rows') + ' × ' + g.ncol + (g.ncol === 1 ? ' column' : ' columns') + (g.rows.length > max ? ' (first ' + max + ' rows shown)' : '') + '.';
+  }
+  $('sheet').addEventListener('change', function () { $('dl').hidden = true; preview(); });
+  ['head', 'grid', 'zebra', 'title'].forEach(function (id) { $(id).addEventListener('change', function () { $('dl').hidden = true; }); });
+
+  // ---------- making the PDF ----------
+  function fonts() {
+    if (fontBytes) return Promise.resolve(fontBytes);
+    return Promise.all(['400', '700'].map(function (w) { return fetch('../assets/vendor/fonts/noto-sans-subset-' + w + '.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }); }))
+      .then(function (b) { return (fontBytes = b); })
+      .catch(function () { throw new Error('The font could not load. Check your connection and reload the page.'); });
+  }
+  function hex(h) { return PDFLib.rgb(parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255); }
+
+  async function build() {
+    var PL = PDFLib, doc = await PL.PDFDocument.create(), fb = await fonts();
+    doc.registerFontkit(fontkit);
+    var F = await doc.embedFont(fb[0], { subset: true }), B = await doc.embedFont(fb[1], { subset: true });
+    var have = {}; F.getCharacterSet().forEach(function (c) { have[c] = 1; });
+    var wcache = [{}, {}], fallbackImgs = {}, fallbackCount = 0;
+    var mctx = document.createElement('canvas').getContext('2d');
+    function supported(s) { for (var i = 0; i < s.length; i++) { var cp = s.codePointAt(i); if (cp > 0xffff) i++; if (cp >= 32 && !have[cp]) return false; } return true; }
+    function width(s, bold, size) {
+      if (!supported(s)) { mctx.font = (bold ? 'bold ' : '') + '40px sans-serif'; return mctx.measureText(s).width / 40 * size; }
+      var cache = wcache[bold ? 1 : 0], font = bold ? B : F, w = 0;
+      for (var i = 0; i < s.length; i++) { var ch = s[i], cw = cache[ch]; if (cw === undefined) { try { cw = cache[ch] = font.widthOfTextAtSize(ch, 1); } catch (e) { cw = cache[ch] = 0.5; } } w += cw; }
+      return w * size;
+    }
+    // Break text into lines that fit maxW.
+    function wrap(text, bold, size, maxW) {
+      var out = [];
+      maxW += 0.05; // rounding: text measured to fit exactly must not wrap
+      text.split('\n').forEach(function (para) {
+        if (width(para, bold, size) <= maxW) { out.push(para); return; }
+        var words = para.split(/(\s+)/), line = '';
+        words.forEach(function (w) {
+          if (!w) return;
+          var t = line + w;
+          if (width(t, bold, size) <= maxW || !line.trim()) {
+            if (!line.trim() && width(t, bold, size) > maxW) { // one very long word: cut it
+              var cut = '';
+              for (var i = 0; i < t.length; i++) { if (width(cut + t[i], bold, size) > maxW && cut) { out.push(cut); cut = ''; } cut += t[i]; }
+              line = cut; return;
+            }
+            line = t;
+          } else { out.push(line.replace(/\s+$/, '')); line = /^\s+$/.test(w) ? '' : w; }
+        });
+        out.push(line.replace(/\s+$/, ''));
+      });
+      return out;
+    }
+    // Letters missing from the built-in font (for example Chinese, Arabic or Hindi) are drawn by the browser as a picture.
+    async function drawFallback(page, s, x, y, size, bold, color) {
+      var key = (bold ? 'b' : 'r') + size + '|' + color + '|' + s, img = fallbackImgs[key];
+      if (!img) {
+        if (fallbackCount > 4000) return;
+        var k = 4, f = (bold ? 'bold ' : '') + size * k + 'px sans-serif', c = document.createElement('canvas'), ctx = c.getContext('2d');
+        ctx.font = f; var w = Math.ceil(ctx.measureText(s).width) + 2, h = Math.ceil(size * k * 1.4);
+        c.width = Math.max(1, w); c.height = h; ctx.font = f; ctx.fillStyle = color; ctx.textBaseline = 'alphabetic';
+        ctx.fillText(s, 1, Math.round(size * k * 1.05));
+        var blob = await PT.blob(c, 'image/png');
+        img = fallbackImgs[key] = { im: await doc.embedPng(new Uint8Array(await blob.arrayBuffer())), w: w / k, h: h / k };
+        fallbackCount++;
+      }
+      page.drawImage(img.im, { x: x - 0.25, y: y + size * 1.05 - img.h, width: img.w, height: img.h });
+    }
+
+    var paper = SIZES[$('size').value], orient = $('orient').value, fit = $('fit').value === 'fit', base = +$('fs').value;
+    var useHead = $('head').checked, lines = $('grid').checked, zebra = $('zebra').checked, showTitle = $('title').checked;
+    var M = 30, sheets = chosen(), pagesBySheet = [], total = 0, cells = 0;
+    sheets.forEach(function (n) { var g = grid(n); cells += g.rows.length * g.ncol; });
+    if (cells > MAXCELLS) throw new Error('This is ' + fmtNum(cells) + ' cells, more than the ' + fmtNum(MAXCELLS) + ' a browser can turn into a PDF at once. Choose one sheet, or split the data first.');
+
+    for (var si = 0; si < sheets.length; si++) {
+      var g = grid(sheets[si]), rows = g.rows, nc = g.ncol;
+      if (!rows.length) continue;
+      PT.say('', 'Measuring "' + g.name + '"…');
+      await new Promise(function (r) { setTimeout(r, 0); });
+      // natural column widths at 1 pt text size, from up to 3000 rows
+      var natural = new Array(nc).fill(0), step = Math.max(1, Math.floor(rows.length / 3000));
+      for (var r = 0; r < rows.length; r += (r < 200 ? 1 : step)) rows[r].forEach(function (c, ci) {
+        if (!c.t || c.span > 1 || c.hide) return;
+        var longest = c.t.split('\n').reduce(function (m, l) { return Math.max(m, width(l, useHead && r === 0, 1)); }, 0);
+        if (longest > natural[ci]) natural[ci] = longest;
+      });
+      natural = natural.map(function (w) { return Math.min(Math.max(w, 2.2), 30); }); // in "text size" units: min ~3 letters, max ~55 letters before wrapping
+      var padU = 0.55; // padding on each side, in text-size units
+      var wantW = natural.reduce(function (a, w) { return a + w + 2 * padU; }, 0);
+      var o = orient;
+      if (o === 'auto') o = wantW * base > paper[0] - 2 * M ? 'landscape' : 'portrait';
+      var PW = o === 'landscape' ? paper[1] : paper[0], PH = o === 'landscape' ? paper[0] : paper[1];
+      var availW = PW - 2 * M, size = base;
+      if (fit && wantW * size > availW) size = Math.max(3.5, availW / wantW);
+      var colW = natural.map(function (w) { return (w + 2 * padU) * size; });
+      if (fit) { var sum = colW.reduce(function (a, b) { return a + b; }, 0); if (sum > availW) colW = colW.map(function (w) { return w * availW / sum; }); }
+      // Column groups that fit across one page (only more than one when splitting).
+      var groups = [], cur = [], cw = 0;
+      colW.forEach(function (w, i) { w = Math.min(w, availW); if (cur.length && cw + w > availW + 0.01) { groups.push(cur); cur = []; cw = 0; } cur.push(i); cw += w; colW[i] = w; });
+      if (cur.length) groups.push(cur);
+      var pad = padU * size, lineH = size * 1.25, top = PH - M - (showTitle ? size + 12 : 0), bottom = M + (showTitle ? 14 : 0);
+
+      for (var gi = 0; gi < groups.length; gi++) {
+        var gc = groups[gi], first = gc[0], last = gc[gc.length - 1];
+        var xs = {}, x = M; gc.forEach(function (ci) { xs[ci] = x; x += colW[ci]; });
+        var tableW = x - M, page = null, y = 0, pageRows = 0;
+        var layoutRow = function (row, bold) {
+          var cellsL = [], h = 1;
+          gc.forEach(function (ci) {
+            var c = row[ci]; if (!c || c.hide) return;
+            var w = colW[ci], span = c.span || 1;
+            for (var s = 1; s < span && ci + s <= last; s++) w += colW[ci + s];
+            var ls = c.t ? wrap(c.t, bold, size, w - 2 * pad) : [];
+            if (ls.length > h) h = ls.length;
+            cellsL.push({ ci: ci, w: w, lines: ls, c: c });
+          });
+          return { cells: cellsL, h: h * lineH + 2 * pad * 0.6 };
+        };
+        var headL = useHead ? layoutRow(rows[0], true) : null;
+        var drawRow = async function (L, bold, shade) {
+          var maxH = top - bottom, h = Math.min(L.h, maxH);
+          for (var k = 0; k < L.cells.length; k++) {
+            var cl = L.cells[k], cx = xs[cl.ci];
+            var bg = bold ? PL.rgb(0.91, 0.93, 0.96) : cl.c.fill ? hex(cl.c.fill) : shade ? PL.rgb(0.96, 0.97, 0.98) : null;
+            if (bg) page.drawRectangle({ x: cx, y: y - h, width: cl.w, height: h, color: bg });
+            if (lines) page.drawRectangle({ x: cx, y: y - h, width: cl.w, height: h, borderColor: PL.rgb(0.72, 0.75, 0.8), borderWidth: 0.5 });
+            var ty = y - pad * 0.6 - size * 0.95, maxLines = Math.max(1, Math.floor((h - 1.2 * pad) / lineH));
+            for (var li = 0; li < Math.min(cl.lines.length, maxLines); li++) {
+              var s = cl.lines[li]; if (!s) { ty -= lineH; continue; }
+              var tw = width(s, bold, size), tx = cl.c.num && !bold ? cx + cl.w - pad - tw : cx + pad;
+              if (supported(s)) page.drawText(s, { x: tx, y: ty, size: size, font: bold ? B : F, color: PL.rgb(0.1, 0.1, 0.12) });
+              else await drawFallback(page, s, tx, ty, size, bold, '#1a1a1f');
+              ty -= lineH;
+            }
+          }
+          if (!lines) page.drawLine({ start: { x: M, y: y - h }, end: { x: M + tableW, y: y - h }, thickness: 0.3, color: PL.rgb(0.85, 0.86, 0.88) });
+          y -= h;
+        };
+        var newPage = async function () {
+          page = doc.addPage([PW, PH]); y = top; pageRows = 0;
+          page.__sheet = g.name; page.__part = groups.length > 1 ? (gi + 1) + '/' + groups.length : '';
+          pagesBySheet.push(page);
+          if (headL) await drawRow(headL, true, false);
+        };
+        var start = useHead ? 1 : 0;
+        await newPage();
+        for (var ri = start; ri < rows.length; ri++) {
+          if (ri % 400 === 0) { PT.say('', 'Making pages for "' + g.name + '": row ' + fmtNum(ri) + ' of ' + fmtNum(rows.length) + (groups.length > 1 ? ', columns part ' + (gi + 1) + ' of ' + groups.length : '') + '…'); await new Promise(function (r) { setTimeout(r, 0); }); }
+          var L = layoutRow(rows[ri], false);
+          if (y - Math.min(L.h, top - bottom) < bottom - 0.01 && pageRows > 0) await newPage();
+          await drawRow(L, false, zebra && (ri - start) % 2 === 1);
+          pageRows++;
+        }
+      }
+    }
+    // Titles and page numbers
+    total = pagesBySheet.length;
+    if (showTitle) for (var pi = 0; pi < total; pi++) {
+      var p = pagesBySheet[pi], W = p.getWidth(), H = p.getHeight(), t = p.__sheet + (p.__part ? '  ·  columns ' + p.__part : '');
+      if (supported(t)) p.drawText(t, { x: M, y: H - M - 10, size: 10, font: B, color: PL.rgb(0.2, 0.22, 0.26) });
+      else await drawFallback(p, t, M, H - M - 10, 10, true, '#33383f');
+      var pn = 'Page ' + (pi + 1) + ' of ' + total, pw = F.widthOfTextAtSize(pn, 8);
+      p.drawText(pn, { x: W - M - pw, y: M - 14, size: 8, font: F, color: PL.rgb(0.45, 0.47, 0.5) });
+    }
+    if (!total) throw new Error('There is nothing to print in the chosen sheets.');
+    doc.setTitle(PT.base(file.name)); doc.setCreator('GetToolNest');
+    return { bytes: await doc.save(), pages: total, fallback: fallbackCount };
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!wb || busy) return;
+    busy = true;
+    PT.run(async function () {
+      var r = await build();
+      PT.done(r.bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'Your PDF is ready: ' + r.pages + (r.pages === 1 ? ' page' : ' pages'));
+    }).then(function () { busy = false; });
+  });
+})();
+</script>
