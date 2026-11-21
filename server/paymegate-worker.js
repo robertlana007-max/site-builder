@@ -37,8 +37,9 @@ function minFor(request) {
 const MAX = 1000;   // dollars
 // Every card / wallet payment method on this account (cards, Google Pay, Apple Pay, PayPal...). PayMeGate itself shows each
 // visitor only the ones that work in their country, so people can pay however they like.
-// No crypto-style methods (crypto, Coinbase, Binance, Blockchain.com, Particle): the site has its own Crypto tab.
-const CARD_METHODS = ['creditcard', 'stripe', 'rampnow', 'googlepay', 'applepay', 'topper', 'banxa', 'alchemypay', 'meld', 'paypal', 'revolut', 'cashapp', 'venmo', 'robinhood', 'alipay', 'wechat', 'sardine', 'interac'];
+// CARD ONLY: every PayMeGate gateway that takes a debit/credit card (plus Google Pay / Apple Pay, which pay with a card).
+// No crypto, Coinbase, Binance, PayPal, Cash App, Venmo, Alipay, WeChat or bank transfers.
+const CARD_METHODS = ['creditcard', 'stripe', 'rampnow', 'googlepay', 'applepay', 'topper', 'revolut', 'robinhood', 'banxa', 'alchemypay', 'meld', 'sardine'];
 // Minimum USD amount per method on this account (from GET /v1/payment-methods). A method is only offered when the gift is big enough.
 const METHOD_MIN = { stripe: 2, creditcard: 6, rampnow: 6, googlepay: 10, applepay: 10, topper: 10, banxa: 11, alchemypay: 15, binance: 20, blockchaincom: 20, meld: 30, particle: 30, sardine: 30, paypal: 5, revolut: 7, cashapp: 2, venmo: 2, robinhood: 5, coinbase: 2, alipay: 5, wechat: 5, interac: 75, crypto: 2 };
 
