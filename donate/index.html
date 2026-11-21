@@ -121,13 +121,13 @@
 <div class="paypanel" id="payCard" role="tabpanel" aria-labelledby="tabCard">
   <p class="pay-soon" id="paySoon" hidden>⏳ Card payments open very soon. Until then, please use <b>Crypto</b>. Thank you! ❤</p>
   <div class="pay-step"><span class="pay-n">1</span><b>Choose an amount</b></div>
-  <div class="amts" role="group" aria-label="Amount"><button type="button" class="amt" data-amt="5" aria-pressed="false">$5</button><button type="button" class="amt" data-amt="10" aria-pressed="true">$10</button><button type="button" class="amt" data-amt="25" aria-pressed="false">$25</button><button type="button" class="amt" data-amt="50" aria-pressed="false">$50</button></div>
-  <label class="amt-in amt-other"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="2" max="1000" step="0.01" placeholder="Other amount" aria-label="Other amount in US dollars" data-nomemo></label>
+  <div class="amts" role="group" aria-label="Amount"><button type="button" class="amt" data-amt="10" aria-pressed="true">$10</button><button type="button" class="amt" data-amt="25" aria-pressed="false">$25</button><button type="button" class="amt" data-amt="50" aria-pressed="false">$50</button><button type="button" class="amt" data-amt="100" aria-pressed="false">$100</button></div>
+  <label class="amt-in amt-other"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="6" max="1000" step="0.01" placeholder="Other amount" aria-label="Other amount in US dollars" data-nomemo></label>
   <div class="pay-step"><span class="pay-n">2</span><b>Your email</b><small>for your receipt</small></div>
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
   <button class="btn paybtn" type="button" id="payGo" data-api="https://gettoolnest-pay.robertlana007.workers.dev/checkout" data-test-api="https://gettoolnest-pay.robertlana007.workers.dev/checkout">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
-  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $2.</p>
+  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $6.</p>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
 <div class="pay-step"><span class="pay-n">1</span><b>Pick a coin and copy its address</b></div>
@@ -179,7 +179,7 @@
   tabs.crypto.addEventListener('click', function () { show('crypto'); });
   if (location.hash === '#crypto') show('crypto');
 
-  var MIN = 2, MAX = 1000, SOON = "Card payments are being set up and will open very soon. Until then you can use the Crypto tab. Thank you for your patience! ❤";
+  var MIN = 6, MAX = 1000, SOON = "Card payments are being set up and will open very soon. Until then you can use the Crypto tab. Thank you for your patience! ❤";
   var own = document.getElementById('amtOwn'), go = document.getElementById('payGo'), msg = document.getElementById('payMsg');
   var amts = document.querySelectorAll('.amt');
   if (!go.dataset.api && go.dataset.testApi && /[?&]cardtest=1(?:&|$)/.test(location.search)) { go.dataset.api = go.dataset.testApi; document.getElementById('paySoon').hidden = true; }
@@ -191,7 +191,7 @@
   }
   function label() { var a = amount(); go.textContent = '💳 Pay ' + (isFinite(a) && a > 0 ? '$' + (a % 1 ? a.toFixed(2) : a) + ' ' : '') + 'with Card'; }
   amts.forEach(function (b) { b.addEventListener('click', function () { amts.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); own.value = ''; if (go.dataset.api) say(''); label(); }); });
-  own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) amts[Math.min(1, amts.length - 1)].setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
+  own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) amts[0].setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
   label();
   go.addEventListener('click', function () {
     var api = go.dataset.api;
@@ -200,10 +200,10 @@
     if (!isFinite(a) || a < MIN || a > MAX) { say('Please choose an amount between $' + MIN + ' and $' + MAX + '.', 'bad'); own.focus(); return; }
     var em = document.getElementById('payEmail'), email = em.value.trim();
     if (!/^[^s@]+@[^s@]+.[^s@]+$/.test(email)) { say('Please enter your email address. The payment page needs it to send your receipt.', 'bad'); em.focus(); return; }
-    go.disabled = true; say('Opening the secure checkout…');
+    go.disabled = true; go.textContent = '⏳ Opening secure checkout…'; say('Connecting to PayMeGate. This can take up to 10 seconds, please wait…');
     fetch(api, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ amount: a, email: email }) })
       .then(function (r) { return r.json().catch(function () { return {}; }).then(function (d) { if (!r.ok || !d.url) throw new Error(d.error || 'The checkout could not be opened. Please try again.'); try { localStorage.setItem('gtn-gift', JSON.stringify({ order: d.order || '', t: Date.now() })); } catch (e) {} location.href = d.url; }); })
-      .catch(function (e) { go.disabled = false; say(e && e.message && e.message !== 'Failed to fetch' ? e.message : 'Could not reach the payment service. Please check your internet and try again.', 'bad'); });
+      .catch(function (e) { go.disabled = false; label(); say(e && e.message && e.message !== 'Failed to fetch' ? e.message : 'Could not reach the payment service. Please check your internet and try again.', 'bad'); });
   });
   window.addEventListener('pageshow', function () { go.disabled = false; });
 })();

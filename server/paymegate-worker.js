@@ -26,11 +26,12 @@ const ALLOWED_ORIGINS = ['https://gettoolnest.xyz', 'https://www.gettoolnest.xyz
 const SITE = 'https://gettoolnest.xyz';
 const OWNER_EMAIL = 'gettoolnest14@gmail.com';
 const CURRENCY = 'USD';
-const MIN = 2;      // dollars (Stripe card minimum on PayMeGate is $2)
+const MIN = 6;      // dollars: below $6 only US/EU-only methods work, so most countries would see no way to pay
 const MAX = 1000;   // dollars
-const CARD_METHODS = ['stripe', 'creditcard', 'googlepay', 'applepay']; // Stripe, Stix, Google Pay, Apple Pay
+// Every card / wallet method on this account. PayMeGate itself only shows each visitor the ones that work in their country.
+const CARD_METHODS = ['stripe', 'creditcard', 'rampnow', 'googlepay', 'applepay', 'topper', 'banxa', 'alchemypay', 'binance', 'meld', 'particle', 'blockchaincom', 'paypal', 'revolut', 'cashapp', 'venmo', 'robinhood', 'coinbase', 'alipay', 'wechat', 'sardine'];
 // Minimum USD amount per method on this account (from GET /v1/payment-methods). Methods are only offered when the gift is big enough.
-const METHOD_MIN = { stripe: 2, creditcard: 6, googlepay: 10, applepay: 10, paypal: 5, crypto: 2 };
+const METHOD_MIN = { stripe: 2, creditcard: 6, rampnow: 6, googlepay: 10, applepay: 10, topper: 10, banxa: 11, alchemypay: 15, binance: 20, blockchaincom: 20, meld: 30, particle: 30, sardine: 30, paypal: 5, revolut: 7, cashapp: 2, venmo: 2, robinhood: 5, coinbase: 2, alipay: 5, wechat: 5, crypto: 2 };
 
 function cors(origin) {
   return {
