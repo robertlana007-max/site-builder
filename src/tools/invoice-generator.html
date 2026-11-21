@@ -112,8 +112,14 @@
       <option value="USD">USD – US dollar ($)</option><option value="EUR">EUR – Euro (€)</option><option value="GBP">GBP – British pound (£)</option>
       <option value="PKR">PKR – Pakistani rupee (₨)</option><option value="INR">INR – Indian rupee (₹)</option><option value="AED">AED – UAE dirham</option>
       <option value="SAR">SAR – Saudi riyal</option><option value="CAD">CAD – Canadian dollar (C$)</option><option value="AUD">AUD – Australian dollar (A$)</option>
+      <option value="JPY">JPY – Japanese yen (¥)</option><option value="CNY">CNY – Chinese yuan (CN¥)</option><option value="CHF">CHF – Swiss franc</option>
+      <option value="BDT">BDT – Bangladeshi taka (Tk)</option><option value="NGN">NGN – Nigerian naira (₦)</option><option value="ZAR">ZAR – South African rand (R)</option>
+      <option value="KES">KES – Kenyan shilling</option><option value="EGP">EGP – Egyptian pound (E£)</option><option value="TRY">TRY – Turkish lira (₺)</option>
+      <option value="BRL">BRL – Brazilian real (R$)</option><option value="MXN">MXN – Mexican peso (MX$)</option><option value="SGD">SGD – Singapore dollar (S$)</option>
+      <option value="MYR">MYR – Malaysian ringgit (RM)</option><option value="IDR">IDR – Indonesian rupiah (Rp)</option><option value="PHP">PHP – Philippine peso (₱)</option>
+      <option value="NZD">NZD – New Zealand dollar (NZ$)</option>
       <option value="X">Other – type your own symbol</option></select></div>
-    <div id="ivgSymBox" hidden><label for="ivgSym">Your currency symbol or code</label><input type="text" id="ivgSym" data-nomemo maxlength="6" placeholder="e.g. ¥ or KES"></div>
+    <div id="ivgSymBox" hidden><label for="ivgSym">Your currency symbol or code</label><input type="text" id="ivgSym" data-nomemo maxlength="6" placeholder="e.g. CFA or ₩"></div>
     <div><label for="ivgPaperSize">Paper size (PDF)</label><select id="ivgPaperSize" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
     <div><label for="ivgColor">Accent colour</label><input type="color" id="ivgColor" data-nomemo value="#2563eb"></div>
   </div>
@@ -169,7 +175,12 @@
 (function () {
   'use strict';
   var DRAFT = 'gtnInvoiceDraft', LAST = 'gtnInvoiceLastNo';
-  var CUR = { USD: '$', EUR: '€', GBP: '£', PKR: '₨', INR: '₹', AED: 'AED ', SAR: 'SAR ', CAD: 'C$', AUD: 'A$' };
+  var CUR = { USD: '$', EUR: '€', GBP: '£', PKR: '₨', INR: '₹', AED: 'AED ', SAR: 'SAR ', CAD: 'C$', AUD: 'A$', JPY: '¥', CNY: 'CN¥', CHF: 'CHF ', BDT: 'Tk ', NGN: '₦', ZAR: 'R ', KES: 'KES ', EGP: 'E£', TRY: '₺', BRL: 'R$', MXN: 'MX$', SGD: 'S$', MYR: 'RM ', IDR: 'Rp ', PHP: '₱', NZD: 'NZ$' };
+  // A first-time visitor starts with the currency of their own country when it is in the list.
+  function localCur() {
+    var EU = 'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' '), M = { US: 'USD', GB: 'GBP', PK: 'PKR', IN: 'INR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', JP: 'JPY', CN: 'CNY', CH: 'CHF', BD: 'BDT', NG: 'NGN', ZA: 'ZAR', KE: 'KES', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP', NZ: 'NZD' };
+    try { var r = new Intl.Locale(navigator.language).maximize().region; return EU.indexOf(r) >= 0 ? 'EUR' : M[r] || 'USD'; } catch (e) { return 'USD'; }
+  }
   var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   var FIELDS = ['ivgBizName', 'ivgBizEmail', 'ivgBizPhone', 'ivgBizAddr', 'ivgClientName', 'ivgClientEmail', 'ivgClientAddr', 'ivgNo', 'ivgDate', 'ivgDuePreset', 'ivgDue', 'ivgCur', 'ivgSym', 'ivgPaperSize', 'ivgColor', 'ivgDiscType', 'ivgDisc', 'ivgTax1Name', 'ivgTax1', 'ivgTax2On', 'ivgTax2Name', 'ivgTax2', 'ivgShip', 'ivgPaid', 'ivgNotes', 'ivgTerms', 'ivgBank'];
   var logo = null; // data URL of the shrunk logo
@@ -391,7 +402,7 @@
     if (bad) say('bad', c.errors.map(function (e) { return e.text; }).join(' '));
     else if (s.ivgDate && s.ivgDuePreset !== '0' && s.ivgDue && s.ivgDue < s.ivgDate) say('bad', 'The due date is before the invoice date. Check the dates.');
     else if (c.overpaid > B0) say('', 'The amount paid is more than the total, so the balance due is 0 and the extra is shown as a credit.');
-    else if ($('ivgCur').value === 'X' && !s.ivgSym.trim()) say('', 'Type your currency symbol or code, for example ¥ or KES.');
+    else if ($('ivgCur').value === 'X' && !s.ivgSym.trim()) say('', 'Type your currency symbol or code, for example CFA or ₩.');
     else say('', '');
     render(s, c);
     last = { s: s, c: c };
@@ -623,7 +634,7 @@
   if (saved && typeof saved === 'object') { apply(saved); }
   else {
     var t = isoToday();
-    apply({ ivgNo: used ? nextNo(used) : 'INV-0001', ivgDate: t, ivgDue: addDays(t, 30), items: [{}] });
+    apply({ ivgNo: used ? nextNo(used) : 'INV-0001', ivgDate: t, ivgDue: addDays(t, 30), ivgCur: localCur(), items: [{}] });
   }
   update(false);
   if (saved) setTimeout(function () { if (!$('msg').textContent) say('ok', 'Your saved draft was restored. Press New invoice to start a fresh one.'); }, 0);

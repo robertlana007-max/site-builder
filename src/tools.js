@@ -173,13 +173,13 @@ module.exports = [
   {
     slug: 'mortgage-calculator', cat: 'Finance calculators', name: 'Mortgage Calculator',
     title: 'Mortgage Calculator - Monthly Payment with Tax & Insurance',
-    desc: 'Estimate your monthly mortgage payment including principal, interest, property tax, home insurance and HOA fees.',
+    desc: 'Estimate your monthly mortgage payment including principal, interest, property tax, home insurance and HOA or service fees.',
     card: 'Monthly house payment with tax and insurance.',
-    intro: 'Estimate the full monthly cost of a home loan: principal and interest plus property tax, insurance and HOA fees.',
-    steps: ['Enter the home price and your down payment.', 'Enter the interest rate and choose the loan term.', 'Add yearly property tax and insurance, and monthly HOA fees if any.', 'Read the total monthly payment.'],
+    intro: 'Estimate the full monthly cost of a home loan: principal and interest plus property tax, insurance and HOA or service fees.',
+    steps: ['Enter the home price and your down payment.', 'Enter the interest rate and choose the loan term.', 'Add yearly property tax and insurance, and any monthly HOA or service charge.', 'Read the total monthly payment.'],
     faq: [
-      ['What is included in the monthly payment?', 'Principal and interest on the loan, plus one twelfth of the yearly property tax and insurance, plus any monthly HOA fee.'],
-      ['Does it include mortgage insurance (PMI)?', 'No. If your down payment is under 20 percent your lender may add PMI, which is not included here.'],
+      ['What is included in the monthly payment?', 'Principal and interest on the loan, plus one twelfth of the yearly property tax and insurance, plus any monthly HOA or service charge.'],
+      ['Does it include mortgage insurance?', 'No. With a small down payment (often under 20 percent) many lenders add mortgage insurance, called PMI in the United States. It is not included here.'],
       ['How much difference does the term make?', 'A shorter term has a higher monthly payment but far less total interest. Switch between 30 and 15 years to compare.'],
       ['Is this financial advice?', 'No. It is an estimate for comparing options. Ask a lender for an exact quote.']
     ]
@@ -686,7 +686,7 @@ module.exports = [
       faq: [
         ['Is this invoice generator free?', 'Yes. It is free with no sign-up, no watermark and no limit on how many invoices you make.'],
         ['Are my invoices uploaded anywhere?', 'No. Everything runs in your browser. Your draft, logo and last invoice number are saved only on this device.'],
-        ['Can I use rupees, euros or pounds?', 'Yes. Choose USD, EUR, GBP, PKR, INR, AED, SAR, CAD or AUD, or type your own currency symbol. Symbols such as ₨, ₹, € and £ appear correctly in the PDF.'],
+        ['Can I use rupees, euros or pounds?', 'Yes. Choose from 25 common currencies (for example USD, EUR, GBP, PKR, INR, AED, JPY, NGN or BRL), or type your own currency symbol. Symbols such as ₨, ₹, € and £ appear correctly in the PDF.'],
         ['How are tax and discount calculated?', 'The discount is taken off the subtotal first, then each tax is worked out on the discounted amount. Shipping is added after tax, and any amount paid is subtracted to give the balance due.'],
         ['Is the PDF text real or a picture?', 'Real text. The PDF is small and sharp, and the amounts and names can be searched and copied.'],
         ['Can an invoice have many items?', 'Yes. Long invoices continue onto extra pages, with the table header repeated and page numbers on every page.']
@@ -1214,7 +1214,7 @@ module.exports = [
   },
   {
       slug: 'currency-converter', cat: 'Finance calculators', name: 'Currency Converter',
-      title: 'Currency Converter - USD to PKR, INR, AED & 170+ Rates',
+      title: 'Currency Converter - USD, EUR, PKR, INR, AED & 170+ Rates',
       desc: 'Convert 170+ currencies, including PKR, INR, AED, SAR and Bitcoin, with daily mid-market rates, a rate history chart and offline use.',
       card: 'Convert 170+ currencies with daily rates and charts.',
       intro: 'Type an amount to convert it instantly between more than 170 currencies, see the rate history for any pair and compare several currencies at once.',

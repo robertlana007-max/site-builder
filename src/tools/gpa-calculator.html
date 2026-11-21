@@ -20,23 +20,30 @@
     $('pts').textContent = credits ? fmtNum(points, 1) : '–';
   }
   var seq = 0;
-  function addRow() {
-    var n = ++seq, r = document.createElement('div');
+  // Tell the site's input memory that rows were removed, so a reload does not bring them back.
+  function changed() { $('rows').dispatchEvent(new Event('change', { bubbles: true })); }
+  function addRow(id) {
+    var n = id || ++seq, r = document.createElement('div');
     r.className = 'fields'; r.style.gridTemplateColumns = 'minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) auto'; r.style.alignItems = 'end'; r.style.marginBottom = '10px';
     r.innerHTML = '<div><label for="n' + n + '">Course ' + n + '</label><input type="text" id="n' + n + '" placeholder="Optional name"></div>' +
       '<div><label for="c' + n + '">Credits</label><input type="number" class="cr" id="c' + n + '" min="0" step="0.5" value="3"></div>' +
       '<div><label for="g' + n + '">Grade</label><select class="gr" id="g' + n + '"><option value="">–</option>' +
       G.map(function (g) { return '<option value="' + g[1] + '">' + g[0] + '</option>'; }).join('') + '</select></div>' +
       '<button type="button" class="btn ghost rm" aria-label="Remove this course" title="Remove this course" style="min-height:44px;padding:0 12px">×</button>';
-    r.querySelector('.rm').addEventListener('click', function () { r.remove(); if (!document.querySelector('#rows .fields')) addRow(); renumber(); calc(); });
+    r.querySelector('.rm').addEventListener('click', function () { r.remove(); if (!document.querySelector('#rows .fields')) addRow(); renumber(); calc(); changed(); });
     r.addEventListener('input', calc);
     $('rows').appendChild(r);
     renumber();
   }
   // Labels follow the row order (Course 1, 2, 3...) even after a row is removed; ids stay unique.
   function renumber() { document.querySelectorAll('#rows .fields').forEach(function (r, i) { r.querySelector('label').textContent = 'Course ' + (i + 1); }); }
-  $('add').addEventListener('click', addRow);
-  $('clr').addEventListener('click', function () { $('rows').innerHTML = ''; seq = 0; for (var i = 0; i < 4; i++) addRow(); calc(); });
-  for (var i = 0; i < 4; i++) addRow();
+  $('add').addEventListener('click', function () { addRow(); });
+  $('clr').addEventListener('click', function () { $('rows').innerHTML = ''; seq = 0; for (var i = 0; i < 4; i++) addRow(); calc(); changed(); });
+  // Recreate every saved course row (with its saved ids) before the site restores the saved values into them.
+  var saved = [];
+  try { var mem = Store.read().inputs['gpa-calculator'] || {}; Object.keys(mem).forEach(function (k) { var m = /^[ncg](\d+)$/.exec(k); if (m && saved.indexOf(+m[1]) < 0) saved.push(+m[1]); }); } catch (e) {}
+  saved = saved.filter(function (n) { return n > 0 && n < 1000; }).sort(function (a, b) { return a - b; });
+  if (saved.length) { seq = saved[saved.length - 1]; saved.forEach(function (n) { addRow(n); }); }
+  else for (var i = 0; i < 4; i++) addRow();
 })();
 </script>
