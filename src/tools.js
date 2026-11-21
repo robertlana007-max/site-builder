@@ -2933,5 +2933,137 @@ module.exports = [
         ['Is 1 a prime number?', 'No. A prime has exactly two factors, 1 and itself. 1 has only one factor.']
       ],
       icon: '<path d="M9 4L7 20M17 4l-2 16M4 9h16M3 15h16"/>'
+  },
+  {
+      slug: 'excel-to-pdf', cat: 'PDF tools', name: 'Excel to PDF',
+      title: 'Excel to PDF Converter - XLSX, XLS, CSV to PDF Free',
+      desc: 'Turn Excel, OpenDocument or CSV spreadsheets into neat PDF tables. Pick a sheet, fit wide tables, repeat headers. Runs in your browser, no upload.',
+      card: 'Turn spreadsheets and CSV files into PDF tables.',
+      intro: 'Convert an Excel workbook, an .ods file or a CSV into a clean, printable PDF table. Choose the sheets, paper size and orientation; the file never leaves your device.',
+      steps: ['Click the box or drop your .xlsx, .xls, .ods or .csv file.', 'Choose one sheet or all sheets, and the paper size.', 'Pick how wide tables should fit, then check the preview.', 'Click Make PDF, then Download PDF.'],
+      faq: [
+        ['Is my spreadsheet uploaded?', 'No. The file is read and turned into a PDF by your browser, on your own device.'],
+        ['What happens to wide tables?', 'By default the text is made smaller so every column fits the page width, and the page turns to landscape when needed. You can instead keep the text size and let extra columns continue on more pages.'],
+        ['Are formulas, colours and charts kept?', 'Formulas show their last calculated values and cell fill colours are kept. Charts, pictures, fonts and conditional formatting are not copied into the PDF.'],
+        ['Does it work with Chinese, Arabic or Hindi text?', 'Yes. Letters that the built-in font does not have are drawn by your browser, so they show correctly in the PDF.'],
+        ['Is there a size limit?', 'Up to about 1.5 million cells at once. Big sheets with tens of thousands of rows work, but can take a minute on a phone.'],
+        ['Can I convert a password-protected workbook?', 'No. Open it in your spreadsheet program, remove the password, save, and try again.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M8 12h8M8 16h8M12 12v6"/>'
+  },
+  {
+      slug: 'powerpoint-to-pdf', cat: 'PDF tools', name: 'PowerPoint to PDF',
+      title: 'PowerPoint to PDF - Convert PPTX to PDF Free, No Upload',
+      desc: 'Convert a PowerPoint .pptx into a PDF with one page per slide: text, pictures, shapes, tables and backgrounds. Runs in your browser, no upload.',
+      card: 'Turn a .pptx presentation into a PDF.',
+      intro: 'Turn the slides of a PowerPoint presentation into a PDF you can share, print or send. The slides are drawn in your browser and your file is never uploaded.',
+      steps: ['Click the box or drop your .pptx file.', 'Tick Include hidden slides if you want those too.', 'Click Make PDF and check the slide previews.', 'Click Download PDF.'],
+      faq: [
+        ['Is my presentation uploaded?', 'No. The .pptx file is opened and turned into a PDF inside your browser, on your own device.'],
+        ['Will the PDF look exactly like my slides?', 'Very close, but not always identical. Text uses the Noto Sans font, so lines can wrap a little differently from your fonts. For a perfect copy, use File, Export, PDF in PowerPoint, Keynote or LibreOffice.'],
+        ['What is not included?', 'Animations, transitions, sound and video are left out (videos show their cover picture). Charts, 3D models, equations and some effects cannot be drawn; the tool tells you which slides had them.'],
+        ['Can I convert old .ppt files?', 'No, only .pptx (also .ppsx and .potx). Open an old .ppt in PowerPoint, Google Slides or LibreOffice and save it as .pptx first.'],
+        ['Is the text in the PDF selectable?', 'Yes. Text is real text, so you can search and copy it.'],
+        ['What about hidden slides?', 'They are skipped unless you tick Include hidden slides.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="13" rx="2"/><path d="M12 17v4M8 21h8M8 8h5a2 2 0 0 1 0 4H8V8z"/>'
+  },
+  {
+      slug: 'unlock-pdf', cat: 'PDF tools', name: 'Unlock PDF',
+      title: 'Unlock PDF - Remove PDF Password Free, No Upload',
+      desc: 'Remove the password from a PDF you can open, and lift print, copy and edit limits. Works with AES-256, AES-128 and RC4. Runs in your browser.',
+      card: 'Remove a known password and print or copy limits.',
+      intro: 'Remove the open password from a PDF when you know it, or take away limits on printing, copying and editing. Everything happens on your device; the file and password are never uploaded.',
+      steps: ['Click the box or drop your locked PDF.', 'If it asks for one, type the PDF password.', 'Click Unlock PDF.', 'Click Download unlocked PDF.'],
+      faq: [
+        ['Can it unlock a PDF if I forgot the password?', 'No. You need the password that opens the file. The tool does not guess or break passwords.'],
+        ['Is my password sent anywhere?', 'No. The PDF and the password stay in your browser. Decryption runs on your device.'],
+        ['Which kinds of PDF encryption work?', 'All standard PDF passwords: AES 256-bit, AES 128-bit and the older RC4 40-bit and 128-bit.'],
+        ['My PDF opens without a password but I cannot print or copy. Can this help?', 'Yes. Drop the file in and click Unlock PDF. The new copy has no printing, copying or editing limits.'],
+        ['Does unlocking change the content?', 'No. Pages, text, pictures and links stay exactly the same; only the encryption is removed.'],
+        ['Is it legal?', 'Only unlock files that are yours or that you have permission to change.']
+      ],
+      icon: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2M12 15v2"/>'
+  },
+  {
+      slug: 'protect-pdf', cat: 'PDF tools', name: 'Protect PDF',
+      title: 'Protect PDF with Password - AES-256 Encryption, Free',
+      desc: 'Add a password to a PDF with strong AES-256 encryption, and optionally block printing, copying or editing. Runs in your browser; nothing is uploaded.',
+      card: 'Add a password and printing or copying limits.',
+      intro: 'Lock a PDF with a password so only people who know it can open it. You can also stop printing, copying or editing. The file is encrypted on your own device.',
+      steps: ['Click the box or drop your PDF.', 'Type a password twice.', 'Optionally open Restrictions to block printing, copying or editing.', 'Click Protect PDF, then Download protected PDF.'],
+      faq: [
+        ['How strong is the protection?', 'The PDF is encrypted with AES 256-bit, the strongest standard PDF encryption. A long password with letters, numbers and symbols is very hard to guess.'],
+        ['Will the PDF open on any device?', 'Yes. Adobe Reader, browsers, phones and Mac Preview all open AES-256 PDFs after you type the password. Choose AES 128-bit only for very old readers.'],
+        ['Is my password uploaded?', 'No. The password and the file never leave your browser.'],
+        ['What if I forget the password?', 'There is no way to recover it, not even for us. Keep a copy of the original file or write the password down somewhere safe.'],
+        ['What is the owner password?', 'It is a second password that lets you change or remove the restrictions later. If you leave it empty, a random one is made and shown to you.'],
+        ['Do restrictions work everywhere?', 'Most readers respect them, but some programs ignore them. Only the open password truly keeps people out.']
+      ],
+      icon: '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4M12 15v2"/>'
+  },
+  {
+      slug: 'crop-pdf', cat: 'PDF tools', name: 'Crop PDF',
+      title: 'Crop PDF - Trim PDF Margins Online Free, No Upload',
+      desc: 'Crop PDF pages by dragging a box on the page, or trim white margins automatically. Apply to all pages or the ones you choose. Free, in your browser.',
+      card: 'Cut margins or keep just part of each page.',
+      intro: 'Cut away margins or keep only the part of a page you need. Drag a box on the preview, or let the tool find the white margins for you. Your PDF stays on your device.',
+      steps: ['Click the box or drop your PDF.', 'Drag the crop box or its handles over the page, or press Trim white margins.', 'Choose all pages, this page or a list of pages.', 'Click Crop PDF, then Download cropped PDF.'],
+      faq: [
+        ['Is my PDF uploaded?', 'No. It is previewed and cropped in your browser, on your own device.'],
+        ['Does cropping reduce quality?', 'No. Pages are not redrawn; the tool only changes which part of each page is shown, so text stays sharp and selectable.'],
+        ['Is the cut-away part deleted?', 'It is hidden, not erased. Every reader and printer shows the new size, but the hidden content is still inside the file. Do not rely on cropping to remove private information.'],
+        ['Can I crop pages of different sizes?', 'Yes. The box is applied as the same share of each page, or choose "Trim white margins on every page separately" to fit each page on its own.'],
+        ['Does it work on a phone?', 'Yes. Drag the box and the round handles with your finger.']
+      ],
+      icon: '<path d="M6 2v14a2 2 0 0 0 2 2h14"/><path d="M18 22V8a2 2 0 0 0-2-2H2"/>'
+  },
+  {
+      slug: 'extract-images-from-pdf', cat: 'PDF tools', name: 'Extract Images from PDF',
+      title: 'Extract Images from PDF - Save Original Pictures Free',
+      desc: 'Pull every picture out of a PDF in its original quality. JPEG photos are saved untouched, other images as PNG. Download one by one or as a ZIP.',
+      card: 'Save the pictures inside a PDF as files.',
+      intro: 'Get the photos and pictures that are inside a PDF as separate image files, at the quality they were stored in. Nothing is uploaded; the PDF is read on your device.',
+      steps: ['Click the box or drop your PDF.', 'Optionally type page numbers and choose whether to skip tiny images.', 'Click Extract images.', 'Tap a picture to save it, or click Download all (ZIP).'],
+      faq: [
+        ['Are the images saved at full quality?', 'Yes. JPEG photos are copied out byte for byte, exactly as stored in the PDF. Other pictures are saved as lossless PNG, with transparency when the PDF has it.'],
+        ['Why are some pictures missing?', 'Text, lines, charts and logos drawn by the PDF itself are not images. To save those, use PDF to PNG, which turns whole pages into pictures.'],
+        ['What are the tiny images that get skipped?', 'Many PDFs contain small dots, lines and icons stored as images. By default images under 32 pixels are skipped; choose "Keep every image" to include them.'],
+        ['Does it work on scanned PDFs?', 'Yes. Each scanned page is usually one image, including black-and-white fax and JBIG2 scans, which are saved as PNG.'],
+        ['Is my PDF uploaded?', 'No. Everything runs in your browser.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="M21 15l-5-5L5 21"/>'
+  },
+  {
+      slug: 'pdf-to-png', cat: 'PDF tools', name: 'PDF to PNG',
+      title: 'PDF to PNG Converter - High Quality, Transparent, Free',
+      desc: 'Convert PDF pages to sharp PNG images up to 300 dpi, with an optional transparent background. Choose pages, download as ZIP. No upload.',
+      card: 'Turn PDF pages into sharp PNG images.',
+      intro: 'Turn every page of a PDF, or just the pages you choose, into lossless PNG pictures. Pick the resolution and an optional transparent background. Your file stays on your device.',
+      steps: ['Click the box or drop your PDF.', 'Choose the resolution, and type pages if you only need some.', 'Tick Transparent background if you want no white paper.', 'Click Convert to PNG, then download the images or the ZIP.'],
+      faq: [
+        ['Why PNG instead of JPG?', 'PNG is lossless, so text, lines and diagrams stay perfectly sharp with no blurry edges. It can also be transparent. JPG files are smaller and better for photos.'],
+        ['What does transparent background do?', 'The white paper behind the page is left out, so text and drawings sit on a see-through background. This is useful for logos, signatures and slides.'],
+        ['Which resolution should I choose?', 'High (144 dpi) suits screens and documents. Print quality (300 dpi) is best for printing but gives much bigger files.'],
+        ['How many pages can I convert?', 'Up to 300 pages at a time. Type a range such as 1-50 for bigger PDFs.'],
+        ['Is my PDF uploaded?', 'No. The pages are drawn in your browser on your own device.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="10" cy="12" r="1.5"/><path d="M19 17l-4-4-6 6"/>'
+  },
+  {
+      slug: 'grayscale-pdf', cat: 'PDF tools', name: 'Grayscale PDF',
+      title: 'Grayscale PDF - Convert PDF to Black and White Free',
+      desc: 'Make a PDF grayscale (black and white) for cheaper printing. Keep text selectable, or rebuild pages as true grey images. Free, runs in your browser.',
+      card: 'Turn a colour PDF into black and white.',
+      intro: 'Remove the colour from a PDF so it prints in black and white or shades of grey. Choose a fast mode that keeps text selectable, or a strong mode that rebuilds every page in grey. Nothing is uploaded.',
+      steps: ['Click the box or drop your PDF.', 'Choose how to convert: keep text selectable, or rebuild pages as grey images.', 'Click Convert to greyscale and check the preview.', 'Click Download grey PDF.'],
+      faq: [
+        ['What is the difference between the two modes?', 'Keep text selectable adds a grey filter over each page, so text stays sharp and searchable and the file stays small. Rebuild pages turns each page into a grey picture, which truly removes all colour but makes text unselectable.'],
+        ['Which mode should I use for a print shop?', 'Use Rebuild pages as grey images. Some print shops check the file for colour, and only this mode removes the colour data completely.'],
+        ['Will links and form fields still work?', 'In Keep text selectable mode, yes, but comments, highlights and form fields keep their colour. In Rebuild mode they are flattened into the page picture.'],
+        ['What does pure black and white do?', 'It turns every pixel either black or white, which suits text and scanned documents and makes them crisp.'],
+        ['Is my PDF uploaded?', 'No. Everything runs in your browser on your device.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="12" cy="14" r="3.5"/><path d="M12 10.5v7a3.5 3.5 0 0 0 0-7z" fill="currentColor"/>'
   }
 ];
