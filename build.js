@@ -554,7 +554,7 @@ ${contact}` },
   <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}" data-test-api="${esc(CARD.checkoutApiLater || '')}">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
   <p class="pay-next">Next: pick <b>Card, Google Pay, PayPal</b> or another way on the secure page, then pay. It takes about <b>1 minute</b>.</p>
-  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $${CARD.min}. More payment options show up from $10.</p>
+  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $<span id="payMin">${CARD.min}</span>. More payment options show up from $10.</p>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
 <div class="pay-step"><span class="pay-n">1</span><b>Pick a coin and copy its address</b></div>
@@ -595,9 +595,25 @@ ${contact}` },
   amts.forEach(function (b) { b.addEventListener('click', function () { amts.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); own.value = ''; if (go.dataset.api) say(''); label(); }); });
   own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) (document.querySelector('.amt[data-amt="10"]') || amts[0]).setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
   label();
-  // Wake PayMeGate up while the visitor chooses an amount, so the checkout opens fast when they press Pay.
+  // Ask the Worker for this visitor's minimum (by country: $2 where Stripe works, $6 elsewhere).
+  // The same call wakes PayMeGate up, so the checkout opens fast when they press Pay.
+  function setMin(m) {
+    m = Number(m); if (!isFinite(m) || m <= 0) return;
+    MIN = m; document.getElementById('payMin').textContent = m; own.min = m;
+    var on = document.querySelector('.amt[aria-pressed="true"]'), first = null;
+    amts.forEach(function (x) { var ok = Number(x.dataset.amt) >= m; x.hidden = !ok; if (ok && !first) first = x; if (!ok && x === on) on = null; });
+    if (!on && own.value.trim() === '' && first) { amts.forEach(function (x) { x.setAttribute('aria-pressed', String(x === first)); }); }
+    label();
+  }
   var woke = 0;
-  function wake() { if (!go.dataset.api || Date.now() - woke < 120000) return; woke = Date.now(); try { fetch(go.dataset.api.split('/checkout')[0] + '/methods',{ mode: 'no-cors', cache: 'no-store' }).catch(function () {}); } catch (e) {} }
+  function wake() {
+    if (!go.dataset.api || Date.now() - woke < 120000) return; woke = Date.now();
+    var base = go.dataset.api.split('/checkout')[0];
+    fetch(base + '/info', { cache: 'no-store' })
+      .then(function (r) { if (!r.ok) throw 0; return r.json(); })
+      .then(function (d) { setMin(d.min); })
+      .catch(function () { try { fetch(base + '/methods', { mode: 'no-cors', cache: 'no-store' }).catch(function () {}); } catch (e) {} });
+  }
   wake();
   ['pointerdown', 'focusin', 'keydown'].forEach(function (ev) { document.getElementById('payCard').addEventListener(ev, wake); });
   go.addEventListener('click', function () {

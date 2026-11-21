@@ -26,7 +26,14 @@ const ALLOWED_ORIGINS = ['https://gettoolnest.xyz', 'https://www.gettoolnest.xyz
 const SITE = 'https://gettoolnest.xyz';
 const OWNER_EMAIL = 'gettoolnest14@gmail.com';
 const CURRENCY = 'USD';
-const MIN = 2;      // dollars (smallest minimum of any method; crypto works from $2 everywhere)
+const MIN = 2;      // dollars: Stripe's minimum, for visitors in Stripe countries
+const MIN_WORLD = 6; // dollars: everywhere else the cheapest card method (Stix) starts at $6
+// Countries where PayMeGate's Stripe (US/EU) card option works: US, EU/EEA, UK, Switzerland.
+const STRIPE_COUNTRIES = new Set('US AT BE BG HR CY CZ DK EE FI FR DE GR HU IE IT LV LT LU MT NL PL PT RO SK SI ES SE IS LI NO GB CH'.split(' '));
+function minFor(request) {
+  const c = (request.cf && request.cf.country) || '';
+  return { country: c, min: STRIPE_COUNTRIES.has(c) ? MIN : MIN_WORLD };
+}
 const MAX = 1000;   // dollars
 // Every card / wallet payment method on this account (cards, Google Pay, Apple Pay, PayPal...). PayMeGate itself shows each
 // visitor only the ones that work in their country, so people can pay however they like.
@@ -54,13 +61,18 @@ function methods(env, amount) {
 }
 
 export default {
-  async fetch(request, env) {
+  async fetch(request, env, ctx) {
     const origin = request.headers.get('Origin') || '';
     const url = new URL(request.url);
 
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
     if (url.pathname === '/webhook' && request.method === 'POST') return webhook(request, env);
     if (url.pathname === '/methods' && request.method === 'GET') return listMethods(env);
+    if (url.pathname === '/info' && request.method === 'GET') {
+      // Tells the Support page this visitor's minimum, and wakes PayMeGate up so Pay is fast.
+      if (env.PAYMEGATE_API_KEY && ctx && ctx.waitUntil) ctx.waitUntil(fetch(API + '/v1/payment-methods', { headers: { 'X-API-Key': env.PAYMEGATE_API_KEY } }).catch(() => {}));
+      return json(minFor(request), 200, origin);
+    }
     if (url.pathname === '/status' && request.method === 'GET') return orderStatus(url, env, origin);
     if (url.pathname === '/notify-test' && request.method === 'GET') return notifyTest(url, env);
     if (request.method !== 'POST' || url.pathname !== '/checkout') return json({ error: 'Not found' }, 404, origin);
@@ -70,8 +82,9 @@ export default {
     let body;
     try { body = await request.json(); } catch (e) { return json({ error: 'Bad request.' }, 400, origin); }
     const amount = Math.round(Number(body && body.amount) * 100) / 100;
-    if (!isFinite(amount) || amount < MIN || amount > MAX) {
-      return json({ error: `Please choose an amount between $${MIN} and $${MAX}.` }, 400, origin);
+    const low = minFor(request).min;
+    if (!isFinite(amount) || amount < low || amount > MAX) {
+      return json({ error: `Please choose an amount between $${low} and $${MAX}.` }, 400, origin);
     }
     const email = String((body && body.email) || '').trim().slice(0, 254);
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json({ error: 'Please enter a valid email address.' }, 400, origin);
