@@ -699,11 +699,11 @@ module.exports = [
       title: 'Image to Text Converter - Free OCR Online, No Upload',
       desc: 'Copy text from photos, screenshots and scans in 12 languages. Paste with Ctrl+V or drop several images, then copy or download the text. Runs on your device.',
       card: 'Copy the text out of photos and screenshots.',
-      intro: 'Turn the words in a picture into text you can copy and edit. Drop images or paste a screenshot, and the text appears in seconds. The reading happens on your device, so your pictures stay private.',
-      steps: ['Drop one or more images on the box, or press Ctrl+V to paste a screenshot.', 'Wait while each image is read. The bar shows the progress.', 'Choose whether to keep line breaks or join lines into paragraphs, and correct any mistakes.', 'Press Copy text or Download .txt.'],
+      intro: 'Turn the words in a picture into text you can copy and edit, in English, Arabic, Chinese, French, German, Hindi, Indonesian, Portuguese, Russian, Spanish, Turkish or Urdu. Drop images or paste a screenshot, and the text appears in seconds. The reading happens on your device, so your pictures stay private.',
+      steps: ['Choose the language of the text.', 'Drop one or more images on the box, or press Ctrl+V to paste a screenshot.', 'Wait while each image is read, then choose whether to keep line breaks and correct any mistakes.', 'Press Copy text or Download .txt.'],
       faq: [
-        ['Are my images uploaded?', 'No. The text is read by your own browser. The text reader downloads its English data from this site the first time (about 7 MB) and then works offline.'],
-        ['Which languages can it read?', 'English. Other languages that use the Latin alphabet may partly work, but accented letters are often misread, and scripts such as Arabic, Chinese or Hindi are not supported yet.'],
+        ['Are my images uploaded?', 'No. The text is read by your own browser. The reader and the data for your language are downloaded from this site the first time (about 4 MB plus 0.6 to 3 MB per language) and are then kept for offline use.'],
+        ['Which languages can it read?', 'English, Arabic, Chinese (Simplified), French, German, Hindi, Indonesian, Portuguese, Russian, Spanish, Turkish and Urdu. If your text mixes a language with English words, tick "The text also has English words in it".'],
         ['Can it read handwriting?', 'Only very neat printed handwriting, and not reliably. It is made for printed text, screenshots and scans.'],
         ['What if my picture is sideways or upside down?', 'With Orientation set to Automatic, the tool tries the picture turned 90, 180 and 270 degrees when the upright reading looks poor, and keeps the best result. You can also set the orientation by hand.'],
         ['How accurate is it?', 'On clear screenshots and flat, sharp scans it is usually close to perfect. Blurry, angled or low-contrast photos produce more mistakes, so always check names and numbers.']
