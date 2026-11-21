@@ -541,7 +541,7 @@ ${contact}` },
 <p><b>But if you would like to support us, you can send a gift</b> by card or with crypto, in any amount. It pays for the website and helps us build new tools. Thank you! ❤</p>
 <h2 class="pay-q">How would you like to give?</h2>
 <div class="paypick" role="tablist" aria-label="How to give">
-  <button type="button" role="tab" id="tabCard" aria-controls="payCard" aria-pressed="true"><span class="pp-ic" aria-hidden="true">💳</span><span class="pp-tx"><b>Card</b><small>Visa, Mastercard, Google Pay, Apple Pay</small></span><span class="pp-ok" aria-hidden="true">✓</span></button>
+  <button type="button" role="tab" id="tabCard" aria-controls="payCard" aria-pressed="true"><span class="pp-ic" aria-hidden="true">💳</span><span class="pp-tx"><b>Card &amp; more</b><small>Visa, Mastercard, Google Pay, Apple Pay, PayPal and more</small></span><span class="pp-ok" aria-hidden="true">✓</span></button>
   <button type="button" role="tab" id="tabCrypto" aria-controls="payCrypto" aria-pressed="false"><span class="pp-ic" aria-hidden="true">🪙</span><span class="pp-tx"><b>Crypto</b><small>USDT, USDC, Bitcoin</small></span><span class="pp-ok" aria-hidden="true">✓</span></button>
 </div>
 <div class="paypanel" id="payCard" role="tabpanel" aria-labelledby="tabCard">
@@ -553,7 +553,7 @@ ${contact}` },
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
   <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}" data-test-api="${esc(CARD.checkoutApiLater || '')}">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
-  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $${CARD.min}.</p>
+  <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $${CARD.min}. More payment options show up from $10.</p>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
 <div class="pay-step"><span class="pay-n">1</span><b>Pick a coin and copy its address</b></div>
