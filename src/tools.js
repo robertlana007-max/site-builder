@@ -2147,5 +2147,361 @@ module.exports = [
       ['Does it work on phones?', 'Yes. Tap to change colours. On iPhone the test fills the page instead of using true full screen.']
     ],
     icon: '<rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/><path d="M7 8h2v2H7z"/>'
+  },
+  {
+      slug: 'emi-calculator',
+      cat: 'Finance calculators',
+      name: 'EMI Calculator',
+      title: 'EMI Calculator - Loan EMI with Prepayment & Schedule',
+      desc: 'Work out the monthly EMI for a home, car or personal loan, see total interest, a yearly chart and full schedule, and test prepayments.',
+      card: 'Loan EMI, interest, prepayments and schedule.',
+      intro: 'Enter a loan amount, interest rate and term to see your monthly payment (EMI), the total interest and a month-by-month repayment schedule. Add prepayments to see how much interest you save.',
+      steps: [
+    'Pick a loan type preset or type the loan amount, yearly interest rate and term.',
+    'Optionally add an extra monthly payment or a one-time prepayment.',
+    'Read the EMI, total interest and payoff date, then check the chart and schedule.',
+    'Download the schedule as CSV or copy a summary.'
+  ],
+      faq: [
+    [ 'What is an EMI?', 'EMI stands for equated monthly instalment: the same payment every month that covers interest and repays part of the loan until it is fully paid.' ],
+    [ 'Which formula does it use?', 'EMI = P × r × (1 + r)^n ÷ ((1 + r)^n − 1), where P is the loan amount, r is the yearly rate ÷ 12 ÷ 100 and n is the number of months.' ],
+    [
+      'How does prepayment work here?',
+      'Prepayments go straight to the balance and the EMI stays the same, so the loan finishes earlier. The tool shows the interest saved and how many months sooner you are debt-free.'
+    ],
+    [ 'Does it include fees or insurance?', 'Only if you add a processing fee, which is included in the total paid. Insurance, taxes and other charges from your lender are not included.' ],
+    [ 'Can I use it for any currency?', 'Yes. Pick from about 40 currencies or type your own symbol. The maths is the same everywhere.' ]
+  ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 15l3-3 3 2 4-5"/><path d="M7 8h4"/>'
+  },
+  {
+      slug: 'income-tax-calculator',
+      cat: 'Finance calculators',
+      name: 'Income Tax Calculator',
+      title: 'Income Tax Calculator - Salary Tax & Take-Home Pay',
+      desc: 'Estimate income tax and take-home pay with editable tax slabs. Presets for the US, UK, Canada, Australia, India and more, or enter your own.',
+      card: 'Tax and take-home pay with editable slabs.',
+      intro: 'Enter your salary to estimate income tax, take-home pay and your average and top tax rates. Start from a country preset or type the tax slabs for any country.',
+      steps: [
+    'Choose a country preset, or Custom to enter your own tax slabs.',
+    'Type your gross salary and choose per year or per month.',
+    'Read the yearly and monthly tax, take-home pay and tax rates.',
+    'Edit any slab, deduction or levy to match your situation.'
+  ],
+      faq: [
+    [
+      'Which countries are included?',
+      'Presets cover United States federal tax (single and married joint, 2026), the United Kingdom (2026-27), Canada federal (2026), Australia (2026-27), India new regime (FY 2026-27), Pakistan salaried (tax years 2026 and 2027) and the UAE. Any other country works with Custom slabs.'
+    ],
+    [ 'How do tax slabs work?', 'Each slab taxes only the part of your income that falls inside it. Moving into a higher slab does not raise the tax on the income below it.' ],
+    [
+      'Is this exact?',
+      'No. It is an estimate of income tax on salary. It does not include every credit, allowance, social security or local tax. Check the official tax website or an adviser before you file.'
+    ],
+    [
+      'Are the rates up to date?',
+      'Each preset shows its tax year and a link to the official source. Tax rules change every year, so check the latest rates there. You can edit any slab if something has changed.'
+    ],
+    [
+      'What are cess, levy and surcharge?',
+      'A cess or surcharge is an extra percentage of the tax (for example India’s 4% cess). A levy is a percentage of taxable income (for example Australia’s Medicare levy). Leave them at 0 if they do not apply.'
+    ],
+    [ 'Is my salary saved or sent anywhere?', 'Nothing is sent. Your entries and any custom slabs are kept only in this browser.' ]
+  ],
+      icon: '<path d="M6 2h12v20l-3-2-3 2-3-2-3 2z"/><path d="M9 7h6M9 11h6"/><path d="M9.5 16l5-3"/><circle cx="9.5" cy="13.5" r=".5"/><circle cx="14.5" cy="16" r=".5"/>'
+  },
+  {
+      slug: 'sip-calculator',
+      cat: 'Finance calculators',
+      name: 'SIP Calculator',
+      title: 'SIP Calculator - Monthly Investment Growth with Step-Up',
+      desc: 'See how a monthly investment (SIP) or a lump sum could grow. Add a yearly step-up, view the growth chart and a year-by-year table.',
+      card: 'Monthly investment growth with step-up.',
+      intro: 'Estimate the future value of a regular monthly investment or a one-time lump sum at an expected yearly return, with an optional yearly step-up.',
+      steps: [
+    'Choose Monthly investment (SIP) or Lump sum.',
+    'Enter the amount, expected yearly return and number of years.',
+    'Optionally add a yearly step-up to raise your monthly amount each year.',
+    'Read the amount invested, estimated gains and total value, and check the chart.'
+  ],
+      faq: [
+    [ 'What is a SIP?', 'A systematic investment plan: investing a fixed amount every month, usually into a fund. It works the same for any regular saving into an investment account.' ],
+    [
+      'How is the SIP value calculated?',
+      'Like most SIP calculators: the yearly return ÷ 12 is applied every month, and each payment is made at the start of the month. A lump sum is compounded once a year.'
+    ],
+    [ 'What is a step-up?', 'Raising your monthly amount by a fixed percentage each year, for example 10% as your income grows. It can make a big difference over long periods.' ],
+    [ 'Are returns guaranteed?', 'No. Real investments go up and down. The calculator shows what a steady average return would give, which helps you plan but is not a promise.' ],
+    [ 'Does it include fees or tax?', 'No. Use a lower expected return to allow for fund fees and taxes.' ]
+  ],
+      icon: '<path d="M3 20h18"/><path d="M5 17l4-5 4 3 6-8"/><path d="M15 7h4v4"/>'
+  },
+  {
+      slug: 'inflation-calculator',
+      cat: 'Finance calculators',
+      name: 'Inflation Calculator',
+      title: 'Inflation Calculator - Future Cost & Purchasing Power',
+      desc: 'See what something will cost in the future and how much buying power your money loses, using any inflation rate you choose.',
+      card: 'Future prices and buying power over time.',
+      intro: 'Type an amount, an inflation rate and a number of years to see the future cost of the same things and what today’s money will really be worth.',
+      steps: [ 'Enter an amount in today’s money.', 'Enter the yearly inflation rate you expect.', 'Enter the number of years.', 'Read the future cost, buying power and the year-by-year table.' ],
+      faq: [
+    [ 'How is it calculated?', 'Future cost = amount × (1 + rate)^years. Buying power = amount ÷ (1 + rate)^years.' ],
+    [
+      'Which inflation rate should I use?',
+      'Use your country’s recent average from its statistics office or central bank, or a guess for the future. Rates differ a lot between countries and years.'
+    ],
+    [ 'Can I use a negative rate?', 'Yes. A negative rate means deflation: prices fall and money buys more.' ],
+    [ 'Does it use official price data?', 'No. You choose the rate, so it works for any country and any period.' ],
+    [ 'How long until prices double?', 'The tool shows it. A quick rule: 70 ÷ the inflation rate is roughly the years for prices to double.' ]
+  ],
+      icon: '<path d="M12 3v18"/><path d="M16 7.5c0-1.7-1.8-3-4-3s-4 1.3-4 3 1.8 2.6 4 3 4 1.3 4 3-1.8 3-4 3-4-1.3-4-3"/><path d="M19 4l2 2-2 2"/>'
+  },
+  {
+      slug: 'roi-calculator',
+      cat: 'Finance calculators',
+      name: 'ROI Calculator',
+      title: 'ROI Calculator - Return on Investment & Break-Even',
+      desc: 'Calculate return on investment, annualized ROI and profit, or find your break-even point in units and sales. Free and simple.',
+      card: 'ROI, yearly ROI and break-even point.',
+      intro: 'Find the return on an investment as a percentage and per year, or switch to Break-even to see how many units you must sell to cover your costs.',
+      steps: [
+    'Choose Return on investment or Break-even.',
+    'For ROI, enter the amount invested, the amount returned and how long you held it.',
+    'For break-even, enter fixed costs, price per unit and variable cost per unit.',
+    'Read the results and copy them if you need to share.'
+  ],
+      faq: [
+    [ 'How is ROI calculated?', 'ROI = (amount returned − total cost) ÷ total cost × 100, where total cost is the amount invested plus extra costs.' ],
+    [
+      'What is annualized ROI?',
+      'The yearly growth rate that would give the same result: (returned ÷ cost)^(1 ÷ years) − 1. It lets you compare investments held for different lengths of time.'
+    ],
+    [ 'How is the break-even point found?', 'Break-even units = fixed costs ÷ (price − variable cost per unit), rounded up to a whole unit.' ],
+    [ 'Why does break-even say the price is too low?', 'If each unit costs as much as or more than its price, every sale loses money and you never break even.' ],
+    [ 'Is this financial advice?', 'No. It is a quick calculator to compare ideas. Include all costs for an honest result.' ]
+  ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M8 15l3-3 2 2 3-4"/><path d="M14 10h2v2"/>'
+  },
+  {
+      slug: 'savings-goal-calculator',
+      cat: 'Finance calculators',
+      name: 'Savings Goal Calculator',
+      title: 'Savings Goal Calculator - How Much to Save Each Month',
+      desc: 'Find out how much to save each month or week to reach a savings goal by a date, including interest, or how long a set amount takes.',
+      card: 'Monthly saving needed to reach a goal.',
+      intro: 'Set a goal, a date and your savings interest rate to see how much to put aside each month and week, and how long it takes if you save a set amount.',
+      steps: [
+    'Enter your savings goal and anything already saved.',
+    'Pick the date you want to reach it and your interest rate.',
+    'Read the monthly and weekly amount needed.',
+    'Optionally type what you can save per month to see when you will get there.'
+  ],
+      faq: [
+    [
+      'How is the monthly amount worked out?',
+      'It uses the future value of regular savings: your current savings grow with monthly interest, and the monthly deposit fills the gap to the goal by the date.'
+    ],
+    [ 'When are deposits made?', 'At the end of each month, with interest added monthly at the yearly rate ÷ 12.' ],
+    [ 'What if I already have enough?', 'If what you have saved will grow to the goal by the date, the tool tells you no more saving is needed.' ],
+    [ 'Should I include interest?', 'Use your savings account rate. Use 0 for cash or if you are unsure; that gives a safe, slightly higher monthly amount.' ],
+    [ 'Can I see when I will reach the goal?', 'Yes. Type how much you can save per month in the second box to see the number of months and the month you reach it.' ]
+  ],
+      icon: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/><path d="M17 3v4h4"/>'
+  },
+  {
+      slug: 'budget-planner',
+      cat: 'Finance calculators',
+      name: 'Budget Planner',
+      title: 'Budget Planner - Monthly Budget with 50/30/20 Guide',
+      desc: 'Plan your monthly budget: list income and expenses, compare them with the 50/30/20 rule, see where money goes, then print or save a PDF.',
+      card: 'Monthly budget with the 50/30/20 guide.',
+      intro: 'List your monthly income and costs, sort each cost into needs, wants or savings, and see how your budget compares with the 50/30/20 guide.',
+      steps: [
+    'Enter your monthly take-home income.',
+    'Edit the example expenses and put each in Needs, Wants or Savings.',
+    'Check what is left over and the 50/30/20 comparison.',
+    'Print it or download a PDF. Your budget is saved on this device.'
+  ],
+      faq: [
+    [
+      'What is the 50/30/20 rule?',
+      'A simple guide: about 50% of take-home pay for needs, 30% for wants and 20% for savings and extra debt payments. It is a starting point, not a strict rule.'
+    ],
+    [ 'Is my budget saved?', 'Yes, automatically, but only in this browser on this device. Nothing is uploaded.' ],
+    [ 'Can I change the categories?', 'Yes. Rename, add or remove any income or expense and choose its group.' ],
+    [ 'Which currency can I use?', 'About 40 currencies are listed, or choose Other to type your own symbol.' ],
+    [ 'Can I print or share it?', 'Yes. Press Print or Download PDF for a clean one-page summary, or Copy summary for a short text.' ]
+  ],
+      icon: '<rect x="3" y="5" width="18" height="15" rx="2"/><path d="M3 10h18"/><path d="M7 15h3M14 15h3"/><path d="M8 3v4M16 3v4"/>'
+  },
+  {
+      slug: 'freelancer-rate-calculator',
+      cat: 'Finance calculators',
+      name: 'Freelancer Rate Calculator',
+      title: 'Freelance Rate Calculator - Hourly, Day & Project Rates',
+      desc: 'Work out your freelance hourly, day and project rate from the income you want, billable hours, costs, tax and platform fees like Upwork or Fiverr.',
+      card: 'Hourly and project rates that cover costs.',
+      intro: 'Find the hourly and day rate you need to charge to take home the income you want after business costs, tax, platform fees and time off.',
+      steps: [
+    'Enter the take-home income you want per year or month.',
+    'Enter your billable hours per week and weeks off per year.',
+    'Add business costs, tax, platform and payment fees and a safety buffer.',
+    'Read your hourly, day, monthly and yearly rate, and price a project by hours.'
+  ],
+      faq: [
+    [
+      'How is the rate calculated?',
+      'It starts from your take-home goal, adds tax on profit and your business costs, then grosses up for platform and payment fees and a safety buffer. That total is divided by your billable hours in a year.'
+    ],
+    [ 'What are billable hours?', 'Hours you can charge a client for. Most freelancers bill 20 to 30 hours a week, because admin, sales and learning are unpaid.' ],
+    [ 'Are the platform fees exact?', 'They are typical figures (for example Fiverr 20%, Upwork around 10%) and platforms change them. Check your platform and type the exact fee.' ],
+    [ 'Should I include tax?', 'Yes. Type an estimate of income tax plus any self-employed social charges as a share of profit. Rules differ by country.' ],
+    [ 'How do I price a fixed project?', 'Type the estimated hours in Price a project. The tool multiplies by your rate and adds a margin for risk and changes.' ]
+  ],
+      icon: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><circle cx="12" cy="13.5" r="2.5"/>'
+  },
+  {
+      slug: 'receipt-generator',
+      cat: 'Generators',
+      name: 'Receipt Generator',
+      title: 'Free Receipt Generator - Make a PDF Receipt Online',
+      desc: 'Make a payment receipt with your logo, items, tax and payment method, then download a PDF or print it. Free, no sign-up, private.',
+      card: 'Printable PDF receipts with logo and tax.',
+      intro: 'Fill in your business, the customer, the items and how they paid to create a clean receipt with a live preview, then download it as a PDF or print it.',
+      steps: [
+    'Add your business name, contact details and logo.',
+    'Enter the receipt number, date, customer and items.',
+    'Add any discount and tax, the payment method and the amount received.',
+    'Check the preview, then press Download PDF or Print.'
+  ],
+      faq: [
+    [ 'Is the receipt generator free?', 'Yes. No sign-up, no watermark and no limit.' ],
+    [ 'Is my data uploaded?', 'No. Everything runs in your browser. Your draft and logo are saved only on this device.' ],
+    [ 'Can prices already include tax?', 'Yes. Choose “Already include tax” and the tool shows the tax part inside the total.' ],
+    [ 'What if the customer paid only part?', 'Type the amount received. The receipt shows the balance due, or the change given if they paid more.' ],
+    [ 'Which currencies work?', 'About 40 currencies are listed, or choose Other and type your own symbol.' ],
+    [ 'Can I print on small paper?', 'Yes. Choose A5 for a smaller page, or print and pick your paper size in the print window.' ]
+  ],
+      icon: '<path d="M5 2h14v20l-2.5-1.5L14 22l-2-1.5L10 22l-2.5-1.5L5 22z"/><path d="M9 7h6M9 11h6M9 15h3"/>'
+  },
+  {
+      slug: 'quotation-generator',
+      cat: 'Generators',
+      name: 'Quotation Generator',
+      title: 'Free Quotation Generator - Make a PDF Quote or Estimate',
+      desc: 'Create a professional quotation or estimate with your logo, items, discount, tax, deposit and terms, then download a PDF or print.',
+      card: 'Make PDF quotes and estimates in minutes.',
+      intro: 'Build a clear quotation, estimate or proposal with a live preview, then download it as a PDF or print it for your client to sign.',
+      steps: [
+    'Add your business details, logo and the client.',
+    'Choose the title, number, date and how long the quote is valid.',
+    'Enter the items, plus any discount, tax, other charges and deposit.',
+    'Add notes and terms, then press Download PDF or Print.'
+  ],
+      faq: [
+    [ 'What is the difference between a quote and an invoice?', 'A quote is an offer sent before work starts, showing the expected price. An invoice asks for payment after the work or sale.' ],
+    [ 'Can I call it an estimate or proposal?', 'Yes. Choose Quotation, Estimate, Price quote or Proposal as the document title.' ],
+    [ 'Is it free and private?', 'Yes. No sign-up or watermark, and everything stays on your device.' ],
+    [ 'Can the client sign it?', 'Yes. An “Accepted by” signature line can be added at the bottom.' ],
+    [ 'Can I ask for a deposit?', 'Yes. Type a deposit percentage and the amount appears under the total.' ],
+    [ 'Do long quotes work?', 'Yes. Long quotes continue onto extra pages with page numbers.' ]
+  ],
+      icon: '<path d="M6 2h9l5 5v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z"/><path d="M14 2v6h6"/><path d="M8 13h5M8 17h3"/><path d="M15 15l1.5 1.5L19 14"/>'
+  },
+  {
+      slug: 'salary-slip-generator',
+      cat: 'Generators',
+      name: 'Salary Slip Generator',
+      title: 'Salary Slip Generator - Free Payslip PDF Maker',
+      desc: 'Make a professional salary slip (payslip) with earnings, deductions, net pay in words and signatures, then download a PDF or print.',
+      card: 'Payslip PDF with earnings and deductions.',
+      intro: 'Enter the company, employee, pay period, earnings and deductions to create a clean payslip with net pay, then download it as a PDF or print it.',
+      steps: [
+    'Add the company details and logo.',
+    'Enter the employee details and pay period.',
+    'List earnings and deductions with their amounts.',
+    'Check the net pay and preview, then press Download PDF or Print.'
+  ],
+      faq: [
+    [ 'Is this payslip generator free?', 'Yes. No sign-up or watermark, and no limit.' ],
+    [ 'Is employee data uploaded?', 'No. Everything stays in your browser. The draft is saved only on this device.' ],
+    [ 'Does it calculate tax?', 'No. Type the tax and other deductions yourself. The Income Tax Calculator can help estimate tax.' ],
+    [ 'Can I make next month’s slip quickly?', 'Yes. Press Next month: the period and payment date move forward and the amounts stay for you to edit.' ],
+    [ 'Is net pay shown in words?', 'Yes, in English, and you can turn it off.' ],
+    [ 'Which currencies work?', 'About 40 currencies, or type your own symbol.' ]
+  ],
+      icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="10" r="2"/><path d="M5.5 16a3 3 0 0 1 6 0"/><path d="M14 9h4M14 13h4M14 16h2"/>'
+  },
+  {
+      slug: 'savings-circle-calculator',
+      cat: 'Finance calculators',
+      name: 'Savings Circle (ROSCA) Calculator',
+      title: 'Savings Circle Calculator - ROSCA Payout Schedule',
+      desc: 'Plan a savings circle (ROSCA), also called committee, tanda, susu, chit fund or hui: payouts, dates, a random draw and a shareable schedule.',
+      card: 'Plan a savings circle and its payout order.',
+      intro: 'Set the members, the amount each pays and how often, then get the payout per round and a dated schedule of who receives the pot when. Share it on WhatsApp, print it or save a PDF.',
+      steps: [
+    'Enter the number of members, the amount each pays per round and how often.',
+    'Pick the first payout date and type member names if you like.',
+    'Choose the payout order: as listed, reversed or a random draw.',
+    'Share the schedule on WhatsApp, copy it, print it or download a PDF.'
+  ],
+      faq: [
+    [
+      'What is a savings circle (ROSCA)?',
+      'A rotating savings and credit association: a group where everyone pays the same amount each round and one member takes the whole pot, until everyone has had a turn. It is known as a committee or BC in South Asia, tanda or cundina in Latin America, susu or esusu in West Africa and the Caribbean, chama in East Africa, hui in China, gameya in Egypt, kye in Korea and a chit fund in India.'
+    ],
+    [ 'How much does each member get?', 'The pot is the number of members × the amount each pays, minus any organiser fee. Everyone pays in the same total and receives the pot once.' ],
+    [ 'Is there interest?', 'No. Early receivers get an interest-free advance and later receivers are effectively saving. This tool does not handle bidding or auction circles.' ],
+    [ 'Is the random draw fair?', 'It shuffles the names with a random order. Press Draw again for a new order and share the result with everyone at the same time.' ],
+    [ 'Are the names saved?', 'Only in this browser on this device. Nothing is uploaded.' ]
+  ],
+      icon: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="4" r="1.5"/><circle cx="19" cy="15" r="1.5"/><circle cx="5" cy="15" r="1.5"/><path d="M12 9v6M10 13l2 2 2-2"/>'
+  },
+  {
+      slug: 'bill-splitter',
+      cat: 'Finance calculators',
+      name: 'Bill Splitter',
+      title: 'Bill Splitter - Split Trip & Group Expenses Fairly',
+      desc: 'Split a group bill or trip expenses: add who paid what, choose who shares each cost, and see who owes whom with the fewest payments.',
+      card: 'Who owes whom, with the fewest payments.',
+      intro: 'Add the people in your group and each expense with who paid and who shared it. The splitter works out everyone’s balance and the fewest payments to settle up.',
+      steps: [ 'Add the names of everyone in the group.', 'Add each expense, who paid it and who shares it.', 'Read who pays whom and each person’s balance.', 'Share the summary on WhatsApp or copy it.' ],
+      faq: [
+    [
+      'How does it decide who pays whom?',
+      'It works out each person’s balance (what they paid minus their share), then repeatedly matches the person who owes the most with the person owed the most. This settles everyone in as few payments as possible.'
+    ],
+    [ 'Can only some people share a cost?', 'Yes. Untick anyone who did not share an expense, such as someone who skipped a dinner.' ],
+    [ 'How is rounding handled?', 'Amounts are split to the cent. If a cost does not divide evenly, the extra cent goes to the first people ticked, so totals always match.' ],
+    [ 'Is my data saved?', 'Yes, in this browser only, so you can add expenses during a trip. Nothing is uploaded.' ],
+    [ 'Can I use any currency?', 'Yes. Pick from the list or type your own symbol.' ]
+  ],
+      icon: '<path d="M4 4h16v6H4z"/><path d="M12 10v10"/><path d="M8 14l-4 4M16 14l4 4"/><path d="M9 7h6"/>'
+  },
+  {
+      slug: 'debt-tracker',
+      cat: 'Finance calculators',
+      name: 'Debt Tracker (IOU Ledger)',
+      title: 'Debt Tracker - Private IOU Ledger for Money Lent & Owed',
+      desc: 'Keep a private ledger of money you lent and borrowed: balances per person, statements, CSV export and reminders. Saved only on your device.',
+      card: 'Private ledger of money lent and owed.',
+      intro: 'Record money you give to or get from friends, family or customers, and always know who owes you and whom you owe. Your ledger stays private on this device.',
+      steps: [
+    'Choose “I gave / lent money” or “I got / borrowed money”.',
+    'Type the person, amount, date and an optional note, then press Add entry.',
+    'Tap a person to see their entries and balance.',
+    'Export a statement PDF or CSV, send a reminder, and download backups.'
+  ],
+      faq: [
+    [ 'Where is my ledger stored?', 'Only in this browser on this device. It is never uploaded and is not part of account sync. Clearing your browser data deletes it.' ],
+    [ 'How do I keep it safe?', 'Press Download backup now and then and keep the file safe. Restore backup brings it back on any device.' ],
+    [ 'How is the balance worked out?', 'Money you gave counts as owed to you and money you got counts as owed by you. A positive balance means the person owes you.' ],
+    [ 'Can I send a reminder?', 'Yes. Tap a person and press Send reminder to open WhatsApp with a polite message showing the balance.' ],
+    [ 'Can I export my records?', 'Yes. Export CSV for spreadsheets, or Statement PDF for everyone or for one person with a running balance.' ],
+    [ 'Is it the same as a khata book?', 'Yes. It works like a simple khata or IOU notebook for personal and small shop credit.' ]
+  ],
+      icon: '<path d="M4 4h12a2 2 0 0 1 2 2v14H6a2 2 0 0 1-2-2z"/><path d="M18 8h2v12h-2"/><path d="M8 9h6M8 13h6"/><path d="M8 17l2-2M10 17l-2-2"/>'
   }
 ];
