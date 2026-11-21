@@ -1705,12 +1705,12 @@ module.exports = [
       desc: 'Pick ready-made broad, medium and niche hashtags for 75+ topics, add your own, keep within the 30 limit and copy them all in one tap. Free.',
       card: 'Hashtag sets for 75+ topics, copy in one tap.',
       intro: 'Choose a topic and tap hashtags, or let the tool mix a balanced set of broad, medium and niche tags. Add your own, stay within Instagram\'s 30-hashtag limit and copy them all at once.',
-      steps: ['Search for a topic, such as travel, food or Lahore, and tap it.', 'Tap hashtags to add them, or click Mix to pick a balanced set.', 'Add your own brand or event hashtags if you like.', 'Click Copy all and paste into your caption.'],
+      steps: ['Search for a topic, such as travel, food or football, and tap it.', 'Tap hashtags to add them, or click Mix to pick a balanced set.', 'Add your own brand or event hashtags if you like.', 'Click Copy all and paste into your caption.'],
       faq: [
         ['How many hashtags can I use on Instagram?', 'Up to 30 on a post or reel. The counter stops you at 30. Many creators get good results with 5 to 15 relevant tags.'],
         ['What are broad, medium and niche hashtags?', 'Broad tags are very common and move fast, niche tags are specific with smaller audiences, and medium tags sit in between. A mix gives reach and a better chance to stay visible.'],
         ['Does this show trending or live hashtag counts?', 'No. The sets are hand-picked starting points built into the page. The tool does not connect to Instagram or TikTok, so check tags in the app before you rely on them.'],
-        ['Can I add hashtags in Urdu, Hindi or Arabic?', 'Yes. Letters from any language work. Spaces and symbols are removed because they cannot be part of a hashtag.'],
+        ['Can I add hashtags in other languages, like Arabic, Hindi, Spanish or Chinese?', 'Yes. Letters from any language work. Spaces and symbols are removed because they cannot be part of a hashtag.'],
         ['Can I use these hashtags on TikTok?', 'Yes. Copy a smaller set of 3 to 6 relevant tags for TikTok, YouTube Shorts or Pinterest.']
       ],
       icon: '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/><circle cx="19" cy="19" r="2"/>'

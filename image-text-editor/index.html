@@ -288,7 +288,8 @@
   setupDrop('drop', 'file', function (f) {
     name = f.name.replace(/\.[^.]+$/, '');
     loadImage(f, function (im) {
-      if (!im) return say('bad', 'Could not read that picture.');
+      if (!im && (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type))) return say('bad', 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool, then come back.');
+      if (!im) return say('bad', 'Could not read that picture. Please choose a JPG, PNG, WebP, GIF or BMP image.');
       img = im; cv.width = im.naturalWidth; cv.height = im.naturalHeight; cv.style.width = '100%'; cv.style.maxWidth = im.naturalWidth + 'px';
       items = []; sel = -1; $('editor').hidden = false; $('panel').hidden = true; setMode(''); changed(); draw(true); findText();
       say('', f.name + ' · ' + im.naturalWidth + ' × ' + im.naturalHeight + ' px');
@@ -310,8 +311,9 @@
       return false;
     });
   }
-  $('undo').addEventListener('click', function () { if (items.length) removeItem(items[items.length - 1]); setMode(''); changed(); select(-1); });
-  $('del').addEventListener('click', function () { if (sel > -1) { removeItem(items[sel]); changed(); select(-1); } });
+  function rehint() { if (mode) return; $('notice').className = 'notice'; $('hint').textContent = zones.length ? 'Click a pink box on the picture to change that text, or click something you added to change or move it.' : items.length ? 'Click something you added to change or move it.' : 'Use “Add new text” or “Hide text by hand” to change the picture.'; }
+  $('undo').addEventListener('click', function () { if (items.length) removeItem(items[items.length - 1]); setMode(''); changed(); select(-1); rehint(); });
+  $('del').addEventListener('click', function () { if (sel > -1) { removeItem(items[sel]); changed(); select(-1); rehint(); } });
 
   cv.addEventListener('pointerdown', function (e) {
     if (!img) return;
@@ -360,7 +362,12 @@
   $('go').addEventListener('click', function () {
     var type = $('fmt').value;
     draw(false); // without the selection outline
-    cv.toBlob(function (b) {
+    var out = cv;
+    if (type === 'image/jpeg') { // JPG has no transparency: put see-through parts on white, not black
+      out = document.createElement('canvas'); out.width = cv.width; out.height = cv.height;
+      var oc = out.getContext('2d'); oc.fillStyle = '#fff'; oc.fillRect(0, 0, out.width, out.height); oc.drawImage(cv, 0, 0);
+    }
+    out.toBlob(function (b) {
       draw(true);
       if (!b) return say('bad', 'This picture is too large to save on this device.');
       if (lastUrl) URL.revokeObjectURL(lastUrl);

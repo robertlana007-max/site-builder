@@ -190,7 +190,7 @@
     c.strokeStyle = '#fff'; c.lineWidth = 2 * u; c.strokeRect(x, y, w, h);
     [[x, y], [x + w, y], [x, y + h], [x + w, y + h]].forEach(function (p) { c.fillStyle = '#fff'; c.fillRect(p[0] - 7 * u, p[1] - 7 * u, 14 * u, 14 * u); c.strokeStyle = '#2563eb'; c.strokeRect(p[0] - 7 * u, p[1] - 7 * u, 14 * u, 14 * u); });
   }
-  function ratio() { var v = $('aspect').value; if (v === 'free') return 0; if (v === 'orig') { return img.naturalWidth / img.naturalHeight; } return +v; }
+  function ratio() { var v = $('aspect').value; if (v === 'free') return 0; if (v === 'orig') { var F = frame(st, 1); return F.w / F.h; } /* the shape of the photo as it is now turned */ return +v; }
   function fitAspect(b, keepCentre) { // make the box match the chosen shape, as large as possible inside the frame
     var r = ratio(); if (!r) return b;
     var F = frame(st, 1), rn = r * F.h / F.w, w = b.w, h = w / rn;
@@ -308,7 +308,7 @@
     if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', 'Please choose a photo (JPG, PNG or WebP).'); return; }
     say('', 'Opening…');
     loadImage(f, function (im) {
-      if (!im || !im.naturalWidth) { say('bad', 'Could not read that photo. It may be damaged, or in a format your browser cannot open (like HEIC or RAW). Convert it to JPG first.'); return; }
+      if (!im || !im.naturalWidth) { say('bad', /\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type) ? 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool, then come back.' : 'Could not read that photo. It may be damaged, or in a format your browser cannot open (like RAW). Convert it to JPG first.'); return; }
       if (im.naturalWidth * im.naturalHeight > 60e6) { say('bad', 'That photo is ' + Math.round(im.naturalWidth * im.naturalHeight / 1e6) + ' megapixels, more than your browser can safely edit. Resize it below 50 megapixels first.'); return; }
       img = im; file = f; st = fresh(); hist = []; fut = []; last = ''; cropMode = false; srcKey = ''; $('aspect').value = 'free';
       $('editor').hidden = false; $('drop').querySelector('b').textContent = 'Open a different photo';
@@ -331,7 +331,7 @@
       processData(function () { var r = first || x.getImageData(0, 0, W, H); first = null; return r; }, params(st), function (out) {
         x.putImageData(new ImageData(out, W, H), 0, 0);
         var type = $('fmt').value;
-        if (type === 'image/jpeg') { x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
+        if (type === 'image/jpeg') { x.setTransform(1, 0, 0, 1, 0, 0); /* white behind see-through parts */ x.globalCompositeOperation = 'destination-over'; x.fillStyle = '#fff'; x.fillRect(0, 0, W, H); }
         PT.blob(c, type, $('q').value / 100).then(function (b) {
           c.width = c.height = 0; busy = false; $('prog').hidden = true; ui();
           if (!b) { say('bad', 'Your browser could not save in this format. Try JPG.'); return; }

@@ -58,7 +58,7 @@
   }
   function update() {
     var has = !!$('out').value.trim();
-    $('copy').disabled = !has; $('clr').disabled = !has && !results.length;
+    $('copy').disabled = !has; $('clr').disabled = !has && !results.length && !$('queue').children.length;
     if (url) { URL.revokeObjectURL(url); url = null; }
     if (has) {
       url = URL.createObjectURL(new Blob([$('out').value.replace(/\n/g, '\r\n')], { type: 'text/plain;charset=utf-8' }));
@@ -135,13 +135,14 @@
   async function next() {
     if (running) return;
     running = true; $('drop').setAttribute('aria-busy', 'true');
+    var fails = [];
     while (queue.length) {
       var job = queue.shift(), li = job.li, idx = ++handled, total = handled + queue.length;
       li.querySelector('small').textContent = 'Reading…';
       try {
         if (!window.Tesseract || !window.WebAssembly) throw new Error('This browser cannot run the text reader. Try an up-to-date Chrome, Edge, Firefox or Safari.');
         var img = await load(job.file);
-        if (!img || !(img.naturalWidth > 0)) throw new Error('This file could not be opened as a picture. HEIC photos from iPhones need converting to JPG first.');
+        if (!img || !(img.naturalWidth > 0)) throw new Error(/\.hei[cf]$/i.test(job.file.name) || /hei[cf]/i.test(job.file.type) ? 'HEIC photos (the iPhone format) cannot be opened in this browser. Convert it to JPG first with the HEIC to JPG tool.' : 'This file could not be opened as a picture. It may be damaged.');
         if (img.naturalWidth * img.naturalHeight > MAXPX) throw new Error('This picture is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.');
         var pre = total > 1 ? 'Image ' + idx + ' of ' + (handled + queue.length) + ': ' : '', base = 0, span = 100;
         progressFn = function (p) { tell(pre + (base ? 'Trying the picture turned another way… ' : 'Reading text… ') + Math.round(p * 100) + '%', base + p * span); };
@@ -165,7 +166,8 @@
         if (!edited) render(); else { $('out').value += ($('out').value ? '\n\n' : '') + (($('names').checked && results.length > 1) ? '— ' + job.file.name + ' —\n' : '') + shape(text); update(); }
       } catch (e) {
         li.className = 'err'; li.querySelector('small').textContent = 'Failed';
-        say('bad', job.file.name + ': ' + (e && e.message && !/^\d+$/.test(e.message) ? e.message : 'the text reader could not run on this device.'));
+        fails.push(job.file.name + ': ' + (e && e.message && !/^\d+$/.test(e.message) ? e.message : 'the text reader could not run on this device.'));
+        say('bad', fails.join(' · ')); update();
         if (worker && /abort|memory|terminated/i.test(String(e && e.message))) { try { worker.terminate(); } catch (x) {} worker = null; }
       }
     }
