@@ -547,7 +547,7 @@ ${contact}` },
 <div class="paypanel" id="payCard" role="tabpanel" aria-labelledby="tabCard">
   <p class="pay-soon" id="paySoon"${CARD.checkoutApi ? ' hidden' : ''}>⏳ Card payments open very soon. Until then, please use <b>Crypto</b>. Thank you! ❤</p>
   <div class="pay-step"><span class="pay-n">1</span><b>Choose an amount</b></div>
-  <div class="amts" role="group" aria-label="Amount">${(CARD.presets || []).map((a, i) => `<button type="button" class="amt" data-amt="${a}" aria-pressed="${i === 0}">$${a}</button>`).join('')}</div>
+  <div class="amts" role="group" aria-label="Amount">${(CARD.presets || []).map((a, i) => `<button type="button" class="amt" data-amt="${a}" aria-pressed="${i === Math.max(0, (CARD.presets || []).indexOf(10))}">$${a}</button>`).join('')}</div>
   <label class="amt-in amt-other"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="${CARD.min}" max="${CARD.max}" step="0.01" placeholder="Other amount" aria-label="Other amount in US dollars" data-nomemo></label>
   <div class="pay-step"><span class="pay-n">2</span><b>Your email</b><small>for your receipt</small></div>
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
@@ -592,7 +592,7 @@ ${contact}` },
   }
   function label() { var a = amount(); go.textContent = '💳 Pay ' + (isFinite(a) && a > 0 ? '$' + (a % 1 ? a.toFixed(2) : a) + ' ' : '') + 'with Card'; }
   amts.forEach(function (b) { b.addEventListener('click', function () { amts.forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); own.value = ''; if (go.dataset.api) say(''); label(); }); });
-  own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) amts[0].setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
+  own.addEventListener('input', function () { var typed = own.value.trim() !== ''; amts.forEach(function (x) { x.setAttribute('aria-pressed', 'false'); }); if (!typed) (document.querySelector('.amt[data-amt="10"]') || amts[0]).setAttribute('aria-pressed', 'true'); if (go.dataset.api) say(''); label(); });
   label();
   go.addEventListener('click', function () {
     var api = go.dataset.api;
