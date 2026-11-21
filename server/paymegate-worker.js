@@ -26,6 +26,8 @@ const CURRENCY = 'USD';
 const MIN = 2;      // dollars (Stripe card minimum on PayMeGate is $2)
 const MAX = 1000;   // dollars
 const CARD_METHODS = ['stripe', 'creditcard', 'googlepay', 'applepay']; // Stripe, Stix, Google Pay, Apple Pay
+// Minimum USD amount per method on this account (from GET /v1/payment-methods). Methods are only offered when the gift is big enough.
+const METHOD_MIN = { stripe: 2, creditcard: 6, googlepay: 10, applepay: 10, paypal: 5, crypto: 2 };
 
 function cors(origin) {
   return {
@@ -39,10 +41,11 @@ function cors(origin) {
 function json(body, status, origin) {
   return new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json', ...cors(origin) } });
 }
-function methods(env) {
+function methods(env, amount) {
   const list = String(env.PAYMEGATE_METHODS || '').split(',').map(s => s.trim()).filter(Boolean);
   // Default: card-type methods only (keys from GET /v1/payment-methods on this account).
-  return list.length ? list : CARD_METHODS;
+  const pick = (list.length ? list : CARD_METHODS).filter(k => k === '*' || !(k in METHOD_MIN) || amount >= METHOD_MIN[k]);
+  return pick.length ? pick : ['stripe'];
 }
 
 export default {
@@ -72,7 +75,7 @@ export default {
     const order = {
       amount: amount.toFixed(2),
       currency: CURRENCY,
-      paymentMethodsKeys: methods(env),
+      paymentMethodsKeys: methods(env, amount),
       customer: name ? { email, fullName: name } : { email },
       externalId: ref,
       description: 'Gift to support GetToolNest (free tools for everyone)',
