@@ -553,6 +553,7 @@ ${contact}` },
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
   <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}" data-test-api="${esc(CARD.checkoutApiLater || '')}">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
+  <p class="pay-next">Next: pick <b>Card, Google Pay, PayPal</b> or another way on the secure page, then pay. It takes about <b>1 minute</b>.</p>
   <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $${CARD.min}. More payment options show up from $10.</p>
 </div>
 <div class="paypanel" id="payCrypto" role="tabpanel" aria-labelledby="tabCrypto" hidden>
