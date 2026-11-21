@@ -1,0 +1,189 @@
+<style>
+.pcz-cmp { position: relative; display: inline-block; max-width: 100%; line-height: 0; touch-action: pan-y; user-select: none; -webkit-user-select: none; cursor: ew-resize; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+.pcz-cmp canvas { display: block; max-width: 100%; height: auto; max-height: 70vh; }
+.pcz-cmp #before { position: absolute; top: 0; left: 0; width: 100%; height: 100%; max-height: none; }
+.pcz-line { position: absolute; top: 0; bottom: 0; width: 3px; margin-left: -1.5px; background: #fff; box-shadow: 0 0 0 1px rgba(0,0,0,.3); pointer-events: none; }
+.pcz-line::after { content: '\2194'; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #111; font: 700 18px/34px system-ui, sans-serif; text-align: center; box-shadow: 0 1px 4px rgba(0,0,0,.4); }
+.pcz-tag { position: absolute; top: 8px; font: 600 12px/1 system-ui, sans-serif; background: rgba(0,0,0,.6); color: #fff; padding: 5px 8px; border-radius: 6px; pointer-events: none; }
+.pcz-wrap { text-align: center; margin-top: 6px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a black and white photo</b>JPG, PNG or WebP. An AI model adds colour on your device; your photo is never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="fields">
+  <div><label for="model">Colour style</label><select id="model"><option value="natural">Natural (34 MB download)</option><option value="vivid">Vivid (32 MB download)</option></select></div>
+  <div><label for="sat">Colour strength: <span id="satv">100%</span></label><input type="range" id="sat" min="0" max="200" step="10" value="100"></div>
+</div>
+<div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat"></p></div>
+<div id="work" hidden>
+  <div class="pcz-wrap">
+    <div class="pcz-cmp" id="cmp"><canvas id="after" aria-label="Colourised photo"></canvas><canvas id="before" aria-hidden="true"></canvas><div class="pcz-line" id="line"></div><span class="pcz-tag" style="left:8px">Original</span><span class="pcz-tag" style="right:8px">Colour</span></div>
+  </div>
+  <p class="msg" style="margin-top:6px;text-align:center">Drag across the photo to compare.</p>
+  <div class="btns">
+    <button class="btn" id="dl" type="button">Download JPG</button>
+    <button class="btn ghost" id="dlPng" type="button">Download PNG</button>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  var BASE = '../assets/vendor/onnx/', WASM = ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852];
+  var MODELS = { natural: ['colorize-natural.onnx', 34179512], vivid: ['colorize-vivid.onnx', 32349563] };
+  var IN = 256, MAXPX = 40e6, PREV = 1400;
+  var ortP = null, sessions = {}, src = null, W = 0, H = 0, name = 'photo', ab = null, job = 0, busy = false, pos = 0.5;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function progress(frac, text) { $('notice').hidden = false; $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%'; $('stat').textContent = text; }
+  function loadScript(url) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); }); }
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() { return reader.read().then(function (d) { if (d.done) { var out = new Uint8Array(got), o = 0; parts.forEach(function (p) { out.set(p, o); o += p.length; }); return out.buffer; } parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump(); }); }
+      return pump();
+    });
+  }
+  // ---------- the AI model (Zhang et al. colorization, BSD licence) ----------
+  function getSession(key, report) {
+    if (sessions[key]) return sessions[key];
+    var m = MODELS[key], a = 0, b = 0, needOrt = !ortP, total = (needOrt ? WASM[2] : 0) + m[1];
+    function tell() { report((a + b) / total, 'Downloading the AI model (' + fmtBytes(a + b) + ' of about ' + fmtBytes(total) + '). This happens only once.'); }
+    tell();
+    if (!ortP) {
+      ortP = Promise.all([window.ort ? null : loadScript(BASE + WASM[0]), fetchBuf(BASE + WASM[1], WASM[2], function (n) { a = n; tell(); })]).then(function (r) {
+        ort.env.wasm.wasmPaths = new URL(BASE, location.href).href; ort.env.wasm.wasmBinary = r[1];
+        ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+        ort.env.wasm.proxy = true; // work on a background thread so the page stays responsive
+        ort.env.logLevel = 'error';
+        return ort;
+      });
+      ortP.catch(function () { ortP = null; });
+    }
+    var p = sessions[key] = Promise.all([ortP, fetchBuf(BASE + m[0], m[1], function (n) { b = n; tell(); })]).then(function (r) {
+      report(null, 'Starting the AI model…');
+      return ort.InferenceSession.create(r[1], { executionProviders: ['wasm'], graphOptimizationLevel: 'all' });
+    });
+    p.catch(function () { if (sessions[key] === p) delete sessions[key]; });
+    return p;
+  }
+
+  // ---------- colour maths (sRGB D65 <-> CIE Lab) ----------
+  var toLin = new Float32Array(256), toS = new Uint8ClampedArray(4097), i;
+  for (i = 0; i < 256; i++) { var c0 = i / 255; toLin[i] = c0 <= 0.04045 ? c0 / 12.92 : Math.pow((c0 + 0.055) / 1.055, 2.4); }
+  for (i = 0; i <= 4096; i++) { var l0 = i / 4096; toS[i] = Math.round(255 * (l0 <= 0.0031308 ? l0 * 12.92 : 1.055 * Math.pow(l0, 1 / 2.4) - 0.055)); }
+  function fLab(t) { return t > 0.008856 ? Math.cbrt(t) : 7.787 * t + 16 / 116; }
+  function lOf(r, g, b) { return 116 * fLab(0.2126729 * toLin[r] + 0.7151522 * toLin[g] + 0.0721750 * toLin[b]) - 16; }
+  function lin2s(v) { return toS[v <= 0 ? 0 : v >= 1 ? 4096 : (v * 4096 + 0.5) | 0]; }
+  function fInv(t) { return t > 0.206893 ? t * t * t : (t - 16 / 116) / 7.787; }
+
+  // Model input: the lightness of the photo squeezed to 256 x 256.
+  function inputTensor() {
+    var c = canvas(IN, IN), x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, IN, IN);
+    var p = x.getImageData(0, 0, IN, IN).data, t = new Float32Array(IN * IN);
+    for (var j = 0; j < IN * IN; j++) t[j] = lOf(p[j * 4], p[j * 4 + 1], p[j * 4 + 2]);
+    return new ort.Tensor('float32', t, [1, 1, IN, IN]);
+  }
+  // Paint the photo at w x h: its own lightness plus the model's colour, scaled smoothly up from 256 x 256.
+  function compose(w, h, strength, out) {
+    var c = out || canvas(w, h); c.width = w; c.height = h;
+    var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0, w, h);
+    var band = 256;
+    for (var y0 = 0; y0 < h; y0 += band) {
+      var bh = Math.min(band, h - y0), d = x.getImageData(0, y0, w, bh), p = d.data;
+      for (var yy = 0; yy < bh; yy++) {
+        var fy = Math.min(IN - 1, Math.max(0, (y0 + yy + 0.5) * IN / h - 0.5)), ya = fy | 0, yb = Math.min(IN - 1, ya + 1), ty = fy - ya;
+        for (var xx = 0; xx < w; xx++) {
+          var fx = Math.min(IN - 1, Math.max(0, (xx + 0.5) * IN / w - 0.5)), xa = fx | 0, xb = Math.min(IN - 1, xa + 1), tx = fx - xa;
+          var i00 = ya * IN + xa, i01 = ya * IN + xb, i10 = yb * IN + xa, i11 = yb * IN + xb;
+          var A = ((ab[i00] * (1 - tx) + ab[i01] * tx) * (1 - ty) + (ab[i10] * (1 - tx) + ab[i11] * tx) * ty) * strength;
+          var B = ((ab[IN * IN + i00] * (1 - tx) + ab[IN * IN + i01] * tx) * (1 - ty) + (ab[IN * IN + i10] * (1 - tx) + ab[IN * IN + i11] * tx) * ty) * strength;
+          var o = (yy * w + xx) * 4, L = lOf(p[o], p[o + 1], p[o + 2]);
+          var fy2 = (L + 16) / 116, X = 0.95047 * fInv(fy2 + A / 500), Y = fInv(fy2), Z = 1.08883 * fInv(fy2 - B / 200);
+          p[o] = lin2s(3.2404542 * X - 1.5371385 * Y - 0.4985314 * Z);
+          p[o + 1] = lin2s(-0.9692660 * X + 1.8760108 * Y + 0.0415560 * Z);
+          p[o + 2] = lin2s(0.0556434 * X - 0.2040259 * Y + 1.0572252 * Z);
+        }
+      }
+      x.putImageData(d, 0, y0);
+    }
+    return c;
+  }
+  function preview() {
+    if (!ab) return;
+    var k = Math.min(1, PREV / Math.max(W, H)), w = Math.max(1, Math.round(W * k)), h = Math.max(1, Math.round(H * k));
+    compose(w, h, +$('sat').value / 100, $('after'));
+    var b = $('before'); b.width = w; b.height = h; var bx = b.getContext('2d'); bx.drawImage(src, 0, 0, w, h);
+    $('work').hidden = false; clip();
+  }
+  function clip() { $('before').style.clipPath = 'inset(0 ' + (100 - pos * 100) + '% 0 0)'; $('line').style.left = (pos * 100) + '%'; }
+  (function () {
+    var box = $('cmp'), on = false;
+    function at(e) { var r = box.getBoundingClientRect(); pos = Math.max(0, Math.min(1, (e.clientX - r.left) / r.width)); clip(); }
+    box.addEventListener('pointerdown', function (e) { on = true; try { box.setPointerCapture(e.pointerId); } catch (x) {} at(e); });
+    box.addEventListener('pointermove', function (e) { if (on) at(e); });
+    ['pointerup', 'pointercancel'].forEach(function (ev) { box.addEventListener(ev, function () { on = false; }); });
+  })();
+
+  function run() {
+    if (!src) return;
+    var mine = ++job, key = $('model').value, timer = null, t0 = 0;
+    busy = true; ab = null; $('work').hidden = true; say('', '');
+    function report(f, t) { if (mine === job) progress(f, t); }
+    getSession(key, report).then(function (s) {
+      if (mine !== job) return;
+      t0 = Date.now(); report(null, 'Adding colour… this takes a few seconds, longer on phones.');
+      timer = setInterval(function () { if (mine === job) report(null, 'Adding colour… ' + Math.round((Date.now() - t0) / 1000) + ' s'); }, 1000);
+      var feeds = {}; feeds[s.inputNames[0]] = inputTensor();
+      return s.run(feeds).then(function (o) {
+        clearInterval(timer); if (mine !== job) return;
+        ab = o[s.outputNames[0]].data;
+        $('notice').hidden = true; preview();
+        say('ok', 'Done in ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s. The colours are the AI\'s best guess, not the real ones. Try the other colour style or change the strength if they look off.');
+      });
+    }).catch(function (e) {
+      clearInterval(timer); if (mine !== job) return;
+      $('notice').hidden = true;
+      say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which this tool needs. Please update your browser.' :
+        e && e.message === 'net' ? 'The AI model could not be downloaded. Check your internet connection and try again.' :
+        'The AI model could not run on this device' + (/memory|alloc/i.test(String(e && e.message)) ? ' because it ran out of memory. Close other tabs and try again.' : '. Try an up-to-date Chrome, Edge, Firefox or Safari.'));
+    }).then(function () { if (mine === job) busy = false; });
+  }
+  function take(f) {
+    if (!f) return;
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { say('bad', 'This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool.'); return; }
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { say('bad', '"' + f.name + '" is not an image. Please choose a JPG, PNG or WebP photo.'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not open "' + f.name + '". It may be damaged or in a format this browser cannot show.'); return; }
+      if (im.naturalWidth * im.naturalHeight > MAXPX) { say('bad', 'This photo is very large (' + im.naturalWidth + ' × ' + im.naturalHeight + '). Please make it smaller with the Image Resizer first.'); return; }
+      src = im; W = im.naturalWidth; H = im.naturalHeight; name = f.name.replace(/\.[^.]+$/, '') || 'photo';
+      run();
+    });
+  }
+  setupDrop('drop', 'file', take);
+  $('file').addEventListener('click', function () { this.value = ''; });
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.items; if (!it) return;
+    for (var j = 0; j < it.length; j++) if (it[j].kind === 'file' && /^image\//.test(it[j].type)) { e.preventDefault(); take(new File([it[j].getAsFile()], 'pasted-photo.png', { type: it[j].type })); return; }
+  });
+  $('model').addEventListener('change', function () { if (src) run(); });
+  var satT = null;
+  $('sat').addEventListener('input', function () { $('satv').textContent = this.value + '%'; clearTimeout(satT); satT = setTimeout(preview, 60); });
+  function save(png) {
+    if (!ab) return;
+    say('', 'Preparing the full-size photo…');
+    setTimeout(function () {
+      var c;
+      try { c = compose(W, H, +$('sat').value / 100); } catch (e) { say('bad', 'This photo is too large to finish on this device. Try a smaller copy.'); return; }
+      c.toBlob(function (b) {
+        if (!b) { say('bad', 'Your browser could not create the file.'); return; }
+        var u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = name + '-colour.' + (png ? 'png' : 'jpg'); document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+        say('ok', 'Saved ' + a.download + ' (' + W + ' × ' + H + ', ' + fmtBytes(b.size) + ').'); burst($(png ? 'dlPng' : 'dl'));
+      }, png ? 'image/png' : 'image/jpeg', 0.92);
+    }, 30);
+  }
+  $('dl').addEventListener('click', function () { save(false); });
+  $('dlPng').addEventListener('click', function () { save(true); });
+})();
+</script>

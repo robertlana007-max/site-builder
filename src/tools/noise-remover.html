@@ -294,7 +294,7 @@ var FF = (function () {
   }
 
   function reset() {
-    stopPlay(); dry = wet = vad = out = null; outBuf = origBuf = null; len = 0;
+    stopPlay(); dry = wet = vad = out = null; outBuf = origBuf = null; len = 0; offset = 0;
     $('work').hidden = true; $('result').hidden = true; $('dl').hidden = true; $('go').disabled = true;
   }
 
@@ -389,10 +389,10 @@ var FF = (function () {
       });
     }).then(function (r) {
       if (mine !== job) return;
-      wet = r.w; vad = r.v;
+      wet = r.w; vad = r.v; outBuf = origBuf = null;
       remix();
       busy = false; $('go').disabled = false; $('stop').hidden = true; bar(null);
-      $('result').hidden = false; setupOutputs();
+      $('result').hidden = false; setupOutputs(); offset = 0; showPos();
       var secs = ((Date.now() - t0) / 1000).toFixed(1);
       say('ok', 'Done in ' + secs + ' s. Press Play and switch between Before and After to compare, then save it.');
       if ($('result').scrollIntoView) $('result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
@@ -530,7 +530,7 @@ var FF = (function () {
     var outExt = webm ? 'webm' : mp4ish ? (ext === 'mov' ? 'mov' : 'mp4') : 'mkv';
     var dur = len / RATE;
     return FF.run([file, wavFile], function (p) {
-      return ['-i', p[0], '-i', p[1], '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy'].concat(webm ? ['-c:a', 'libopus', '-b:a', '128k'] : ['-c:a', 'aac', '-b:a', '160k'], ['-shortest']);
+      return ['-i', p[0], '-i', p[1], '-map', '0:v:0', '-map', '1:a:0', '-c:v', 'copy'].concat(webm ? ['-c:a', 'libvorbis', '-q:a', '5'] : ['-c:a', 'aac', '-b:a', '160k'], ['-shortest']);
     }, 'clean.' + outExt, dur, function (p) { bar(p); say('', 'Putting the clean sound into the video… ' + Math.round(p * 100) + '%'); }, say).then(function (data) {
       return { blob: new Blob([data], { type: webm ? 'video/webm' : outExt === 'mkv' ? 'video/x-matroska' : outExt === 'mov' ? 'video/quicktime' : 'video/mp4' }), ext: outExt };
     });

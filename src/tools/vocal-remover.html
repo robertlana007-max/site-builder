@@ -1,0 +1,427 @@
+<style>
+.vr-name { margin: 0 0 12px; font-weight: 600; overflow-wrap: anywhere; }
+.vr-sub { font-size: 14px; color: var(--muted); margin: 6px 0 14px; }
+.vr-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 0 0 12px; }
+.vr-row .seg { flex-wrap: wrap; }
+.vr-box { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 14px 0; }
+.vr-box .btn { min-height: 40px; padding: 8px 16px; }
+.vr-seek { display: flex; align-items: center; gap: 10px; margin-top: 12px; font-size: 14px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.vr-seek input { flex: 1; min-width: 0; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a song here</b>MP3, WAV, M4A, OGG, FLAC, or a music video (MP4, WebM). Up to 10 minutes. It is processed on your device and never uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.webm,.mp4,.m4v,.mov,.mkv" hidden data-nomemo>
+<div class="vr-row" style="margin-top:14px">
+  <span style="font-size:14px;font-weight:600">Method</span>
+  <div class="seg" role="group" aria-label="Separation method">
+    <button type="button" data-mode="ai" aria-pressed="true">AI separation (best)</button>
+    <button type="button" data-mode="classic" aria-pressed="false">Quick centre cut</button>
+  </div>
+</div>
+<p class="vr-sub" id="modeNote"></p>
+<div id="work" hidden>
+  <p class="vr-name" id="fname"></p>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Separate vocals</button><button class="btn ghost" type="button" id="stop" hidden>Stop</button></div>
+<p class="msg" id="msg" aria-live="polite"></p>
+<div id="result" hidden>
+  <div class="vr-box">
+    <div class="vr-row">
+      <button class="btn" type="button" id="play">▶ Play</button>
+      <div class="seg" role="group" aria-label="Which track to hear">
+        <button type="button" data-track="music" aria-pressed="true">Music only (karaoke)</button>
+        <button type="button" data-track="vocals" aria-pressed="false">Vocals only</button>
+        <button type="button" data-track="orig" aria-pressed="false">Original</button>
+      </div>
+    </div>
+    <div class="vr-seek"><span id="tNow">0:00</span><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Position" data-nomemo><span id="tAll">0:00</span></div>
+    <p class="vr-sub" style="margin-bottom:0">Switch tracks while it plays to compare. Results depend on the song: leftover echoes of the voice are normal, especially with reverb-heavy or live recordings.</p>
+  </div>
+  <div class="fields">
+    <div><label for="which">Track to save</label><select id="which"><option value="music">Music only (karaoke / instrumental)</option><option value="vocals">Vocals only (a cappella)</option></select></div>
+    <div><label for="fmt">Format</label><select id="fmt"><option value="mp3-192">MP3 192 kbps</option><option value="mp3-320">MP3 320 kbps (best)</option><option value="mp3-128">MP3 128 kbps (small)</option><option value="wav">WAV (no quality loss, big)</option></select></div>
+  </div>
+  <div class="btns"><button class="btn" id="save">Make file</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+</div>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+(function () {
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  var RATE = 44100, N = 4096, HOP = 1024, BINS = 1024, T = 512, MAX_SEC = 600;
+  var BASE = '../assets/vendor/onnx/', SP = '../assets/vendor/spleeter/';
+  var ORTW = ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852];
+  var MODELS = [['vocals.fp16.onnx', 19681017], ['accompaniment.fp16.onnx', 19681024]];
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(Math.min(1, p) * 100) + '%'; }
+  function clock(s) { s = Math.max(0, Math.floor(s)); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+
+  var mode = 'ai';
+  var NOTES = {
+    ai: 'Uses Spleeter, an open-source AI model by Deezer, running on your device. The first time it downloads about 54 MB (then it stays in your browser). A 4-minute song usually takes under a minute on a computer and a few minutes on a phone.',
+    classic: 'No download and very fast. It removes sound that is exactly in the middle of a stereo mix, where the lead voice usually is, between about 150 Hz and 7 kHz. Works on some studio songs, poorly on others, and not at all on mono recordings.'
+  };
+  function setMode(m) {
+    mode = m; $('modeNote').textContent = NOTES[m];
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === m)); });
+  }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mode]'), function (b) { b.addEventListener('click', function () { if (!busy) setMode(b.getAttribute('data-mode')); }); });
+  setMode('ai');
+
+  // ---------- FFT (radix 2, size 4096) ----------
+  var rev = new Uint16Array(N), cosT = new Float32Array(N / 2), sinT = new Float32Array(N / 2), win = new Float32Array(N);
+  (function () {
+    var bits = Math.log2(N);
+    for (var i = 0; i < N; i++) { var r = 0, x = i; for (var b = 0; b < bits; b++) { r = (r << 1) | (x & 1); x >>= 1; } rev[i] = r; }
+    for (i = 0; i < N / 2; i++) { cosT[i] = Math.cos(2 * Math.PI * i / N); sinT[i] = -Math.sin(2 * Math.PI * i / N); }
+    for (i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N); // periodic Hann, as Spleeter uses
+  })();
+  function fft(re, im, inverse) {
+    var i, j, t;
+    for (i = 0; i < N; i++) { j = rev[i]; if (j > i) { t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    var sg = inverse ? -1 : 1;
+    for (var size = 2; size <= N; size <<= 1) {
+      var half = size >> 1, step = N / size;
+      for (i = 0; i < N; i += size) {
+        for (j = 0; j < half; j++) {
+          var k = j * step, wr = cosT[k], wi = sg * sinT[k], a = i + j, b = a + half;
+          var xr = re[b] * wr - im[b] * wi, xi = re[b] * wi + im[b] * wr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+        }
+      }
+    }
+  }
+
+  // ---------- AI model (ONNX Runtime Web, shared with the other AI tools) ----------
+  function loadScript(url) {
+    return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); });
+  }
+  function fetchBuf(url, total, onProg) {
+    return fetch(url).then(function (r) {
+      if (!r.ok) throw new Error('net');
+      if (!r.body || !r.body.getReader) return r.arrayBuffer();
+      var reader = r.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (d) {
+          if (d.done) { var out = new Uint8Array(got), o = 0; parts.forEach(function (p) { out.set(p, o); o += p.length; }); return out.buffer; }
+          parts.push(d.value); got += d.value.length; onProg(Math.min(got, total)); return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('net'); });
+  }
+  var sessP = null;
+  function getSessions(onProg) {
+    if (sessP) return sessP;
+    var got = [0, 0, 0], total = ORTW[2] + MODELS[0][1] + MODELS[1][1];
+    function tell() { onProg((got[0] + got[1] + got[2]) / total, 'Downloading the AI model (' + fmtBytes(got[0] + got[1] + got[2]) + ' of ' + fmtBytes(total) + '). This happens only once.'); }
+    tell();
+    sessP = Promise.all([
+      (window.ort ? Promise.resolve() : loadScript(BASE + ORTW[0])).then(function () { return fetchBuf(BASE + ORTW[1], ORTW[2], function (n) { got[0] = n; tell(); }); }),
+      fetchBuf(SP + MODELS[0][0], MODELS[0][1], function (n) { got[1] = n; tell(); }),
+      fetchBuf(SP + MODELS[1][0], MODELS[1][1], function (n) { got[2] = n; tell(); })
+    ]).then(function (r) {
+      onProg(null, 'Starting the AI model…');
+      ort.env.wasm.wasmPaths = new URL(BASE, location.href).href;
+      ort.env.wasm.wasmBinary = r[0];
+      ort.env.wasm.numThreads = self.crossOriginIsolated ? Math.min(4, navigator.hardwareConcurrency || 1) : 1;
+      ort.env.wasm.proxy = true; // inference runs on a worker so the page stays responsive
+      ort.env.logLevel = 'error';
+      var o = { executionProviders: ['wasm'], graphOptimizationLevel: 'all' };
+      return ort.InferenceSession.create(new Uint8Array(r[1]), o).then(function (v) {
+        return ort.InferenceSession.create(new Uint8Array(r[2]), o).then(function (a) { return [v, a]; });
+      });
+    });
+    sessP.catch(function () { sessP = null; });
+    return sessP;
+  }
+
+  // ---------- state ----------
+  var file = null, L = null, R = null, len = 0, stereo = true, VL = null, VR = null, busy = false, stopFlag = false, job = 0, outUrl = null;
+
+  function reset() {
+    stopPlay(); L = R = VL = VR = null; len = 0; cache = {}; offset = 0;
+    $('work').hidden = true; $('result').hidden = true; $('dl').hidden = true; $('go').disabled = true;
+  }
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { toast('Please wait until the current song is finished, or press Stop.'); return; }
+    var mine = ++job; reset(); file = f;
+    if (!(/^(audio|video)\//.test(f.type) || /\.(mp3|wav|m4a|aac|ogg|oga|opus|flac|webm|mp4|m4v|mov|mkv)$/i.test(f.name))) { file = null; return say('bad', '"' + f.name + '" is not an audio file. Choose a song such as MP3, WAV, M4A or FLAC.'); }
+    if (!f.size) { file = null; return say('bad', '"' + f.name + '" is empty.'); }
+    if (f.size > 700 * 1048576) { file = null; return say('bad', 'This file is ' + fmtBytes(f.size) + ', which is too big. Please use a song file under 700 MB.'); }
+    busy = true; say('', 'Reading "' + f.name + '"…');
+    f.arrayBuffer().then(function (data) {
+      var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+      if (!OAC) throw new Error('old');
+      return new Promise(function (res, rej) { var p = new OAC(1, 1, RATE).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+    }).then(function (b) {
+      if (mine !== job) return;
+      busy = false;
+      if (b.duration > MAX_SEC) { file = null; return say('bad', 'This song is ' + clock(b.duration) + ' long. Songs up to 10 minutes are supported, to stay within the memory of the browser. Cut it first, for example with the Audio Cutter tool.'); }
+      if (b.duration < 0.5) { file = null; return say('bad', 'This file is too short.'); }
+      len = b.length;
+      L = b.getChannelData(0); R = b.numberOfChannels > 1 ? b.getChannelData(1) : b.getChannelData(0);
+      stereo = b.numberOfChannels > 1;
+      if (stereo) { var same = true; for (var i = 0; i < len; i += 97) if (Math.abs(L[i] - R[i]) > 1e-4) { same = false; break; } if (same) stereo = false; }
+      $('fname').textContent = f.name + ' · ' + fmtBytes(f.size) + ' · ' + clock(b.duration) + (stereo ? ' · stereo' : ' · mono');
+      $('work').hidden = false; $('go').disabled = false;
+      say('', stereo ? 'Ready. Press Separate vocals.' : 'Ready. This song is mono, so only AI separation can work on it. Press Separate vocals.');
+    }).catch(function (e) {
+      if (mine !== job) return;
+      busy = false; file = null;
+      if (e && e.message === 'old') return say('bad', 'This browser is too old for this tool. Please use a current Chrome, Edge, Firefox or Safari.');
+      if (e instanceof RangeError) return say('bad', 'Your device ran out of memory reading this file. Try a shorter song.');
+      say('bad', 'Could not read the sound in "' + f.name + '". The file may be damaged, have no sound, or use a format this browser cannot open. Try an MP3 or WAV.');
+    });
+  });
+
+  // ---------- separation ----------
+  // The song is cut into blocks of 512 frames (about 12 seconds). Each block: STFT, masks (AI or centre detection), inverse STFT.
+  function separate(sess, onProg) {
+    var frames = Math.ceil((len + N) / HOP), blocks = Math.ceil(frames / T), FB = N / 2 + 1;
+    VL = new Float32Array(len); VR = new Float32Array(len);
+    var sLr = new Float32Array(T * FB), sLi = new Float32Array(T * FB), sRr = new Float32Array(T * FB), sRi = new Float32Array(T * FB);
+    var mv = new Float32Array(2 * T * BINS); // vocal mask, [channel][time][bin]
+    var re = new Float32Array(N), im = new Float32Array(N), eps = 1e-10, norm = 1 / 1.5;
+    var b = 0;
+    function stftBlock(t0, nT) {
+      for (var t = 0; t < nT; t++) {
+        var start = (t0 + t) * HOP - N; // sample index of the first point of this frame
+        for (var n = 0; n < N; n++) { var j = start + n, ok = j >= 0 && j < len; re[n] = ok ? L[j] * win[n] : 0; im[n] = ok ? R[j] * win[n] : 0; }
+        fft(re, im, false);
+        var o = t * FB;
+        for (var k = 0; k < FB; k++) {
+          var k2 = (N - k) & (N - 1), ar = re[k], ai = im[k], br = re[k2], bi = im[k2];
+          sLr[o + k] = (ar + br) / 2; sLi[o + k] = (ai - bi) / 2; // left = (Z[k] + conj Z[N-k]) / 2
+          sRr[o + k] = (ai + bi) / 2; sRi[o + k] = (br - ar) / 2; // right = (Z[k] - conj Z[N-k]) / 2i
+        }
+      }
+    }
+    function istftBlock(t0, nT) {
+      for (var t = 0; t < nT; t++) {
+        var o = t * FB, mo = t * BINS, k, ext0 = 0, ext1 = 0;
+        for (k = BINS - 256; k < BINS; k++) { ext0 += mv[mo + k]; ext1 += mv[T * BINS + mo + k]; }
+        ext0 /= 256; ext1 /= 256; // above 11 kHz the model gives no mask: use the average of the top part
+        for (k = 0; k < FB; k++) {
+          var m0 = k < BINS ? mv[mo + k] : ext0, m1 = k < BINS ? mv[T * BINS + mo + k] : ext1;
+          var lr = sLr[o + k] * m0, li = sLi[o + k] * m0, rr = sRr[o + k] * m1, ri = sRi[o + k] * m1;
+          re[k] = lr - ri; im[k] = li + rr; // Z = L + iR
+          if (k > 0 && k < N / 2) { re[N - k] = lr + ri; im[N - k] = rr - li; } // conj(L) + i conj(R)
+        }
+        fft(re, im, true);
+        var start = (t0 + t) * HOP - N;
+        for (var n = 0; n < N; n++) { var j = start + n; if (j >= 0 && j < len) { var w = win[n] * norm / N; VL[j] += re[n] * w; VR[j] += im[n] * w; } }
+      }
+    }
+    function classicMask(nT) {
+      var lo = Math.round(150 / RATE * N), hi = Math.round(7000 / RATE * N);
+      for (var t = 0; t < nT; t++) for (var k = 0; k < BINS; k++) {
+        var i = t * FB + k, c = 0;
+        if (k >= lo && k <= hi) {
+          var a = sLr[i], bb = sLi[i], cc = sRr[i], d = sRi[i];
+          var dot = a * cc + bb * d, e = a * a + bb * bb + cc * cc + d * d + eps;
+          c = Math.max(0, 2 * dot / e); c = c * c; c = c * c; c = c * c; // only nearly identical left and right count as centre
+        }
+        mv[t * BINS + k] = c; mv[T * BINS + t * BINS + k] = c;
+      }
+    }
+    return new Promise(function (resolve, reject) {
+      function next() {
+        if (stopFlag) return reject(new Error('stopped'));
+        if (b >= blocks) return resolve();
+        var t0 = b * T, nT = Math.min(T, frames - t0);
+        try { stftBlock(t0, nT); } catch (e) { return reject(e); }
+        var p;
+        if (!sess) { classicMask(nT); p = Promise.resolve(); }
+        else {
+          var x = new Float32Array(2 * T * BINS);
+          for (var t = 0; t < nT; t++) for (var k = 0; k < BINS; k++) {
+            var i = t * FB + k;
+            x[t * BINS + k] = Math.hypot(sLr[i], sLi[i]); x[T * BINS + t * BINS + k] = Math.hypot(sRr[i], sRi[i]);
+          }
+          var feedV = {}, feedA = {};
+          feedV[sess[0].inputNames[0]] = new ort.Tensor('float32', x, [2, 1, T, BINS]);
+          feedA[sess[1].inputNames[0]] = new ort.Tensor('float32', x.slice(), [2, 1, T, BINS]);
+          p = sess[0].run(feedV).then(function (ov) {
+            var v = ov[sess[0].outputNames[0]].data;
+            return sess[1].run(feedA).then(function (oa) {
+              var a = oa[sess[1].outputNames[0]].data;
+              for (var i = 0; i < mv.length; i++) { var v2 = v[i] * v[i], a2 = a[i] * a[i]; mv[i] = (v2 + eps / 2) / (v2 + a2 + eps); }
+            });
+          });
+        }
+        p.then(function () {
+          if (stopFlag) return reject(new Error('stopped'));
+          istftBlock(t0, nT); b++; onProg(b / blocks);
+          setTimeout(next, 0);
+        }).catch(reject);
+      }
+      next();
+    });
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!L || busy) return;
+    if (mode === 'classic' && !stereo) return say('bad', 'This song is mono (left and right are the same), so the quick centre cut cannot work. Choose AI separation.');
+    busy = true; stopFlag = false; stopPlay(); cache = {};
+    $('go').disabled = true; $('stop').hidden = false; $('result').hidden = true; $('dl').hidden = true; bar(0);
+    var mine = job, t0 = Date.now(), tick = null, frac = 0;
+    var ready = mode === 'ai' ? getSessions(function (f, t) { bar(f); say('', t); }) : Promise.resolve(null);
+    ready.then(function (sess) {
+      if (stopFlag) throw new Error('stopped');
+      t0 = Date.now();
+      function show() { var el = (Date.now() - t0) / 1000, left = frac > 0.05 ? el / frac - el : 0; say('', 'Separating… ' + Math.round(frac * 100) + '%' + (left > 3 ? ' · about ' + clock(left + 1) + ' left' : '')); }
+      show(); tick = setInterval(show, 1000);
+      return separate(sess, function (f) { frac = f; bar(f); });
+    }).then(function () {
+      clearInterval(tick);
+      if (mine !== job) return;
+      busy = false; $('go').disabled = false; $('stop').hidden = true; bar(null);
+      $('result').hidden = false; offset = 0; showPos();
+      say('ok', 'Done in ' + clock((Date.now() - t0) / 1000) + '. Press Play to listen, then save the music or the vocals.');
+      if ($('result').scrollIntoView) $('result').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    }).catch(function (e) {
+      clearInterval(tick);
+      busy = false; $('go').disabled = !L; $('stop').hidden = true; bar(null);
+      if (e && e.message === 'stopped') return say('', 'Stopped. Press Separate vocals to start again.');
+      if (e && e.message === 'net') return say('bad', 'The AI model could not be downloaded. Check your internet connection and try again, or use the Quick centre cut.');
+      if (e instanceof RangeError) return say('bad', 'Your device ran out of memory. Try a shorter song.');
+      say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which this tool needs. Please update your browser.' : 'Separation failed' + (e && e.message ? ' (' + String(e.message).slice(0, 120) + ')' : '') + '. Try reloading the page or the Quick centre cut.');
+    });
+  });
+  $('stop').addEventListener('click', function () { stopFlag = true; });
+
+  function track(name) { // returns [left, right] for a track
+    if (name === 'vocals') return [VL, VR];
+    if (name === 'orig') return [L, R];
+    var ml = new Float32Array(len), mr = new Float32Array(len);
+    for (var i = 0; i < len; i++) { ml[i] = L[i] - VL[i]; mr[i] = R[i] - VR[i]; }
+    return [ml, mr];
+  }
+
+  // ---------- player ----------
+  var actx = null, cache = {}, node = null, playing = false, startedAt = 0, offset = 0, which = 'music', raf = 0, seeking = false;
+  function buf(name) {
+    if (cache.name === name) return cache.buf;
+    var t = track(name), b = actx.createBuffer(2, len, RATE);
+    if (b.copyToChannel) { b.copyToChannel(t[0], 0); b.copyToChannel(t[1], 1); } else { b.getChannelData(0).set(t[0]); b.getChannelData(1).set(t[1]); }
+    cache = { name: name, buf: b }; return b;
+  }
+  function position() { return playing ? Math.min(len / RATE, offset + actx.currentTime - startedAt) : offset; }
+  function startAt(t) {
+    if (node) { node.onended = null; try { node.stop(); } catch (e) {} node = null; }
+    if (t >= len / RATE - 0.05) t = 0;
+    node = actx.createBufferSource(); node.buffer = buf(which); node.connect(actx.destination);
+    node.onended = function () { if (playing && position() >= len / RATE - 0.1) { stopPlay(); offset = 0; showPos(); } };
+    offset = t; startedAt = actx.currentTime; node.start(0, t); playing = true;
+    $('play').textContent = '❚❚ Pause';
+    cancelAnimationFrame(raf); (function loop() { showPos(); if (playing) raf = requestAnimationFrame(loop); })();
+  }
+  function stopPlay() {
+    if (playing && actx) offset = position();
+    playing = false; cancelAnimationFrame(raf);
+    if (node) { node.onended = null; try { node.stop(); } catch (e) {} node = null; }
+    $('play').textContent = '▶ Play';
+  }
+  function showPos() {
+    var d = len / RATE || 1, p = position();
+    $('tNow').textContent = clock(p); $('tAll').textContent = clock(d);
+    if (!seeking) $('seek').value = Math.round(p / d * 1000);
+  }
+  $('play').addEventListener('click', function () {
+    if (!VL) return;
+    if (playing) return stopPlay();
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return say('bad', 'This browser cannot play the preview. You can still save the file.');
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    startAt(offset);
+  });
+  $('seek').addEventListener('input', function () { seeking = true; offset = +$('seek').value / 1000 * len / RATE; $('tNow').textContent = clock(offset); });
+  $('seek').addEventListener('change', function () { seeking = false; var t = +$('seek').value / 1000 * len / RATE; if (playing) startAt(t); else { offset = t; showPos(); } });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-track]'), function (b) {
+    b.addEventListener('click', function () {
+      which = b.getAttribute('data-track');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-track]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      if (which !== 'orig') $('which').value = which;
+      $('dl').hidden = true;
+      if (playing) startAt(position());
+    });
+  });
+
+  // ---------- saving ----------
+  ['which', 'fmt'].forEach(function (id) { $(id).addEventListener('change', function () { $('dl').hidden = true; }); });
+  $('save').addEventListener('click', function () {
+    if (!VL || busy) return;
+    var w = $('which').value, f = $('fmt').value, t = track(w), mp3 = f !== 'wav';
+    var peak = 0; for (var k = 0; k < 2; k++) for (var i = 0; i < len; i++) { var a = t[k][i]; if (a > peak) peak = a; else if (-a > peak) peak = -a; }
+    if (peak > 0.99) { var g = 0.99 / peak; t = t.map(function (c) { var o = new Float32Array(c.length); for (var i = 0; i < c.length; i++) o[i] = c[i] * g; return o; }); }
+    busy = true; stopPlay(); $('save').disabled = $('go').disabled = true; $('dl').hidden = true; bar(0);
+    say('', mp3 ? 'Making the MP3…' : 'Making the WAV…');
+    var base = (file.name.replace(/\.[^.]+$/, '') || 'song') + (w === 'music' ? '-instrumental' : '-vocals');
+    (mp3 ? encodeMp3(t, RATE, +f.split('-')[1], function (x) { bar(x); }) : new Promise(function (r) { setTimeout(function () { r(wavBlob(t, RATE)); }, 30); })).then(function (blob) {
+      if (outUrl) URL.revokeObjectURL(outUrl);
+      outUrl = URL.createObjectURL(blob);
+      var a = $('dl'); a.href = outUrl; a.download = base + (mp3 ? '.mp3' : '.wav'); a.textContent = 'Download ' + (mp3 ? 'MP3' : 'WAV') + ' (' + fmtBytes(blob.size) + ')'; a.hidden = false;
+      say('ok', 'Ready: ' + a.download);
+    }).catch(function () { say('bad', 'Saving failed. Try WAV, or a shorter song.'); })
+      .then(function () { busy = false; bar(null); $('save').disabled = false; $('go').disabled = !L; });
+  });
+})();
+</script>

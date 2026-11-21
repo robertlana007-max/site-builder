@@ -1,0 +1,268 @@
+<style>
+.otr-bar { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: end; margin-bottom: 12px; }
+.otr-bar label { margin-bottom: 4px; }
+.otr-swap { min-height: 44px; padding: 8px 14px; font-size: 18px; line-height: 1; }
+.otr-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.otr-cols textarea { min-height: 220px; font-family: inherit; font-size: 16px; line-height: 1.5; margin: 0; }
+.otr-out[readonly] { background: var(--field, transparent); }
+.otr-meta { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; color: var(--muted); margin: 4px 2px 0; flex-wrap: wrap; }
+.otr-engine { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 12px 0 0; }
+.otr-engine b { font-weight: 600; }
+.otr-help { font-size: 14px; color: var(--muted); }
+.otr-help summary { cursor: pointer; font-weight: 600; color: var(--ink); margin: 14px 0 6px; }
+.otr-help ul { margin: 6px 0; padding-left: 20px; }
+.otr-help li { margin: 4px 0; }
+@media (max-width: 640px) {
+  .otr-cols { grid-template-columns: 1fr; }
+  .otr-cols textarea { min-height: 160px; }
+  .otr-bar { grid-template-columns: 1fr auto 1fr; gap: 6px; }
+  .otr-swap { padding: 8px 10px; }
+}
+</style>
+<div class="otr-bar">
+  <div><label for="from">From</label><select id="from"></select></div>
+  <button class="btn ghost otr-swap" type="button" id="swap" title="Swap languages" aria-label="Swap languages">⇄</button>
+  <div><label for="to">To</label><select id="to"></select></div>
+</div>
+<div class="otr-cols">
+  <div>
+    <label for="src" class="sr-only" style="position:absolute;left:-9999px">Text to translate</label>
+    <textarea id="src" dir="auto" placeholder="Type or paste text here…" data-nomemo maxlength="50000"></textarea>
+    <div class="otr-meta"><span id="count">0 characters</span><span>Ctrl + Enter translates</span></div>
+  </div>
+  <div>
+    <label for="out" class="sr-only" style="position:absolute;left:-9999px">Translation</label>
+    <textarea id="out" class="otr-out" dir="auto" readonly placeholder="The translation appears here." data-nomemo></textarea>
+    <div class="otr-meta"><span id="outCount"></span><span id="took"></span></div>
+  </div>
+</div>
+<div class="fields" style="margin-top:12px">
+  <div><label for="engine">Translation engine</label><select id="engine"><option value="auto">Automatic (best available)</option><option value="builtin">Built into my browser</option><option value="model">Downloadable offline model</option></select></div>
+</div>
+<div class="otr-engine" id="engineInfo" aria-live="polite">Checking what this browser can do…</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go">Translate</button><button class="btn ghost" type="button" id="copy">Copy</button><button class="btn ghost" type="button" id="dl">Download .txt</button><button class="btn ghost" type="button" id="clear">Clear</button></div>
+<p class="msg" id="msg" aria-live="polite"></p>
+<details class="otr-help">
+  <summary>Which browsers and languages work?</summary>
+  <ul>
+    <li><b>Chrome (version 138 or newer) on Windows, Mac, Linux and ChromeOS</b> has a translator built in. It works on your device for many languages, including English, Spanish, French, German, Portuguese, Italian, Hindi, Bengali, Arabic, Chinese, Japanese, Korean, Russian, Turkish, Indonesian and Vietnamese. Each language pack downloads once.</li>
+    <li><b>Any modern browser</b> (Firefox, Safari, Edge, Chrome on phones) can use the downloadable offline models from the Firefox Translations project instead. They cover <b>English ⇄ Spanish, French, German, Hindi and Urdu</b>. Other pairs among these, such as Spanish → French, go through English. Each direction is a 15 to 26 MB download, kept by your browser afterwards.</li>
+    <li>Your text is never sent to a server: both engines translate on your own device, and they keep working offline once the language is downloaded.</li>
+    <li>Machine translation can make mistakes. Check important text, such as legal or medical wording, with a person who speaks the language.</li>
+  </ul>
+</details>
+<script>
+(function () {
+  var MODEL_BASE = new URL('../assets/vendor/bergamot/', location.href).href;
+  var ENGINE_BYTES = 5174294;
+  var PAIRS = { 'en-es': 25373354, 'es-en': 26241052, 'en-fr': 25752472, 'fr-en': 26234715, 'en-de': 25720702, 'de-en': 25444292, 'en-hi': 14856351, 'hi-en': 15501784, 'en-ur': 24600961, 'ur-en': 25127667 };
+  var LANGS = [['en', 'English'], ['es', 'Spanish', 'Español'], ['fr', 'French', 'Français'], ['de', 'German', 'Deutsch'], ['hi', 'Hindi', 'हिन्दी'], ['ur', 'Urdu', 'اردو'],
+    ['ar', 'Arabic', 'العربية'], ['bn', 'Bengali', 'বাংলা'], ['zh', 'Chinese (Simplified)', '简体中文'], ['zh-Hant', 'Chinese (Traditional)', '繁體中文'], ['pt', 'Portuguese', 'Português'], ['ru', 'Russian', 'Русский'], ['ja', 'Japanese', '日本語'], ['ko', 'Korean', '한국어'], ['id', 'Indonesian', 'Bahasa Indonesia'], ['it', 'Italian', 'Italiano'], ['tr', 'Turkish', 'Türkçe'], ['vi', 'Vietnamese', 'Tiếng Việt'], ['th', 'Thai', 'ไทย'], ['nl', 'Dutch', 'Nederlands'], ['pl', 'Polish', 'Polski'], ['uk', 'Ukrainian', 'Українська'], ['fa', 'Persian', 'فارسی'], ['he', 'Hebrew', 'עברית'], ['ta', 'Tamil', 'தமிழ்'], ['te', 'Telugu', 'తెలుగు'], ['mr', 'Marathi', 'मराठी'], ['kn', 'Kannada', 'ಕನ್ನಡ'], ['ro', 'Romanian', 'Română'], ['el', 'Greek', 'Ελληνικά'], ['cs', 'Czech', 'Čeština'], ['hu', 'Hungarian', 'Magyar'], ['sv', 'Swedish', 'Svenska'], ['da', 'Danish', 'Dansk'], ['fi', 'Finnish', 'Suomi'], ['no', 'Norwegian', 'Norsk'], ['sk', 'Slovak', 'Slovenčina'], ['bg', 'Bulgarian', 'Български'], ['hr', 'Croatian', 'Hrvatski'], ['lt', 'Lithuanian', 'Lietuvių'], ['sl', 'Slovenian', 'Slovenščina']];
+  var NAME = {}, RTL = { ar: 1, ur: 1, fa: 1, he: 1 };
+  ['from', 'to'].forEach(function (id) {
+    var sel = $(id);
+    LANGS.forEach(function (l) { NAME[l[0]] = l[1]; var o = document.createElement('option'); o.value = l[0]; o.textContent = l[1] + (l[2] ? ' – ' + l[2] : ''); sel.appendChild(o); });
+  });
+  // start from the visitor's own language when it is one we know
+  (function () {
+    var nav = String(navigator.language || 'en').toLowerCase(), mine = nav.split('-')[0];
+    if (/^zh-(tw|hk|mo|hant)/.test(nav)) mine = 'zh-Hant';
+    var known = NAME[mine] ? mine : 'en';
+    $('from').value = 'en'; $('to').value = known === 'en' ? 'es' : known;
+  })();
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(Math.min(1, p) * 100) + '%'; }
+  function pair() { return { from: $('from').value, to: $('to').value }; }
+  function modelRoute(f, t) { // offline models needed for a pair, going through English if needed
+    if (f === t) return [];
+    if (PAIRS[f + '-' + t]) return [f + '-' + t];
+    if (f !== 'en' && t !== 'en' && PAIRS[f + '-en'] && PAIRS['en-' + t]) return [f + '-en', 'en-' + t];
+    return null;
+  }
+  var hasBuiltin = typeof self.Translator !== 'undefined' && self.Translator && typeof self.Translator.availability === 'function';
+
+  // ---------- built-in (Chrome's on-device Translator API) ----------
+  var builtins = {}, availCache = {};
+  function builtinAvail(f, t) {
+    if (!hasBuiltin) return Promise.resolve('unavailable');
+    var k = f + '>' + t;
+    if (!availCache[k]) {
+      // some browsers expose the API but never answer: give up after 3 seconds
+      availCache[k] = Promise.race([
+        Promise.resolve().then(function () { return Translator.availability({ sourceLanguage: f, targetLanguage: t }); }),
+        new Promise(function (r) { setTimeout(function () { r('timeout'); }, 3000); })
+      ]).then(function (a) { if (a === 'timeout') { delete availCache[k]; return 'unavailable'; } return a; }, function () { return 'unavailable'; });
+    }
+    return availCache[k];
+  }
+  function builtinGet(f, t, onProg) {
+    var k = f + '-' + t;
+    if (!builtins[k]) {
+      builtins[k] = Translator.create({ sourceLanguage: f, targetLanguage: t, monitor: function (m) { m.addEventListener('downloadprogress', function (e) { onProg(e.loaded > 1 ? e.loaded / (e.total || 1) : e.loaded); }); } });
+      builtins[k].catch(function () { delete builtins[k]; });
+    }
+    return builtins[k];
+  }
+
+  // ---------- offline models (Bergamot / Firefox Translations, MPL 2.0) ----------
+  var mtP = null, mtKey = '', loaded = {}, progress = null, engineSeen = false;
+  // One engine (worker) per language pair: a fresh one for a new pair keeps memory low, as the engine has a fixed memory size.
+  function dropMT() { var old = mtP; mtP = null; mtKey = ''; if (old) old.then(function (mt) { try { mt.delete(); } catch (e) {} }, function () {}); }
+  function getMT(key) {
+    if (mtP && mtKey === key) return mtP;
+    dropMT(); mtKey = key;
+    mtP = import(MODEL_BASE + 'translator.js').then(function (m) {
+      var Backing = class extends m.TranslatorBacking {
+        loadModelRegistery() {
+          return Promise.resolve(Object.keys(PAIRS).map(function (k) {
+            var b = MODEL_BASE + 'models/' + k + '/';
+            return { from: k.slice(0, 2), to: k.slice(3), files: { model: { name: b + 'model.bin.gz' }, lex: { name: b + 'lex.bin.gz' }, vocab: { name: b + 'vocab.spm.gz' } } };
+          }));
+        }
+        // download with progress, then unpack the .gz file in the browser
+        fetch(url) {
+          return fetch(url).then(function (r) {
+            if (!r.ok) throw new Error('net');
+            var reader = r.body.getReader(), parts = [], got = 0;
+            function pump() {
+              return reader.read().then(function (d) {
+                if (d.done) return new Blob(parts);
+                parts.push(d.value); got += d.value.length; if (progress) progress(url, got); return pump();
+              });
+            }
+            return pump();
+          }, function () { throw new Error('net'); }).then(function (blob) {
+            if (!/\.gz$/.test(url)) return blob.arrayBuffer();
+            if (typeof DecompressionStream === 'undefined') throw new Error('old');
+            return new Response(blob.stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+          });
+        }
+      };
+      var backing = new Backing({ pivotLanguage: 'en', downloadTimeout: 0 });
+      backing.onerror = function () { dropMT(); runId++; busy = false; bar(null); $('go').disabled = false; say('bad', 'The translation engine stopped unexpectedly (perhaps out of memory). Press Translate to try again.'); }; // (options are sent to the worker, so no functions there)
+      return new m.LatencyOptimisedTranslator({ pivotLanguage: 'en' }, backing);
+    });
+    mtP.then(function () { engineSeen = true; }, function () { mtP = null; mtKey = ''; });
+    return mtP;
+  }
+
+  // ---------- engine choice ----------
+  var plan = null, checkId = 0, checking = null;
+  function bytesFor(route) { var n = route.filter(function (k) { return !loaded[k]; }).reduce(function (a, k) { return a + PAIRS[k]; }, 0); return n; }
+  function check() {
+    var p = pair(), me = ++checkId, pref = $('engine').value;
+    plan = null; info('Checking what this browser can do…');
+    $('src').dir = RTL[p.from] ? 'rtl' : 'auto'; $('out').dir = RTL[p.to] ? 'rtl' : 'auto';
+    if (p.from === p.to) { plan = { kind: 'same' }; checking = null; info('Choose two different languages.'); return Promise.resolve(); }
+    var cp = checking = builtinAvail(p.from, p.to).then(function (av) {
+      if (me !== checkId) return;
+      var route = modelRoute(p.from, p.to), canB = av !== 'unavailable', canM = !!route;
+      if (pref === 'builtin' && !canB) { plan = null; return info(hasBuiltin ? 'Your browser\'s built-in translator does not offer ' + NAME[p.from] + ' → ' + NAME[p.to] + '. Choose Automatic or the offline model.' : 'This browser has no built-in translator. It is available in Chrome 138 or newer on computers. Choose Automatic to use the downloadable offline models.'); }
+      if (pref === 'model' && !canM) { plan = null; return info('The offline models cover English with Spanish, French, German, Hindi and Urdu (and pairs among them through English). ' + NAME[p.from] + ' → ' + NAME[p.to] + ' is not one of them.'); }
+      if (canB && pref !== 'model') {
+        plan = { kind: 'builtin', av: av };
+        return info('<b>Engine:</b> built into your browser, runs on this device. ' + (av === 'available' ? 'This language pair is ready.' : 'The language pack downloads the first time you press Translate.'));
+      }
+      if (canM) {
+        plan = { kind: 'model', route: route };
+        var need = bytesFor(route);
+        return info('<b>Engine:</b> offline model from Firefox Translations, runs on this device' + (route.length > 1 ? ' (through English)' : '') + '. ' + (need ? 'First use downloads about ' + fmtBytes(need + (engineSeen ? 0 : ENGINE_BYTES)) + '; after that it works offline.' : 'Ready.'));
+      }
+      plan = null;
+      info(NAME[p.from] + ' → ' + NAME[p.to] + ' is not available in this browser. ' + (hasBuiltin ? 'Your browser\'s translator does not offer it, and the offline models cover only English with Spanish, French, German, Hindi and Urdu.' : 'For many more languages, use Chrome 138 or newer on a computer, which has a translator built in. Here, the offline models cover English with Spanish, French, German, Hindi and Urdu.'));
+    }).then(function () {
+      if (checking === cp) checking = null;
+      if (me === checkId && $('src').value.trim() && ready()) translate(false); // re-translate when the language changes, if nothing must be downloaded
+    });
+    return cp;
+  }
+  function info(html) { $('engineInfo').innerHTML = html; }
+
+  // ---------- translate ----------
+  var busy = false, again = false, runId = 0;
+  function paragraphs(text) { return text.split(/(\n\s*\n)/); } // keep the blank lines between paragraphs
+  function translate(manual) {
+    var text = $('src').value, p = pair();
+    if (!text.trim()) { if (manual) say('bad', 'Type or paste some text to translate first.'); $('out').value = ''; outCount(); return; }
+    if (busy) { again = true; return; }
+    if (!plan && checking) { checking.then(function () { if (plan) translate(manual); else if (manual) say('bad', 'This language pair is not available here. See "Which browsers and languages work?" below.'); }); return; }
+    if (!plan) { if (manual) say('bad', 'This language pair is not available here. See "Which browsers and languages work?" below.'); return; }
+    if (plan.kind === 'same') { $('out').value = text; outCount(); return; }
+    busy = true; again = false; var mine = ++runId, t0 = performance.now(), kind = plan.kind;
+    $('go').disabled = true; say('', manual ? 'Translating…' : '');
+    var parts = paragraphs(text), todo = parts.filter(function (s, i) { return i % 2 === 0 && s.trim(); }).length, done = 0;
+    var one;
+    if (kind === 'builtin') {
+      one = function (s) {
+        return builtinGet(p.from, p.to, function (f) { bar(f); say('', 'Downloading the ' + NAME[p.to] + ' language pack… ' + Math.round(f * 100) + '%'); }).then(function (tr) { return tr.translate(s); });
+      };
+    } else {
+      var route = plan.route, need = bytesFor(route), tot = need + (engineSeen ? 0 : ENGINE_BYTES), seen = {};
+      if (need) {
+        progress = function (url, got) { seen[url] = got; var n = 0; for (var k in seen) n += seen[k]; bar(n / tot); say('', 'Downloading the translation model… ' + fmtBytes(n) + ' of about ' + fmtBytes(tot) + '. This happens only once.'); };
+        say('', 'Getting the translation model ready…'); bar(0);
+      }
+      one = function (s) { return getMT(p.from + '>' + p.to).then(function (mt) { return mt.translate({ from: p.from, to: p.to, text: s, html: false }); }).then(function (r) { route.forEach(function (k) { loaded[k] = true; }); return r.target.text; }); };
+    }
+    var out = [];
+    parts.reduce(function (chain, s, i) {
+      return chain.then(function () {
+        if (mine !== runId) return;
+        if (i % 2 === 1 || !s.trim()) { out[i] = s; return; }
+        return one(s.trim()).then(function (r) {
+          out[i] = s.match(/^\s*/)[0] + r + s.match(/\s*$/)[0]; done++;
+          if (todo > 1) { bar(done / todo); $('out').value = out.join(''); }
+        });
+      });
+    }, Promise.resolve()).then(function () {
+      if (mine !== runId) return;
+      $('out').value = out.join(''); outCount();
+      $('took').textContent = (kind === 'builtin' ? 'Built-in translator' : 'Offline model') + ' · ' + ((performance.now() - t0) / 1000).toFixed(1) + ' s';
+      say('', '');
+      if (kind === 'model' && plan && plan.kind === 'model') info('<b>Engine:</b> offline model from Firefox Translations, runs on this device' + (plan.route.length > 1 ? ' (through English)' : '') + '. Ready, and works offline.');
+      else { availCache[p.from + '>' + p.to] = Promise.resolve('available'); if (plan && plan.kind === 'builtin') plan.av = 'available'; }
+    }).catch(function (e) {
+      var m = e && (e.message || e.name) || '';
+      if (/net/.test(m)) say('bad', 'The translation model could not be downloaded. Check your internet connection and try again.');
+      else if (/old/.test(m)) say('bad', 'This browser is too old to unpack the translation model. Please update it.');
+      else if (e && e.name === 'NotAllowedError') say('bad', 'The browser needs you to press the Translate button to download this language. Press Translate.');
+      else if (/Superseded|Cancelled/.test(m)) return;
+      else say('bad', 'Translation failed' + (m ? ' (' + String(m).slice(0, 120) + ')' : '') + '. Try again, or choose the other engine.');
+      if (kind === 'model') dropMT(); // a crashed engine is replaced on the next try
+    }).then(function () {
+      busy = false; bar(null); $('go').disabled = false; progress = null;
+      if (again) translate(false);
+    });
+  }
+  function outCount() { var n = $('out').value.length; $('outCount').textContent = n ? fmtNum(n) + ' characters' : ''; }
+
+  function ready() { return !!plan && (plan.kind === 'builtin' && plan.av === 'available' || plan.kind === 'model' && !bytesFor(plan.route)); }
+  var typeT = 0;
+  $('src').addEventListener('input', function () {
+    var n = $('src').value.length; $('count').textContent = fmtNum(n) + (n === 1 ? ' character' : ' characters') + (n >= 50000 ? ' (limit reached)' : '');
+    clearTimeout(typeT);
+    // translate as you type once the language is ready (no surprise downloads)
+    if (ready()) typeT = setTimeout(function () { translate(false); }, 700);
+  });
+  $('src').addEventListener('keydown', function (e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); translate(true); } });
+  $('go').addEventListener('click', function () { translate(true); });
+  ['from', 'to', 'engine'].forEach(function (id) { $(id).addEventListener('change', function () { runId++; $('out').value = ''; outCount(); $('took').textContent = ''; say('', ''); check(); }); });
+  $('swap').addEventListener('click', function () {
+    var f = $('from').value; $('from').value = $('to').value; $('to').value = f;
+    if ($('out').value.trim()) { $('src').value = $('out').value; $('src').dispatchEvent(new Event('input')); }
+    $('out').value = ''; outCount(); runId++; check();
+  });
+  $('copy').addEventListener('click', function () { if (!$('out').value.trim()) return toast('There is no translation to copy yet.'); copyText($('out').value); });
+  var dlUrl = null;
+  $('dl').addEventListener('click', function () {
+    if (!$('out').value.trim()) return toast('There is no translation to download yet.');
+    if (dlUrl) URL.revokeObjectURL(dlUrl);
+    dlUrl = URL.createObjectURL(new Blob([$('out').value], { type: 'text/plain;charset=utf-8' }));
+    var a = document.createElement('a'); a.href = dlUrl; a.download = 'translation-' + $('from').value + '-' + $('to').value + '.txt'; document.body.appendChild(a); a.click(); a.remove();
+  });
+  $('clear').addEventListener('click', function () { runId++; $('src').value = ''; $('out').value = ''; $('src').dispatchEvent(new Event('input')); outCount(); $('took').textContent = ''; say('', ''); $('src').focus(); });
+  check();
+})();
+</script>

@@ -1,0 +1,513 @@
+<style>
+.dsc-add { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+.dsc-add .btn { min-height: 56px; font-size: 16px; }
+.dsc-cam { margin: 0 0 16px; text-align: center; }
+.dsc-cam video { width: 100%; max-height: 60vh; background: #000; border-radius: 10px; display: block; }
+.dsc-ed { position: relative; text-align: center; line-height: 0; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px; }
+.dsc-ed canvas { max-width: 100%; height: auto; touch-action: none; cursor: grab; }
+.dsc-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 12px 0; }
+.dsc-bar .btn { min-height: 40px; padding: 6px 14px; }
+.dsc-pages { list-style: none; padding: 0; margin: 16px 0 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 12px; }
+.dsc-pages li { background: var(--bg); border: 2px solid var(--line); border-radius: 10px; padding: 6px; text-align: center; font-size: 13px; color: var(--muted); }
+.dsc-pages li.cur { border-color: var(--accent); }
+.dsc-pages img { width: 100%; height: 130px; object-fit: contain; background: #fff; border-radius: 6px; display: block; margin-bottom: 4px; cursor: pointer; }
+.dsc-pages .row { display: flex; justify-content: center; gap: 4px; margin-top: 4px; }
+.dsc-pages button { font: inherit; width: 30px; height: 30px; border-radius: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; padding: 0; }
+.dsc-pages button[disabled] { opacity: .35; cursor: default; }
+.dsc-h { font-size: 16px; margin: 22px 0 10px; }
+</style>
+<div class="dsc-add">
+  <button class="btn" id="shoot" type="button">📷 Take a photo</button>
+  <button class="btn ghost" id="pick" type="button">Upload photos</button>
+</div>
+<input type="file" id="cam" accept="image/*" capture="environment" hidden data-nomemo>
+<div class="drop" id="drop" tabindex="0" role="button"><b>…or drop photos of your pages here</b>JPG, PNG or WebP. Pages are found and straightened on your device; nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="dsc-cam" id="camBox" hidden>
+  <video id="video" playsinline muted autoplay></video>
+  <div class="btns" style="justify-content:center"><button class="btn" id="snap" type="button">Capture page</button><button class="btn ghost" id="camOff" type="button">Close camera</button></div>
+</div>
+<div id="edit" hidden>
+  <h3 class="dsc-h" id="edTitle">Page 1</h3>
+  <div class="dsc-ed"><canvas id="ed" width="10" height="10" aria-label="Drag the four corners onto the corners of the page"></canvas></div>
+  <p class="msg" style="margin-top:6px;font-size:14px">Drag the round handles onto the four corners of the page.</p>
+  <div class="dsc-bar">
+    <button class="btn ghost" id="auto" type="button">Find edges again</button>
+    <button class="btn ghost" id="full" type="button">Use whole photo</button>
+    <button class="btn ghost" id="rot" type="button">↻ Turn</button>
+  </div>
+  <label>Look</label>
+  <div class="seg" id="modes" role="group" aria-label="Look"><button type="button" data-v="color" aria-pressed="true">Colour</button><button type="button" data-v="gray" aria-pressed="false">Grey</button><button type="button" data-v="bw" aria-pressed="false">Black &amp; white</button><button type="button" data-v="orig" aria-pressed="false">Original</button></div>
+  <div class="preview" style="margin-top:12px"><canvas id="out" width="10" height="10" aria-label="Straightened page" style="max-width:100%;height:auto;background:#fff"></canvas></div>
+</div>
+<ul class="dsc-pages" id="pages"></ul>
+<div id="exp" hidden>
+  <h3 class="dsc-h">Save your scan</h3>
+  <div class="fields">
+    <div><label for="size">PDF page size</label><select id="size"><option value="a4">A4 (210 × 297 mm)</option><option value="letter">Letter (8.5 × 11 in)</option><option value="fit">Same shape as the scan</option></select></div>
+    <div><label for="qual">Quality</label><select id="qual"><option value="2480">High (300 dpi)</option><option value="1754" selected>Standard (200 dpi)</option><option value="1240">Smaller file (150 dpi)</option></select></div>
+  </div>
+  <div class="btns">
+    <button class="btn" id="pdf" type="button">Download PDF</button>
+    <button class="btn ghost" id="jpg" type="button">Download JPG</button>
+    <button class="btn ghost danger" id="clear" type="button">Start again</button>
+  </div>
+  <div class="notice" id="notice" hidden><div class="meter"><i id="fill"></i></div><p id="stat"></p></div>
+</div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var MAXPX = 60e6, SRC = 3200, EDIT = 1000, DET = 360, MAXPAGES = 100;
+  var pages = [], cur = -1, stream = null, urls = [];
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(w)); c.height = Math.max(1, Math.round(h)); return c; }
+  function scaled(img, long) { var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, k = Math.min(1, long / Math.max(w, h)), c = canvas(w * k, h * k), x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, c.width, c.height); return c; }
+  if (/^(en-US|en-CA|es-MX|es-US|en-PH|fil)/i.test(navigator.language || '')) $('size').value = 'letter';
+
+  // ======================= finding the page =======================
+  function grayOf(c) {
+    var d = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, c.width, c.height).data, n = c.width * c.height, g = new Float32Array(n), rgb = new Uint8ClampedArray(n * 3);
+    for (var i = 0; i < n; i++) { rgb[i * 3] = d[i * 4]; rgb[i * 3 + 1] = d[i * 4 + 1]; rgb[i * 3 + 2] = d[i * 4 + 2]; g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114; }
+    return { g: g, rgb: rgb };
+  }
+  function boxBlur(a, w, h, r) {
+    var t = new Float32Array(a.length), o = new Float32Array(a.length), x, y, s, k, n = 2 * r + 1;
+    for (y = 0; y < h; y++) { var row = y * w; s = 0; for (k = -r; k <= r; k++) s += a[row + Math.min(w - 1, Math.max(0, k))]; for (x = 0; x < w; x++) { t[row + x] = s / n; s += a[row + Math.min(w - 1, x + r + 1)] - a[row + Math.max(0, x - r)]; } }
+    for (x = 0; x < w; x++) { s = 0; for (k = -r; k <= r; k++) s += t[Math.min(h - 1, Math.max(0, k)) * w + x]; for (y = 0; y < h; y++) { o[y * w + x] = s / n; s += t[Math.min(h - 1, y + r + 1) * w + x] - t[Math.max(0, y - r) * w + x]; } }
+    return o;
+  }
+  function otsu(vals, lo, hi) {
+    var hist = new Float64Array(256), n = vals.length, i, sc = 255 / Math.max(1e-6, hi - lo);
+    for (i = 0; i < n; i++) hist[Math.max(0, Math.min(255, ((vals[i] - lo) * sc) | 0))]++;
+    var sum = 0; for (i = 0; i < 256; i++) sum += i * hist[i];
+    var sB = 0, wB = 0, best = -1, t = 128;
+    for (i = 0; i < 256; i++) { wB += hist[i]; if (!wB) continue; var wF = n - wB; if (!wF) break; sB += i * hist[i]; var d = sB / wB - (sum - sB) / wF, v = wB * wF * d * d; if (v > best) { best = v; t = i; } }
+    return lo + t / sc;
+  }
+  function morph(m, w, h, r, grow) { // square dilate (grow) or erode, separable
+    var t = new Uint8Array(m.length), o = new Uint8Array(m.length), x, y, k, v;
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { v = grow ? 0 : 1; for (k = -r; k <= r; k++) { var xx = x + k; var q = xx < 0 || xx >= w ? (grow ? 0 : 1) : m[y * w + xx]; if (grow ? q : !q) { v = grow ? 1 : 0; break; } } t[y * w + x] = v; }
+    for (x = 0; x < w; x++) for (y = 0; y < h; y++) { v = grow ? 0 : 1; for (k = -r; k <= r; k++) { var yy = y + k; var q2 = yy < 0 || yy >= h ? (grow ? 0 : 1) : t[yy * w + x]; if (grow ? q2 : !q2) { v = grow ? 1 : 0; break; } } o[y * w + x] = v; }
+    return o;
+  }
+  function largest(m, w, h) { // biggest 4-connected blob: { mask, area }
+    var lab = new Int32Array(m.length), st = new Int32Array(m.length), best = 0, bestId = 0, id = 0;
+    for (var i = 0; i < m.length; i++) {
+      if (!m[i] || lab[i]) continue;
+      id++; var sp = 0, cnt = 0; st[sp++] = i; lab[i] = id;
+      while (sp) { var p = st[--sp], x = p % w; cnt++;
+        if (x > 0 && m[p - 1] && !lab[p - 1]) { lab[p - 1] = id; st[sp++] = p - 1; }
+        if (x < w - 1 && m[p + 1] && !lab[p + 1]) { lab[p + 1] = id; st[sp++] = p + 1; }
+        if (p >= w && m[p - w] && !lab[p - w]) { lab[p - w] = id; st[sp++] = p - w; }
+        if (p < m.length - w && m[p + w] && !lab[p + w]) { lab[p + w] = id; st[sp++] = p + w; } }
+      if (cnt > best) { best = cnt; bestId = id; }
+    }
+    var out = new Uint8Array(m.length); for (i = 0; i < m.length; i++) out[i] = lab[i] === bestId ? 1 : 0;
+    return { mask: out, area: best };
+  }
+  function fillHoles(m, w, h) { // anything not reachable from the border is inside
+    var seen = new Uint8Array(m.length), st = new Int32Array(m.length), sp = 0, i;
+    function push(p) { if (!m[p] && !seen[p]) { seen[p] = 1; st[sp++] = p; } }
+    for (i = 0; i < w; i++) { push(i); push((h - 1) * w + i); } for (i = 0; i < h; i++) { push(i * w); push(i * w + w - 1); }
+    while (sp) { var p = st[--sp], x = p % w; if (x > 0) push(p - 1); if (x < w - 1) push(p + 1); if (p >= w) push(p - w); if (p < m.length - w) push(p + w); }
+    var o = new Uint8Array(m.length); for (i = 0; i < m.length; i++) o[i] = seen[i] ? 0 : 1; return o;
+  }
+  function hull(pts) { // monotone chain, pts = [[x,y]...]
+    pts.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+    function cr(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+    var lo = [], up = [], i;
+    for (i = 0; i < pts.length; i++) { while (lo.length >= 2 && cr(lo[lo.length - 2], lo[lo.length - 1], pts[i]) <= 0) lo.pop(); lo.push(pts[i]); }
+    for (i = pts.length - 1; i >= 0; i--) { while (up.length >= 2 && cr(up[up.length - 2], up[up.length - 1], pts[i]) <= 0) up.pop(); up.push(pts[i]); }
+    lo.pop(); up.pop(); return lo.concat(up);
+  }
+  function tri(a, b, c) { return Math.abs((b[0] - a[0]) * (c[1] - a[1]) - (b[1] - a[1]) * (c[0] - a[0])) / 2; }
+  function bestQuad(H) { // largest four-corner shape inside a convex outline
+    var n = H.length; if (n < 4) return null;
+    if (n > 60) { var step = n / 60, s = []; for (var q = 0; q < 60; q++) s.push(H[Math.floor(q * step)]); H = s; n = 60; }
+    var best = -1, bq = null;
+    for (var i = 0; i < n; i++) for (var k = i + 2; k < n; k++) {
+      var m1 = 0, j1 = -1, m2 = 0, j2 = -1, j;
+      for (j = i + 1; j < k; j++) { var a = tri(H[i], H[j], H[k]); if (a > m1) { m1 = a; j1 = j; } }
+      for (j = k + 1; j < n + i; j++) { var jj = j % n, a2 = tri(H[i], H[jj], H[k]); if (a2 > m2) { m2 = a2; j2 = jj; } }
+      if (j1 >= 0 && j2 >= 0 && m1 + m2 > best) { best = m1 + m2; bq = [H[i], H[j1], H[k], H[j2]]; }
+    }
+    return bq && { q: bq, area: best };
+  }
+  function order(q) { // top-left, top-right, bottom-right, bottom-left
+    var cx = 0, cy = 0; q.forEach(function (p) { cx += p[0] / 4; cy += p[1] / 4; });
+    q = q.slice().sort(function (a, b) { return Math.atan2(a[1] - cy, a[0] - cx) - Math.atan2(b[1] - cy, b[0] - cx); }); // clockwise on screen, from the left
+    var s = 0; for (var i = 1; i < 4; i++) if (q[i][0] + q[i][1] < q[s][0] + q[s][1]) s = i;
+    return [q[s], q[(s + 1) % 4], q[(s + 2) % 4], q[(s + 3) % 4]];
+  }
+  function quadFrom(mask, w, h) {
+    var m = morph(morph(mask, w, h, 2, false), w, h, 2, true); // remove thin bits
+    var L = largest(m, w, h); if (L.area < w * h * 0.08) return null;
+    var f = fillHoles(L.mask, w, h), area = 0, pts = [], i;
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) { i = y * w + x; if (!f[i]) continue; area++; if (x === 0 || y === 0 || x === w - 1 || y === h - 1 || !f[i - 1] || !f[i + 1] || !f[i - w] || !f[i + w]) pts.push([x, y]); }
+    var bq = bestQuad(hull(pts)); if (!bq) return null;
+    return { q: order(bq.q), fill: area / bq.area, frac: bq.area / (w * h) };
+  }
+  // Returns the four corners (in the coordinates of canvas c) or null.
+  function detect(c) {
+    var k = Math.min(1, DET / Math.max(c.width, c.height)), s = canvas(c.width * k, c.height * k); s.getContext('2d').drawImage(c, 0, 0, s.width, s.height);
+    var w = s.width, h = s.height, n = w * h, G = grayOf(s), g = boxBlur(boxBlur(G.g, w, h, 1), w, h, 1), cands = [], i;
+    var lo = 255, hi = 0; for (i = 0; i < n; i++) { if (g[i] < lo) lo = g[i]; if (g[i] > hi) hi = g[i]; }
+    // 1. paper is usually lighter than what it lies on
+    var t = otsu(g, lo, hi), m1 = new Uint8Array(n); for (i = 0; i < n; i++) m1[i] = g[i] > t ? 1 : 0; cands.push(m1);
+    // 2. different in colour from the border of the photo
+    var bs = [], rgb = G.rgb, x, y;
+    for (x = 0; x < w; x += 2) { bs.push(x, (h - 1) * w + x); } for (y = 0; y < h; y += 2) { bs.push(y * w, y * w + w - 1); }
+    var med = [0, 1, 2].map(function (ch) { var v = bs.map(function (p) { return rgb[p * 3 + ch]; }).sort(function (a, b) { return a - b; }); return v[v.length >> 1]; });
+    var dist = new Float32Array(n); for (i = 0; i < n; i++) { var dr = rgb[i * 3] - med[0], dg = rgb[i * 3 + 1] - med[1], db = rgb[i * 3 + 2] - med[2]; dist[i] = Math.sqrt(dr * dr + dg * dg + db * db); }
+    dist = boxBlur(dist, w, h, 1); var dmax = 0; for (i = 0; i < n; i++) if (dist[i] > dmax) dmax = dist[i];
+    if (dmax > 30) { var t2 = Math.max(25, otsu(dist, 0, dmax)), m2 = new Uint8Array(n); for (i = 0; i < n; i++) m2[i] = dist[i] > t2 ? 1 : 0; cands.push(m2); }
+    // 3. strong edges that enclose an area
+    var mag = new Float32Array(n), mx = 0;
+    for (y = 1; y < h - 1; y++) for (x = 1; x < w - 1; x++) { i = y * w + x;
+      var gx = g[i - w + 1] + 2 * g[i + 1] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - 1] - g[i + w - 1], gy = g[i + w - 1] + 2 * g[i + w] + g[i + w + 1] - g[i - w - 1] - 2 * g[i - w] - g[i - w + 1];
+      mag[i] = Math.sqrt(gx * gx + gy * gy); if (mag[i] > mx) mx = mag[i]; }
+    if (mx > 40) { var te = Math.max(30, otsu(mag, 0, mx)), e = new Uint8Array(n); for (i = 0; i < n; i++) e[i] = mag[i] > te ? 1 : 0; cands.push(fillHoles(morph(e, w, h, 1, true), w, h)); }
+    // how much of each side of a candidate lies on a visible edge (a side on the photo's border counts as an edge)
+    var te2 = mx > 40 ? Math.max(20, otsu(mag, 0, mx) * 0.5) : 20;
+    function support(q) {
+      var sides = [];
+      for (var sd = 0; sd < 4; sd++) {
+        var a = q[sd], b = q[(sd + 1) % 4], hit = 0, N = 40;
+        for (var t = 0; t < N; t++) {
+          var px = a[0] + (b[0] - a[0]) * (t + 0.5) / N, py = a[1] + (b[1] - a[1]) * (t + 0.5) / N, ok = px < 3 || py < 3 || px > w - 4 || py > h - 4;
+          for (var dy = -2; dy <= 2 && !ok; dy++) for (var dx = -2; dx <= 2; dx++) { var X = Math.round(px) + dx, Y = Math.round(py) + dy; if (X >= 0 && Y >= 0 && X < w && Y < h && mag[Y * w + X] > te2) { ok = true; break; } }
+          if (ok) hit++;
+        }
+        sides.push(hit / N);
+      }
+      var mn = Math.min.apply(null, sides), mean = (sides[0] + sides[1] + sides[2] + sides[3]) / 4;
+      return 0.5 * mn + 0.5 * mean;
+    }
+    var best = null, bestScore = 0;
+    cands.forEach(function (m) {
+      var r = quadFrom(m, w, h); if (!r) return;
+      if (r.frac < 0.06 || r.frac > 0.985 || r.fill < 0.8) return;
+      var sup = support(r.q); if (sup < 0.5) return;
+      var sc = Math.pow(Math.min(1, r.fill), 3) * Math.sqrt(r.frac) * sup * sup;
+      if (sc > bestScore) { bestScore = sc; best = r; }
+    });
+    if (!best) return null;
+    var mx2 = 0, my2 = 0; best.q.forEach(function (p) { mx2 += p[0] / 4; my2 += p[1] / 4; });
+    return best.q.map(function (p) { // pulled in by about a pixel so no background shows along the edges
+      var dx = mx2 - p[0], dy = my2 - p[1], d = Math.hypot(dx, dy) || 1, x2 = p[0] + 0.5 + dx / d * 1.2, y2 = p[1] + 0.5 + dy / d * 1.2;
+      return [Math.min(c.width, Math.max(0, x2 / k)), Math.min(c.height, Math.max(0, y2 / k))]; });
+  }
+
+  // ======================= straightening and cleaning =======================
+  function homography(src, dst) { // 3x3 matrix mapping src points to dst points
+    var A = [], b = [];
+    for (var i = 0; i < 4; i++) { var x = src[i][0], y = src[i][1], u = dst[i][0], v = dst[i][1]; A.push([x, y, 1, 0, 0, 0, -x * u, -y * u]); b.push(u); A.push([0, 0, 0, x, y, 1, -x * v, -y * v]); b.push(v); }
+    for (var c = 0; c < 8; c++) { var p = c; for (var r = c + 1; r < 8; r++) if (Math.abs(A[r][c]) > Math.abs(A[p][c])) p = r;
+      var tA = A[c]; A[c] = A[p]; A[p] = tA; var tb = b[c]; b[c] = b[p]; b[p] = tb;
+      for (r = 0; r < 8; r++) if (r !== c) { var f = A[r][c] / A[c][c]; for (var k = c; k < 8; k++) A[r][k] -= f * A[c][k]; b[r] -= f * b[c]; } }
+    var hh = b.map(function (v, j) { return v / A[j][j]; }); hh.push(1); return hh;
+  }
+  function dist2(a, b) { return Math.hypot(a[0] - b[0], a[1] - b[1]); }
+  // Real width / height of the page, undoing the camera's perspective (Zhang and He's whiteboard method);
+  // falls back to the side lengths when the photo gives too little to go on.
+  function aspect(q, cw, ch) {
+    var u0 = cw / 2, v0 = ch / 2, m1 = [q[0][0], q[0][1], 1], m2 = [q[1][0], q[1][1], 1], m3 = [q[3][0], q[3][1], 1], m4 = [q[2][0], q[2][1], 1];
+    function cross(a, b) { return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]]; }
+    function dot(a, b) { return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]; }
+    var k2 = dot(cross(m1, m4), m3) / dot(cross(m2, m4), m3), k3 = dot(cross(m1, m4), m2) / dot(cross(m3, m4), m2);
+    var n2 = [k2 * m2[0] - m1[0], k2 * m2[1] - m1[1], k2 * m2[2] - m1[2]], n3 = [k3 * m3[0] - m1[0], k3 * m3[1] - m1[1], k3 * m3[2] - m1[2]];
+    var r;
+    if (Math.abs(n2[2] * n3[2]) < 1e-9) r = Math.sqrt((n2[0] * n2[0] + n2[1] * n2[1]) / (n3[0] * n3[0] + n3[1] * n3[1]));
+    else {
+      var f2 = -((n2[0] * n3[0] - (n2[0] * n3[2] + n2[2] * n3[0]) * u0 + n2[2] * n3[2] * u0 * u0) + (n2[1] * n3[1] - (n2[1] * n3[2] + n2[2] * n3[1]) * v0 + n2[2] * n3[2] * v0 * v0)) / (n2[2] * n3[2]);
+      if (!(f2 > 0)) return 0;
+      function nrm(n) { var a = n[0] - u0 * n[2], b = n[1] - v0 * n[2]; return (a * a + b * b) / f2 + n[2] * n[2]; }
+      r = Math.sqrt(nrm(n2) / nrm(n3));
+    }
+    return isFinite(r) && r > 0.2 && r < 5 ? r : 0;
+  }
+  function outSize(q, long, cw, ch) {
+    var w = Math.max(dist2(q[0], q[1]), dist2(q[3], q[2])), h = Math.max(dist2(q[0], q[3]), dist2(q[1], q[2])), r = cw ? aspect(q, cw, ch) : 0;
+    if (r) { if (r * h >= w) w = h * r; else h = w / r; }
+    var k = long / Math.max(w, h);
+    return { w: Math.max(8, Math.round(w * k)), h: Math.max(8, Math.round(h * k)) };
+  }
+  function warp(c, q, long) { // straighten the area inside q of canvas c into a long x ? rectangle
+    var sz = outSize(q, long, c.width, c.height), W = sz.w, H = sz.h, sw = c.width, sh = c.height;
+    var sd = c.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, sw, sh).data;
+    var M = homography([[0, 0], [W, 0], [W, H], [0, H]], q), out = new ImageData(W, H), od = out.data;
+    for (var y = 0; y < H; y++) for (var x = 0; x < W; x++) {
+      var X = x + 0.5, Y = y + 0.5, z = M[6] * X + M[7] * Y + 1, fx = (M[0] * X + M[1] * Y + M[2]) / z - 0.5, fy = (M[3] * X + M[4] * Y + M[5]) / z - 0.5;
+      fx = fx < 0 ? 0 : fx > sw - 1 ? sw - 1 : fx; fy = fy < 0 ? 0 : fy > sh - 1 ? sh - 1 : fy;
+      var x0 = fx | 0, y0 = fy | 0, x1 = Math.min(sw - 1, x0 + 1), y1 = Math.min(sh - 1, y0 + 1), tx = fx - x0, ty = fy - y0, o = (y * W + x) * 4;
+      var a = (y0 * sw + x0) * 4, b = (y0 * sw + x1) * 4, cc = (y1 * sw + x0) * 4, d = (y1 * sw + x1) * 4;
+      for (var ch = 0; ch < 3; ch++) od[o + ch] = (sd[a + ch] * (1 - tx) + sd[b + ch] * tx) * (1 - ty) + (sd[cc + ch] * (1 - tx) + sd[d + ch] * tx) * ty;
+      od[o + 3] = 255;
+    }
+    return out;
+  }
+  function paperLevel(v, w, h) { // brightness of the paper around each pixel (ink is thin, paper is everywhere)
+    var B = Math.max(8, Math.round(Math.max(w, h) / 40)), bw = Math.ceil(w / B), bh = Math.ceil(h / B), blk = new Float32Array(bw * bh), bx, by, X, Y;
+    for (by = 0; by < bh; by++) for (bx = 0; bx < bw; bx++) {
+      var vals = [], y1 = Math.min(h, (by + 1) * B), x1 = Math.min(w, (bx + 1) * B), st = Math.max(1, B >> 3);
+      for (Y = by * B; Y < y1; Y += st) for (X = bx * B; X < x1; X += st) vals.push(v[Y * w + X]);
+      vals.sort(function (a, b) { return a - b; }); blk[by * bw + bx] = vals[Math.floor(vals.length * 0.92)];
+    }
+    var b2 = new Float32Array(blk.length); // spread to neighbours so large dark areas (photos, headings) do not darken the estimate
+    for (by = 0; by < bh; by++) for (bx = 0; bx < bw; bx++) { var m = 0, cnt = 0, s = 0;
+      for (Y = Math.max(0, by - 1); Y <= Math.min(bh - 1, by + 1); Y++) for (X = Math.max(0, bx - 1); X <= Math.min(bw - 1, bx + 1); X++) { m = Math.max(m, blk[Y * bw + X]); s += blk[Y * bw + X]; cnt++; }
+      b2[by * bw + bx] = 0.6 * m + 0.4 * s / cnt; }
+    var out = new Float32Array(w * h);
+    for (Y = 0; Y < h; Y++) { var fy = Math.min(bh - 1, Math.max(0, (Y + 0.5) / B - 0.5)), ya = fy | 0, yb = Math.min(bh - 1, ya + 1), ty = fy - ya;
+      for (X = 0; X < w; X++) { var fx = Math.min(bw - 1, Math.max(0, (X + 0.5) / B - 0.5)), xa = fx | 0, xb = Math.min(bw - 1, xa + 1), tx = fx - xa;
+        out[Y * w + X] = (b2[ya * bw + xa] * (1 - tx) + b2[ya * bw + xb] * tx) * (1 - ty) + (b2[yb * bw + xa] * (1 - tx) + b2[yb * bw + xb] * tx) * ty; } }
+    return out;
+  }
+  function enhance(img, mode) {
+    if (mode === 'orig') return img;
+    var w = img.width, h = img.height, p = img.data, n = w * h, i, g = new Float32Array(n);
+    for (i = 0; i < n; i++) g[i] = p[i * 4] * 0.299 + p[i * 4 + 1] * 0.587 + p[i * 4 + 2] * 0.114;
+    var bg = paperLevel(g, w, h);
+    if (mode === 'color') { // white paper, the colours of the ink kept
+      var wb = [0, 0, 0], wn = 0; // white balance: make the paper itself neutral white
+      for (i = 0; i < n; i += 7) if (g[i] > bg[i] * 0.9) { wb[0] += p[i * 4]; wb[1] += p[i * 4 + 1]; wb[2] += p[i * 4 + 2]; wn++; }
+      var gm = wn ? (wb[0] + wb[1] + wb[2]) / 3 : 1, cb = wn ? wb.map(function (v) { return Math.min(1.5, Math.max(0.67, gm / Math.max(1, v))); }) : [1, 1, 1];
+      for (i = 0; i < n; i++) { var k = 255 / Math.max(40, bg[i]);
+        for (var ch = 0; ch < 3; ch++) { var v = p[i * 4 + ch] * k * cb[ch]; v = v >= 255 ? 255 : v; v = 255 * Math.pow(v / 255, 1.35); p[i * 4 + ch] = v > 247 ? 255 : v; } }
+      return img;
+    }
+    var nv = new Float32Array(n); for (i = 0; i < n; i++) nv[i] = Math.min(255, g[i] * 255 / Math.max(40, bg[i]));
+    if (mode === 'gray') { for (i = 0; i < n; i++) { var u = 255 * Math.pow(nv[i] / 255, 1.6); u = u > 240 ? 255 : u; p[i * 4] = p[i * 4 + 1] = p[i * 4 + 2] = u; } return img; }
+    // black and white: compare each pixel with the average of its surroundings (adaptive threshold)
+    var ii = new Float64Array((w + 1) * (h + 1)), r = Math.max(6, Math.round(Math.max(w, h) / 50)), x, y;
+    for (y = 0; y < h; y++) { var rs = 0; for (x = 0; x < w; x++) { rs += nv[y * w + x]; ii[(y + 1) * (w + 1) + x + 1] = ii[y * (w + 1) + x + 1] + rs; } }
+    for (y = 0; y < h; y++) { var ya = Math.max(0, y - r), yb = Math.min(h, y + r + 1);
+      for (x = 0; x < w; x++) { var xa = Math.max(0, x - r), xb = Math.min(w, x + r + 1), cnt = (yb - ya) * (xb - xa);
+        var mean = (ii[yb * (w + 1) + xb] - ii[ya * (w + 1) + xb] - ii[yb * (w + 1) + xa] + ii[ya * (w + 1) + xa]) / cnt, val = nv[y * w + x];
+        var o = val < 110 ? 0 : val < mean * 0.86 && val < 215 ? (val < mean * 0.78 ? 0 : 255 * (val - mean * 0.78) / (mean * 0.08)) : 255; // a soft edge of a few grey levels keeps text smooth
+        i = (y * w + x) * 4; p[i] = p[i + 1] = p[i + 2] = o; } }
+    return img;
+  }
+  function rotated(img, rot) { // ImageData -> canvas, turned by rot degrees
+    var t = canvas(img.width, img.height); t.getContext('2d').putImageData(img, 0, 0);
+    if (!rot) return t;
+    var side = rot % 180 !== 0, c = canvas(side ? img.height : img.width, side ? img.width : img.height), x = c.getContext('2d');
+    x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 180); x.drawImage(t, -t.width / 2, -t.height / 2); return c;
+  }
+  function render(pg, long) { // the finished page at the given size (long side, in pixels)
+    var src = long <= EDIT ? pg.edit : scaled(pg.img, Math.min(SRC, Math.max(long * 1.6, EDIT))), k = src.width / pg.edit.width;
+    var q = pg.q.map(function (p) { return [p[0] * k, p[1] * k]; });
+    var natural = Math.max(dist2(q[0], q[1]), dist2(q[3], q[2]), dist2(q[0], q[3]), dist2(q[1], q[2]));
+    return rotated(enhance(warp(src, q, Math.min(long, Math.round(natural * 1.5))), pg.mode), pg.rot);
+  }
+
+  // ======================= pages =======================
+  function addFiles(list) {
+    var bad = 0, heic = 0, todo = [];
+    list.forEach(function (f) {
+      if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { heic++; return; }
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif)$/i.test(f.name)) { bad++; return; }
+      todo.push(f);
+    });
+    var notes = [];
+    if (bad) notes.push('Skipped ' + bad + ' file(s) that are not photos.');
+    if (heic) notes.push(heic + ' HEIC photo(s) (the iPhone format) cannot be opened here. Convert them to JPG first with the HEIC to JPG tool, or take the photo with the "Take a photo" button.');
+    say(notes.length ? 'bad' : '', notes.join(' '));
+    var i = 0;
+    (function next() {
+      if (i >= todo.length) return;
+      if (pages.length >= MAXPAGES) { say('bad', 'A scan can have up to ' + MAXPAGES + ' pages. Save this one first, then start a new one.'); return; }
+      var f = todo[i++];
+      loadImage(f, function (img) {
+        if (!img || !img.naturalWidth) { notes.push('"' + f.name + '" could not be opened.'); say('bad', notes.join(' ')); next(); return; }
+        if (img.naturalWidth * img.naturalHeight > MAXPX) { notes.push('"' + f.name + '" is too large.'); say('bad', notes.join(' ')); next(); return; }
+        addPage(img);
+        setTimeout(next, 0);
+      });
+    })();
+  }
+  function addPage(img) {
+    var src = scaled(img, SRC), edit = scaled(src, EDIT); // keep a smaller copy in memory, not the full camera photo
+    var q = detect(edit), pg = { img: src, edit: edit, q: q || inset(edit), found: !!q, mode: 'color', rot: 0 };
+    pages.push(pg); cur = pages.length - 1;
+    refresh(); openEditor();
+    say(q ? 'ok' : '', q ? 'Page ' + pages.length + ' added. The edges were found automatically; drag the corners if they need adjusting.' : 'Page ' + pages.length + ' added. The page edges could not be found, so drag the four corners onto the corners of the page.');
+  }
+  function inset(c) { var dx = c.width * 0.04, dy = c.height * 0.04; return [[dx, dy], [c.width - dx, dy], [c.width - dx, c.height - dy], [dx, c.height - dy]]; }
+  function thumb(pg) { var c = render(pg, 260); return c.toDataURL('image/jpeg', 0.7); }
+  function refresh() {
+    var ul = $('pages'); ul.innerHTML = '';
+    pages.forEach(function (pg, i) {
+      if (!pg.thumb) pg.thumb = thumb(pg);
+      var li = document.createElement('li'), im = new Image(), cap = document.createElement('div'), row = document.createElement('div');
+      li.className = i === cur ? 'cur' : ''; im.src = pg.thumb; im.alt = 'Page ' + (i + 1); im.addEventListener('click', function () { cur = i; refresh(); openEditor(); });
+      cap.textContent = 'Page ' + (i + 1); row.className = 'row';
+      [['↑', 'Move page ' + (i + 1) + ' up', i > 0, function () { pages.splice(i - 1, 0, pages.splice(i, 1)[0]); if (cur === i) cur--; else if (cur === i - 1) cur++; }],
+       ['↓', 'Move page ' + (i + 1) + ' down', i < pages.length - 1, function () { pages.splice(i + 1, 0, pages.splice(i, 1)[0]); if (cur === i) cur++; else if (cur === i + 1) cur--; }],
+       ['✎', 'Edit page ' + (i + 1), true, function () { cur = i; }],
+       ['✕', 'Delete page ' + (i + 1), true, function () { pages.splice(i, 1); if (cur >= pages.length) cur = pages.length - 1; else if (cur > i) cur--; }]].forEach(function (b) {
+        var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0]; btn.title = b[1]; btn.setAttribute('aria-label', b[1]); btn.disabled = !b[2];
+        btn.addEventListener('click', function () { b[3](); refresh(); openEditor(); }); row.appendChild(btn);
+      });
+      li.appendChild(im); li.appendChild(cap); li.appendChild(row); ul.appendChild(li);
+    });
+    $('exp').hidden = !pages.length;
+    $('jpg').textContent = pages.length > 1 ? 'Download JPGs (ZIP)' : 'Download JPG';
+    if (!pages.length) { $('edit').hidden = true; }
+  }
+
+  // ======================= the corner editor =======================
+  var drag = -1, loupe = null;
+  function openEditor() {
+    var pg = pages[cur]; if (!pg) { $('edit').hidden = true; return; }
+    $('edit').hidden = false; $('edTitle').textContent = 'Page ' + (cur + 1) + ' of ' + pages.length;
+    Array.prototype.forEach.call($('modes').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.v === pg.mode ? 'true' : 'false'); });
+    drawEditor(); drawResult();
+  }
+  function drawEditor() {
+    var pg = pages[cur], c = $('ed'), e = pg.edit; if (c.width !== e.width || c.height !== e.height) { c.width = e.width; c.height = e.height; }
+    var x = c.getContext('2d'), q = pg.q, r = Math.max(10, c.width / 45);
+    x.drawImage(e, 0, 0);
+    x.fillStyle = 'rgba(0,0,0,.45)'; x.beginPath(); x.rect(0, 0, c.width, c.height); x.moveTo(q[0][0], q[0][1]); for (var i = 3; i >= 0; i--) x.lineTo(q[i][0], q[i][1]); x.closePath(); x.fill('evenodd');
+    x.strokeStyle = '#3b82f6'; x.lineWidth = Math.max(2, c.width / 400); x.beginPath(); q.forEach(function (p, j) { j ? x.lineTo(p[0], p[1]) : x.moveTo(p[0], p[1]); }); x.closePath(); x.stroke();
+    q.forEach(function (p, j) { x.beginPath(); x.arc(p[0], p[1], r, 0, Math.PI * 2); x.fillStyle = j === drag ? 'rgba(59,130,246,.55)' : 'rgba(255,255,255,.35)'; x.fill(); x.lineWidth = Math.max(2, r / 4); x.strokeStyle = '#3b82f6'; x.stroke(); });
+    if (drag >= 0) { // magnifier, so the corner can be placed exactly even under a finger
+      var p = q[drag], R = Math.round(c.width / 7), zoom = 3, lx = p[0] < c.width / 2 ? c.width - R - 10 : R + 10, ly = R + 10;
+      x.save(); x.beginPath(); x.arc(lx, ly, R, 0, Math.PI * 2); x.clip();
+      x.drawImage(e, p[0] - R / zoom, p[1] - R / zoom, 2 * R / zoom, 2 * R / zoom, lx - R, ly - R, 2 * R, 2 * R);
+      x.strokeStyle = '#ef4444'; x.lineWidth = 2; x.beginPath(); x.moveTo(lx - 12, ly); x.lineTo(lx + 12, ly); x.moveTo(lx, ly - 12); x.lineTo(lx, ly + 12); x.stroke(); x.restore();
+      x.beginPath(); x.arc(lx, ly, R, 0, Math.PI * 2); x.lineWidth = 3; x.strokeStyle = '#fff'; x.stroke();
+    }
+  }
+  var resT = null;
+  function drawResult() {
+    clearTimeout(resT);
+    resT = setTimeout(function () { var pg = pages[cur]; if (!pg) return; var r = render(pg, EDIT), o = $('out'); o.width = r.width; o.height = r.height; o.getContext('2d').drawImage(r, 0, 0); }, 30);
+  }
+  function edPt(e) { var c = $('ed'), b = c.getBoundingClientRect(); return [(e.clientX - b.left) / b.width * c.width, (e.clientY - b.top) / b.height * c.height, c.width / b.width]; }
+  $('ed').addEventListener('pointerdown', function (e) {
+    var pg = pages[cur]; if (!pg) return; var p = edPt(e), best = -1, bd = 1e9;
+    pg.q.forEach(function (c, i) { var d = Math.hypot(c[0] - p[0], c[1] - p[1]); if (d < bd) { bd = d; best = i; } });
+    if (bd > 60 * p[2] && bd > pages[cur].edit.width / 6) return; // too far from any corner
+    drag = best; try { this.setPointerCapture(e.pointerId); } catch (x) {} e.preventDefault(); drawEditor();
+  });
+  $('ed').addEventListener('pointermove', function (e) {
+    if (drag < 0) return; var pg = pages[cur], p = edPt(e);
+    pg.q[drag] = [Math.max(0, Math.min(pg.edit.width, p[0])), Math.max(0, Math.min(pg.edit.height, p[1]))]; drawEditor();
+  });
+  function endDrag() { if (drag < 0) return; drag = -1; var pg = pages[cur]; pg.thumb = null; drawEditor(); drawResult(); refreshThumb(); }
+  $('ed').addEventListener('pointerup', endDrag); $('ed').addEventListener('pointercancel', endDrag);
+  $('ed').addEventListener('keydown', function () {});
+  var thT = null;
+  function refreshThumb() { clearTimeout(thT); thT = setTimeout(refresh, 250); }
+  $('auto').addEventListener('click', function () { var pg = pages[cur]; if (!pg) return; var q = detect(pg.edit); if (q) { pg.q = q; say('ok', 'Edges found.'); } else say('bad', 'The page edges could not be found automatically. Drag the corners by hand, or take the photo on a darker, plain surface.'); pg.thumb = null; drawEditor(); drawResult(); refreshThumb(); });
+  $('full').addEventListener('click', function () { var pg = pages[cur]; if (!pg) return; var w = pg.edit.width, h = pg.edit.height; pg.q = [[0, 0], [w, 0], [w, h], [0, h]]; pg.thumb = null; drawEditor(); drawResult(); refreshThumb(); });
+  $('rot').addEventListener('click', function () { var pg = pages[cur]; if (!pg) return; pg.rot = (pg.rot + 90) % 360; pg.thumb = null; drawResult(); refreshThumb(); });
+  Array.prototype.forEach.call($('modes').querySelectorAll('button'), function (b) {
+    b.addEventListener('click', function () { var pg = pages[cur]; if (!pg) return; pg.mode = b.dataset.v; pg.thumb = null; openEditor(); refreshThumb(); });
+  });
+
+  // ======================= adding photos =======================
+  var coarse = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  $('pick').addEventListener('click', function () { $('file').click(); });
+  $('file').addEventListener('change', function () { var a = Array.prototype.slice.call(this.files); this.value = ''; if (a.length) addFiles(a); });
+  $('cam').addEventListener('change', function () { var a = Array.prototype.slice.call(this.files); this.value = ''; if (a.length) addFiles(a); });
+  (function () {
+    var drop = $('drop');
+    drop.addEventListener('click', function () { $('file').click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { addFiles(Array.prototype.slice.call(e.dataTransfer.files)); });
+  })();
+  document.addEventListener('paste', function (e) {
+    var it = e.clipboardData && e.clipboardData.items, files = []; if (!it) return;
+    for (var j = 0; j < it.length; j++) if (it[j].kind === 'file' && /^image\//.test(it[j].type)) files.push(it[j].getAsFile());
+    if (files.length) { e.preventDefault(); addFiles(files); }
+  });
+  function stopCam() { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; $('camBox').hidden = true; $('video').srcObject = null; }
+  $('shoot').addEventListener('click', function () {
+    // phones and tablets: the phone's own camera app gives the sharpest photo
+    if (coarse || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { $('cam').click(); return; }
+    if (stream) return;
+    say('', 'Starting the camera…');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      stream = s; $('video').srcObject = s; $('camBox').hidden = false; say('', 'Hold the page flat in view of the camera, then press Capture page.');
+      $('video').play().catch(function () {});
+    }).catch(function (e) {
+      var n = e && e.name;
+      say('bad', n === 'NotAllowedError' || n === 'SecurityError' ? 'Camera access was blocked. Allow the camera for this site in your browser settings, or use Upload photos instead.' :
+        n === 'NotFoundError' || n === 'OverconstrainedError' ? 'No camera was found on this device. Use Upload photos instead.' :
+        n === 'NotReadableError' ? 'The camera is being used by another app. Close it and try again, or use Upload photos.' : 'The camera could not be started. Use Upload photos instead.');
+    });
+  });
+  $('camOff').addEventListener('click', function () { stopCam(); say('', ''); });
+  $('snap').addEventListener('click', function () {
+    var v = $('video'); if (!v.videoWidth) { say('bad', 'The camera is not ready yet. Wait a moment and try again.'); return; }
+    var c = canvas(v.videoWidth, v.videoHeight); c.getContext('2d').drawImage(v, 0, 0); addPage(c);
+  });
+  window.addEventListener('pagehide', stopCam);
+
+  // ======================= saving =======================
+  function progress(f, t) { $('notice').hidden = false; $('fill').style.width = Math.round(f * 100) + '%'; $('stat').textContent = t; }
+  function save(blob, name) { var u = URL.createObjectURL(blob); urls.push(u); var a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); if (urls.length > 3) URL.revokeObjectURL(urls.shift()); }
+  function pause() { return new Promise(function (r) { setTimeout(r, 0); }); }
+  function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return 'scan-' + d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()); }
+  function encode(pg, long) {
+    var c = render(pg, long), png = pg.mode === 'bw';
+    return PT.blob(c, png ? 'image/png' : 'image/jpeg', 0.85).then(function (b) {
+      if (!b) throw new Error('Your browser could not create the page image. Try a lower quality.');
+      if (png) return PT.blob(c, 'image/jpeg', 0.9).then(function (j) { return j && j.size < b.size ? { blob: j, png: false, w: c.width, h: c.height } : { blob: b, png: true, w: c.width, h: c.height }; });
+      return { blob: b, png: false, w: c.width, h: c.height };
+    });
+  }
+  var busy = false;
+  function lock(on) { busy = on; ['pdf', 'jpg', 'clear', 'shoot', 'pick'].forEach(function (id) { $(id).disabled = on; }); if (!on) $('notice').hidden = true; }
+  $('pdf').addEventListener('click', function () {
+    if (busy || !pages.length) return; lock(true);
+    var long = +$('qual').value, size = $('size').value, doc, i = 0;
+    PDFLib.PDFDocument.create().then(function (d) {
+      doc = d; doc.setTitle('Scan'); doc.setProducer('GetToolNest Document Scanner'); doc.setCreator('GetToolNest');
+      function next() {
+        if (i >= pages.length) return doc.save();
+        var pg = pages[i++]; progress((i - 1) / pages.length, 'Preparing page ' + i + ' of ' + pages.length + '…');
+        return pause().then(function () { return encode(pg, long); }).then(function (r) { return r.blob.arrayBuffer().then(function (a) { return r.png ? doc.embedPng(a) : doc.embedJpg(a); }).then(function (im) {
+          var pw, ph;
+          if (size === 'fit') { var dpi = long / 11.69; pw = r.w / dpi * 72; ph = r.h / dpi * 72; }
+          else { var P = size === 'letter' ? [612, 792] : [595.28, 841.89]; if (r.w > r.h) { pw = P[1]; ph = P[0]; } else { pw = P[0]; ph = P[1]; } }
+          var page = doc.addPage([pw, ph]), k = Math.min(pw / r.w, ph / r.h), w = r.w * k, h = r.h * k;
+          page.drawImage(im, { x: (pw - w) / 2, y: (ph - h) / 2, width: w, height: h });
+        }); }).then(next);
+      }
+      return next();
+    }).then(function (bytes) {
+      var b = new Blob([bytes], { type: 'application/pdf' }); save(b, stamp() + '.pdf');
+      say('ok', 'Saved a ' + pages.length + '-page PDF (' + fmtBytes(b.size) + ').'); burst($('pdf'));
+    }).catch(function (e) { say('bad', e && e.message ? e.message : 'The PDF could not be made on this device. Try a lower quality.'); }).then(function () { lock(false); });
+  });
+  $('jpg').addEventListener('click', function () {
+    if (busy || !pages.length) return; lock(true);
+    var long = +$('qual').value, files = [], i = 0, base = stamp();
+    (function next() {
+      if (i >= pages.length) {
+        if (files.length === 1) { save(new Blob([files[0].data], { type: 'image/jpeg' }), base + '.jpg'); say('ok', 'Saved ' + base + '.jpg (' + fmtBytes(files[0].data.length) + ').'); }
+        else { var z = PT.zip(files); save(z, base + '.zip'); say('ok', 'Saved ' + files.length + ' pages as JPG files in ' + base + '.zip (' + fmtBytes(z.size) + ').'); }
+        burst($('jpg')); lock(false); return;
+      }
+      var pg = pages[i++]; progress((i - 1) / pages.length, 'Preparing page ' + i + ' of ' + pages.length + '…');
+      pause().then(function () { return PT.blob(render(pg, long), 'image/jpeg', 0.88); }).then(function (b) {
+        if (!b) throw new Error('Your browser could not create the image. Try a lower quality.');
+        return b.arrayBuffer();
+      }).then(function (a) { files.push({ name: base + '-page-' + (i < 10 && pages.length >= 10 ? '0' : '') + i + '.jpg', data: new Uint8Array(a) }); next(); })
+        .catch(function (e) { say('bad', e && e.message ? e.message : 'The images could not be made.'); lock(false); });
+    })();
+  });
+  $('clear').addEventListener('click', function () {
+    if (busy || !pages.length) return;
+    if (!confirm('Remove all ' + pages.length + ' page(s) and start a new scan?')) return;
+    pages = []; cur = -1; refresh(); say('', '');
+  });
+})();
+</script>

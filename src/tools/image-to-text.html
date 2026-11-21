@@ -16,6 +16,7 @@
 <div class="checks">
   <label><input type="checkbox" id="names" checked>Put each file name above its text</label>
   <label><input type="checkbox" id="clean" checked>Clean up the image first (grayscale, contrast, enlarge small text)</label>
+  <label id="pluswrap" hidden><input type="checkbox" id="pluseng">The text also has English words in it</label>
 </div>
 <ul class="ocr-q" id="queue"></ul>
 <div class="notice" id="notice" hidden><div class="meter"><i id="bar"></i></div><p id="hint">Starting…</p></div>
@@ -30,9 +31,19 @@
 <script src="../assets/vendor/ocr/tesseract.min.js"></script>
 <script>
 (function () {
-  // Only languages whose data is shipped with the site in assets/vendor/ocr.
-  var LANGS = [['eng', 'English']];
-  $('lang').innerHTML = LANGS.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + '</option>'; }).join('');
+  // Language data shipped with the site in assets/vendor/ocr. English is the best ("best_int") model; the others are the
+  // small "fast" Tesseract models, downloaded only when that language is chosen and then kept by the browser.
+  var LANGS = [['eng', 'English', '', 2952873], ['ara', 'Arabic', 'العربية', 720292], ['chi_sim', 'Chinese (Simplified)', '简体中文', 1723450],
+    ['fra', 'French', 'Français', 608490], ['deu', 'German', 'Deutsch', 853431], ['hin', 'Hindi', 'हिन्दी', 921852], ['ind', 'Indonesian', 'Bahasa Indonesia', 609600],
+    ['por', 'Portuguese', 'Português', 1004345], ['rus', 'Russian', 'Русский', 1610187], ['spa', 'Spanish', 'Español', 1132435],
+    ['tur', 'Turkish', 'Türkçe', 2017185], ['urd', 'Urdu', 'اردو', 1033085]];
+  var RTL = { ara: 1, urd: 1 }, CJK = /[\u3000-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uf900-\ufaff\uff00-\uffef]/;
+  $('lang').innerHTML = LANGS.map(function (l) { return '<option value="' + l[0] + '">' + l[1] + (l[2] ? ' – ' + l[2] : '') + (l[0] === 'eng' ? '' : ' (' + fmtBytes(l[3]).replace('.00', '') + ')') + '</option>'; }).join('');
+  function langInfo(code) { for (var i = 0; i < LANGS.length; i++) if (LANGS[i][0] === code) return LANGS[i]; return LANGS[0]; }
+  function langCode() { var l = $('lang').value; return l !== 'eng' && $('pluseng').checked ? l + '+eng' : l; }
+  function setDir() { $('out').dir = RTL[$('lang').value] ? 'rtl' : 'auto'; $('pluswrap').hidden = $('lang').value === 'eng'; }
+  $('lang').addEventListener('change', setDir);
+  setTimeout(setDir, 0); // after a remembered choice has been restored
   var queue = [], results = [], handled = 0, running = false, worker = null, workerLang = '', edited = false, url = null, firstName = '';
   var MAXPX = 40e6; // larger pictures would run phones out of memory
 
@@ -43,9 +54,11 @@
   // ---------- turning the recognised text into the result box ----------
   function shape(text) {
     text = text.replace(/\r/g, '').replace(/[ \t]+\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim();
+    // Chinese and Japanese do not put spaces between words, but the reader often adds them
+    if (CJK.test(text)) text = text.replace(new RegExp('(' + CJK.source + ') +(?=' + CJK.source + ')', 'g'), '$1');
     if ($('lines').value !== 'join') return text;
     return text.split(/\n\s*\n/).map(function (p) {
-      return p.replace(/(\w)-\n(?=[a-z])/g, '$1').replace(/\s*\n\s*/g, ' ');
+      return p.replace(/(\p{L})-\n(?=\p{Ll})/gu, '$1').replace(new RegExp('(' + CJK.source + ')\\s*\\n\\s*(?=' + CJK.source + ')', 'g'), '$1').replace(/\s*\n\s*/g, ' ');
     }).join('\n\n');
   }
   function render() {
@@ -82,10 +95,33 @@
   });
 
   // ---------- preparing an image so the reader sees it clearly ----------
+  // Typical height of a line of text in pixels (from the rows that contain ink), or 0 if it cannot be told.
+  function lineHeight(img, sideways) {
+    var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, s = Math.min(1, 1600 / Math.max(w, h));
+    var cw = Math.max(1, Math.round(w * s)), ch = Math.max(1, Math.round(h * s)), c = document.createElement('canvas');
+    c.width = sideways ? ch : cw; c.height = sideways ? cw : ch;
+    var x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height);
+    if (sideways) { x.translate(c.width / 2, c.height / 2); x.rotate(Math.PI / 2); x.drawImage(img, -cw / 2, -ch / 2, cw, ch); } else x.drawImage(img, 0, 0, cw, ch);
+    var W = c.width, H = c.height, p = x.getImageData(0, 0, W, H).data, g = new Uint8Array(W * H), lo = 255, hi = 0, sum = 0, i;
+    for (i = 0; i < g.length; i++) { var v = (p[i * 4] * 299 + p[i * 4 + 1] * 587 + p[i * 4 + 2] * 114) / 1000 | 0; g[i] = v; sum += v; if (v < lo) lo = v; if (v > hi) hi = v; }
+    if (hi - lo < 40) return 0;
+    var mid = (lo + hi) / 2, dark = sum / g.length > mid, runs = [], run = 0;
+    for (var y = 0; y <= H; y++) {
+      var n = 0;
+      if (y < H) for (var xx = 0; xx < W; xx++) { var d = g[y * W + xx] < mid; if (d !== dark) n++; }
+      if (y < H && n > W * 0.003) run++; else { if (run >= 3) runs.push(run); run = 0; }
+    }
+    if (runs.length < 1) return 0;
+    runs.sort(function (a, b) { return a - b; });
+    return runs[Math.floor(runs.length / 2)] / s;
+  }
   function prepare(img, angle) {
     var w = img.naturalWidth || img.width, h = img.naturalHeight || img.height, k = 1, clean = $('clean').checked;
     var long = Math.max(w, h);
-    if (clean && long < 1800) k = Math.min(3, 1800 / long); // small text is read far better when enlarged
+    if (clean) { // small text is read far better when enlarged, but text that is already large gets worse
+      var lh = lineHeight(img, angle === 90 || angle === 270);
+      k = lh ? Math.max(1, Math.min(3, 40 / lh)) : (long < 1800 ? Math.min(3, 1800 / long) : 1);
+    }
     if (long * k > 4200) k = 4200 / long; // and very large pictures are slow without being clearer
     var sw = Math.round(w * k), sh = Math.round(h * k), side = angle === 90 || angle === 270;
     var c = document.createElement('canvas'); c.width = side ? sh : sw; c.height = side ? sw : sh;
@@ -112,18 +148,23 @@
   // How convincing a reading is: confident words of two or more letters or digits.
   function score(data) {
     var s = 0;
-    (data.words || []).forEach(function (w) { if (w.confidence > 50 && /[A-Za-z0-9]{2,}/.test(w.text)) s += w.confidence * Math.min(8, w.text.length); });
+    (data.words || []).forEach(function (w) { var t = w.text || '', n = Array.from(t.replace(/[^\p{L}\p{N}\p{M}]/gu, '')).length; if (w.confidence > 50 && (n >= 2 || (n === 1 && CJK.test(t)))) s += w.confidence * Math.min(8, CJK.test(t) ? n * 2 : n); });
     return s;
   }
 
   async function getWorker(lang, onProgress) {
     if (worker && workerLang === lang) return worker;
     if (worker) { await worker.terminate(); worker = null; }
-    tell('Loading the text reader (about 7 MB, only the first time)…', 3);
+    var names = lang.split('+').map(function (c) { return langInfo(c)[1]; }).join(' and ');
+    tell('Loading the text reader and the ' + names + ' language data (only the first time)…', 3);
     worker = await Tesseract.createWorker(lang, 1, {
       workerPath: '../assets/vendor/ocr/worker.min.js', corePath: '../assets/vendor/ocr', langPath: '../assets/vendor/ocr',
-      logger: function (m) { if (m.status === 'recognizing text') onProgress(m.progress); }
+      logger: function (m) {
+        if (m.status === 'recognizing text') onProgress(m.progress);
+        else if (/loading language/.test(m.status)) tell('Loading the ' + names + ' language data… ' + Math.round((m.progress || 0) * 100) + '%', 3 + (m.progress || 0) * 20);
+      }
     });
+    if (/chi_sim/.test(lang)) await worker.setParameters({ preserve_interword_spaces: '1' });
     workerLang = lang;
     return worker;
   }
@@ -146,7 +187,7 @@
         if (img.naturalWidth * img.naturalHeight > MAXPX) throw new Error('This picture is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.');
         var pre = total > 1 ? 'Image ' + idx + ' of ' + (handled + queue.length) + ': ' : '', base = 0, span = 100;
         progressFn = function (p) { tell(pre + (base ? 'Trying the picture turned another way… ' : 'Reading text… ') + Math.round(p * 100) + '%', base + p * span); };
-        var w = await getWorker($('lang').value, function (p) { progressFn(p); });
+        var w = await getWorker(langCode(), function (p) { progressFn(p); });
         var mode = $('rot').value, angles = mode === 'auto' ? [0] : [+mode], best = null, bestScore = -1, bestAngle = 0;
         for (var a = 0; a < angles.length; a++) {
           tell(pre + (a ? 'Trying the picture turned ' + angles[a] + '°…' : 'Reading text…'), base);
@@ -176,7 +217,7 @@
     var ok = results.filter(function (r) { return r.text; }).length;
     if (results.length && $('msg').className.indexOf('bad') < 0) {
       if (ok) say('ok', 'Text found in ' + ok + ' of ' + results.length + (results.length === 1 ? ' image' : ' images') + '. Check it for mistakes: reading text from pictures is never perfect.');
-      else say('bad', 'No text was found. Make sure the writing is printed, sharp and in ' + $('lang').options[$('lang').selectedIndex].text + '. Handwriting is rarely read well.');
+      else say('bad', 'No text was found. Make sure the writing is printed, sharp and in ' + langInfo($('lang').value)[1] + '. Handwriting is rarely read well.');
     }
   }
 

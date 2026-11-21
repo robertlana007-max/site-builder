@@ -1,0 +1,642 @@
+<style>
+.sg-name { margin: 0 0 12px; font-weight: 600; overflow-wrap: anywhere; }
+.sg-sub { font-size: 14px; color: var(--muted); margin: 6px 0 14px; }
+.sg-player { display: block; width: 100%; max-height: 360px; border-radius: 10px; background: #000; margin: 0 0 14px; }
+.sg-player.audio { height: 54px; background: none; }
+.sg-cues { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 14px; max-height: 520px; overflow-y: auto; padding: 2px; }
+.sg-cue { display: grid; grid-template-columns: auto 1fr auto; gap: 6px 10px; align-items: start; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.sg-cue.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.sg-times { display: flex; flex-direction: column; gap: 4px; }
+.sg-times input { width: 96px; min-height: 32px; padding: 4px 6px; font-size: 13px; font-variant-numeric: tabular-nums; }
+.sg-cue textarea { font-family: inherit; min-height: 70px; height: 70px; resize: vertical; font-size: 15px; padding: 6px 8px; margin: 0; }
+.sg-x { border: 0; background: none; color: var(--muted); cursor: pointer; font-size: 20px; line-height: 1; padding: 4px 6px; border-radius: 6px; }
+.sg-x:hover { color: var(--ink); background: var(--line); }
+.sg-go { border: 0; background: none; color: var(--accent); cursor: pointer; font-size: 13px; padding: 2px 0; text-align: left; }
+.sg-burn { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 16px 0 6px; }
+.sg-burn h3 { margin: 0 0 6px; font-size: 17px; }
+@media (max-width: 520px) {
+  .sg-cue { grid-template-columns: 1fr auto; }
+  .sg-cue textarea { grid-column: 1 / -1; grid-row: 2; }
+  .sg-times { flex-direction: row; flex-wrap: wrap; }
+}
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a video or audio file here</b>MP4, MOV, WebM, MKV, MP3, WAV, M4A and more. The speech is recognised on your device; nothing is uploaded.</div>
+<input type="file" id="file" accept="video/*,audio/*,.mp4,.m4v,.mov,.mkv,.webm,.mp3,.wav,.m4a,.aac,.ogg,.oga,.opus,.flac,.3gp" hidden data-nomemo>
+<div id="work" hidden>
+  <p class="sg-name" id="fname"></p>
+  <video class="sg-player" id="player" controls playsinline preload="metadata"></video>
+</div>
+<div class="fields">
+  <div><label for="lang">Spoken language</label><select id="lang"></select></div>
+  <div><label for="model">Accuracy</label><select id="model"><option value="tiny">Fast (small model, 41 MB)</option><option value="base">Better (larger model, 77 MB, about 2× slower)</option></select></div>
+  <div><label for="task">Subtitles in</label><select id="task"><option value="transcribe">The spoken language</option><option value="translate">English (translate)</option></select></div>
+  <div><label for="maxc">Caption length</label><select id="maxc"><option value="42">One short line (up to 42 letters)</option><option value="84" selected>Up to two lines</option><option value="0">Whole sentences</option></select></div>
+</div>
+<p class="sg-sub" id="speed">Speech recognition uses Whisper, an open-source AI model, running inside your browser. The model downloads once and then stays on your device. On a typical computer it takes about 10 to 30 seconds per minute of speech with the fast model; phones are slower. You can watch the captions appear and stop at any time.</p>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Generate subtitles</button><button class="btn ghost" type="button" id="stop" hidden>Stop</button></div>
+<p class="msg" id="msg" aria-live="polite"></p>
+<div id="result" hidden>
+  <div class="stats">
+    <div class="stat"><span>Captions</span><b id="nCues">0</b></div>
+    <div class="stat"><span>Language</span><b id="langOut">–</b></div>
+    <div class="stat"><span>Words</span><b id="nWords">0</b></div>
+  </div>
+  <p class="sg-sub">Click into any caption to fix the words or times (minutes:seconds, for example 1:02.5). Changes show in the player straight away.</p>
+  <div class="sg-cues" id="cues"></div>
+  <div class="btns" style="margin-top:0"><button class="btn ghost" type="button" id="addCue">+ Add caption</button><button class="btn ghost" type="button" id="shiftBtn">Shift all times</button></div>
+  <div class="btns"><button class="btn" type="button" id="dlSrt">Download SRT</button><button class="btn ghost" type="button" id="dlVtt">Download VTT</button><button class="btn ghost" type="button" id="dlTxt">Download text</button><button class="btn ghost" type="button" id="copyTxt">Copy text</button></div>
+  <div class="sg-burn" id="burnBox" hidden>
+    <h3>Burn the subtitles into the video</h3>
+    <p class="sg-sub" style="margin-top:0">Makes a new MP4 with the captions drawn on the picture, so they show everywhere (Instagram, TikTok, WhatsApp). The whole video is re-encoded on your device, which is slow: expect roughly 1 to 3 times the video length on a computer, longer on a phone.</p>
+    <div class="fields">
+      <div><label for="fsize">Text size</label><select id="fsize"><option value="0.045">Small</option><option value="0.06" selected>Medium</option><option value="0.08">Large</option></select></div>
+      <div><label for="fstyle">Style</label><select id="fstyle"><option value="box">White text on dark box</option><option value="outline">White text with black outline</option><option value="yellow">Yellow text with black outline</option></select></div>
+    </div>
+    <div class="btns" style="margin-top:4px"><button class="btn" type="button" id="burn">Make video with subtitles</button><a class="btn ghost" id="dlBurn" hidden>Download video</a></div>
+  </div>
+</div>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+(function () {
+  var SR = 16000, WIN = 30, MAX_SEC = 3 * 3600;
+  var VBASE = new URL('../assets/vendor/whisper/', location.href).href, OBASE = new URL('../assets/vendor/onnx/', location.href).href;
+  var ORT_WASM = ['ort-wasm-simd-threaded.wasm', 14848852];
+  var SIZES = { tiny: 10124910 + 30727765 + 2480466 + 282683, base: 23200850 + 53707539 + 2480466 + 282683 };
+  // Whisper language codes, most spoken first. Names in English and in the language itself.
+  var LANGS = [['en', 'English'], ['zh', 'Chinese', '中文'], ['es', 'Spanish', 'Español'], ['hi', 'Hindi', 'हिन्दी'], ['ar', 'Arabic', 'العربية'], ['bn', 'Bengali', 'বাংলা'], ['pt', 'Portuguese', 'Português'], ['ru', 'Russian', 'Русский'], ['ur', 'Urdu', 'اردو'], ['id', 'Indonesian', 'Bahasa Indonesia'], ['de', 'German', 'Deutsch'], ['ja', 'Japanese', '日本語'], ['fr', 'French', 'Français'], ['pa', 'Punjabi', 'ਪੰਜਾਬੀ'], ['tr', 'Turkish', 'Türkçe'], ['ko', 'Korean', '한국어'], ['vi', 'Vietnamese', 'Tiếng Việt'], ['it', 'Italian', 'Italiano'], ['fa', 'Persian', 'فارسی'], ['ta', 'Tamil', 'தமிழ்'], ['te', 'Telugu', 'తెలుగు'], ['mr', 'Marathi', 'मराठी'], ['gu', 'Gujarati', 'ગુજરાતી'], ['kn', 'Kannada', 'ಕನ್ನಡ'], ['ml', 'Malayalam', 'മലയാളം'], ['th', 'Thai', 'ไทย'], ['pl', 'Polish', 'Polski'], ['uk', 'Ukrainian', 'Українська'], ['nl', 'Dutch', 'Nederlands'], ['ms', 'Malay', 'Bahasa Melayu'], ['tl', 'Filipino / Tagalog'], ['sw', 'Swahili', 'Kiswahili'], ['ha', 'Hausa'], ['yo', 'Yoruba', 'Yorùbá'], ['am', 'Amharic', 'አማርኛ'], ['so', 'Somali', 'Soomaali'], ['ro', 'Romanian', 'Română'], ['el', 'Greek', 'Ελληνικά'], ['cs', 'Czech', 'Čeština'], ['hu', 'Hungarian', 'Magyar'], ['sv', 'Swedish', 'Svenska'], ['he', 'Hebrew', 'עברית'], ['da', 'Danish', 'Dansk'], ['fi', 'Finnish', 'Suomi'], ['no', 'Norwegian', 'Norsk'], ['sk', 'Slovak', 'Slovenčina'], ['bg', 'Bulgarian', 'Български'], ['hr', 'Croatian', 'Hrvatski'], ['sr', 'Serbian', 'Српски'], ['ne', 'Nepali', 'नेपाली'], ['si', 'Sinhala', 'සිංහල'], ['my', 'Burmese', 'မြန်မာ'], ['km', 'Khmer', 'ខ្មែរ'], ['ps', 'Pashto', 'پښتو'], ['az', 'Azerbaijani', 'Azərbaycan'], ['kk', 'Kazakh', 'Қазақ'], ['uz', 'Uzbek', 'Oʻzbek'], ['af', 'Afrikaans'], ['ca', 'Catalan', 'Català'], ['lt', 'Lithuanian', 'Lietuvių'], ['lv', 'Latvian', 'Latviešu'], ['et', 'Estonian', 'Eesti'], ['sl', 'Slovenian', 'Slovenščina'], ['ka', 'Georgian', 'ქართული'], ['hy', 'Armenian', 'Հայերեն']];
+  var NAME = {};
+  (function () {
+    var sel = $('lang'), o = document.createElement('option'); o.value = 'auto'; o.textContent = 'Detect automatically'; sel.appendChild(o);
+    LANGS.forEach(function (l) { NAME[l[0]] = l[1]; var x = document.createElement('option'); x.value = l[0]; x.textContent = l[1] + (l[2] ? ' – ' + l[2] : ''); sel.appendChild(x); });
+  })();
+
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(Math.min(1, p) * 100) + '%'; }
+  function clock(s) { s = Math.max(0, Math.round(s)); var h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0'); }
+  function stamp(s, sep) { // 62.5 -> 00:01:02,500
+    s = Math.max(0, s); var ms = Math.round(s * 1000), h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, x = Math.floor(ms / 1000) % 60, r = ms % 1000;
+    return String(h).padStart(2, '0') + ':' + String(m).padStart(2, '0') + ':' + String(x).padStart(2, '0') + sep + String(r).padStart(3, '0');
+  }
+  function short(s) { var t = stamp(s, '.'); return t.replace(/^00:0?/, ''); } // 0:01:02.500 -> 1:02.500, keeps hours when needed
+  function parseT(t) { // "1:02.5", "0:01:02,500", "62.5"
+    t = String(t).trim().replace(',', '.');
+    if (!/^(\d+:){0,2}\d+(\.\d+)?$/.test(t)) return NaN;
+    return t.split(':').reduce(function (a, x) { return a * 60 + parseFloat(x); }, 0);
+  }
+
+  // ---------- the recognition worker (Whisper via Transformers.js on ONNX Runtime Web) ----------
+  function workerSource() {
+    /* eslint-disable */
+    var T = null, pipe = null, processor = null;
+    function post(m) { self.postMessage(m); }
+    function fetchBuf(url, total, onProg) {
+      return fetch(url).then(function (r) {
+        if (!r.ok) throw new Error('net');
+        if (!r.body || !r.body.getReader) return r.arrayBuffer();
+        var reader = r.body.getReader(), parts = [], got = 0;
+        function pump() { return reader.read().then(function (d) { if (d.done) { var o = new Uint8Array(got), p = 0; parts.forEach(function (x) { o.set(x, p); p += x.length; }); return o.buffer; } parts.push(d.value); got += d.value.length; onProg(got); return pump(); }); }
+        return pump();
+      }, function () { throw new Error('net'); });
+    }
+    function load(d) {
+      var got = {}, wasmGot = 0;
+      function tell() { var n = wasmGot; for (var k in got) n += got[k]; post({ type: 'dl', got: n }); }
+      return fetchBuf(d.obase + d.wasm[0], d.wasm[1], function (n) { wasmGot = n; tell(); }).then(function (bin) {
+        importScripts(d.obase + 'ort.wasm.min.js');
+        ort.env.wasm.wasmPaths = d.obase; ort.env.wasm.wasmBinary = bin; ort.env.wasm.numThreads = 1; ort.env.logLevel = 'error';
+        importScripts(d.vbase + 'transformers.min.js');
+        T = self.transformers;
+        T.env.allowRemoteModels = true; T.env.allowLocalModels = false; T.env.remoteHost = d.vbase; T.env.remotePathTemplate = '{model}/'; T.env.useBrowserCache = false;
+        if (T.env.backends && T.env.backends.onnx && T.env.backends.onnx.setLogLevel) try { T.env.backends.onnx.setLogLevel('error'); } catch (e) {}
+        return T.pipeline('automatic-speech-recognition', 'Xenova/whisper-' + d.model, {
+          device: 'wasm', dtype: 'q8',
+          progress_callback: function (p) { if (p.status === 'progress' && p.file) { got[p.file] = p.loaded || 0; tell(); } }
+        });
+      }).then(function (p) {
+        pipe = p;
+        processor = p.processor; post({ type: 'ready' });
+      });
+    }
+    function rms(a) { var s = 0; for (var i = 0; i < a.length; i += 4) s += a[i] * a[i]; return Math.sqrt(s / Math.max(1, a.length / 4)); }
+    function detect(audio) {
+      // one decoder step after <|startoftranscript|>; the most likely language token wins
+      var gc = pipe.model.generation_config, lt = gc.lang_to_id;
+      return processor(audio).then(function (inp) {
+        var ids = new T.Tensor('int64', BigInt64Array.from([BigInt(gc.decoder_start_token_id)]), [1, 1]);
+        return pipe.model({ input_features: inp.input_features, decoder_input_ids: ids });
+      }).then(function (out) {
+        var lg = out.logits, V = lg.dims[lg.dims.length - 1], data = lg.data, off = data.length - V, best = null, bv = -Infinity;
+        for (var tok in lt) { var v = data[off + lt[tok]]; if (v > bv) { bv = v; best = tok; } }
+        return best ? best.replace(/[<|>]/g, '') : 'en';
+      });
+    }
+    function run(d) {
+      var a = d.audio, n = a.length, W = 30 * 16000, seek = 0, lang = d.lang;
+      var quiet = Math.min(0.01, Math.max(0.001, rms(a) * 0.12)); // below this a 0.1 s slice counts as silence
+      function step() {
+        // skip silence before the window, so Whisper's first timestamp lines up with the speech
+        var s0 = seek;
+        while (seek < n - 1600 && rms(a.subarray(seek, seek + 1600)) < quiet) seek += 1600;
+        if (seek > s0) seek = Math.max(s0, seek - 3200);
+        if (seek >= n - 1600) return Promise.resolve();
+        var end = Math.min(n, seek + W), chunk = a.subarray(seek, end), off = seek / 16000;
+        post({ type: 'pos', t: off });
+        if (rms(chunk) < 0.003) { seek = end; return step(); } // silence: Whisper tends to invent words here
+        var opts = { return_timestamps: true, task: d.task, max_new_tokens: 400, no_repeat_ngram_size: 0 };
+        if (lang) opts.language = lang;
+        return pipe(chunk, opts).then(function (r) {
+          var cs = (r.chunks || []).filter(function (c) { return c.text && c.text.trim(); }), adv = (end - seek) / 16000;
+          var last = cs[cs.length - 1];
+          if (end < n && cs.length > 1 && last && (last.timestamp[1] == null || last.timestamp[1] > adv - 0.5) && last.timestamp[0] > 5) {
+            // the last sentence was cut by the 30-second window: drop it and start the next window there
+            cs.pop(); adv = last.timestamp[0];
+          } else if (end < n && last && last.timestamp[1] != null && last.timestamp[1] > 5 && last.timestamp[1] < adv - 1) {
+            // speech after the last caption may have been skipped: listen to it again in the next window
+            adv = last.timestamp[1];
+          }
+          cs.forEach(function (c) {
+            var s = c.timestamp[0] || 0, e = c.timestamp[1] == null ? Math.min(adv, s + 5) : c.timestamp[1];
+            post({ type: 'seg', start: off + s, end: off + Math.max(e, s + 0.3), text: c.text.trim() });
+          });
+          seek += Math.max(16000, Math.round(adv * 16000));
+          return step();
+        });
+      }
+      var first = lang ? Promise.resolve(lang) : (function () {
+        // detect on the loudest 30 seconds of the first few minutes
+        var best = 0, bestR = -1, lim = Math.min(n, 16000 * 300);
+        for (var s = 0; s < lim; s += 16000 * 10) { var r = rms(a.subarray(s, Math.min(n, s + W))); if (r > bestR) { bestR = r; best = s; } }
+        return detect(a.subarray(best, Math.min(n, best + W)));
+      })();
+      return first.then(function (l) { lang = l; post({ type: 'lang', code: l }); return step(); }).then(function () { post({ type: 'done' }); });
+    }
+    self.onmessage = function (e) {
+      var d = e.data;
+      (d.type === 'load' ? load(d) : run(d)).catch(function (err) { post({ type: 'error', message: String(err && err.message || err) }); });
+    };
+  }
+  var worker = null, workerModel = '', workerReady = null;
+  function getWorker(model, onDl) {
+    if (worker && workerModel === model) return workerReady;
+    killWorker();
+    var src = '(' + workerSource.toString() + ')();';
+    var url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+    worker = new Worker(url); workerModel = model;
+    var w = worker;
+    workerReady = new Promise(function (res, rej) {
+      w.onmessage = function (e) {
+        var d = e.data;
+        if (d.type === 'dl') onDl(d.got);
+        else if (d.type === 'ready') { URL.revokeObjectURL(url); res(w); }
+        else if (d.type === 'error') rej(new Error(d.message));
+      };
+      w.onerror = function (e) { e.preventDefault(); rej(new Error(e.message || 'worker')); };
+    });
+    worker.postMessage({ type: 'load', model: model, vbase: VBASE, obase: OBASE, wasm: ORT_WASM });
+    workerReady.catch(function () { killWorker(); });
+    return workerReady;
+  }
+  function killWorker() { if (worker) { try { worker.terminate(); } catch (e) {} } worker = null; workerModel = ''; workerReady = null; }
+
+  // ---------- file ----------
+  var burning = false, file = null, audio = null, dur = 0, isVideo = false, busy = false, stopped = false, job = 0, mediaUrl = null, cues = [], detected = '', urls = {};
+  var player = $('player');
+  function decode16k(buf) {
+    var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+    if (!OAC) return Promise.reject(new Error('old'));
+    return new Promise(function (res, rej) { var p = new OAC(1, 1, SR).decodeAudioData(buf, res, rej); if (p && p.catch) p.catch(rej); });
+  }
+  function toMono(b) {
+    if (b.numberOfChannels === 1) return b.getChannelData(0);
+    var m = new Float32Array(b.length), c = b.numberOfChannels;
+    for (var k = 0; k < c; k++) { var d = b.getChannelData(k); for (var i = 0; i < m.length; i++) m[i] += d[i] / c; }
+    return m;
+  }
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { toast('Please wait, or press Stop first.'); return; }
+    var mine = ++job;
+    file = null; audio = null; cues = []; renderCues(); $('result').hidden = true; $('work').hidden = true; $('go').disabled = true; $('dlBurn').hidden = true;
+    if (!(/^(audio|video)\//.test(f.type) || /\.(mp4|m4v|mov|mkv|webm|mp3|wav|m4a|aac|ogg|oga|opus|flac|3gp|avi|wma)$/i.test(f.name))) return say('bad', '"' + f.name + '" is not a video or audio file. Choose something like an MP4, MOV, WebM or MP3.');
+    if (!f.size) return say('bad', '"' + f.name + '" is empty.');
+    if (f.size > 1024 * 1048576) return say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 1 GB are too big for the browser. Trim it first.');
+    isVideo = /^video\//.test(f.type) || /\.(mp4|m4v|mov|mkv|webm|3gp|avi)$/i.test(f.name) && !/^audio\//.test(f.type);
+    busy = true; say('', 'Reading the sound from "' + f.name + '"…');
+    f.arrayBuffer().then(function (data) {
+      return decode16k(data).catch(function (e) {
+        if (e && e.message === 'old') throw e;
+        if (!isVideo) throw new Error('decode');
+        say('', 'Your browser cannot read this sound format directly, so the video engine is converting it first…');
+        return FF.run(f, function (inp) { return ['-i', inp, '-vn', '-ac', '1', '-ar', String(SR), '-c:a', 'pcm_s16le', '-f', 'wav']; }, 'sound.wav', 0, function () {}, say)
+          .then(function (b) { return decode16k(b.buffer.slice(b.byteOffset, b.byteOffset + b.length)); }, function () { throw new Error('decode'); });
+      });
+    }).then(function (b) {
+      busy = false;
+      if (mine !== job) return;
+      if (b.duration > MAX_SEC) return say('bad', 'This file is ' + clock(b.duration) + ' long. Up to 3 hours is supported; please split it first.');
+      if (b.duration < 0.5) return say('bad', 'This file is too short to contain speech.');
+      audio = toMono(b); dur = b.duration; file = f;
+      if (mediaUrl) URL.revokeObjectURL(mediaUrl);
+      mediaUrl = URL.createObjectURL(f);
+      player.className = 'sg-player' + (isVideo ? '' : ' audio'); player.hidden = false;
+      player.onerror = function () { player.hidden = true; };
+      player.onloadedmetadata = function () { if (!player.videoWidth) player.className = 'sg-player audio'; };
+      player.src = mediaUrl;
+      $('fname').textContent = f.name + ' · ' + fmtBytes(f.size) + ' · ' + clock(dur);
+      $('work').hidden = false; $('go').disabled = false;
+      say('', 'Ready. Choose the language (or leave it on Detect automatically) and press Generate subtitles.');
+    }).catch(function (e) {
+      busy = false;
+      if (mine !== job) return;
+      if (e && e.message === 'old') return say('bad', 'This browser is too old for this tool. Please use a current Chrome, Edge, Firefox or Safari.');
+      if (e instanceof RangeError) return say('bad', 'Your device ran out of memory reading this file. Try a shorter one.');
+      say('bad', 'Could not read the sound in "' + f.name + '". The file may be damaged, have no sound track, or use a format this browser cannot open.');
+    });
+  });
+
+  // ---------- run ----------
+  $('go').addEventListener('click', function () {
+    if (!audio || busy) return;
+    busy = true; stopped = false;
+    cues = []; renderCues(); $('result').hidden = false; $('nCues').textContent = '0'; $('langOut').textContent = '…'; $('dlBurn').hidden = true;
+    $('go').disabled = true; $('stop').hidden = false; bar(0); setOpts(true);
+    var model = $('model').value, total = SIZES[model] + ORT_WASM[1], t0 = 0, pos = 0, timer = null, mine = job;
+    var firstLoad = workerModel !== model;
+    say('', firstLoad ? 'Getting the speech model ready…' : 'Starting…');
+    getWorker(model, function (got) { bar(got / total); say('', 'Downloading the speech model (' + fmtBytes(got) + ' of about ' + fmtBytes(total) + '). This happens only once.'); })
+      .then(function (w) {
+        if (stopped) throw new Error('stopped');
+        t0 = Date.now(); bar(0);
+        var lang = $('lang').value;
+        say('', lang === 'auto' ? 'Detecting the language…' : 'Listening…');
+        function show() {
+          if (!busy) return;
+          var el = (Date.now() - t0) / 1000, f = pos / dur, left = f > 0.03 ? el / f - el : 0;
+          say('', 'Listening… ' + clock(pos) + ' of ' + clock(dur) + (left > 5 ? ' · about ' + clock(left) + ' left' : '') + ' · ' + cues.length + ' captions so far');
+        }
+        return new Promise(function (res, rej) {
+          w.onmessage = function (e) {
+            var d = e.data;
+            if (mine !== job) return;
+            if (d.type === 'lang') { detected = d.code; $('langOut').textContent = (NAME[d.code] || d.code) + ($('task').value === 'translate' && d.code !== 'en' ? ' → English' : ''); timer = timer || setInterval(show, 1000); show(); }
+            else if (d.type === 'pos') { pos = d.t; bar(pos / dur); show(); }
+            else if (d.type === 'seg') { addSegment(d); pos = Math.max(pos, d.end); bar(pos / dur); }
+            else if (d.type === 'done') res();
+            else if (d.type === 'error') rej(new Error(d.message));
+          };
+          w.onerror = function (e) { e.preventDefault(); rej(new Error(e.message || 'worker')); };
+          var copy = audio.slice();
+          w.postMessage({ type: 'run', audio: copy, lang: lang === 'auto' ? '' : lang, task: $('task').value }, [copy.buffer]);
+        });
+      }).then(function () {
+        clearInterval(timer); busy = false; finishRun();
+        say('ok', cues.length ? 'Done in ' + clock((Date.now() - t0) / 1000) + ': ' + cues.length + ' captions. Check them in the player, fix any words, then download.' : 'No speech was found in this file. If there is speech, choose the language by hand or try the Better accuracy.');
+      }).catch(function (e) {
+        clearInterval(timer); busy = false; finishRun();
+        if (stopped || (e && e.message === 'stopped')) return say('', cues.length ? 'Stopped. The ' + cues.length + ' captions made so far are kept below.' : 'Stopped.');
+        killWorker();
+        if (e && e.message === 'net') return say('bad', 'The speech model could not be downloaded. Check your internet connection and try again.');
+        say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which this tool needs. Please update your browser.' :
+          /memory|allocation|Aborted/i.test(e && e.message) ? 'Your device ran out of memory. Close other tabs, use the Fast model, or try a shorter file.' :
+          'Speech recognition stopped with an error' + (e && e.message ? ' (' + String(e.message).slice(0, 120) + ')' : '') + '. Reload the page and try again.');
+      });
+  });
+  function finishRun() { $('go').disabled = !audio; $('stop').hidden = true; bar(null); setOpts(false); $('result').hidden = !cues.length && !busy; refreshAll(); }
+  function setOpts(dis) { ['lang', 'model', 'task'].forEach(function (id) { $(id).disabled = dis; }); }
+  $('stop').addEventListener('click', function () {
+    if (!busy || burning) return;
+    stopped = true; killWorker(); // stopping the worker is instant; the model reloads from the browser cache next time
+    busy = false; finishRun(); say('', cues.length ? 'Stopped. The ' + cues.length + ' captions made so far are kept below.' : 'Stopped.');
+  });
+
+  // Split long Whisper segments into readable captions, sharing the time by length.
+  function addSegment(d) {
+    var text = d.text.replace(/\s+/g, ' ').trim(), max = +$('maxc').value;
+    // Whisper sometimes gets stuck repeating a word or sign: keep one copy
+    text = text.replace(/(\D.{0,39}?)(?:[\s,،.。]*\1){3,}/g, '$1').trim();
+    if (!text || /^[\s.,!?…\-–—♪*()[\]،۔。]*$/.test(text)) return;
+    if (cues.length) { var p = cues[cues.length - 1]; if (p.text === text && d.start - p.end < 1) return; } // repeated line
+    var parts = [text];
+    if (max && text.length > max) {
+      parts = []; var words = text.split(' '), cur = '';
+      var n = Math.ceil(text.length / max), target = text.length / n;
+      words.forEach(function (w) { if (cur && (cur.length + 1 + w.length > max || (cur.length >= target && /[.,!?;:،。，！？]$/.test(cur)))) { parts.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      if (cur) parts.push(cur);
+    }
+    var totalLen = parts.reduce(function (a, s) { return a + s.length; }, 0), t = d.start, span = d.end - d.start;
+    parts.forEach(function (s) { var e = t + span * s.length / totalLen; cues.push({ start: t, end: e, text: s }); t = e; });
+    if (cues.length) $('result').hidden = false;
+    renderCues(true);
+  }
+
+  // ---------- cue editor ----------
+  function renderCues(append) {
+    var box = $('cues');
+    if (!append) box.textContent = '';
+    for (var i = box.children.length; i < cues.length; i++) box.appendChild(cueRow(i));
+    $('nCues').textContent = cues.length;
+    $('nWords').textContent = fmtNum ? fmtNum(cues.reduce(function (a, c) { return a + (c.text.trim() ? c.text.trim().split(/\s+/).length : 0); }, 0)) : '';
+    if (append) { box.scrollTop = box.scrollHeight; updateTrack(); }
+  }
+  function cueRow(i) {
+    var c = cues[i], row = document.createElement('div'); row.className = 'sg-cue';
+    var times = document.createElement('div'); times.className = 'sg-times';
+    var a = document.createElement('input'), b = document.createElement('input'), go = document.createElement('button');
+    a.value = short(c.start); b.value = short(c.end); a.setAttribute('aria-label', 'Start time'); b.setAttribute('aria-label', 'End time');
+    a.setAttribute('data-nomemo', ''); b.setAttribute('data-nomemo', ''); a.inputMode = b.inputMode = 'decimal';
+    go.type = 'button'; go.className = 'sg-go'; go.textContent = '▶ play';
+    var ta = document.createElement('textarea'); ta.value = c.text; ta.setAttribute('aria-label', 'Caption text'); ta.setAttribute('data-nomemo', ''); ta.dir = 'auto';
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'sg-x'; x.textContent = '×'; x.title = 'Delete this caption'; x.setAttribute('aria-label', 'Delete caption');
+    function idx() { return Array.prototype.indexOf.call($('cues').children, row); }
+    function time(inp, key) {
+      inp.addEventListener('change', function () {
+        var k = idx(), v = parseT(inp.value); if (k < 0) return;
+        if (isNaN(v)) { inp.value = short(cues[k][key]); toast('Write times like 1:02.5'); return; }
+        cues[k][key] = v; if (cues[k].end <= cues[k].start) cues[k].end = cues[k].start + 0.5;
+        a.value = short(cues[k].start); b.value = short(cues[k].end); updateTrack();
+      });
+    }
+    time(a, 'start'); time(b, 'end');
+    ta.addEventListener('input', function () { var k = idx(); if (k >= 0) { cues[k].text = ta.value; updateTrackSoon(); } });
+    go.addEventListener('click', function () { var k = idx(); if (k < 0 || player.hidden) return; player.currentTime = cues[k].start; player.play().catch(function () {}); });
+    x.addEventListener('click', function () { var k = idx(); if (k < 0) return; cues.splice(k, 1); row.remove(); $('nCues').textContent = cues.length; updateTrack(); });
+    times.appendChild(a); times.appendChild(b); times.appendChild(go);
+    row.appendChild(times); row.appendChild(ta); row.appendChild(x);
+    return row;
+  }
+  $('addCue').addEventListener('click', function () {
+    var t = player.hidden ? (cues.length ? cues[cues.length - 1].end : 0) : player.currentTime;
+    var k = 0; while (k < cues.length && cues[k].start <= t) k++;
+    cues.splice(k, 0, { start: t, end: Math.min(dur, t + 2) || t + 2, text: '' });
+    renderCues(); updateTrack();
+    var ta = $('cues').children[k].querySelector('textarea'); ta.focus(); ta.scrollIntoView({ block: 'nearest' });
+  });
+  $('shiftBtn').addEventListener('click', function () {
+    var v = prompt('Move all captions later by how many seconds? Use a minus sign to move them earlier (for example -0.5).', '0.5');
+    if (v == null) return; v = parseFloat(String(v).replace(',', '.'));
+    if (isNaN(v)) return toast('Please type a number of seconds.');
+    cues.forEach(function (c) { c.start = Math.max(0, c.start + v); c.end = Math.max(c.start + 0.1, c.end + v); });
+    renderCues(); updateTrack(); toast('Moved ' + (v > 0 ? 'later' : 'earlier') + ' by ' + Math.abs(v) + ' s');
+  });
+
+  // live preview in the player
+  var trackEl = null, trackT = 0;
+  function updateTrackSoon() { clearTimeout(trackT); trackT = setTimeout(updateTrack, 400); }
+  function updateTrack() {
+    if (!audio || player.hidden) return;
+    if (trackEl) { if (trackEl.src) URL.revokeObjectURL(trackEl.src); trackEl.remove(); }
+    trackEl = document.createElement('track'); trackEl.kind = 'subtitles'; trackEl.label = 'Subtitles'; trackEl.default = true;
+    trackEl.src = URL.createObjectURL(new Blob([toVtt()], { type: 'text/vtt' }));
+    player.appendChild(trackEl);
+    if (player.textTracks && player.textTracks.length) player.textTracks[player.textTracks.length - 1].mode = 'showing';
+  }
+  player.addEventListener('timeupdate', function () {
+    var t = player.currentTime, rows = $('cues').children;
+    for (var i = 0; i < cues.length && i < rows.length; i++) rows[i].classList.toggle('now', t >= cues[i].start && t < cues[i].end);
+  });
+
+  // ---------- export ----------
+  function sorted() { return cues.filter(function (c) { return c.text.trim(); }).slice().sort(function (a, b) { return a.start - b.start; }); }
+  function toSrt() { return sorted().map(function (c, i) { return (i + 1) + '\n' + stamp(c.start, ',') + ' --> ' + stamp(c.end, ',') + '\n' + c.text.trim(); }).join('\n\n') + '\n'; }
+  function toVtt() { return 'WEBVTT\n\n' + sorted().map(function (c) { return stamp(c.start, '.') + ' --> ' + stamp(c.end, '.') + '\n' + c.text.trim().replace(/-->/g, '→'); }).join('\n\n') + '\n'; }
+  function toTxt() {
+    var out = '', last = -9;
+    sorted().forEach(function (c) { out += (out && c.start - last > 2 ? '\n\n' : out ? ' ' : '') + c.text.trim(); last = c.end; });
+    return out + '\n';
+  }
+  function base() { return file ? file.name.replace(/\.[^.]+$/, '') || 'subtitles' : 'subtitles'; }
+  function save(text, ext, mime) {
+    if (!sorted().length) return toast('There are no captions to save yet.');
+    var a = document.createElement('a'); if (urls[ext]) URL.revokeObjectURL(urls[ext]);
+    urls[ext] = URL.createObjectURL(new Blob([ext === 'srt' ? '\ufeff' : '', text], { type: mime + ';charset=utf-8' }));
+    a.href = urls[ext]; a.download = base() + (detected ? '.' + ($('task').value === 'translate' ? 'en' : detected) : '') + '.' + ext; document.body.appendChild(a); a.click(); a.remove();
+  }
+  $('dlSrt').addEventListener('click', function () { save(toSrt(), 'srt', 'application/x-subrip'); });
+  $('dlVtt').addEventListener('click', function () { save(toVtt(), 'vtt', 'text/vtt'); });
+  $('dlTxt').addEventListener('click', function () { save(toTxt(), 'txt', 'text/plain'); });
+  $('copyTxt').addEventListener('click', function () { if (!sorted().length) return toast('There is no text to copy yet.'); copyText(toTxt().trim()); });
+  function refreshAll() { renderCues(); updateTrack(); $('burnBox').hidden = !isVideo || !cues.length; }
+
+  // ---------- burn-in: captions drawn by the browser (any script), laid over the video by the video engine ----------
+  function drawStrip(text, W, SH, fs, style) {
+    var c = document.createElement('canvas'); c.width = W; c.height = SH;
+    var x = c.getContext('2d'), size = Math.max(12, Math.round(W > SH * 3 ? fs : fs));
+    x.font = '600 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", "Noto Sans Devanagari", Arial, sans-serif';
+    x.textAlign = 'center'; x.textBaseline = 'middle'; x.direction = /[֐-ࣿ]/.test(text) ? 'rtl' : 'ltr';
+    // wrap to lines that fit 90% of the width
+    var words = text.split(/\s+/), lines = [], cur = '', maxW = W * 0.9;
+    words.forEach(function (w) { var t = cur ? cur + ' ' + w : w; if (cur && x.measureText(t).width > maxW) { lines.push(cur); cur = w; } else cur = t; });
+    if (cur) lines.push(cur);
+    lines = lines.slice(-3);
+    var lh = size * 1.3, y0 = SH - lh * lines.length - size * 0.5;
+    lines.forEach(function (l, i) {
+      var y = y0 + lh * i + lh / 2, w = Math.min(maxW, x.measureText(l).width);
+      if (style === 'box') { x.fillStyle = 'rgba(0,0,0,0.7)'; x.fillRect(W / 2 - w / 2 - size * 0.4, y - lh / 2, w + size * 0.8, lh); }
+      else { x.lineJoin = 'round'; x.lineWidth = Math.max(2, size * 0.16); x.strokeStyle = '#000'; x.strokeText(l, W / 2, y, maxW); }
+      x.fillStyle = style === 'yellow' ? '#ffe600' : '#fff'; x.fillText(l, W / 2, y, maxW);
+    });
+    return new Promise(function (res) { c.toBlob(function (b) { b.arrayBuffer().then(function (ab) { res(new Uint8Array(ab)); }); }, 'image/png'); });
+  }
+  var burnUrl = null;
+  $('burn').addEventListener('click', function () {
+    var list = sorted();
+    if (!file || !isVideo || busy || !list.length) return;
+    busy = true; burning = true; stopped = false; $('burn').disabled = $('go').disabled = true; $('dlBurn').hidden = true; $('stop').hidden = true; bar(0);
+    var cancelBtn = $('stop'), info = null, t0 = Date.now();
+    cancelBtn.hidden = false;
+    var onStop = function () { FF.cancel(); }; cancelBtn.addEventListener('click', onStop);
+    FF.probe(file, say).then(function (inf) {
+      info = inf;
+      var W = info.width & ~1, H = info.height & ~1, fs = Math.round(Math.min(W, H * 1.2) * +$('fsize').value), SH = Math.min(H, Math.round(fs * 5.5)), style = $('fstyle').value;
+      say('', 'Drawing ' + list.length + ' captions…');
+      var pngs = [], p = drawStrip('', W, SH, fs, style).then(function (b) { pngs.blank = b; });
+      list.forEach(function (c, i) { p = p.then(function () { return drawStrip(c.text.trim(), W, SH, fs, style).then(function (b) { pngs[i] = b; }); }); });
+      return p.then(function () {
+        // a list of images with durations: blank between captions
+        var lines = ['ffconcat version 1.0'], t = 0;
+        function add(name, d) { if (d > 0.001) { lines.push('file ' + name); lines.push('duration ' + d.toFixed(3)); } }
+        list.forEach(function (c, i) { add('blank.png', c.start - t); add('c' + i + '.png', Math.max(0.05, c.end - Math.max(t, c.start))); t = Math.max(t, c.end); });
+        add('blank.png', Math.max(1, info.duration - t + 1)); lines.push('file blank.png');
+        var copyAudio = /^(aac|mp3)$/.test(info.acodec);
+        return FF.run(file, function (inp) {
+          return ['-i', inp, '-f', 'concat', '-safe', '0', '-i', '/subs/list.txt', '-filter_complex', '[1:v]format=rgba[s];[0:v]scale=' + W + ':' + H + '[v];[v][s]overlay=0:' + (H - SH) + ':eof_action=pass:format=auto,format=yuv420p[o]',
+            '-map', '[o]', '-map', '0:a?', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23'].concat(copyAudio ? ['-c:a', 'copy'] : ['-c:a', 'aac', '-b:a', '160k'], ['-movflags', '+faststart', '-shortest']);
+        }, 'subtitled.mp4', info.duration, function (f) { bar(f); var el = (Date.now() - t0) / 1000, left = f > 0.03 ? el / f - el : 0; say('', 'Making the video… ' + Math.round(f * 100) + '%' + (left > 5 ? ' · about ' + clock(left) + ' left' : '')); }, say, function (f) {
+          return f.createDir('/subs').catch(function () {}).then(function () {
+            var w = [f.writeFile('/subs/blank.png', pngs.blank), f.writeFile('/subs/list.txt', lines.join('\n') + '\n')];
+            pngs.forEach(function (b, i) { w.push(f.writeFile('/subs/c' + i + '.png', b)); });
+            return Promise.all(w);
+          });
+        });
+      });
+    }).then(function (data) {
+      if (burnUrl) URL.revokeObjectURL(burnUrl);
+      burnUrl = URL.createObjectURL(new Blob([data], { type: 'video/mp4' }));
+      var a = $('dlBurn'); a.href = burnUrl; a.download = base() + '-subtitled.mp4'; a.textContent = 'Download video (' + fmtBytes(data.length) + ')'; a.hidden = false;
+      say('ok', 'Your video with subtitles is ready (took ' + clock((Date.now() - t0) / 1000) + ').');
+    }).catch(function (e) {
+      if (e && e.message === 'cancelled') return say('', 'Stopped.');
+      say('bad', (e && e.message) || 'Making the video failed. Try a shorter or smaller video.');
+    }).then(function () { busy = false; burning = false; bar(null); cancelBtn.removeEventListener('click', onStop); cancelBtn.hidden = true; $('burn').disabled = false; $('go').disabled = !audio; });
+  });
+})();
+</script>

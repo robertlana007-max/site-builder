@@ -3691,5 +3691,89 @@ module.exports = [
         ['Is my caption saved?', 'Only in this browser, so you can come back to it. Nothing is uploaded.']
       ],
       icon: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M9 14h6M9 17h4M11 5h2"/>'
+  },
+  {
+    slug: 'online-keyboard', cat: 'Text tools', name: 'Online Keyboard (All Languages)',
+    title: 'Online Keyboard for 49 Languages - Virtual Keyboard, Free',
+    desc: 'Type in Arabic, Hindi, Russian, Greek, Korean, Japanese, Thai, Hebrew, Vietnamese and 40 more languages with an on-screen keyboard. Copy or download.',
+    card: 'Type in 49 languages with an on-screen keyboard.',
+    intro: 'Type in almost any language without installing anything. Pick a keyboard from the list, then tap the on-screen keys or use your computer keys, which are mapped to the chosen language. Korean letters join into syllables, Japanese romaji becomes kana, and accent keys add marks to any letter.',
+    steps: ['Find your language in the list (it starts with your browser\'s language).', 'Type with your computer keys or tap the on-screen keys; Shift and AltGr give more characters.', 'Use the accent keys or special-letter keys above the keyboard when you need them.', 'Copy your text or download it as a .txt file.'],
+    faq: [
+      ['Which languages are included?', 'Arabic, Persian, Urdu, Pashto, Hindi, Marathi, Nepali, Bengali, Punjabi, Gujarati, Tamil, Telugu, Russian, Ukrainian, Bulgarian, Serbian, Kazakh, Greek, Hebrew, Georgian, Armenian, Thai, Korean, Japanese, Amharic, Vietnamese, Chinese Pinyin, Turkish, Azerbaijani, Spanish, French, German, Portuguese, Italian, Polish, Czech, Romanian, Hungarian, Swedish, Norwegian, Danish, Icelandic, Dutch, Swahili, Yoruba, Hausa, Igbo and English.'],
+      ['How do my computer keys type another alphabet?', 'Each key position is mapped to the chosen language\'s standard layout (for example ЙЦУКЕН for Russian, InScript for Indian languages, Kedmanee for Thai, 2-set for Korean), whatever layout your computer uses. The small Latin letter on each on-screen key shows which key to press.'],
+      ['How do I type accents like é, ñ or ş?', 'Tap an accent key (´ ` ^ ¨ ~ ˇ and more), then a letter. Most Latin languages also have a row of their special letters, and AltGr (right Alt) with a letter gives common accented letters. You can also turn on accent keys for your own keyboard: \' then e gives é.'],
+      ['How do Korean, Japanese and Vietnamese work?', 'Korean jamo join into syllable blocks as you type. For Japanese, type romaji (konnichiha) and it turns into hiragana or katakana. For Vietnamese, Telex typing turns aa into â, dd into đ and s f r x j into tone marks; tone buttons are on screen too.'],
+      ['Is my text saved or uploaded?', 'No. Your text stays in your browser. Only your last chosen keyboard is remembered on this device.']
+    ],
+    icon: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 15h8"/><circle cx="18" cy="3.5" r="2.5"/>'
+  },
+  {
+      slug: 'subtitle-generator', cat: 'Media tools', name: 'Subtitle Generator',
+      title: 'AI Subtitle Generator - Video to SRT Free, No Upload',
+      desc: 'Make subtitles from a video or audio file with Whisper AI in your browser. Auto language detection, editable captions, SRT, VTT and TXT, burn-in. No upload.',
+      card: 'Auto-caption videos with AI, then edit and export SRT.',
+      intro: 'Turn the speech in a video or recording into timed subtitles. Whisper, an open-source speech recognition model, runs inside your browser, so your file is never uploaded. Fix any words, then download SRT, VTT or text, or burn the captions into the video.',
+      steps: ['Click the box or drop a video or audio file onto it.', 'Choose the spoken language or leave it on Detect automatically, and pick Fast or Better accuracy.', 'Press Generate subtitles and watch the captions appear.', 'Fix words or times, then download SRT, VTT or text, or make a video with the subtitles burned in.'],
+      faq: [
+        ['Is my video uploaded?', 'No. The speech model is downloaded to your browser once and the recognition happens on your device, so your file never leaves it.'],
+        ['Which languages work?', 'Whisper understands about 100 languages, including English, Spanish, French, German, Portuguese, Hindi, Urdu, Arabic, Bengali, Chinese, Japanese, Indonesian and Swahili. Accuracy is best for widely spoken languages with clear audio; use Better accuracy for others.'],
+        ['How long does it take?', 'With the Fast model a typical computer needs about 10 to 30 seconds per minute of speech; Better is about twice as slow, and phones are slower. The first use also downloads the model (41 or 77 MB).'],
+        ['Can it translate the subtitles?', 'Yes, into English: set Subtitles in to English (translate). For other target languages, download the text and use the Offline Translator.'],
+        ['Can I put the subtitles into the video?', 'Yes. Make video with subtitles draws the captions onto the picture and saves an MP4. It re-encodes the whole video on your device, so it can take one to three times the video length.'],
+        ['Why are some words wrong?', 'Speech recognition makes mistakes with names, noise, music, strong accents and several people talking at once. Click into any caption to correct it before downloading.']
+      ],
+      icon: '<rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 12h4M12 12h6M6 15.5h8M16 15.5h2"/>'
+  },
+  {
+      slug: 'noise-remover', cat: 'Media tools', name: 'Noise Remover',
+      title: 'Remove Background Noise from Audio & Video - Free, No Upload',
+      desc: 'Clean fan hum, traffic, wind and room noise from voice recordings and videos with RNNoise AI in your browser. Compare before and after, save MP3, WAV or video.',
+      card: 'Clean background noise from voice recordings.',
+      intro: 'Remove steady background noise such as fans, hum, traffic and room echo from speech. The open-source RNNoise model cleans the sound on your device; compare before and after, then save it as MP3, WAV or a video with clean sound.',
+      steps: ['Click the box or drop a voice recording or a video onto it.', 'Press Remove noise.', 'Press Play and switch between Before and After; adjust Strength and the pauses setting until it sounds right.', 'Choose MP3, WAV or video, press Make, then Download.'],
+      faq: [
+        ['Is my recording uploaded?', 'No. The noise remover runs in your browser with WebAssembly, so the sound never leaves your device.'],
+        ['What kind of noise does it remove?', 'Steady and everyday noise behind a voice: fans, air conditioning, computer hum, traffic, wind, keyboard clicks and room noise. It cannot remove other voices or music without affecting the speaker.'],
+        ['Can I use it for music?', 'It is designed for speech. On music it removes too much and the result sounds thin.'],
+        ['What does Strength do?', 'At 100% you hear only the cleaned sound. Lower values mix some of the original back in, which sounds more natural when the noise was light.'],
+        ['Can I clean the sound of a video?', 'Yes. Drop an MP4, MOV, WebM or MKV video and choose Video with the cleaned sound. The picture is copied as it is, so it stays sharp and saving is quick.'],
+        ['How long can the recording be?', 'Up to 1 hour. It cleans roughly 30 to 60 seconds of sound per second on a computer.']
+      ],
+      icon: '<path d="M2 12h2l2-5 3 10 3-14 3 12 2-6 2 3h3"/>'
+  },
+  {
+      slug: 'vocal-remover', cat: 'Media tools', name: 'Vocal Remover',
+      title: 'Vocal Remover - Make Karaoke & Acapella Online Free',
+      desc: 'Remove the vocals from a song to make a karaoke track, or isolate the voice for an acapella. AI separation runs in your browser. Save MP3 or WAV. No upload.',
+      card: 'Split a song into karaoke music and vocals.',
+      intro: 'Split a song into the music without the singer (karaoke or instrumental) and the vocals alone (acapella). The open-source Spleeter AI model runs on your device; a quick centre-cut method is also included. Results depend on the song.',
+      steps: ['Click the box or drop a song onto it.', 'Keep AI separation (best) or choose Quick centre cut.', 'Press Separate vocals, then play Music only, Vocals only and Original to compare.', 'Choose the track and format, press Make file, then Download.'],
+      faq: [
+        ['Is my song uploaded?', 'No. The AI model downloads to your browser once (about 54 MB) and the separation happens on your device.'],
+        ['How good is the result?', 'For most studio songs the voice becomes much quieter or disappears, but traces and echoes of the voice can remain, and some instruments may sound slightly watery. Live recordings and songs with heavy reverb are harder.'],
+        ['What is the difference between the two methods?', 'AI separation uses Spleeter, a model trained to tell voices from instruments, and works on most songs, even mono ones. Quick centre cut removes only what is exactly in the middle of a stereo mix; it is instant but works on fewer songs.'],
+        ['Can I get just the vocals?', 'Yes. Choose Vocals only (acapella) under Track to save. It is approximate: some drums or instruments can leak in.'],
+        ['How long can the song be?', 'Up to 10 minutes. A 4-minute song usually takes under a minute on a computer and a few minutes on a phone.'],
+        ['Can I use the result commercially?', 'The tool itself places no limits, but the song still belongs to its rights holders. Use karaoke tracks of other people’s songs only where you have the right to.']
+      ],
+      icon: '<path d="M12 3a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z"/><path d="M19 11a7 7 0 0 1-12.2 4.7M5 11a7 7 0 0 0 .4 2.3M12 18v3M3 3l18 18"/>'
+  },
+  {
+      slug: 'offline-translator', cat: 'Text tools', name: 'Offline Translator',
+      title: 'Offline Translator - Private Text Translation in Your Browser',
+      desc: 'Translate text on your own device: Chrome’s built-in translator or free offline models for English with Spanish, French, German, Hindi and Urdu. No upload.',
+      card: 'Translate text privately, on your own device.',
+      intro: 'Translate text without sending it to a server. The tool uses the translator built into Chrome where available, and otherwise downloads small open-source Firefox Translations models that keep working offline.',
+      steps: ['Choose the From and To languages, or press ⇄ to swap them.', 'Type or paste your text.', 'Press Translate (or Ctrl + Enter). The first time, the language downloads once.', 'Copy the translation or download it as a text file.'],
+      faq: [
+        ['Is my text sent anywhere?', 'No. Both engines run on your device. Only the language model itself is downloaded, once, and after that translation works offline.'],
+        ['Which languages can I translate?', 'In Chrome 138 or newer on a computer, the built-in translator covers many languages, such as Spanish, French, German, Portuguese, Hindi, Bengali, Arabic, Chinese, Japanese, Korean, Russian and Turkish. In other browsers, the offline models cover English with Spanish, French, German, Hindi and Urdu, and pairs among them through English.'],
+        ['Why is a language pair not available?', 'Your browser has no built-in translator for that pair and there is no offline model for it here. Try Chrome on a computer, or translate through English in two steps.'],
+        ['How big are the downloads?', 'Each offline model is 15 to 26 MB, plus a 5 MB engine the first time. Chrome’s language packs are downloaded and managed by Chrome itself.'],
+        ['How accurate is it?', 'Good for everyday text, emails and articles, but machine translation can make mistakes. Have important legal, medical or official text checked by a person.'],
+        ['Is there a length limit?', 'Up to 50,000 characters at a time. Long text is translated paragraph by paragraph, and the paragraphs are kept.']
+      ],
+      icon: '<path d="M4 5h8M8 3v2M10 5c-.5 3-2.5 6-6 8M6 9c1 2 3 3.5 5 4"/><path d="M13 21l4-10 4 10M14.5 17.5h5"/>'
   }
 ];
