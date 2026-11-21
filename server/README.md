@@ -17,7 +17,7 @@ Support page --(amount, email)--> Cloudflare Worker --(X-API-Key)--> api.paymega
 
 ## Status
 
-> **Card tab is paused** (`card.checkoutApi` is empty; the Worker address is kept in `card.checkoutApiLater`). Turn it back on by copying that address into `checkoutApi` once a sandbox order works.
+> **Card tab is ON for everyone** (`card.checkoutApi` set). Real money arrives only once the Worker uses a LIVE PayMeGate key.
 
 
 - [x] PayMeGate: sandbox API key `gettoolnest-worker` created, Back URL set to https://gettoolnest.xyz/thank-you.html
