@@ -1,0 +1,164 @@
+<style>
+.ar-f[hidden] { display: none; }
+.ar-big { font-size: clamp(22px, 4.4vw, 30px); font-weight: 800; margin: 14px 0 2px; overflow-wrap: anywhere; }
+.ar-sub { color: var(--muted); font-size: 15px; margin: 0; }
+.ar-tbl td:first-child { color: var(--muted); }
+.ar-tbl tr.ar-g td { color: var(--ink); font-weight: 700; padding-top: 14px; text-align: start; }
+.ar-reg { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 0 0 14px; }
+.ar-reg summary { cursor: pointer; font-weight: 600; }
+.ar-note { font-size: 14px; color: var(--muted); }
+.ar-pic { float: right; width: 110px; height: 84px; margin: 0 0 8px 12px; color: var(--accent); }
+@media (max-width: 480px) { .ar-pic { width: 84px; height: 64px; } }
+</style>
+<div class="fields">
+  <div><label for="arShape">Shape</label><select id="arShape">
+    <option value="rect">Rectangle</option>
+    <option value="square">Square</option>
+    <option value="tri">Triangle (base and height)</option>
+    <option value="tri3">Triangle (three sides)</option>
+    <option value="circle">Circle (radius)</option>
+    <option value="circD">Circle (diameter)</option>
+    <option value="trap">Trapezoid</option>
+    <option value="para">Parallelogram</option>
+    <option value="ellipse">Ellipse (oval)</option>
+    <option value="quad">Four-sided plot (irregular)</option>
+    <option value="known">I already know the area (convert units)</option>
+  </select></div>
+  <div id="arLenBox"><label for="arLen">Lengths are in</label><select id="arLen">
+    <option value="1">Meters (m)</option><option value="0.01">Centimeters (cm)</option><option value="0.001">Millimeters (mm)</option><option value="1000">Kilometers (km)</option>
+    <option value="0.3048">Feet (ft)</option><option value="0.0254">Inches (in)</option><option value="0.9144">Yards (yd)</option><option value="1609.344">Miles (mi)</option>
+  </select></div>
+</div>
+<svg class="ar-pic" id="arPic" viewBox="0 0 110 84" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round" aria-hidden="true"></svg>
+<div class="fields" id="arIns">
+  <div class="ar-f"><label for="arA" id="arLA">A</label><input type="number" id="arA" min="0" step="any" inputmode="decimal" value="20"></div>
+  <div class="ar-f"><label for="arB" id="arLB">B</label><input type="number" id="arB" min="0" step="any" inputmode="decimal" value="10"></div>
+  <div class="ar-f"><label for="arC" id="arLC">C</label><input type="number" id="arC" min="0" step="any" inputmode="decimal"></div>
+  <div class="ar-f"><label for="arD" id="arLD">D</label><input type="number" id="arD" min="0" step="any" inputmode="decimal"></div>
+  <div class="ar-f"><label for="arE" id="arLE">E</label><input type="number" id="arE" min="0" step="any" inputmode="decimal"></div>
+  <div class="ar-f" id="arKU"><label for="arKnownU">Area unit</label><select id="arKnownU"></select></div>
+</div>
+<div style="clear:both"></div>
+<div class="fields">
+  <div><label for="arOut">Show the answer in</label><select id="arOut"></select></div>
+</div>
+<details class="ar-reg"><summary>Regional unit sizes (marla, bigha)</summary>
+<div class="fields" style="margin:12px 0 0">
+  <div><label for="arMarla">Size of 1 marla</label><select id="arMarla">
+    <option value="225">225 sq ft (Punjab, Pakistan; common)</option>
+    <option value="250">250 sq ft (some housing societies)</option>
+    <option value="272.25">272.25 sq ft (revenue / Sarsahi marla)</option>
+  </select></div>
+  <div><label for="arBigha">Size of 1 bigha (sq ft)</label><input type="number" id="arBigha" min="1" step="any" value="14400" inputmode="decimal"></div>
+</div>
+</details>
+<p class="ar-sub">Area</p>
+<p class="ar-big" id="arRes">–</p>
+<p class="ar-sub" id="arPer"></p>
+<p class="msg" id="arMsg"></p>
+<div class="btns"><button type="button" class="btn ghost" id="arCopy">Copy all units</button></div>
+<h3>In every unit</h3>
+<div class="scroll-x"><table class="sched ar-tbl"><tbody id="arAll"></tbody></table></div>
+<p class="ar-note">Marla, kanal, bigha and katha are used in Pakistan, India, Bangladesh and Nepal, and their sizes differ by region, so pick or type the size used where you are. 1 kanal = 20 marla and 1 katha = 1/20 bigha (Bengal system). Check legal documents with a local surveyor.</p>
+<script>
+(function () {
+  var SQFT = 0.09290304;
+  // [key, label, square meters (number or function), group]
+  var UNITS = [
+    ['m2', 'Square meters (m²)', 1, 'Metric'], ['cm2', 'Square centimeters (cm²)', 1e-4, 'Metric'], ['km2', 'Square kilometers (km²)', 1e6, 'Metric'], ['ha', 'Hectares (ha)', 1e4, 'Metric'], ['are', 'Ares (a)', 100, 'Metric'],
+    ['ft2', 'Square feet (sq ft)', SQFT, 'Imperial / US'], ['in2', 'Square inches (sq in)', 0.00064516, 'Imperial / US'], ['yd2', 'Square yards (sq yd)', 0.83612736, 'Imperial / US'], ['ac', 'Acres', 4046.8564224, 'Imperial / US'], ['mi2', 'Square miles', 2589988.110336, 'Imperial / US'],
+    ['marla', 'Marla', function () { return +$('arMarla').value * SQFT; }, 'South Asia'], ['kanal', 'Kanal (20 marla)', function () { return 20 * +$('arMarla').value * SQFT; }, 'South Asia'],
+    ['bigha', 'Bigha', function () { return +$('arBigha').value * SQFT; }, 'South Asia'], ['katha', 'Katha (1/20 bigha)', function () { return +$('arBigha').value * SQFT / 20; }, 'South Asia'],
+    ['guntha', 'Guntha (1,089 sq ft)', 1089 * SQFT, 'South Asia'], ['cent', 'Cent (1/100 acre)', 40.468564224, 'South Asia'],
+    ['rai', 'Rai (Thailand, 1,600 m²)', 1600, 'East and Southeast Asia'], ['ngan', 'Ngan (Thailand, 400 m²)', 400, 'East and Southeast Asia'], ['tsubo', 'Tsubo / pyeong / ping (≈3.306 m²)', 400 / 121, 'East and Southeast Asia'], ['mu', 'Mu (China, 666.67 m²)', 2000 / 3, 'East and Southeast Asia'],
+    ['dunam', 'Dunam / dönüm (1,000 m²)', 1000, 'Middle East and Africa'], ['feddan', 'Feddan (Egypt, 4,200 m²)', 4200, 'Middle East and Africa']
+  ];
+  function m2(u) { return typeof u[2] === 'function' ? u[2]() : u[2]; }
+  function find(k) { for (var i = 0; i < UNITS.length; i++) if (UNITS[i][0] === k) return UNITS[i]; }
+  var opts = '', g = '';
+  UNITS.forEach(function (u) { if (u[3] !== g) { opts += (g ? '</optgroup>' : '') + '<optgroup label="' + u[3] + '">'; g = u[3]; } opts += '<option value="' + u[0] + '">' + u[1] + '</option>'; });
+  opts += '</optgroup>';
+  $('arOut').innerHTML = opts; $('arKnownU').innerHTML = opts;
+  try { $('arOut').value = /-US$/.test(navigator.language) ? 'ft2' : 'm2'; } catch (e) { $('arOut').value = 'm2'; }
+  $('arKnownU').value = 'ac';
+  var S = {
+    rect: ['Length', 'Width'], square: ['Side'], tri: ['Base', 'Height'], tri3: ['Side a', 'Side b', 'Side c'], circle: ['Radius'], circD: ['Diameter'],
+    trap: ['Parallel side a', 'Parallel side b', 'Height (distance between them)'], para: ['Base', 'Height'], ellipse: ['Long radius (half the length)', 'Short radius (half the width)'],
+    quad: ['Side 1 (A to B)', 'Side 2 (B to C)', 'Side 3 (C to D)', 'Side 4 (D to A)', 'Diagonal A to C (optional, for an exact answer)'], known: ['Area']
+  };
+  var PIC = {
+    rect: '<rect x="8" y="16" width="94" height="52" rx="2"/>', square: '<rect x="25" y="6" width="60" height="72" rx="2"/>',
+    tri: '<path d="M8 76h94L66 8z"/><path d="M66 8v68" stroke-dasharray="4 4"/>', tri3: '<path d="M8 76h94L40 8z"/>',
+    circle: '<circle cx="55" cy="42" r="34"/><path d="M55 42h34"/>', circD: '<circle cx="55" cy="42" r="34"/><path d="M21 42h68"/>',
+    trap: '<path d="M8 76h94L80 12H30z"/>', para: '<path d="M8 76h72l22-64H30z"/>', ellipse: '<ellipse cx="55" cy="42" rx="48" ry="28"/>',
+    quad: '<path d="M10 72l88 6-10-66-60 10z"/><path d="M10 72L88 12" stroke-dasharray="4 4"/>', known: '<path d="M10 70h90M10 70V14"/><rect x="22" y="26" width="64" height="36" rx="2"/>'
+  };
+  var IDS = ['arA', 'arB', 'arC', 'arD', 'arE'], LBL = ['arLA', 'arLB', 'arLC', 'arLD', 'arLE'];
+  function layout() {
+    var k = $('arShape').value, L = S[k];
+    IDS.forEach(function (id, i) { var box = $(id).parentNode; box.hidden = i >= L.length; if (i < L.length) $(LBL[i]).textContent = L[i]; });
+    $('arKU').hidden = k !== 'known'; $('arLenBox').hidden = k === 'known';
+    $('arPic').innerHTML = PIC[k];
+  }
+  function fmt(x) {
+    if (x === 0) return '0';
+    var a = Math.abs(x);
+    if (a >= 1e15 || a < 1e-6) return x.toExponential(4).replace('e+', ' × 10^').replace('e-', ' × 10^-');
+    return x.toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: a >= 100 ? 2 : a >= 1 ? 4 : 6 });
+  }
+  var copyTxt = '';
+  function calc() {
+    layout();
+    var k = $('arShape').value, L = S[k], f = +$('arLen').value, v = [], msg = $('arMsg');
+    function fail(t, cls) { $('arRes').textContent = '–'; $('arPer').textContent = ''; $('arAll').innerHTML = ''; msg.className = 'msg ' + (cls || 'bad'); msg.textContent = t; copyTxt = ''; }
+    for (var i = 0; i < L.length; i++) {
+      var raw = $(IDS[i]).value;
+      if (raw === '') { if (k === 'quad' && i === 4) { v.push(NaN); continue; } return fail('Enter the ' + L[i].toLowerCase().replace(/ \(.*/, '') + '.', ' '); }
+      var x = +raw; if (!isFinite(x) || x <= 0) return fail(L[i].replace(/ \(.*/, '') + ' must be greater than 0.');
+      if (x > 1e12) return fail(L[i].replace(/ \(.*/, '') + ' is too large. Please check the number.');
+      v.push(k === 'known' ? x : x * f);
+    }
+    var A, P = NaN, note = '';
+    if (+$('arBigha').value <= 0 || $('arBigha').value === '') return fail('Enter the size of 1 bigha in square feet (for example 14400).');
+    switch (k) {
+      case 'rect': A = v[0] * v[1]; P = 2 * (v[0] + v[1]); break;
+      case 'square': A = v[0] * v[0]; P = 4 * v[0]; break;
+      case 'tri': A = v[0] * v[1] / 2; break;
+      case 'tri3':
+        var s = (v[0] + v[1] + v[2]) / 2, q = s * (s - v[0]) * (s - v[1]) * (s - v[2]);
+        if (q <= 0) return fail('These three sides cannot make a triangle: each side must be shorter than the other two added together.');
+        A = Math.sqrt(q); P = 2 * s; break;
+      case 'circle': A = Math.PI * v[0] * v[0]; P = 2 * Math.PI * v[0]; break;
+      case 'circD': A = Math.PI * v[0] * v[0] / 4; P = Math.PI * v[0]; break;
+      case 'trap': A = (v[0] + v[1]) / 2 * v[2]; break;
+      case 'para': A = v[0] * v[1]; break;
+      case 'ellipse': A = Math.PI * v[0] * v[1]; var h = Math.pow(v[0] - v[1], 2) / Math.pow(v[0] + v[1], 2); P = Math.PI * (v[0] + v[1]) * (1 + 3 * h / (10 + Math.sqrt(4 - 3 * h))); break;
+      case 'quad':
+        P = v[0] + v[1] + v[2] + v[3];
+        if (isNaN(v[4])) { A = (v[0] + v[2]) / 2 * ((v[1] + v[3]) / 2); note = 'Without a diagonal this uses the "average of opposite sides" method. It is exact for rectangles and close for nearly rectangular plots, but can be too high for slanted ones. Add the diagonal for an exact answer.'; }
+        else {
+          var her = function (a, b, c) { var s = (a + b + c) / 2, q = s * (s - a) * (s - b) * (s - c); return q > 0 ? Math.sqrt(q) : NaN; };
+          var t1 = her(v[0], v[1], v[4]), t2 = her(v[2], v[3], v[4]);
+          if (isNaN(t1) || isNaN(t2)) return fail('The diagonal does not fit these sides. It must be shorter than sides 1 + 2 and sides 3 + 4, and longer than their differences.');
+          A = t1 + t2; note = 'Exact: the plot is split along the diagonal into two triangles (Heron\'s formula). This assumes the corners point outward (a convex plot).';
+        }
+        break;
+      case 'known': A = v[0] * m2(find($('arKnownU').value)); break;
+    }
+    var out = find($('arOut').value);
+    $('arRes').textContent = fmt(A / m2(out)) + ' ' + out[1].replace(/ \(.*\)$/, '').toLowerCase().replace(/^square/, 'square').replace(/^(\w)/, function (c) { return c; });
+    var lenName = $('arLen').selectedOptions[0].textContent.replace(/.*\((.*)\)/, '$1');
+    $('arPer').textContent = isNaN(P) ? '' : 'Perimeter: ' + fmt(P / f) + ' ' + lenName + (f !== 1 ? ' (' + fmt(P) + ' m)' : '');
+    msg.className = 'msg'; msg.textContent = note;
+    var html = '', grp = '', lines = [];
+    UNITS.forEach(function (u) {
+      if (u[3] !== grp) { grp = u[3]; html += '<tr class="ar-g"><td colspan="2">' + grp + '</td></tr>'; }
+      var val = fmt(A / m2(u)); html += '<tr><td>' + u[1] + '</td><td>' + val + '</td></tr>'; lines.push(u[1] + ': ' + val);
+    });
+    $('arAll').innerHTML = html; copyTxt = lines.join('\n');
+  }
+  ['arShape', 'arLen', 'arA', 'arB', 'arC', 'arD', 'arE', 'arKnownU', 'arOut', 'arMarla', 'arBigha'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('arCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+  calc();
+})();
+</script>

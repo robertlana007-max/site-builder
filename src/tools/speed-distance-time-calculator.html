@@ -1,0 +1,81 @@
+<style>
+.sd-g[hidden] { display: none; }
+.sd-t { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.sd-big { font-size: clamp(22px, 4.4vw, 30px); font-weight: 800; margin: 14px 0 4px; overflow-wrap: anywhere; }
+.sd-sub { color: var(--muted); font-size: 15px; margin: 0; }
+.sd-f { font-family: var(--mono); font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+.sd-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 0 20px; }
+</style>
+<div class="fields">
+  <div><label for="sdSolve">What do you want to find?</label><select id="sdSolve"><option value="s">Speed</option><option value="d">Distance</option><option value="t">Time</option></select></div>
+</div>
+<div class="fields">
+  <div class="sd-g" id="sdDG"><label for="sdD">Distance</label><input type="number" id="sdD" min="0" step="any" value="120" inputmode="decimal"></div>
+  <div class="sd-g" id="sdDUG"><label for="sdDU">Distance unit</label><select id="sdDU"></select></div>
+  <div class="sd-g" id="sdSG"><label for="sdS">Speed</label><input type="number" id="sdS" min="0" step="any" value="60" inputmode="decimal"></div>
+  <div class="sd-g" id="sdSUG"><label for="sdSU">Speed unit</label><select id="sdSU"></select></div>
+</div>
+<div class="sd-g" id="sdTG"><label>Time</label>
+  <div class="sd-t" style="margin-bottom:16px">
+    <div><label for="sdH" style="font-weight:400;font-size:13px">Hours</label><input type="number" id="sdH" min="0" step="any" value="1" inputmode="decimal"></div>
+    <div><label for="sdM" style="font-weight:400;font-size:13px">Minutes</label><input type="number" id="sdM" min="0" step="any" value="30" inputmode="decimal"></div>
+    <div><label for="sdX" style="font-weight:400;font-size:13px">Seconds</label><input type="number" id="sdX" min="0" step="any" value="0" inputmode="decimal"></div>
+  </div>
+</div>
+<p class="sd-sub" id="sdWhat">Speed</p>
+<p class="sd-big" id="sdOut">–</p>
+<p class="sd-f" id="sdF"></p>
+<p class="msg" id="sdMsg"></p>
+<div class="sd-cols">
+  <div><h3>Speed in other units</h3><div class="scroll-x"><table class="sched"><tbody id="sdSpeeds"></tbody></table></div></div>
+  <div><h3>Distance and time</h3><div class="scroll-x"><table class="sched"><tbody id="sdOther"></tbody></table></div></div>
+</div>
+<script>
+(function () {
+  // meters per unit, and meters-per-second per unit
+  var DU = [['km', 'Kilometers (km)', 1000], ['m', 'Meters (m)', 1], ['mi', 'Miles (mi)', 1609.344], ['ft', 'Feet (ft)', 0.3048], ['yd', 'Yards (yd)', 0.9144], ['nmi', 'Nautical miles', 1852]];
+  var SU = [['kmh', 'km/h', 1 / 3.6], ['mph', 'mph (miles per hour)', 0.44704], ['ms', 'm/s', 1], ['fts', 'ft/s', 0.3048], ['kn', 'knots', 1852 / 3600], ['pkm', 'pace, min per km', 'pkm'], ['pmi', 'pace, min per mile', 'pmi']];
+  $('sdDU').innerHTML = DU.map(function (u) { return '<option value="' + u[0] + '">' + u[1] + '</option>'; }).join('');
+  $('sdSU').innerHTML = SU.map(function (u) { return '<option value="' + u[0] + '">' + u[1] + '</option>'; }).join('');
+  try { if (/-(US|GB)$/.test(navigator.language)) { $('sdDU').value = 'mi'; $('sdSU').value = 'mph'; } } catch (e) {}
+  function f(id, a) { for (var i = 0; i < a.length; i++) if (a[i][0] === id) return a[i]; }
+  function nf(x, d) { return Number(x).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 3 : d }); }
+  function toMs(v, u) { var k = f(u, SU)[2]; if (k === 'pkm') return 1000 / (v * 60); if (k === 'pmi') return 1609.344 / (v * 60); return v * k; }
+  function fromMs(ms, u) { var k = f(u, SU)[2]; if (k === 'pkm') return 1000 / ms / 60; if (k === 'pmi') return 1609.344 / ms / 60; return ms / k; }
+  function pace(min) { var s = Math.round(min * 60); return Math.floor(s / 60) + ':' + String(s % 60).padStart(2, '0'); }
+  function speedTxt(ms, u) { var v = fromMs(ms, u); return /^p/.test(u) ? pace(v) + ' ' + f(u, SU)[1].replace('pace, ', '') : nf(v) + ' ' + f(u, SU)[1].replace(/ \(.*/, ''); }
+  function dur(sec) {
+    var s = Math.round(sec), d = Math.floor(s / 86400), h = Math.floor(s % 86400 / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (d ? fmtNum(d, 0) + ' d ' : '') + h + ' h ' + m + ' min ' + x + ' s';
+  }
+  function calc() {
+    var solve = $('sdSolve').value, msg = $('sdMsg');
+    $('sdDG').hidden = solve === 'd'; $('sdSG').hidden = solve === 's'; $('sdTG').hidden = solve === 't';
+    $('sdWhat').textContent = { s: 'Speed', d: 'Distance', t: 'Time' }[solve];
+    function fail(t) { $('sdOut').textContent = '–'; $('sdF').textContent = ''; $('sdSpeeds').innerHTML = ''; $('sdOther').innerHTML = ''; msg.className = 'msg bad'; msg.textContent = t; }
+    var D, T, S;
+    if (solve !== 'd') { var dv = $('sdD').value; if (dv === '') return fail('Enter the distance.'); D = +dv * f($('sdDU').value, DU)[2]; if (!(+dv > 0) || !isFinite(D)) return fail('Distance must be greater than 0.'); }
+    if (solve !== 't') {
+      var hv = $('sdH').value, mv = $('sdM').value, xv = $('sdX').value;
+      if (hv === '' && mv === '' && xv === '') return fail('Enter the time in hours, minutes or seconds.');
+      var h = +(hv || 0), m = +(mv || 0), x = +(xv || 0);
+      if (h < 0 || m < 0 || x < 0 || !isFinite(h + m + x)) return fail('Time cannot be negative.');
+      T = h * 3600 + m * 60 + x; if (!(T > 0)) return fail('Time must be more than 0.');
+    }
+    if (solve !== 's') { var sv = $('sdS').value; if (sv === '') return fail('Enter the speed.'); if (!(+sv > 0) || !isFinite(+sv)) return fail('Speed must be greater than 0.'); S = toMs(+sv, $('sdSU').value); }
+    if (solve === 's') S = D / T; else if (solve === 'd') D = S * T; else T = D / S;
+    if (!isFinite(S) || !isFinite(D) || !isFinite(T)) return fail('Those numbers are too large or too small to work with.');
+    var du = $('sdDU').value, su = $('sdSU').value, dn = f(du, DU);
+    if (solve === 's') { $('sdOut').textContent = speedTxt(S, su); $('sdF').textContent = 'speed = distance ÷ time'; }
+    if (solve === 'd') { $('sdOut').textContent = nf(D / dn[2]) + ' ' + dn[1].replace(/ \(.*/, '').toLowerCase(); $('sdF').textContent = 'distance = speed × time'; }
+    if (solve === 't') { $('sdOut').textContent = dur(T); $('sdF').textContent = 'time = distance ÷ speed  ·  ' + nf(T / 3600, 4) + ' hours'; }
+    var warn = S > 299792458 ? 'That is faster than light. Check your numbers.' : '';
+    msg.className = 'msg'; msg.textContent = warn;
+    $('sdSpeeds').innerHTML = SU.map(function (u) { return '<tr><td>' + u[1] + '</td><td>' + speedTxt(S, u[0]).replace(/ .*/, '') + '</td></tr>'; }).join('');
+    $('sdOther').innerHTML = DU.map(function (u) { return '<tr><td>' + u[1] + '</td><td>' + nf(D / u[2]) + '</td></tr>'; }).join('') +
+      '<tr><td>Time (h:min:s)</td><td>' + dur(T) + '</td></tr><tr><td>Time in hours</td><td>' + nf(T / 3600, 4) + '</td></tr><tr><td>Time in minutes</td><td>' + nf(T / 60, 2) + '</td></tr>';
+  }
+  ['sdSolve', 'sdD', 'sdDU', 'sdS', 'sdSU', 'sdH', 'sdM', 'sdX'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  calc();
+})();
+</script>

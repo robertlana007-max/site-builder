@@ -2673,5 +2673,265 @@ module.exports = [
       ['Can I edit the text?', 'Yes. The text box is a normal text area: click anywhere to fix words while you dictate or afterwards.']
     ],
     icon: '<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/><path d="M8 21h8"/>'
+  },
+  {
+      slug: 'electricity-bill-calculator', cat: 'Calculators', name: 'Electricity Bill Calculator',
+      title: 'Electricity Bill Calculator - Units to Bill With Slabs',
+      desc: 'Estimate your electricity bill from units (kWh) with a flat rate or your own slab table, plus fixed charges and taxes. Presets for several countries.',
+      card: 'Units (kWh) to bill with slabs, charges and tax.',
+      intro: 'Turn the units on your meter into an estimated bill. Use one flat price or a slab table you can edit, add fixed charges and taxes, and see every line of the breakdown.',
+      steps: ['Pick a preset or keep "My own rates", and choose flat rate or slabs.', 'Enter the units (kWh) you used, or work them out from two meter readings.', 'Add fixed charges and taxes from your bill.', 'Read the estimated total and the line-by-line breakdown.'],
+      faq: [
+        ['Are the preset rates up to date?', 'Presets are examples with the date they were published. Electricity prices change often, so copy the current rates from your bill or your supplier and edit them.'],
+        ['What is a slab or tiered rate?', 'With slabs the price per unit changes with how much you use, for example the first 100 units at one price and the next 100 at a higher price.'],
+        ['What is the "one previous slab benefit"?', 'Units up to the end of the previous slab all pay that slab\'s rate, and only the rest pays the current rate. Some utilities, for example in Pakistan, bill this way.'],
+        ['Why is my real bill different?', 'Bills can include fuel or price adjustments, meter rent, subsidies, late fees and rounding. Add known extras in the charges and tax fields.'],
+        ['Where do I find my units?', 'Your bill shows the units consumed, or subtract the previous meter reading from the current one using the meter readings box.']
+      ],
+      icon: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>'
+  },
+  {
+      slug: 'area-calculator', cat: 'Calculators', name: 'Area Calculator',
+      title: 'Area Calculator - Shapes, Plots and Land Unit Converter',
+      desc: 'Find the area of rectangles, triangles, circles, trapezoids and irregular plots, and convert to m², sq ft, acres, hectares and regional land units.',
+      card: 'Shape and plot area in every land unit.',
+      intro: 'Work out the area of a room, garden or plot of land from its measurements, then see it in metric, imperial and regional land units.',
+      steps: ['Choose the shape, or "I already know the area" to convert units.', 'Pick the length unit and type the measurements.', 'Choose the unit you want for the answer.', 'See the area in every unit in the table below.'],
+      faq: [
+        ['How do I measure an irregular four-sided plot?', 'Measure all four sides and one diagonal between opposite corners. The plot is split into two triangles for an exact area. Without the diagonal you get an estimate.'],
+        ['How big is a marla or kanal?', 'A marla is usually 225 or 272.25 square feet depending on the region, and 1 kanal is 20 marla. Pick the size used where you are.'],
+        ['How big is a bigha?', 'It differs a lot between regions, so type the size used locally. 14,400 square feet is common in Bangladesh, West Bengal and Assam.'],
+        ['How many square feet are in an acre?', '43,560 square feet, which is about 4,047 m² or 0.405 hectares.'],
+        ['Is this good enough for legal documents?', 'It is for planning. For buying, selling or registering land, use an official survey.']
+      ],
+      icon: '<path d="M3 3h18v18H3z"/><path d="M3 9h4M3 15h4M9 3v4M15 3v4"/>'
+  },
+  {
+      slug: 'construction-calculator', cat: 'Calculators', name: 'Construction Material Calculator',
+      title: 'Construction Calculator - Bricks, Cement, Sand and Concrete',
+      desc: 'Estimate bricks, cement bags, sand and crushed stone for walls, concrete slabs and plaster. Metric or imperial, editable mix ratios and wastage.',
+      card: 'Bricks, cement, sand and stone for a job.',
+      intro: 'Estimate how many bricks and how much cement, sand and crushed stone you need for a wall, a concrete slab or plastering, before you buy.',
+      steps: ['Choose metric or imperial and what you are building.', 'Enter the sizes and pick the brick size or concrete mix.', 'Adjust the mix ratio, wastage and bag size if needed.', 'Read the materials list and how it was worked out.'],
+      faq: [
+        ['What is the dry volume factor?', 'A dry mix of cement and sand shrinks when water is added, so you need more dry material than the finished volume: about 1.33 for mortar and plaster and 1.54 for concrete.'],
+        ['Which concrete mix should I use?', '1 : 1.5 : 3 is common for general structural work and 1 : 2 : 4 for floors and footings. Follow your engineer and local rules for anything structural.'],
+        ['How much wastage should I add?', '5–10% is typical for breakage, spills and cutting.'],
+        ['How big is a bag of cement?', '50 kg in most countries and 94 lb in the US. Change the bag size to match yours.'],
+        ['Does it work with concrete blocks?', 'Yes. Choose the concrete block size or type your own block size.']
+      ],
+      icon: '<path d="M3 21h18M5 21V11h14v10M5 11V7h6v4M11 7V3h8v8"/>'
+  },
+  {
+      slug: 'fuel-cost-calculator', cat: 'Calculators', name: 'Fuel Cost Calculator',
+      title: 'Fuel Cost Calculator - Trip Cost and Split Per Person',
+      desc: 'Work out the fuel cost of a trip from distance, fuel economy (km/L, L/100 km or mpg) and price, split it between people. Works for electric cars too.',
+      card: 'Trip fuel cost, split between people.',
+      intro: 'Find out how much fuel a trip needs and what it will cost, in kilometers or miles, liters or gallons, and split the cost between passengers.',
+      steps: ['Enter the distance and choose one way or round trip.', 'Enter your car\'s fuel economy and its unit.', 'Enter the fuel price and choose per liter, gallon or kWh.', 'Read the total cost and the cost per person.'],
+      faq: [
+        ['What is the difference between US and UK mpg?', 'A UK (imperial) gallon is 4.546 liters and a US gallon is 3.785 liters, so the same car shows a higher mpg in the UK.'],
+        ['Does it work for electric cars?', 'Yes. Choose kWh/100 km, km per kWh, miles per kWh or Wh per mile, and enter the price per kWh.'],
+        ['Where do I find my fuel economy?', 'Your car\'s trip computer, the manual, or measure it with the Mileage Calculator.'],
+        ['Does it include tolls or parking?', 'No, only fuel or electricity.']
+      ],
+      icon: '<path d="M4 21V5a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v16M3 21h12M4 10h10M14 8l3 2v7a1.5 1.5 0 0 0 3 0V9l-3-3"/>'
+  },
+  {
+      slug: 'average-calculator', cat: 'Calculators', name: 'Average Calculator',
+      title: 'Average Calculator - Mean, Median, Mode and Ratio',
+      desc: 'Find the mean, median, mode, range and weighted average of a list of numbers. Also simplify ratios, solve proportions and share amounts in a ratio.',
+      card: 'Mean, median, mode and ratio tools.',
+      intro: 'Paste a list of numbers to get the average and other summaries instantly, or switch to the Ratio tab to simplify ratios and solve proportions.',
+      steps: ['Type or paste your numbers, separated by commas, spaces or new lines.', 'Choose Weighted if each value has a weight.', 'Read the mean, median, mode and range.', 'Open the Ratio tab for ratio problems.'],
+      faq: [
+        ['What is the difference between mean, median and mode?', 'The mean is the total divided by the count, the median is the middle value when sorted, and the mode is the value that appears most often.'],
+        ['How is a weighted average worked out?', 'Each value is multiplied by its weight, the results are added, and the total is divided by the sum of the weights.'],
+        ['How do I simplify a ratio with decimals?', 'Type it as it is, for example 1.5:2.25:3. The tool multiplies to remove decimals, then divides by the highest common factor to give 2:3:4.'],
+        ['How do I solve 3:4 = 15:?', 'In "Solve a proportion" fill in 3, 4 and 15 and leave the last box empty. The answer is 20.']
+      ],
+      icon: '<path d="M4 20h16M7 16V9M12 16V5M17 16v-4M3 12h18" />'
+  },
+  {
+      slug: 'speed-distance-time-calculator', cat: 'Calculators', name: 'Speed Distance Time Calculator',
+      title: 'Speed Distance Time Calculator - Solve Any One',
+      desc: 'Find speed, distance or time from the other two, in km/h, mph, m/s, knots or running pace, with every unit converted for you.',
+      card: 'Solve speed, distance or time; pace too.',
+      intro: 'Choose what you want to find, enter the other two values, and get the answer with conversions to every common unit, including running pace.',
+      steps: ['Choose Speed, Distance or Time.', 'Enter the two values you know and pick their units.', 'Read the answer and the conversion tables.'],
+      faq: [
+        ['What is the formula?', 'Speed = distance ÷ time, distance = speed × time, and time = distance ÷ speed.'],
+        ['Can I use running pace?', 'Yes. Choose "pace, min per km" or "pace, min per mile" as the speed unit, and type the pace in minutes (5.5 means 5:30).'],
+        ['How do I convert km/h to mph?', 'Divide by 1.609. The table under the answer shows every unit at once.'],
+        ['What is a knot?', 'One nautical mile (1,852 m) per hour, used at sea and in aviation.']
+      ],
+      icon: '<path d="M12 14l4-4"/><path d="M3.3 17a9 9 0 1 1 17.4 0"/><circle cx="12" cy="14" r="1"/>'
+  },
+  {
+      slug: 'size-converter', cat: 'Calculators', name: 'Size Converter',
+      title: 'Shoe, Clothing and Ring Size Converter - US, UK, EU',
+      desc: 'Convert shoe sizes for men, women and kids, clothing sizes and ring sizes between US, UK, EU, Japan and more, or find your size by measuring.',
+      card: 'Shoe, clothing and ring sizes worldwide.',
+      intro: 'Shopping from another country? Convert shoe, clothing and ring sizes between US, UK, EU, Japan and other systems, or measure to find your size.',
+      steps: ['Choose what you are converting.', 'Pick the size system you know.', 'Choose your size and read the equivalents.', 'Or open "Measure instead" and type your foot length or ring diameter.'],
+      faq: [
+        ['Are size charts the same for every brand?', 'No. Brands differ, so treat this as a guide and check the brand\'s own chart when you can.'],
+        ['How do I measure my foot?', 'Stand on paper, mark the heel and the longest toe, and measure in cm. Measure in the evening and use your longer foot.'],
+        ['How do I measure my ring size?', 'Measure the inside diameter of a ring that fits, in millimeters, or wrap a strip of paper around your finger and measure the circumference.'],
+        ['What do C and Y mean for kids\' shoes?', 'C is child (toddler and little kid) and Y is youth (big kid) in US sizing.']
+      ],
+      icon: '<path d="M3 16c0-2 1-3 3-3l4-1 3-5h3l-1 6c3 0 5 1 5 3v1H3z"/><path d="M3 17v2h18v-2"/>'
+  },
+  {
+      slug: 'gold-weight-converter', cat: 'Calculators', name: 'Gold Weight Converter',
+      title: 'Gold Weight Converter - Grams, Troy Oz, Tola, Baht, Tael',
+      desc: 'Convert gold weight between grams, troy ounces, tola, masha, ratti, baht, tael, mithqal and more. Find pure gold by karat and value at your price.',
+      card: 'Grams, troy oz, tola, baht and karat value.',
+      intro: 'Convert gold and silver weights between international and traditional units, see how much pure gold an item contains, and value it at a price you enter.',
+      steps: ['Type the weight and choose its unit.', 'Read it in every other unit.', 'Choose the karat to see the pure gold content.', 'Optionally type a price to estimate the value.'],
+      faq: [
+        ['Is a troy ounce the same as an ounce?', 'No. Gold is priced in troy ounces of 31.1035 g. An ordinary (avoirdupois) ounce is 28.35 g.'],
+        ['How many grams is a tola?', '11.6638 grams. 1 tola = 12 masha = 96 ratti.'],
+        ['What is the difference between karat and carat?', 'Karat (K) measures gold purity, 24K being pure. Carat (ct) is a weight for gemstones, 0.2 g.'],
+        ['Does it show live gold prices?', 'No. Type today\'s price from your jeweler, bank or a market website.'],
+        ['How heavy is a baht or tael?', 'A Thai baht of gold is 15.244 g. A tael is 37.429 g in Hong Kong, 37.5 g in Taiwan and Vietnam, and 50 g in mainland China.']
+      ],
+      icon: '<path d="M3 18l3-7h12l3 7z"/><path d="M8 11l2-5h4l2 5"/>'
+  },
+  {
+      slug: 'mileage-calculator', cat: 'Calculators', name: 'Mileage Calculator',
+      title: 'Mileage Calculator - Fuel Average km/L, L/100km, MPG',
+      desc: 'Work out your car\'s real fuel average from odometer readings and fuel filled, in km/L, L/100 km and mpg, and keep a log of fill-ups.',
+      card: 'Real fuel average from odometer and fill-ups.',
+      intro: 'Measure your car or bike\'s real fuel economy with the full-tank method, and log several fill-ups to see your average, best and worst.',
+      steps: ['Fill the tank to full and note the odometer.', 'Next time, fill to full again and note the odometer and fuel added.', 'Enter both readings and the fuel to see your average.', 'Add each fill-up to the log to track it over time.'],
+      faq: [
+        ['What is the full-tank method?', 'Fill to full, drive, then fill to full again. The fuel added the second time is exactly what you used for the distance driven.'],
+        ['Why does my average change between fill-ups?', 'City driving, traffic, air conditioning, load and how full the pump stops all change it. An average over several fill-ups is more reliable.'],
+        ['Is my log saved?', 'It stays in this browser on this device if remembering inputs is on in Settings. It is never uploaded.'],
+        ['How do I convert km/L to L/100 km?', 'Divide 100 by the km/L figure. 15 km/L is 6.67 L/100 km.']
+      ],
+      icon: '<circle cx="12" cy="13" r="8"/><path d="M12 13l4-4M8 21h8"/>'
+  },
+  {
+      slug: 'unit-price-comparer', cat: 'Calculators', name: 'Unit Price Comparer',
+      title: 'Unit Price Calculator - Compare Price per kg, L or Item',
+      desc: 'Compare products of different sizes to find the cheapest per kg, 100 g, liter, ounce or item. Handles multipacks and mixed units.',
+      card: 'Which pack is cheapest per kg, L or item?',
+      intro: 'Big pack or small pack? Enter the price and size of each product and see which is the best value per kilogram, liter, ounce or item.',
+      steps: ['Enter the price and size of each product.', 'Pick the unit and the number of packs if it is a multipack.', 'Choose what to compare per (kg, 100 g, L, item).', 'The best value is highlighted.'],
+      faq: [
+        ['Can I compare grams with kilograms?', 'Yes. Mix any weight units, any volume units, or any length units. Everything is converted first.'],
+        ['Can I compare weight with volume?', 'No, because that depends on the product\'s density. Those products are marked so you can change the unit.'],
+        ['How do multipacks work?', 'Type the size of one pack and the number of packs, for example 6 × 250 g.'],
+        ['Is the biggest pack always cheapest?', 'Not always. Offers and small packs on sale often beat bulk sizes, which is why it helps to check.']
+      ],
+      icon: '<path d="M20 12l-8 8-9-9V3h8z"/><circle cx="7.5" cy="7.5" r="1.5"/>'
+  },
+  {
+      slug: 'solar-panel-calculator', cat: 'Calculators', name: 'Solar Panel Calculator',
+      title: 'Solar Panel Calculator - Panels, Battery and Inverter Size',
+      desc: 'Size a solar system from your bill or appliances: number of panels, kW, battery kWh and Ah, inverter and charge controller, using your sun hours.',
+      card: 'Panels, battery and inverter for your use.',
+      intro: 'Estimate the solar system you need: how many panels, how big a battery bank and inverter, and how much energy and money it could save.',
+      steps: ['Enter your monthly kWh, daily kWh, or list your appliances.', 'Enter your peak sun hours, or pick a rough guide for your region.', 'Set panel size, battery share and battery type.', 'Read the panels, battery, inverter and yearly production.'],
+      faq: [
+        ['What are peak sun hours?', 'The day\'s sunlight counted as hours of full-strength sun (1,000 W per m²). Most places get 2.5–6.5 on a yearly average.'],
+        ['Why add system losses?', 'Heat, dust, wiring, the inverter and battery all waste some energy. 15–25% is typical.'],
+        ['Do I need batteries?', 'Only if you want power at night or during outages. For a grid-tied system without backup, set the battery share to 0.'],
+        ['Which battery voltage should I choose?', '12 V suits very small systems. 24 V or 48 V is better for homes because the current and cable sizes are lower.'],
+        ['Is this enough to buy a system?', 'It is a first estimate. Get a site survey from a qualified installer who checks shade, roof direction and local rules.']
+      ],
+      icon: '<rect x="3" y="11" width="18" height="10" rx="1"/><path d="M3 16h18M9 11v10M15 11v10M12 2v3M5.6 4.6l1.4 1.4M18.4 4.6L17 6"/>'
+  },
+  {
+      slug: 'ups-battery-backup-calculator', cat: 'Calculators', name: 'UPS Battery Backup Calculator',
+      title: 'UPS Battery Backup Calculator - Backup Time and Inverter Size',
+      desc: 'Find how long a UPS or inverter battery will last from its Ah, voltage and your load in watts, the battery size for a target time, and inverter VA.',
+      card: 'Battery backup hours and UPS/inverter size.',
+      intro: 'Work out how many hours your UPS or inverter battery will run your devices, what battery you need for a target time, and what VA rating to buy.',
+      steps: ['Enter the battery voltage, Ah and how many batteries you have.', 'Choose the battery type and inverter efficiency.', 'Enter your total load in watts, or add devices.', 'Read the backup time, battery needed and inverter size.'],
+      faq: [
+        ['How is backup time calculated?', 'Backup hours = battery volts × Ah × usable share × inverter efficiency ÷ load in watts.'],
+        ['Why only 50% for lead-acid batteries?', 'Draining lead-acid batteries deeper shortens their life a lot. Lithium (LiFePO4) batteries can safely use about 90%.'],
+        ['What is the difference between VA and watts?', 'VA is apparent power. Watts = VA × power factor, usually about 0.8 for UPS ratings.'],
+        ['Series or parallel?', 'Series adds the voltages (two 12 V make 24 V); parallel adds the Ah. The stored energy is the same either way.']
+      ],
+      icon: '<rect x="2" y="7" width="18" height="12" rx="2"/><path d="M22 11v4M7 13h3M8.5 11.5v3M13 13h3"/>'
+  },
+  {
+      slug: 'appliance-energy-cost-calculator', cat: 'Calculators', name: 'Appliance Energy Cost Calculator',
+      title: 'Appliance Energy Cost Calculator - kWh and Running Cost',
+      desc: 'List your appliances with watts and hours to see kWh and running cost per day, month and year, and which appliance uses the most electricity.',
+      card: 'kWh and running cost of each appliance.',
+      intro: 'Find out what each appliance costs to run. Add your devices with their watts and hours, enter your price per kWh, and see the daily, monthly and yearly cost.',
+      steps: ['Enter your electricity price per kWh and currency.', 'Add appliances with watts, how many and hours a day.', 'Use quick-add buttons for common devices.', 'Read the cost per day, month and year, and the biggest user.'],
+      faq: [
+        ['How is the cost worked out?', 'kWh = watts × hours ÷ 1,000. Cost = kWh × your price per kWh.'],
+        ['Where do I find the watts?', 'On the label or rating plate, usually on the back or bottom, or in the manual.'],
+        ['Why does my fridge or AC use less than shown?', 'They switch on and off by themselves, so they often run only 30–60% of the time. Lower the hours to match.'],
+        ['Is my list saved?', 'It stays in this browser if remembering inputs is on in Settings. Nothing is uploaded.']
+      ],
+      icon: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>'
+  },
+  {
+      slug: 'date-calculator', cat: 'Time tools', name: 'Date Calculator',
+      title: 'Date Calculator - Add or Subtract Days, Weeks, Months',
+      desc: 'Add or subtract days, weeks, months and years from any date and see the resulting date and weekday. Optional working-days-only counting.',
+      card: 'Add or subtract days, weeks, months, years.',
+      intro: 'Find the date that is a number of days, weeks, months or years before or after another date, with the weekday and ISO week number.',
+      steps: ['Pick the start date (today is filled in).', 'Choose Add or Subtract.', 'Type the years, months, weeks and days.', 'Read the result date and its weekday.'],
+      faq: [
+        ['What happens with 31 January plus 1 month?', 'February has no 31st, so the last day of February is used (28 or 29). The tool tells you when this happens.'],
+        ['In what order is it added?', 'Years and months first, then weeks and days. This matches how most people and spreadsheets count.'],
+        ['Can I count only working days?', 'Yes. Tick the working days option and weeks and days skip Saturdays and Sundays. For other weekends or holidays use the Working Days Calculator.'],
+        ['Can I use negative numbers?', 'Yes. A negative number moves the other way, so Add with -3 days is the same as Subtract 3 days.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M12 13v5M9.5 15.5h5"/>'
+  },
+  {
+      slug: 'working-days-calculator', cat: 'Time tools', name: 'Working Days Calculator',
+      title: 'Working Days Calculator - Business Days Between Dates',
+      desc: 'Count working days between two dates with your own weekend days (Sat-Sun, Fri-Sat and more) and a holiday list. Also add business days to a date.',
+      card: 'Business days between dates, any weekend.',
+      intro: 'Count the business days between two dates for deadlines, payroll and leave. Choose which days are your weekend and paste your public holidays.',
+      steps: ['Pick the start and end dates.', 'Choose your weekend days.', 'Paste holidays, one date per line (optional).', 'Read the working days, or add working days to a date below.'],
+      faq: [
+        ['Are the start and end dates counted?', 'Both are counted by default, like the NETWORKDAYS function in spreadsheets. Untick either box to leave it out.'],
+        ['My weekend is Friday and Saturday. Can I use that?', 'Yes. Choose it from the Weekend list or tick any days you like.'],
+        ['Which holidays are included?', 'Only the ones you type. Public holidays differ by country and region, so paste your own list.'],
+        ['What if a holiday falls on a weekend?', 'It is not subtracted twice. If your employer gives a replacement day off, add that day to the list.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18M8 15l2 2 4-4"/>'
+  },
+  {
+      slug: 'time-calculator', cat: 'Time tools', name: 'Time Calculator',
+      title: 'Time Calculator - Add Hours, Minutes and Timesheets',
+      desc: 'Add and subtract hours, minutes and seconds, total a timesheet with breaks and overnight shifts, and convert between decimal hours and h:mm.',
+      card: 'Add times, timesheets and decimal hours.',
+      intro: 'Add or subtract lengths of time, total the hours on a timesheet, and convert hours and minutes to decimal hours for payroll.',
+      steps: ['Type hours, minutes and seconds on each line; choose − to subtract.', 'Fill in start, end and break for each day in the timesheet.', 'Use the converter to switch between 7:45 and 7.75 hours.'],
+      faq: [
+        ['How do I convert minutes to decimal hours?', 'Divide the minutes by 60. 45 minutes is 0.75 hours, so 7:45 is 7.75 hours.'],
+        ['Does the timesheet handle night shifts?', 'Yes. If the end time is earlier than the start time, the shift is counted as running past midnight.'],
+        ['Can I type more than 59 minutes?', 'Yes. 90 minutes is counted as 1 hour 30 minutes.'],
+        ['Can it work out pay?', 'Yes. Type your hourly rate under the timesheet to see the pay for the total hours.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2M17 3l2 2M7 3L5 5"/>'
+  },
+  {
+      slug: 'lcm-hcf-calculator', cat: 'Study tools', name: 'LCM and HCF Calculator',
+      title: 'LCM and HCF Calculator With Steps - GCD and Primes',
+      desc: 'Find the LCM and HCF (GCD) of two or more numbers with prime factor and Euclid steps. Includes a prime number checker and prime factorization.',
+      card: 'LCM, HCF/GCD with steps, prime checker.',
+      intro: 'Get the lowest common multiple and highest common factor of any whole numbers, with the working shown two ways, plus a prime checker.',
+      steps: ['Type two or more whole numbers.', 'Read the HCF (GCD) and LCM.', 'Follow the prime factor and Euclid steps below.', 'Check whether a number is prime and see its factors.'],
+      faq: [
+        ['Are HCF and GCD the same?', 'Yes. Highest common factor (HCF), greatest common divisor (GCD) and greatest common factor (GCF) all mean the same thing.'],
+        ['How is the LCM found?', 'With prime factors, take every prime with its largest power. Or use LCM(a, b) = a × b ÷ HCF(a, b), one number at a time.'],
+        ['How big can the numbers be?', 'Up to 9,007,199,254,740,991. The LCM itself can be much larger and is shown exactly.'],
+        ['Is 1 a prime number?', 'No. A prime has exactly two factors, 1 and itself. 1 has only one factor.']
+      ],
+      icon: '<path d="M9 4L7 20M17 4l-2 16M4 9h16M3 15h16"/>'
   }
 ];

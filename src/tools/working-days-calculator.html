@@ -1,0 +1,127 @@
+<style>
+.wd-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; margin: 6px 0 16px; }
+.wd-days label { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 0; padding: 8px 2px; border: 1px solid var(--line); border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; }
+.wd-days label:has(input:checked) { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
+.wd-ta { min-height: 110px; font-family: var(--mono); font-size: 14px; }
+.wd-note { font-size: 14px; color: var(--muted); margin: 4px 0 12px; }
+.wd-big { font-size: clamp(20px, 4vw, 26px); font-weight: 800; margin: 10px 0 0; overflow-wrap: anywhere; }
+</style>
+<div class="fields">
+  <div><label for="wdA">Start date</label><input type="date" id="wdA"></div>
+  <div><label for="wdB">End date</label><input type="date" id="wdB"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="wdIncA" checked>Count the start date</label>
+  <label><input type="checkbox" id="wdIncB" checked>Count the end date</label>
+</div>
+<div class="fields">
+  <div><label for="wdPre">Weekend</label><select id="wdPre">
+    <option value="06">Saturday and Sunday</option>
+    <option value="56">Friday and Saturday</option>
+    <option value="5">Friday only</option>
+    <option value="0">Sunday only</option>
+    <option value="6">Saturday only</option>
+    <option value="">No weekend</option>
+    <option value="c">Custom (tick below)</option>
+  </select></div>
+</div>
+<div class="wd-days" id="wdDays" role="group" aria-label="Weekend days"></div>
+<label for="wdHol">Holidays and days off <small>(one date per line, a name after it is fine)</small></label>
+<textarea id="wdHol" class="wd-ta" data-nomemo spellcheck="false" placeholder="2026-12-25 Christmas&#10;2027-01-01 New Year&#10;25/12/2026"></textarea>
+<p class="wd-note">Write dates as 2026-12-25, 25/12/2026 (day first) or 25 Dec 2026. Holidays that fall on a weekend are not subtracted twice.</p>
+<div class="stats">
+  <div class="stat"><span>Working days</span><b id="wdWork">–</b></div>
+  <div class="stat"><span>Calendar days</span><b id="wdCal">–</b></div>
+  <div class="stat"><span>Weekend days</span><b id="wdWe">–</b></div>
+  <div class="stat"><span>Holidays on working days</span><b id="wdHo">–</b></div>
+  <div class="stat"><span>Working hours</span><b id="wdHrs">–</b></div>
+</div>
+<div class="fields" style="margin-top:12px"><div><label for="wdHpd">Hours per working day</label><input type="number" id="wdHpd" min="0" max="24" step="any" value="8" inputmode="decimal"></div></div>
+<p class="msg" id="wdMsg"></p>
+
+<h3>Add working days to a date</h3>
+<div class="fields">
+  <div><label for="wdS2">Start date</label><input type="date" id="wdS2"></div>
+  <div><label for="wdN">Working days to add <small>(negative to go back)</small></label><input type="number" id="wdN" step="1" value="10" inputmode="numeric"></div>
+</div>
+<p class="wd-big" id="wdOut2">–</p>
+<p class="msg" id="wdMsg2">Uses the same weekend and holidays as above. The start date itself is not counted.</p>
+<script>
+(function () {
+  var DAY = 86400000, NAMES = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MON = { jan: 0, feb: 1, mar: 2, apr: 3, may: 4, jun: 5, jul: 6, aug: 7, sep: 8, oct: 9, nov: 10, dec: 11 };
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function utc(y, m, d) { var t = new Date(Date.UTC(2000, 0, 1)); t.setUTCFullYear(y, m, d); return (t.getUTCFullYear() === y && t.getUTCMonth() === m && t.getUTCDate() === d) ? t.getTime() : NaN; }
+  function fromInput(v) { var p = /^(\d{4,6})-(\d\d)-(\d\d)$/.exec(v); return p ? utc(+p[1], +p[2] - 1, +p[3]) : NaN; }
+  function today() { var n = new Date(); return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate()); }
+  function loc() { try { return navigator.language || 'en-US'; } catch (e) { return 'en-US'; } }
+  // weekend checkboxes
+  $('wdDays').innerHTML = [1, 2, 3, 4, 5, 6, 0].map(function (d) { return '<label><input type="checkbox" id="wdK' + d + '"' + (d === 0 || d === 6 ? ' checked' : '') + '>' + NAMES[d] + '</label>'; }).join('');
+  function weekend() { var w = {}; for (var d = 0; d < 7; d++) if ($('wdK' + d).checked) w[d] = 1; return w; }
+  function parseHol(text) {
+    var set = {}, bad = [];
+    text.split(/\n/).forEach(function (line, i) {
+      var s = line.trim(); if (!s) return;
+      var m, t = NaN;
+      if ((m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/.exec(s))) t = utc(+m[1], +m[2] - 1, +m[3]);
+      else if ((m = /^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})/.exec(s))) t = utc(+m[3], +m[2] - 1, +m[1]);
+      else if ((m = /^(\d{1,2})\s+([a-z]{3})[a-z]*\.?,?\s+(\d{4})/i.exec(s)) && MON[m[2].toLowerCase()] != null) t = utc(+m[3], MON[m[2].toLowerCase()], +m[1]);
+      else if ((m = /^([a-z]{3})[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i.exec(s)) && MON[m[1].toLowerCase()] != null) t = utc(+m[3], MON[m[1].toLowerCase()], +m[2]);
+      if (isNaN(t)) bad.push(i + 1); else set[t] = 1;
+    });
+    return { set: set, bad: bad };
+  }
+  var syncing = false;
+  function fromPreset() {
+    var v = $('wdPre').value; if (v === 'c') return;
+    syncing = true; for (var d = 0; d < 7; d++) $('wdK' + d).checked = v.indexOf(String(d)) > -1; syncing = false;
+  }
+  function count(a, b, we, hol) { // inclusive range of day timestamps
+    var n = b >= a ? Math.round((b - a) / DAY) + 1 : 0, full = Math.floor(n / 7), wkPerWeek = Object.keys(we).length;
+    var weCount = full * wkPerWeek, dow = new Date(a).getUTCDay();
+    for (var i = 0; i < n % 7; i++) if (we[(dow + full * 7 + i) % 7]) weCount++;
+    var ho = 0; for (var k in hol) { var t = +k; if (t >= a && t <= b && !we[new Date(t).getUTCDay()]) ho++; }
+    return { cal: n, we: weCount, ho: ho, work: n - weCount - ho };
+  }
+  function calc() {
+    var msg = $('wdMsg'), ids = ['wdWork', 'wdCal', 'wdWe', 'wdHo', 'wdHrs'];
+    var we = weekend(), H = parseHol($('wdHol').value), notes = [];
+    if (H.bad.length) notes.push('Could not read the holiday on line ' + H.bad.slice(0, 5).join(', ') + (H.bad.length > 5 ? '…' : '') + '. Use a format like 2026-12-25.');
+    if (Object.keys(we).length === 7) { ids.forEach(function (i) { $(i).textContent = '–'; }); msg.className = 'msg bad'; msg.textContent = 'Every day is ticked as a weekend, so there are no working days. Untick at least one day.'; calc2(we, H.set); return; }
+    var a = fromInput($('wdA').value), b = fromInput($('wdB').value);
+    if (isNaN(a) || isNaN(b)) { ids.forEach(function (i) { $(i).textContent = '–'; }); msg.className = 'msg'; msg.textContent = 'Pick a start and an end date.'; calc2(we, H.set); return; }
+    var sw = a > b; if (sw) { var x = a; a = b; b = x; notes.push('The end date is before the start date, so they were swapped.'); }
+    if ((b - a) / DAY > 3660000) { ids.forEach(function (i) { $(i).textContent = '–'; }); msg.className = 'msg bad'; msg.textContent = 'That range is over 10,000 years. Please pick closer dates.'; return; }
+    var from = a + ($('wdIncA').checked ? 0 : DAY), to = b - ($('wdIncB').checked ? 0 : DAY);
+    var r = from <= to ? count(from, to, we, H.set) : { cal: 0, we: 0, ho: 0, work: 0 };
+    $('wdWork').textContent = fmtNum(r.work); $('wdCal').textContent = fmtNum(r.cal); $('wdWe').textContent = fmtNum(r.we); $('wdHo').textContent = fmtNum(r.ho);
+    var h = +$('wdHpd').value; $('wdHrs').textContent = $('wdHpd').value === '' || !(h >= 0) || h > 24 ? '–' : fmtNum(r.work * h);
+    if ($('wdHpd').value !== '' && (!(h >= 0) || h > 24)) notes.push('Hours per day must be between 0 and 24.');
+    msg.className = notes.length && /Could not|must/.test(notes.join()) ? 'msg bad' : 'msg'; msg.textContent = notes.join(' ');
+    calc2(we, H.set);
+  }
+  function calc2(we, hol) {
+    var s = fromInput($('wdS2').value), raw = $('wdN').value, n = +raw, out = $('wdOut2'), m = $('wdMsg2');
+    m.className = 'msg'; m.textContent = 'Uses the same weekend and holidays as above. The start date itself is not counted.';
+    if (isNaN(s) || raw === '') { out.textContent = '–'; return; }
+    if (Math.floor(n) !== n || Math.abs(n) > 100000) { out.textContent = '–'; m.className = 'msg bad'; m.textContent = 'Enter a whole number of working days up to 100,000.'; return; }
+    if (Object.keys(we).length === 7) { out.textContent = '–'; return; }
+    var t = s, left = Math.abs(n), step = n < 0 ? -DAY : DAY, guard = 0;
+    while (left > 0 && guard++ < 5e6) { t += step; if (!we[new Date(t).getUTCDay()] && !hol[t]) left--; }
+    var d = new Date(t);
+    out.textContent = d.toLocaleDateString(loc(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' });
+  }
+  $('wdPre').addEventListener('change', function () { fromPreset(); calc(); });
+  $('wdDays').addEventListener('change', function () {
+    if (syncing) return;
+    var key = ''; for (var d = 0; d < 7; d++) if ($('wdK' + d).checked) key += d;
+    $('wdPre').value = $('wdPre').querySelector('option[value="' + key + '"]') ? key : 'c';
+    calc();
+  });
+  var t0 = today(), n = new Date(); $('wdA').value = t0; $('wdS2').value = t0;
+  $('wdB').value = n.getFullYear() + '-12-31';
+  ['wdA', 'wdB', 'wdIncA', 'wdIncB', 'wdHol', 'wdHpd', 'wdS2', 'wdN'].forEach(function (id) { $(id).addEventListener('input', calc); });
+  setTimeout(calc, 0);
+  calc();
+})();
+</script>

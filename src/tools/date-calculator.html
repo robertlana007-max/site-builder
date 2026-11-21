@@ -1,0 +1,99 @@
+<style>
+.dc-big { font-size: clamp(20px, 4vw, 26px); font-weight: 800; margin: 16px 0 4px; overflow-wrap: anywhere; }
+.dc-sub { color: var(--muted); margin: 0 0 6px; font-size: 15px; }
+.dc-op { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.dc-qk { display: flex; flex-wrap: wrap; gap: 6px; margin: -4px 0 14px; }
+.dc-qk .btn { min-height: 36px; padding: 5px 12px; font-size: 14px; }
+</style>
+<div class="fields">
+  <div><label for="dcStart">Start date</label><input type="date" id="dcStart"></div>
+  <div><label for="dcOp">Add or subtract</label><select id="dcOp"><option value="1">Add (+)</option><option value="-1">Subtract (−)</option></select></div>
+</div>
+<div class="fields">
+  <div><label for="dcY">Years</label><input type="number" id="dcY" step="1" value="0" inputmode="numeric"></div>
+  <div><label for="dcM">Months</label><input type="number" id="dcM" step="1" value="0" inputmode="numeric"></div>
+  <div><label for="dcW">Weeks</label><input type="number" id="dcW" step="1" value="0" inputmode="numeric"></div>
+  <div><label for="dcD">Days</label><input type="number" id="dcD" step="1" value="30" inputmode="numeric"></div>
+</div>
+<div class="dc-qk" aria-label="Quick picks">
+  <button type="button" class="btn ghost" data-q="0,0,0,7">+7 days</button>
+  <button type="button" class="btn ghost" data-q="0,0,0,30">+30 days</button>
+  <button type="button" class="btn ghost" data-q="0,0,0,90">+90 days</button>
+  <button type="button" class="btn ghost" data-q="0,6,0,0">+6 months</button>
+  <button type="button" class="btn ghost" data-q="1,0,0,0">+1 year</button>
+  <button type="button" class="btn ghost" id="dcToday">Start = today</button>
+</div>
+<div class="checks"><label><input type="checkbox" id="dcBiz">Count weeks and days as working days only (skip Saturday and Sunday)</label></div>
+<p class="dc-sub">Result date</p>
+<p class="dc-big" id="dcOut" aria-live="polite">–</p>
+<div class="stats">
+  <div class="stat"><span>Weekday</span><b id="dcWd">–</b></div>
+  <div class="stat"><span>Date (YYYY-MM-DD)</span><b id="dcIso">–</b></div>
+  <div class="stat"><span>Calendar days apart</span><b id="dcDays">–</b></div>
+  <div class="stat"><span>Start date was a</span><b id="dcSWd">–</b></div>
+  <div class="stat"><span>Week number (ISO)</span><b id="dcWk">–</b></div>
+</div>
+<p class="msg" id="dcMsg"></p>
+<div class="btns"><button type="button" class="btn ghost" id="dcCopy">Copy result</button></div>
+<script>
+(function () {
+  var DAY = 86400000;
+  function parse(v) { var p = /^(\d{1,6})-(\d\d)-(\d\d)$/.exec(v); return p ? { y: +p[1], m: +p[2] - 1, d: +p[3] } : null; }
+  function mk(y, m, d) { var t = new Date(Date.UTC(2000, 0, 1)); t.setUTCFullYear(y, m, d); return t; } // works for years below 100 too
+  function dim(y, m) { return mk(y, m + 1, 0).getUTCDate(); }
+  function pad(n, w) { return String(n).padStart(w || 2, '0'); }
+  function iso(t) { return pad(t.getUTCFullYear(), 4) + '-' + pad(t.getUTCMonth() + 1) + '-' + pad(t.getUTCDate()); }
+  function loc() { try { return navigator.language || 'en-US'; } catch (e) { return 'en-US'; } }
+  function longDate(t) { return t.toLocaleDateString(loc(), { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); }
+  function wd(t) { return t.toLocaleDateString(loc(), { weekday: 'long', timeZone: 'UTC' }); }
+  function isoWeek(t) { var d = mk(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()), w = (d.getUTCDay() + 6) % 7; d.setUTCDate(d.getUTCDate() - w + 3); var y = d.getUTCFullYear(), f = mk(y, 0, 4); return Math.round((d - f) / DAY / 7 - ((f.getUTCDay() + 6) % 7 - 3) / 7) + 1 + ' (' + y + ')'; }
+  function today() { var n = new Date(); return n.getFullYear() + '-' + pad(n.getMonth() + 1) + '-' + pad(n.getDate()); }
+  $('dcStart').value = today();
+  var ids = ['dcWd', 'dcIso', 'dcDays', 'dcSWd', 'dcWk'], last = '';
+  function calc() {
+    var msg = $('dcMsg'), s = parse($('dcStart').value);
+    function fail(t) { $('dcOut').textContent = '–'; ids.forEach(function (i) { $(i).textContent = '–'; }); msg.className = 'msg bad'; msg.textContent = t; last = ''; }
+    if (!s) return fail('Pick a start date.');
+    var v = {}, bad = '';
+    [['dcY', 'years', 10000], ['dcM', 'months', 120000], ['dcW', 'weeks', 520000], ['dcD', 'days', 3650000]].forEach(function (f) {
+      var raw = $(f[0]).value, x = raw === '' ? 0 : +raw;
+      if (!isFinite(x) || Math.floor(x) !== x) bad = bad || 'Use whole numbers for ' + f[1] + ' (no decimals).';
+      else if (Math.abs(x) > f[2]) bad = bad || 'That many ' + f[1] + ' goes past the calendar this tool supports.';
+      v[f[1]] = x;
+    });
+    if (bad) return fail(bad);
+    var sign = +$('dcOp').value, start = mk(s.y, s.m, s.d);
+    // 1) years and months, keeping the day but clamping it to the length of the new month
+    var tm = s.y * 12 + s.m + sign * (v.years * 12 + v.months), ny = Math.floor(tm / 12), nm = tm - ny * 12;
+    var day = Math.min(s.d, dim(ny, nm)), clamped = day !== s.d;
+    var t = mk(ny, nm, day);
+    // 2) weeks and days
+    var addDays = sign * (v.weeks * 7 + v.days);
+    if ($('dcBiz').checked) {
+      var left = Math.abs(addDays), step = addDays < 0 ? -1 : 1;
+      if (left > 200000) return fail('Working-day mode supports up to 200,000 days.');
+      while (left > 0) { t = new Date(t.getTime() + step * DAY); var g = t.getUTCDay(); if (g !== 0 && g !== 6) left--; }
+    } else t = new Date(t.getTime() + addDays * DAY);
+    if (isNaN(t) || t.getUTCFullYear() < 1 || t.getUTCFullYear() > 275000) return fail('The result is outside the supported calendar range.');
+    $('dcOut').textContent = wd(t) + ', ' + longDate(t);
+    $('dcWd').textContent = wd(t);
+    $('dcIso').textContent = iso(t);
+    var diff = Math.round((t - start) / DAY);
+    $('dcDays').textContent = (diff > 0 ? '+' : diff < 0 ? '−' : '') + fmtNum(Math.abs(diff));
+    $('dcSWd').textContent = wd(start);
+    $('dcWk').textContent = isoWeek(t);
+    var notes = [];
+    if (clamped) notes.push('The start day (' + s.d + ') does not exist in the new month, so the last day of that month (' + day + ') was used before adding weeks and days.');
+    if (t.getUTCFullYear() < 1583) notes.push('Dates before 1583 use today\'s (Gregorian) calendar rules, which may differ from historical records.');
+    msg.className = 'msg'; msg.textContent = notes.join(' ');
+    last = longDate(start) + ' ' + (sign > 0 ? '+' : '−') + ' ' + [v.years && v.years + ' years', v.months && v.months + ' months', v.weeks && v.weeks + ' weeks', v.days && v.days + ($('dcBiz').checked ? ' working days' : ' days')].filter(Boolean).join(', ') + ' = ' + wd(t) + ', ' + longDate(t);
+  }
+  ['dcStart', 'dcOp', 'dcY', 'dcM', 'dcW', 'dcD', 'dcBiz'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  document.querySelectorAll('.dc-qk [data-q]').forEach(function (b) {
+    b.addEventListener('click', function () { var q = b.dataset.q.split(','); $('dcY').value = q[0]; $('dcM').value = q[1]; $('dcW').value = q[2]; $('dcD').value = q[3]; $('dcOp').value = '1'; $('dcD').dispatchEvent(new Event('input', { bubbles: true })); });
+  });
+  $('dcToday').addEventListener('click', function () { $('dcStart').value = today(); $('dcStart').dispatchEvent(new Event('input', { bubbles: true })); });
+  $('dcCopy').addEventListener('click', function () { if (last) copyText(last, this); });
+  calc();
+})();
+</script>
