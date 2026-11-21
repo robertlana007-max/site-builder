@@ -7,6 +7,14 @@
 .sp-tbl .sp-x { min-height: 36px; padding: 4px 10px; }
 .sp-res .stat small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
 .sp-note { font-size: 14px; color: var(--muted); }
+@media (max-width: 600px) {
+  .sp-tbl thead { display: none; }
+  .sp-tbl tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; padding: 10px 0; border-bottom: 1px solid var(--line); position: relative; }
+  .sp-tbl td { border: 0; padding: 0 !important; min-width: 0 !important; text-align: start !important; }
+  .sp-tbl td[data-l]::before { content: attr(data-l); display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+  .sp-tbl td:first-child { grid-column: 1 / -1; padding-inline-end: 50px !important; }
+  .sp-tbl td:last-child { position: absolute; top: 10px; inset-inline-end: 0; }
+}
 </style>
 <h3 style="margin-top:0">1. How much electricity do you use?</h3>
 <div class="fields">
@@ -15,7 +23,7 @@
   <div class="sp-g" id="spDayG" hidden><label for="spDay">kWh per day</label><input type="number" id="spDay" min="0" step="any" value="12" inputmode="decimal"></div>
 </div>
 <div class="sp-g" id="spListG" hidden>
-  <div class="scroll-x"><table class="sched sp-tbl"><thead><tr><th>Appliance</th><th>Watts</th><th>How many</th><th>Hours a day</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody id="spRows"></tbody></table></div>
+  <div class="scroll-x"><table class="sched sp-tbl"><thead><tr><th>Appliance</th><th>Watts</th><th>How many</th><th>Hours a day</th><th aria-label="Remove"></th></tr></thead><tbody id="spRows"></tbody></table></div>
   <div class="btns"><button type="button" class="btn ghost" id="spAdd">Add appliance</button></div>
 </div>
 
@@ -62,6 +70,7 @@
 </div>
 <script>
 (function () {
+  function num(n, d) { return Number(n).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); }
   var INV = [1, 1.5, 2, 3, 3.6, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50];
   var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
   var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
@@ -75,7 +84,7 @@
   function draw() {
     $('spRows').innerHTML = rows.map(function (r, i) {
       var f = function (k, lab, x) { return '<input ' + (k === 'n' ? 'type="text" maxlength="50" autocomplete="off"' : 'type="number" min="0" step="any" inputmode="decimal"') + ' data-nomemo data-i="' + i + '" data-k="' + k + '" aria-label="' + lab + '" value="' + esc(r[k]) + '"' + (x || '') + '>'; };
-      return '<tr><td class="sp-name">' + f('n', 'Appliance') + '</td><td class="sp-n">' + f('w', 'Watts') + '</td><td class="sp-n">' + f('q', 'How many') + '</td><td class="sp-n">' + f('h', 'Hours a day', ' max="24"') + '</td><td><button type="button" class="btn ghost sp-x" data-del="' + i + '" aria-label="Remove">✕</button></td></tr>';
+      return '<tr><td class="sp-name" data-l="Appliance">' + f('n', 'Appliance') + '</td><td class="sp-n" data-l="Watts">' + f('w', 'Watts') + '</td><td class="sp-n" data-l="How many">' + f('q', 'How many') + '</td><td class="sp-n" data-l="Hours a day">' + f('h', 'Hours a day', ' max="24"') + '</td><td><button type="button" class="btn ghost sp-x" data-del="' + i + '" aria-label="Remove">✕</button></td></tr>';
     }).join('');
     calc();
   }
@@ -113,14 +122,14 @@
     var inv = peak * 1.25 / 1000, invPick = INV.filter(function (s) { return s >= inv; })[0];
     var cc = real * 1000 / bv * 1.25;
     var st = [
-      ['Daily use', fmtNum(daily, 2) + ' kWh', fmtNum(daily * 365 / 12, 0) + ' kWh a month'],
-      ['Solar array', fmtNum(real, 2) + ' kW', 'needs at least ' + fmtNum(kWp, 2) + ' kW'],
-      ['Panels', panels + ' × ' + fmtNum(pw, 0) + ' W', 'roof space about ' + fmtNum(area, 0) + ' m² (' + fmtNum(area * 10.7639, 0) + ' sq ft)'],
-      ['Yearly production', fmtNum(yearly, 0) + ' kWh', 'about ' + fmtNum(yearly / 12, 0) + ' kWh a month']
+      ['Daily use', num(daily, 2) + ' kWh', num(daily * 365 / 12, 0) + ' kWh a month'],
+      ['Solar array', num(real, 2) + ' kW', 'needs at least ' + num(kWp, 2) + ' kW'],
+      ['Panels', panels + ' × ' + num(pw, 0) + ' W', 'roof space about ' + num(area, 0) + ' m² (' + num(area * 10.7639, 0) + ' sq ft)'],
+      ['Yearly production', num(yearly, 0) + ' kWh', 'about ' + num(yearly / 12, 0) + ' kWh a month']
     ];
-    if (night > 0 && days > 0) st.push(['Battery bank', fmtNum(bk, 1) + ' kWh', fmtNum(ah, 0) + ' Ah at ' + bv + ' V']);
-    st.push(['Inverter', peak > 0 ? (invPick ? fmtNum(invPick, 1) + ' kW' : fmtNum(Math.ceil(inv), 0) + ' kW+') : '–', peak > 0 ? 'load ' + fmtNum(peak, 0) + ' W + 25% headroom' : 'enter your peak load']);
-    if (night > 0 && days > 0) st.push(['Charge controller', fmtNum(Math.ceil(cc), 0) + ' A', 'at ' + bv + ' V (MPPT), or use a hybrid inverter that includes one']);
+    if (night > 0 && days > 0) st.push(['Battery bank', num(bk, 1) + ' kWh', num(ah, 0) + ' Ah at ' + bv + ' V']);
+    st.push(['Inverter', peak > 0 ? (invPick ? num(invPick, 1) + ' kW' : num(Math.ceil(inv), 0) + ' kW+') : '–', peak > 0 ? 'load ' + num(peak, 0) + ' W + 25% headroom' : 'enter your peak load']);
+    if (night > 0 && days > 0) st.push(['Charge controller', num(Math.ceil(cc), 0) + ' A', 'at ' + bv + ' V (MPPT), or use a hybrid inverter that includes one']);
     res.innerHTML = st.map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + s[1] + '</b><small>' + s[2] + '</small></div>'; }).join('');
     var notes = [];
     if (cc > 200) notes.push('The charge current is very high at ' + bv + ' V. A higher battery voltage or several controllers would be needed.');
@@ -129,7 +138,7 @@
     var pr = n('spPrice');
     if (isNaN(pr)) $('spSave').textContent = 'Enter your price per kWh to estimate savings.';
     else if (pr < 0) $('spSave').textContent = 'Price cannot be negative.';
-    else { var used = Math.min(yearly, daily * 365); $('spSave').textContent = 'About ' + cur() + fmtNum(used * pr, 0) + ' a year (' + cur() + fmtNum(used * pr / 12, 0) + ' a month), if all the solar energy replaces bought electricity.'; }
+    else { var used = Math.min(yearly, daily * 365); $('spSave').textContent = 'About ' + cur() + num(used * pr, 0) + ' a year (' + cur() + num(used * pr / 12, 0) + ' a month), if all the solar energy replaces bought electricity.'; }
     copyTxt = st.map(function (s) { return s[0] + ': ' + s[1] + ' (' + s[2] + ')'; }).join('\n') + '\nSun hours: ' + sun + ', losses: ' + loss + '%';
   }
   $('spRows').addEventListener('input', function (e) { var t = e.target; if (!t.dataset.k) return; rows[+t.dataset.i][t.dataset.k] = t.dataset.k === 'n' ? t.value : t.value === '' ? '' : +t.value; calc(); });

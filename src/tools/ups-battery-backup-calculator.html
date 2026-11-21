@@ -48,6 +48,7 @@
 </div>
 <script>
 (function () {
+  function num(n, d) { return Number(n).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); }
   var QUICK = [['Ceiling fan', 75], ['LED bulb', 10], ['Wi-Fi router', 10], ['Laptop', 60], ['Desktop + monitor', 250], ['TV', 100], ['Fridge (running)', 150], ['CCTV / DVR', 40]];
   var SIZES = [500, 600, 800, 1000, 1200, 1500, 2000, 2500, 3000, 3500, 4000, 5000, 6000, 7500, 8000, 10000, 12000, 15000, 20000];
   $('ubQuick').innerHTML = QUICK.map(function (q, i) { return '<button type="button" class="btn ghost" data-q="' + i + '">+ ' + q[0] + ' ' + q[1] + ' W</button>'; }).join('') + '<button type="button" class="btn ghost" id="ubZero">Reset to 0</button>';
@@ -66,30 +67,30 @@
     if (!(pf > 0) || pf > 1) return fail('Power factor must be between 0.1 and 1 (0.8 is typical).');
     if (L < 0 || L > 1e7) return fail('Load must be 0 or more watts.');
     var series = $('ubWire').value === 's', Vs = series ? V * N : V, Ahs = series ? Ah : Ah * N, Wh = Vs * Ahs, use = Wh * dod / 100 * eff / 100;
-    $('ubBank').textContent = fmtNum(Vs, 1) + ' V · ' + fmtNum(Ahs, 0) + ' Ah (' + fmtNum(Wh / 1000, 2) + ' kWh)';
-    $('ubUse').textContent = fmtNum(use, 0) + ' Wh';
+    $('ubBank').textContent = num(Vs, 1) + ' V · ' + num(Ahs, 0) + ' Ah (' + num(Wh / 1000, 2) + ' kWh)';
+    $('ubUse').textContent = num(use, 0) + ' Wh';
     var notes = [];
     if (L === 0) { $('ubTime').textContent = 'No load'; $('ubHrs').textContent = '–'; $('ubAmp').textContent = '0 A'; }
     else {
       var h = use / L, amp = L / (eff / 100) / Vs;
-      $('ubTime').textContent = h > 1000 ? 'over 1,000 h' : hm(h); $('ubHrs').textContent = fmtNum(h, 2); $('ubAmp').textContent = fmtNum(amp, 1) + ' A';
+      $('ubTime').textContent = h > 1000 ? 'over 1,000 h' : hm(h); $('ubHrs').textContent = num(h, 2); $('ubAmp').textContent = num(amp, 1) + ' A';
       if (dod < 80 && amp > Ahs / 10) notes.push('The battery is being drained fast (more than a tenth of its Ah per hour). Lead-acid batteries give less than their rated Ah at high current, so expect 10–30% less time.');
-      if (amp > 150) notes.push('Over 150 A is a very high current for ' + fmtNum(Vs, 1) + ' V. A higher system voltage (24 V or 48 V) needs thinner cables and wastes less.');
+      if (amp > 150) notes.push('Over 150 A is a very high current for ' + num(Vs, 1) + ' V. A higher system voltage (24 V or 48 V) needs thinner cables and wastes less.');
     }
-    if (Vs > 60 && series) notes.push('Check that your inverter accepts ' + fmtNum(Vs, 1) + ' V input.');
+    if (Vs > 60 && series) notes.push('Check that your inverter accepts ' + num(Vs, 1) + ' V input.');
     msg.className = 'msg'; msg.textContent = notes.join(' ');
     var want = n('ubWant');
     if (isNaN(want) || want <= 0) $('ubNeed').textContent = 'Enter the hours you want.';
     else if (L === 0) $('ubNeed').textContent = 'Enter a load above 0 watts.';
     else {
       var needWh = L * want / (dod / 100) / (eff / 100), needAh = needWh / Vs, cnt = Math.max(1, Math.ceil(needAh / Ah - 1e-9));
-      $('ubNeed').textContent = fmtNum(needAh, 0) + ' Ah at ' + fmtNum(Vs, 1) + ' V (' + fmtNum(needWh / 1000, 2) + ' kWh). That is about ' +
-        (series && N > 1 ? cnt + ' parallel string(s) of ' + N + ' × ' + fmtNum(Ah, 0) + ' Ah batteries.' : cnt + ' × ' + fmtNum(V, 1) + ' V ' + fmtNum(Ah, 0) + ' Ah ' + (cnt > 1 ? 'batteries in parallel.' : 'battery.'));
+      $('ubNeed').textContent = num(needAh, 0) + ' Ah at ' + num(Vs, 1) + ' V (' + num(needWh / 1000, 2) + ' kWh). That is about ' +
+        (series && N > 1 ? cnt + ' parallel string(s) of ' + N + ' × ' + num(Ah, 0) + ' Ah batteries.' : cnt + ' × ' + num(V, 1) + ' V ' + num(Ah, 0) + ' Ah ' + (cnt > 1 ? 'batteries in parallel.' : 'battery.'));
     }
     if (L === 0) { $('ubVA').textContent = '–'; $('ubSug').textContent = '–'; return; }
     var va = L / pf, sug = va * 1.25, pick = SIZES.filter(function (s) { return s >= sug; })[0];
-    $('ubVA').textContent = fmtNum(va, 0) + ' VA (' + fmtNum(L, 0) + ' W)';
-    $('ubSug').textContent = pick ? fmtNum(pick, 0) + ' VA (' + fmtNum(pick * pf, 0) + ' W)' : fmtNum(Math.ceil(sug / 1000), 0) + ' kVA or more';
+    $('ubVA').textContent = num(va, 0) + ' VA (' + num(L, 0) + ' W)';
+    $('ubSug').textContent = pick ? num(pick, 0) + ' VA (' + num(pick * pf, 0) + ' W)' : num(Math.ceil(sug / 1000), 0) + ' kVA or more';
   }
   $('ubType').addEventListener('change', function () { if (this.value !== 'c') { $('ubDoD').value = this.value; if (this.value === '90' && +$('ubEff').value === 85) $('ubEff').value = 90; } calc(); });
   $('ubQuick').addEventListener('click', function (e) {

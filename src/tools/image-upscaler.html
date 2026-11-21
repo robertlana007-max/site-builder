@@ -20,7 +20,7 @@
   <span>Method</span>
   <div class="seg" role="group" aria-label="Method"><button type="button" data-method="ai" aria-pressed="true">AI (sharpest)</button><button type="button" data-method="fast" aria-pressed="false">Fast (smooth)</button></div>
 </div>
-<select id="scale" hidden aria-hidden="true" tabindex="-1"><option>2</option><option>4</option></select>
+<select id="upx" hidden aria-hidden="true" tabindex="-1"><option>2</option><option>4</option></select>
 <select id="method" hidden aria-hidden="true" tabindex="-1"><option>ai</option><option>fast</option></select>
 <p class="up-sub" id="methodNote"></p>
 <div class="notice" id="notice" hidden><div class="meter" id="bar"><i id="fill"></i></div><p id="stat">Getting ready…</p><button type="button" class="btn ghost up-stop" id="stop">Stop</button></div>
@@ -52,7 +52,7 @@
   }
   function loadScript(url) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = url; s.onload = res; s.onerror = function () { rej(new Error('net')); }; document.head.appendChild(s); }); }
   function fetchBuf(url, total, onProg) {
-    return fetch(url).then(function (r) {
+    return fetch(url).catch(function () { throw new Error('net'); }).then(function (r) {
       if (!r.ok) throw new Error('net');
       if (!r.body || !r.body.getReader) return r.arrayBuffer();
       var reader = r.body.getReader(), parts = [], got = 0;
@@ -173,7 +173,7 @@
       : 'Fast uses high-quality Lanczos resizing: instant and smooth, but it cannot invent new detail.';
   }
   function plan() {
-    var scale = +$('scale').value, w = W, h = H, f = 1, ai = $('method').value === 'ai';
+    var scale = +$('upx').value, w = W, h = H, f = 1, ai = $('method').value === 'ai';
     if (ai && w * h > AI_MAX_IN) f = Math.sqrt(AI_MAX_IN / (w * h));
     if (w * h * f * f * scale * scale > MAX_OUT) f = Math.min(f, Math.sqrt(MAX_OUT / (w * h * scale * scale)));
     return { scale: scale, w: Math.max(1, Math.floor(w * f)), h: Math.max(1, Math.floor(h * f)), f: f, ai: ai };
@@ -198,7 +198,9 @@
       return;
     }
     function fail(t) { if (mine !== job) return; busy = false; $('notice').hidden = true; say('bad', t); }
-    session(function (f, t) { if (mine === job) progress(f, t); }).then(function (s) {
+    var settled = false; // once the engine has failed, a download still finishing in the background must not show progress again
+    session(function (f, t) { if (mine === job && !settled) progress(f, t); }).then(function (s) {
+      settled = true;
       if (mine !== job) return;
       progress(0, 'Enlarging with AI…');
       return aiUpscale(s, img, p.w, p.h, p.scale, mine, function (f, n, total, left) {
@@ -206,6 +208,7 @@
         progress(f, 'Enlarging with AI: part ' + n + ' of ' + total + (n < total ? ', about ' + (left < 60 ? Math.max(1, Math.round(left)) + ' s' : Math.round(left / 60) + ' min') + ' left' : '') + '…');
       }).then(function (c) { if (hasAlpha) addAlpha(c, img, p.w, p.h, p.scale); done(c, 'AI on ' + s.ep); });
     }).catch(function (e) {
+      settled = true;
       if (mine !== job) return;
       if (e && e.message === 'stopped') { busy = false; $('notice').hidden = true; say('', 'Stopped. Choose Fast for an instant result, or press AI again to restart.'); return; }
       // the AI could not run here: fall back to the fast method so the person still gets a result
@@ -252,10 +255,10 @@
   $('cmp').addEventListener('input', drawCmp);
 
   // ---------- controls ----------
-  Array.prototype.forEach.call(document.querySelectorAll('[data-scale]'), function (b) { b.addEventListener('click', function () { var v = b.getAttribute('data-scale'); if ($('scale').value === v) return; $('scale').value = v; $('scale').dispatchEvent(new Event('change', { bubbles: true })); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-scale]'), function (b) { b.addEventListener('click', function () { var v = b.getAttribute('data-scale'); if ($('upx').value === v) return; $('upx').value = v; $('upx').dispatchEvent(new Event('change', { bubbles: true })); }); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-method]'), function (b) { b.addEventListener('click', function () { var v = b.getAttribute('data-method'); if ($('method').value === v && !(v === 'ai' && !busy && !out && src)) return; $('method').value = v; $('method').dispatchEvent(new Event('change', { bubbles: true })); }); });
   Array.prototype.forEach.call(document.querySelectorAll('[data-view]'), function (b) { b.addEventListener('click', function () { view = b.getAttribute('data-view'); setSeg('data-view', view); drawCmp(); }); });
-  $('scale').addEventListener('change', function () { setSeg('data-scale', $('scale').value); if (src) run(); });
+  $('upx').addEventListener('change', function () { setSeg('data-scale', $('upx').value); if (src) run(); });
   $('method').addEventListener('change', function () { setSeg('data-method', $('method').value); methodNote(); if (src) run(); });
   $('sharp').addEventListener('input', function () { $('sharpv').textContent = $('sharp').value; $('dl').hidden = true; });
   $('fmt').addEventListener('change', function () { $('dl').hidden = true; });

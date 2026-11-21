@@ -89,16 +89,24 @@
     var g = c.createLinearGradient(0, 0, 0, S); g.addColorStop(0, v('ppC1')); g.addColorStop(1, v('ppC2')); return g;
   }
   // Text along the circle. Characters are placed one by one so they follow the curve.
+  // Pieces placed one by one along the curve: whole letters (with their accents and emoji kept together),
+  // or whole words for Arabic, Urdu, Persian and Hebrew, whose letters must stay joined and read right to left.
+  function pieces(t) {
+    if (/[\u0590-\u08FF\uFB1D-\uFDFF\uFE70-\uFEFF]/.test(t)) return t.split(/(\s+)/).filter(Boolean).reverse();
+    if (window.Intl && Intl.Segmenter) return Array.from(new Intl.Segmenter(undefined, { granularity: 'grapheme' }).segment(t), function (x) { return x.segment; });
+    return Array.from(t);
+  }
   function curvedText(c, g) {
     var t = v('ppText').trim(); if (!t) return;
+    var P = pieces(t);
     var size = +v('ppTSize'), bt = size * 1.55, rb = g.rp - bt / 2, mid = +v('ppPos') * Math.PI / 180, top = Math.sin(mid) < 0;
     c.font = '800 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
-    var sp = size * 0.06, widths = Array.from(t).map(function (ch) { return c.measureText(ch).width + sp; });
+    var sp = size * 0.06, widths = P.map(function (ch) { return c.measureText(ch).width + sp; });
     var total = widths.reduce(function (a, b) { return a + b; }, 0) - sp, span = total / rb;
     if (span > Math.PI * 1.6) { // too long for the circle: shrink to fit
       var k = Math.PI * 1.6 / span; size *= k; bt = size * 1.55; rb = g.rp - bt / 2;
       c.font = '800 ' + size + 'px system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
-      widths = Array.from(t).map(function (ch) { return c.measureText(ch).width + size * 0.06; });
+      widths = P.map(function (ch) { return c.measureText(ch).width + size * 0.06; });
       total = widths.reduce(function (a, b) { return a + b; }, 0) - size * 0.06; span = total / rb;
     }
     if ($('ppBandOn').checked) {
@@ -109,7 +117,7 @@
     }
     c.save(); c.fillStyle = v('ppTCol'); c.textAlign = 'center'; c.textBaseline = 'middle';
     var a = top ? mid - span / 2 : mid + span / 2;
-    Array.from(t).forEach(function (ch, i) {
+    P.forEach(function (ch, i) {
       var w = widths[i] - (i === widths.length - 1 ? 0 : 0), half = (widths[i] - size * 0.06) / 2 / rb;
       var at = top ? a + half : a - half;
       c.save(); c.translate(C + Math.cos(at) * rb, C + Math.sin(at) * rb); c.rotate(top ? at + Math.PI / 2 : at - Math.PI / 2);
