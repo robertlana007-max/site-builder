@@ -187,6 +187,7 @@
       var n = e && e.name;
       if (n === 'NotAllowedError' || n === 'SecurityError') say('bad', 'Camera access was blocked. Allow the camera for this site in your browser settings (the camera icon in the address bar), or use Upload a photo.');
       else if (n === 'NotFoundError' || n === 'OverconstrainedError') { if (touch) $('snap').click(); else say('bad', 'No camera was found on this device. Use Upload a photo instead.'); }
+      else if (n === 'NotSupportedError' || n === 'TypeError') { if (touch) $('snap').click(); else say('bad', 'Your browser cannot open the camera on this page. Take a photo with your camera app, then use Upload a photo.'); }
       else if (n === 'NotReadableError') say('bad', 'The camera is being used by another app. Close it and try again.');
       else say('bad', 'The camera could not be opened. Use Upload a photo instead.');
     });
@@ -456,11 +457,14 @@
   }
   function sheetLayout() {
     var p = PAPER[$('paper').value], best = null;
-    [[p[0], p[1]], [p[1], p[0]]].forEach(function (o) {
-      var W = Math.round(o[0] * DPI), H = Math.round(o[1] * DPI), m = mm(4), g = mm(2.5), cols = Math.floor((W - 2 * m + g) / (spec.W + g)), rows = Math.floor((H - 2 * m + g) / (spec.H + g));
-      if (!best || cols * rows > best.cols * best.rows || (cols * rows === best.cols * best.rows && o[0] === p[0] && best.W !== W)) best = { W: W, H: H, cols: Math.max(0, cols), rows: Math.max(0, rows), g: g, inW: o[0], inH: o[1] };
+    // try roomy spacing first, then tighter spacing (2 × 2 in photos fit 6 to a 4 × 6 in print only edge to edge)
+    [[4, 2.5], [2, 1], [0, 0]].forEach(function (sp) {
+      [[p[0], p[1]], [p[1], p[0]]].forEach(function (o) {
+        var W = Math.round(o[0] * DPI), H = Math.round(o[1] * DPI), m = mm(sp[0]), g = mm(sp[1]), cols = Math.floor((W - 2 * m + g + 1) / (spec.W + g)), rows = Math.floor((H - 2 * m + g + 1) / (spec.H + g));
+        cols = Math.max(0, cols); rows = Math.max(0, rows);
+        if (!best || cols * rows > best.cols * best.rows) best = { W: W, H: H, cols: cols, rows: rows, g: g, inW: o[0], inH: o[1] };
+      });
     });
-    // keep the paper the way people expect it unless turning it fits more
     return best;
   }
   function fillCopies() {
