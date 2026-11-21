@@ -38,9 +38,18 @@
 (function () {
   var file = null, bytes = null, busy = false, wasm = null, MAXB = 1024 * 1024 * 1024;
 
-  // qpdf (compiled to WebAssembly) writes standard PDF encryption that every reader understands.
+  // qpdf (compiled to WebAssembly) does the real PDF encryption work. It writes its messages to the
+  // console, so while it runs those lines are caught and read here instead.
+  var sink = null;
+  function hookConsole() {
+    if (hookConsole.done) return; hookConsole.done = true;
+    ['log', 'error', 'warn'].forEach(function (k) {
+      var orig = console[k];
+      console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else orig.apply(console, arguments); };
+    });
+  }
   function loadScript() {
-    if (window.Module && window.Module.length !== undefined) return Promise.resolve();
+    if (typeof window.Module === 'function') return Promise.resolve();
     return new Promise(function (res, rej) {
       var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js';
       s.onload = res; s.onerror = rej;
@@ -48,19 +57,19 @@
     });
   }
   function qpdf() {
+    hookConsole();
     return loadScript().then(function () {
       if (wasm) return wasm;
       return fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); });
-    }).catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); }).then(function (bin) {
-      var log = [];
-      return window.Module({ wasmBinary: bin, noInitialRun: true, print: function (t) { log.push(t); }, printErr: function (t) { log.push(t); } }).then(function (m) { m.log = log; return m; });
-    });
+    }).then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+      .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
   }
   function run(m, args) {
-    m.log.length = 0;
-    var code;
-    try { code = m.callMain(args); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
-    return { code: code, text: m.log.join('\n') };
+    var log = [], code;
+    sink = function (t) { log.push(t); };
+    try { code = m.callMain(args.slice()); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+    sink = null;
+    return { code: code, text: log.join('\n') };
   }
 
   function strength(p) {
@@ -98,8 +107,9 @@
       var b = new Uint8Array(r[0]), m = r[1];
       if (new TextDecoder('latin1').decode(b.subarray(0, 1024)).indexOf('%PDF') === -1) throw new Error('"' + f.name + '" could not be read as a PDF.');
       m.FS.writeFile('/in.pdf', b);
-      if (run(m, ['--requires-password', '/in.pdf']).code === 0) throw new Error('"' + f.name + '" already has a password. Remove it first with Unlock PDF, then add a new one here.');
-      if (run(m, ['--check', '/in.pdf']).code === 2) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
+      var shown = run(m, ['--show-encryption', '/in.pdf']);
+      if (shown.code === 2 && /invalid password/i.test(shown.text)) throw new Error('"' + f.name + '" already has a password. Remove it first with Unlock PDF, then add a new one here.');
+      if (shown.code === 2) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
       file = f; bytes = b; $('go').disabled = false;
       PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Now choose a password.');
     }).catch(function (e) { PT.say('bad', e && e.message || 'Something went wrong with this file.'); }).then(function () { busy = false; });
@@ -120,6 +130,7 @@
     if (pw !== pw2) { PT.say('bad', 'The two passwords are not the same. Type them again.'); $('pw2').focus(); return; }
     if (owner && owner === pw) { PT.say('bad', 'The owner password must be different from the open password, or anyone who can open the file could remove the restrictions.'); $('owner').focus(); return; }
     var bits = $('enc').value, made = false;
+    if (bits === '128' && /[^\x20-\x7e]/.test(pw + owner)) { PT.say('bad', 'AES 128-bit only works with plain letters (A to Z), numbers and keyboard symbols. Remove other characters, or choose AES 256-bit.'); return; }
     if (!owner) { owner = randomPw(); made = limited; }
     busy = true; $('ownerMsg').hidden = true;
     PT.run(async function () {
@@ -135,7 +146,7 @@
       var r = run(m, args);
       if (r.code === 2) throw new Error('This PDF could not be protected. It may be damaged.');
       // Prove the result opens with the password before handing it over.
-      var chk = run(m, ['--password=' + pw, '--check', '/out.pdf']);
+      var chk = run(m, ['--password=' + pw, '--show-encryption', '/out.pdf']);
       if (chk.code === 2) throw new Error('Something went wrong while checking the protected file. Please try again.');
       var out = m.FS.readFile('/out.pdf');
       PT.done(out, PT.base(file.name) + '-protected.pdf', 'application/pdf', pw ? 'Protected. The PDF now asks for your password' : 'Restrictions added. The PDF opens without a password');

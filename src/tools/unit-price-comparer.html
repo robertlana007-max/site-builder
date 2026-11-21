@@ -1,0 +1,113 @@
+<style>
+.up-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; position: relative; }
+.up-card.best { border-color: var(--ok); box-shadow: 0 0 0 2px color-mix(in srgb, var(--ok) 30%, transparent); }
+.up-grid { display: grid; grid-template-columns: minmax(0, 1.4fr) repeat(2, minmax(0, 1fr)) minmax(0, 1.1fr) minmax(0, .8fr); gap: 8px; align-items: end; }
+.up-grid label { font-size: 12.5px; margin-bottom: 2px; }
+.up-grid input, .up-grid select { min-width: 0; width: 100%; }
+.up-res { margin: 8px 0 0; font-size: 15px; display: flex; flex-wrap: wrap; gap: 4px 12px; align-items: center; }
+.up-res b { font-family: var(--mono); }
+.up-tag { font-size: 12.5px; font-weight: 700; border-radius: 99px; padding: 2px 10px; background: var(--bg); border: 1px solid var(--line); }
+.up-card.best .up-tag { background: var(--ok); border-color: var(--ok); color: #fff; }
+.up-x { position: absolute; top: 6px; inset-inline-end: 6px; min-height: 32px !important; padding: 2px 10px !important; }
+.up-head { font-weight: 700; font-size: 14px; margin: 0 0 8px; color: var(--muted); }
+@media (max-width: 600px) { .up-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } .up-grid .up-name { grid-column: 1 / -1; } }
+</style>
+<div class="fields">
+  <div><label for="upBase">Compare price per</label><select id="upBase">
+    <optgroup label="Weight"><option value="kg">kilogram (kg)</option><option value="100g">100 grams</option><option value="lb">pound (lb)</option><option value="oz">ounce (oz)</option></optgroup>
+    <optgroup label="Volume"><option value="L">liter (L)</option><option value="100ml">100 ml</option><option value="floz">US fluid ounce</option><option value="gal">US gallon</option></optgroup>
+    <optgroup label="Count and length"><option value="pc">item / piece</option><option value="m">meter</option><option value="ft">foot</option></optgroup>
+  </select></div>
+  <div><label for="upCur">Currency</label><select id="upCur"></select></div>
+  <div id="upCurOBox" hidden><label for="upCurO">Your currency symbol</label><input type="text" id="upCurO" maxlength="6"></div>
+</div>
+<div id="upList"></div>
+<div class="btns"><button type="button" class="btn ghost" id="upAdd">Add another product</button><button type="button" class="btn ghost" id="upEx">Example</button><button type="button" class="btn ghost" id="upClr">Clear</button><button type="button" class="btn ghost" id="upCopy">Copy comparison</button></div>
+<p class="msg" id="upMsg"></p>
+<script>
+(function () {
+  // [key, label, category, size in base unit (g, ml, pcs, m)]
+  var U = [['g', 'g', 'w', 1], ['kg', 'kg', 'w', 1000], ['mg', 'mg', 'w', 0.001], ['oz', 'oz', 'w', 28.349523125], ['lb', 'lb', 'w', 453.59237],
+    ['ml', 'ml', 'v', 1], ['L', 'L', 'v', 1000], ['cl', 'cl', 'v', 10], ['floz', 'US fl oz', 'v', 29.5735295625], ['gal', 'US gal', 'v', 3785.411784], ['ukfloz', 'UK fl oz', 'v', 28.4130625],
+    ['pc', 'items', 'c', 1], ['m', 'm', 'l', 1], ['cm', 'cm', 'l', 0.01], ['ft', 'ft', 'l', 0.3048], ['yd', 'yd', 'l', 0.9144]];
+  var BASE = { kg: ['w', 1000, 'kg'], '100g': ['w', 100, '100 g'], lb: ['w', 453.59237, 'lb'], oz: ['w', 28.349523125, 'oz'], L: ['v', 1000, 'L'], '100ml': ['v', 100, '100 ml'], floz: ['v', 29.5735295625, 'fl oz'], gal: ['v', 3785.411784, 'gal'], pc: ['c', 1, 'item'], m: ['l', 1, 'm'], ft: ['l', 0.3048, 'ft'] };
+  var DEFB = { w: 'kg', v: 'L', c: 'pc', l: 'm' }, CATN = { w: 'weight', v: 'volume', c: 'count', l: 'length' };
+  function unit(k) { for (var i = 0; i < U.length; i++) if (U[i][0] === k) return U[i]; }
+  var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
+  var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
+  'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ').forEach(function (c) { REG[c] = '€'; });
+  $('upCur').innerHTML = CUR.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+  var region = ''; try { region = ((navigator.language || '').split('-')[1] || '').toUpperCase(); } catch (e) {}
+  $('upCur').value = REG[region] || '';
+  var US = region === 'US'; if (US) $('upBase').value = 'oz';
+  function cur() { var v = $('upCur').value; if (v === 'other') v = $('upCurO').value.trim(); return v ? v + ' ' : ''; }
+  function money(x) { var a = Math.abs(x); return cur() + x.toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { minimumFractionDigits: 2, maximumFractionDigits: a < 1 ? 4 : 2 }); }
+  var uopts = '<optgroup label="Weight">' + U.filter(function (u) { return u[2] === 'w'; }).map(o).join('') + '</optgroup><optgroup label="Volume">' + U.filter(function (u) { return u[2] === 'v'; }).map(o).join('') + '</optgroup><optgroup label="Count and length">' + U.filter(function (u) { return u[2] === 'c' || u[2] === 'l'; }).map(o).join('') + '</optgroup>';
+  function o(u) { return '<option value="' + u[0] + '">' + u[1] + '</option>'; }
+  var list = $('upList'), seq = 0;
+  function card(d) {
+    d = d || {}; var i = seq++, c = document.createElement('div'); c.className = 'up-card';
+    c.innerHTML = '<p class="up-head"></p><button type="button" class="btn ghost up-x" aria-label="Remove this product">✕</button><div class="up-grid">' +
+      '<div class="up-name"><label for="upN' + i + '">Name (optional)</label><input type="text" id="upN' + i + '" data-nomemo maxlength="60" autocomplete="off"></div>' +
+      '<div><label for="upP' + i + '">Price</label><input type="number" id="upP' + i + '" data-nomemo min="0" step="any" inputmode="decimal"></div>' +
+      '<div><label for="upQ' + i + '">Size</label><input type="number" id="upQ' + i + '" data-nomemo min="0" step="any" inputmode="decimal"></div>' +
+      '<div><label for="upU' + i + '">Unit</label><select id="upU' + i + '" data-nomemo>' + uopts + '</select></div>' +
+      '<div><label for="upK' + i + '">Packs</label><input type="number" id="upK' + i + '" data-nomemo min="1" step="1" value="1" inputmode="numeric"></div></div><div class="up-res" aria-live="polite"></div>';
+    list.appendChild(c);
+    c.querySelector('[id^=upN]').value = d.n || ''; c.querySelector('[id^=upP]').value = d.p == null ? '' : d.p; c.querySelector('[id^=upQ]').value = d.q == null ? '' : d.q;
+    c.querySelector('select').value = d.u || (US ? 'oz' : 'g'); c.querySelector('[id^=upK]').value = d.k || 1;
+    c.querySelector('.up-x').addEventListener('click', function () { if (list.children.length > 2) c.remove(); else c.querySelectorAll('input').forEach(function (x) { x.value = x.id.indexOf('upK') === 0 ? 1 : ''; }); calc(); });
+    return c;
+  }
+  var copyTxt = '';
+  function calc() {
+    $('upCurOBox').hidden = $('upCur').value !== 'other';
+    var B = BASE[$('upBase').value], items = [], msg = $('upMsg'), cats = {};
+    list.querySelectorAll('.up-card').forEach(function (c, idx) {
+      var name = c.querySelector('[id^=upN]').value.trim() || 'Product ' + String.fromCharCode(65 + idx % 26) + (idx >= 26 ? Math.floor(idx / 26) : '');
+      c.querySelector('.up-head').textContent = name; c.classList.remove('best');
+      var res = c.querySelector('.up-res'), p = c.querySelector('[id^=upP]').value, q = c.querySelector('[id^=upQ]').value, k = c.querySelector('[id^=upK]').value, u = unit(c.querySelector('select').value);
+      if (p === '' || q === '') { res.innerHTML = '<span class="msg" style="margin:0">Enter the price and size.</span>'; return; }
+      k = k === '' ? 1 : +k;
+      if (!(+p >= 0) || !(+q > 0) || !(k >= 1) || Math.floor(k) !== k) { res.innerHTML = '<span class="msg bad" style="margin:0">Price must be 0 or more, size above 0, and packs a whole number from 1.</span>'; return; }
+      if (+p > 1e12 || +q > 1e12) { res.innerHTML = '<span class="msg bad" style="margin:0">That number is too large.</span>'; return; }
+      var amount = +q * k * u[3]; cats[u[2]] = (cats[u[2]] || 0) + 1;
+      items.push({ c: c, name: name, cat: u[2], per: u[2] === B[0] ? +p / amount * B[1] : NaN, amount: amount, price: +p, u: u, q: +q, k: k });
+    });
+    // if nothing matches the chosen basis, switch to the most common kind
+    var match = items.filter(function (x) { return x.cat === B[0]; });
+    if (!match.length && items.length) {
+      var top = Object.keys(cats).sort(function (a, b) { return cats[b] - cats[a]; })[0];
+      $('upBase').value = top === 'w' && US ? 'oz' : DEFB[top]; return calc();
+    }
+    match.sort(function (a, b) { return a.per - b.per; });
+    var best = match[0];
+    items.forEach(function (x) {
+      var res = x.c.querySelector('.up-res');
+      if (x.cat !== B[0]) { res.innerHTML = '<span class="msg bad" style="margin:0">This is sold by ' + CATN[x.cat] + ', so it cannot be compared per ' + B[2] + '. Change "Compare price per" or the unit.</span>'; return; }
+      var pct = best.per > 0 ? (x.per / best.per - 1) * 100 : (x.per > 0 ? Infinity : 0), same = Math.abs(x.per - best.per) < 1e-12;
+      if (same && match.length > 1) x.c.classList.add('best');
+      res.innerHTML = '<b>' + money(x.per) + '</b> per ' + B[2] + (x.k > 1 ? ' <span style="color:var(--muted)">(' + x.k + ' × ' + x.q + ' ' + x.u[1] + ')</span>' : '') +
+        (match.length > 1 ? ' <span class="up-tag">' + (same ? 'Best value' : isFinite(pct) ? '+' + fmtNum(pct, 1) + '% more' : 'more') + '</span>' : '');
+    });
+    var tie = match.filter(function (x) { return Math.abs(x.per - best.per) < 1e-12; }).length;
+    if (match.length < 2) { msg.className = 'msg'; msg.textContent = items.length ? 'Add at least one more product of the same kind to compare.' : 'Enter a price and size for each product.'; copyTxt = ''; return; }
+    var worst = match[match.length - 1], save = (worst.per - best.per) * worst.amount / B[1];
+    msg.className = 'msg ok';
+    msg.textContent = tie === match.length ? 'All products cost the same per ' + B[2] + '.' :
+      (tie > 1 ? tie + ' products tie for' : best.name + ' is') + ' the best value at ' + money(best.per) + ' per ' + B[2] + '. Buying the same amount as ' + worst.name + ' that way saves ' + money(save) + '.';
+    copyTxt = match.map(function (x) { return x.name + ': ' + money(x.price) + ' for ' + (x.k > 1 ? x.k + ' × ' : '') + x.q + ' ' + x.u[1] + ' = ' + money(x.per) + ' per ' + B[2]; }).join('\n') + '\n' + msg.textContent;
+  }
+  list.addEventListener('input', calc); list.addEventListener('change', calc);
+  ['upBase', 'upCur', 'upCurO'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('upAdd').addEventListener('click', function () { if (list.children.length >= 30) return; card({ u: list.lastElementChild ? list.lastElementChild.querySelector('select').value : 'g' }).querySelector('[id^=upP]').focus(); calc(); });
+  $('upEx').addEventListener('click', function () {
+    list.innerHTML = '';
+    card({ n: 'Small bag', p: 2.49, q: 500, u: 'g' }); card({ n: 'Big bag', p: 4.29, q: 1, u: 'kg' }); card({ n: 'Multipack', p: 5.99, q: 250, u: 'g', k: 6 });
+    $('upBase').value = 'kg'; calc();
+  });
+  $('upClr').addEventListener('click', function () { list.innerHTML = ''; card(); card(); calc(); });
+  $('upCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+  card(); card(); calc();
+})();
+</script>

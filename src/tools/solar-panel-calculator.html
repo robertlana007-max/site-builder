@@ -1,0 +1,144 @@
+<style>
+.sp-sec { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+.sp-g[hidden] { display: none; }
+.sp-tbl input { min-width: 0; width: 100%; }
+.sp-tbl td, .sp-tbl th { padding: 6px 4px; }
+.sp-tbl td.sp-name { min-width: 130px; } .sp-tbl td.sp-n { min-width: 72px; }
+.sp-tbl .sp-x { min-height: 36px; padding: 4px 10px; }
+.sp-res .stat small { display: block; font-size: 12.5px; color: var(--muted); margin-top: 2px; overflow-wrap: anywhere; }
+.sp-note { font-size: 14px; color: var(--muted); }
+</style>
+<h3 style="margin-top:0">1. How much electricity do you use?</h3>
+<div class="fields">
+  <div><label for="spMode">I know</label><select id="spMode"><option value="bill">Units (kWh) on my monthly bill</option><option value="day">kWh per day</option><option value="list">My appliances (watts and hours)</option></select></div>
+  <div class="sp-g" id="spBillG"><label for="spBill">kWh per month</label><input type="number" id="spBill" min="0" step="any" value="400" inputmode="decimal"></div>
+  <div class="sp-g" id="spDayG" hidden><label for="spDay">kWh per day</label><input type="number" id="spDay" min="0" step="any" value="12" inputmode="decimal"></div>
+</div>
+<div class="sp-g" id="spListG" hidden>
+  <div class="scroll-x"><table class="sched sp-tbl"><thead><tr><th>Appliance</th><th>Watts</th><th>How many</th><th>Hours a day</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody id="spRows"></tbody></table></div>
+  <div class="btns"><button type="button" class="btn ghost" id="spAdd">Add appliance</button></div>
+</div>
+
+<h3>2. Your sunshine and panels</h3>
+<div class="fields">
+  <div><label for="spRegion">Rough guide for your location</label><select id="spRegion">
+    <option value="">Choose to fill in sun hours…</option>
+    <option value="2.5">Cloudy and far north or south (UK, Ireland, Scandinavia, northern Canada): about 2.5</option>
+    <option value="3.5">Temperate (Germany, northern US, Japan, New Zealand south): about 3.5</option>
+    <option value="4.5">Sunny temperate (southern US, Mediterranean, China, southern Brazil): about 4.5</option>
+    <option value="5.5">Sunny tropics and subtropics (India, Pakistan, Mexico, South Africa, Australia, Nigeria): about 5.5</option>
+    <option value="6.2">Desert (Middle East, North Africa, Atacama, US Southwest): about 6.2</option>
+  </select></div>
+  <div><label for="spSun">Peak sun hours per day</label><input type="number" id="spSun" min="0" step="any" value="4.5" inputmode="decimal"></div>
+  <div><label for="spPanel">Panel size (watts each)</label><input type="number" id="spPanel" min="1" step="any" value="450" inputmode="decimal"></div>
+  <div><label for="spLoss">System losses (%)</label><input type="number" id="spLoss" min="0" max="90" step="any" value="20" inputmode="decimal"></div>
+  <div><label for="spCover">Share of your use to cover (%)</label><input type="number" id="spCover" min="1" max="300" step="any" value="100" inputmode="decimal"></div>
+</div>
+<p class="sp-note" style="margin-top:-6px">Peak sun hours = the day's sunlight counted as full-strength hours, averaged over the year. For an off-grid system use your worst month instead. Free maps such as the Global Solar Atlas give the exact figure for your address.</p>
+
+<h3>3. Batteries and inverter</h3>
+<div class="fields">
+  <div><label for="spNight">Share of daily use from battery (%)</label><input type="number" id="spNight" min="0" max="100" step="any" value="50" inputmode="decimal"></div>
+  <div><label for="spDays">Days of backup</label><input type="number" id="spDays" min="0" step="any" value="1" inputmode="decimal"></div>
+  <div><label for="spBType">Battery type</label><select id="spBType"><option value="90">Lithium LiFePO4 (90% usable)</option><option value="50">Lead-acid / AGM / gel (50% usable)</option></select></div>
+  <div><label for="spBV">Battery bank voltage</label><select id="spBV"><option value="12">12 V</option><option value="24">24 V</option><option value="48" selected>48 V</option></select></div>
+  <div class="sp-g" id="spPeakG"><label for="spPeak">Most watts used at the same time</label><input type="number" id="spPeak" min="0" step="any" value="3000" inputmode="decimal"></div>
+</div>
+<p class="sp-note" style="margin-top:-6px">Set the battery share to 0 for a grid-tied system without batteries.</p>
+
+<div class="sp-sec">
+<h3>Your system</h3>
+<div class="stats sp-res" id="spRes"></div>
+<p class="msg" id="spMsg"></p>
+<h3>Savings <small style="font-weight:400">(optional)</small></h3>
+<div class="fields">
+  <div><label for="spPrice">Electricity price per kWh</label><input type="number" id="spPrice" min="0" step="any" inputmode="decimal" placeholder="e.g. 0.15"></div>
+  <div><label for="spCur">Currency</label><select id="spCur"></select></div>
+  <div id="spCurOBox" hidden><label for="spCurO">Your currency symbol</label><input type="text" id="spCurO" maxlength="6"></div>
+</div>
+<div class="out" id="spSave">–</div>
+<p class="sp-note">This is a first estimate. Shade, roof direction and tilt, temperature, local rules and equipment change the real numbers, so get a site survey from a qualified installer before you buy.</p>
+<div class="btns"><button type="button" class="btn ghost" id="spCopy">Copy results</button></div>
+</div>
+<script>
+(function () {
+  var INV = [1, 1.5, 2, 3, 3.6, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30, 40, 50];
+  var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
+  var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
+  'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ').forEach(function (c) { REG[c] = '€'; });
+  $('spCur').innerHTML = CUR.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+  try { $('spCur').value = REG[((navigator.language || '').split('-')[1] || '').toUpperCase()] || ''; } catch (e) {}
+  function cur() { var v = $('spCur').value; if (v === 'other') v = $('spCurO').value.trim(); return v ? v + ' ' : ''; }
+  function n(id) { var v = $(id).value; return v === '' ? NaN : +v; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var rows = [{ n: 'LED bulbs', w: 10, q: 8, h: 6 }, { n: 'Fans', w: 75, q: 3, h: 10 }, { n: 'Fridge (running)', w: 150, q: 1, h: 24 }, { n: 'TV', w: 100, q: 1, h: 5 }, { n: 'Laptop', w: 60, q: 2, h: 6 }];
+  function draw() {
+    $('spRows').innerHTML = rows.map(function (r, i) {
+      var f = function (k, lab, x) { return '<input ' + (k === 'n' ? 'type="text" maxlength="50" autocomplete="off"' : 'type="number" min="0" step="any" inputmode="decimal"') + ' data-nomemo data-i="' + i + '" data-k="' + k + '" aria-label="' + lab + '" value="' + esc(r[k]) + '"' + (x || '') + '>'; };
+      return '<tr><td class="sp-name">' + f('n', 'Appliance') + '</td><td class="sp-n">' + f('w', 'Watts') + '</td><td class="sp-n">' + f('q', 'How many') + '</td><td class="sp-n">' + f('h', 'Hours a day', ' max="24"') + '</td><td><button type="button" class="btn ghost sp-x" data-del="' + i + '" aria-label="Remove">✕</button></td></tr>';
+    }).join('');
+    calc();
+  }
+  var copyTxt = '';
+  function calc() {
+    var mode = $('spMode').value, msg = $('spMsg'), res = $('spRes');
+    $('spBillG').hidden = mode !== 'bill'; $('spDayG').hidden = mode !== 'day'; $('spListG').hidden = mode !== 'list'; $('spPeakG').hidden = mode === 'list';
+    $('spCurOBox').hidden = $('spCur').value !== 'other';
+    function fail(t) { res.innerHTML = ''; $('spSave').textContent = '–'; msg.className = 'msg bad'; msg.textContent = t; copyTxt = ''; }
+    var daily, peak;
+    if (mode === 'bill') { daily = n('spBill') / (365 / 12); if (isNaN(daily)) return fail('Enter the kWh (units) from your monthly bill.'); }
+    else if (mode === 'day') { daily = n('spDay'); if (isNaN(daily)) return fail('Enter your kWh per day.'); }
+    else {
+      daily = 0; peak = 0;
+      for (var i = 0; i < rows.length; i++) {
+        var r = rows[i]; if (r.w === '' || r.h === '') continue;
+        var q = r.q === '' ? 1 : +r.q;
+        if (+r.w < 0 || q < 0 || +r.h < 0) return fail('Line ' + (i + 1) + ': values cannot be negative.');
+        if (+r.h > 24) return fail('Line ' + (i + 1) + ': a day has only 24 hours.');
+        daily += r.w * q * r.h / 1000; peak += r.w * q;
+      }
+    }
+    if (!(daily > 0)) return fail('Your daily use must be more than 0 kWh.');
+    if (daily > 1e5) return fail('That is more than 100,000 kWh a day. This tool is for homes and small businesses.');
+    var sun = n('spSun'), pw = n('spPanel'), loss = n('spLoss'), cover = n('spCover'), night = n('spNight'), days = n('spDays'), dod = +$('spBType').value, bv = +$('spBV').value;
+    if (!(sun > 0) || sun > 12) return fail('Peak sun hours must be between 0 and 12 (most places are 2–7).');
+    if (!(pw > 0) || pw > 5000) return fail('Panel size must be more than 0 watts (most are 300–700 W).');
+    if (!(loss >= 0) || loss >= 90) return fail('System losses must be from 0 to 89% (15–25% is typical).');
+    if (!(cover > 0) || cover > 300) return fail('Share to cover must be between 1 and 300%.');
+    if (!(night >= 0) || night > 100 || !(days >= 0) || days > 30) return fail('Battery share must be 0–100% and days of backup 0–30.');
+    if (mode !== 'list') { peak = n('spPeak'); if (!(peak >= 0)) return fail('Enter the most watts you use at the same time (0 or more).'); }
+    var kWp = daily * cover / 100 / (sun * (1 - loss / 100)), panels = Math.ceil(kWp * 1000 / pw - 1e-9), real = panels * pw / 1000;
+    var yearly = real * sun * (1 - loss / 100) * 365, area = panels * pw / 210; // about 21% efficient panels
+    var bk = daily * night / 100 * days / (dod / 100), ah = bk * 1000 / bv;
+    var inv = peak * 1.25 / 1000, invPick = INV.filter(function (s) { return s >= inv; })[0];
+    var cc = real * 1000 / bv * 1.25;
+    var st = [
+      ['Daily use', fmtNum(daily, 2) + ' kWh', fmtNum(daily * 365 / 12, 0) + ' kWh a month'],
+      ['Solar array', fmtNum(real, 2) + ' kW', 'needs at least ' + fmtNum(kWp, 2) + ' kW'],
+      ['Panels', panels + ' × ' + fmtNum(pw, 0) + ' W', 'roof space about ' + fmtNum(area, 0) + ' m² (' + fmtNum(area * 10.7639, 0) + ' sq ft)'],
+      ['Yearly production', fmtNum(yearly, 0) + ' kWh', 'about ' + fmtNum(yearly / 12, 0) + ' kWh a month']
+    ];
+    if (night > 0 && days > 0) st.push(['Battery bank', fmtNum(bk, 1) + ' kWh', fmtNum(ah, 0) + ' Ah at ' + bv + ' V']);
+    st.push(['Inverter', peak > 0 ? (invPick ? fmtNum(invPick, 1) + ' kW' : fmtNum(Math.ceil(inv), 0) + ' kW+') : '–', peak > 0 ? 'load ' + fmtNum(peak, 0) + ' W + 25% headroom' : 'enter your peak load']);
+    if (night > 0 && days > 0) st.push(['Charge controller', fmtNum(Math.ceil(cc), 0) + ' A', 'at ' + bv + ' V (MPPT), or use a hybrid inverter that includes one']);
+    res.innerHTML = st.map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + s[1] + '</b><small>' + s[2] + '</small></div>'; }).join('');
+    var notes = [];
+    if (cc > 200) notes.push('The charge current is very high at ' + bv + ' V. A higher battery voltage or several controllers would be needed.');
+    if (bv === 12 && real > 1.5) notes.push('For a system this big, 24 V or 48 V batteries are usually better than 12 V.');
+    msg.className = 'msg'; msg.textContent = notes.join(' ');
+    var pr = n('spPrice');
+    if (isNaN(pr)) $('spSave').textContent = 'Enter your price per kWh to estimate savings.';
+    else if (pr < 0) $('spSave').textContent = 'Price cannot be negative.';
+    else { var used = Math.min(yearly, daily * 365); $('spSave').textContent = 'About ' + cur() + fmtNum(used * pr, 0) + ' a year (' + cur() + fmtNum(used * pr / 12, 0) + ' a month), if all the solar energy replaces bought electricity.'; }
+    copyTxt = st.map(function (s) { return s[0] + ': ' + s[1] + ' (' + s[2] + ')'; }).join('\n') + '\nSun hours: ' + sun + ', losses: ' + loss + '%';
+  }
+  $('spRows').addEventListener('input', function (e) { var t = e.target; if (!t.dataset.k) return; rows[+t.dataset.i][t.dataset.k] = t.dataset.k === 'n' ? t.value : t.value === '' ? '' : +t.value; calc(); });
+  $('spRows').addEventListener('click', function (e) { var b = e.target.closest('[data-del]'); if (!b) return; rows.splice(+b.dataset.del, 1); draw(); });
+  $('spAdd').addEventListener('click', function () { if (rows.length >= 60) return; rows.push({ n: '', w: '', q: 1, h: '' }); draw(); $('spRows').lastElementChild.querySelector('input').focus(); });
+  $('spRegion').addEventListener('change', function () { if (this.value) { $('spSun').value = this.value; calc(); } });
+  $('spSun').addEventListener('input', function (e) { if (e.isTrusted) $('spRegion').value = ''; });
+  ['spMode', 'spBill', 'spDay', 'spSun', 'spPanel', 'spLoss', 'spCover', 'spNight', 'spDays', 'spBType', 'spBV', 'spPeak', 'spPrice', 'spCur', 'spCurO'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  $('spCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+  draw();
+})();
+</script>

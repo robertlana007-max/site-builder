@@ -31,7 +31,7 @@
   // Open with pdf-lib (for editing). Rejects with a message that is safe to show.
   PT.open = function (file) {
     return file.arrayBuffer().then(function (buf) { return PDFLib.PDFDocument.load(buf); }).catch(function (e) {
-      throw new Error(/encrypt/i.test(String(e && e.message)) ? '"' + file.name + '" is password protected. Remove the password first.' : '"' + file.name + '" could not be read as a PDF.');
+      throw new Error(/encrypt/i.test(String(e && e.message)) ? '"' + file.name + '" is password protected or locked against changes. Remove the protection first (for example, open it in a PDF reader and print it to a new PDF with "Save as PDF").' : '"' + file.name + '" could not be read as a PDF.');
     });
   };
 
@@ -60,6 +60,9 @@
   // "1-3, 5" -> [0, 1, 2, 4]. n is the page count. Throws a readable Error.
   PT.ranges = function (str, n) {
     var out = [], seen = {};
+    // accept Arabic-Indic and Persian digits, and the dashes phones type automatically
+    str = str.replace(/[\u0660-\u0669]/g, function (d) { return d.charCodeAt(0) - 0x660; }).replace(/[\u06F0-\u06F9]/g, function (d) { return d.charCodeAt(0) - 0x6F0; })
+      .replace(/[\u2010-\u2015\u2212]/g, '-').replace(/[\u060C\uFF0C]/g, ',');
     var parts = str.split(',').map(function (p) { return p.trim(); }).filter(Boolean);
     if (!parts.length) throw new Error('Enter the page numbers, for example 1-3, 5.');
     parts.forEach(function (p) {
@@ -71,6 +74,18 @@
       for (var i = a; i <= b; i++) if (!seen[i]) { seen[i] = 1; out.push(i - 1); }
     });
     return out;
+  };
+
+  // Text the standard PDF fonts cannot write (Arabic, Chinese, emoji…) drawn by the browser as a sharp PNG.
+  // px: font size in CSS pixels. Returns { png: Uint8Array, w, h, asc } in the same pixels (asc = baseline from the top).
+  PT.textPng = function (text, px, color, weight, family) {
+    var k = Math.max(2, Math.min(8, 300 / px)), font = (weight || 'normal') + ' ' + px + 'px ' + (family || 'Arial, "Noto Sans", sans-serif');
+    var m = document.createElement('canvas').getContext('2d'); m.font = font;
+    var mt = m.measureText(text), asc = Math.max(mt.fontBoundingBoxAscent || 0, mt.actualBoundingBoxAscent || 0) || px * 0.9, desc = Math.max(mt.fontBoundingBoxDescent || 0, mt.actualBoundingBoxDescent || 0) || px * 0.25;
+    var w = Math.max(1, Math.ceil(mt.width + 2)), h = Math.ceil(asc + desc + 2), c = document.createElement('canvas');
+    c.width = Math.ceil(w * k); c.height = Math.ceil(h * k);
+    var x = c.getContext('2d'); x.scale(k, k); x.font = font; x.fillStyle = color || '#000'; x.textBaseline = 'alphabetic'; x.fillText(text, 1, asc + 1);
+    return PT.blob(c, 'image/png').then(function (b) { return b.arrayBuffer(); }).then(function (a) { return { png: new Uint8Array(a), w: w, h: h, asc: asc + 1 }; });
   };
 
   // Show the finished file on the #dl button.

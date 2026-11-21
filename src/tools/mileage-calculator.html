@@ -1,0 +1,145 @@
+<style>
+.mg-sec { border-top: 1px solid var(--line); margin-top: 22px; padding-top: 4px; }
+.mg-log input { min-width: 0; width: 100%; }
+.mg-log td, .mg-log th { padding: 6px 4px; }
+.mg-log input[type=date] { min-width: 120px; }
+.mg-log .mg-x { min-height: 36px; padding: 4px 10px; }
+.mg-note { font-size: 14px; color: var(--muted); }
+</style>
+<div class="fields">
+  <div><label for="mgDU">Distance unit</label><select id="mgDU"><option value="km">Kilometers</option><option value="mi">Miles</option></select></div>
+  <div><label for="mgVU">Fuel unit</label><select id="mgVU"><option value="L">Liters</option><option value="usgal">US gallons</option><option value="ukgal">UK gallons</option></select></div>
+</div>
+<h3 style="margin-top:0">Quick check from one fill-up</h3>
+<div class="fields">
+  <div><label for="mgA">Odometer at last fill-up</label><input type="number" id="mgA" data-nomemo min="0" step="any" inputmode="decimal" value="12000"></div>
+  <div><label for="mgB">Odometer now</label><input type="number" id="mgB" data-nomemo min="0" step="any" inputmode="decimal" value="12450"></div>
+  <div><label for="mgF">Fuel to fill the tank again</label><input type="number" id="mgF" data-nomemo min="0" step="any" inputmode="decimal" value="30"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Distance driven</span><b id="mgDist">–</b></div>
+  <div class="stat"><span>km per liter</span><b id="mgKmL">–</b></div>
+  <div class="stat"><span>L per 100 km</span><b id="mgL100">–</b></div>
+  <div class="stat"><span>mpg (US)</span><b id="mgMpgUS">–</b></div>
+  <div class="stat"><span>mpg (UK)</span><b id="mgMpgUK">–</b></div>
+</div>
+<p class="msg" id="mgMsg">Fill the tank to full, reset or note the odometer, drive, then fill to full again. The fuel you add the second time is what you used.</p>
+
+<div class="mg-sec">
+<h3>Fill-up log</h3>
+<p class="mg-note" style="margin-top:0">Add every fill-up, filling to full each time. The first line is the starting point; each later line shows the average since the fill-up before it.</p>
+<div class="scroll-x"><table class="sched mg-log"><thead><tr><th>Date</th><th>Odometer</th><th>Fuel added</th><th>Cost <small>(optional)</small></th><th>Average</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody id="mgRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="mgAdd">Add fill-up</button><button type="button" class="btn ghost" id="mgEx">Example</button><button type="button" class="btn ghost" id="mgClr">Clear log</button><button type="button" class="btn ghost" id="mgCopy">Copy log</button></div>
+<div class="fields" style="margin-top:12px"><div><label for="mgCur">Currency</label><select id="mgCur"></select></div><div id="mgCurOBox" hidden><label for="mgCurO">Your currency symbol</label><input type="text" id="mgCurO" maxlength="6"></div></div>
+<div class="stats">
+  <div class="stat"><span>Overall average</span><b id="mgAvg">–</b></div>
+  <div class="stat"><span>Best / worst</span><b id="mgBW">–</b></div>
+  <div class="stat"><span>Total distance</span><b id="mgTD">–</b></div>
+  <div class="stat"><span>Total fuel</span><b id="mgTF">–</b></div>
+  <div class="stat"><span>Cost per distance</span><b id="mgCPD">–</b></div>
+</div>
+<p class="msg" id="mgLogMsg"></p>
+</div>
+<script>
+(function () {
+  var MI = 1.609344, VOL = { L: 1, usgal: 3.785411784, ukgal: 4.54609 }, STORE = 'gtn-mileage-log';
+  var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
+  var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
+  'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ').forEach(function (c) { REG[c] = '€'; });
+  $('mgCur').innerHTML = CUR.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+  var region = ''; try { region = ((navigator.language || '').split('-')[1] || '').toUpperCase(); } catch (e) {}
+  $('mgCur').value = REG[region] || '';
+  if (region === 'US') { $('mgDU').value = 'mi'; $('mgVU').value = 'usgal'; $('mgB').value = 12300; $('mgF').value = 10; }
+  if (region === 'GB') { $('mgDU').value = 'mi'; $('mgVU').value = 'L'; }
+  function cur() { var v = $('mgCur').value; if (v === 'other') v = $('mgCurO').value.trim(); return v ? v + ' ' : ''; }
+  function nf(x, d) { return Number(x).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); }
+  // economy from km and liters, in the user's main unit
+  function all(km, L) { return { kmL: km / L, l100: L / km * 100, us: km / MI / (L / VOL.usgal), uk: km / MI / (L / VOL.ukgal) }; }
+  function main(km, L) {
+    var e = all(km, L), du = $('mgDU').value, vu = $('mgVU').value;
+    if (du === 'km') return vu === 'L' ? nf(e.kmL) + ' km/L' : nf(km / (L / VOL[vu])) + ' km/' + (vu === 'usgal' ? 'US gal' : 'UK gal');
+    return vu === 'usgal' ? nf(e.us, 1) + ' mpg (US)' : vu === 'ukgal' ? nf(e.uk, 1) + ' mpg (UK)' : nf(km / MI / L) + ' mi/L';
+  }
+  function quick() {
+    var a = $('mgA').value, b = $('mgB').value, fl = $('mgF').value, m = $('mgMsg'), ids = ['mgDist', 'mgKmL', 'mgL100', 'mgMpgUS', 'mgMpgUK'];
+    function fail(t, bad) { ids.forEach(function (i) { $(i).textContent = '–'; }); m.className = bad ? 'msg bad' : 'msg'; m.textContent = t; }
+    var tip = 'Fill the tank to full, note the odometer, drive, then fill to full again. The fuel you add the second time is what you used.';
+    if (a === '' || b === '' || fl === '') return fail(tip);
+    if (+a < 0 || +b < 0) return fail('Odometer readings cannot be negative.', true);
+    var d = +b - +a; if (!(d > 0)) return fail('"Odometer now" must be bigger than the reading at the last fill-up.', true);
+    if (!(+fl > 0)) return fail('Fuel must be more than 0.', true);
+    var km = d * ($('mgDU').value === 'mi' ? MI : 1), L = +fl * VOL[$('mgVU').value], e = all(km, L);
+    $('mgDist').textContent = nf(d, 1) + ($('mgDU').value === 'mi' ? ' mi' : ' km');
+    $('mgKmL').textContent = nf(e.kmL); $('mgL100').textContent = nf(e.l100); $('mgMpgUS').textContent = nf(e.us, 1); $('mgMpgUK').textContent = nf(e.uk, 1);
+    m.className = 'msg'; m.textContent = e.l100 < 1.5 || e.l100 > 60 ? 'That result looks unusual for a car. Check the readings and units.' : tip;
+  }
+  // ---------- log ----------
+  var rows = [];
+  function save() { try { if (Prefs.get().rememberInputs) localStorage.setItem(STORE, JSON.stringify(rows)); } catch (e) {} }
+  try { var s = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(s)) rows = s.filter(function (r) { return r && typeof r === 'object'; }).slice(0, 500); } catch (e) {}
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function draw() {
+    $('mgRows').innerHTML = rows.map(function (r, i) {
+      return '<tr><td><input type="date" data-nomemo data-i="' + i + '" data-k="d" aria-label="Date" value="' + esc(r.d) + '"></td>' +
+        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="o" min="0" step="any" inputmode="decimal" aria-label="Odometer" value="' + esc(r.o) + '"></td>' +
+        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="f" min="0" step="any" inputmode="decimal" aria-label="Fuel added" value="' + esc(r.f) + '"' + (i === 0 ? ' placeholder="(start)"' : '') + '></td>' +
+        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="c" min="0" step="any" inputmode="decimal" aria-label="Cost" value="' + esc(r.c) + '"></td>' +
+        '<td class="mg-e">–</td><td><button type="button" class="btn ghost mg-x" data-del="' + i + '" aria-label="Remove fill-up ' + (i + 1) + '">✕</button></td></tr>';
+    }).join('');
+    log();
+  }
+  function log() {
+    var m = $('mgLogMsg'), cells = $('mgRows').querySelectorAll('.mg-e'), ids = ['mgAvg', 'mgBW', 'mgTD', 'mgTF', 'mgCPD'];
+    $('mgCurOBox').hidden = $('mgCur').value !== 'other';
+    var dk = $('mgDU').value === 'mi' ? MI : 1, vl = VOL[$('mgVU').value], prev = null, tk = 0, tl = 0, tc = 0, costAll = true, best = null, worst = null, probs = [];
+    rows.forEach(function (r, i) {
+      var o = r.o === '' || r.o == null ? NaN : +r.o, f = r.f === '' || r.f == null ? NaN : +r.f;
+      if (cells[i]) cells[i].textContent = '–';
+      if (isNaN(o)) return;
+      if (prev !== null) {
+        var d = o - prev;
+        if (d <= 0) probs.push('Line ' + (i + 1) + ': the odometer must be higher than the line before.');
+        else if (!(f > 0)) probs.push('Line ' + (i + 1) + ': enter the fuel added.');
+        else {
+          var km = d * dk, L = f * vl; tk += km; tl += L;
+          if (r.c === '' || r.c == null) costAll = false; else tc += +r.c;
+          var lp = L / km; if (best === null || lp < best[0]) best = [lp, km, L]; if (worst === null || lp > worst[0]) worst = [lp, km, L];
+          if (cells[i]) cells[i].textContent = main(km, L);
+        }
+      }
+      prev = o;
+    });
+    m.className = probs.length ? 'msg bad' : 'msg'; m.textContent = probs.slice(0, 3).join(' ');
+    if (!(tk > 0)) { ids.forEach(function (i) { $(i).textContent = '–'; }); if (!probs.length) m.textContent = rows.length < 2 ? 'Add at least two fill-ups to see averages.' : ''; return; }
+    $('mgAvg').textContent = main(tk, tl);
+    $('mgBW').textContent = main(best[1], best[2]) + ' / ' + main(worst[1], worst[2]).replace(/ .*/, '');
+    $('mgTD').textContent = nf(tk / dk, 1) + ($('mgDU').value === 'mi' ? ' mi' : ' km');
+    $('mgTF').textContent = nf(tl / vl) + ({ L: ' L', usgal: ' US gal', ukgal: ' UK gal' })[$('mgVU').value];
+    $('mgCPD').textContent = costAll && tc > 0 ? cur() + nf(tc / (tk / dk), 3) + ' per ' + ($('mgDU').value === 'mi' ? 'mi' : 'km') : '–';
+  }
+  $('mgRows').addEventListener('input', function (e) { var t = e.target; if (!t.dataset.k) return; rows[+t.dataset.i][t.dataset.k] = t.value; save(); log(); });
+  $('mgRows').addEventListener('click', function (e) { var b = e.target.closest('[data-del]'); if (!b) return; rows.splice(+b.dataset.del, 1); save(); draw(); });
+  function today(off) { var n = new Date(Date.now() - (off || 0) * 864e5); return n.getFullYear() + '-' + String(n.getMonth() + 1).padStart(2, '0') + '-' + String(n.getDate()).padStart(2, '0'); }
+  $('mgAdd').addEventListener('click', function () {
+    if (rows.length >= 500) return;
+    var last = rows[rows.length - 1]; rows.push({ d: today(), o: '', f: '', c: '' }); save(); draw();
+    var ins = $('mgRows').querySelectorAll('tr:last-child input'); if (ins[1]) ins[1].focus();
+    if (last && last.o !== '' && ins[1]) ins[1].placeholder = 'more than ' + last.o;
+  });
+  $('mgEx').addEventListener('click', function () {
+    if (rows.length && !confirm('Replace your log with an example?')) return;
+    rows = [{ d: today(42), o: 20000, f: '', c: '' }, { d: today(28), o: 20480, f: 36, c: 54 }, { d: today(14), o: 20950, f: 33.5, c: 51 }, { d: today(1), o: 21400, f: 35.2, c: 52.8 }];
+    save(); draw();
+  });
+  $('mgClr').addEventListener('click', function () { if (rows.length && !confirm('Delete every line of your fill-up log?')) return; rows = []; save(); draw(); });
+  $('mgCopy').addEventListener('click', function () {
+    var cells = $('mgRows').querySelectorAll('.mg-e');
+    var t = rows.map(function (r, i) { return [r.d, r.o, r.f, r.c, cells[i] ? cells[i].textContent : ''].join('\t'); }).join('\n');
+    if (t) copyText('Date\tOdometer\tFuel\tCost\tAverage\n' + t + '\nOverall: ' + $('mgAvg').textContent, this);
+  });
+  ['mgA', 'mgB', 'mgF'].forEach(function (id) { $(id).addEventListener('input', quick); });
+  ['mgDU', 'mgVU', 'mgCur', 'mgCurO'].forEach(function (id) { $(id).addEventListener('input', function () { quick(); log(); }); $(id).addEventListener('change', function () { quick(); log(); }); });
+  if (!rows.length) rows = [{ d: today(), o: '', f: '', c: '' }, { d: today(), o: '', f: '', c: '' }];
+  draw(); quick();
+})();
+</script>

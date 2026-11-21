@@ -1,0 +1,90 @@
+<style>
+.ae-tbl input { min-width: 0; width: 100%; }
+.ae-tbl td, .ae-tbl th { padding: 6px 4px; vertical-align: middle; }
+.ae-tbl td.ae-name { min-width: 130px; }
+.ae-tbl td.ae-n { min-width: 72px; }
+.ae-tbl .ae-x { min-height: 36px; padding: 4px 10px; }
+.ae-tbl td.ae-out { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ae-bar { height: 6px; border-radius: 3px; background: var(--accent); margin-top: 4px; min-width: 2px; }
+.ae-add { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; }
+.ae-add .btn { min-height: 36px; padding: 5px 12px; font-size: 14px; }
+.ae-note { font-size: 14px; color: var(--muted); }
+</style>
+<div class="fields">
+  <div><label for="aePrice">Electricity price per kWh</label><input type="number" id="aePrice" min="0" step="any" value="0.15" inputmode="decimal"></div>
+  <div><label for="aeCur">Currency</label><select id="aeCur"></select></div>
+  <div id="aeCurOBox" hidden><label for="aeCurO">Your currency symbol</label><input type="text" id="aeCurO" maxlength="6"></div>
+</div>
+<p class="ae-note" style="margin-top:-6px">Find the price per kWh (unit) on your electricity bill. If your bill has slabs or extra charges, divide the total bill by the units used for an average price.</p>
+<div class="scroll-x"><table class="sched ae-tbl"><thead><tr><th>Appliance</th><th>Watts</th><th>How many</th><th>Hours a day</th><th>Days a week</th><th>Cost a month</th><th><span class="sr-only">Remove</span></th></tr></thead><tbody id="aeRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="aeAdd">Add appliance</button><button type="button" class="btn ghost" id="aeClr">Clear list</button><button type="button" class="btn ghost" id="aeCopy">Copy table</button></div>
+<p class="ae-note" style="margin-bottom:0">Quick add (typical watts, edit to match your label):</p>
+<div class="ae-add" id="aeQuick"></div>
+<div class="stats">
+  <div class="stat"><span>Energy per day</span><b id="aeKd">–</b></div>
+  <div class="stat"><span>Energy per month</span><b id="aeKm">–</b></div>
+  <div class="stat"><span>Cost per day</span><b id="aeCd">–</b></div>
+  <div class="stat"><span>Cost per month</span><b id="aeCm">–</b></div>
+  <div class="stat"><span>Cost per year</span><b id="aeCy">–</b></div>
+</div>
+<p class="msg" id="aeMsg"></p>
+<p class="ae-note">A month is counted as 30.42 days (365 ÷ 12). Fridges, ACs and heaters switch on and off by themselves, so their real use is often 30–60% of the label watts × hours. The wattage is on the label or in the manual.</p>
+<script>
+(function () {
+  var QUICK = [['LED bulb', 10], ['Ceiling fan', 75], ['Laptop', 60], ['Desktop computer', 200], ['TV (LED)', 100], ['Wi-Fi router', 10], ['Phone charger', 10], ['Fridge (average running)', 150], ['Air conditioner 1 ton / 12,000 BTU', 1100], ['Air conditioner 1.5 ton / 18,000 BTU', 1600], ['Electric heater', 2000], ['Water heater / geyser', 2000], ['Washing machine', 500], ['Clothes iron', 1000], ['Microwave', 1200], ['Electric kettle', 2000], ['Water pump 1 hp', 750], ['Hair dryer', 1500]];
+  var CUR = [['', 'No symbol'], ['$', 'US dollar ($)'], ['€', 'Euro (€)'], ['£', 'British pound (£)'], ['₹', 'Indian rupee (₹)'], ['Rs', 'Pakistani rupee (Rs)'], ['৳', 'Bangladeshi taka (৳)'], ['₦', 'Nigerian naira (₦)'], ['KSh', 'Kenyan shilling (KSh)'], ['R', 'South African rand (R)'], ['AED', 'UAE dirham (AED)'], ['SAR', 'Saudi riyal (SAR)'], ['₱', 'Philippine peso (₱)'], ['Rp', 'Indonesian rupiah (Rp)'], ['RM', 'Malaysian ringgit (RM)'], ['R$', 'Brazilian real (R$)'], ['C$', 'Canadian dollar (C$)'], ['A$', 'Australian dollar (A$)'], ['¥', 'Yen / yuan (¥)'], ['₺', 'Turkish lira (₺)'], ['E£', 'Egyptian pound (E£)'], ['other', 'Other…']];
+  var REG = { US: '$', GB: '£', IN: '₹', PK: 'Rs', BD: '৳', NG: '₦', KE: 'KSh', ZA: 'R', AE: 'AED', SA: 'SAR', PH: '₱', ID: 'Rp', MY: 'RM', BR: 'R$', CA: 'C$', AU: 'A$', JP: '¥', CN: '¥', TR: '₺', EG: 'E£' };
+  'AT BE CY DE EE ES FI FR GR HR IE IT LT LU LV MT NL PT SI SK'.split(' ').forEach(function (c) { REG[c] = '€'; });
+  $('aeCur').innerHTML = CUR.map(function (c) { return '<option value="' + c[0] + '">' + c[1] + '</option>'; }).join('');
+  try { $('aeCur').value = REG[((navigator.language || '').split('-')[1] || '').toUpperCase()] || ''; } catch (e) {}
+  function cur() { var v = $('aeCur').value; if (v === 'other') v = $('aeCurO').value.trim(); return v ? v + ' ' : ''; }
+  function money(x) { return cur() + fmtNum(x, 2); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  var STORE = 'gtn-appliance-list', rows = null, MD = 365 / 12;
+  try { var s = JSON.parse(localStorage.getItem(STORE)); if (Array.isArray(s) && s.length) rows = s.slice(0, 100); } catch (e) {}
+  if (!rows) rows = [{ n: 'LED bulb', w: 10, q: 6, h: 6, d: 7 }, { n: 'Ceiling fan', w: 75, q: 2, h: 10, d: 7 }, { n: 'Fridge (average running)', w: 150, q: 1, h: 24, d: 7 }, { n: 'TV (LED)', w: 100, q: 1, h: 4, d: 7 }];
+  function save() { try { if (Prefs.get().rememberInputs) localStorage.setItem(STORE, JSON.stringify(rows)); } catch (e) {} }
+  function inp(i, k, v, label, extra) { return '<input ' + (k === 'n' ? 'type="text" maxlength="50" autocomplete="off"' : 'type="number" min="0" step="any" inputmode="decimal"') + ' data-nomemo data-i="' + i + '" data-k="' + k + '" aria-label="' + label + '" value="' + esc(v) + '"' + (extra || '') + '>'; }
+  function draw() {
+    $('aeRows').innerHTML = rows.map(function (r, i) {
+      return '<tr><td class="ae-name">' + inp(i, 'n', r.n, 'Appliance name') + '</td><td class="ae-n">' + inp(i, 'w', r.w, 'Watts') + '</td><td class="ae-n">' + inp(i, 'q', r.q, 'How many') + '</td><td class="ae-n">' + inp(i, 'h', r.h, 'Hours a day', ' max="24"') + '</td><td class="ae-n">' + inp(i, 'd', r.d, 'Days a week', ' max="7"') + '</td><td class="ae-out">–</td><td><button type="button" class="btn ghost ae-x" data-del="' + i + '" aria-label="Remove ' + esc(r.n || 'appliance') + '">✕</button></td></tr>';
+    }).join('');
+    calc();
+  }
+  var copyTxt = '';
+  function calc() {
+    $('aeCurOBox').hidden = $('aeCur').value !== 'other';
+    var price = $('aePrice').value === '' ? NaN : +$('aePrice').value, msg = $('aeMsg'), outs = $('aeRows').querySelectorAll('.ae-out'), probs = [], kd = 0, per = [];
+    rows.forEach(function (r, i) {
+      var w = +r.w, q = r.q === '' ? 1 : +r.q, h = +r.h, d = r.d === '' ? 7 : +r.d, bad = '';
+      if (r.w === '' || r.h === '') bad = 'skip';
+      else if (!(w >= 0) || !(q >= 0) || !(h >= 0) || !(d >= 0)) bad = 'Line ' + (i + 1) + ': values cannot be negative.';
+      else if (h > 24) bad = 'Line ' + (i + 1) + ': a day has only 24 hours.';
+      else if (d > 7) bad = 'Line ' + (i + 1) + ': a week has only 7 days.';
+      else if (w > 1e6) bad = 'Line ' + (i + 1) + ': that wattage is too large. Check whether it is watts, not milliwatts.';
+      if (bad) { if (bad !== 'skip') probs.push(bad); per.push(null); if (outs[i]) outs[i].textContent = '–'; return; }
+      var k = w * q * h * d / 7 / 1000; kd += k; per.push(k);
+    });
+    var ok = price >= 0;
+    var maxK = Math.max.apply(null, per.filter(function (x) { return x !== null; }).concat([0]));
+    per.forEach(function (k, i) { if (k === null || !outs[i]) return; outs[i].innerHTML = (ok ? money(k * MD * price) : fmtNum(k * MD, 1) + ' kWh') + '<div class="ae-bar" style="width:' + (maxK ? Math.max(2, k / maxK * 100) : 0) + '%"></div>'; });
+    $('aeKd').textContent = fmtNum(kd, 2) + ' kWh'; $('aeKm').textContent = fmtNum(kd * MD, 1) + ' kWh';
+    if (!ok) { ['aeCd', 'aeCm', 'aeCy'].forEach(function (i) { $(i).textContent = '–'; }); probs.unshift('Enter your electricity price per kWh (0 or more) to see costs.'); }
+    else { $('aeCd').textContent = money(kd * price); $('aeCm').textContent = money(kd * MD * price); $('aeCy').textContent = money(kd * 365 * price); }
+    var top = -1; per.forEach(function (k, i) { if (k !== null && (top < 0 || k > per[top])) top = i; });
+    msg.className = probs.length ? 'msg bad' : 'msg';
+    msg.textContent = probs.length ? probs.slice(0, 3).join(' ') : top >= 0 && kd > 0 ? 'Biggest user: ' + (rows[top].n || 'line ' + (top + 1)) + ', ' + fmtNum(per[top] / kd * 100, 0) + '% of the total.' : 'Add your appliances with their watts and hours.';
+    copyTxt = rows.map(function (r, i) { return [r.n, r.w + ' W', '× ' + (r.q === '' ? 1 : r.q), r.h + ' h/day', (r.d === '' ? 7 : r.d) + ' days/week', per[i] === null ? '' : fmtNum(per[i] * MD, 1) + ' kWh/month' + (ok ? ' = ' + money(per[i] * MD * price) : '')].join(', '); }).join('\n') + '\nTotal: ' + $('aeKm').textContent + ' per month' + (ok ? ', ' + $('aeCm').textContent + ' per month, ' + $('aeCy').textContent + ' per year' : '');
+  }
+  $('aeRows').addEventListener('input', function (e) { var t = e.target; if (!t.dataset.k) return; rows[+t.dataset.i][t.dataset.k] = t.dataset.k === 'n' ? t.value : t.value === '' ? '' : +t.value; save(); calc(); });
+  $('aeRows').addEventListener('click', function (e) { var b = e.target.closest('[data-del]'); if (!b) return; rows.splice(+b.dataset.del, 1); save(); draw(); });
+  function add(n, w) { if (rows.length >= 100) return; rows.push({ n: n || '', w: w == null ? '' : w, q: 1, h: '', d: 7 }); save(); draw(); var tr = $('aeRows').lastElementChild; if (tr) tr.querySelectorAll('input')[n ? 3 : 0].focus(); }
+  $('aeQuick').innerHTML = QUICK.map(function (q, i) { return '<button type="button" class="btn ghost" data-q="' + i + '">+ ' + q[0] + '</button>'; }).join('');
+  $('aeQuick').addEventListener('click', function (e) { var b = e.target.closest('[data-q]'); if (b) { var q = QUICK[+b.dataset.q]; add(q[0], q[1]); } });
+  $('aeAdd').addEventListener('click', function () { add(); });
+  $('aeClr').addEventListener('click', function () { if (rows.length && !confirm('Remove every appliance from the list?')) return; rows = []; save(); draw(); });
+  $('aeCopy').addEventListener('click', function () { if (copyTxt) copyText(copyTxt, this); });
+  ['aePrice', 'aeCur', 'aeCurO'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+  draw();
+})();
+</script>

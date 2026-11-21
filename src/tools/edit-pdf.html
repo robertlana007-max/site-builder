@@ -179,12 +179,15 @@
     // fontExtraProperties keeps each embedded font's data, so edits can reuse the document's own fonts.
     pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
     f.arrayBuffer().then(function (buf) { return pdfjsLib.getDocument({ data: buf, fontExtraProperties: true }).promise; }).then(function (doc) {
+      // saving needs pdf-lib, which cannot write into a locked PDF: say so now, before any work is done
+      return PT.open(f).then(function () { return doc; }, function (e) { doc.destroy(); throw e; });
+    }).then(function (doc) {
       file = f; pdf = doc; edits = {}; scans = {}; $('editor').hidden = false; refresh();
       PT.say('', f.name + ' · ' + doc.numPages + (doc.numPages === 1 ? ' page' : ' pages'));
       return show(1);
     }).catch(function (e) {
       file = pdf = null; edits = {}; $('editor').hidden = true; refresh();
-      PT.say('bad', e && e.name === 'PasswordException' ? 'This PDF is password protected. Remove the password first.' : 'This file could not be read as a PDF.');
+      PT.say('bad', e && e.name === 'PasswordException' ? 'This PDF is password protected. Remove the password first.' : e && /^"/.test(e.message || '') ? e.message : 'This file could not be read as a PDF.');
     });
   });
   $('prev').addEventListener('click', function () { if (pageNum > 1) show(pageNum - 1); });
@@ -197,6 +200,22 @@
     if (/courier|mono|consol|menlo/.test(n) || e.family === 'monospace') return bold ? (ital ? F.CourierBoldOblique : F.CourierBold) : (ital ? F.CourierOblique : F.Courier);
     if (/times|serif|georgia|garamond|roman|minion|cambria|book/.test(n) && !/sans/.test(n) || e.family === 'serif') return bold ? (ital ? F.TimesRomanBoldItalic : F.TimesRomanBold) : (ital ? F.TimesRomanItalic : F.TimesRoman);
     return bold ? (ital ? F.HelveticaBoldOblique : F.HelveticaBold) : (ital ? F.HelveticaOblique : F.Helvetica);
+  }
+
+  // A Noto Sans / Noto Serif font for letters the 12 standard fonts lack (Greek, Cyrillic, Vietnamese…), or null.
+  var notoBytes = {};
+  async function noto(doc, e, cache) {
+    if (!window.fontkit) return null;
+    var name = standard(e), key = (/^Times/.test(name) ? 'serif' : 'sans') + '-subset-' + (/Bold/.test(name) ? 700 : 400);
+    if (!(key in cache)) {
+      try {
+        var b = notoBytes[key] || (notoBytes[key] = await fetch('../assets/vendor/fonts/noto-' + key + '.ttf').then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }));
+        cache[key] = await doc.embedFont(b, { subset: true });
+      } catch (x) { cache[key] = null; delete notoBytes[key]; }
+    }
+    var f = cache[key];
+    if (!f) return null;
+    try { return Array.from(e.text).every(function (ch) { return !ch.trim() || f.embedder.font.hasGlyphForCodePoint(ch.codePointAt(0)); }) ? f : null; } catch (x) { return null; }
   }
 
   // ---------- Taking the old words out of the file ----------
@@ -374,7 +393,7 @@
   $('go').addEventListener('click', function () {
     if (cur) deselect();
     PT.run(async function () {
-      var doc = await PT.open(file), own = {}, std = {}, usedOwn = 0, usedStd = 0, covered = 0, list = Object.keys(edits).map(function (k) { return edits[k]; });
+      var doc = await PT.open(file), own = {}, std = {}, nf = {}, usedOwn = 0, usedStd = 0, usedPic = 0, covered = 0, list = Object.keys(edits).map(function (k) { return edits[k]; });
       if (window.fontkit) doc.registerFontkit(fontkit);
       // First take the old words out of every page that has changes (before anything new is drawn on it).
       var byPage = {};
@@ -384,7 +403,7 @@
       });
       for (var i = 0; i < list.length; i++) {
         var e = list[i], page = doc.getPage(e.page - 1), rgb = function (c) { return PDFLib.rgb(c[0] / 255, c[1] / 255, c[2] / 255); };
-        var pad = e.size * .08, size = e.size, font = null, set = null, has = !!e.text.trim(), wide = 0;
+        var pad = e.size * .08, size = e.size, font = null, set = null, has = !!e.text.trim(), wide = 0, pic = null;
         if (has && e.data && window.fontkit) { // try the document's own font first
           try {
             if (!(e.fontId in own)) own[e.fontId] = await doc.embedFont(e.data, { subset: false });
@@ -402,12 +421,17 @@
           var name = standard(e);
           if (!std[name]) std[name] = await doc.embedFont(name);
           font = std[name];
-          try {
-            font.widthOfTextAtSize(e.text, size);
+          try { font.widthOfTextAtSize(e.text, size); } catch (err) { font = await noto(doc, e, nf); } // letters outside the standard font: try Noto
+          if (font) {
             // on a scanned page the size is whatever makes the original words as wide as they were
-            if (e.fit) { var ow = font.widthOfTextAtSize(e.orig, 1); if (ow > 0) size = Math.max(e.size * .5, Math.min(e.size * 1.6, e.w / ow)); }
-          } catch (err) { throw new Error('On page ' + e.page + ', "' + e.text.slice(0, 30) + '" has letters this tool cannot write into the PDF. Only Latin letters work when the PDF lacks those letters in its own font.'); }
-          wide = font.widthOfTextAtSize(e.text, size);
+            if (e.fit) { var ow = 0; try { ow = font.widthOfTextAtSize(e.orig, 1); } catch (err) {} if (ow > 0) size = Math.max(e.size * .5, Math.min(e.size * 1.6, e.w / ow)); }
+            wide = font.widthOfTextAtSize(e.text, size);
+          } else { // Arabic, Chinese, emoji…: the browser draws the line as a picture
+            var serif = /^Times/.test(name), bold = /Bold/.test(name), italic = /Italic|Oblique/.test(name);
+            var t = await PT.textPng(e.text, 100, css(e.ink), (italic ? 'italic ' : '') + (bold ? 'bold' : 'normal'), serif ? '"Times New Roman", "Noto Serif", serif' : 'Arial, "Noto Sans", sans-serif');
+            var k = size / 100; pic = { img: await doc.embedPng(t.png), w: t.w * k, h: t.h * k, asc: t.asc * k };
+            wide = pic.w;
+          }
         }
         // Cover the old line (when its words could not be taken out) and, if the new text is longer, the space it needs.
         var cw = e.removed ? (wide > e.w ? wide : 0) : Math.max(e.w, wide), cx = e.removed ? e.x + e.w : e.x;
@@ -415,7 +439,10 @@
         if (cw > 0) page.drawRectangle({ x: cx - pad, y: e.y + e.desc * e.size - pad, width: cw + pad * 2, height: e.size * (e.asc - e.desc) + pad * 2, color: rgb(e.bg) });
         if (!e.removed) covered++;
         if (!has) continue;
-        if (mine) {
+        if (pic) {
+          usedPic++;
+          page.drawImage(pic.img, { x: e.x - 1 * size / 100, y: e.y - (pic.h - pic.asc), width: pic.w, height: pic.h });
+        } else if (mine) {
           usedOwn++;
           var x = e.x;
           e.text.split(' ').forEach(function (word) {
@@ -430,6 +457,7 @@
       var note = 'Saved ' + list.length + (list.length === 1 ? ' change' : ' changes');
       if (usedStd) note += '. ' + (usedOwn ? usedOwn + ' kept the original font; ' : '') + usedStd + ' used the closest standard font, because the PDF does not contain those letters in its own font';
       else if (usedOwn) note += ' in the original font';
+      if (usedPic) note += '. ' + usedPic + (usedPic === 1 ? ' line has' : ' lines have') + ' letters no PDF font here can write (for example Arabic, Chinese or emoji), so ' + (usedPic === 1 ? 'it was' : 'they were') + ' added as a picture of the text';
       if (covered) note += '. Note: ' + (covered === list.length ? 'the old text was' : covered + (covered === 1 ? ' old line was' : ' old lines were')) + ' only covered over, so it is hidden but can still be found by copying or searching the file';
       PT.done(await doc.save(), PT.base(file.name) + '-edited.pdf', 'application/pdf', note);
     });

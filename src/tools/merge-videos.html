@@ -7,6 +7,8 @@
 .vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
 </style>
 <style>
+.mg-list { grid-template-columns: minmax(0, 1fr); }
+.mg-list li { min-width: 0; }
 .mg-list li span small { color: var(--muted); margin-inline-start: 4px; }
 .mg-list li.mg-bad span { color: var(--bad); }
 .mg-total { font-size: 15px; margin: -6px 0 14px; color: var(--muted); }
@@ -259,7 +261,7 @@ var VT = (function () {
 })();
 (function () {
   var MAX_TOTAL = 1024 * 1024 * 1024, MAX_CLIPS = 20;
-  var clips = [], busy = false, probing = false, cancelled = false, outUrl = null;
+  var skipNote = '', clips = [], busy = false, probing = false, cancelled = false, outUrl = null;
   // clip: { file, info, err }
   function say(c, t) { VT.say(c, t); }
   function ok() { return clips.filter(function (c) { return c.info; }); }
@@ -321,12 +323,13 @@ var VT = (function () {
     if (!good.length || good.length < 2 || bad) $('hint').textContent = '';
     else if (fast) $('hint').textContent = 'The clips are joined end to end exactly as they are.';
     else {
-      var s = size(), mins = dur / 60;
+      var s = size(), slow = Math.max(0.3, s.w * s.h / 230400 * 0.4), lo = dur * slow / 60, hi = lo * 3;
+      function m(x) { return x < 1 ? 'under a minute' : Math.round(x) + (Math.round(x) === 1 ? ' minute' : ' minutes'); }
       $('hint').textContent = 'The clips are re-encoded to one ' + s.w + ' × ' + s.h + ' MP4 so they play smoothly one after another. ' +
-        (mins > 3 ? 'This is ' + Math.round(mins) + ' minutes of video, so it can take ' + Math.round(mins * (s.w * s.h > 1e6 ? 2 : 1)) + ' to ' + Math.round(mins * (s.w * s.h > 1e6 ? 6 : 3)) + ' minutes or more. Keep this tab open.' : 'Short clips take about as long as they play.');
+        'Expect roughly ' + (hi < 1 ? 'under a minute' : m(lo) + (Math.round(hi) > Math.round(lo) ? ' to ' + m(hi) : '')) + ' on a computer, longer on a phone' + (s.w * s.h > 1e6 ? '; a smaller size such as 720p is much faster' : '') + '. Keep this tab open.';
     }
     $('go').disabled = busy || probing || good.length < 2 || !!bad;
-    if (!busy && !probing && !keep) say(bad && bytes > MAX_TOTAL ? 'bad' : '', bad);
+    if (!busy && !probing && !keep) say(bad && bytes > MAX_TOTAL || skipNote ? 'bad' : '', bytes > MAX_TOTAL ? bad : [skipNote, bad].filter(Boolean).join(' '));
   }
   ['size', 'fit', 'q', 'fast'].forEach(function (id) { $(id).addEventListener('change', function () { refresh(); }); });
 
@@ -343,13 +346,13 @@ var VT = (function () {
     list = Array.prototype.slice.call(list); // copy before the input is cleared
     $('file').value = '';
     if (busy) { say('bad', 'Please wait until the merge is finished, or press Cancel.'); return; }
-    var skipped = 0;
+    var skipped = 0; skipNote = '';
     Array.prototype.forEach.call(list, function (f) {
       if (FF.check(f) || clips.length >= MAX_CLIPS) { skipped++; return; }
       clips.push({ file: f });
     });
+    if (skipped) skipNote = 'Skipped ' + skipped + (skipped === 1 ? ' file that is' : ' files that are') + ' not a video, empty, over 1 GB, or over the limit of ' + MAX_CLIPS + ' clips.';
     render(); probeNext();
-    if (skipped) setTimeout(function () { say('bad', 'Skipped ' + skipped + (skipped === 1 ? ' file that is' : ' files that are') + ' not a video, empty, over 1 GB, or over the limit of ' + MAX_CLIPS + ' clips.'); }, 0);
   }
   var drop = $('drop');
   drop.addEventListener('click', function () { $('file').click(); });

@@ -1,0 +1,271 @@
+<style>
+.xi-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 10px; margin-top: 12px; }
+.xi-grid a { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: inherit; border: 1px solid var(--line); border-radius: 10px; padding: 6px; background: var(--surface); min-width: 0; }
+.xi-grid .xi-pic { aspect-ratio: 1; display: flex; align-items: center; justify-content: center; background: repeating-conic-gradient(#e5e7eb 0 25%, #fff 0 50%) 0 0 / 16px 16px; border-radius: 6px; overflow: hidden; }
+.xi-grid img { max-width: 100%; max-height: 100%; display: block; }
+.xi-grid span { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; line-height: 1.3; }
+.xi-grid b { font-size: 12px; font-weight: 600; color: var(--text); }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>The pictures inside it are saved on your device. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="pages">Pages</label><input type="text" id="pages" placeholder="All pages, or for example 1-3, 5" data-nomemo></div>
+  <div><label for="minSize">Skip small images</label><select id="minSize"><option value="0">Keep every image</option><option value="32" selected>Skip tiny ones (under 32 px)</option><option value="100">Skip small ones (under 100 px)</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Extract images</button><a class="btn ghost" id="dl" hidden>Download all (ZIP)</a></div>
+<p class="msg" id="msg"></p>
+<div class="xi-grid" id="grid"></div>
+<p class="msg">JPEG photos are saved exactly as they are stored in the PDF, with no loss in quality. Other pictures are saved as lossless PNG files (with transparency when the PDF has it). Text, lines and shapes drawn by the PDF itself are not images; to save whole pages, use PDF to PNG.</p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, busy = false, urls = [], MAXPX = 40000000;
+  var PL = PDFLib, N = function (n) { return PL.PDFName.of(n); };
+
+  function clearGrid() { urls.forEach(function (u) { URL.revokeObjectURL(u); }); urls = []; $('grid').innerHTML = ''; }
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current file is finished.');
+    clearGrid(); $('dl').hidden = true; $('go').disabled = true; file = null;
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    file = f; $('go').disabled = false;
+    PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Press Extract images.');
+  });
+
+  // ---------- reading PDF objects ----------
+  function look(doc, o) { return o instanceof PL.PDFRef ? doc.context.lookup(o) : o; }
+  function num(doc, o, d) { o = look(doc, o); return o instanceof PL.PDFNumber ? o.asNumber() : d; }
+  function name(o) { return o instanceof PL.PDFName ? o.decodeText ? o.decodeText() : o.asString().replace(/^\//, '') : null; }
+  function arr(doc, o) { o = look(doc, o); if (!o) return []; if (o instanceof PL.PDFArray) { var a = []; for (var i = 0; i < o.size(); i++) a.push(look(doc, o.get(i))); return a; } return [o]; }
+  function bytesOf(o) { if (!o) return null; if (o.asBytes) return o.asBytes(); return null; }
+
+  // Find image XObjects used on each page (also inside forms), remembering the first page they appear on.
+  function collect(doc, pageIdx) {
+    var found = [], seen = {};
+    function visit(res, pi, depth) {
+      res = look(doc, res);
+      if (!(res instanceof PL.PDFDict) || depth > 12) return;
+      var xo = look(doc, res.get(N('XObject')));
+      if (!(xo instanceof PL.PDFDict)) return;
+      xo.entries().forEach(function (e) {
+        var ref = e[1], obj = look(doc, ref);
+        if (!(obj instanceof PL.PDFRawStream) && !(obj && obj.dict)) return;
+        var st = name(obj.dict.get(N('Subtype'))), key = ref instanceof PL.PDFRef ? ref.toString() : null;
+        if (st === 'Image') { if (key && seen[key]) return; if (key) seen[key] = 1; found.push({ obj: obj, page: pi }); }
+        else if (st === 'Form') { if (key && seen['f' + key + '/' + pi]) return; if (key) seen['f' + key + '/' + pi] = 1; visit(obj.dict.get(N('Resources')), pi, depth + 1); }
+      });
+    }
+    var pages = doc.getPages();
+    pageIdx.forEach(function (i) { visit(pages[i].node.Resources(), i, 0); });
+    return found;
+  }
+
+  // ---------- decoding pixel data ----------
+  function filters(doc, d) { return arr(doc, d.get(N('Filter'))).map(name); }
+  function unpredict(data, parms, doc) {
+    parms = look(doc, parms);
+    if (!(parms instanceof PL.PDFDict)) return data;
+    var pred = num(doc, parms.get(N('Predictor')), 1);
+    if (pred < 2) return data;
+    var colors = num(doc, parms.get(N('Colors')), 1), bpc = num(doc, parms.get(N('BitsPerComponent')), 8), cols = num(doc, parms.get(N('Columns')), 1);
+    var bpp = Math.max(1, Math.ceil(colors * bpc / 8)), row = Math.ceil(colors * bpc * cols / 8);
+    if (pred === 2) {
+      if (bpc !== 8) return data;
+      for (var r = 0; r * row < data.length; r++) for (var x = colors; x < row; x++) { var k = r * row + x; data[k] = (data[k] + data[k - colors]) & 255; }
+      return data;
+    }
+    var rows = Math.floor(data.length / (row + 1)), out = new Uint8Array(rows * row), prev = new Uint8Array(row);
+    for (var y = 0; y < rows; y++) {
+      var t = data[y * (row + 1)], src = y * (row + 1) + 1, o = y * row;
+      for (var i = 0; i < row; i++) {
+        var a = i >= bpp ? out[o + i - bpp] : 0, b = prev[i], c = i >= bpp ? prev[i - bpp] : 0, v = data[src + i], p;
+        if (t === 1) v += a; else if (t === 2) v += b; else if (t === 3) v += (a + b) >> 1;
+        else if (t === 4) { p = a + b - c; var pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c); v += pa <= pb && pa <= pc ? a : pb <= pc ? b : c; }
+        out[o + i] = v & 255;
+      }
+      prev = out.subarray(o, o + row);
+    }
+    return out;
+  }
+  function rawPixels(doc, st) {
+    var fl = filters(doc, st.dict);
+    if (fl.some(function (f) { return !/^(FlateDecode|Fl|LZWDecode|LZW|ASCIIHexDecode|AHx|ASCII85Decode|A85|RunLengthDecode|RL)$/.test(f); })) return null;
+    var data = fl.length ? PL.decodePDFRawStream(st).decode() : st.contents.slice();
+    var parms = arr(doc, st.dict.get(N('DecodeParms')) || st.dict.get(N('DP')));
+    if (parms.length) data = unpredict(data, parms[parms.length - 1], doc);
+    return data;
+  }
+  // Colour space -> { n: components, toRGB(values 0..1 array) } or null when unsupported.
+  function space(doc, cs, depth) {
+    cs = look(doc, cs);
+    var a = cs instanceof PL.PDFArray ? arr(doc, cs) : [cs], kind = name(a[0]);
+    if (kind === 'DeviceGray' || kind === 'CalGray' || kind === 'G') return { n: 1 };
+    if (kind === 'DeviceRGB' || kind === 'CalRGB' || kind === 'RGB') return { n: 3 };
+    if (kind === 'DeviceCMYK' || kind === 'CMYK') return { n: 4 };
+    if (kind === 'ICCBased' && a[1] && a[1].dict) {
+      var n = num(doc, a[1].dict.get(N('N')), 0);
+      return n === 1 || n === 3 || n === 4 ? { n: n } : null;
+    }
+    if ((kind === 'Indexed' || kind === 'I') && !depth) {
+      var base = space(doc, a[1], 1), hi = num(doc, a[2], 0), lut = a[3];
+      if (!base || base.indexed) return null;
+      var tbl = lut && lut.dict ? rawPixels(doc, lut) : bytesOf(lut);
+      if (!tbl) return null;
+      return { n: 1, indexed: true, base: base, hi: hi, lut: tbl };
+    }
+    return null;
+  }
+  function decodeImage(doc, st) {
+    var d = st.dict, w = num(doc, d.get(N('Width')) || d.get(N('W')), 0), h = num(doc, d.get(N('Height')) || d.get(N('H')), 0);
+    if (!w || !h || w * h > MAXPX) return null;
+    var isMask = look(doc, d.get(N('ImageMask'))), bpc = num(doc, d.get(N('BitsPerComponent')) || d.get(N('BPC')), 1);
+    isMask = isMask && isMask.asBoolean && isMask.asBoolean();
+    var cs = isMask ? { n: 1 } : space(doc, d.get(N('ColorSpace')) || d.get(N('CS')));
+    if (!cs || [1, 2, 4, 8, 16].indexOf(bpc) < 0) return null;
+    var data = rawPixels(doc, st);
+    if (!data) return null;
+    var n = cs.n, rowBytes = Math.ceil(w * n * bpc / 8);
+    if (data.length < rowBytes * h) { if (data.length < rowBytes * Math.floor(h * 0.5)) return null; }
+    var dec = arr(doc, d.get(N('Decode')) || d.get(N('D'))).map(function (x) { return x instanceof PL.PDFNumber ? x.asNumber() : 0; });
+    var max = (1 << bpc) - 1, out = new Uint8ClampedArray(w * h * 4), comp = new Array(n);
+    function sample(y, i) { // i-th component index in the row
+      var bit = i * bpc, off = y * rowBytes;
+      if (bpc === 8) return data[off + i];
+      if (bpc === 16) return (data[off + i * 2] << 8 | data[off + i * 2 + 1]) / 257;
+      var byte = data[off + (bit >> 3)], shift = 8 - (bit & 7) - bpc;
+      return (byte >> shift) & max;
+    }
+    for (var y = 0; y < h; y++) for (var x = 0; x < w; x++) {
+      var o = (y * w + x) * 4;
+      for (var c = 0; c < n; c++) {
+        var v = sample(y, x * n + c);
+        if (bpc === 16) v = v / 255; else v = v / max; // 0..1
+        if (dec.length >= 2 * n && !cs.indexed && !isMask) v = dec[2 * c] + v * (dec[2 * c + 1] - dec[2 * c]);
+        comp[c] = cs.indexed ? Math.round(v * max) : v;
+      }
+      if (isMask) { var on = dec.length && dec[0] === 1 ? comp[0] >= 0.5 : comp[0] < 0.5; out[o] = out[o + 1] = out[o + 2] = 0; out[o + 3] = on ? 255 : 0; continue; }
+      var r, g, b;
+      if (cs.indexed) {
+        var idx = Math.min(cs.hi, comp[0]) * cs.base.n, L = cs.lut;
+        if (cs.base.n === 1) r = g = b = L[idx] / 255;
+        else if (cs.base.n === 3) { r = L[idx] / 255; g = L[idx + 1] / 255; b = L[idx + 2] / 255; }
+        else { var C = L[idx] / 255, M = L[idx + 1] / 255, Y = L[idx + 2] / 255, K = L[idx + 3] / 255; r = (1 - C) * (1 - K); g = (1 - M) * (1 - K); b = (1 - Y) * (1 - K); }
+      } else if (n === 1) r = g = b = comp[0];
+      else if (n === 3) { r = comp[0]; g = comp[1]; b = comp[2]; }
+      else { r = (1 - comp[0]) * (1 - comp[3]); g = (1 - comp[1]) * (1 - comp[3]); b = (1 - comp[2]) * (1 - comp[3]); }
+      out[o] = r * 255; out[o + 1] = g * 255; out[o + 2] = b * 255; out[o + 3] = 255;
+    }
+    // Soft mask (transparency)
+    var sm = look(doc, d.get(N('SMask')));
+    if (sm && sm.dict && !isMask) {
+      var mw = num(doc, sm.dict.get(N('Width')), 0), mh = num(doc, sm.dict.get(N('Height')), 0), m = null;
+      try { m = mw && mh ? decodeImage(doc, sm) : null; } catch (e) { m = null; }
+      if (m) {
+        for (var yy = 0; yy < h; yy++) for (var xx = 0; xx < w; xx++) {
+          var sx = Math.min(mw - 1, Math.floor(xx * mw / w)), sy = Math.min(mh - 1, Math.floor(yy * mh / h));
+          out[(yy * w + xx) * 4 + 3] = m.data[(sy * mw + sx) * 4];
+        }
+      }
+    }
+    return { width: w, height: h, data: out };
+  }
+
+  function toPng(img) {
+    var c = document.createElement('canvas'); c.width = img.width; c.height = img.height;
+    c.getContext('2d').putImageData(new ImageData(img.data, img.width, img.height), 0, 0);
+    return PT.blob(c, 'image/png').then(function (b) { c.width = c.height = 0; return b; });
+  }
+
+  // pdf.js decodes the rare formats (fax and JBIG2 scans, JPEG 2000, special colour spaces).
+  var jsDoc = null;
+  async function viaPdfJs(item) {
+    if (!jsDoc) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+      jsDoc = await pdfjsLib.getDocument({ data: new Uint8Array(await file.arrayBuffer()), isOffscreenCanvasSupported: false }).promise;
+    }
+    var page = await jsDoc.getPage(item.page + 1);
+    if (!page._xiOps) page._xiOps = await page.getOperatorList();
+    var ops = page._xiOps, used = page._xiUsed || (page._xiUsed = {});
+    for (var i = 0; i < ops.fnArray.length; i++) {
+      if (ops.fnArray[i] !== pdfjsLib.OPS.paintImageXObject) continue;
+      var a = ops.argsArray[i], id = a[0];
+      if (used[id] || a[1] !== item.w || a[2] !== item.h) continue;
+      var obj = await new Promise(function (res) {
+        var store = id.indexOf('g_') === 0 ? page.commonObjs : page.objs, done = false;
+        try { store.get(id, function (o) { done = true; res(o); }); } catch (e) { res(null); }
+        setTimeout(function () { if (!done) res(null); }, 4000);
+      });
+      if (!obj) continue;
+      used[id] = 1;
+      var c = document.createElement('canvas'); c.width = obj.width; c.height = obj.height;
+      var ctx = c.getContext('2d');
+      if (obj.bitmap) ctx.drawImage(obj.bitmap, 0, 0);
+      else if (obj.data) {
+        var px = obj.width * obj.height, out = new Uint8ClampedArray(px * 4), d = obj.data;
+        if (obj.kind === 3) out.set(d.subarray(0, px * 4));
+        else if (obj.kind === 2) for (var p = 0; p < px; p++) { out[p * 4] = d[p * 3]; out[p * 4 + 1] = d[p * 3 + 1]; out[p * 4 + 2] = d[p * 3 + 2]; out[p * 4 + 3] = 255; }
+        else { var row = (obj.width + 7) >> 3; for (var y = 0; y < obj.height; y++) for (var x = 0; x < obj.width; x++) { var v = d[y * row + (x >> 3)] >> (7 - (x & 7)) & 1, q = (y * obj.width + x) * 4; out[q] = out[q + 1] = out[q + 2] = v ? 255 : 0; out[q + 3] = 255; } }
+        ctx.putImageData(new ImageData(out, obj.width, obj.height), 0, 0);
+      } else continue;
+      var blob = await PT.blob(c, 'image/png'); c.width = c.height = 0;
+      return blob;
+    }
+    return null;
+  }
+
+  function add(blob, fname, info) {
+    var url = URL.createObjectURL(blob); urls.push(url);
+    var a = document.createElement('a'), box = document.createElement('div'), img = document.createElement('img'), t = document.createElement('b'), s = document.createElement('span');
+    a.href = url; a.download = fname; box.className = 'xi-pic';
+    img.src = url; img.alt = fname; img.loading = 'lazy';
+    img.onerror = function () { box.textContent = 'No preview'; };
+    t.textContent = fname; s.textContent = info + ' · ' + fmtBytes(blob.size);
+    box.appendChild(img); a.appendChild(box); a.appendChild(t); a.appendChild(s); $('grid').appendChild(a);
+  }
+
+  $('pages').addEventListener('input', function () { $('dl').hidden = true; });
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    PT.run(async function () {
+      clearGrid(); jsDoc = null;
+      PT.say('', 'Reading ' + file.name + '…');
+      var doc = await PT.open(file), n = doc.getPageCount(), base = PT.base(file.name), minSize = +$('minSize').value;
+      var list = $('pages').value.trim() ? PT.ranges($('pages').value, n) : doc.getPageIndices();
+      var items = collect(doc, list), out = [], small = 0, failed = 0, count = {}, names = {};
+      if (!items.length) throw new Error(list.length === n ? 'No images were found in this PDF. If it is a scan or drawing, try PDF to PNG to save whole pages as pictures.' : 'No images were found on those pages.');
+      for (var k = 0; k < items.length; k++) {
+        var it = items[k], d = it.obj.dict;
+        it.w = num(doc, d.get(N('Width')) || d.get(N('W')), 0); it.h = num(doc, d.get(N('Height')) || d.get(N('H')), 0);
+        if (it.w < minSize && it.h < minSize || (minSize && (it.w < 4 || it.h < 4))) { small++; continue; }
+        PT.say('', 'Extracting image ' + (k + 1) + ' of ' + items.length + '…');
+        var fl = filters(doc, d), blob = null, ext = 'png', kind = 'PNG';
+        try {
+          if (fl.length === 1 && (fl[0] === 'DCTDecode' || fl[0] === 'DCT')) {
+            blob = new Blob([it.obj.contents], { type: 'image/jpeg' }); ext = 'jpg'; kind = 'JPEG, original';
+          } else {
+            var img = decodeImage(doc, it.obj);
+            if (img) blob = await toPng(img);
+          }
+          if (!blob) blob = await viaPdfJs(it);
+        } catch (e) { blob = null; }
+        if (!blob) { failed++; continue; }
+        var pg = it.page + 1; count[pg] = (count[pg] || 0) + 1;
+        var fname = base + '-page' + pg + '-' + count[pg] + '.' + ext;
+        if (names[fname]) fname = base + '-' + k + '.' + ext;
+        names[fname] = 1;
+        out.push({ name: fname, data: new Uint8Array(await blob.arrayBuffer()) });
+        add(blob, fname, 'Page ' + pg + ' · ' + it.w + '×' + it.h + ' · ' + kind);
+        await new Promise(function (r) { setTimeout(r, 0); }); // let the page update
+      }
+      if (jsDoc) { jsDoc.destroy(); jsDoc = null; }
+      var extra = (small ? ' ' + small + ' tiny ' + (small === 1 ? 'image was' : 'images were') + ' skipped.' : '') + (failed ? ' ' + failed + (failed === 1 ? ' image uses a format that could not be read.' : ' images use a format that could not be read.') : '');
+      if (!out.length) throw new Error('No images could be saved.' + extra + (small ? ' Choose "Keep every image" to include small ones.' : ''));
+      PT.done(PT.zip(out), base + '-images.zip', 'application/zip', out.length + (out.length === 1 ? ' image' : ' images') + ' found. Tap one to save it, or download them all');
+      if (extra) PT.say('ok', $('msg').textContent + '.' + extra);
+    }).then(function () { busy = false; });
+  });
+})();
+</script>

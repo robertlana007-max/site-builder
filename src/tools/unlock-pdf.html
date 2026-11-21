@@ -21,29 +21,38 @@
 (function () {
   var file = null, bytes = null, needPw = false, busy = false, wasm = null, MAXB = 1024 * 1024 * 1024;
 
-  // qpdf (compiled to WebAssembly) does the real decryption: RC4 40/128-bit, AES-128 and AES-256.
+  // qpdf (compiled to WebAssembly) does the real PDF encryption work. It writes its messages to the
+  // console, so while it runs those lines are caught and read here instead.
+  var sink = null;
+  function hookConsole() {
+    if (hookConsole.done) return; hookConsole.done = true;
+    ['log', 'error', 'warn'].forEach(function (k) {
+      var orig = console[k];
+      console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else orig.apply(console, arguments); };
+    });
+  }
   function loadScript() {
-    if (window.Module && window.Module.length !== undefined) return Promise.resolve();
+    if (typeof window.Module === 'function') return Promise.resolve();
     return new Promise(function (res, rej) {
       var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js';
-      s.onload = res; s.onerror = function () { rej(new Error('The PDF engine could not load. Check your connection and reload the page.')); };
+      s.onload = res; s.onerror = rej;
       document.head.appendChild(s);
     });
   }
   function qpdf() {
+    hookConsole();
     return loadScript().then(function () {
       if (wasm) return wasm;
       return fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); });
-    }).catch(function (e) { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); }).then(function (bin) {
-      var log = [];
-      return window.Module({ wasmBinary: bin, noInitialRun: true, print: function (t) { log.push(t); }, printErr: function (t) { log.push(t); } }).then(function (m) { m.log = log; return m; });
-    });
+    }).then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+      .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
   }
   function run(m, args) {
-    m.log.length = 0;
-    var code;
-    try { code = m.callMain(args); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
-    return { code: code, text: m.log.join('\n') };
+    var log = [], code;
+    sink = function (t) { log.push(t); };
+    try { code = m.callMain(args.slice()); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+    sink = null;
+    return { code: code, text: log.join('\n') };
   }
 
   function info(html) { $('info').hidden = !html; $('info').innerHTML = html || ''; }
@@ -60,24 +69,21 @@
       var b = new Uint8Array(r[0]), m = r[1], head = new TextDecoder('latin1').decode(b.subarray(0, 1024));
       if (head.indexOf('%PDF') === -1) throw new Error('"' + f.name + '" could not be read as a PDF.');
       m.FS.writeFile('/in.pdf', b);
-      var enc = run(m, ['--is-encrypted', '/in.pdf']);
-      if (enc.code === 2) {
-        var chk = run(m, ['--check', '/in.pdf']);
-        if (chk.code === 2) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
-        throw new Error('"' + f.name + '" has no password and no restrictions, so there is nothing to unlock.');
-      }
-      var req = run(m, ['--requires-password', '/in.pdf']);
-      file = f; bytes = b; needPw = req.code === 0;
-      var shown = run(m, needPw ? ['--show-encryption', '--password=', '/in.pdf'] : ['--show-encryption', '/in.pdf']).text;
-      var method = (/stream encryption method: (\w+)/.exec(shown) || [])[1] || '', R = +((/R = (\d)/.exec(shown) || [])[1] || 0);
+      var shown = run(m, ['--show-encryption', '/in.pdf']), method = '', R = 0;
+      if (shown.code === 2 && !/invalid password/i.test(shown.text)) throw new Error('"' + f.name + '" could not be read as a PDF. It may be damaged.');
+      if (/File is not encrypted/i.test(shown.text)) throw new Error('"' + f.name + '" has no password and no restrictions, so there is nothing to unlock.');
+      file = f; bytes = b; needPw = shown.code === 2;
+      method = (/stream encryption method: (\w+)/.exec(shown.text) || [])[1] || ''; R = +((/R = (\d)/.exec(shown.text) || [])[1] || 0);
       var name = { AESv3: 'AES 256-bit', AESv2: 'AES 128-bit', RC4: R >= 3 ? 'RC4 128-bit' : 'RC4 40-bit' }[method] || 'standard';
       if (needPw) {
         $('pwBox').hidden = false; $('go').disabled = false;
-        info('<b>This PDF needs a password to open.</b>It uses ' + name + ' encryption. Type the password, then press Unlock PDF.');
+        info('<b>This PDF needs a password to open.</b>Type the password, then press Unlock PDF.');
         PT.say('', f.name + ' · ' + fmtBytes(f.size));
         setTimeout(function () { $('pw').focus(); }, 0);
       } else {
-        var no = shown.split('\n').filter(function (l) { return /: not allowed/.test(l); }).map(function (l) { return l.replace(/: not allowed.*/, '').trim(); });
+        var NAMES = { 'print high resolution': 'Printing', 'print low resolution': 'Printing (even low quality)', 'extract for any purpose': 'Copying text and pictures', 'modify document assembly': 'Adding, deleting or rotating pages', 'modify forms': 'Filling in forms', 'modify annotations': 'Adding comments', 'modify other': 'Editing the content' }, seen = {};
+        var no = shown.text.split('\n').filter(function (l) { return /: not allowed/.test(l); }).map(function (l) { return NAMES[l.replace(/: not allowed.*/, '').trim()]; }).filter(function (x) { if (!x || seen[x]) return false; return (seen[x] = 1); });
+        if (seen['Printing (even low quality)']) no = no.filter(function (x) { return x !== 'Printing'; });
         $('go').disabled = false;
         info('<b>This PDF opens without a password, but it is locked against some changes.</b>' + (no.length ? 'Not allowed now: <ul>' + no.map(function (x) { return '<li>' + x.replace(/[<>&]/g, '') + '</li>'; }).join('') + '</ul>' : '') + 'Press Unlock PDF to remove these limits (' + name + ' encryption).');
         PT.say('', f.name + ' · ' + fmtBytes(f.size));

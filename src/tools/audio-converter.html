@@ -1,0 +1,382 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.ax-list { grid-template-columns: minmax(0, 1fr); }
+.ax-list li { min-width: 0; padding: 8px 8px 8px 12px; }
+.ax-list li span small { display: block; color: var(--muted); font-size: 12.5px; white-space: normal; }
+.ax-list li.ax-bad small { color: var(--bad); }
+.ax-list li.ax-ok small { color: var(--ok); }
+.ax-list li a.btn { padding: 6px 12px; min-height: 38px; flex: none; font-size: 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop audio files here</b>MP3, WAV, M4A, AAC, OGG, OPUS, FLAC, WMA, AMR, or videos to take the sound from. Add one or many. Nothing is uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.wav,.m4a,.m4r,.aac,.ogg,.oga,.opus,.flac,.wma,.amr,.aiff,.aif,.caf,.ac3,.mp4,.mov,.webm,.mkv,.3gp" multiple hidden data-nomemo>
+<ul class="files ax-list" id="list"></ul>
+<div class="fields">
+  <div><label for="fmt">Convert to</label><select id="fmt"><option value="mp3">MP3 (plays everywhere)</option><option value="m4a">M4A / AAC (iPhone, Apple Music)</option><option value="wav">WAV (no quality loss, big)</option><option value="flac">FLAC (no quality loss, smaller than WAV)</option><option value="ogg">OGG Vorbis</option></select></div>
+  <div id="kbpsBox"><label for="kbps">Quality (bitrate)</label><select id="kbps"><option value="64">64 kbps (voice, smallest)</option><option value="96">96 kbps</option><option value="128">128 kbps (good)</option><option value="192" selected>192 kbps (very good)</option><option value="256">256 kbps</option><option value="320">320 kbps (best)</option></select></div>
+  <div><label for="chans">Channels</label><select id="chans"><option value="">Keep as it is</option><option value="2">Stereo</option><option value="1">Mono (smaller)</option></select></div>
+  <div><label for="rate">Sample rate</label><select id="rate"><option value="">Keep as it is</option><option value="44100">44.1 kHz (CD, music)</option><option value="48000">48 kHz (video)</option><option value="22050">22.05 kHz (voice, small)</option></select></div>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Convert</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download all (ZIP)</a><button class="btn ghost" id="clear" type="button" hidden>Clear list</button></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.max(0, s); var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var MAX = 1024 * 1048576, MAXN = 50;
+  var items = [], busy = false, cancelled = false, zipUrl = null;
+  var MIME = { mp3: 'audio/mpeg', m4a: 'audio/mp4', wav: 'audio/wav', flac: 'audio/flac', ogg: 'audio/ogg' };
+  function say(c, t) { VT.say(c, t); }
+  function isMedia(f) { return /^(audio|video)\//.test(f.type) || /\.(mp3|wav|m4a|m4r|m4b|aac|ogg|oga|opus|flac|wma|amr|aiff?|caf|ac3|mp4|m4v|mov|webm|mkv|3gp|avi|wv|ape)$/i.test(f.name); }
+  function lossy() { return /^(mp3|m4a|ogg)$/.test($('fmt').value); }
+  function render() {
+    var ul = $('list'); ul.innerHTML = '';
+    items.forEach(function (it, i) {
+      var li = document.createElement('li'), name = document.createElement('span'), sm = document.createElement('small');
+      li.className = it.state === 'bad' ? 'ax-bad' : it.state === 'ok' ? 'ax-ok' : '';
+      name.textContent = it.file.name; name.title = it.file.name;
+      sm.textContent = it.note || fmtBytes(it.file.size);
+      name.appendChild(sm); li.appendChild(name);
+      if (it.url) { var a = document.createElement('a'); a.className = 'btn ghost'; a.href = it.url; a.download = it.outName; a.textContent = 'Download'; li.appendChild(a); }
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove ' + it.file.name); x.disabled = busy;
+      x.addEventListener('click', function () { if (busy) return; if (it.url) URL.revokeObjectURL(it.url); items.splice(i, 1); render(); });
+      li.appendChild(x);
+      ul.appendChild(li);
+    });
+    $('go').disabled = busy || !items.some(function (it) { return it.state !== 'bad'; });
+    var n = items.filter(function (it) { return it.state !== 'bad'; }).length;
+    $('go').textContent = n > 1 ? 'Convert ' + n + ' files' : 'Convert';
+    $('clear').hidden = busy || !items.length;
+  }
+  function settings() { $('kbpsBox').hidden = !lossy(); invalidate(); }
+  function invalidate() { // a setting changed: old results no longer match
+    if (busy) return;
+    items.forEach(function (it) { if (it.url) { URL.revokeObjectURL(it.url); it.url = null; } if (it.state !== 'bad') { it.state = ''; it.note = ''; } });
+    $('dl').hidden = true; render();
+  }
+  ['fmt', 'kbps', 'chans', 'rate'].forEach(function (id) { $(id).addEventListener('change', settings); });
+  settings();
+  function take(list) {
+    list = Array.prototype.slice.call(list); $('file').value = '';
+    if (busy) { say('bad', 'Please wait until the conversion is finished, or press Cancel.'); return; }
+    var skipped = [];
+    list.forEach(function (f) {
+      if (!isMedia(f)) skipped.push('"' + f.name + '" is not an audio or video file');
+      else if (!f.size) skipped.push('"' + f.name + '" is empty');
+      else if (f.size > MAX) skipped.push('"' + f.name + '" is over 1 GB');
+      else if (items.length >= MAXN) skipped.push('"' + f.name + '" is over the limit of ' + MAXN + ' files at a time');
+      else items.push({ file: f, state: '' });
+    });
+    $('dl').hidden = true; render();
+    say(skipped.length ? 'bad' : '', skipped.length ? 'Skipped: ' + skipped.join('; ') + '.' : items.length ? 'Choose the format, then press Convert.' : '');
+  }
+  var drop = $('drop');
+  drop.addEventListener('click', function () { $('file').click(); });
+  drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('file').click(); } });
+  $('file').addEventListener('change', function () { take($('file').files); });
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { take(e.dataTransfer.files); });
+  $('clear').addEventListener('click', function () { if (busy) return; items.forEach(function (it) { if (it.url) URL.revokeObjectURL(it.url); }); items = []; $('dl').hidden = true; say('', ''); render(); });
+  $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+
+  function args(input) {
+    var fmt = $('fmt').value, k = $('kbps').value + 'k', a = ['-i', input, '-map', '0:a:0', '-vn', '-sn', '-map_metadata', '0'];
+    if ($('chans').value) a.push('-ac', $('chans').value);
+    if ($('rate').value) a.push('-ar', $('rate').value);
+    if (fmt === 'mp3') a.push('-c:a', 'libmp3lame', '-b:a', k, '-id3v2_version', '3');
+    else if (fmt === 'm4a') a.push('-c:a', 'aac', '-b:a', Math.min(320, +$('kbps').value) + 'k', '-f', 'ipod', '-movflags', '+faststart');
+    else if (fmt === 'ogg') a.push('-c:a', 'libvorbis', '-b:a', k);
+    else if (fmt === 'flac') a.push('-c:a', 'flac');
+    else a.push('-c:a', 'pcm_s16le');
+    return a;
+  }
+  $('go').addEventListener('click', function () {
+    if (busy) return;
+    var todo = items.filter(function (it) { return it.state !== 'bad'; });
+    if (!todo.length) return;
+    busy = true; cancelled = false; $('go').disabled = true; $('stop').hidden = false; $('dl').hidden = true; VT.bar(0);
+    todo.forEach(function (it) { if (it.url) URL.revokeObjectURL(it.url); it.url = null; it.state = ''; it.note = fmtBytes(it.file.size) + ' · waiting'; });
+    render();
+    var fmt = $('fmt').value, done = 0, okN = 0, started = Date.now();
+    function one(it, idx) {
+      it.note = 'Converting…'; render();
+      var dur = 0;
+      return FF.probe(it.file, say, true).then(function (info) {
+        dur = info.duration;
+        if (!info.audio) throw new Error('This file has no sound track.');
+        return FF.run(it.file, args, 'out.' + fmt, dur, function (p) {
+          VT.bar((idx + p) / todo.length);
+          it.note = 'Converting… ' + Math.round(p * 100) + '%'; render();
+          say('', 'Converting file ' + (idx + 1) + ' of ' + todo.length + '…');
+        }, say);
+      }).then(function (data) {
+        var blob = new Blob([data], { type: MIME[fmt] });
+        it.url = URL.createObjectURL(blob); it.blob = blob;
+        it.outName = it.file.name.replace(/\.[^.]+$/, '') + '.' + fmt;
+        it.state = 'ok'; it.note = 'Done · ' + VT.clock(dur).replace(/\.\d$/, '') + ' · ' + fmtBytes(it.file.size) + ' → ' + fmtBytes(blob.size);
+        okN++;
+      }, function (e) {
+        if (cancelled || e.message === 'cancelled') throw new Error('cancelled');
+        it.state = 'bad'; it.note = e.message;
+      }).then(function () { done++; render(); });
+    }
+    todo.reduce(function (p, it, i) { return p.then(function () { return one(it, i); }); }, Promise.resolve()).then(function () {
+      var good = items.filter(function (it) { return it.blob && it.url; });
+      if (good.length > 1) {
+        // unique names inside the ZIP
+        var seen = {};
+        return Promise.all(good.map(function (it) {
+          var n = it.outName, c = 1; while (seen[n.toLowerCase()]) n = it.outName.replace(/(\.[^.]+)$/, ' (' + (++c) + ')$1'); seen[n.toLowerCase()] = 1;
+          return it.blob.arrayBuffer().then(function (ab) { return { name: n, data: new Uint8Array(ab) }; });
+        })).then(function (files) {
+          if (zipUrl) URL.revokeObjectURL(zipUrl);
+          zipUrl = URL.createObjectURL(PT.zip(files));
+          $('dl').href = zipUrl; $('dl').download = 'converted-' + fmt + '.zip'; $('dl').hidden = false;
+        });
+      }
+    }).then(function () {
+      VT.bar(null);
+      var bad = todo.length - okN;
+      say(okN ? 'ok' : 'bad', okN ? 'Converted ' + okN + ' of ' + todo.length + (todo.length === 1 ? ' file' : ' files') + ' to ' + fmt.toUpperCase() + (bad ? '. ' + bad + ' could not be converted (see the list).' : '.') + ' Press Download next to each file' + (okN > 1 ? ', or download them all as a ZIP.' : '.') : 'No file could be converted. See the reason under each file.');
+    }, function (e) {
+      VT.bar(null);
+      items.forEach(function (it) { if (!it.state) it.note = ''; });
+      say(e.message === 'cancelled' ? '' : 'bad', e.message === 'cancelled' ? 'Cancelled. Files already converted can still be downloaded.' : e.message);
+    }).then(function () { busy = false; $('stop').hidden = true; render(); });
+  });
+  render();
+})();
+</script>

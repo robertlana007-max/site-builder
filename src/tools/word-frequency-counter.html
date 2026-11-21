@@ -1,0 +1,173 @@
+<style>
+.wf-tbl { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.wf-tbl th, .wf-tbl td { text-align: start; padding: 7px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.wf-tbl th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.wf-tbl td.n, .wf-tbl th.n { text-align: end; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.wf-tbl td.w { overflow-wrap: anywhere; font-weight: 600; }
+.wf-bar { height: 8px; border-radius: 4px; background: var(--accent); opacity: .75; min-width: 2px; }
+.wf-wrap { max-height: 560px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 12px; }
+.wf-wrap thead th { position: sticky; top: 0; background: var(--surface); }
+.wf-barc { width: 30%; }
+@media (max-width: 520px) { .wf-barc { display: none; } }
+</style>
+<label for="wfIn">Your text</label>
+<textarea id="wfIn" data-nomemo class="plain" style="min-height:200px" placeholder="Paste an article, essay, reviews or any text to see which words and phrases are used most."></textarea>
+<div class="btns" style="margin:8px 0 16px">
+  <button class="btn ghost" id="wfOpen">Open text file</button>
+  <input type="file" id="wfFile" accept=".txt,.csv,.md,.html,.htm,.srt,.vtt,.json,.xml,.log,text/*" hidden data-nomemo>
+</div>
+<div class="fields">
+  <div><label>Count</label>
+    <div class="seg" role="group" aria-label="Phrase length" id="wfN">
+      <button type="button" data-n="1" aria-pressed="true">Single words</button><button type="button" data-n="2" aria-pressed="false">2-word phrases</button><button type="button" data-n="3" aria-pressed="false">3-word phrases</button>
+    </div></div>
+  <div><label for="wfTop">Show</label><select id="wfTop"><option value="20">Top 20</option><option value="50" selected>Top 50</option><option value="100">Top 100</option><option value="500">Top 500</option><option value="0">All</option></select></div>
+  <div><label for="wfMin">Shortest word to count</label><select id="wfMin"><option value="1">1 letter</option><option value="2">2 letters</option><option value="3" selected>3 letters</option><option value="4">4 letters</option><option value="5">5 letters</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="wfStop" checked>Skip common English words (the, and, of…)</label>
+  <label><input type="checkbox" id="wfCase" checked>Ignore upper/lower case</label>
+  <label><input type="checkbox" id="wfNum" checked>Skip numbers</label>
+</div>
+<div class="fields" style="grid-template-columns:1fr">
+  <div><label for="wfExtra">Also skip these words (optional, separated by commas)</label><input type="text" id="wfExtra" autocomplete="off" placeholder="e.g. chapter, said"></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Total words</span><b id="wfT">0</b></div>
+  <div class="stat"><span>Unique words</span><b id="wfU">0</b></div>
+  <div class="stat"><span>Counted items</span><b id="wfC">0</b></div>
+  <div class="stat"><span>Average word length</span><b id="wfA">0</b></div>
+</div>
+<p class="msg" id="wfMsg"></p>
+<div class="wf-wrap" id="wfWrap" hidden>
+  <table class="wf-tbl"><thead><tr><th class="n">#</th><th id="wfHead">Word</th><th class="n">Count</th><th class="n">Share</th><th class="wf-barc"><span class="sr-only" style="position:absolute;left:-9999px">Bar</span></th></tr></thead><tbody id="wfBody"></tbody></table>
+</div>
+<div class="btns">
+  <button class="btn" id="wfCsv">Download CSV</button>
+  <button class="btn ghost" id="wfCp">Copy list</button>
+  <button class="btn ghost" id="wfClr">Clear</button>
+</div>
+<script>
+(function () {
+  var STOP = new Set(('a about above after again against all almost also although am among an and another any anyone anything are aren\'t around as at be became because been before being below between both but by can can\'t cannot could couldn\'t did didn\'t do does doesn\'t doing don\'t down during each either else even ever every few for from further get gets got had hadn\'t has hasn\'t have haven\'t having he he\'d he\'ll he\'s her here here\'s hers herself him himself his how how\'s however i i\'d i\'ll i\'m i\'ve if in into is isn\'t it it\'s its itself just let\'s like may me might more most much must mustn\'t my myself never no nor not now of off often on once one only or other others ought our ours ourselves out over own per quite rather really same say says shan\'t she she\'d she\'ll she\'s should shouldn\'t since so some still such than that that\'s the their theirs them themselves then there there\'s these they they\'d they\'ll they\'re they\'ve this those though through thus to too toward towards under until up upon us very via was wasn\'t we we\'d we\'ll we\'re we\'ve were weren\'t what what\'s when when\'s where where\'s whether which while who who\'s whom whose why why\'s will with within without won\'t would wouldn\'t yet you you\'d you\'ll you\'re you\'ve your yours yourself yourselves').split(' '));
+  var n = 1, last = null, deb;
+  function say(cls, t) { $('wfMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('wfMsg').textContent = t; }
+  // Scripts written without spaces (Chinese, Japanese, Thai, Lao, Khmer, Myanmar) need the browser's word segmenter.
+  var NOSPACE = /[぀-ヿ㐀-䶿一-鿿฀-໿က-႟ក-៿]/;
+  var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'word' }) : null;
+  // Split into "runs": words that belong together. A run breaks at sentence punctuation and line breaks, so phrases never cross them.
+  function tokenize(text, ci) {
+    var runs = [], run = [], words = 0, letters = 0, m;
+    var push = function (w) {
+      w = w.replace(/[’‘`]/g, '\'').replace(/^'+|'+$/g, '');
+      if (!w) return;
+      words++; letters += w.length;
+      run.push(ci ? w.toLocaleLowerCase() : w);
+    };
+    var brk = function () { if (run.length) runs.push(run); run = []; };
+    if (seg && NOSPACE.test(text)) {
+      for (var s of seg.segment(text)) {
+        if (s.isWordLike) push(s.segment);
+        else if (/[.!?;:,()\[\]{}"«»“”。！？；：，、\n]/.test(s.segment)) brk();
+      }
+    } else {
+      var re = /([\p{L}\p{M}\p{N}]+(?:['’‘\-–.·][\p{L}\p{M}\p{N}]+)*)|([.!?;:,()\[\]{}"«»“”؟،؛।\n]+)/gu;
+      while ((m = re.exec(text))) { if (m[1]) push(m[1]); else brk(); }
+    }
+    brk();
+    return { runs: runs, words: words, letters: letters };
+  }
+  function count() {
+    var text = $('wfIn').value;
+    if (!text.trim()) { last = null; $('wfWrap').hidden = true; ['wfT', 'wfU', 'wfC'].forEach(function (id) { $(id).textContent = '0'; }); $('wfA').textContent = '0'; say('', ''); return; }
+    var t0 = performance.now(), ci = $('wfCase').checked, min = +$('wfMin').value, stop = $('wfStop').checked, nums = $('wfNum').checked;
+    var extra = new Set($('wfExtra').value.split(/[,;\n]/).map(function (s) { return s.trim().toLocaleLowerCase(); }).filter(Boolean));
+    var tk = tokenize(text, ci), uniq = new Set(), map = new Map(), total = 0;
+    var skip = function (w) {
+      var lw = ci ? w : w.toLocaleLowerCase();
+      if (extra.has(lw)) return true;
+      if (stop && STOP.has(lw)) return true;
+      if (nums && /^[\p{N}.,'\-]+$/u.test(w)) return true;
+      return [...w].length < min && !NOSPACE.test(w);
+    };
+    tk.runs.forEach(function (run) {
+      for (var i = 0; i < run.length; i++) {
+        uniq.add(run[i]);
+        if (i + n > run.length) continue;
+        var g = run.slice(i, i + n);
+        // a phrase may contain common words in the middle (piece of cake) but not start or end with one
+        if (n === 1 ? skip(g[0]) : (skip(g[0]) || skip(g[n - 1]) || g.some(function (w) { return nums && /^[\p{N}.,'\-]+$/u.test(w); }))) continue;
+        var key = g.join(' ');
+        map.set(key, (map.get(key) || 0) + 1); total++;
+      }
+    });
+    var rows = Array.from(map), col = new Intl.Collator();
+    rows.sort(function (a, b) { return b[1] - a[1] || col.compare(a[0], b[0]); });
+    last = { rows: rows, total: total };
+    $('wfT').textContent = fmtNum(tk.words, 0); $('wfU').textContent = fmtNum(uniq.size, 0); $('wfC').textContent = fmtNum(total, 0);
+    $('wfA').textContent = tk.words ? fmtNum(tk.letters / tk.words, 1) : '0';
+    render();
+    var ms = performance.now() - t0;
+    if (!rows.length) say('', 'Nothing to count with these settings. Try 1 letter as the shortest word, or untick Skip common English words.');
+    else say('', ms > 400 ? 'Counted in ' + (ms / 1000).toFixed(1) + ' s.' : '');
+  }
+  function render() {
+    if (!last) return;
+    var top = +$('wfTop').value, rows = top ? last.rows.slice(0, top) : last.rows, body = $('wfBody'), frag = document.createDocumentFragment();
+    var max = rows.length ? rows[0][1] : 1, LIMIT = 5000;
+    $('wfHead').textContent = n === 1 ? 'Word' : 'Phrase';
+    rows.slice(0, LIMIT).forEach(function (r, i) {
+      var tr = document.createElement('tr');
+      tr.innerHTML = '<td class="n"></td><td class="w"></td><td class="n"></td><td class="n"></td><td class="wf-barc"><div class="wf-bar"></div></td>';
+      tr.children[0].textContent = i + 1;
+      tr.children[1].textContent = r[0];
+      tr.children[2].textContent = fmtNum(r[1], 0);
+      tr.children[3].textContent = fmtNum(r[1] / last.total * 100, 1) + '%';
+      tr.children[4].firstChild.style.width = (r[1] / max * 100) + '%';
+      frag.appendChild(tr);
+    });
+    body.textContent = ''; body.appendChild(frag);
+    $('wfWrap').hidden = !rows.length;
+    if (rows.length > LIMIT) say('', 'Showing the first ' + fmtNum(LIMIT, 0) + ' rows. Download CSV to get all ' + fmtNum(rows.length, 0) + '.');
+  }
+  function schedule() { clearTimeout(deb); deb = setTimeout(count, $('wfIn').value.length > 300000 ? 500 : 150); }
+  $('wfIn').addEventListener('input', schedule);
+  ['wfStop', 'wfCase', 'wfNum', 'wfMin'].forEach(function (id) { $(id).addEventListener('change', count); });
+  $('wfExtra').addEventListener('input', schedule);
+  $('wfTop').addEventListener('change', render);
+  $('wfN').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    n = +b.dataset.n;
+    [].forEach.call(this.querySelectorAll('button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+    count();
+  });
+  function csvCell(s) { s = String(s); if (/^[=+\-@\t\r]/.test(s)) s = '\'' + s; return /[",\n\r]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  $('wfCsv').addEventListener('click', function () {
+    if (!last || !last.rows.length) { say('', 'Paste some text first to get a list to download.'); return; }
+    var top = +$('wfTop').value, rows = top ? last.rows.slice(0, top) : last.rows;
+    var lines = ['Rank,' + (n === 1 ? 'Word' : 'Phrase') + ',Count,Percent'];
+    rows.forEach(function (r, i) { lines.push((i + 1) + ',' + csvCell(r[0]) + ',' + r[1] + ',' + (r[1] / last.total * 100).toFixed(2)); });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob(['\ufeff' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.download = (n === 1 ? 'word' : n + '-word-phrase') + '-frequency.csv'; a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    burst($('wfCsv'));
+  });
+  $('wfCp').addEventListener('click', function () {
+    if (!last || !last.rows.length) { say('', 'Paste some text first to get a list to copy.'); return; }
+    var top = +$('wfTop').value, rows = top ? last.rows.slice(0, top) : last.rows;
+    copyText(rows.map(function (r) { return r[0] + '\t' + r[1]; }).join('\n'), $('wfCp'));
+  });
+  $('wfClr').addEventListener('click', function () { $('wfIn').value = ''; count(); $('wfIn').focus(); });
+  $('wfOpen').addEventListener('click', function () { $('wfFile').click(); });
+  $('wfFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 50 * 1048576) { say('bad', 'That file is ' + fmtBytes(f.size) + '. Please use a text file under 50 MB.'); return; }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) { say('bad', 'That does not look like a text file. For Word or PDF files, copy the text and paste it here.'); return; }
+      $('wfIn').value = t; count();
+    });
+  });
+  count();
+})();
+</script>

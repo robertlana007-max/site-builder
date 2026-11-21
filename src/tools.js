@@ -361,7 +361,7 @@ module.exports = [
     intro: 'Pick a color or type a code to convert between HEX, RGB and HSL.',
     steps: ['Use the color picker or type a HEX, RGB or HSL value.', 'Check the preview.', 'Click Copy next to the format you need.'],
     faq: [
-      ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), and HSL such as hsl(243, 75%, 59%).'],
+      ['What formats can I type?', 'HEX such as #4f46e5 or #fff, RGB such as rgb(79, 70, 229), HSL such as hsl(243, 75%, 59%), and color names such as red or teal. Codes with transparency (rgba, #rrggbbaa) also work; the result shows the solid color.'],
       ['What is the difference between RGB and HSL?', 'RGB describes a color by its red, green and blue light. HSL describes it by hue, saturation and lightness, which is easier to adjust by eye.'],
       ['Why does HSL change slightly when converted back?', 'HSL values are rounded to whole numbers, so a round trip can shift a color by one step.']
     ]
@@ -494,7 +494,7 @@ module.exports = [
     steps: ['Choose a PDF.', 'Type the watermark text.', 'Choose the style, strength and color.', 'Click Add watermark, then Download.'],
     faq: [
       ['Can someone remove the watermark?', 'It becomes part of each page, but a person with PDF editing software could remove it. It discourages casual copying rather than preventing it.'],
-      ['Which characters can I use?', 'Latin letters, numbers and common symbols. Other scripts are not supported by the built-in font.'],
+      ['Which characters can I use?', 'Any language, including Arabic, Urdu, Chinese and emoji. Latin letters are added as real text; other scripts are added as a sharp see-through picture of the text.'],
       ['Does it hide the text underneath?', 'No. The watermark is see-through. Use Light if the page must stay easy to read.']
     ]
   },

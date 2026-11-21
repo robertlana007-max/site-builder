@@ -1,0 +1,161 @@
+<style>
+.fin .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.fin input[type=month] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.fin table.sched td, .fin table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .fin .stats { grid-template-columns: 1fr 1fr; } .fin .stat { padding: 10px 12px; } }
+.frc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 14px; min-width: 0; }
+.frc legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.frc .frc-hint { font-size: 13px; color: var(--muted); display: block; margin-top: 4px; font-weight: 400; }
+.frc .stat.frc-main { background: var(--accent-soft); border-color: var(--accent); }
+.frc .frc-flow { width: 100%; }
+</style>
+<div class="fin frc" id="frc">
+<fieldset>
+  <legend>What you want to earn</legend>
+  <div class="fields">
+    <div><label for="frcCur">Currency</label><select id="frcCur" data-cur></select></div>
+    <div hidden><label for="frcSym">Your currency symbol</label><input type="text" id="frcSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+    <div><label for="frcGoal">Take-home income you want</label><input type="number" id="frcGoal" min="0" step="any" inputmode="decimal" value="50000"></div>
+    <div><label for="frcGoalPer">Per</label><select id="frcGoalPer"><option value="y">Year</option><option value="m">Month</option></select></div>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Your time</legend>
+  <div class="fields">
+    <div><label for="frcHours">Billable hours per week</label><input type="number" id="frcHours" min="0" max="168" step="any" inputmode="decimal" value="25"><span class="frc-hint">Hours you can charge for. Admin, emails and finding clients are not billable.</span></div>
+    <div><label for="frcOff">Weeks off per year</label><input type="number" id="frcOff" min="0" max="51" step="any" inputmode="decimal" value="6"><span class="frc-hint">Holidays, public holidays and sick days.</span></div>
+    <div><label for="frcDay">Hours in a working day</label><input type="number" id="frcDay" min="1" max="24" step="any" inputmode="decimal" value="8"></div>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Costs, tax and fees</legend>
+  <div class="fields">
+    <div><label for="frcExp">Business costs per year</label><input type="number" id="frcExp" min="0" step="any" inputmode="decimal" value="3000"><span class="frc-hint">Laptop, software, internet, coworking, insurance, training.</span></div>
+    <div><label for="frcTax">Income tax and social charges (%)</label><input type="number" id="frcTax" min="0" max="90" step="any" inputmode="decimal" value="25"><span class="frc-hint">An estimate of the share of profit you pay. Check your local rules.</span></div>
+  </div>
+  <div class="fields">
+    <div><label for="frcPlat">Where you find clients</label><select id="frcPlat">
+      <option value="0">Direct clients (no platform fee)</option>
+      <option value="10">Upwork (about 10%; varies 0–15%)</option>
+      <option value="20">Fiverr (20%)</option>
+      <option value="10.01">Freelancer.com (10%)</option>
+      <option value="20.01">PeoplePerHour (up to 20%)</option>
+      <option value="c">Other platform – enter the fee</option>
+    </select></div>
+    <div><label for="frcFee">Platform fee (%)</label><input type="number" id="frcFee" min="0" max="90" step="any" inputmode="decimal" value="0"></div>
+    <div><label for="frcPay">Payment fees (%)</label><input type="number" id="frcPay" min="0" max="50" step="any" inputmode="decimal" value="3"><span class="frc-hint">Bank, PayPal, Payoneer or card fees and currency conversion.</span></div>
+    <div><label for="frcBuf">Safety buffer (%)</label><input type="number" id="frcBuf" min="0" max="200" step="any" inputmode="decimal" value="10"><span class="frc-hint">For quiet months, late payers and savings.</span></div>
+  </div>
+</fieldset>
+<div class="stats">
+  <div class="stat frc-main"><span>Your hourly rate</span><b id="frcRate">–</b></div>
+  <div class="stat"><span>Day rate</span><b id="frcDayR">–</b></div>
+  <div class="stat"><span>Bill per month</span><b id="frcMonth">–</b></div>
+  <div class="stat"><span>Bill per year</span><b id="frcYear">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Where your money goes (per year)</h3>
+<div class="scroll-x"><table class="sched frc-flow"><tbody id="frcFlow"></tbody></table></div>
+<fieldset style="margin-top:18px">
+  <legend>Price a project</legend>
+  <div class="fields">
+    <div><label for="frcPh">Estimated hours</label><input type="number" id="frcPh" min="0" step="any" inputmode="decimal" placeholder="e.g. 40"></div>
+    <div><label for="frcPx">Extra for risk or changes (%)</label><input type="number" id="frcPx" min="0" max="500" step="any" inputmode="decimal" value="15"></div>
+  </div>
+  <p class="msg" id="frcProj" style="margin-top:0"></p>
+</fieldset>
+<div class="btns"><button type="button" class="btn ghost" id="frcCopy">Copy rates</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  var last = null;
+  function calc() {
+    var goal = num('frcGoal') * ($('frcGoalPer').value === 'm' ? 12 : 1), hrs = num('frcHours'), off = num('frcOff') || 0, day = num('frcDay');
+    var exp = num('frcExp') || 0, tax = num('frcTax') || 0, pf = num('frcFee') || 0, pp = num('frcPay') || 0, buf = num('frcBuf') || 0;
+    var weeks = 52 - off;
+    var err = !(goal >= 0) ? 'Enter the take-home income you want.' : !(hrs > 0 && hrs <= 168) ? 'Billable hours per week must be above 0 and at most 168.' : !(off >= 0 && off < 52) ? 'Weeks off must be from 0 to 51.' : !(day > 0 && day <= 24) ? 'Hours in a working day must be from 1 to 24.'
+      : exp < 0 ? 'Business costs cannot be negative.' : !(tax >= 0 && tax < 100) ? 'Tax must be from 0 to 99%.' : !(pf >= 0 && pf < 100) || !(pp >= 0 && pp < 100) ? 'Fees must be from 0 to 99%.' : buf < 0 ? 'The buffer cannot be negative.' : goal + exp <= 0 ? 'Enter the income you want or your business costs.' : '';
+    if (err) { ['frcRate', 'frcDayR', 'frcMonth', 'frcYear'].forEach(function (i) { $(i).textContent = '–'; }); $('frcFlow').innerHTML = ''; $('frcProj').textContent = ''; last = null; return say('bad', err); }
+    var profit = goal / (1 - tax / 100), afterFees = profit + exp, gross = afterFees / ((1 - pf / 100) * (1 - pp / 100)) * (1 + buf / 100);
+    var H = hrs * weeks, rate = gross / H;
+    $('frcRate').textContent = money(rate); $('frcDayR').textContent = money(rate * day); $('frcMonth').textContent = money(gross / 12); $('frcYear').textContent = money(gross);
+    var bufAmt = gross - gross / (1 + buf / 100), g0 = gross - bufAmt, platAmt = g0 * pf / 100, payAmt = (g0 - platAmt) * pp / 100;
+    var rows = [['You bill clients', gross, 1], ['Platform fee (' + fmtNum(pf, 2) + '%)', -platAmt], ['Payment fees (' + fmtNum(pp, 2) + '%)', -payAmt], ['Business costs', -exp], ['Tax and social charges (' + fmtNum(tax, 2) + '%)', -(profit - goal)], ['Safety buffer (' + fmtNum(buf, 2) + '%)', -bufAmt], ['Your take-home', goal, 1]];
+    $('frcFlow').innerHTML = rows.map(function (r) { return '<tr><td>' + (r[2] ? '<b>' + esc(r[0]) + '</b>' : esc(r[0])) + '</td><td>' + (r[2] ? '<b>' + esc(money(r[1])) + '</b>' : esc(money(r[1]))) + '</td><td>' + (gross ? fmtNum(Math.abs(r[1]) / gross * 100, 1) + '%' : '') + '</td></tr>'; }).join('');
+    say('', 'Based on ' + fmtNum(H, 0) + ' billable hours a year (' + fmtNum(hrs) + ' hours × ' + fmtNum(weeks) + ' weeks). ' + (hrs > 40 ? 'More than 40 billable hours a week is hard to keep up for long.' : 'Round your rate up to a simple number when you quote.'));
+    var ph = num('frcPh'), px = num('frcPx') || 0;
+    $('frcProj').textContent = ph > 0 ? 'Quote about ' + money(ph * rate * (1 + px / 100)) + ' for ' + fmtNum(ph) + ' hours (' + money(ph * rate) + ' + ' + fmtNum(px) + '% for risk and changes).' : 'Enter the hours a project will take to get a fixed price.';
+    last = { rate: rate, day: rate * day, month: gross / 12, year: gross, goal: goal };
+  }
+  $('frcPlat').addEventListener('change', function () {
+    if (this.value !== 'c') { $('frcFee').value = Math.floor(+this.value); }
+    calc();
+  });
+  $('frcFee').addEventListener('input', function () { var v = num('frcFee'), o = Array.prototype.find.call($('frcPlat').options, function (x) { return x.value !== 'c' && Math.floor(+x.value) === v; }); if (!o || Math.floor(+$('frcPlat').value) !== v) $('frcPlat').value = v === 0 ? '0' : 'c'; });
+  $('frcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('My freelance rates\nHourly: ' + money(last.rate) + '\nDay rate: ' + money(last.day) + '\nMonthly billing target: ' + money(last.month) + '\nYearly billing target: ' + money(last.year) + ' (for ' + money(last.goal) + ' take-home)', this);
+  });
+  $('frc').addEventListener('input', function (e) { if (e.target.id !== 'frcPlat') calc(); });
+  $('frc').addEventListener('change', function (e) { if (e.target.id === 'frcGoalPer') calc(); });
+  curWire(calc);
+  calc();
+})();
+</script>

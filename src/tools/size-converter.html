@@ -1,0 +1,113 @@
+<style>
+.sz-tbl tr.sz-hit td { background: var(--accent-soft); color: var(--accent); font-weight: 700; }
+.sz-tbl th, .sz-tbl td { text-align: center !important; white-space: nowrap; }
+.sz-res { margin-top: 6px; }
+.sz-res .stat b { font-size: 20px; }
+.sz-note { font-size: 14px; color: var(--muted); }
+.sz-meas { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin: 16px 0; }
+.sz-meas summary { cursor: pointer; font-weight: 600; }
+.sz-meas[open] summary { margin-bottom: 12px; }
+</style>
+<div class="fields">
+  <div><label for="szKind">What are you converting?</label><select id="szKind">
+    <optgroup label="Shoes"><option value="sm">Men's shoes</option><option value="sw">Women's shoes</option><option value="sk">Kids' shoes</option></optgroup>
+    <optgroup label="Clothing"><option value="cw">Women's dresses, tops and coats</option><option value="cj">Men's suits and jackets</option><option value="cs">Men's shirts (collar)</option></optgroup>
+    <optgroup label="Jewelry"><option value="rg">Rings</option></optgroup>
+  </select></div>
+  <div><label for="szSys">Size system you know</label><select id="szSys"></select></div>
+  <div><label for="szVal">Your size</label><select id="szVal"></select></div>
+</div>
+<h3 style="margin-bottom:4px">Equivalent sizes</h3>
+<div class="stats sz-res" id="szRes"></div>
+<p class="msg" id="szMsg"></p>
+<details class="sz-meas" id="szMeasBox"><summary id="szMeasT">Not sure? Measure instead</summary>
+  <div class="fields" style="margin-bottom:0">
+    <div><label for="szLen" id="szLenL">Foot length</label><input type="number" id="szLen" data-nomemo min="0" step="any" inputmode="decimal"></div>
+    <div><label for="szLenU">Unit</label><select id="szLenU" data-nomemo></select></div>
+  </div>
+  <p class="msg" id="szMeasMsg"></p>
+</details>
+<h3>Full chart</h3>
+<div class="scroll-x"><table class="sched sz-tbl"><thead id="szHead"></thead><tbody id="szBody"></tbody></table></div>
+<p class="sz-note">Sizes differ between brands and countries, so treat this chart as a guide and check the brand's own size chart when you can. Shoe "cm" is foot length (Mondopoint, used in Japan and for sports shoes).</p>
+<script>
+(function () {
+  function ringRows() {
+    var r = [];
+    for (var us = 3; us <= 13.001; us += 0.5) {
+      var d = 11.63 + 0.8128 * us, c = Math.PI * d, idx = 2 * us - 0.5, L = String.fromCharCode(65 + Math.floor(idx)) + (idx % 1 ? '½' : '');
+      r.push([String(us), L, (Math.round(c * 2) / 2).toFixed(1), d.toFixed(1), String(Math.max(1, Math.round(c - 40)))]);
+    }
+    return r;
+  }
+  var K = {
+    sm: { cols: ['US', 'UK', 'EU', 'cm (foot)', 'inches (foot)'], m: 3, rows: [['6', '5.5', '39', '24'], ['6.5', '6', '39', '24.5'], ['7', '6.5', '40', '25'], ['7.5', '7', '40.5', '25.5'], ['8', '7.5', '41', '26'], ['8.5', '8', '42', '26.5'], ['9', '8.5', '42.5', '27'], ['9.5', '9', '43', '27.5'], ['10', '9.5', '44', '28'], ['10.5', '10', '44.5', '28.5'], ['11', '10.5', '45', '29'], ['11.5', '11', '45.5', '29.5'], ['12', '11.5', '46', '30'], ['13', '12.5', '47.5', '31'], ['14', '13.5', '48.5', '32'], ['15', '14.5', '49.5', '33']] },
+    sw: { cols: ['US', 'UK', 'EU', 'cm (foot)', 'inches (foot)'], m: 3, rows: [['4', '2', '34.5', '21'], ['4.5', '2.5', '35', '21.5'], ['5', '3', '35.5', '22'], ['5.5', '3.5', '36', '22.5'], ['6', '4', '36.5', '23'], ['6.5', '4.5', '37', '23.5'], ['7', '5', '37.5', '24'], ['7.5', '5.5', '38', '24.5'], ['8', '6', '38.5', '25'], ['8.5', '6.5', '39', '25.5'], ['9', '7', '40', '26'], ['9.5', '7.5', '40.5', '26.5'], ['10', '8', '41', '27'], ['10.5', '8.5', '41.5', '27.5'], ['11', '9', '42', '28'], ['12', '10', '43', '29']] },
+    sk: { cols: ['US', 'UK', 'EU', 'cm (foot)', 'inches (foot)'], m: 3, rows: [['4C', '3', '19.5', '11'], ['5C', '4', '21', '12'], ['6C', '5', '22', '13'], ['7C', '6', '23.5', '14'], ['8C', '7', '25', '14.5'], ['9C', '8', '26', '15.5'], ['10C', '9', '27', '16.5'], ['11C', '10', '28', '17'], ['12C', '11', '30', '18'], ['13C', '12', '31', '19'], ['1Y', '13', '32', '20'], ['2Y', '1', '33', '20.5'], ['3Y', '2', '34', '21.5'], ['4Y', '3', '35', '22'], ['5Y', '4', '36', '23'], ['6Y', '5', '38', '24']] },
+    cw: { cols: ['Letter', 'US', 'UK / Australia', 'EU (Germany)', 'France / Spain', 'Italy', 'Japan'], rows: [['XXS', '0', '4', '30', '32', '36', '3'], ['XS', '2', '6', '32', '34', '38', '5'], ['S', '4', '8', '34', '36', '40', '7'], ['S', '6', '10', '36', '38', '42', '9'], ['M', '8', '12', '38', '40', '44', '11'], ['M', '10', '14', '40', '42', '46', '13'], ['L', '12', '16', '42', '44', '48', '15'], ['L', '14', '18', '44', '46', '50', '17'], ['XL', '16', '20', '46', '48', '52', '19'], ['XL', '18', '22', '48', '50', '54', '21'], ['XXL', '20', '24', '50', '52', '56', '23']] },
+    cj: { cols: ['Letter', 'US / UK (chest in)', 'EU', 'Chest (cm)'], rows: [['XS', '34', '44', '86'], ['S', '36', '46', '91'], ['M', '38', '48', '97'], ['M', '40', '50', '102'], ['L', '42', '52', '107'], ['L', '44', '54', '112'], ['XL', '46', '56', '117'], ['XXL', '48', '58', '122'], ['XXL', '50', '60', '127']] },
+    cs: { cols: ['Letter', 'US / UK collar (in)', 'EU / Asia collar (cm)'], rows: [['XS', '14', '36'], ['S', '14.5', '37'], ['S', '15', '38'], ['M', '15.5', '39'], ['M', '16', '41'], ['L', '16.5', '42'], ['L', '17', '43'], ['XL', '17.5', '44'], ['XL', '18', '45'], ['XXL', '18.5', '47']] },
+    rg: { cols: ['US / Canada', 'UK / Australia', 'EU / ISO (inside mm)', 'Inside diameter (mm)', 'Japan / China'], rows: ringRows() }
+  };
+  // shoe tables: add the inches column
+  ['sm', 'sw', 'sk'].forEach(function (k) { K[k].rows.forEach(function (r) { r.push((+r[3] / 2.54).toFixed(2)); }); });
+  var defSys = 0;
+  try { if (/-(GB|IE|AU|NZ)$/.test(navigator.language)) defSys = 1; else if (!/-(US|CA)$/.test(navigator.language)) defSys = 2; } catch (e) {}
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function fillSys() {
+    var k = K[$('szKind').value], cur = $('szSys').value;
+    $('szSys').innerHTML = k.cols.map(function (c, i) { return '<option value="' + i + '">' + c + '</option>'; }).join('');
+    var want = /^[cr]/.test($('szKind').value) && $('szKind').value !== 'rg' ? Math.min(defSys + 1, k.cols.length - 1) : Math.min(defSys, k.cols.length - 1);
+    $('szSys').value = cur !== '' && +cur < k.cols.length && k.cols[+cur] && fillSys.kind === $('szKind').value ? cur : want;
+    fillSys.kind = $('szKind').value;
+    fillVal();
+  }
+  function fillVal() {
+    var k = K[$('szKind').value], c = +$('szSys').value, seen = {}, opts = '';
+    k.rows.forEach(function (r) { if (seen[r[c]]) return; seen[r[c]] = 1; opts += '<option value="' + esc(r[c]) + '">' + esc(r[c]) + '</option>'; });
+    var old = $('szVal').value;
+    $('szVal').innerHTML = opts;
+    if (seen[old]) $('szVal').value = old; else $('szVal').selectedIndex = Math.floor(Object.keys(seen).length / 2);
+    var meas = $('szKind').value;
+    $('szMeasBox').hidden = !/^s|rg/.test(meas);
+    $('szLenL').textContent = meas === 'rg' ? 'Inside diameter of a ring that fits' : 'Foot length (heel to longest toe)';
+    $('szLenU').innerHTML = meas === 'rg' ? '<option value="d">mm (diameter)</option><option value="c">mm (circumference)</option>' : '<option value="cm">cm</option><option value="in">inches</option>';
+    show();
+  }
+  function show() {
+    var k = K[$('szKind').value], c = +$('szSys').value, v = $('szVal').value, hits = [];
+    k.rows.forEach(function (r, i) { if (r[c] === v) hits.push(i); });
+    $('szHead').innerHTML = '<tr>' + k.cols.map(function (h) { return '<th>' + h + '</th>'; }).join('') + '</tr>';
+    $('szBody').innerHTML = k.rows.map(function (r, i) { return '<tr' + (hits.indexOf(i) > -1 ? ' class="sz-hit"' : '') + '>' + r.map(function (x) { return '<td>' + x + '</td>'; }).join('') + '</tr>'; }).join('');
+    $('szRes').innerHTML = k.cols.map(function (h, j) {
+      var vals = []; hits.forEach(function (i) { if (vals.indexOf(k.rows[i][j]) < 0) vals.push(k.rows[i][j]); });
+      return j === c ? '' : '<div class="stat"><span>' + h + '</span><b>' + (vals.join(' – ') || '–') + '</b></div>';
+    }).join('');
+    $('szMsg').textContent = hits.length > 1 ? 'Letter sizes cover a range, so more than one size matches.' : '';
+  }
+  function measure() {
+    var kind = $('szKind').value, v = $('szLen').value, m = $('szMeasMsg'), k = K[kind];
+    if (v === '') { m.className = 'msg'; m.textContent = ''; return; }
+    var x = +v; if (!(x > 0)) { m.className = 'msg bad'; m.textContent = 'Enter a length greater than 0.'; return; }
+    var row;
+    if (kind === 'rg') {
+      var d = $('szLenU').value === 'c' ? x / Math.PI : x, us = (d - 11.63) / 0.8128;
+      if (us < 2.75 || us > 13.25) { m.className = 'msg bad'; m.textContent = 'That is outside this chart (about 14–22.2 mm diameter, US 3–13).'; return; }
+      var best = Math.round(us * 2) / 2; row = k.rows.filter(function (r) { return +r[0] === best; })[0];
+      m.className = 'msg ok'; m.textContent = 'A ' + d.toFixed(1) + ' mm diameter is about US ' + best + ' (exact: ' + us.toFixed(2) + '). Between two sizes, pick the larger one for wide knuckles.';
+    } else {
+      var cm = $('szLenU').value === 'in' ? x * 2.54 : x;
+      row = k.rows.filter(function (r) { return +r[3] >= cm - 0.001; })[0];
+      if (!row) { m.className = 'msg bad'; m.textContent = 'That foot is longer than this chart (' + k.rows[k.rows.length - 1][3] + ' cm). Try the men\'s chart or a brand with larger sizes.'; return; }
+      if (cm < +k.rows[0][3] - 1.5) { m.className = 'msg bad'; m.textContent = 'That foot is shorter than this chart starts. Try the kids\' chart.'; return; }
+      m.className = 'msg ok'; m.textContent = 'For a ' + cm.toFixed(1) + ' cm foot, the closest size that is not too small is the row with ' + row[3] + ' cm. Measure in the evening, use your longer foot, and add 0.5–1 cm room for sports shoes.';
+    }
+    var c = +$('szSys').value; $('szVal').value = row[c]; show();
+  }
+  $('szKind').addEventListener('change', function () { fillSys(); measure(); });
+  $('szSys').addEventListener('change', fillVal);
+  $('szVal').addEventListener('change', show);
+  $('szLen').addEventListener('input', measure); $('szLenU').addEventListener('change', measure);
+  fillSys();
+})();
+</script>

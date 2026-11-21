@@ -1,0 +1,321 @@
+<style>
+.ex-list { display: grid; gap: 12px; margin-bottom: 14px; }
+.ex-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px; background: var(--surface); display: grid; grid-template-columns: 72px 1fr; gap: 12px; align-items: start; min-width: 0; }
+.ex-card img { width: 72px; height: 72px; object-fit: cover; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); }
+.ex-card h3 { margin: 0 0 4px; font-size: 15px; overflow-wrap: anywhere; }
+.ex-sum { font-size: 14px; color: var(--muted); margin: 0 0 6px; }
+.ex-warn { color: var(--bad); font-weight: 600; }
+.ex-okk { color: var(--ok); font-weight: 600; }
+.ex-card details { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 10px; }
+.ex-card summary { cursor: pointer; padding: 8px 10px; font-weight: 600; font-size: 14px; }
+.ex-tbl { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.ex-tbl th, .ex-tbl td { text-align: start; padding: 6px 10px; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+.ex-tbl th { width: 38%; color: var(--muted); font-weight: 600; }
+.ex-tbl tr.gps td, .ex-tbl tr.gps th { background: color-mix(in srgb, var(--bad) 8%, transparent); }
+.ex-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.ex-row .btn { min-height: 38px; padding: 6px 12px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop photos here</b>JPG, PNG or WebP (one or many). They are read on your device and never uploaded.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="stats" id="stats" hidden>
+  <div class="stat"><span>Photos</span><b id="sN">0</b></div>
+  <div class="stat"><span>With hidden data</span><b id="sM">0</b></div>
+  <div class="stat"><span>With GPS location</span><b id="sG">0</b></div>
+</div>
+<div class="ex-list" id="list" aria-live="polite"></div>
+<div class="checks"><label><input type="checkbox" id="keepIcc" checked> Keep the colour profile (recommended, holds no personal data)</label></div>
+<div class="btns"><button class="btn" id="go" disabled>Remove metadata and download</button><button class="btn ghost" id="clear" hidden>Remove all photos</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var items = [], busy = false, lastUrl = null;
+  function say(c, t) { PT.say(c, t); }
+  function ascii(u, a, b) { var s = ''; for (var i = a; i < b && i < u.length; i++) s += String.fromCharCode(u[i]); return s; }
+
+  // ---------- EXIF (TIFF) reader ----------
+  var TAGS0 = { 0x10F: 'Camera make', 0x110: 'Camera model', 0x112: 'Orientation', 0x131: 'Software', 0x132: 'Date changed', 0x13B: 'Artist', 0x8298: 'Copyright', 0x10E: 'Description', 0x9C9B: 'Title', 0x9C9C: 'Comment', 0x9C9D: 'Author' };
+  var TAGSX = { 0x9003: 'Date taken', 0x9004: 'Date digitised', 0x829A: 'Exposure', 0x829D: 'F-number', 0x8827: 'ISO', 0x920A: 'Focal length', 0xA405: 'Focal length (35 mm)', 0xA433: 'Lens make', 0xA434: 'Lens model', 0xA431: 'Camera serial number', 0xA430: 'Camera owner', 0xA435: 'Lens serial number', 0x9010: 'Time zone', 0xA420: 'Unique image ID', 0x9286: 'User comment' };
+  function tiff(u, base, len) {
+    var out = { tags: [], gps: null, orient: 0 };
+    if (len < 8) return out;
+    var le = u[base] === 0x49, v = new DataView(u.buffer, u.byteOffset + base, Math.min(len, u.length - base));
+    function U16(o) { return v.getUint16(o, le); } function U32(o) { return v.getUint32(o, le); }
+    if (U16(2) !== 42) return out;
+    function val(e) {
+      var type = U16(e + 2), cnt = U32(e + 4), sz = [0, 1, 1, 2, 4, 8, 1, 1, 2, 4, 8][type] || 1, off = sz * cnt > 4 ? U32(e + 8) : e + 8;
+      if (off + sz * cnt > v.byteLength) return null;
+      var a = [], i;
+      if (type === 2) { var s = ''; for (i = 0; i < cnt; i++) { var c = v.getUint8(off + i); if (!c) break; s += String.fromCharCode(c); } return s.trim(); }
+      if (type === 1 && cnt > 4 && U16(e) >= 0x9C9B && U16(e) <= 0x9C9F) { var w = ''; for (i = 0; i + 1 < cnt; i += 2) { var ch = v.getUint16(off + i, true); if (!ch) break; w += String.fromCharCode(ch); } return w; }
+      if (type === 7) { if (cnt > 8 && ascii(new Uint8Array(v.buffer, v.byteOffset + off, 8), 0, 5) === 'ASCII') { var t = ''; for (i = 8; i < cnt; i++) { var c2 = v.getUint8(off + i); if (!c2) break; t += String.fromCharCode(c2); } return t.trim(); } return cnt + ' bytes'; }
+      for (i = 0; i < Math.min(cnt, 8); i++) {
+        var o = off + i * sz;
+        a.push(type === 3 ? U16(o) : type === 4 ? U32(o) : type === 9 ? v.getInt32(o, le) : type === 5 ? U32(o) / (U32(o + 4) || 1) : type === 10 ? v.getInt32(o, le) / (v.getInt32(o + 4, le) || 1) : v.getUint8(o));
+      }
+      if (type === 5 && U16(e) === 0x829A) a.raw = [U32(off), U32(off + 4)];
+      return cnt === 1 ? (a.raw ? a : a[0]) : a;
+    }
+    function ifd(o, names, cb) {
+      if (!o || o + 2 > v.byteLength) return;
+      var n = U16(o);
+      if (n > 500) return;
+      for (var k = 0; k < n; k++) {
+        var e = o + 2 + k * 12; if (e + 12 > v.byteLength) break;
+        var tag = U16(e), x; try { x = val(e); } catch (er) { continue; }
+        cb(tag, x, names && names[tag]);
+      }
+    }
+    var exifAt = 0, gpsAt = 0, gps = {};
+    ifd(U32(4), TAGS0, function (t, x, nm) { if (t === 0x8769) exifAt = x; else if (t === 0x8825) gpsAt = x; else if (t === 0x112) out.orient = x; if (nm && x !== null && x !== '') out.tags.push([nm, x, t]); });
+    ifd(exifAt, TAGSX, function (t, x, nm) { if (nm && x !== null && x !== '') out.tags.push([nm, x, t]); });
+    ifd(gpsAt, null, function (t, x) { gps[t] = x; });
+    if (gps[2] && gps[4] && gps[2].length === 3 && gps[4].length === 3) {
+      var lat = gps[2][0] + gps[2][1] / 60 + gps[2][2] / 3600, lon = gps[4][0] + gps[4][1] / 60 + gps[4][2] / 3600;
+      if (gps[1] === 'S') lat = -lat; if (gps[3] === 'W') lon = -lon;
+      if (isFinite(lat) && isFinite(lon) && (lat || lon)) out.gps = { lat: lat, lon: lon, alt: typeof gps[6] === 'number' ? (gps[5] === 1 ? -gps[6] : gps[6]) : null };
+    } else if (gpsAt && Object.keys(gps).length > 1) out.gpsOther = true;
+    return out;
+  }
+  function pretty(t, x) {
+    if ((t === 0x829A || t === 0x829D || t === 0x920A) && Array.isArray(x) && !x.raw && x.length === 2 && x[1]) x = t === 0x829A ? Object.assign([x[0] / x[1]], { raw: x }) : x[0] / x[1]; // some apps store a fraction as two numbers
+    if (t === 0x829A) return x.raw && x.raw[0] && x.raw[1] > x.raw[0] ? '1/' + Math.round(x.raw[1] / x.raw[0]) + ' s' : (Array.isArray(x) ? x[0] : x) + ' s';
+    if (t === 0x829D) return 'f/' + (+x).toFixed(1);
+    if (t === 0x920A) return (+x).toFixed(1).replace(/\.0$/, '') + ' mm';
+    if (t === 0xA405) return x + ' mm';
+    if (t === 0x112) return ['', 'Normal', 'Mirrored', 'Upside down', 'Upside down, mirrored', 'Turned and mirrored', 'Turned right', 'Turned and mirrored', 'Turned left'][x] || String(x);
+    if ((t === 0x9003 || t === 0x9004 || t === 0x132) && /^\d{4}:\d\d:\d\d/.test(x)) return x.replace(/^(\d{4}):(\d\d):(\d\d)/, '$1-$2-$3');
+    return Array.isArray(x) ? x.join(', ') : String(x);
+  }
+
+  // ---------- read every kind of hidden data, by file format ----------
+  function inspect(u) {
+    var r = { fmt: 'other', blocks: [], tags: [], gps: null, orient: 0, icc: false };
+    function exif(base, len) { var t = tiff(u, base, len); r.tags = r.tags.concat(t.tags); r.gps = r.gps || t.gps; r.orient = r.orient || t.orient; if (t.gpsOther) r.gpsOther = true; }
+    if (u[0] === 0xFF && u[1] === 0xD8) {
+      r.fmt = 'jpeg';
+      var o = 2;
+      while (o + 4 <= u.length) {
+        if (u[o] !== 0xFF) break;
+        var m = u[o + 1]; if (m === 0xFF) { o++; continue; }
+        if (m === 0xD9 || m === 0xDA) break;
+        if (m >= 0xD0 && m <= 0xD7 || m === 0x01) { o += 2; continue; }
+        var len = (u[o + 2] << 8) | u[o + 3], id = ascii(u, o + 4, o + 4 + 30);
+        if (m === 0xE1 && id.indexOf('Exif\0\0') === 0) { r.blocks.push('EXIF'); exif(o + 10, len - 8); }
+        else if (m === 0xE1 && id.indexOf('http://ns.adobe.com/xap') === 0) r.blocks.push('XMP');
+        else if (m === 0xE1) r.blocks.push('Extra data (APP1)');
+        else if (m === 0xED) r.blocks.push('IPTC / Photoshop');
+        else if (m === 0xFE) { r.blocks.push('Comment'); r.tags.push(['Comment', ascii(u, o + 4, o + 2 + len).replace(/[^\x20-\x7e]/g, '').slice(0, 200), 0]); }
+        else if (m === 0xE2 && id.indexOf('ICC_PROFILE') === 0) r.icc = true;
+        else if (m === 0xE2 && id.indexOf('MPF') === 0) r.blocks.push('Extra images (MPF)');
+        else if (m >= 0xE2 && m <= 0xEF && m !== 0xEE) r.blocks.push('Maker data (APP' + (m - 0xE0) + ')');
+        o += 2 + len;
+      }
+    } else if (u[0] === 0x89 && ascii(u, 1, 4) === 'PNG') {
+      r.fmt = 'png';
+      var p = 8;
+      while (p + 12 <= u.length) {
+        var L = ((u[p] << 24) | (u[p + 1] << 16) | (u[p + 2] << 8) | u[p + 3]) >>> 0, ty = ascii(u, p + 4, p + 8);
+        if (ty === 'eXIf') { r.blocks.push('EXIF'); exif(p + 8 + (ascii(u, p + 8, p + 12) === 'Exif' ? 6 : 0), L); }
+        else if (ty === 'tEXt' || ty === 'iTXt' || ty === 'zTXt') {
+          var key = ascii(u, p + 8, Math.min(p + 8 + 80, p + 8 + L)).split('\0')[0];
+          r.blocks.push(key === 'XML:com.adobe.xmp' ? 'XMP' : 'Text: ' + key);
+          if (ty === 'tEXt' && key !== 'XML:com.adobe.xmp') r.tags.push([key, ascii(u, p + 9 + key.length, p + 8 + L).slice(0, 200), 0]);
+        } else if (ty === 'tIME') r.blocks.push('Date changed');
+        else if (ty === 'iCCP') r.icc = true;
+        if (ty === 'IEND') break;
+        p += 12 + L;
+      }
+    } else if (ascii(u, 0, 4) === 'RIFF' && ascii(u, 8, 12) === 'WEBP') {
+      r.fmt = 'webp';
+      var q = 12;
+      while (q + 8 <= u.length) {
+        var t2 = ascii(u, q, q + 4), L2 = (u[q + 4] | (u[q + 5] << 8) | (u[q + 6] << 16) | (u[q + 7] << 24)) >>> 0;
+        if (t2 === 'EXIF') { r.blocks.push('EXIF'); var b = q + 8 + (ascii(u, q + 8, q + 12) === 'Exif' ? 6 : 0); exif(b, L2); }
+        else if (t2 === 'XMP ') r.blocks.push('XMP');
+        else if (t2 === 'ICCP') r.icc = true;
+        q += 8 + L2 + (L2 & 1);
+      }
+    }
+    r.blocks = r.blocks.filter(function (b, i, a) { return a.indexOf(b) === i; });
+    return r;
+  }
+
+  // ---------- remove it without re-compressing the picture ----------
+  function be32(n) { return [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255]; }
+  function concat(parts) { var n = 0, i; for (i = 0; i < parts.length; i++) n += parts[i].length; var o = new Uint8Array(n), k = 0; for (i = 0; i < parts.length; i++) { o.set(parts[i], k); k += parts[i].length; } return o; }
+  // A tiny EXIF block that only says which way up the photo is, so phone photos do not end up sideways.
+  function orientOnly(n) {
+    var t = [0x4D, 0x4D, 0, 42, 0, 0, 0, 8, 0, 1, 0x01, 0x12, 0, 3, 0, 0, 0, 1, 0, n, 0, 0, 0, 0, 0, 0, 0, 0];
+    var body = [0x45, 0x78, 0x69, 0x66, 0, 0].concat(t), len = body.length + 2;
+    return new Uint8Array([0xFF, 0xE1, len >> 8, len & 255].concat(body));
+  }
+  function strip(u, info, keepIcc) {
+    var parts = [], o, keep;
+    if (info.fmt === 'jpeg') {
+      parts.push(u.subarray(0, 2)); o = 2;
+      while (o + 4 <= u.length) {
+        var m = u[o + 1];
+        if (u[o] !== 0xFF) break;
+        if (m === 0xFF) { o++; continue; }
+        if (m === 0xDA || m === 0xD9) break;
+        if (m >= 0xD0 && m <= 0xD7 || m === 0x01) { parts.push(u.subarray(o, o + 2)); o += 2; continue; }
+        var len = (u[o + 2] << 8) | u[o + 3], id = ascii(u, o + 4, o + 4 + 12);
+        keep = !(m >= 0xE1 && m <= 0xEF || m === 0xFE) || (m === 0xE2 && keepIcc && id.indexOf('ICC_PROFILE') === 0) || m === 0xEE;
+        if (keep) parts.push(u.subarray(o, o + 2 + len));
+        o += 2 + len;
+      }
+      parts.push(u.subarray(o));
+      if (info.orient > 1 && info.orient <= 8) { // right after the JFIF header if there is one, else straight after the start marker
+        var at = parts.length > 1 && parts[1][1] === 0xE0 ? 2 : 1; parts.splice(at, 0, orientOnly(info.orient));
+      }
+      return concat(parts);
+    }
+    if (info.fmt === 'png') {
+      parts.push(u.subarray(0, 8)); o = 8;
+      while (o + 12 <= u.length) {
+        var L = ((u[o] << 24) | (u[o + 1] << 16) | (u[o + 2] << 8) | u[o + 3]) >>> 0, ty = ascii(u, o + 4, o + 8);
+        keep = ['tEXt', 'iTXt', 'zTXt', 'eXIf', 'tIME'].indexOf(ty) < 0 && !(ty === 'iCCP' && !keepIcc);
+        if (keep) parts.push(u.subarray(o, o + 12 + L));
+        o += 12 + L;
+        if (ty === 'IEND') break;
+      }
+      return concat(parts);
+    }
+    if (info.fmt === 'webp') {
+      o = 12; var chunks = [], flagsAt = -1;
+      while (o + 8 <= u.length) {
+        var t2 = ascii(u, o, o + 4), L2 = (u[o + 4] | (u[o + 5] << 8) | (u[o + 6] << 16) | (u[o + 7] << 24)) >>> 0, end = Math.min(u.length, o + 8 + L2 + (L2 & 1));
+        if (t2 !== 'EXIF' && t2 !== 'XMP ' && !(t2 === 'ICCP' && !keepIcc)) { if (t2 === 'VP8X') flagsAt = chunks.reduce(function (a, c) { return a + c.length; }, 12) + 8; chunks.push(u.slice(o, end)); }
+        o = end;
+      }
+      var body = concat(chunks), out = concat([u.subarray(0, 12), body]), size = out.length - 8;
+      out[4] = size & 255; out[5] = (size >> 8) & 255; out[6] = (size >> 16) & 255; out[7] = (size >>> 24) & 255;
+      if (flagsAt > 0) out[flagsAt] &= ~(0x08 | 0x04 | (keepIcc ? 0 : 0x20)); // clear the EXIF and XMP (and colour profile) flags
+      return out;
+    }
+    return null;
+  }
+  // Formats we cannot edit directly are redrawn by the browser, which drops all hidden data.
+  function reencode(it) {
+    return new Promise(function (res, rej) {
+      loadImage(it.file, function (im) {
+        if (!im || !im.naturalWidth) return rej(new Error('"' + it.file.name + '" could not be opened by your browser.'));
+        var c = document.createElement('canvas'), s = Math.min(1, Math.sqrt(16000000 / (im.naturalWidth * im.naturalHeight)));
+        c.width = Math.round(im.naturalWidth * s); c.height = Math.round(im.naturalHeight * s); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+        PT.blob(c, 'image/png').then(function (b) { c.width = c.height = 0; if (!b) rej(new Error('Could not save "' + it.file.name + '".')); else res(b); });
+      });
+    });
+  }
+  function clean(it) {
+    if (['jpeg', 'png', 'webp'].indexOf(it.info.fmt) >= 0) {
+      var out = strip(it.u, it.info, $('keepIcc').checked);
+      var check = inspect(out); // make sure nothing personal is left
+      if (check.tags.some(function (t) { return t[2] !== 0x112; }) || check.gps || check.blocks.some(function (b) { return b !== 'EXIF'; })) return reencode(it).then(function (b) { return { blob: b, ext: 'png' }; });
+      return Promise.resolve({ blob: new Blob([out], { type: it.file.type || 'image/' + it.info.fmt }), ext: { jpeg: 'jpg', png: 'png', webp: 'webp' }[it.info.fmt] });
+    }
+    return reencode(it).then(function (b) { return { blob: b, ext: 'png' }; });
+  }
+
+  // ---------- page ----------
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+  function render() {
+    var list = $('list'); list.innerHTML = '';
+    var withMeta = 0, withGps = 0;
+    items.forEach(function (it, k) {
+      var info = it.info, tags = info.tags.filter(function (t) { return t[2] !== 0x112 || t[1] > 1; }), has = info.blocks.length > 0;
+      if (has) withMeta++; if (info.gps || info.gpsOther) withGps++;
+      var card = el('div', 'ex-card'), th = el('img'), box = el('div');
+      th.src = it.url; th.alt = ''; th.onerror = function () { th.style.visibility = 'hidden'; };
+      box.appendChild(el('h3', '', it.file.name));
+      var sum = el('p', 'ex-sum');
+      if (info.fmt === 'other') sum.appendChild(el('span', '', 'This format is cleaned by saving a fresh PNG copy, which keeps no hidden data.'));
+      else if (!has) sum.appendChild(el('span', 'ex-okk', 'No hidden data found.'));
+      else {
+        if (info.gps) sum.appendChild(el('span', 'ex-warn', '⚠ Shows where it was taken. '));
+        sum.appendChild(document.createTextNode('Contains: ' + info.blocks.join(', ') + '.'));
+      }
+      sum.appendChild(document.createTextNode(' ' + fmtBytes(it.file.size)));
+      box.appendChild(sum);
+      var row = el('div', 'ex-row'), one = el('button', 'btn ghost', 'Clean and download'), rm = el('button', 'btn ghost', 'Remove');
+      one.type = rm.type = 'button'; one.setAttribute('aria-label', 'Clean and download ' + it.file.name); rm.setAttribute('aria-label', 'Remove ' + it.file.name);
+      one.addEventListener('click', function () { if (!busy) single(it); });
+      rm.addEventListener('click', function () { if (busy) return; URL.revokeObjectURL(it.url); items.splice(k, 1); render(); });
+      row.appendChild(one); row.appendChild(rm); box.appendChild(row);
+      card.appendChild(th); card.appendChild(box);
+      if (tags.length || info.gps) {
+        var det = el('details'), s = el('summary', '', 'Show what is inside (' + (tags.length + (info.gps ? 1 : 0)) + ' items)'), tb = el('table', 'ex-tbl');
+        if (info.gps) {
+          var g = info.gps, tr = el('tr', 'gps'); tr.appendChild(el('th', '', 'GPS location'));
+          var td = el('td', '', g.lat.toFixed(6) + ', ' + g.lon.toFixed(6) + ' (' + Math.abs(g.lat).toFixed(4) + '° ' + (g.lat >= 0 ? 'N' : 'S') + ', ' + Math.abs(g.lon).toFixed(4) + '° ' + (g.lon >= 0 ? 'E' : 'W') + ')' + (g.alt != null ? ' · altitude ' + Math.round(g.alt) + ' m' : ''));
+          tr.appendChild(td); tb.appendChild(tr);
+          if (k === 0) det.open = true;
+        }
+        tags.forEach(function (t) { var r = el('tr'); r.appendChild(el('th', '', t[0])); r.appendChild(el('td', '', pretty(t[2], t[1]))); tb.appendChild(r); });
+        det.appendChild(s); det.appendChild(tb); card.appendChild(det);
+      }
+      list.appendChild(card);
+    });
+    $('stats').hidden = !items.length; $('sN').textContent = items.length; $('sM').textContent = withMeta; $('sG').textContent = withGps;
+    $('go').disabled = !items.length || busy; $('clear').hidden = !items.length;
+    $('go').textContent = items.length > 1 ? 'Clean all ' + items.length + ' and download ZIP' : 'Remove metadata and download';
+    if (!items.length) $('dl').hidden = true;
+  }
+  function offer(blob, name, note) {
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var a = $('dl'); a.href = lastUrl; a.download = name; a.textContent = 'Download ' + name; a.hidden = false; a.click(); if (window.burst) burst(a);
+    say('ok', note + ' · ' + fmtBytes(blob.size) + '. If the download did not start, use the green button.');
+  }
+  function outName(it, ext) { return PT.base(it.file.name) + '-clean.' + ext; }
+  function single(it) {
+    busy = true; render(); say('', 'Cleaning ' + it.file.name + '…');
+    clean(it).then(function (r) { offer(r.blob, outName(it, r.ext), 'Saved ' + outName(it, r.ext) + ' with no hidden data' + (it.info.fmt === 'other' ? '' : ' (picture quality unchanged)')); }, function (e) { say('bad', e.message); })
+      .then(function () { busy = false; render(); });
+  }
+  $('go').addEventListener('click', async function () {
+    if (busy || !items.length) return;
+    if (items.length === 1) return single(items[0]);
+    busy = true; render();
+    try {
+      var files = [], used = {}, failed = [];
+      for (var k = 0; k < items.length; k++) {
+        say('', 'Cleaning ' + (k + 1) + ' of ' + items.length + '…');
+        try {
+          var r = await clean(items[k]), name = outName(items[k], r.ext), n = 2, base = name;
+          while (used[name.toLowerCase()]) name = base.replace(/(\.\w+)$/, '-' + (n++) + '$1');
+          used[name.toLowerCase()] = 1;
+          files.push({ name: name, data: new Uint8Array(await r.blob.arrayBuffer()) });
+        } catch (e) { failed.push(items[k].file.name); }
+      }
+      if (files.length) offer(PT.zip(files), 'photos-without-metadata.zip', 'Saved ' + files.length + ' clean photos in a ZIP' + (failed.length ? '. Could not clean ' + failed.join(', ') : ''));
+      else say('bad', 'None of these files could be cleaned.');
+    } catch (e) { say('bad', e && e.message ? e.message : 'Something went wrong.'); }
+    busy = false; render();
+  });
+  $('clear').addEventListener('click', function () { if (busy) return; items.forEach(function (it) { URL.revokeObjectURL(it.url); }); items = []; render(); say('', ''); });
+  $('keepIcc').addEventListener('change', function () { $('dl').hidden = true; });
+  PT.drop(true, async function (files) {
+    if (busy) return;
+    var bad = [], heic = [];
+    for (var f of files) {
+      if (/\.(hei[cf])$/i.test(f.name) || /hei[cf]/i.test(f.type)) { heic.push(f.name); continue; }
+      if (!/^image\//.test(f.type) && !/\.(jpe?g|png|webp|gif|bmp|avif|tiff?)$/i.test(f.name)) { bad.push(f.name); continue; }
+      if (f.size > 200 * 1048576) { bad.push(f.name + ' (too large)'); continue; }
+      var u = new Uint8Array(await f.arrayBuffer()), info = inspect(u);
+      if (info.fmt === 'other') { // make sure the browser can open it before we promise to clean it
+        var ok = await new Promise(function (res) { loadImage(f, function (im) { res(!!(im && im.naturalWidth)); }); });
+        if (!ok) { bad.push(f.name); continue; }
+      }
+      items.push({ file: f, u: u, info: info, url: URL.createObjectURL(f) });
+    }
+    render();
+    var n = [];
+    if (items.length) { var g = items.filter(function (it) { return it.info.gps; }).length; n.push(g ? g + (g === 1 ? ' photo shows' : ' photos show') + ' the place where it was taken. Clean before you share.' : 'Check what each photo contains, then download the clean copies.'); }
+    if (bad.length) n.push('Could not read ' + bad.join(', ') + ': not a supported image.');
+    if (heic.length) n.push(heic.join(', ') + ': HEIC photos need converting first. Use the HEIC to JPG tool, which also drops the hidden data.');
+    say(bad.length || heic.length ? 'bad' : '', n.join(' '));
+  });
+  render();
+})();
+</script>

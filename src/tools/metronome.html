@@ -1,0 +1,216 @@
+<style>
+.mn-top { text-align: center; margin: 4px 0 10px; }
+.mn-bpm { font-size: clamp(56px, 16vw, 96px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.mn-bpm small { font-size: 18px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-inline-start: 6px; }
+.mn-name { color: var(--muted); font-weight: 600; margin-top: 4px; min-height: 1.4em; }
+.mn-adj { display: flex; align-items: center; gap: 10px; margin: 14px 0 6px; }
+.mn-adj input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 32px; }
+.mn-adj .btn { flex: none; width: 48px; height: 48px; padding: 0; font-size: 22px; display: inline-flex; align-items: center; justify-content: center; }
+.mn-dots { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; margin: 18px 0 8px; min-height: 52px; }
+.mn-dots button { width: 44px; height: 44px; border-radius: 50%; border: 2px solid var(--line); background: var(--bg); color: var(--muted); font: 700 14px/1 inherit; font-family: inherit; cursor: pointer; padding: 0; transition: transform .06s, background .06s; }
+.mn-dots button.acc { border-color: var(--accent); color: var(--accent); }
+.mn-dots button.off { border-style: dashed; opacity: .5; }
+.mn-dots button.now { background: var(--accent); border-color: var(--accent); color: var(--on-accent, #fff); transform: scale(1.15); }
+.mn-dots button.now.off { background: var(--line); color: var(--muted); }
+.mn-dotnote { text-align: center; font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.mn-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 16px; }
+.mn-main .btn { flex: 1 1 150px; min-height: 56px; font-size: 18px; }
+.mn-bar { text-align: center; color: var(--muted); font-variant-numeric: tabular-nums; margin: -6px 0 14px; min-height: 1.4em; }
+</style>
+<div class="mn-top">
+  <div class="mn-bpm" aria-live="polite"><span id="bpmShow">100</span><small>BPM</small></div>
+  <div class="mn-name" id="tname">Moderato</div>
+</div>
+<div class="mn-adj">
+  <button class="btn ghost" type="button" id="minus" aria-label="Slower by 1 BPM">−</button>
+  <input type="range" id="slider" min="20" max="300" step="1" value="100" aria-label="Tempo in beats per minute">
+  <button class="btn ghost" type="button" id="plus" aria-label="Faster by 1 BPM">+</button>
+</div>
+<div class="mn-dots" id="dots" aria-label="Beats in a bar"></div>
+<p class="mn-dotnote">Tap a beat to make it accented, normal or silent.</p>
+<div class="mn-main">
+  <button class="btn" type="button" id="play">▶ Start</button>
+  <button class="btn ghost" type="button" id="tap">Tap tempo</button>
+</div>
+<p class="mn-bar" id="barCount"></p>
+<div class="fields">
+  <div><label for="bpm">Tempo (20 to 300 BPM)</label><input type="number" id="bpm" min="20" max="300" step="1" value="100" inputmode="numeric"></div>
+  <div><label for="sig">Time signature</label><select id="sig"><option>1/4</option><option>2/4</option><option>3/4</option><option selected>4/4</option><option>5/4</option><option>6/4</option><option>7/4</option><option>3/8</option><option>5/8</option><option>6/8</option><option>7/8</option><option>9/8</option><option>12/8</option></select></div>
+  <div><label for="sub">Clicks between beats</label><select id="sub"><option value="1">None</option><option value="2">2 (eighth notes)</option><option value="3">3 (triplets)</option><option value="4">4 (sixteenth notes)</option></select></div>
+  <div><label for="snd">Sound</label><select id="snd"><option value="click">Click</option><option value="beep">Beep</option><option value="wood">Wood block</option><option value="hat">Hi-hat</option></select></div>
+  <div><label for="vol">Volume</label><input type="range" id="vol" min="0" max="100" value="80" style="accent-color:var(--accent)"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="accent" checked> Accent the first beat of each bar</label><label><input type="checkbox" id="flash"> Flash the screen on the first beat</label></div>
+<p class="msg" id="msg">Press Start or the space bar. On iPhone, turn off silent mode to hear the clicks.</p>
+<script>
+(function () {
+  var AC = window.AudioContext || window.webkitAudioContext;
+  var actx = null, master = null, noise = null, timer = null, running = false, next = 0, beat = 0, sub = 0, bars = 0, queue = [], raf = 0, wake = null, taps = [];
+  var states = []; // per beat: 2 accent, 1 normal, 0 silent
+  var NAMES = [[40, 'Grave'], [60, 'Largo'], [66, 'Larghetto'], [76, 'Adagio'], [108, 'Andante'], [120, 'Moderato'], [156, 'Allegro'], [176, 'Vivace'], [200, 'Presto'], [999, 'Prestissimo']];
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t; }
+  if (!AC) { say('bad', 'This browser cannot make sound with Web Audio. Please update it, or try Chrome, Edge, Firefox or Safari.'); $('play').disabled = true; }
+
+  function bpm() { return +$('bpm').value; }
+  function sig() { var p = $('sig').value.split('/'); return { n: +p[0], d: +p[1] }; }
+  function setBpm(v, from) {
+    v = Math.round(Math.max(20, Math.min(300, v)));
+    if (isNaN(v)) return;
+    if (from !== 'box') $('bpm').value = v;
+    $('slider').value = v; $('bpmShow').textContent = v;
+    for (var i = 0; i < NAMES.length; i++) if (v < NAMES[i][0]) { $('tname').textContent = NAMES[i][1]; break; }
+  }
+  $('bpm').addEventListener('input', function () { var v = parseFloat($('bpm').value); if (v >= 20 && v <= 300) setBpm(v, 'box'); });
+  $('bpm').addEventListener('change', function () { var v = parseFloat($('bpm').value); setBpm(isNaN(v) ? 100 : v); });
+  $('slider').addEventListener('input', function () { setBpm(+$('slider').value); });
+  function hold(id, by) { // press and hold to keep changing
+    var t = null, el = $(id);
+    function stop() { clearTimeout(t); clearInterval(t); t = null; }
+    el.addEventListener('pointerdown', function (e) { e.preventDefault(); setBpm(bpm() + by); stop(); t = setTimeout(function () { t = setInterval(function () { setBpm(bpm() + by); }, 70); }, 400); });
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { el.addEventListener(ev, stop); });
+    el.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); setBpm(bpm() + by); } });
+  }
+  hold('minus', -1); hold('plus', 1);
+
+  function defaultStates() {
+    var s = sig(), a = [];
+    for (var i = 0; i < s.n; i++) a.push(i === 0 && $('accent').checked ? 2 : (s.d === 8 && s.n % 3 === 0 && s.n > 3 && i % 3 === 0 && $('accent').checked ? 2 : 1));
+    states = a; drawDots();
+  }
+  function drawDots() {
+    var box = $('dots'); box.innerHTML = '';
+    states.forEach(function (st, i) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = i + 1;
+      b.className = st === 2 ? 'acc' : st === 0 ? 'off' : '';
+      b.setAttribute('aria-label', 'Beat ' + (i + 1) + ': ' + (st === 2 ? 'accented' : st === 0 ? 'silent' : 'normal'));
+      b.addEventListener('click', function () { states[i] = st === 2 ? 1 : st === 1 ? 0 : 2; drawDots(); });
+      box.appendChild(b);
+    });
+  }
+  $('sig').addEventListener('change', function () { defaultStates(); beat = 0; sub = 0; });
+  $('accent').addEventListener('change', defaultStates);
+
+  // ---------- sound ----------
+  function makeNoise() {
+    var b = actx.createBuffer(1, actx.sampleRate * 0.2, actx.sampleRate), d = b.getChannelData(0);
+    for (var i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    return b;
+  }
+  // kind: 2 accent, 1 beat, 0.5 subdivision
+  function click(t, kind) {
+    var snd = $('snd').value, g = actx.createGain(), lvl = kind === 2 ? 1 : kind === 1 ? 0.7 : 0.35;
+    g.connect(master);
+    if (snd === 'hat') {
+      var src = actx.createBufferSource(), hp = actx.createBiquadFilter();
+      src.buffer = noise; hp.type = 'highpass'; hp.frequency.value = kind === 2 ? 5000 : 7000;
+      src.connect(hp); hp.connect(g);
+      g.gain.setValueAtTime(lvl, t); g.gain.exponentialRampToValueAtTime(0.001, t + (kind === 2 ? 0.12 : 0.06));
+      src.start(t); src.stop(t + 0.15);
+      return;
+    }
+    var o = actx.createOscillator(), f = { click: [1600, 1000, 800], beep: [880, 660, 520], wood: [1200, 800, 700] }[snd];
+    o.type = snd === 'beep' ? 'sine' : snd === 'wood' ? 'triangle' : 'square';
+    o.frequency.setValueAtTime(kind === 2 ? f[0] : kind === 1 ? f[1] : f[2], t);
+    if (snd === 'wood') o.frequency.exponentialRampToValueAtTime((kind === 2 ? f[0] : f[1]) * 0.6, t + 0.05);
+    var len = snd === 'beep' ? 0.09 : snd === 'wood' ? 0.06 : 0.03;
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(lvl * (snd === 'click' ? 0.5 : 1), t + 0.002);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + len);
+    o.connect(g); o.start(t); o.stop(t + len + 0.02);
+  }
+
+  // ---------- timing: a worker timer wakes the scheduler, which books clicks a little ahead on the audio clock ----------
+  var AHEAD = 0.12, TICK = 25;
+  function schedule() {
+    var subs = +$('sub').value, s = sig(), perBeat = 60 / bpm() / subs;
+    if (states.length !== s.n) defaultStates();
+    while (next < actx.currentTime + AHEAD) {
+      var st = states[beat] == null ? 1 : states[beat];
+      if (sub === 0) { if (st) click(next, st); queue.push({ t: next, beat: beat, bar: bars }); }
+      else if (st) click(next, 0.5);
+      next += perBeat;
+      if (++sub >= subs) { sub = 0; if (++beat >= s.n) { beat = 0; bars++; } }
+    }
+  }
+  function makeTimer() {
+    try {
+      var u = URL.createObjectURL(new Blob(['var t=null;onmessage=function(e){clearInterval(t);if(e.data>0)t=setInterval(function(){postMessage(0);},e.data);};'], { type: 'text/javascript' }));
+      var w = new Worker(u); URL.revokeObjectURL(u);
+      w.onmessage = schedule;
+      return { start: function () { w.postMessage(TICK); }, stop: function () { w.postMessage(0); } };
+    } catch (e) { // no workers: a normal timer (slower in background tabs)
+      var id = null;
+      return { start: function () { id = setInterval(schedule, TICK); }, stop: function () { clearInterval(id); } };
+    }
+  }
+  function draw() {
+    var now = actx.currentTime, cur = null;
+    while (queue.length && queue[0].t <= now) cur = queue.shift();
+    if (cur) {
+      var kids = $('dots').children;
+      for (var i = 0; i < kids.length; i++) kids[i].classList.toggle('now', i === cur.beat);
+      $('barCount').textContent = 'Bar ' + (cur.bar + 1) + ', beat ' + (cur.beat + 1);
+      if (cur.beat === 0 && $('flash').checked && states[0]) {
+        var c = document.querySelector('.card');
+        if (c && c.animate) c.animate([{ boxShadow: '0 0 0 6px var(--accent)' }, { boxShadow: '0 0 0 0 transparent' }], { duration: 180 });
+      }
+    }
+    raf = requestAnimationFrame(draw);
+  }
+  function start() {
+    if (!AC) return;
+    if (!actx) {
+      try { actx = new AC({ latencyHint: 'interactive' }); } catch (e) { actx = new AC(); }
+      master = actx.createGain(); master.connect(actx.destination); noise = makeNoise();
+      timer = makeTimer();
+    }
+    var go = function () {
+      master.gain.value = Math.pow(+$('vol').value / 100, 2);
+      running = true; beat = 0; sub = 0; bars = 0; queue = [];
+      next = actx.currentTime + 0.06;
+      schedule(); timer.start(); cancelAnimationFrame(raf); draw();
+      $('play').textContent = '■ Stop';
+      say('', 'Playing. Press Stop or the space bar to stop.');
+      if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { wake = l; }, function () {});
+    };
+    var r = actx.resume ? actx.resume() : null;
+    if (r && r.then) r.then(go, function () { say('bad', 'The browser did not allow sound to start. Tap Start again.'); }); else go();
+  }
+  function stop() {
+    running = false; if (timer) timer.stop(); cancelAnimationFrame(raf); queue = [];
+    if (master) { // silence clicks already booked ahead
+      try { master.disconnect(); } catch (e) {}
+      master = actx.createGain(); master.connect(actx.destination);
+    }
+    Array.prototype.forEach.call($('dots').children, function (k) { k.classList.remove('now'); });
+    $('play').textContent = '▶ Start'; $('barCount').textContent = '';
+    say('', 'Stopped.');
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  $('play').addEventListener('click', function () { running ? stop() : start(); });
+  $('vol').addEventListener('input', function () { if (master) master.gain.value = Math.pow(+$('vol').value / 100, 2); });
+  $('sub').addEventListener('change', function () { sub = 0; });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && running && actx && actx.state === 'suspended') actx.resume(); });
+
+  $('tap').addEventListener('click', function () {
+    var now = performance.now();
+    if (taps.length && now - taps[taps.length - 1] > 2000) taps = [];
+    taps.push(now); if (taps.length > 6) taps.shift();
+    if (taps.length < 2) { say('', 'Keep tapping in time: at least 2 taps.'); return; }
+    var gaps = []; for (var i = 1; i < taps.length; i++) gaps.push(taps[i] - taps[i - 1]);
+    var avg = gaps.reduce(function (a, b) { return a + b; }, 0) / gaps.length, v = 60000 / avg;
+    if (v < 20 || v > 300) { say('bad', 'That is outside 20 to 300 BPM. Tap a little ' + (v < 20 ? 'faster' : 'slower') + '.'); return; }
+    setBpm(v); say('', 'Tempo set to ' + Math.round(v) + ' BPM from your taps.');
+  });
+  document.addEventListener('keydown', function (e) {
+    var t = e.target, tag = t && t.tagName;
+    if (e.code !== 'Space' && e.key !== ' ') return;
+    if (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(tag) || (t && t.isContentEditable) || document.querySelector('dialog[open]')) return;
+    e.preventDefault(); running ? stop() : start();
+  });
+  setBpm(parseFloat($('bpm').value) || 100);
+  defaultStates();
+  // the site may fill in saved values after this script: follow them
+  window.addEventListener('load', function () { setBpm(parseFloat($('bpm').value) || 100); defaultStates(); });
+})();
+</script>
