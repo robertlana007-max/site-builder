@@ -551,7 +551,7 @@ ${contact}` },
   <label class="amt-in amt-other"><b aria-hidden="true">$</b><input type="number" id="amtOwn" inputmode="decimal" min="${CARD.min}" max="${CARD.max}" step="0.01" placeholder="Other amount" aria-label="Other amount in US dollars" data-nomemo></label>
   <div class="pay-step"><span class="pay-n">2</span><b>Your email</b><small>for your receipt</small></div>
   <label class="amt-in"><input type="email" id="payEmail" autocomplete="email" maxlength="254" placeholder="you@example.com" aria-label="Your email" data-nomemo></label>
-  <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}">💳 Pay with Card</button>
+  <button class="btn paybtn" type="button" id="payGo" data-api="${esc(CARD.checkoutApi || '')}" data-test-api="${esc(CARD.checkoutApiLater || '')}">💳 Pay with Card</button>
   <p class="msg" id="payMsg" role="status" aria-live="polite" hidden></p>
   <p class="pay-safe">🔒 Secure checkout by PayMeGate. We never see your card. Minimum $${CARD.min}.</p>
 </div>
@@ -583,6 +583,7 @@ ${contact}` },
   var MIN = ${Number(CARD.min) || 2}, MAX = ${Number(CARD.max) || 1000}, SOON = ${JSON.stringify(SOON)};
   var own = document.getElementById('amtOwn'), go = document.getElementById('payGo'), msg = document.getElementById('payMsg');
   var amts = document.querySelectorAll('.amt');
+  if (!go.dataset.api && go.dataset.testApi && /[?&]cardtest=1(?:&|$)/.test(location.search)) { go.dataset.api = go.dataset.testApi; document.getElementById('paySoon').hidden = true; }
   function say(text, cls) { msg.hidden = !text; msg.textContent = text || ''; msg.className = 'msg' + (cls ? ' ' + cls : ''); }
   function amount() {
     if (own.value.trim() !== '') return Math.round(parseFloat(own.value) * 100) / 100;
@@ -747,7 +748,7 @@ write('404.html', layout({
 </section>
 <script>
 (function () {
-  var API = ${JSON.stringify((CARD.checkoutApi || '').replace(/\/checkout\/?$/, '/status'))};
+  var API = ${JSON.stringify((CARD.checkoutApi || CARD.checkoutApiLater || '').replace(/\/checkout\/?$/, '/status'))};
   var $id = function (i) { return document.getElementById(i); };
   function show(k) { ['tyCheck', 'tyFail', 'tyNone', 'tyPaid'].forEach(function (i) { $id(i).hidden = i !== k; }); }
   var gift = null;
