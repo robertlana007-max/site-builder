@@ -9,7 +9,7 @@
 //   PAYMEGATE_API_KEY     (Secret)  merchant API key (pmg_test_… for sandbox, live key later). Sent as X-API-Key.
 //   PAYMEGATE_SECRET_KEY  (Secret)  optional: the webhook signingSecret (only if you set up a webhook).
 //   PAYMEGATE_METHODS     (Text)    optional: comma-separated payment method keys, e.g. "stripe".
-//                                   Leave empty to offer every method ("*"). See GET /methods below.
+//                                   Leave empty for the card methods in CARD_METHODS. See GET /methods below.
 //
 // API facts used (PayMeGate Merchant API v1):
 //   POST https://api.paymegate.com/v1/orders   header X-API-Key
@@ -25,6 +25,7 @@ const SITE = 'https://gettoolnest.xyz';
 const CURRENCY = 'USD';
 const MIN = 2;      // dollars (Stripe card minimum on PayMeGate is $2)
 const MAX = 1000;   // dollars
+const CARD_METHODS = ['stripe', 'creditcard', 'googlepay', 'applepay']; // Stripe, Stix, Google Pay, Apple Pay
 
 function cors(origin) {
   return {
@@ -40,7 +41,8 @@ function json(body, status, origin) {
 }
 function methods(env) {
   const list = String(env.PAYMEGATE_METHODS || '').split(',').map(s => s.trim()).filter(Boolean);
-  return list.length ? list : ['*'];
+  // Default: card-type methods only (keys from GET /v1/payment-methods on this account).
+  return list.length ? list : CARD_METHODS;
 }
 
 export default {
@@ -94,7 +96,9 @@ export default {
     if (!res.ok || !/^https:\/\//.test(checkout)) {
       // Visible in Cloudflare → Workers → Logs, never sent to the visitor.
       console.log('PayMeGate error', res.status, JSON.stringify(data).slice(0, 800));
-      return json({ error: 'The payment service could not start the checkout. Please try again later.' }, 502, origin);
+      const e = (data && data.error) || {};
+      const why = String((data && data.message) || (typeof e === 'string' ? e : e.message) || '').slice(0, 200);
+      return json({ error: 'The payment service could not start the checkout. Please try again later.', detail: why, code: res.status }, 502, origin);
     }
     return json({ url: checkout, order: orderId }, 200, origin);
   }
