@@ -296,8 +296,14 @@
     var side = rot % 180 !== 0, c = canvas(side ? img.height : img.width, side ? img.width : img.height), x = c.getContext('2d');
     x.translate(c.width / 2, c.height / 2); x.rotate(rot * Math.PI / 180); x.drawImage(t, -t.width / 2, -t.height / 2); return c;
   }
-  function render(pg, long) { // the finished page at the given size (long side, in pixels)
-    var src = long <= EDIT ? pg.edit : scaled(pg.img, Math.min(SRC, Math.max(long * 1.6, EDIT))), k = src.width / pg.edit.width;
+  // Full-size source of a page: kept as a JPG file in memory (much smaller than a decoded picture) and opened only when saving.
+  function source(pg) {
+    if (pg.img) return Promise.resolve(pg.img);
+    return new Promise(function (res, rej) { loadImage(pg.blob, function (im) { if (im) res(im); else rej(new Error('A page could not be read back from memory. Remove it and add the photo again.')); }); });
+  }
+  function renderFull(pg, long) { return long <= EDIT ? Promise.resolve(render(pg, long)) : source(pg).then(function (im) { return render(pg, long, im); }); }
+  function render(pg, long, full) { // the finished page at the given size (long side, in pixels)
+    var src = long <= EDIT || !full ? pg.edit : scaled(full, Math.min(SRC, Math.max(long * 1.6, EDIT))), k = src.width / pg.edit.width;
     var q = pg.q.map(function (p) { return [p[0] * k, p[1] * k]; });
     var natural = Math.max(dist2(q[0], q[1]), dist2(q[3], q[2]), dist2(q[0], q[3]), dist2(q[1], q[2]));
     return rotated(enhance(warp(src, q, Math.min(long, Math.round(natural * 1.5))), pg.mode), pg.rot);
@@ -331,6 +337,7 @@
   function addPage(img) {
     var src = scaled(img, SRC), edit = scaled(src, EDIT); // keep a smaller copy in memory, not the full camera photo
     var q = detect(edit), pg = { img: src, edit: edit, q: q || inset(edit), found: !!q, mode: 'color', rot: 0 };
+    src.toBlob(function (b) { if (b) { pg.blob = b; pg.img = null; } }, 'image/jpeg', 0.94);
     pages.push(pg); cur = pages.length - 1;
     refresh(); openEditor();
     say(q ? 'ok' : '', q ? 'Page ' + pages.length + ' added. The edges were found automatically; drag the corners if they need adjusting.' : 'Page ' + pages.length + ' added. The page edges could not be found, so drag the four corners onto the corners of the page.');
@@ -456,12 +463,12 @@
   function pause() { return new Promise(function (r) { setTimeout(r, 0); }); }
   function stamp() { var d = new Date(), z = function (n) { return (n < 10 ? '0' : '') + n; }; return 'scan-' + d.getFullYear() + '-' + z(d.getMonth() + 1) + '-' + z(d.getDate()) + '-' + z(d.getHours()) + z(d.getMinutes()); }
   function encode(pg, long) {
-    var c = render(pg, long), png = pg.mode === 'bw';
-    return PT.blob(c, png ? 'image/png' : 'image/jpeg', 0.85).then(function (b) {
+    var c, png = pg.mode === 'bw';
+    return renderFull(pg, long).then(function (r) { c = r; return PT.blob(c, png ? 'image/png' : 'image/jpeg', 0.85).then(function (b) {
       if (!b) throw new Error('Your browser could not create the page image. Try a lower quality.');
       if (png) return PT.blob(c, 'image/jpeg', 0.9).then(function (j) { return j && j.size < b.size ? { blob: j, png: false, w: c.width, h: c.height } : { blob: b, png: true, w: c.width, h: c.height }; });
       return { blob: b, png: false, w: c.width, h: c.height };
-    });
+    }); });
   }
   var busy = false;
   function lock(on) { busy = on; ['pdf', 'jpg', 'clear', 'shoot', 'pick'].forEach(function (id) { $(id).disabled = on; }); if (!on) $('notice').hidden = true; }
@@ -497,7 +504,7 @@
         burst($('jpg')); lock(false); return;
       }
       var pg = pages[i++]; progress((i - 1) / pages.length, 'Preparing page ' + i + ' of ' + pages.length + '…');
-      pause().then(function () { return PT.blob(render(pg, long), 'image/jpeg', 0.88); }).then(function (b) {
+      pause().then(function () { return renderFull(pg, long); }).then(function (c) { return PT.blob(c, 'image/jpeg', 0.88); }).then(function (b) {
         if (!b) throw new Error('Your browser could not create the image. Try a lower quality.');
         return b.arrayBuffer();
       }).then(function (a) { files.push({ name: base + '-page-' + (i < 10 && pages.length >= 10 ? '0' : '') + i + '.jpg', data: new Uint8Array(a) }); next(); })
