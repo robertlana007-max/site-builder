@@ -79,6 +79,15 @@
       var p = out[a], q = out[b], dd = (p.c[0] - q.c[0]) * (p.c[0] - q.c[0]) + (p.c[1] - q.c[1]) * (p.c[1] - q.c[1]) + (p.c[2] - q.c[2]) * (p.c[2] - q.c[2]);
       if (dd < 324) { var t2 = p.n + q.n; p.c = [0, 1, 2].map(function (m) { return (p.c[m] * p.n + q.c[m] * q.n) / t2; }); p.n = t2; out.splice(b, 1); }
     }
+    // fold tiny groups (under 1%) into their nearest colour: they are mostly blended edge pixels, not real colours
+    var tot = out.reduce(function (s2, p) { return s2 + p.n; }, 0);
+    for (var z = out.length - 1; z >= 0 && out.length > 1; z--) {
+      if (out[z].n / tot >= 0.01) continue;
+      var near = -1, nd = Infinity;
+      for (var y = 0; y < out.length; y++) if (y !== z && out[y].n / tot >= 0.01) { var e2 = sq(out[z].c, 0, out[y].c); if (e2 < nd) { nd = e2; near = y; } }
+      if (near < 0) continue;
+      out[near].n += out[z].n; out.splice(z, 1); // keep the real colour, only count the pixels
+    }
     return out.map(function (p) { return { c: p.c.map(Math.round), n: p.n }; });
   }
   function sq(a, o, c) { var x = a[o] - c[0], y = a[o + 1] - c[1], z = a[o + 2] - c[2]; return x * x + y * y + z * z; }
@@ -90,7 +99,7 @@
     res.sort(o === 'light' ? function (a, b) { return lum(a.c) - lum(b.c); } : o === 'hue' ? function (a, b) { var x = hsl(a.c), y = hsl(b.c); return (x[1] < 12 ? 400 : x[0]) - (y[1] < 12 ? 400 : y[0]) || lum(a.c) - lum(b.c); } : function (a, b) { return b.n - a.n; });
     palette = res.map(function (p) { return { c: p.c, pct: p.n / total * 100 }; });
     show();
-    say('ok', palette.length < k ? 'Found ' + palette.length + ' clearly different colours. Shades that look the same were joined.' : 'Found ' + palette.length + ' main colours. Tap a code to copy it.');
+    say('ok', palette.length < k ? 'Found ' + palette.length + (palette.length === 1 ? ' colour' : ' clearly different colours') + '. Shades that look the same were joined.' : 'Found ' + palette.length + ' main colours. Tap a code to copy it.');
   }
   function show() {
     var bar = $('bar'), ul = $('list'); bar.innerHTML = ''; ul.innerHTML = '';
@@ -120,7 +129,7 @@
       var x = cv.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, cv.width, cv.height);
       // analyse a small copy: about 20,000 pixels is plenty to find the main colours
       var ss = Math.min(1, Math.sqrt(20000 / (W * H))), w = Math.max(1, Math.round(W * ss)), h = Math.max(1, Math.round(H * ss)), t = document.createElement('canvas');
-      t.width = w; t.height = h; var tx = t.getContext('2d', { willReadFrequently: true }); tx.drawImage(im, 0, 0, w, h);
+      t.width = w; t.height = h; var tx = t.getContext('2d', { willReadFrequently: true }); tx.imageSmoothingEnabled = false; tx.drawImage(im, 0, 0, w, h); // sample real pixels, not blends of neighbours
       var d = tx.getImageData(0, 0, w, h).data, arr = new Float32Array(w * h * 3), n = 0;
       for (var i = 0; i < d.length; i += 4) { if (d[i + 3] < 128) continue; arr[n * 3] = d[i]; arr[n * 3 + 1] = d[i + 1]; arr[n * 3 + 2] = d[i + 2]; n++; }
       if (!n) { say('bad', 'This image is completely see-through, so it has no colours to find.'); $('work').hidden = $('acts').hidden = true; return; }

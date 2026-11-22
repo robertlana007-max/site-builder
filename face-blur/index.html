@@ -171,7 +171,7 @@
 (function () {
   var BASE = '../assets/vendor/onnx/', MODEL = ['yunet-face.onnx', 232589], WASM = ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852];
   var S = 640, THRESH = 0.6, MAXPX = 50e6, MAXFILES = 100, PREVIEW = 1600;
-  var photos = [], cur = -1, sessP = null, queue = [], working = false, mode = 'toggle', urls = [];
+  var photos = [], skipped = [], cur = -1, sessP = null, queue = [], working = false, mode = 'toggle', urls = [];
   function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
   function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   function progress(frac, text) { $('notice').hidden = false; $('bar').hidden = frac == null; if (frac != null) $('fill').style.width = Math.round(Math.min(1, frac) * 100) + '%'; $('stat').textContent = text; }
@@ -317,6 +317,7 @@
     var notes = [];
     if (bad) notes.push('Skipped ' + bad + ' file(s) that are not photos' + (photos.length + queue.length >= MAXFILES ? ' or are over the ' + MAXFILES + '-photo limit' : '') + '.');
     if (heic) notes.push(heic + ' HEIC photo(s) (the iPhone format) cannot be opened here. Convert them to JPG first with the HEIC to JPG tool.');
+    skipped = notes.slice(); // shown again after the faces are found, so the note is not lost
     say(notes.length ? 'bad' : '', notes.join(' '));
     if (added) pump();
   }
@@ -324,8 +325,8 @@
     if (working) return; var f = queue.shift(); if (!f) { $('notice').hidden = true; return; }
     working = true;
     loadImage(f, function (img) {
-      if (!img || !img.naturalWidth) { say('bad', 'Could not open "' + f.name + '". It may be damaged.'); working = false; pump(); return; }
-      if (img.naturalWidth * img.naturalHeight > MAXPX) { say('bad', '"' + f.name + '" is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.'); working = false; pump(); return; }
+      if (!img || !img.naturalWidth) { skipped.push('Could not open "' + f.name + '". It may be damaged.'); say('bad', skipped.join(' ')); working = false; pump(); return; }
+      if (img.naturalWidth * img.naturalHeight > MAXPX) { skipped.push('"' + f.name + '" is too large (' + img.naturalWidth + ' × ' + img.naturalHeight + '). Make it smaller with the Image Resizer first.'); say('bad', skipped.join(' ')); working = false; pump(); return; }
       var ph = { img: img, w: img.naturalWidth, h: img.naturalHeight, name: f.name, type: f.type, faces: null };
       photos.push(ph);
       var t = canvas(1, 1), k = Math.min(1, 160 / Math.max(ph.w, ph.h)); t.width = Math.max(1, Math.round(ph.w * k)); t.height = Math.max(1, Math.round(ph.h * k)); t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
@@ -346,7 +347,8 @@
       ph.faces = found.map(function (f) { return { x: f.x, y: f.y, w: f.w, h: f.h, s: f.s, on: true }; }).concat(manual);
       if (photos.indexOf(ph) === cur) show(); else show();
       var total = photos.reduce(function (n, p) { return n + (p.faces ? p.faces.filter(function (f) { return !f.manual; }).length : 0); }, 0);
-      say('ok', photos.length > 1 ? photos.length + ' photos, ' + total + ' faces found in all.' : found.length ? 'Found ' + found.length + (found.length === 1 ? ' face.' : ' faces.') + ' Tap any face to switch its cover on or off.' : 'No faces were found. Choose "Draw a new box" to cover areas yourself.');
+      var extra = skipped.length ? ' ' + skipped.join(' ') : '';
+      say(skipped.length ? 'bad' : 'ok', (photos.length > 1 ? photos.length + ' photos, ' + total + ' faces found in all.' : found.length ? 'Found ' + found.length + (found.length === 1 ? ' face.' : ' faces.') + ' Tap any face to switch its cover on or off.' : 'No faces were found. Choose "Draw a new box" to cover areas yourself.') + extra);
     }).catch(function (e) {
       ph.faces = ph.faces || [];
       say('bad', typeof WebAssembly === 'undefined' ? 'Your browser does not support WebAssembly, which the face finder needs. You can still draw boxes yourself.' : 'The face finder could not start' + (e && e.message === 'net' ? ' because the download failed. Check your connection and try again.' : ' on this device.') + ' You can still draw boxes yourself.');

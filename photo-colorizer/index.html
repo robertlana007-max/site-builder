@@ -202,14 +202,17 @@
   // Model input: the lightness of the photo squeezed to 256 x 256.
   function inputTensor() {
     var c = canvas(IN, IN), x = c.getContext('2d', { willReadFrequently: true }); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, IN, IN);
-    var p = x.getImageData(0, 0, IN, IN).data, t = new Float32Array(IN * IN);
-    for (var j = 0; j < IN * IN; j++) t[j] = lOf(p[j * 4], p[j * 4 + 1], p[j * 4 + 2]);
+    var p = x.getImageData(0, 0, IN, IN).data, t = new Float32Array(IN * IN), chroma = 0;
+    for (var j = 0; j < IN * IN; j++) { t[j] = lOf(p[j * 4], p[j * 4 + 1], p[j * 4 + 2]); chroma += Math.max(p[j * 4], p[j * 4 + 1], p[j * 4 + 2]) - Math.min(p[j * 4], p[j * 4 + 1], p[j * 4 + 2]); }
+    inputTensor.coloured = chroma / (IN * IN) > 12; // the photo already has clear colours
     return new ort.Tensor('float32', t, [1, 1, IN, IN]);
   }
   // Paint the photo at w x h: its own lightness plus the model's colour, scaled smoothly up from 256 x 256.
-  function compose(w, h, strength, out) {
+  function compose(w, h, strength, out, flat) {
     var c = out || canvas(w, h); c.width = w; c.height = h;
-    var x = c.getContext('2d', { willReadFrequently: true }); x.drawImage(src, 0, 0, w, h);
+    var x = c.getContext('2d', { willReadFrequently: true });
+    if (flat) { x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); } // JPG has no see-through: use white, not black
+    x.drawImage(src, 0, 0, w, h);
     var band = 256;
     for (var y0 = 0; y0 < h; y0 += band) {
       var bh = Math.min(band, h - y0), d = x.getImageData(0, y0, w, bh), p = d.data;
@@ -261,7 +264,7 @@
         clearInterval(timer); if (mine !== job) return;
         ab = o[s.outputNames[0]].data;
         $('notice').hidden = true; preview();
-        say('ok', 'Done in ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s. The colours are the AI\'s best guess, not the real ones. Try the other colour style or change the strength if they look off.');
+        say('ok', 'Done in ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s. The colours are the AI\'s best guess, not the real ones. Try the other colour style or change the strength if they look off.' + (inputTensor.coloured ? ' Note: this photo already had colour, which has been replaced. The tool is made for black and white photos.' : ''));
       });
     }).catch(function (e) {
       clearInterval(timer); if (mine !== job) return;
@@ -296,7 +299,7 @@
     say('', 'Preparing the full-size photo…');
     setTimeout(function () {
       var c;
-      try { c = compose(W, H, +$('sat').value / 100); } catch (e) { say('bad', 'This photo is too large to finish on this device. Try a smaller copy.'); return; }
+      try { c = compose(W, H, +$('sat').value / 100, null, !png); } catch (e) { say('bad', 'This photo is too large to finish on this device. Try a smaller copy.'); return; }
       c.toBlob(function (b) {
         if (!b) { say('bad', 'Your browser could not create the file.'); return; }
         var u = URL.createObjectURL(b), a = document.createElement('a'); a.href = u; a.download = name + '-colour.' + (png ? 'png' : 'jpg'); document.body.appendChild(a); a.click(); a.remove();
