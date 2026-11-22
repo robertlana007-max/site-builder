@@ -167,7 +167,7 @@
 <script>
 (function () {
   var AC = window.AudioContext || window.webkitAudioContext;
-  var actx = null, master = null, noise = null, timer = null, running = false, next = 0, beat = 0, sub = 0, bars = 0, queue = [], raf = 0, wake = null, taps = [];
+  var gen = 0, actx = null, master = null, noise = null, timer = null, running = false, next = 0, beat = 0, sub = 0, bars = 0, queue = [], raf = 0, wake = null, taps = [];
   var states = []; // per beat: 2 accent, 1 normal, 0 silent
   var NAMES = [[40, 'Grave'], [60, 'Largo'], [66, 'Larghetto'], [76, 'Adagio'], [108, 'Andante'], [120, 'Moderato'], [156, 'Allegro'], [176, 'Vivace'], [200, 'Presto'], [999, 'Prestissimo']];
   function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t; }
@@ -286,7 +286,9 @@
       master = actx.createGain(); master.connect(actx.destination); noise = makeNoise();
       timer = makeTimer();
     }
+    var mine = ++gen; running = true;
     var go = function () {
+      if (mine !== gen) return; // stopped again before the sound was allowed to start
       master.gain.value = Math.pow(+$('vol').value / 100, 2);
       running = true; beat = 0; sub = 0; bars = 0; queue = [];
       next = actx.currentTime + 0.06;
@@ -296,10 +298,10 @@
       if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { wake = l; }, function () {});
     };
     var r = actx.resume ? actx.resume() : null;
-    if (r && r.then) r.then(go, function () { say('bad', 'The browser did not allow sound to start. Tap Start again.'); }); else go();
+    if (r && r.then) r.then(go, function () { if (mine !== gen) return; running = false; say('bad', 'The browser did not allow sound to start. Tap Start again.'); }); else go();
   }
   function stop() {
-    running = false; if (timer) timer.stop(); cancelAnimationFrame(raf); queue = [];
+    running = false; gen++; if (timer) timer.stop(); cancelAnimationFrame(raf); queue = [];
     if (master) { // silence clicks already booked ahead
       try { master.disconnect(); } catch (e) {}
       master = actx.createGain(); master.connect(actx.destination);
