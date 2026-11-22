@@ -165,7 +165,7 @@
   var BASE = '../assets/vendor/onnx/', MODEL = { file: 'realesr-general-x4v3.onnx', bytes: 2435209 };
   var WASM = { gpu: ['ort.webgpu.min.js', 'ort-wasm-simd-threaded.asyncify.wasm', 28747738], cpu: ['ort.wasm.min.js', 'ort-wasm-simd-threaded.wasm', 14848852] };
   var MAX_OUT = 16000000, AI_MAX_IN = 2000000, TILE = 128, PAD = 10;
-  var src = null, name = 'image', W = 0, H = 0, hasAlpha = false, out = null, outScale = 0, outMethod = '', job = 0, busy = false, stopped = false, lastUrl = null, note = '';
+  var src = null, name = 'image', W = 0, H = 0, W0 = 0, H0 = 0, hasAlpha = false, out = null, outScale = 0, outMethod = '', job = 0, busy = false, stopped = false, lastUrl = null, note = '';
   function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
   function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
   function progress(frac, text) {
@@ -312,7 +312,8 @@
       busy = false; $('notice').hidden = true; out = c; outScale = p.scale; outMethod = how;
       showResult();
       var s = ((performance.now() - t0) / 1000).toFixed(1);
-      say('ok', 'Done: ' + c.width + ' × ' + c.height + ' px (' + p.scale + '× using ' + how + ', ' + s + ' s). Drag across the picture to compare.' + note);
+      if (c.width <= W0 && c.height <= H0) say('bad', 'Your picture is already ' + W0 + ' × ' + H0 + ' px, which is about the largest a browser can make. The result (' + c.width + ' × ' + c.height + ' px) is not bigger than the original, so there is no need to save it. Upscaling works best on small pictures.');
+      else say('ok', 'Done: ' + c.width + ' × ' + c.height + ' px (' + p.scale + '× using ' + how + ', ' + s + ' s). Drag across the picture to compare.' + note);
     }
     if (!p.ai) {
       progress(null, 'Enlarging…');
@@ -393,6 +394,7 @@
       if (mine !== job) return;
       if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open (convert HEIC photos to JPG first).'); return; }
       var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, Math.sqrt(MAX_OUT / (w * h)));
+      W0 = w; H0 = h;
       W = Math.max(1, Math.round(w * s)); H = Math.max(1, Math.round(h * s));
       src = canvas(W, H); var x = src.getContext('2d', { willReadFrequently: true }); x.drawImage(im, 0, 0, W, H);
       name = f.name.replace(/\.[^.]+$/, '') || 'image';

@@ -228,6 +228,7 @@
       cols.forEach(function (c) {
         var cell = ws[XLSX.utils.encode_cell({ r: r, c: c })], t = '', num = false, fill = null;
         if (cell) {
+          if (cell.f && (cell.t === 'z' || cell.v === undefined || cell.v === null) && !cell.w) out.noval = (out.noval || 0) + 1;
           if (cell.w !== undefined && cell.w !== null) t = String(cell.w);
           else if (cell.v !== undefined && cell.v !== null) { try { t = XLSX.utils.format_cell(cell); } catch (e) { t = String(cell.v); } }
           num = cell.t === 'n' || cell.t === 'd' || (cell.t === 's' && ws.__csv && NUMRE.test(t.trim()));
@@ -255,6 +256,7 @@
     PT.say('', 'Reading ' + f.name + '…');
     f.arrayBuffer().then(function (buf) {
       var b = new Uint8Array(buf), isZip = b[0] === 0x50 && b[1] === 0x4B, isOle = b[0] === 0xD0 && b[1] === 0xCF;
+      if (/^(xlsx|xlsm|xlsb|ods)$/.test(ext) && !isZip && !isOle) throw new Error('"' + f.name + '" could not be read as a spreadsheet. It may be damaged, or it is not really a .' + ext + ' file.');
       if (isZip || isOle || /^(xlsx|xlsm|xlsb|xls|ods)$/.test(ext)) {
         try { wb = XLSX.read(b, { type: 'array', cellStyles: true, cellDates: false, cellNF: true }); }
         catch (e) {
@@ -278,7 +280,8 @@
       names.forEach(function (n) { var o = document.createElement('option'); o.value = n; o.textContent = n; sel.appendChild(o); });
       $('sheetBox').hidden = names.length < 2;
       file = f; $('loaded').hidden = false; $('go').disabled = false;
-      $('note').textContent = (isZip || isOle) ? 'Formulas show their last calculated values. Cell fill colours are kept; charts, pictures and fonts are not.' : '';
+      var noval = names.reduce(function (a, n) { return a + (grid(n).noval || 0); }, 0);
+      $('note').textContent = (isZip || isOle) ? 'Formulas show their last calculated values. Cell fill colours are kept; charts, pictures and fonts are not.' + (noval ? ' ' + fmtNum(noval) + (noval === 1 ? ' formula has' : ' formulas have') + ' no saved result in this file, so ' + (noval === 1 ? 'that cell stays' : 'those cells stay') + ' empty. To fix it, open the file in Excel, LibreOffice or Google Sheets, save it, and try again.' : '') : '';
       preview();
       PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Check the options, then press Make PDF.');
     }).catch(function (e) { reset(); PT.say('bad', e && e.message || 'This file could not be read.'); });

@@ -45,7 +45,7 @@
   <h3 class="dsc-h">Save your scan</h3>
   <div class="fields">
     <div><label for="size">PDF page size</label><select id="size"><option value="a4">A4 (210 × 297 mm)</option><option value="letter">Letter (8.5 × 11 in)</option><option value="fit">Same shape as the scan</option></select></div>
-    <div><label for="qual">Quality</label><select id="qual"><option value="2480">High (300 dpi)</option><option value="1754" selected>Standard (200 dpi)</option><option value="1240">Smaller file (150 dpi)</option></select></div>
+    <div><label for="qual">Quality</label><select id="qual"><option value="3508">High (300 dpi)</option><option value="2339" selected>Standard (200 dpi)</option><option value="1754">Smaller file (150 dpi)</option></select></div>
   </div>
   <div class="btns">
     <button class="btn" id="pdf" type="button">Download PDF</button>
@@ -259,6 +259,9 @@
     for (by = 0; by < bh; by++) for (bx = 0; bx < bw; bx++) { var m = 0, cnt = 0, s = 0;
       for (Y = Math.max(0, by - 1); Y <= Math.min(bh - 1, by + 1); Y++) for (X = Math.max(0, bx - 1); X <= Math.min(bw - 1, bx + 1); X++) { m = Math.max(m, blk[Y * bw + X]); s += blk[Y * bw + X]; cnt++; }
       b2[by * bw + bx] = 0.6 * m + 0.4 * s / cnt; }
+    // big dark or coloured areas (photos, charts, coloured boxes) are not paper: never brighten them like a shadow
+    var srt = Array.prototype.slice.call(b2).sort(function (a, b) { return a - b; }), floor = 0.6 * srt[Math.floor(srt.length * 0.9)];
+    for (by = 0; by < b2.length; by++) if (b2[by] < floor) b2[by] = floor;
     var out = new Float32Array(w * h);
     for (Y = 0; Y < h; Y++) { var fy = Math.min(bh - 1, Math.max(0, (Y + 0.5) / B - 0.5)), ya = fy | 0, yb = Math.min(bh - 1, ya + 1), ty = fy - ya;
       for (X = 0; X < w; X++) { var fx = Math.min(bw - 1, Math.max(0, (X + 0.5) / B - 0.5)), xa = fx | 0, xb = Math.min(bw - 1, xa + 1), tx = fx - xa;
@@ -275,7 +278,7 @@
       for (i = 0; i < n; i += 7) if (g[i] > bg[i] * 0.9) { wb[0] += p[i * 4]; wb[1] += p[i * 4 + 1]; wb[2] += p[i * 4 + 2]; wn++; }
       var gm = wn ? (wb[0] + wb[1] + wb[2]) / 3 : 1, cb = wn ? wb.map(function (v) { return Math.min(1.5, Math.max(0.67, gm / Math.max(1, v))); }) : [1, 1, 1];
       for (i = 0; i < n; i++) { var k = 255 / Math.max(40, bg[i]);
-        for (var ch = 0; ch < 3; ch++) { var v = p[i * 4 + ch] * k * cb[ch]; v = v >= 255 ? 255 : v; v = 255 * Math.pow(v / 255, 1.35); p[i * 4 + ch] = v > 247 ? 255 : v; } }
+        for (var ch = 0; ch < 3; ch++) { var v = p[i * 4 + ch] * k * cb[ch]; v = v >= 255 ? 255 : v; v = 255 * Math.pow(v / 255, 1.35); p[i * 4 + ch] = v > 235 ? 235 + (v - 235) * 2 : v; } }
       return img;
     }
     var nv = new Float32Array(n); for (i = 0; i < n; i++) nv[i] = Math.min(255, g[i] * 255 / Math.max(40, bg[i]));
@@ -474,7 +477,7 @@
   function lock(on) { busy = on; ['pdf', 'jpg', 'clear', 'shoot', 'pick'].forEach(function (id) { $(id).disabled = on; }); if (!on) $('notice').hidden = true; }
   $('pdf').addEventListener('click', function () {
     if (busy || !pages.length) return; lock(true);
-    var long = +$('qual').value, size = $('size').value, doc, i = 0;
+    var long = +$('qual').value || 2339, size = $('size').value, doc, i = 0;
     PDFLib.PDFDocument.create().then(function (d) {
       doc = d; doc.setTitle('Scan'); doc.setProducer('GetToolNest Document Scanner'); doc.setCreator('GetToolNest');
       function next() {
@@ -496,7 +499,7 @@
   });
   $('jpg').addEventListener('click', function () {
     if (busy || !pages.length) return; lock(true);
-    var long = +$('qual').value, files = [], i = 0, base = stamp();
+    var long = +$('qual').value || 2339, files = [], i = 0, base = stamp();
     (function next() {
       if (i >= pages.length) {
         if (files.length === 1) { save(new Blob([files[0].data], { type: 'image/jpeg' }), base + '.jpg'); say('ok', 'Saved ' + base + '.jpg (' + fmtBytes(files[0].data.length) + ').'); }

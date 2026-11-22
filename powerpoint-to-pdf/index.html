@@ -432,7 +432,7 @@
       for (var i = 0; i < s.length; i++) { var ch = s[i], v = c[ch]; if (v === undefined) { try { v = c[ch] = fnt.widthOfTextAtSize(ch, 1); } catch (e) { v = c[ch] = 0.5; } } w += v; }
       return w * size;
     }
-    var imgCache = {}, fallImgs = {}, skipped = [], includeHidden = $('hidden').checked, done = 0, slideNo = 0;
+    var imgCache = {}, fallImgs = {}, skipped = [], includeHidden = $('hidden').checked, done = 0, slideNo = 0, hiddenLeft = 0;
     function skip(n, what) { var key = n + '|' + what, s = skipped.filter(function (x) { return x.k === key; })[0]; if (s) s.n++; else skipped.push({ k: key, slide: n, what: what, n: 1 }); }
 
     async function image(partPath) {
@@ -803,7 +803,8 @@
             var rs = nattr(tc, 'rowSpan', 1), h = 0; for (var r2 = 0; r2 < rs; r2++) h += heights[ri + r2] || 0;
             var tcPr = kid(tc, 'tcPr'), f = fillOf(tcPr, ctx);
             var head = firstRow && ri === 0;
-            if (f === undefined && hasStyle) f = head ? { c: acc } : band ? { c: (ri - (firstRow ? 1 : 0)) % 2 === 0 ? mix(acc, 0.8) : mix(acc, 0.9) } : null;
+            var styled = f === undefined && hasStyle;
+            if (styled) f = head ? { c: acc } : band ? { c: (ri - (firstRow ? 1 : 0)) % 2 === 0 ? mix(acc, 0.8) : mix(acc, 0.9) } : null;
             if (f && f.c) page.drawRectangle({ x: cx, y: -y - h, width: w, height: h, color: rgb(f.c), opacity: clamp(f.c.a) });
             var anyBorder = false;
             [['lnL', cx, y, cx, y + h], ['lnR', cx + w, y, cx + w, y + h], ['lnT', cx, y, cx + w, y], ['lnB', cx, y + h, cx + w, y + h]].forEach(function (bd) {
@@ -823,7 +824,7 @@
               bodyEl = bodyEl.cloneNode(true);
               Array.prototype.forEach.call(bodyEl.getElementsByTagNameNS('*', 'r'), function (r) { var rp = kid(r, 'rPr'); if (rp && rp.getAttribute('b') === null) rp.setAttribute('b', '1'); if (!rp) { rp = bodyEl.ownerDocument.createElementNS(r.namespaceURI, 'a:rPr'); rp.setAttribute('b', '1'); r.insertBefore(rp, r.firstChild); } });
             }
-            await drawTextNoWrap(page, cellM, bodyEl, w, h, box, fake, tcCtx, tColor);
+            await drawTextNoWrap(page, cellM, bodyEl, w, h, box, fake, tcCtx, tColor, head && styled);
             cx += w;
           }
           y += heights[ri];
@@ -832,11 +833,11 @@
       function mix(c, k) { return { r: c.r + (1 - c.r) * k, g: c.g + (1 - c.g) * k, b: c.b + (1 - c.b) * k, a: 1 }; }
     }
     // tables are drawn inside the table's own matrix, which is already pushed
-    async function drawTextNoWrap(page, cellM, body, w, h, box, anchorEl, ctx, color0) {
+    async function drawTextNoWrap(page, cellM, body, w, h, box, anchorEl, ctx, color0, force) {
       if (!body) return;
       // draw relative to the slide: undo the pushed table matrix by giving drawText the full matrix and popping temporarily
       page.pushOperators(PL.popGraphicsState());
-      await drawText(page, cellM, body, w, h, [defStyle, kid(kid(curMaster, 'txStyles'), 'otherStyle')], [anchorEl], ctx, color0, { box: box });
+      await drawText(page, cellM, body, w, h, [defStyle, kid(kid(curMaster, 'txStyles'), 'otherStyle')], [anchorEl], ctx, color0, { box: box, fontColor: force ? color0 : null });
       var M = pdfMatrix(curTableM, H);
       page.pushOperators(PL.pushGraphicsState(), PL.concatTransformationMatrix(M[0], M[1], M[2], M[3], M[4], M[5]));
     }
@@ -879,7 +880,7 @@
     for (var si = 0; si < slides.length; si++) {
       var sp = slides[si], sx = await xml(sp);
       if (!sx) { skip(si + 1, 'slide that could not be read'); continue; }
-      if (attr(sx, 'show') === '0' && !includeHidden) continue;
+      if (attr(sx, 'show') === '0' && !includeHidden) { hiddenLeft++; continue; }
       slideNo = si + 1;
       PT.say('', 'Drawing slide ' + (si + 1) + ' of ' + total + '…');
       await new Promise(function (r) { setTimeout(r, 0); });
@@ -906,7 +907,7 @@
     }
     if (!done) throw new Error('All slides in "' + f.name + '" are hidden. Tick "Include hidden slides" and try again.');
     doc.setTitle(PT.base(f.name)); doc.setCreator('GetToolNest');
-    return { bytes: await doc.save(), pages: done, skipped: skipped };
+    return { bytes: await doc.save(), pages: done, skipped: skipped, hidden: hiddenLeft };
   }
 
   function loadFonts() {
@@ -927,7 +928,13 @@
     if (ext === 'key' || ext === 'odp') return PT.say('bad', '"' + f.name + '" is a ' + (ext === 'key' ? 'Keynote' : 'LibreOffice Impress') + ' file. Export it as PowerPoint (.pptx) first, or export it straight to PDF from that program.');
     f.slice(0, 8).arrayBuffer().then(function (h) {
       var b = new Uint8Array(h);
-      if (b[0] === 0xD0 && b[1] === 0xCF) throw new Error(ext === 'pptx' ? '"' + f.name + '" is password protected. Open it in PowerPoint, remove the password (File › Info › Protect Presentation), save, and try again.' : '"' + f.name + '" is an old .ppt file, which this tool cannot read. Save it as .pptx first.');
+      if (b[0] === 0xD0 && b[1] === 0xCF) {
+        // Both password-protected .pptx files and old .ppt files use this container; only the first holds "EncryptionInfo".
+        return f.arrayBuffer().then(function (all) {
+          var locked = new TextDecoder('utf-16le').decode(new Uint8Array(all, 0, all.byteLength & ~1)).indexOf('EncryptionInfo') !== -1;
+          throw new Error(locked ? '"' + f.name + '" is password protected. Open it in PowerPoint, remove the password (File › Info › Protect Presentation), save, and try again.' : '"' + f.name + '" is an old .ppt file, which this tool cannot read. Open it in PowerPoint, Google Slides or LibreOffice, save it as .pptx, then try again.');
+        });
+      }
       if (!(b[0] === 0x50 && b[1] === 0x4B)) throw new Error('"' + f.name + '" is not a PowerPoint .pptx file.');
       file = f; $('go').disabled = false;
       PT.say('', f.name + ' · ' + fmtBytes(f.size) + '. Press Make PDF.');
@@ -959,7 +966,7 @@
       try { r = await convert(file); }
       catch (e) { if (e && /^"|^All slides|^The font/.test(e.message)) throw e; console.warn(e); throw new Error('"' + file.name + '" could not be converted. It may be damaged or use features this tool cannot read.'); }
       result = r;
-      PT.done(r.bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'Your PDF is ready: ' + r.pages + (r.pages === 1 ? ' page' : ' pages'));
+      PT.done(r.bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'Your PDF is ready: ' + r.pages + (r.pages === 1 ? ' page' : ' pages') + (r.hidden ? ' (' + r.hidden + (r.hidden === 1 ? ' hidden slide was' : ' hidden slides were') + ' left out)' : ''));
       if (r.skipped.length) {
         var ul = $('skips');
         r.skipped.forEach(function (s) { var li = document.createElement('li'); li.textContent = 'Slide ' + s.slide + ': ' + (s.n > 1 ? s.n + ' × ' : '') + s.what + (/animation/.test(s.what) ? '' : ' could not be drawn'); ul.appendChild(li); });
