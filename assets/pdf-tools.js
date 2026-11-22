@@ -31,7 +31,7 @@
   // Open with pdf-lib (for editing). Rejects with a message that is safe to show.
   PT.open = function (file) {
     return file.arrayBuffer().then(function (buf) { return PDFLib.PDFDocument.load(buf); }).catch(function (e) {
-      throw new Error(/encrypt/i.test(String(e && e.message)) ? '"' + file.name + '" is password protected or locked against changes. Remove the protection first (for example, open it in a PDF reader and print it to a new PDF with "Save as PDF").' : '"' + file.name + '" could not be read as a PDF.');
+      throw new Error(/encrypt/i.test(String(e && e.message)) ? '"' + file.name + '" is password protected or locked against changes. Remove the protection first with the free Unlock PDF tool on this site (you need the password), then try again.' : '"' + file.name + '" could not be read as a PDF.');
     });
   };
 
@@ -39,7 +39,7 @@
   PT.render = function (file) {
     pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
     return file.arrayBuffer().then(function (buf) { return pdfjsLib.getDocument({ data: buf }).promise; }).catch(function (e) {
-      throw new Error(e && e.name === 'PasswordException' ? '"' + file.name + '" is password protected. Remove the password first.' : '"' + file.name + '" could not be read as a PDF.');
+      throw new Error(e && e.name === 'PasswordException' ? '"' + file.name + '" is password protected. Remove the password first with the free Unlock PDF tool on this site, then try again.' : '"' + file.name + '" could not be read as a PDF.');
     });
   };
 
