@@ -232,22 +232,24 @@
     d.querySelector('.tc-x').addEventListener('click', function () { if (ts.children.length > 1) d.remove(); else ins.forEach(function (x) { x.value = ''; }); tcalc(); });
     return d;
   }
+  function hm(w) { var r = Math.round(w); return Math.floor(r / 60) + ':' + pad(r % 60); }
   function mins(v) { var p = /^(\d\d):(\d\d)/.exec(v); return p ? +p[1] * 60 + +p[2] : NaN; }
   function tcalc() {
-    var total = 0, bad = '', rows = 0;
+    var total = 0, bad = '', rows = 0, same = '';
     ts.querySelectorAll('.tc-ts').forEach(function (r, k) {
       var ins = r.querySelectorAll('input'), out = r.querySelector('output'), a = mins(ins[0].value), b = mins(ins[1].value), br = ins[2].value === '' ? 0 : +ins[2].value;
       if (isNaN(a) || isNaN(b)) { out.textContent = '–'; return; }
       var w = b - a; if (w <= 0) w += 1440; // overnight shift
+      if (a === b) same = same || 'Day ' + (k + 1) + ': start and end are the same time, so it is counted as a full 24-hour shift.';
       if (!(br >= 0)) { bad = bad || 'Day ' + (k + 1) + ': the break cannot be negative.'; out.textContent = '–'; return; }
       if (br > w) { bad = bad || 'Day ' + (k + 1) + ': the break is longer than the shift.'; out.textContent = '–'; return; }
       w -= br; total += w; rows++;
-      out.textContent = Math.floor(w / 60) + ':' + pad(Math.round(w % 60));
+      out.textContent = hm(w);
     });
     var msg = $('tsMsg');
-    msg.className = bad ? 'msg bad' : 'msg'; msg.textContent = bad || 'If the end time is earlier than the start time, the shift is counted as running past midnight.';
+    msg.className = bad ? 'msg bad' : 'msg'; msg.textContent = bad || same || 'If the end time is earlier than the start time, the shift is counted as running past midnight.';
     if (!rows) { ['tsHm', 'tsDec', 'tsPay'].forEach(function (i) { $(i).textContent = '–'; }); return; }
-    $('tsHm').textContent = Math.floor(total / 60) + 'h ' + pad(Math.round(total % 60)) + 'm';
+    $('tsHm').textContent = hm(total).replace(':', 'h ') + 'm';
     $('tsDec').textContent = dec(total / 60, 2);
     var r = $('tsRate').value; $('tsPay').textContent = r === '' || !(+r >= 0) ? '–' : fmtNum(total / 60 * +r, 2);
   }
@@ -267,11 +269,13 @@
   function cvFromHm() {
     var v = $('cvHm').value.trim(), o = $('cvOut');
     if (!v) { o.textContent = '–'; return; }
+    var mm = /^(-?)(\d+(?:\.\d+)?)\s*m(?:in(?:ute)?s?)?$/i.exec(v); // just minutes, like 45m or 45 min
+    if (mm) { $('cvDec').value = ''; var ms = +mm[2] * 60 * (mm[1] ? -1 : 1); o.textContent = v + ' = ' + hms(ms) + ' = ' + dec(ms / 3600) + ' hours'; return; }
     var p = /^(-?)(\d+)(?::(\d{1,2}))?(?::(\d{1,2}(?:\.\d+)?))?$/.exec(v.replace(/\s+/g, '').replace(/h/i, ':').replace(/m(in)?$/i, '').replace(/:$/, ''));
     if (!p || (p[3] && +p[3] > 59) || (p[4] && +p[4] >= 60)) { o.textContent = 'Write it as hours:minutes, like 7:45 or 1:05:30 (minutes and seconds below 60).'; return; }
     $('cvDec').value = '';
     var sec = (+p[2]) * 3600 + (+(p[3] || 0)) * 60 + (+(p[4] || 0)); if (p[1]) sec = -sec;
-    o.textContent = v + ' = ' + dec(sec / 3600) + ' hours (' + dec(sec / 60, 2) + ' minutes)';
+    o.textContent = v + ' = ' + dec(sec / 3600) + (Math.abs(sec) === 3600 ? ' hour (' : ' hours (') + dec(sec / 60, 2) + ' minutes)';
   }
   $('cvDec').addEventListener('input', cvFromDec); $('cvHm').addEventListener('input', cvFromHm);
 })();
