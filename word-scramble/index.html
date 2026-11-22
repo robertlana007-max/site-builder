@@ -186,7 +186,7 @@
   $('wsCat').addEventListener('change', function () { $('wsCustomBox').hidden = this.value !== 'custom'; });
   function pool() {
     var cat = $('wsCat').value, lvl = $('wsLvl').value, list = [];
-    if (cat === 'custom') list = $('wsCustom').value.split(/[\n,;]+/).map(norm).filter(function (w) { return /^[\p{L}' -]{2,30}$/u.test(w) && w.replace(/[^\p{L}]/gu, '').length >= 2; }).map(function (w) { return [w, 'custom']; });
+    if (cat === 'custom') list = $('wsCustom').value.split(/[\n,;]+/).map(norm).filter(function (w) { return /^[\p{L}\p{M}' -]{2,30}$/u.test(w) && w.replace(/[^\p{L}]/gu, '').length >= 2; }).map(function (w) { return [w, 'custom']; });
     else (cat === 'mix' ? Object.keys(W) : [cat]).forEach(function (k) { W[k].split(' ').forEach(function (w) { list.push([w, k]); }); });
     if (cat !== 'custom' && lvl !== 'any') list = list.filter(function (x) { var n = x[0].length; return lvl === 'easy' ? n <= 5 : lvl === 'med' ? n >= 5 && n <= 7 : n >= 8; });
     var seen = {}; return shuffle(list.filter(function (x) { if (seen[x[0]]) return false; seen[x[0]] = 1; return true; }));
@@ -228,6 +228,7 @@
   }
   function rev() { return Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).length; }
   function refix() { g.used = []; Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).forEach(function (c) { var k = g.letters.findIndex(function (l, i) { return l === c && g.used.indexOf(i) < 0; }); if (k >= 0) g.used.push(k); }); g.fixed = g.used.slice(); }
+  function pre() { return Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).join(''); } // letters given by hints; the answer box always starts with them
   function current() { return Array.from(g.word).slice(0, g.revealed).filter(function (c) { return c !== ' '; }).join('') + g.typed.join(''); }
   function check(guess) {
     if (!g || g.over) return;
@@ -254,20 +255,20 @@
     $('wsStart').textContent = 'Play again';
   }
   $('wsStart').addEventListener('click', start);
-  $('wsForm').addEventListener('submit', function (e) { e.preventDefault(); check($('wsGuess').value || current()); });
-  $('wsGuess').addEventListener('input', function () { if (!g || g.over) return; var v = Array.from(norm(this.value).replace(/ /g, '')); g.typed = v.slice(0, Array.from(g.word.replace(/ /g, '')).length - rev()); g.used = g.fixed.slice(); var pool = g.letters.map(function (c, i) { return [c, i]; }); g.typed.forEach(function (c) { var k = pool.findIndex(function (p) { return p[0] === c && g.used.indexOf(p[1]) < 0; }); if (k >= 0) g.used.push(pool[k][1]); }); draw(); if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) check(current()); });
+  $('wsForm').addEventListener('submit', function (e) { e.preventDefault(); check(g && g.revealed ? current() : $('wsGuess').value || current()); });
+  $('wsGuess').addEventListener('input', function () { if (!g || g.over) return; var raw = norm(this.value).replace(/ /g, ''), p = pre(); if (p && raw.indexOf(p) === 0) raw = raw.slice(p.length); var v = Array.from(raw); g.typed = v.slice(0, Array.from(g.word.replace(/ /g, '')).length - rev()); g.used = g.fixed.slice(); var pool = g.letters.map(function (c, i) { return [c, i]; }); g.typed.forEach(function (c) { var k = pool.findIndex(function (p) { return p[0] === c && g.used.indexOf(p[1]) < 0; }); if (k >= 0) g.used.push(pool[k][1]); }); draw(); if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) check(current()); });
   $('wsTiles').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-i]'); if (!b || !g || g.over) return;
-    var i = +b.dataset.i; g.used.push(i); g.typed.push(g.letters[i]); $('wsGuess').value = g.typed.join(''); draw();
-    if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) { var c = current(); if (norm(c) === g.word.replace(/ /g, '')) check(c); else { check(c); g.typed = []; g.used = g.fixed.slice(); $('wsGuess').value = ''; setTimeout(function () { if (g && !g.over) draw(); }, 400); } }
+    var i = +b.dataset.i; g.used.push(i); g.typed.push(g.letters[i]); $('wsGuess').value = pre() + g.typed.join(''); draw();
+    if (g.typed.length + rev() === Array.from(g.word.replace(/ /g, '')).length) { var c = current(); if (norm(c) === g.word.replace(/ /g, '')) check(c); else { check(c); g.typed = []; g.used = g.fixed.slice(); $('wsGuess').value = pre(); setTimeout(function () { if (g && !g.over) draw(); }, 400); } }
   });
-  $('wsBack').addEventListener('click', function () { if (!g || g.over || !g.typed.length || g.used.length <= g.fixed.length) return; g.typed.pop(); g.used.pop(); $('wsGuess').value = g.typed.join(''); draw(); });
-  $('wsShuf').addEventListener('click', function () { if (!g || g.over) return; g.letters = scramble(g.word); g.typed = []; refix(); $('wsGuess').value = ''; draw(); });
+  $('wsBack').addEventListener('click', function () { if (!g || g.over || !g.typed.length || g.used.length <= g.fixed.length) return; g.typed.pop(); g.used.pop(); $('wsGuess').value = pre() + g.typed.join(''); draw(); });
+  $('wsShuf').addEventListener('click', function () { if (!g || g.over) return; g.letters = scramble(g.word); g.typed = []; refix(); $('wsGuess').value = pre(); draw(); });
   $('wsHint').addEventListener('click', function () {
     if (!g || g.over) return; var len = Array.from(g.word).length;
     if (g.revealed >= len - 1) return hint('', 'Only one letter left. You can do it!');
     g.revealed++; if (Array.from(g.word)[g.revealed - 1] === ' ') g.revealed++;
-    g.hints++; g.typed = []; $('wsGuess').value = ''; refix(); draw(); hint('', 'It starts with "' + Array.from(g.word).slice(0, g.revealed).join('').toUpperCase() + '".');
+    g.hints++; g.typed = []; refix(); $('wsGuess').value = pre(); draw(); hint('', 'It starts with "' + Array.from(g.word).slice(0, g.revealed).join('').toUpperCase() + '".');
   });
   $('wsSkip').addEventListener('click', function () { if (!g || g.over) return; g.missed.push(g.word); g.streak = 0; stats(); hint('', 'The word was ' + g.word.toUpperCase() + '.'); g.over = true; setTimeout(function () { g.over = false; next(); }, 1100); });
 })();

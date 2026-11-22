@@ -528,12 +528,12 @@
         if (P.quality !== 'auto' && $('q') && $('q').type === 'range') setStart('q', P.quality);
         if (P.pdfres !== 'auto') setStart('scale', P.pdfres);
         setStart('snd', P.sounds);
-        var pick = function () { return card.querySelectorAll('input[type=number][id],input[type=range][id],input[type=checkbox][id],input[type=date][id],input[type=text][id],input[type=color][id],select[id]'.split(',').map(function (q) { return q + ':not([data-nomemo])'; }).join(',')); };
+        var pick = function () { return card.querySelectorAll('input[type=number][id],input[type=range][id],input[type=checkbox][id],input[type=date][id],input[type=time][id],input[type=month][id],input[type=text][id],input[type=color][id],select[id]'.split(',').map(function (q) { return q + ':not([data-nomemo])'; }).join(',')); };
         var mem = read().inputs[SLUG], restored = 0, clear = $('clearBtn');
         if (mem) pick().forEach(function (el) {
           if (el.disabled || !(el.id in mem)) return;
           if (el.type === 'checkbox') { if (el.checked === !!mem[el.id]) return; el.checked = !!mem[el.id]; }
-          else { if (el.value === String(mem[el.id])) return; el.value = mem[el.id]; if (el.value !== String(mem[el.id])) return; }
+          else { if (el.value === String(mem[el.id])) return; if (el.tagName === 'SELECT' && ![].some.call(el.options, function (o) { return o.value === String(mem[el.id]); })) return; var was = el.value; el.value = mem[el.id]; if (el.value !== String(mem[el.id])) { el.value = was; return; } }
           restored++;
           el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true }));
         });
