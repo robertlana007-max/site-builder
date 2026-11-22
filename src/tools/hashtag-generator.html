@@ -25,8 +25,10 @@
 </style>
 <div class="hg-top">
   <div><label for="hgFind">Find a topic</label><input type="search" id="hgFind" data-nomemo placeholder="e.g. travel, food, football, wedding" autocomplete="off"></div>
-  <div style="flex:0 1 170px"><label for="hgMixN">Hashtags to pick</label><select id="hgMixN"><option value="10">10</option><option value="15">15</option><option value="20">20</option><option value="25">25</option><option value="30" selected>30 (Instagram max)</option></select></div>
+  <div style="flex:0 1 170px"><label for="hgPlat">For</label><select id="hgPlat"><option value="instagram">Instagram</option><option value="tiktok">TikTok</option><option value="youtube">YouTube</option><option value="x">X (Twitter)</option><option value="linkedin">LinkedIn</option></select></div>
+  <div style="flex:0 1 150px"><label for="hgMixN">Hashtags to pick</label><select id="hgMixN"></select></div>
 </div>
+<p class="msg" id="hgPlatNote" style="margin:8px 0 0"></p>
 <div class="hg-topics" id="hgTopics" role="group" aria-label="Topics"></div>
 <p class="msg" id="hgNoTopic" hidden>No topic matches that search. Try a broader word, or add your own hashtags below.</p>
 <div id="hgPanel" hidden>
@@ -41,7 +43,7 @@
 <div class="hg-sel">
   <div class="hg-head">
     <b>Your hashtags</b>
-    <span class="hg-count" id="hgCount" aria-live="polite">0 / 30</span>
+    <span class="hg-count" id="hgCount" aria-live="polite">0 / 5</span>
   </div>
   <div class="hg-chosen" id="hgChosen"><p class="hg-empty">Pick a topic above, tap hashtags, or add your own.</p></div>
   <div class="hg-add">
@@ -150,7 +152,23 @@
     ['Memes & funny', 'meme humor jokes lol comedy', 'memes funny meme lol humor comedy', 'funnymemes dankmemes relatable memesdaily funnyvideos jokes lmao memepage', 'relatablememes officehumor studentmemes desimemes momlifehumor petmemes wholesomememes memesfordays'],
     ['Jewelry & accessories', 'jewellery earrings rings necklace', 'jewelry jewellery accessories earrings necklace rings', 'handmadejewelry jewelrydesign jewelrylover jewelryaddict goldjewelry silverjewelry fashionjewelry jewelryoftheday', 'minimaljewelry bridaljewellery kundan oxidisedjewellery layerednecklace stackingrings jewelrygifts statementearrings']
   ];
-  var MAX = 30, chosen = [], cur = -1, msgT;
+  // hashtag rules per app: max = most the tool lets you collect, pick = the default "Hashtags to pick"
+  var PLAT = {
+    instagram: { name: 'Instagram', max: 5, pick: 5, note: 'Instagram allows at most 5 hashtags on a post or Reel, so choose the 5 that fit best.', full: 'You already have 5 hashtags, the most Instagram allows on one post. Remove one first.' },
+    tiktok: { name: 'TikTok', max: 30, pick: 5, note: 'TikTok has no fixed hashtag limit (only the 4,000-character caption limit). 3 to 5 relevant hashtags usually work best.', full: 'You already have 30 hashtags. That is far more than TikTok needs; remove some first.' },
+    youtube: { name: 'YouTube', max: 15, pick: 3, note: 'On YouTube, if a video has more than 15 hashtags they are all ignored. The first 3 can show above the title.', full: 'You already have 15 hashtags. YouTube ignores all of them if there are more than 15. Remove one first.' },
+    x: { name: 'X', max: 5, pick: 2, note: 'On X, 1 or 2 hashtags work best, and they count towards the 280-character limit.', full: 'You already have 5 hashtags, more than X posts usually need. Remove one first.' },
+    linkedin: { name: 'LinkedIn', max: 10, pick: 3, note: 'On LinkedIn, 3 to 5 hashtags is usually plenty.', full: 'You already have 10 hashtags, more than LinkedIn posts need. Remove one first.' }
+  };
+  var MAX = 5, chosen = [], cur = -1, msgT;
+  function plat() { return PLAT[$('hgPlat').value] || PLAT.instagram; }
+  function setPlat() {
+    var P = plat(), sel = $('hgMixN'), opts = [1, 2, 3, 5, 10, 15, 20, 30].filter(function (n) { return n <= P.max; });
+    MAX = P.max;
+    sel.innerHTML = opts.map(function (n) { return '<option value="' + n + '"' + (n === P.pick ? ' selected' : '') + '>' + n + (n === P.max && P.name === 'Instagram' ? ' (the limit)' : '') + '</option>'; }).join('');
+    $('hgPlatNote').textContent = P.note;
+    render();
+  }
   function norm(s) { return String(s).toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim(); }
   function clean(t) { return String(t).replace(/^#+/, '').normalize('NFC').replace(/[^\p{L}\p{M}\p{N}_]/gu, ''); }
   function key(t) { return t.toLowerCase(); }
@@ -192,7 +210,7 @@
     if (!t) { if (!quiet) say('bad', 'A hashtag needs letters or numbers. Spaces and symbols are removed.'); return false; }
     if (/^\d+$/.test(t)) { if (!quiet) say('bad', 'A hashtag made only of numbers does not work on most apps. Add a letter.'); return false; }
     if (has(t)) { if (!quiet) say('', '#' + t + ' is already in your list.'); return false; }
-    if (chosen.length >= MAX) { if (!quiet) say('bad', 'You already have 30 hashtags, the most Instagram allows on one post. Remove one first.'); return false; }
+    if (chosen.length >= MAX) { if (!quiet) say('bad', plat().full); return false; }
     chosen.push(t); render(); return true;
   }
   function remove(t) { var k = key(t); chosen = chosen.filter(function (x) { return key(x) !== k; }); render(); }
@@ -207,14 +225,14 @@
       x.addEventListener('click', function () { remove(t); });
       s.appendChild(x); box.appendChild(s);
     });
-    c.textContent = chosen.length + ' / ' + MAX; c.classList.toggle('full', chosen.length >= MAX);
+    c.textContent = chosen.length + ' / ' + MAX + (chosen.length > MAX ? ' – remove ' + (chosen.length - MAX) : ''); c.classList.toggle('full', chosen.length >= MAX);
     document.querySelectorAll('.hg-tag').forEach(function (b) { b.setAttribute('aria-pressed', has(b.dataset.tag)); });
   }
   function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), x = a[i]; a[i] = a[j]; a[j] = x; } return a; }
   function mix() {
     if (cur < 0) return;
     var want = Math.min(+$('hgMixN').value, MAX), room = MAX - chosen.length;
-    if (room <= 0) { say('bad', 'Your list is full (30). Remove some hashtags or click Clear first.'); return; }
+    if (room <= 0) { say('bad', 'Your list is full (' + MAX + ' for ' + plat().name + '). Remove some hashtags or click Clear first.'); return; }
     var target = Math.min(want, room);
     // About 20% broad, 40% medium, 40% niche: a few big tags for reach, more specific ones to be found.
     var nb = Math.max(1, Math.round(target * 0.2)), nm = Math.round(target * 0.4), nn = target - nb - nm, added = 0;
@@ -232,7 +250,7 @@
     var n = 0, all = (T[cur][2] + ' ' + T[cur][3] + ' ' + T[cur][4]).split(' ');
     all.forEach(function (t) { if (add(t, true)) n++; });
     var left = all.filter(function (t) { return !has(t); }).length;
-    say(left ? 'bad' : n ? 'ok' : '', !n && !left ? 'All hashtags from this topic are already in your list.' : 'Added ' + n + ' hashtags.' + (left ? ' ' + left + ' did not fit because 30 is the limit.' : ''));
+    say(left ? 'bad' : n ? 'ok' : '', !n && !left ? 'All hashtags from this topic are already in your list.' : 'Added ' + n + ' hashtags.' + (left ? ' ' + left + ' did not fit because ' + MAX + ' is the limit for ' + plat().name + '.' : ''));
   });
   function addOwn() {
     var raw = $('hgOwn').value.trim();
@@ -241,7 +259,7 @@
     if (parts.length === 1) { if (add(parts[0])) { ok = 1; say('ok', 'Added #' + clean(parts[0]) + '.'); } }
     else parts.forEach(function (p) { if (add(p, true)) ok++; });
     if (ok) { $('hgOwn').value = ''; if (parts.length > 1) say(ok < parts.length ? 'bad' : 'ok', 'Added ' + ok + ' of ' + parts.length + ' hashtags.' + (ok < parts.length ? ' The rest were repeats, invalid or over the limit.' : '')); }
-    else if (parts.length > 1) say('bad', 'None of those could be added. They may be repeats, only numbers, or over the 30 limit.');
+    else if (parts.length > 1) say('bad', 'None of those could be added. They may be repeats, only numbers, or over the limit of ' + MAX + '.');
   }
   $('hgAddBtn').addEventListener('click', addOwn);
   $('hgOwn').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); addOwn(); } });
@@ -250,10 +268,12 @@
     var tags = chosen.map(function (t) { return '#' + t; }), sep = $('hgSep').value;
     var text = sep === 'line' ? tags.join('\n') : sep === 'gap' ? '.\n.\n.\n.\n.\n' + tags.join(' ') : tags.join(' ');
     copyText(text, $('hgCopy'));
-    say('ok', 'Copied ' + chosen.length + ' hashtag' + (chosen.length === 1 ? '' : 's') + '.');
+    if (chosen.length > MAX) say('bad', 'Copied ' + chosen.length + ' hashtags, but ' + plat().name + ' allows ' + MAX + '. Remove ' + (chosen.length - MAX) + ' before posting.');
+    else say('ok', 'Copied ' + chosen.length + ' hashtag' + (chosen.length === 1 ? '' : 's') + '.');
   });
   $('hgShuffle').addEventListener('click', function () { if (chosen.length < 2) { say('', 'Add at least two hashtags to shuffle.'); return; } shuffle(chosen); render(); say('ok', 'Order shuffled.'); });
   $('hgClear').addEventListener('click', function () { chosen = []; render(); say('', 'List cleared.'); });
-  topicsUI(); render();
+  $('hgPlat').addEventListener('change', setPlat);
+  topicsUI(); setPlat();
 })();
 </script>

@@ -1702,16 +1702,16 @@ module.exports = [
   {
       slug: 'hashtag-generator', cat: 'Social media tools', name: 'Hashtag Generator',
       title: 'Hashtag Generator - Instagram Hashtags for 75+ Topics',
-      desc: 'Pick ready-made broad, medium and niche hashtags for 75+ topics, add your own, keep within the 30 limit and copy them all in one tap. Free.',
+      desc: 'Pick ready-made broad, medium and niche hashtags for 75+ topics, add your own, stay within each app\'s limit (5 on Instagram) and copy them all in one tap. Free.',
       card: 'Hashtag sets for 75+ topics, copy in one tap.',
-      intro: 'Choose a topic and tap hashtags, or let the tool mix a balanced set of broad, medium and niche tags. Add your own, stay within Instagram\'s 30-hashtag limit and copy them all at once.',
-      steps: ['Search for a topic, such as travel, food or football, and tap it.', 'Tap hashtags to add them, or click Mix to pick a balanced set.', 'Add your own brand or event hashtags if you like.', 'Click Copy all and paste into your caption.'],
+      intro: 'Choose a topic and tap hashtags, or let the tool mix a balanced set of broad, medium and niche tags. Add your own, stay within the limit for your app (5 on Instagram) and copy them all at once.',
+      steps: ['Choose the app you are posting to, then search for a topic, such as travel, food or football, and tap it.', 'Tap hashtags to add them, or click Mix to pick a balanced set.', 'Add your own brand or event hashtags if you like.', 'Click Copy all and paste into your caption.'],
       faq: [
-        ['How many hashtags can I use on Instagram?', 'Up to 30 on a post or reel. The counter stops you at 30. Many creators get good results with 5 to 15 relevant tags.'],
+        ['How many hashtags can I use on Instagram?', 'Up to 5 on a post or Reel. The counter stops you at 5, so pick the 5 that describe your post best.'],
         ['What are broad, medium and niche hashtags?', 'Broad tags are very common and move fast, niche tags are specific with smaller audiences, and medium tags sit in between. A mix gives reach and a better chance to stay visible.'],
         ['Does this show trending or live hashtag counts?', 'No. The sets are hand-picked starting points built into the page. The tool does not connect to Instagram or TikTok, so check tags in the app before you rely on them.'],
         ['Can I add hashtags in other languages, like Arabic, Hindi, Spanish or Chinese?', 'Yes. Letters from any language work. Spaces and symbols are removed because they cannot be part of a hashtag.'],
-        ['Can I use these hashtags on TikTok?', 'Yes. Copy a smaller set of 3 to 6 relevant tags for TikTok, YouTube Shorts or Pinterest.']
+        ['Can I use these hashtags on TikTok?', 'Yes. Set "For" to TikTok, YouTube, X or LinkedIn and the counter and suggested amount follow that app. On YouTube, more than 15 hashtags means all of them are ignored.']
       ],
       icon: '<path d="M5 9h14M5 15h14M10 4L8 20M16 4l-2 16"/><circle cx="19" cy="19" r="2"/>'
   },
@@ -1724,7 +1724,7 @@ module.exports = [
       steps: ['Type or paste your post into the box.', 'Check each platform row for characters left or over.', 'Fix anything marked in red, such as too many hashtags.', 'Click Copy text, or Copy for Instagram to keep blank lines.'],
       faq: [
         ['How does X count characters?', 'X gives most letters a weight of 1, but emoji and Chinese, Japanese or Korean characters count as 2, and every link counts as 23 whatever its length. The X row uses these rules.'],
-        ['What is the Instagram caption limit?', '2,200 characters, up to 30 hashtags and 20 @mentions. About the first 125 characters show before "more".'],
+        ['What is the Instagram caption limit?', '2,200 characters, up to 5 hashtags and 20 @mentions. About the first 125 characters show before "more".'],
         ['How do I keep line breaks in an Instagram caption?', 'Click "Copy for Instagram (keep blank lines)". It puts an invisible character on each empty line so Instagram keeps your paragraphs.'],
         ['Does an emoji count as one character?', 'Here it counts as one, the way you see it, even for flags and family emoji. On X every emoji counts as 2.'],
         ['Is my text saved or sent anywhere?', 'No. Counting happens in your browser and the text is not stored.']
