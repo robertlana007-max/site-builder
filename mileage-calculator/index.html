@@ -127,6 +127,16 @@
 .mg-log input[type=date] { min-width: 120px; }
 .mg-log .mg-x { min-height: 36px; padding: 4px 10px; }
 .mg-note { font-size: 14px; color: var(--muted); }
+@media (max-width: 600px) {
+  .mg-log thead { display: none; }
+  .mg-log tr { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 8px; padding: 10px 0; border-bottom: 1px solid var(--line); position: relative; }
+  .mg-log td { border: 0; padding: 0 !important; text-align: start !important; min-width: 0; }
+  .mg-log td[data-l]::before { content: attr(data-l); display: block; font-size: 12.5px; font-weight: 600; color: var(--muted); margin-bottom: 2px; }
+  .mg-log td:first-child { grid-column: 1 / -1; padding-inline-end: 50px !important; }
+  .mg-log td:last-child { position: absolute; top: 10px; inset-inline-end: 0; }
+  .mg-log td.mg-e { grid-column: 1 / -1; font-weight: 600; }
+  .mg-log input[type=date] { min-width: 0; }
+}
 </style>
 <div class="fields">
   <div><label for="mgDU">Distance unit</label><select id="mgDU"><option value="km">Kilometers</option><option value="mi">Miles</option></select></div>
@@ -172,7 +182,7 @@
   var region = ''; try { region = ((navigator.language || '').split('-')[1] || '').toUpperCase(); } catch (e) {}
   $('mgCur').value = REG[region] || '';
   if (region === 'US') { $('mgDU').value = 'mi'; $('mgVU').value = 'usgal'; $('mgB').value = 12300; $('mgF').value = 10; }
-  if (region === 'GB') { $('mgDU').value = 'mi'; $('mgVU').value = 'L'; }
+  if (region === 'GB') { $('mgDU').value = 'mi'; $('mgVU').value = 'L'; $('mgB').value = 12300; }
   function cur() { var v = $('mgCur').value; if (v === 'other') v = $('mgCurO').value.trim(); return v ? v + ' ' : ''; }
   function nf(x, d) { return Number(x).toLocaleString((Prefs.get() || {}).numfmt || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); }
   // economy from km and liters, in the user's main unit
@@ -180,7 +190,7 @@
   function main(km, L) {
     var e = all(km, L), du = $('mgDU').value, vu = $('mgVU').value;
     if (du === 'km') return vu === 'L' ? nf(e.kmL) + ' km/L' : nf(km / (L / VOL[vu])) + ' km/' + (vu === 'usgal' ? 'US gal' : 'UK gal');
-    return vu === 'usgal' ? nf(e.us, 1) + ' mpg (US)' : vu === 'ukgal' ? nf(e.uk, 1) + ' mpg (UK)' : nf(km / MI / L) + ' mi/L';
+    return vu === 'usgal' ? nf(e.us, 1) + ' mpg (US)' : nf(e.uk, 1) + ' mpg (UK)'; // miles with liters is the UK habit: show UK mpg
   }
   function quick() {
     var a = $('mgA').value, b = $('mgB').value, fl = $('mgF').value, m = $('mgMsg'), ids = ['mgDist', 'mgKmL', 'mgL100', 'mgMpgUS', 'mgMpgUK'];
@@ -202,11 +212,11 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   function draw() {
     $('mgRows').innerHTML = rows.map(function (r, i) {
-      return '<tr><td><input type="date" data-nomemo data-i="' + i + '" data-k="d" aria-label="Date" value="' + esc(r.d) + '"></td>' +
-        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="o" min="0" step="any" inputmode="decimal" aria-label="Odometer" value="' + esc(r.o) + '"></td>' +
-        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="f" min="0" step="any" inputmode="decimal" aria-label="Fuel added" value="' + esc(r.f) + '"' + (i === 0 ? ' placeholder="(start)"' : '') + '></td>' +
-        '<td><input type="number" data-nomemo data-i="' + i + '" data-k="c" min="0" step="any" inputmode="decimal" aria-label="Cost" value="' + esc(r.c) + '"></td>' +
-        '<td class="mg-e">–</td><td><button type="button" class="btn ghost mg-x" data-del="' + i + '" aria-label="Remove fill-up ' + (i + 1) + '">✕</button></td></tr>';
+      return '<tr><td data-l="Date"><input type="date" data-nomemo data-i="' + i + '" data-k="d" aria-label="Date" value="' + esc(r.d) + '"></td>' +
+        '<td data-l="Odometer"><input type="number" data-nomemo data-i="' + i + '" data-k="o" min="0" step="any" inputmode="decimal" aria-label="Odometer" value="' + esc(r.o) + '"></td>' +
+        '<td data-l="Fuel added"><input type="number" data-nomemo data-i="' + i + '" data-k="f" min="0" step="any" inputmode="decimal" aria-label="Fuel added" value="' + esc(r.f) + '"' + (i === 0 ? ' placeholder="(start)"' : '') + '></td>' +
+        '<td data-l="Cost (optional)"><input type="number" data-nomemo data-i="' + i + '" data-k="c" min="0" step="any" inputmode="decimal" aria-label="Cost" value="' + esc(r.c) + '"></td>' +
+        '<td class="mg-e" data-l="Average">–</td><td><button type="button" class="btn ghost mg-x" data-del="' + i + '" aria-label="Remove fill-up ' + (i + 1) + '">✕</button></td></tr>';
     }).join('');
     log();
   }

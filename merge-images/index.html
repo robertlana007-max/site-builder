@@ -123,7 +123,7 @@
 <style>
 .mi-stage { background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 20px 20px; border: 1px solid var(--line); border-radius: 12px; padding: 10px; text-align: center; margin-bottom: 14px; }
 .mi-stage canvas { max-width: 100%; max-height: 60vh; display: block; margin: 0 auto; }
-.mi-list { list-style: none; padding: 0; margin: 0 0 14px; display: grid; gap: 6px; }
+.mi-list { list-style: none; padding: 0; margin: 0 0 14px; display: grid; grid-template-columns: minmax(0, 1fr); gap: 6px; }
 .mi-list li { display: flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); font-size: 14px; }
 .mi-list li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .mi-list li button { width: 36px; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); cursor: pointer; flex: none; }
@@ -161,7 +161,7 @@
   // Layout in "full size" pixels: a box (x, y, w, h) per image plus the total size.
   function layout() {
     var mode = $('layout').value, match = $('match').value, gap = +$('gap').value, pad = +$('pad').value, align = $('align').value;
-    var cols = mode === 'h' ? items.length : mode === 'v' ? 1 : Math.max(1, Math.min(20, parseInt($('cols').value, 10) || 2));
+    var cols = mode === 'h' ? items.length : mode === 'v' ? 1 : Math.max(1, Math.min(20, isFinite(parseInt($('cols').value, 10)) ? parseInt($('cols').value, 10) : 2));
     var rows = Math.ceil(items.length / cols), dims = items.map(function (it) { return { w: it.img.naturalWidth, h: it.img.naturalHeight }; });
     if (match !== 'off') { // same height side by side, same width otherwise
       var key = mode === 'h' ? 'h' : 'w', vals = dims.map(function (d) { return d[key]; });
@@ -227,7 +227,7 @@
        ['↓', 'Move down', i < items.length - 1, function () { items.splice(i + 1, 0, items.splice(i, 1)[0]); }],
        ['✕', 'Remove', true, function () { items.splice(i, 1); }]].forEach(function (b) {
         var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0]; btn.setAttribute('aria-label', b[1] + ' ' + it.name); btn.disabled = !b[2];
-        btn.addEventListener('click', function () { if (busy) return; b[3](); list(); draw(); });
+        btn.addEventListener('click', function () { if (busy) return; b[3](); list(); draw(); say('', ''); });
         li.appendChild(btn);
       });
       ul.appendChild(li);
@@ -253,6 +253,8 @@
   Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) { el.addEventListener('input', draw); el.addEventListener('change', draw); });
   [['gap', 'gapv'], ['pad', 'padv'], ['q', 'qv']].forEach(function (p) { var f = function () { $(p[1]).textContent = $(p[0]).value; }; $(p[0]).addEventListener('input', f); f(); });
   $('clear').addEventListener('click', function () { if (busy) return; items = []; list(); draw(); say('', ''); });
+  // A saved file no longer matches once the layout changes, so drop the old success message.
+  Array.prototype.forEach.call(document.querySelectorAll('.fields input, .fields select'), function (el) { el.addEventListener('input', function () { if ($('msg').classList.contains('ok')) say('', ''); }); });
   $('go').addEventListener('click', function () {
     if (busy || items.length < 2) return;
     busy = true; syncUi(); say('', 'Merging…');

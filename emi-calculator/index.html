@@ -324,16 +324,16 @@
   // Month-by-month schedule. Returns null when the inputs cannot make a loan.
   function schedule(P, yr, n, extra, lump, lumpAt) {
     var r = yr / 1200, emi = r === 0 ? P / n : P * r / (1 - Math.pow(1 + r, -n));
-    var bal = P, rows = [], k = 0;
-    while (bal > 0.005 && k < 1200) {
+    var bal = P, rows = [], k = 0, eps = Math.min(0.005, P * 1e-6); // tiny loans need a tiny "paid off" threshold
+    while (bal > eps && k < 1200) {
       k++;
       var i = bal * r, pr = Math.min(emi - i, bal);
       if (pr < 0) pr = 0;
       bal -= pr;
       var pre = 0;
-      if (bal > 0.005) { pre = Math.min(bal, (extra || 0) + (k === lumpAt ? lump || 0 : 0)); bal -= pre; }
+      if (bal > eps) { pre = Math.min(bal, (extra || 0) + (k === lumpAt ? lump || 0 : 0)); bal -= pre; }
       rows.push({ k: k, pay: i + pr, prin: pr, int: i, pre: pre, bal: Math.max(0, bal) });
-      if (k >= n && bal > 0.005 && r === 0) break;
+      if (k >= n && bal > eps && r === 0) break;
     }
     return { emi: emi, rows: rows };
   }
@@ -415,12 +415,16 @@
   });
   $('emiCopy').addEventListener('click', function () {
     if (!last) return say('bad', 'Fix the numbers above first.');
-    var t = 'Loan ' + money(last.P) + ' at ' + last.yr + '% for ' + last.n + ' months\nMonthly payment (EMI): ' + money(last.emi) + '\nTotal interest: ' + money(last.intReal) + '\nTotal paid: ' + money(last.paid) + '\nPaid off in ' + last.months + ' months';
+    var t = 'Loan ' + money(last.P) + ' at ' + last.yr + '% for ' + last.n + ' months\nMonthly payment (EMI): ' + money(last.emi) + '\nTotal interest: ' + money(last.intReal) + '\nTotal paid: ' + money(last.paid) + '\nPaid off in ' + last.months + (last.months === 1 ? ' month' : ' months');
     if (last.saved > 0.5) t += '\nInterest saved by prepaying: ' + money(last.saved);
     copyText(t, this);
   });
   $('emi').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
   $('emi').addEventListener('change', function (e) { if (e.target.tagName === 'SELECT' || e.target.type === 'month') calc(); });
+  // The site does not remember month fields, so keep the first payment month here.
+  var keepIn = !window.Prefs || Prefs.get().rememberInputs !== false, savedStart = keepIn ? load('gtn-emi-start') : null;
+  if (savedStart && /^\d{4}-\d{2}$/.test(savedStart)) $('emiStart').value = savedStart;
+  $('emiStart').addEventListener('change', function () { if (keepIn) store('gtn-emi-start', $('emiStart').value || null); });
   curWire(calc);
   calc();
 })();

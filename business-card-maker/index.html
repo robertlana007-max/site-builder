@@ -286,6 +286,15 @@
           page.drawCircle(c);
         } else if (o.k === 'line') {
           page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1])) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          await load(o.font);
+          env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+          var tw = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (fk.hasGlyphForCodePoint(cp)) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
         } else if (o.k === 'text') {
           var f = await font(o.font), t = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (f.cs[cp]) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
           if (!t.trim()) continue;
@@ -465,13 +474,17 @@
   var timer = null, ready = false;
   function draw() {
     var sz = SIZES[$('bcSize').value] || SIZES.eu, W = sz[0], H = sz[1], qr = qrModules(qrText());
-    if (qr === 'big') say('bad', 'The QR code text is too long. Shorten it or choose "Website link".'); else if ($('msg').classList.contains('bad') && /QR/.test($('msg').textContent)) say('', '');
+    var tiny = [];
     ['bcFront', 'bcBack'].forEach(function (id, i) {
       var c = $(id), sc = 2 * Math.max(1, Math.min(2.5, (c.clientWidth || 300) * (window.devicePixelRatio || 1) / 2 / W));
       c.width = Math.round(W * sc); c.height = Math.round(H * sc);
-      var g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height);
-      GD.drawCanvas(design(i ? 'back' : 'front', W, H, 0, qr), g, sc);
+      var g = c.getContext('2d'); g.clearRect(0, 0, c.width, c.height); var ops = design(i ? 'back' : 'front', W, H, 0, qr);
+      ops.forEach(function (o) { if (o.k === 'text' && o.s < 4.6 && tiny.indexOf(o.t) < 0) tiny.push(o.t); });
+      GD.drawCanvas(ops, g, sc);
     });
+    if (qr === 'big') say('bad', 'The QR code text is too long. Shorten it or choose "Website link".');
+    else if (tiny.length) say('bad', 'Some text had to shrink so much it will be hard to read when printed: "' + tiny[0].slice(0, 50) + '". Shorten it if you can.');
+    else if ($('msg').classList.contains('bad') && /QR code text|hard to read/.test($('msg').textContent)) say('', '');
   }
   function changed() { clearTimeout(timer); timer = setTimeout(function () { if (ready) draw(); save(); }, 60); }
   function save() { var o = { tpl: S.tpl, color: S.color, logo: S.logo }; FIELDS.forEach(function (id) { o[id] = $(id).value; }); try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) { try { o.logo = null; localStorage.setItem(KEY, JSON.stringify(o)); } catch (e2) {} } }
@@ -538,7 +551,10 @@
           var p2 = doc.addPage(PS);
           for (var r = 0; r < rows; r++) for (var c = 0; c < cols; c++) {
             var cc = si ? cols - 1 - c : c; // back page is mirrored so it lines up when printed on both sides
+            var P = PDFLib; // clip each card to its own box so shapes that reach into the bleed do not spill onto the next card
+            p2.pushOperators(P.pushGraphicsState(), P.rectangle(gx + cc * W, PS[1] - gy - (r + 1) * H, W, H), P.clip(), P.endPath());
             await GD.drawPdf(env, p2, si ? bo : fo, gx + cc * W, gy + r * H);
+            p2.pushOperators(P.popGraphicsState());
           }
           var k = PDFLib.rgb(.55, .55, .55), Hh = PS[1];
           for (var i = 0; i <= cols; i++) { var xx = gx + i * W; p2.drawLine({ start: { x: xx, y: Hh - gy + 4 }, end: { x: xx, y: Hh - gy + 16 }, thickness: .4, color: k }); p2.drawLine({ start: { x: xx, y: Hh - gy - rows * H - 4 }, end: { x: xx, y: Hh - gy - rows * H - 16 }, thickness: .4, color: k }); }
@@ -556,6 +572,7 @@
   $('bcReset').addEventListener('click', function () {
     if (!confirm('Clear all your card details?')) return;
     FIELDS.forEach(function (id) { var el = $(id); if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = ''; });
+    if (/^en-(US|CA)$/i.test(navigator.language || '')) { $('bcSize').value = 'us'; $('bcOut').value = 'sheetl'; }
     S.tpl = 'clean'; S.color = COLORS[0]; setLogo(null); paint(); changed(); say('', 'Cleared.');
   });
 

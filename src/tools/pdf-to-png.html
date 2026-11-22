@@ -45,23 +45,23 @@
         // Keep very large pages inside what phones and browsers can draw.
         if (vp1.width * vp1.height * s * s > MAXPX) { s = Math.sqrt(MAXPX / (vp1.width * vp1.height)); lowered++; }
         var vp = page.getViewport({ scale: s }), c = document.createElement('canvas');
-        c.width = Math.max(1, Math.floor(vp.width)); c.height = Math.max(1, Math.floor(vp.height));
+        c.width = Math.max(1, Math.round(vp.width)); c.height = Math.max(1, Math.round(vp.height));
         var ctx = c.getContext('2d');
         await page.render({ canvasContext: ctx, viewport: vp, background: transparent ? 'rgba(0,0,0,0)' : '#ffffff' }).promise;
         page.cleanup();
-        var blob = await PT.blob(c, 'image/png');
+        var blob = await PT.blob(c, 'image/png'), pw = c.width, ph = c.height;
         c.width = c.height = 0;
         if (!blob) throw new Error('Page ' + i + ' is too large for this resolution. Choose a lower one.');
-        var name = base + '-page-' + i + '.png', url = URL.createObjectURL(blob); urls.push(url);
+        var name = base + '-page-' + String(i).padStart(String(n).length, '0') + '.png', url = URL.createObjectURL(blob); urls.push(url);
         out.push({ name: name, data: new Uint8Array(await blob.arrayBuffer()) });
         var a = document.createElement('a'), img = document.createElement('img'), cap = document.createElement('span');
         a.href = url; a.download = name; img.src = url; img.alt = 'Page ' + i; img.loading = 'lazy';
         if (transparent) img.style.background = 'repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 16px 16px';
-        cap.textContent = 'Page ' + i + ' · ' + Math.round(vp.width) + '×' + Math.round(vp.height) + ' · ' + fmtBytes(blob.size);
+        cap.textContent = 'Page ' + i + ' · ' + pw + '×' + ph + ' · ' + fmtBytes(blob.size);
         a.appendChild(img); a.appendChild(cap); $('thumbs').appendChild(a);
       }
-      var note = out.length + (out.length === 1 ? ' PNG' : ' PNGs') + ' ready. Tap one to save it, or download them all';
-      PT.done(PT.zip(out), base + '-png.zip', 'application/zip', note);
+      if (out.length === 1) { $('dl').textContent = 'Download PNG'; PT.done(out[0].data, out[0].name, 'image/png', '1 PNG ready'); }
+      else { $('dl').textContent = 'Download all (ZIP)'; PT.done(PT.zip(out), base + '-png.zip', 'application/zip', out.length + ' PNGs ready. Tap one to save it, or download them all'); }
       if (lowered) PT.say('ok', $('msg').textContent + '. ' + lowered + (lowered === 1 ? ' very large page was' : ' very large pages were') + ' made a little smaller so your browser can draw it.');
     }).then(function () { busy = false; });
   });

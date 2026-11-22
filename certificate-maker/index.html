@@ -300,6 +300,15 @@
           page.drawCircle(c);
         } else if (o.k === 'line') {
           page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1])) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          await load(o.font);
+          env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+          var tw = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (fk.hasGlyphForCodePoint(cp)) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
         } else if (o.k === 'text') {
           var f = await font(o.font), t = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (f.cs[cp]) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
           if (!t.trim()) continue;
@@ -401,15 +410,21 @@
     y += 14 * U;
     o.push({ k: 'line', x1: cx - Math.min(200 * U, maxW / 2), y1: y, x2: cx + Math.min(200 * U, maxW / 2), y2: y, stroke: A, lw: 0.8 * U });
     y += 26 * U;
-    var body = v('ckBody').replace(/\{name\}/gi, name || 'Recipient Name');
-    if (v('ckOrg')) body = body ? body : v('ckOrg');
-    GD.wrap(body, 'serif', 13 * U, maxW - 60 * U).slice(0, port ? 6 : 4).forEach(function (l) { text(l, cx, y, 'serif', 13 * U, mut, 'center', maxW); y += 19 * U; });
-    if (v('ckOrg') && v('ckBody')) { y += 2 * U; text(v('ckOrg'), cx, y, 'serifb', 13 * U, ink, 'center', maxW); }
     // bottom blocks: signatures and date
     var blocks = [];
     [['s1', 'ckS1Name', 'ckS1Role'], ['s2', 'ckS2Name', 'ckS2Role']].forEach(function (s) { if (v(s[1]) || IMG[s[0]]) blocks.push({ img: IMG[s[0]], top: v(s[1]), label: [v(s[1]), v(s[2])].filter(Boolean).join(', ') || 'Signature', script: !IMG[s[0]] }); });
     if (v('ckDate')) blocks.splice(blocks.length ? 1 : 0, 0, { top: v('ckDate'), label: 'Date', date: true });
     var by = H - (tpl === 'bold' ? 92 : port ? 130 : 82) * U, bw = Math.min(180 * U, (W - 120 * U) / Math.max(blocks.length, 1) - 20 * U);
+    var body = v('ckBody').replace(/\{name\}/gi, name || 'Recipient Name');
+    if (v('ckOrg')) body = body ? body : v('ckOrg');
+    // shrink a long description so it fits above the signatures and seal instead of being cut off or overlapping
+    var orgH = v('ckOrg') && v('ckBody') ? 21 * U : 0, limit = (S.seal && blocks.length === 3 ? by - 139 * U : S.seal ? by - 52 * U : by - 40 * U) - orgH;
+    var bs = 13 * U, bl = GD.wrap(body, 'serif', bs, maxW - 60 * U);
+    while (bs > 9 * U && bl.length > 1 && y + (bl.length - 1) * bs * 1.46 > limit) { bs -= 0.5 * U; bl = GD.wrap(body, 'serif', bs, maxW - 60 * U); }
+    var room = Math.max(1, Math.floor((limit - y) / (bs * 1.46)) + 1);
+    if (bl.length > room) { bl = bl.slice(0, room); bl[room - 1] = bl[room - 1].replace(/\s*\S{0,12}$/, '') + '…'; o.cut = true; }
+    bl.forEach(function (l) { text(l, cx, y, 'serif', bs, mut, 'center', maxW); y += bs * 1.46; });
+    if (v('ckOrg') && v('ckBody')) { y += 2 * U; text(v('ckOrg'), cx, y, 'serifb', 13 * U, ink, 'center', maxW); }
     var n = blocks.length, seal = S.seal, slots = [];
     if (n === 1) slots = seal ? [W * 0.3] : [cx]; else if (n === 2) slots = [W * 0.26, W * 0.74]; else if (n === 3) slots = [W * 0.2, cx, W * 0.8];
     if (n === 3 && seal) slots = [W * 0.2, W * 0.5, W * 0.8];
@@ -444,7 +459,10 @@
     $('ckPrevBox').classList.toggle('cmk-portrait', H > W);
     var sc = Math.min(2, Math.max(1, (c.clientWidth || 600) * (window.devicePixelRatio || 1) / W));
     c.width = Math.round(W * sc); c.height = Math.round(H * sc);
-    GD.drawCanvas(design(list[idx] || '', W, H), c.getContext('2d'), sc);
+    var ops = design(list[idx] || '', W, H);
+    GD.drawCanvas(ops, c.getContext('2d'), sc);
+    if (ops.cut) say('bad', 'The description is too long to fit on the certificate, so its end is cut off. Please shorten it.');
+    else if (/too long to fit/.test($('msg').textContent)) say('', '');
   }
   function save() { var o = { type: S.type, tpl: S.tpl, color: S.color, seal: $('ckSeal').checked }; FIELDS.forEach(function (id) { o[id] = $(id).value; }); try { localStorage.setItem(KEY, JSON.stringify(o)); } catch (e) {} }
   function changed() { clearTimeout(timer); timer = setTimeout(function () { if (ready) draw(); save(); }, 80); }
@@ -510,7 +528,7 @@
       var bytes = await env.doc.save(), nm = list.length === 1 ? fileName(list[0]) + '.pdf' : 'certificates-' + list.length + '.pdf';
       GD.download(new Blob([bytes], { type: 'application/pdf' }), nm);
       var note = 'Saved ' + nm + ' (' + list.length + (list.length === 1 ? ' page, ' : ' pages, ') + fmtBytes(bytes.length) + ').';
-      if (env.lost) say('bad', note + ' Some letters (' + env.lost + ') are not in the fonts and show as "?". Choose the Serif or Modern sans name style, which cover more languages.'); else { say('ok', note); if (window.burst) burst(b); }
+      if (env.lost) say('bad', note + ' Some letters (' + env.lost + ') are not in the PDF fonts and show as "?". The Serif and Modern sans name styles cover accented, Greek and Cyrillic letters. For other alphabets, use "This one as PNG", which keeps them.'); else { say('ok', note); if (window.burst) burst(b); }
     } catch (e) { say('bad', 'Sorry, the PDF could not be made. Check your connection (the PDF maker loads the first time) and try again.'); }
     busy = false; b.disabled = false;
   });
@@ -518,6 +536,8 @@
     if (!confirm('Clear everything and start over?')) return;
     FIELDS.forEach(function (id) { var el = $(id); if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = ''; });
     ['logo', 's1', 's2'].forEach(function (k) { IMG[k] = null; }); ['ckLogo', 'ckS1', 'ckS2'].forEach(function (p) { var a = $(p === 'ckLogo' ? 'ckLogoImg' : p + 'Prev'), d = $(p + (p === 'ckLogo' ? 'Del' : 'Del')); a.hidden = d.hidden = true; });
+    try { $('ckDate').value = new Date().toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }); } catch (e) {}
+    if (/^en-(US|CA)$/i.test(navigator.language || '')) $('ckPaper').value = 'letter';
     S.tpl = 'classic'; S.color = COLORS[0]; setType('achievement'); say('', 'Cleared.');
   });
 
