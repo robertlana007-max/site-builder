@@ -191,7 +191,7 @@
     };
   } + ')()';
   var url = URL.createObjectURL(new Blob([SRC], { type: 'text/javascript' }));
-  var worker = null, job = 0, busy = null, timer = null, deb = null, last = null, cur = -1, undo = null;
+  var worker = null, job = 0, busy = null, timer = null, deb = null, last = null, cur = -1, undo = null, afterOne = null;
 
   function say(cls, t) { $('frMsg').className = 'msg' + (cls ? ' ' + cls : ''); $('frMsg').textContent = t; }
   function esc(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
@@ -226,7 +226,7 @@
     clearTimeout(timer);
     timer = setTimeout(function () {
       if (busy !== id) return;
-      busy = null; worker.terminate(); worker = null; last = null;
+      busy = null; worker.terminate(); worker = null; last = null; $('frN').textContent = '0'; $('frL').textContent = '0';
       say('bad', 'Stopped: this search took more than ' + TIMEOUT / 1000 + ' seconds, so it was cancelled to keep the page working. If you use a regular expression, avoid nested repeats like (a+)+ or (.*)*.');
     }, TIMEOUT);
   }
@@ -245,7 +245,15 @@
     last = d; if (cur >= d.pos.length / 2) cur = -1;
     $('frN').textContent = fmtNum(d.total, 0); $('frL').textContent = fmtNum(d.lines, 0);
     paint($('frText').value, d.pos);
-    if ($('frMsg').className.indexOf('ok') === -1 || !d.total) say('', d.total ? '' : 'No matches found.' + ($('frCase').checked || $('frWord').checked ? ' Try turning off Match case or Whole words only.' : ''));
+    // keep a "Replaced …" message visible even when no matches are left
+    if ($('frMsg').className.indexOf('ok') === -1) say('', d.total ? '' : 'No matches found.' + ($('frCase').checked || $('frWord').checked ? ' Try turning off Match case or Whole words only.' : ''));
+    // after "Replace this one", select the next match so the next press replaces it
+    if (afterOne !== null) {
+      var from = afterOne; afterOne = null;
+      for (var k = 0; k < d.pos.length; k += 2) if (d.pos[k] >= from) { cur = k / 2; break; }
+      if (cur >= 0) { var t = $('frText'); t.focus(); t.setSelectionRange(d.pos[cur * 2], d.pos[cur * 2] + d.pos[cur * 2 + 1]); paint(t.value, d.pos); say('ok', 'Replaced 1 match. The next match is selected: press Replace this one again to replace it too.'); }
+      else say('ok', 'Replaced 1 match. There are no more matches after it.');
+    }
   }
   function paint(text, pos) {
     var hl = $('frHl'), frag = document.createDocumentFragment(), at = 0, lim = Math.min(text.length, PREVIEW), k;
@@ -289,7 +297,7 @@
     undo = t.value; $('frUndo').disabled = false;
     t.value = t.value.slice(0, i) + rep + t.value.slice(i + len);
     t.focus(); t.setSelectionRange(i, i + rep.length);
-    cur = cur - 1; say('ok', 'Replaced 1 match.'); run(false);
+    cur = -1; afterOne = i + rep.length; say('ok', 'Replaced 1 match.'); run(false);
   });
   $('frAll').addEventListener('click', function () {
     if (!$('frText').value) { say('bad', 'Paste or type some text first.'); return; }
@@ -297,7 +305,7 @@
     run(true);
   });
   $('frUndo').addEventListener('click', function () { if (undo === null) return; $('frText').value = undo; undo = null; $('frUndo').disabled = true; cur = -1; say('', 'Undone.'); run(false); });
-  ['frFind', 'frText'].forEach(function (id) { $(id).addEventListener('input', function () { cur = -1; schedule(); }); });
+  ['frFind', 'frText'].forEach(function (id) { $(id).addEventListener('input', function () { cur = -1; afterOne = null; schedule(); }); });
   ['frCase', 'frWord', 'frRe', 'frEsc'].forEach(function (id) { $(id).addEventListener('change', function () { cur = -1; schedule(); }); });
   $('frCopy').addEventListener('click', function () { if ($('frText').value) copyText($('frText').value, $('frCopy')); else say('', 'There is no text to copy yet.'); });
   $('frDl').addEventListener('click', function () {

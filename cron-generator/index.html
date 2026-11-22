@@ -227,6 +227,7 @@
   }
   function fieldText(s, f) { return list(s.split(',').map(function (p) { return partText(p, f); })); }
   function isAll(s) { return s === '*' || s === '?'; }
+  function starDay(r) { return /^[*?]/.test(r.dom) || /^[*?]/.test(r.dow); }
   function single(s) { return /^\d+$/.test(s); }
   function describe(r) {
     if (r.reboot) return 'Once, every time the computer starts (@reboot). There are no clock times to show.';
@@ -235,7 +236,7 @@
     if (r.six && r.sec !== '0') secTxt = isAll(r.sec) ? 'Every second' : /^\*\/\d+$/.test(r.sec) ? 'Every ' + r.sec.split('/')[1] + ' seconds' : 'At second ' + fieldText(r.sec, f.sec);
     // time of day
     if (single(r.min) && single(r.hour)) out = 'At ' + pad(+r.hour) + ':' + pad(+r.min);
-    else if (single(r.min) && /^[\d,]+$/.test(r.hour) && r.hour.split(',').length <= 8) out = 'At ' + list(r.hour.split(',').map(function (h) { return pad(+h) + ':' + pad(+r.min); }));
+    else if (single(r.min) && !isAll(r.hour) && r.sets.hour.length <= 8) out = 'At ' + list(r.sets.hour.map(function (h) { return pad(h) + ':' + pad(+r.min); }));
     else {
       var mt;
       if (isAll(r.min)) mt = 'Every minute';
@@ -254,9 +255,10 @@
     if (secTxt) out = secTxt + ', ' + out.charAt(0).toLowerCase() + out.slice(1);
     // days
     var domAll = isAll(r.dom), dowAll = isAll(r.dow), dayTxt = '';
-    var domT = function () { return /^\*\/\d+$/.test(r.dom) ? 'every ' + r.dom.split('/')[1] + ' days' : 'on the ' + fieldText(r.dom, f.dom) + ' of the month'; };
+    var domT = function () { if (/^\*\/\d+$/.test(r.dom)) return 'every ' + r.dom.split('/')[1] + ' days'; var t = fieldText(r.dom, f.dom); return (/^every /.test(t) ? '' : 'on the ') + t + ' of the month'; };
     var dowT = function () { var t = fieldText(r.dow, f.dow); return /^\*\/\d+$/.test(r.dow) ? t : 'on ' + t; };
-    if (!domAll && !dowAll) dayTxt = domT() + ', and also ' + dowT() + ' (cron runs when either matches)';
+    // like real cron: when either day field starts with *, both must match; otherwise either one is enough
+    if (!domAll && !dowAll) dayTxt = starDay(r) ? domT() + ', but only when that day is also ' + dowT().replace(/^on /, 'a ') : domT() + ', and also ' + dowT() + ' (cron runs when either matches)';
     else if (!domAll) dayTxt = domT();
     else if (!dowAll) dayTxt = dowT();
     else if (isAll(r.mon)) dayTxt = 'every day';
@@ -269,12 +271,12 @@
   function nextRuns(r, count) {
     var res = [], utc = tz === 'utc', now = new Date(), S = r.sets;
     var has = function (arr, v) { return arr.indexOf(v) !== -1; };
-    var domR = !isAll(r.dom), dowR = !isAll(r.dow);
+    var domR = !isAll(r.dom), dowR = !isAll(r.dow), either = domR && dowR && !starDay(r);
     var day = utc ? new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) : new Date(now.getFullYear(), now.getMonth(), now.getDate());
     for (var d = 0; d < 366 * 5 && res.length < count; d++) {
       var y = utc ? day.getUTCFullYear() : day.getFullYear(), mo = (utc ? day.getUTCMonth() : day.getMonth()) + 1, dt = utc ? day.getUTCDate() : day.getDate(), wd = utc ? day.getUTCDay() : day.getDay();
       if (has(S.mon, mo)) {
-        var a = has(S.dom, dt), b = has(S.dow, wd), ok = domR && dowR ? (a || b) : (a && b);
+        var a = has(S.dom, dt), b = has(S.dow, wd), ok = either ? (a || b) : (a && b);
         if (ok) {
           for (var hi = 0; hi < S.hour.length && res.length < count; hi++) for (var mi = 0; mi < S.min.length && res.length < count; mi++) for (var si = 0; si < S.sec.length && res.length < count; si++) {
             var h = S.hour[hi], m = S.min[mi], s = S.sec[si];

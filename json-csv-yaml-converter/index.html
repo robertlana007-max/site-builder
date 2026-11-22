@@ -202,11 +202,20 @@
     if (s === 'null') return null;
     return s;
   }
+  // drop the gaps left by skipped list items, so ["a", , "c"] becomes ["a", "c"]
+  function compact(v) {
+    if (Array.isArray(v)) return v.filter(function (x, i) { return i in v; }).map(compact);
+    if (v && typeof v === 'object') Object.keys(v).forEach(function (k) { v[k] = compact(v[k]); });
+    return v;
+  }
   function unflatten(o) {
-    var out = {};
+    var out = {}, lists = false;
     Object.keys(o).forEach(function (k) {
       var parts = k.split('.'), cur = out;
       if (parts.some(function (p) { return p === ''; }) || parts.length === 1) { out[k] = o[k]; return; }
+      // an empty cell in a list column (tags.1) means the row has fewer items, not an empty item
+      if (o[k] === '' && parts.slice(1).some(function (p) { return /^\d+$/.test(p); })) return;
+      lists = true;
       for (var i = 0; i < parts.length - 1; i++) {
         var p = parts[i], nextIsIndex = /^\d+$/.test(parts[i + 1]);
         if (cur[p] === undefined || cur[p] === null || typeof cur[p] !== 'object') cur[p] = nextIsIndex ? [] : {};
@@ -214,7 +223,7 @@
       }
       cur[parts[parts.length - 1]] = o[k];
     });
-    return out;
+    return lists ? compact(out) : out;
   }
   function csvToData(text, d) {
     var rows = parseCSV(text, d);
