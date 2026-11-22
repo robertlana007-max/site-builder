@@ -30,6 +30,7 @@
 <script src="../assets/vendor/docx-preview/docx-preview.min.js"></script>
 <script src="../assets/vendor/pdf-lib.min.js"></script>
 <script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/pdf-text.js"></script>
 <script src="../assets/pdf-tools.js"></script>
 <script>
 (function () {
@@ -196,7 +197,7 @@
           continue;
         }
         var b = box(rects[0]), base = b.y + (b.h - met.a - met.d) / 2 + met.a;
-        if (seg && !style.justify && !RTL.test(m[0]) && !RTL.test(seg.t) && Math.abs(seg.base - base) < 0.5 && b.x >= seg.b.x + seg.b.w - 0.5) { // same line: extend the run
+        if (seg && !style.justify && !RTL.test(m[0]) && !RTL.test(seg.t) && Math.abs(seg.base - base) < 0.5 && b.x >= seg.b.x + seg.b.w - 0.5 && b.x <= seg.b.x + seg.b.w + size) { // same line, next word: extend the run (words a right-to-left run moved elsewhere start a new one)
           seg.t = txt.slice(seg.start, m.index + m[0].length); seg.b.w = b.x + b.w - seg.b.x;
         } else { flush(); seg = { t: m[0], start: m.index, b: b, base: base, s: style, z: z }; }
       }
@@ -236,18 +237,6 @@
       im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
     });
   }
-  var rasterCache = {};
-  function rasterText(seg) { // letters the PDF font does not have (Chinese, Arabic, emoji…): keep them as a sharp picture
-    var key = seg.s.font + '|' + seg.t + '|' + seg.s.c.r + seg.s.c.g + seg.s.c.b;
-    if (rasterCache[key]) return rasterCache[key];
-    var k = 4, met = ascent(seg.s.font, seg.s.size), c = document.createElement('canvas');
-    c.width = Math.max(1, Math.ceil(seg.b.w * k) + 4); c.height = Math.max(1, Math.ceil((met.a + met.d) * k) + 4);
-    var g = c.getContext('2d'); g.scale(k, k); g.font = seg.s.font; g.textBaseline = 'alphabetic';
-    g.fillStyle = 'rgb(' + Math.round(seg.s.c.r * 255) + ',' + Math.round(seg.s.c.g * 255) + ',' + Math.round(seg.s.c.b * 255) + ')';
-    g.fillText(seg.t, 0, met.a);
-    return (rasterCache[key] = PT.blob(c, 'image/png').then(function (b) { return b.arrayBuffer(); }).then(function (a) { return { png: new Uint8Array(a), w: c.width / k, h: c.height / k, a: met.a }; }));
-  }
-
   $('go').addEventListener('click', function () {
     if (!ready) return;
     PT.run(async function () {
@@ -255,9 +244,10 @@
       var pdf = await L.PDFDocument.create();
       pdf.registerFontkit(window.fontkit);
       var reg = await pdf.embedFont(f[0], { subset: true }), bold = await pdf.embedFont(f[1], { subset: true });
-      var has = function (font, ch) { try { return font.embedder.font.hasGlyphForCodePoint(ch.codePointAt(0)); } catch (e) { return true; } };
+      // PDFText writes every language: other scripts get their own font (downloaded only when used) or a sharp picture
+      var T = await PDFText.create(pdf, { text: $('host').textContent, onStatus: function (m) { PT.say('', m); } });
       pdf.setTitle(PT.base(file.name)); pdf.setCreator('GetToolNest Word to PDF'); pdf.setProducer('pdf-lib');
-      var secs = Array.prototype.slice.call($('host').querySelectorAll('section.docx')), PX = 0.75, missing = 0, imgCache = new Map(), pagesOut = 0;
+      var secs = Array.prototype.slice.call($('host').querySelectorAll('section.docx')), PX = 0.75, imgCache = new Map(), pagesOut = 0;
       $('bar').hidden = false;
       for (var si = 0; si < secs.length; si++) {
         PT.say('', 'Laying out part ' + (si + 1) + ' of ' + secs.length + '…'); $('fill').style.width = (si / secs.length * 90) + '%';
@@ -322,11 +312,9 @@
             var sg = it.text[ti], top = place(sg.z, sg.b.y, sg.b.h);
             if (top === null) continue;
             var base = sg.base + (top - sg.b.y), font = sg.s.bold ? bold : reg, size = sg.s.size * PX, col = L.rgb(sg.s.c.r, sg.s.c.g, sg.s.c.b);
-            var ok = true; for (var ch of sg.t) if (!has(font, ch) && ch.trim()) { ok = false; break; }
-            if (!ok) {
-              missing++;
-              var ras = await rasterText(sg), pimg = await pdf.embedPng(ras.png);
-              page.drawImage(pimg, { x: sg.b.x * PX, y: Y(base - ras.a + ras.h), width: ras.w * PX, height: ras.h * PX });
+            if (!T.isSimple(sg.t, font)) { // Arabic, Hindi, Chinese, emoji…: shaped by PDFText, squeezed to the width the browser gave it
+              var nat = T.width(sg.t, size, font), wantW = sg.b.w * PX;
+              T.draw(page, sg.t, { x: sg.b.x * PX, width: wantW, y: Y(base), size: size, font: font, color: col, hscale: nat > 0 && (Array.from(sg.t).length > 2 || nat > wantW) ? Math.max(50, Math.min(200, wantW / nat * 100)) : 100, ySkew: sg.s.italic ? L.degrees(12) : undefined });
             } else {
               var natural = font.widthOfTextAtSize(sg.t, size), want = sg.b.w * PX, sq = natural > 0 && sg.t.length > 2 ? Math.max(50, Math.min(200, want / natural * 100)) : 100; // short marks like "1." keep their shape
               page.pushOperators(L.pushGraphicsState(), L.setCharacterSqueeze(sq));
@@ -341,7 +329,7 @@
       $('fill').style.width = '95%'; PT.say('', 'Saving the PDF…');
       var bytes = await pdf.save();
       $('fill').style.width = '100%';
-      note(missing ? 'Some letters (for example Chinese, Japanese, Arabic or emoji) are not in the PDF font, so they were added as small pictures and cannot be selected. For fully selectable text in those languages, use Print → Save as PDF.' : '');
+      note(T.pictures ? 'Chinese, Japanese and Korean letters and emoji were added as sharp pictures, so those words cannot be selected or searched in the PDF.' : '');
       PT.done(bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'PDF ready: ' + pagesOut + (pagesOut === 1 ? ' page' : ' pages'));
       burst($('dl'));
     }).then(function () { $('bar').hidden = true; });

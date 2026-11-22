@@ -3465,7 +3465,7 @@ module.exports = [
         ['Is my information uploaded anywhere?', 'No. Everything runs in your browser. Your CV is saved only in this browser on this device, and you can save a backup file to move it elsewhere.'],
         ['Should I use A4 or US Letter?', 'Use US Letter for jobs in the United States and Canada, and A4 almost everywhere else. The tool picks the usual size for your region, and you can change it.'],
         ['Should I add a photo?', 'It depends on the country. In the US, UK, Canada and Australia, CVs usually have no photo. In much of Europe, the Middle East and Asia a photo is common. The ATS template always hides it.'],
-        ['Can I write my CV in another language?', 'Yes. Headings can be renamed and the fonts cover Latin, Greek and Cyrillic letters. For other scripts, such as Arabic, Chinese or Hindi, use Print and choose Save as PDF so your device fonts are used.']
+        ['Can I write my CV in another language?', 'Yes. Headings can be renamed and any language works in the PDF. Arabic, Urdu, Hebrew, Hindi, Bengali, Tamil and Thai are real text with their own font, loaded only when you use them; Chinese, Japanese, Korean and emoji are added as sharp pictures.']
       ],
       icon: '<rect x="4" y="2" width="16" height="20" rx="2"/><circle cx="9" cy="8" r="2"/><path d="M6.5 13a3 3 0 0 1 5 0M14 7h3M14 10h3M7 16h10M7 19h7"/>'
   },

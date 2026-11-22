@@ -263,13 +263,19 @@
         ctx.restore();
       });
     }
-    // render ops into a pdf-lib page. env = { doc, fonts:{}, lost:'' }; ox/oy shift the drawing (in points)
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
     async function drawPdf(env, page, ops, ox, oy) {
       var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
       function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
       async function font(k) {
         if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
         return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
       }
       for (var i = 0; i < ops.length; i++) {
         var o = ops[i], op = o.op == null ? 1 : o.op;
@@ -286,21 +292,26 @@
           page.drawCircle(c);
         } else if (o.k === 'line') {
           page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
-        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1])) {
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
           // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
-          await load(o.font);
-          env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
-          var tw = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (fk.hasGlyphForCodePoint(cp)) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
           if (!tw.trim()) continue;
           var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
           run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
           if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
         } else if (o.k === 'text') {
-          var f = await font(o.font), t = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (f.cs[cp]) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
           if (!t.trim()) continue;
-          if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
-          page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
-          if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
         } else if (o.k === 'img' && o.img) {
           env.imgs = env.imgs || new Map();
           var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
@@ -315,12 +326,12 @@
     }
     var libs = null;
     function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
-    function pdfLibs() { if (!libs) libs = Promise.all([window.PDFLib ? 0 : script('../assets/vendor/pdf-lib.min.js'), window.fontkit ? 0 : script('../assets/vendor/fontkit.min.js')]).catch(function (e) { libs = null; throw e; }); return libs; }
-    async function newPdf(title, creator) {
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
       await pdfLibs();
       var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
       doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
-      return { doc: doc, fonts: {}, lost: '' };
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
     }
     function readImage(file, maxSide, cb) {
       if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
@@ -532,7 +543,7 @@
   $('bcPdf').addEventListener('click', async function () {
     if (busy || !check()) return; busy = true; var btn = this; btn.disabled = true; say('', 'Making your PDF…');
     try {
-      var sz = SIZES[$('bcSize').value], W = sz[0], H = sz[1], mode = $('bcOut').value, qr = qrModules(qrText()), env = await GD.newPdf('Business card – ' + (v('bcName') || v('bcCompany')), 'GetToolNest Business Card Maker');
+      var sz = SIZES[$('bcSize').value], W = sz[0], H = sz[1], mode = $('bcOut').value, qr = qrModules(qrText()), env = await GD.newPdf('Business card – ' + (v('bcName') || v('bcCompany')), 'GetToolNest Business Card Maker', function (m) { say('', m); });
       var doc = env.doc, B = 3 * MM, pages = 0;
       if (mode === 'bleed' || mode === 'marks') {
         var m = mode === 'marks' ? 18 : 0;
@@ -565,7 +576,7 @@
       var bytes = await doc.save(), name = fileBase() + '-' + (mode.indexOf('sheet') === 0 ? 'print-sheet' : sz[2] + '-bleed') + '.pdf';
       GD.download(new Blob([bytes], { type: 'application/pdf' }), name);
       var note = 'Saved ' + name + ' (' + pages + ' pages, ' + fmtBytes(bytes.length) + ').' + (mode.indexOf('sheet') === 0 ? ' Print page 1, turn the sheet over, then print page 2 at 100% scale ("Actual size").' : ' Page 1 is the front, page 2 the back.');
-      if (env.lost) say('bad', note + ' Some letters (' + env.lost + ') are not in the font and show as "?".'); else { say('ok', note); if (window.burst) burst(btn); }
+      say('ok', note); if (window.burst) burst(btn);
     } catch (e) { say('bad', 'Sorry, the PDF could not be made. Check your connection (the PDF maker loads the first time) and try again.'); }
     busy = false; btn.disabled = false;
   });
@@ -600,7 +611,7 @@
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Six templates</b>Clean, Bold band, Split, Centred, Dark and Corner, each with a matching back.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>QR code</b>Contact card, website link or your own text; front or back.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Print-shop PDF</b>3 mm bleed with trim and bleed boxes set, plus optional crop marks.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Home printing sheet</b>10 cards on A4 or Letter with cut marks; the back page is mirrored to line up.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>World card sizes</b>85 × 55 mm, 3.5 × 2 in, 90 × 55 mm and 91 × 55 mm.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>300 DPI PNG</b>High-resolution pictures of each side.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private</b>Your details and logo never leave your device.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: cards for a print shop</h2><p>Sam types &quot;Sam Rivera, Interior Designer, Rivera Studio&quot;, a phone, email, website and address, and adds a transparent PNG logo. Sam picks Split in teal, keeps the contact-card QR code on the back and chooses 90 × 55 mm. Sam selects &quot;For a print shop: bleed and crop marks&quot; and downloads sam-rivera-90x55mm-bleed.pdf, which has the front on page 1 and the back on page 2, ready to upload to the printer.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Scan the QR code with your phone before printing to check it works.</li><li>Keep important text away from the edges; printers trim within a millimetre or two.</li><li>Use thick card stock (300 gsm or more) when printing at home.</li><li>Print one test sheet first and check the front and back line up.</li><li>Use a dark text colour on a light background for the easiest reading.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The QR code says the text is too long</summary><p>Contact cards with long addresses can be too big. Choose &quot;Website link&quot; or shorten the address.</p></details><details><summary>Front and back do not line up at home</summary><p>Print at 100% or &quot;Actual size&quot;, not &quot;Fit to page&quot;, and check which way your printer feeds paper.</p></details><details><summary>Some letters show as &quot;?&quot;</summary><p>The fonts cover Latin, Greek and Cyrillic letters. Use the PNG export for other scripts.</p></details><details><summary>My logo looks blurry</summary><p>Use a larger logo file, ideally 1000 pixels wide or an SVG.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>The QR code says the text is too long</summary><p>Contact cards with long addresses can be too big. Choose &quot;Website link&quot; or shorten the address.</p></details><details><summary>Front and back do not line up at home</summary><p>Print at 100% or &quot;Actual size&quot;, not &quot;Fit to page&quot;, and check which way your printer feeds paper.</p></details><details><summary>Some words in the PDF cannot be selected</summary><p>Chinese, Japanese and Korean letters and emoji are added as sharp pictures, so they print perfectly but cannot be selected. Other languages are real text.</p></details><details><summary>My logo looks blurry</summary><p>Use a larger logo file, ideally 1000 pixels wide or an SVG.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>What size are the cards?</summary><p>Choose 85 × 55 mm (Europe and most countries), 3.5 × 2 in (US and Canada), 90 × 55 mm (Australia, India and China) or 91 × 55 mm (Japan).</p></details><details><summary>What is bleed and do I need it?</summary><p>Bleed is extra background beyond the cut line, so no white edge shows if the cutter is slightly off. Print shops usually ask for 3 mm (about 1/8 inch). The print-shop PDF includes it and marks the trim size.</p></details><details><summary>What does the QR code do?</summary><p>By default it holds a contact card (vCard). When someone scans it, their phone offers to save your name, phone, email and website. You can also make it open your website or any text you choose.</p></details><details><summary>Can I print the cards at home?</summary><p>Yes. Choose &quot;Print at home&quot; to get 10 cards on A4 or US Letter with cut marks. Print the fronts, turn the sheet over and print the backs at 100% scale.</p></details><details><summary>Is it free and private?</summary><p>Yes. It is free with no watermark, and everything, including your logo, stays on your device.</p></details></div>

@@ -152,6 +152,7 @@
 <script src="../assets/vendor/docx-preview/docx-preview.min.js"></script>
 <script src="../assets/vendor/pdf-lib.min.js"></script>
 <script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/pdf-text.js"></script>
 <script src="../assets/pdf-tools.js"></script>
 <script>
 (function () {
@@ -318,7 +319,7 @@
           continue;
         }
         var b = box(rects[0]), base = b.y + (b.h - met.a - met.d) / 2 + met.a;
-        if (seg && !style.justify && !RTL.test(m[0]) && !RTL.test(seg.t) && Math.abs(seg.base - base) < 0.5 && b.x >= seg.b.x + seg.b.w - 0.5) { // same line: extend the run
+        if (seg && !style.justify && !RTL.test(m[0]) && !RTL.test(seg.t) && Math.abs(seg.base - base) < 0.5 && b.x >= seg.b.x + seg.b.w - 0.5 && b.x <= seg.b.x + seg.b.w + size) { // same line, next word: extend the run (words a right-to-left run moved elsewhere start a new one)
           seg.t = txt.slice(seg.start, m.index + m[0].length); seg.b.w = b.x + b.w - seg.b.x;
         } else { flush(); seg = { t: m[0], start: m.index, b: b, base: base, s: style, z: z }; }
       }
@@ -358,18 +359,6 @@
       im.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(xml);
     });
   }
-  var rasterCache = {};
-  function rasterText(seg) { // letters the PDF font does not have (Chinese, Arabic, emoji…): keep them as a sharp picture
-    var key = seg.s.font + '|' + seg.t + '|' + seg.s.c.r + seg.s.c.g + seg.s.c.b;
-    if (rasterCache[key]) return rasterCache[key];
-    var k = 4, met = ascent(seg.s.font, seg.s.size), c = document.createElement('canvas');
-    c.width = Math.max(1, Math.ceil(seg.b.w * k) + 4); c.height = Math.max(1, Math.ceil((met.a + met.d) * k) + 4);
-    var g = c.getContext('2d'); g.scale(k, k); g.font = seg.s.font; g.textBaseline = 'alphabetic';
-    g.fillStyle = 'rgb(' + Math.round(seg.s.c.r * 255) + ',' + Math.round(seg.s.c.g * 255) + ',' + Math.round(seg.s.c.b * 255) + ')';
-    g.fillText(seg.t, 0, met.a);
-    return (rasterCache[key] = PT.blob(c, 'image/png').then(function (b) { return b.arrayBuffer(); }).then(function (a) { return { png: new Uint8Array(a), w: c.width / k, h: c.height / k, a: met.a }; }));
-  }
-
   $('go').addEventListener('click', function () {
     if (!ready) return;
     PT.run(async function () {
@@ -377,9 +366,10 @@
       var pdf = await L.PDFDocument.create();
       pdf.registerFontkit(window.fontkit);
       var reg = await pdf.embedFont(f[0], { subset: true }), bold = await pdf.embedFont(f[1], { subset: true });
-      var has = function (font, ch) { try { return font.embedder.font.hasGlyphForCodePoint(ch.codePointAt(0)); } catch (e) { return true; } };
+      // PDFText writes every language: other scripts get their own font (downloaded only when used) or a sharp picture
+      var T = await PDFText.create(pdf, { text: $('host').textContent, onStatus: function (m) { PT.say('', m); } });
       pdf.setTitle(PT.base(file.name)); pdf.setCreator('GetToolNest Word to PDF'); pdf.setProducer('pdf-lib');
-      var secs = Array.prototype.slice.call($('host').querySelectorAll('section.docx')), PX = 0.75, missing = 0, imgCache = new Map(), pagesOut = 0;
+      var secs = Array.prototype.slice.call($('host').querySelectorAll('section.docx')), PX = 0.75, imgCache = new Map(), pagesOut = 0;
       $('bar').hidden = false;
       for (var si = 0; si < secs.length; si++) {
         PT.say('', 'Laying out part ' + (si + 1) + ' of ' + secs.length + '…'); $('fill').style.width = (si / secs.length * 90) + '%';
@@ -444,11 +434,9 @@
             var sg = it.text[ti], top = place(sg.z, sg.b.y, sg.b.h);
             if (top === null) continue;
             var base = sg.base + (top - sg.b.y), font = sg.s.bold ? bold : reg, size = sg.s.size * PX, col = L.rgb(sg.s.c.r, sg.s.c.g, sg.s.c.b);
-            var ok = true; for (var ch of sg.t) if (!has(font, ch) && ch.trim()) { ok = false; break; }
-            if (!ok) {
-              missing++;
-              var ras = await rasterText(sg), pimg = await pdf.embedPng(ras.png);
-              page.drawImage(pimg, { x: sg.b.x * PX, y: Y(base - ras.a + ras.h), width: ras.w * PX, height: ras.h * PX });
+            if (!T.isSimple(sg.t, font)) { // Arabic, Hindi, Chinese, emoji…: shaped by PDFText, squeezed to the width the browser gave it
+              var nat = T.width(sg.t, size, font), wantW = sg.b.w * PX;
+              T.draw(page, sg.t, { x: sg.b.x * PX, width: wantW, y: Y(base), size: size, font: font, color: col, hscale: nat > 0 && (Array.from(sg.t).length > 2 || nat > wantW) ? Math.max(50, Math.min(200, wantW / nat * 100)) : 100, ySkew: sg.s.italic ? L.degrees(12) : undefined });
             } else {
               var natural = font.widthOfTextAtSize(sg.t, size), want = sg.b.w * PX, sq = natural > 0 && sg.t.length > 2 ? Math.max(50, Math.min(200, want / natural * 100)) : 100; // short marks like "1." keep their shape
               page.pushOperators(L.pushGraphicsState(), L.setCharacterSqueeze(sq));
@@ -463,7 +451,7 @@
       $('fill').style.width = '95%'; PT.say('', 'Saving the PDF…');
       var bytes = await pdf.save();
       $('fill').style.width = '100%';
-      note(missing ? 'Some letters (for example Chinese, Japanese, Arabic or emoji) are not in the PDF font, so they were added as small pictures and cannot be selected. For fully selectable text in those languages, use Print → Save as PDF.' : '');
+      note(T.pictures ? 'Chinese, Japanese and Korean letters and emoji were added as sharp pictures, so those words cannot be selected or searched in the PDF.' : '');
       PT.done(bytes, PT.base(file.name) + '.pdf', 'application/pdf', 'PDF ready: ' + pagesOut + (pagesOut === 1 ? ' page' : ' pages'));
       burst($('dl'));
     }).then(function () { $('bar').hidden = true; });
@@ -494,10 +482,10 @@
 <section class="guide" id="about"><h2>What is Word to PDF?</h2><p>Word to PDF turns a Word document (.docx) into a PDF that looks the same on every phone, computer and printer. It is the usual way to send a CV, letter, invoice or assignment so nobody can change it by accident.</p><p>The tool first shows a preview of your document, then builds a PDF with real, selectable and searchable text. Pictures, tables, colours, bullet lists, headers and footers are kept. For the closest match to your own fonts you can also print to PDF with your browser.</p><p>Your document is read inside your browser and never uploaded.</p></section>
 <section class="guide" id="uses"><h2>What you can use it for</h2><div class="uses"><div class="use"><h3>Send a CV or cover letter</h3><p>Employers often ask for PDF so the layout stays exactly as you made it.</p></div><div class="use"><h3>Hand in school or university work</h3><p>Upload portals usually want a PDF that cannot be edited.</p></div><div class="use"><h3>Share invoices and quotes</h3><p>A PDF looks professional and opens on any device.</p></div><div class="use"><h3>Print reliably</h3><p>PDFs print the same everywhere, without missing fonts or moved pictures.</p></div><div class="use"><h3>Convert on a computer without Word</h3><p>Make a PDF on a library or work computer that has no Office installed.</p></div></div></section>
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Word to PDF</h2><ol class="tut"><li><h3>Choose your .docx file</h3><p>Click the box that says &quot;Click or drop a Word file (.docx) here&quot;, or drag the file onto it.</p></li><li><h3>Check the preview</h3><p>Your pages appear in a grey box below the buttons, so you can see the document was read correctly.</p></li><li><h3>Press &quot;Make PDF&quot;</h3><p>The tool lays out the pages and shows a progress bar. Long documents take a few seconds.</p></li><li><h3>Download the PDF</h3><p>Click &quot;Download PDF&quot;. The file has the same name as your document with .pdf at the end.</p></li><li><h3>Or use &quot;Print → Save as PDF&quot;</h3><p>This opens your browser's print window. Choose &quot;Save as PDF&quot; (or &quot;Microsoft Print to PDF&quot; on Windows) as the printer and click Save. This keeps your exact fonts.</p></li></ol></section>
-<section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Selectable text</b>The PDF holds real text, so it can be searched, copied and read by screen readers.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Live preview</b>See your document before you make the PDF.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Pictures, tables and colours</b>Images, table borders, shading, highlights and coloured text are kept.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Lists, headers and footers</b>Bullets and numbering are kept, and headers and footers are repeated on every page.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>All languages</b>Letters outside the built-in font, such as Chinese, Arabic or emoji, are kept as sharp pictures.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Two ways to save</b>Make PDF for a quick file, or Print → Save as PDF for the most exact look.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private</b>Nothing is uploaded.</span></li></ul></section>
+<section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Selectable text</b>The PDF holds real text, so it can be searched, copied and read by screen readers.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Live preview</b>See your document before you make the PDF.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Pictures, tables and colours</b>Images, table borders, shading, highlights and coloured text are kept.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Lists, headers and footers</b>Bullets and numbering are kept, and headers and footers are repeated on every page.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>All languages</b>Arabic, Urdu, Hebrew, Hindi, Bengali, Tamil and Thai are real text; Chinese, Japanese, Korean and emoji are kept as sharp pictures.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Two ways to save</b>Make PDF for a quick file, or Print → Save as PDF for the most exact look.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private</b>Nothing is uploaded.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: sending a CV as PDF</h2><p>Tom has cv.docx with a photo, two headings and a table of skills. He drops it on the tool and sees the preview of his 2 pages. He presses &quot;Make PDF&quot;, the message says &quot;PDF ready: 2 pages&quot;, and he downloads cv.pdf to attach to his job application.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Old .doc files are not supported. Open them in Word, LibreOffice or Google Docs and choose Save as .docx first.</li><li>If letters look slightly different from your document, use Print → Save as PDF, which uses your installed fonts.</li><li>In the print window, turn off &quot;Headers and footers&quot; so the browser does not add the date and web address.</li><li>Password-protected documents must be unlocked in Word first.</li><li>Check page breaks in the PDF; text can move slightly when fonts differ from the ones used in Word.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>It says the file is an old .doc file</summary><p>This tool reads .docx only. Save the file as .docx in Word, LibreOffice or Google Docs and try again.</p></details><details><summary>The fonts look different</summary><p>Make PDF draws text with the Noto Sans font. Use Print → Save as PDF to keep your own fonts.</p></details><details><summary>A drawing or chart is missing</summary><p>Some Word drawings, charts and equations cannot be shown in the browser. Save them as pictures in Word first.</p></details><details><summary>Some characters cannot be selected</summary><p>Letters not in the PDF font are added as small pictures. Use Print → Save as PDF for fully selectable text in those languages.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>It says the file is an old .doc file</summary><p>This tool reads .docx only. Save the file as .docx in Word, LibreOffice or Google Docs and try again.</p></details><details><summary>The fonts look different</summary><p>Make PDF draws text with the Noto Sans font. Use Print → Save as PDF to keep your own fonts.</p></details><details><summary>A drawing or chart is missing</summary><p>Some Word drawings, charts and equations cannot be shown in the browser. Save them as pictures in Word first.</p></details><details><summary>Some characters cannot be selected</summary><p>Chinese, Japanese and Korean letters and emoji are added as sharp pictures. Use Print → Save as PDF if you need to select those words.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Is my document uploaded?</summary><p>No. The document is read and the PDF is made inside your browser.</p></details><details><summary>Can I convert old .doc files?</summary><p>No. Open the .doc in Word, LibreOffice or Google Docs, save it as .docx, then convert.</p></details><details><summary>Why do the letters look a little different?</summary><p>Make PDF draws the text with the Noto Sans font. Use Print → Save as PDF to keep the fonts installed on your device.</p></details><details><summary>Can I select and copy text in the PDF?</summary><p>Yes. The PDF holds real text, so it can be searched and copied.</p></details><details><summary>Are pictures and tables kept?</summary><p>Yes. Pictures, table borders, shading, colours, lists, headers and footers are kept. Some Word charts and equations may not appear.</p></details></div>

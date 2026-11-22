@@ -596,7 +596,7 @@
   var libs = null, fonts = null;
   function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
   function getLibs() {
-    if (!libs) libs = Promise.all([window.PDFLib ? 0 : script('../assets/vendor/pdf-lib.min.js'), window.fontkit ? 0 : script('../assets/vendor/fontkit.min.js')]).catch(function (e) { libs = null; throw e; });
+    if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; });
     return libs;
   }
   function getFonts() {
@@ -610,35 +610,20 @@
     doc.registerFontkit(fontkit);
     var fb = await getFonts();
     var R = await doc.embedFont(fb[0], { subset: true }), Bf = await doc.embedFont(fb[1], { subset: true });
-    var have = {}; R.getCharacterSet().forEach(function (cp) { have[cp] = 1; });
-    var lost = '';
-    function clean(t) { return Array.from(String(t == null ? '' : t).replace(/\r\n?/g, '\n').replace(/\t/g, ' ')).map(function (ch) { var cp = ch.codePointAt(0); if (ch === '\n' || have[cp]) return ch; if (/\s/.test(ch)) return ' '; if (lost.indexOf(ch) === -1 && lost.length < 12) lost += ch; return '?'; }).join(''); }
+    // PDFText writes every language: other scripts get their own font (downloaded only when used) or a sharp picture
+    var T = await PDFText.create(doc, { text: [Object.assign({}, s, { logo: '' }), c], onStatus: function (m) { say('', m); } });
+    function clean(t) { return String(t == null ? '' : t).replace(/\r\n?/g, '\n').replace(/\t/g, ' '); }
     var size = s.ivgPaperSize === 'letter' ? [612, 792] : [595.28, 841.89], PW = size[0], PH = size[1], M = 48, W = PW - 2 * M, BOTTOM = M + 22;
     var ink = L.rgb(.12, .14, .17), mute = L.rgb(.42, .45, .5), line = L.rgb(.88, .89, .91), a = hex(s.ivgColor), acc = L.rgb(a[0], a[1], a[2]);
     var soft = L.rgb(1 - (1 - a[0]) * .12, 1 - (1 - a[1]) * .12, 1 - (1 - a[2]) * .12), white = L.rgb(1, 1, 1);
     doc.setTitle('Invoice ' + clean(s.ivgNo)); doc.setAuthor(clean(s.ivgBizName) || 'GetToolNest Invoice Generator'); doc.setCreator('GetToolNest Invoice Generator'); doc.setProducer('GetToolNest');
     var page = doc.addPage(size), y = PH - M;
-    function txt(t, x, yy, sz, f, col) { t = clean(t); if (t) page.drawText(t, { x: x, y: yy, size: sz, font: f || R, color: col || ink }); }
-    function wid(t, sz, f) { return (f || R).widthOfTextAtSize(clean(t), sz); }
+    // w: the width of the box, so right-to-left lines (Arabic, Hebrew…) line up on its right edge
+    function txt(t, x, yy, sz, f, col, w) { T.draw(page, clean(t), { x: x, y: yy, size: sz, font: f || R, color: col || ink, width: w }); }
+    function wid(t, sz, f) { return T.width(clean(t), sz, f || R); }
     function rtxt(t, xr, yy, sz, f, col) { txt(t, xr - wid(t, sz, f), yy, sz, f, col); }
     function fit(t, sz, f, max) { while (sz > 5 && wid(t, sz, f) > max) sz -= .5; return sz; }
-    function wrap(t, sz, f, max) {
-      var out = [];
-      clean(t).split('\n').forEach(function (para) {
-        var cur = '';
-        para.split(/ +/).forEach(function (w) {
-          var trial = cur ? cur + ' ' + w : w;
-          if (wid(trial, sz, f) <= max) { cur = trial; return; }
-          if (cur) out.push(cur);
-          cur = '';
-          while (wid(w, sz, f) > max) { var k = w.length; while (k > 1 && wid(w.slice(0, k), sz, f) > max) k--; out.push(w.slice(0, k)); w = w.slice(k); }
-          cur = w;
-        });
-        out.push(cur);
-      });
-      while (out.length > 1 && out[out.length - 1] === '') out.pop();
-      return out;
-    }
+    function wrap(t, sz, f, max) { return T.wrap(clean(t), sz, f || R, max); }
     function newPage() { page = doc.addPage(size); y = PH - M; }
 
     // header: logo or business name on the left, INVOICE and the dates on the right
@@ -666,8 +651,8 @@
     function partyBlock(x, label, name, addr, extra) {
       var yy = partyY;
       txt(label.toUpperCase(), x, yy, 8, Bf, mute); yy -= 14;
-      wrap(name || '—', 11, Bf, colW).forEach(function (l) { txt(l, x, yy, 11, Bf); yy -= 14; });
-      [addr].concat(extra).filter(function (v) { return v && v.trim(); }).forEach(function (v) { wrap(v.trim(), 9.5, R, colW).forEach(function (l) { txt(l, x, yy, 9.5, R); yy -= 12.5; }); });
+      wrap(name || '—', 11, Bf, colW).forEach(function (l) { txt(l, x, yy, 11, Bf, null, colW); yy -= 14; });
+      [addr].concat(extra).filter(function (v) { return v && v.trim(); }).forEach(function (v) { wrap(v.trim(), 9.5, R, colW).forEach(function (l) { txt(l, x, yy, 9.5, R, null, colW); yy -= 12.5; }); });
       return yy;
     }
     var b1 = partyBlock(M, 'From', s.ivgBizName, s.ivgBizAddr, [s.ivgBizEmail, s.ivgBizPhone]);
@@ -688,7 +673,7 @@
       var dl = wrap(l.desc, 9.5, R, dW), h = dl.length * 12.5 + 10;
       if (y - h < BOTTOM) { newPage(); txt('Invoice ' + s.ivgNo + ' (continued)', M, y - 10, 9, R, mute); y -= 22; head(); }
       var top = y - 15;
-      dl.forEach(function (t, i) { txt(t, M + 8, top - i * 12.5, 9.5, R); });
+      dl.forEach(function (t, i) { txt(t, M + 8, top - i * 12.5, 9.5, R, null, dW); });
       var q = scaled(l.qty, 3), pr = unitPrice(l.price), am = money(l.amount);
       rtxt(q, xQty, top, fit(q, 9.5, R, 58), R); rtxt(pr, xPrice, top, fit(pr, 9.5, R, 88), R); rtxt(am, xAmt - 8, top, fit(am, 9.5, Bf, 88), Bf);
       y -= h;
@@ -715,18 +700,18 @@
       y -= 8;
       if (y - 30 < BOTTOM) newPage();
       txt(n[0], M, y - 10, 9.5, Bf, mute); y -= 24;
-      wrap(n[1], 9.5, R, W).forEach(function (l) { if (y < BOTTOM) newPage(); txt(l, M, y, 9.5, R); y -= 13; });
+      wrap(n[1], 9.5, R, W).forEach(function (l) { if (y < BOTTOM) newPage(); txt(l, M, y, 9.5, R, null, W); y -= 13; });
     });
 
     // footer on every page
     var pages = doc.getPages();
     pages.forEach(function (pg, i) {
       page = pg;
-      var f = clean((s.ivgNo ? 'Invoice ' + s.ivgNo : 'Invoice') + (s.ivgBizName.trim() ? ' · ' + s.ivgBizName.trim() : ''));
-      txt(f.length > 90 ? f.slice(0, 90) + '…' : f, M, M - 14, 8, R, mute);
+      var f = Array.from(clean((s.ivgNo ? 'Invoice ' + s.ivgNo : 'Invoice') + (s.ivgBizName.trim() ? ' · ' + s.ivgBizName.trim() : '')));
+      txt(f.length > 90 ? f.slice(0, 90).join('') + '…' : f.join(''), M, M - 14, 8, R, mute);
       rtxt('Page ' + (i + 1) + ' of ' + pages.length, PW - M, M - 14, 8, R, mute);
     });
-    return { bytes: await doc.save(), pages: pages.length, lost: lost };
+    return { bytes: await doc.save(), pages: pages.length };
   }
 
   var busy = false, dlUrl = null;
@@ -743,9 +728,8 @@
       var a = $('dl'); a.href = dlUrl; a.download = name; a.hidden = false; a.click();
       markUsed(); saveDraft();
       var note = 'Saved ' + name + ' (' + r.pages + (r.pages === 1 ? ' page, ' : ' pages, ') + fmtBytes(r.bytes.length) + ').';
-      if (r.lost) say('bad', note + ' Some letters (' + r.lost + ') are not in the PDF font and show as "?". Use Print and choose "Save as PDF" to keep them.');
-      else { say('ok', note); if (window.burst) burst(b); }
-    } catch (e) { say('bad', e && /^The PDF/.test(e.message) ? e.message : 'Sorry, the PDF could not be made on this device. Try Print and choose "Save as PDF" instead.'); }
+      say('ok', note); if (window.burst) burst(b);
+    } catch (e) { console.warn(e); say('bad', e && /^The PDF/.test(e.message) ? e.message : 'Sorry, the PDF could not be made on this device. Try Print and choose "Save as PDF" instead.'); }
     busy = false; b.disabled = false; b.textContent = 'Download PDF';
   });
 
@@ -772,8 +756,8 @@
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Invoice Generator</h2><ol class="tut"><li><h3>Add your business details</h3><p>Under &quot;Your business&quot;, type your business name, address, email and phone. Optionally pick a logo picture; it appears at the top left of the invoice.</p></li><li><h3>Add the client</h3><p>Under &quot;Bill to&quot;, type the client's name, address and email.</p></li><li><h3>Check the number and dates</h3><p>The invoice number is suggested for you (INV-0001, then INV-0002 and so on). Pick the invoice date, then choose when payment is due: on receipt, in 7, 15 or 30 days, or pick a date yourself.</p></li><li><h3>Choose the currency</h3><p>Pick a currency from the list. Choose &quot;Other&quot; to type any symbol or code, such as CFA or KRW. You can also pick A4 or US Letter paper and an accent colour.</p></li><li><h3>Add your items</h3><p>Type a description, quantity and unit price on each row. The amount is worked out for you. Press &quot;+ Add item&quot; for more rows, use the ↑ and ↓ buttons to change the order, and × to remove a row.</p></li><li><h3>Add discount, tax and payments</h3><p>Enter a discount as a percent or a fixed amount, a tax rate with its name, an optional second tax, shipping, and any amount already paid. The Subtotal, Total and Balance due boxes update as you type.</p></li><li><h3>Add notes and payment details</h3><p>Write a thank-you note, your payment terms and your bank or payment details. Each appears at the bottom of the invoice.</p></li><li><h3>Download or print</h3><p>Press Download PDF to save the invoice as a PDF, or Print to print it. Press New invoice when you start the next one: your business details are kept and the number goes up by one.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Exact maths</b>All amounts are worked out in whole cents, so totals never show rounding errors like 0.30000000004. Each line is rounded to the cent, half up.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Real PDF text</b>The PDF contains real text, not a picture, so it is small, sharp at any zoom and searchable. Clients can copy amounts from it.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Multi-page invoices</b>Many items flow onto as many pages as needed. The table header is repeated on every page and each page is numbered.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Currency symbols that work</b>An embedded Noto Sans font draws €, £, ₨, ₹ and many accented letters such as é, ü and ß correctly in the PDF.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Discounts and two taxes</b>Use a percent or fixed discount, then one or two named taxes calculated on the discounted subtotal, plus shipping.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Auto-saved draft</b>Everything you type is saved in this browser as you go, so a closed tab or a refresh loses nothing. Save draft saves right away.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Automatic invoice numbers</b>After you download or print, the next invoice number is suggested for you, keeping any prefix and leading zeros.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Clear warnings</b>Negative numbers, a discount over 100% or a fixed discount larger than the subtotal are shown in red with a message saying what to fix.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a web design invoice with GST</h2><p>You bill a client for Website design (1 × 1,500.00), Consulting (2.5 hours × 80.00) and Hosting (12 months × 9.99). The amounts are 1,500.00, 200.00 and 119.88, so the Subtotal is 1,819.88. A 10% discount takes off 181.99 (181.988 rounded), leaving 1,637.89. GST at 17% adds 278.44 and a second tax at 2.5% adds 40.95. With 25.00 shipping the Total is 1,982.28. The client already paid a 500.00 deposit, so the Balance due is 1,482.28. Choose PKR and the PDF shows ₨1,482.28.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Fill in your business details and logo once. They stay saved and are kept when you press New invoice.</li><li>Quantities can have decimals, such as 1.5 hours or 0.25 kg, and unit prices can have up to 4 decimals for very cheap items.</li><li>Use a line break in the address boxes to put each part of the address on its own line.</li><li>Leave the tax rate empty if you do not charge tax. Tax and discount lines with 0 are not shown on the invoice.</li><li>If your names use letters such as Arabic, Urdu or Chinese, use Print and choose Save as PDF; the browser keeps every script.</li><li>Your draft lives only in this browser. Download the PDF to keep a permanent copy of each invoice.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>A box is outlined in red and the totals show a dash</summary><p>Something cannot be used, for example a negative number, letters in a price box, or a discount above 100%. The red message under the buttons says which box to fix.</p></details><details><summary>It says some letters show as &quot;?&quot; in the PDF</summary><p>The PDF font covers Latin, Greek and Cyrillic letters and common currency symbols, but not scripts such as Arabic, Urdu, Hindi or Chinese. Press Print and choose Save as PDF instead; it keeps those letters.</p></details><details><summary>The invoice number did not go up</summary><p>The number moves on when you press New invoice after downloading or printing. You can also type any number you like in the Invoice number box.</p></details><details><summary>My draft or logo disappeared</summary><p>Drafts are saved in this browser only. Private browsing, clearing site data or a different browser or device will not have it. A very large logo may not fit in storage; use a smaller picture.</p></details><details><summary>Printing shows extra pages or no colours</summary><p>In the print window, turn on Background graphics so the coloured table header prints, and choose the same paper size you use.</p></details></div></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Fill in your business details and logo once. They stay saved and are kept when you press New invoice.</li><li>Quantities can have decimals, such as 1.5 hours or 0.25 kg, and unit prices can have up to 4 decimals for very cheap items.</li><li>Use a line break in the address boxes to put each part of the address on its own line.</li><li>Leave the tax rate empty if you do not charge tax. Tax and discount lines with 0 are not shown on the invoice.</li><li>You can write in any language. Arabic, Urdu, Persian, Hebrew, Hindi, Bengali, Tamil and Thai get their own font in the PDF (downloaded only when you use them), and right-to-left lines line up on the right.</li><li>Your draft lives only in this browser. Download the PDF to keep a permanent copy of each invoice.</li></ul></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>A box is outlined in red and the totals show a dash</summary><p>Something cannot be used, for example a negative number, letters in a price box, or a discount above 100%. The red message under the buttons says which box to fix.</p></details><details><summary>Some words in the PDF cannot be selected</summary><p>Chinese, Japanese and Korean letters and emoji are added as sharp pictures, so they look right but cannot be selected or searched. Other languages, including Arabic, Urdu and Hindi, are real text.</p></details><details><summary>The invoice number did not go up</summary><p>The number moves on when you press New invoice after downloading or printing. You can also type any number you like in the Invoice number box.</p></details><details><summary>My draft or logo disappeared</summary><p>Drafts are saved in this browser only. Private browsing, clearing site data or a different browser or device will not have it. A very large logo may not fit in storage; use a smaller picture.</p></details><details><summary>Printing shows extra pages or no colours</summary><p>In the print window, turn on Background graphics so the coloured table header prints, and choose the same paper size you use.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Is this invoice generator free?</summary><p>Yes. It is free with no sign-up, no watermark and no limit on how many invoices you make.</p></details><details><summary>Are my invoices uploaded anywhere?</summary><p>No. Everything runs in your browser. Your draft, logo and last invoice number are saved only on this device.</p></details><details><summary>Can I use rupees, euros or pounds?</summary><p>Yes. Choose from 25 common currencies (for example USD, EUR, GBP, PKR, INR, AED, JPY, NGN or BRL), or type your own currency symbol. Symbols such as ₨, ₹, € and £ appear correctly in the PDF.</p></details><details><summary>How are tax and discount calculated?</summary><p>The discount is taken off the subtotal first, then each tax is worked out on the discounted amount. Shipping is added after tax, and any amount paid is subtracted to give the balance due.</p></details><details><summary>Is the PDF text real or a picture?</summary><p>Real text. The PDF is small and sharp, and the amounts and names can be searched and copied.</p></details><details><summary>Can an invoice have many items?</summary><p>Yes. Long invoices continue onto extra pages, with the table header repeated and page numbers on every page.</p></details></div>
