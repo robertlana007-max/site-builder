@@ -255,13 +255,19 @@
         ctx.restore();
       });
     }
-    // render ops into a pdf-lib page. env = { doc, fonts:{}, lost:'' }; ox/oy shift the drawing (in points)
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
     async function drawPdf(env, page, ops, ox, oy) {
       var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
       function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
       async function font(k) {
         if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
         return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
       }
       for (var i = 0; i < ops.length; i++) {
         var o = ops[i], op = o.op == null ? 1 : o.op;
@@ -278,21 +284,26 @@
           page.drawCircle(c);
         } else if (o.k === 'line') {
           page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
-        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1])) {
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
           // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
-          await load(o.font);
-          env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
-          var tw = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (fk.hasGlyphForCodePoint(cp)) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
           if (!tw.trim()) continue;
           var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
           run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
           if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
         } else if (o.k === 'text') {
-          var f = await font(o.font), t = chars(o.t).map(function (ch) { var cp = ch.codePointAt(0); if (f.cs[cp]) return ch; if (/\s/.test(ch)) return ' '; if (env.lost.indexOf(ch) < 0 && env.lost.length < 12) env.lost += ch; return '?'; }).join('');
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
           if (!t.trim()) continue;
-          if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
-          page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
-          if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
         } else if (o.k === 'img' && o.img) {
           env.imgs = env.imgs || new Map();
           var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
@@ -307,12 +318,12 @@
     }
     var libs = null;
     function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
-    function pdfLibs() { if (!libs) libs = Promise.all([window.PDFLib ? 0 : script('../assets/vendor/pdf-lib.min.js'), window.fontkit ? 0 : script('../assets/vendor/fontkit.min.js')]).catch(function (e) { libs = null; throw e; }); return libs; }
-    async function newPdf(title, creator) {
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
       await pdfLibs();
       var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
       doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
-      return { doc: doc, fonts: {}, lost: '' };
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
     }
     function readImage(file, maxSide, cb) {
       if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
@@ -436,11 +447,11 @@
   $('gcPdf').addEventListener('click', async function () {
     if (busy || !check()) return; busy = true; var btn = this; btn.disabled = true; say('', 'Making your PDF…');
     try {
-      var sz = SIZES[$('gcSize').value], env = await GD.newPdf(v('gcHead') || 'Card', 'GetToolNest Card Maker'), pg = env.doc.addPage([sz[0], sz[1]]);
+      var sz = SIZES[$('gcSize').value], env = await GD.newPdf(v('gcHead') || 'Card', 'GetToolNest Card Maker', function (m) { say('', m); }), pg = env.doc.addPage([sz[0], sz[1]]);
       await GD.drawPdf(env, pg, design(sz[0], sz[1]));
       var bytes = await env.doc.save(); GD.download(new Blob([bytes], { type: 'application/pdf' }), base() + '.pdf');
       var note = 'Saved ' + base() + '.pdf (' + fmtBytes(bytes.length) + '). Print it at 100% ("Actual size").';
-      if (env.lost) say('bad', note + ' Some letters (' + env.lost + ') are not in the fonts and show as "?". Use the PNG, or the Classic serif or Clean sans font.'); else say('ok', note);
+      say('ok', note);
     } catch (e) { say('bad', 'Sorry, the PDF could not be made. Check your connection (the PDF maker loads the first time) and try again.'); }
     busy = false; btn.disabled = false;
   });
@@ -475,8 +486,8 @@
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Card Maker</h2><ol class="tut"><li><h3>Pick an occasion</h3><p>Tap the occasion. The headline, message and a matching look are filled in.</p></li><li><h3>Write your words</h3><p>Change the headline and message, and add who it is to and from.</p></li><li><h3>Add event details</h3><p>For party invites and weddings, fill in the date and time, place and RSVP.</p></li><li><h3>Choose the look</h3><p>Pick a decoration, colour set and headline font. Press &quot;Shuffle decorations&quot; for a new arrangement.</p></li><li><h3>Add a photo</h3><p>Choose a photo and show it in a circle or as the background with a dark overlay so the text stays readable.</p></li><li><h3>Choose a size and download</h3><p>Pick Square or Story for sharing, or a print size, then press Download PNG or Download PDF.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>9 occasions</b>Birthday, invitations, wedding, thank you, congratulations, festive, new baby, anniversary and get well.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>7 decorations</b>Confetti, balloons, flowers, stars, hearts, frame or plain.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>7 colour sets</b>Light and dark palettes that work for print and screens.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>6 headline fonts</b>Script, handwritten, casual, display, serif and sans.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Photo option</b>In a circle or as a full background.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Share and print</b>PNG for apps, PDF for printing, and a Share button on phones.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private</b>Nothing is uploaded.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a birthday party invitation</h2><p>Ana taps Party invite, changes the headline to &quot;Leo is turning 7!&quot;, writes &quot;Come and celebrate with games and cake&quot;, and adds &quot;Saturday 14 June, 4 pm&quot;, &quot;Garden Hall, 5 Park Road&quot; and &quot;Ana, +34 600 000 000&quot;. She picks Balloons and the pink colour set, chooses Square and taps Share to send it to the parents' group chat.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Keep the message short so it stays large and easy to read on phones.</li><li>For printing, choose 5 × 7 in or A5 and print at 100% scale on card.</li><li>With a background photo, choose a busy-free picture so the words stand out.</li><li>Use &quot;Shuffle decorations&quot; until the confetti or stars sit nicely around your text.</li><li>Write greetings in your own language; the Classic serif and Clean sans fonts cover the most alphabets.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>Some letters show as &quot;?&quot; in the PDF</summary><p>Choose the Classic serif or Clean sans font, or use the PNG, which uses your device's fonts.</p></details><details><summary>My long message got small</summary><p>Text shrinks to fit the card. Shorten the message or choose the Story size for more room.</p></details><details><summary>The Share button is missing</summary><p>Sharing pictures is only available in some phone browsers. Use Download PNG and send the file.</p></details></div></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Keep the message short so it stays large and easy to read on phones.</li><li>For printing, choose 5 × 7 in or A5 and print at 100% scale on card.</li><li>With a background photo, choose a busy-free picture so the words stand out.</li><li>Use &quot;Shuffle decorations&quot; until the confetti or stars sit nicely around your text.</li><li>Write greetings in any language. The decorative fonts only have Latin letters, so other alphabets and emoji are written in Noto Sans instead.</li></ul></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>My text is not in the font I picked</summary><p>The decorative fonts only have Latin letters. Arabic, Hindi, Chinese, emoji and other letters are written in Noto Sans so they always show.</p></details><details><summary>My long message got small</summary><p>Text shrinks to fit the card. Shorten the message or choose the Story size for more room.</p></details><details><summary>The Share button is missing</summary><p>Sharing pictures is only available in some phone browsers. Use Download PNG and send the file.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>What occasions are included?</summary><p>Birthday, party invitation, wedding, thank you, congratulations, festive greetings, new baby, anniversary and get well soon. You can write anything you like for any other occasion.</p></details><details><summary>Can I use it for religious festivals?</summary><p>Yes. The &quot;Festive greetings&quot; card has neutral wording by default. Type your own greeting, such as Eid Mubarak, Merry Christmas, Happy Diwali or Happy Lunar New Year.</p></details><details><summary>What size should I choose?</summary><p>Square or Story for WhatsApp, Instagram and other apps; 5 × 7 in, A5 or 7 × 5 in to print and fold or post.</p></details><details><summary>Is my photo uploaded?</summary><p>No. The card is made in your browser and your photo never leaves your device.</p></details><details><summary>Is it free?</summary><p>Yes, with no watermark and no sign-up.</p></details></div>

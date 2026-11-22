@@ -795,7 +795,7 @@
   // ---------- PDF ----------
   var libs = null;
   function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
-  function getLibs() { if (!libs) libs = Promise.all([window.PDFLib ? 0 : script('../assets/vendor/pdf-lib.min.js'), window.fontkit ? 0 : script('../assets/vendor/fontkit.min.js')]).catch(function (e) { libs = null; throw e; }); return libs; }
+  function getLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
   function shapedPhoto(src, shape) {
     return new Promise(function (res, rej) {
       if (shape === 'square') return res({ jpg: true, url: src });
@@ -811,11 +811,11 @@
   async function makePdf(st, fam) {
     var P = PDFLib, doc = await P.PDFDocument.create(); doc.registerFontkit(fontkit);
     var bufs = fontBufs[fam], F = { R: await doc.embedFont(bufs[0], { subset: true }), B: await doc.embedFont(bufs[1], { subset: true }) };
-    var have = {}; F.R.getCharacterSet().forEach(function (cp) { have[cp] = 1; });
-    var lost = '';
-    function clean(t) { return Array.from(String(t)).map(function (ch) { var cp = ch.codePointAt(0); if (have[cp]) return ch; if (cp === 0xa0) return ' '; if (/\s/.test(ch)) return ' '; if (lost.indexOf(ch) < 0 && lost.length < 12) lost += ch; return '?'; }).join(''); }
-    // lay out with the text exactly as the PDF font will draw it, so "?" stand-ins do not overlap the next word
-    var M0 = measurer(fam), L = layout(st, function (t, f, s) { return M0(clean(t), f, s); });
+    // PDFText writes every language: other scripts get their own font (downloaded only when used) or a sharp picture
+    var T = await PDFText.create(doc, { text: Object.assign({}, st, { photo: '' }), onStatus: function (m) { say('', m); } });
+    function clean(t) { return T.clean(String(t).replace(/\u00a0/g, ' ')); }
+    // lay out with the same widths as the preview; other scripts use the widths the PDF will really have
+    var M0 = measurer(fam), L = layout(st, function (t, f, s) { t = clean(t); return T.isSimple(t, F[f]) ? M0(t, f, s) : T.width(t, s, F[f]); });
     var nm = String(st.name || '').trim();
     doc.setTitle(clean(nm ? nm + ' – CV' : 'CV')); if (nm) doc.setAuthor(clean(nm)); doc.setCreator('GetToolNest Resume Maker'); doc.setProducer('GetToolNest');
     var imgCache = {};
@@ -826,9 +826,11 @@
         var o = L.pages[i].ops[j];
         if (o.k === 't') {
           var t = clean(o.v); if (!t.trim()) continue;
-          if (o.ls) pg.pushOperators(P.setCharacterSpacing(o.ls));
-          pg.drawText(t, { x: o.x, y: H - o.y, size: o.s, font: F[o.f], color: col(o.c) });
-          if (o.ls) pg.pushOperators(P.setCharacterSpacing(0));
+          if (o.ls && T.isSimple(t, F[o.f])) { // spaced-out headings; other scripts are drawn without the extra spacing
+            pg.pushOperators(P.setCharacterSpacing(o.ls));
+            pg.drawText(t, { x: o.x, y: H - o.y, size: o.s, font: F[o.f], color: col(o.c) });
+            pg.pushOperators(P.setCharacterSpacing(0));
+          } else T.draw(pg, t, { x: o.x, y: H - o.y, size: o.s, font: F[o.f], color: col(o.c) });
         } else if (o.k === 'r') {
           if (o.rr) pg.drawSvgPath(rr(o.x, o.y, o.w, o.h, o.rr), { x: 0, y: H, color: col(o.c), borderWidth: 0 });
           else pg.drawRectangle({ x: o.x, y: H - o.y - o.h, width: o.w, height: o.h, color: col(o.c) });
@@ -844,7 +846,7 @@
       }
       annots.forEach(function (a) { pg.node.addAnnot(a); });
     }
-    return { bytes: await doc.save(), lost: lost, pages: L.pages.length };
+    return { bytes: await doc.save(), pages: L.pages.length };
   }
   var busy = false, dlUrl = null;
   $('rmPdf').addEventListener('click', async function () {
@@ -862,9 +864,8 @@
       var name = base + '-' + (S.paper === 'letter' ? 'Resume' : 'CV') + '.pdf';
       var a = $('dl'); a.href = dlUrl; a.download = name; a.hidden = false; a.click();
       var note = 'Saved ' + name + ' (' + r.pages + (r.pages === 1 ? ' page, ' : ' pages, ') + fmtBytes(r.bytes.length) + '). The text is real, so job portals can read it.';
-      if (r.lost) say('bad', note + ' Some letters (' + r.lost + ') are not in the PDF font and show as "?". Use Print and choose "Save as PDF" to keep them.');
-      else { say('ok', note); if (window.burst) burst(b); }
-    } catch (e) { say('bad', e && /^The PDF/.test(e.message) ? e.message : 'Sorry, the PDF could not be made on this device. Try Print and choose "Save as PDF" instead.'); }
+      say('ok', note); if (window.burst) burst(b);
+    } catch (e) { console.warn(e); say('bad', e && /^The PDF/.test(e.message) ? e.message : 'Sorry, the PDF could not be made on this device. Try Print and choose "Save as PDF" instead.'); }
     busy = false; b.disabled = false; b.textContent = 'Download PDF';
   });
 

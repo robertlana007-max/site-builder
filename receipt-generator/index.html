@@ -387,7 +387,7 @@
   var pdfLibs = null, pdfFonts = null;
   function loadScript(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
   function getPdfLibs() {
-    if (!pdfLibs) pdfLibs = Promise.all([window.PDFLib ? 0 : loadScript('../assets/vendor/pdf-lib.min.js'), window.fontkit ? 0 : loadScript('../assets/vendor/fontkit.min.js')]).catch(function (e) { pdfLibs = null; throw e; });
+    if (!pdfLibs) pdfLibs = (window.PDFText ? Promise.resolve() : loadScript('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { pdfLibs = null; throw e; });
     if (!pdfFonts) pdfFonts = Promise.all(['400', '700'].map(function (w) { return fetch('../assets/vendor/fonts/noto-sans-subset-' + w + '.ttf').then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }); })).catch(function (e) { pdfFonts = null; throw e; });
     return Promise.all([pdfLibs, pdfFonts]).then(function (r) { return r[1]; });
   }
@@ -397,35 +397,20 @@
     var L = PDFLib, doc = await L.PDFDocument.create();
     doc.registerFontkit(fontkit);
     var R = await doc.embedFont(fb[0], { subset: true }), Bf = await doc.embedFont(fb[1], { subset: true });
-    var have = {}; R.getCharacterSet().forEach(function (cp) { have[cp] = 1; });
-    var lost = '';
-    function clean(t) { return Array.from(String(t == null ? '' : t).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/−/g, '-')).map(function (ch) { var cp = ch.codePointAt(0); if (ch === '\n' || have[cp]) return ch; if (/\s/.test(ch)) return ' '; if (lost.indexOf(ch) === -1 && lost.length < 12) lost += ch; return '?'; }).join(''); }
+    // PDFText writes every language: other scripts get their own font (downloaded only when used) or a sharp picture
+    var T = await PDFText.create(doc, { text: Object.assign({}, sp, { logo: '' }), onStatus: function (m) { say('', m); } });
+    function clean(t) { return String(t == null ? '' : t).replace(/\r\n?/g, '\n').replace(/\t/g, ' ').replace(/−/g, '-'); }
     var size = sp.paper === 'letter' ? [612, 792] : sp.paper === 'a5' ? [419.53, 595.28] : [595.28, 841.89], PW = size[0], PH = size[1], M = sp.paper === 'a5' ? 32 : 48, W = PW - 2 * M, BOTTOM = M + 22;
     var ink = L.rgb(.12, .14, .17), mute = L.rgb(.42, .45, .5), line = L.rgb(.88, .89, .91), a = hexRgb(sp.accent), acc = L.rgb(a[0], a[1], a[2]);
     var soft = L.rgb(1 - (1 - a[0]) * .12, 1 - (1 - a[1]) * .12, 1 - (1 - a[2]) * .12), white = L.rgb(1, 1, 1);
     doc.setTitle(clean(sp.docTitle || sp.title)); doc.setAuthor(clean(sp.biz) || 'GetToolNest'); doc.setCreator('GetToolNest'); doc.setProducer('GetToolNest');
     var page = doc.addPage(size), y = PH - M;
-    function txt(t, x, yy, sz, f, col) { t = clean(t); if (t) page.drawText(t, { x: x, y: yy, size: sz, font: f || R, color: col || ink }); }
-    function wid(t, sz, f) { return (f || R).widthOfTextAtSize(clean(t), sz); }
+    // w: the width of the box, so right-to-left lines (Arabic, Hebrew…) line up on its right edge
+    function txt(t, x, yy, sz, f, col, w) { T.draw(page, clean(t), { x: x, y: yy, size: sz, font: f || R, color: col || ink, width: w }); }
+    function wid(t, sz, f) { return T.width(clean(t), sz, f || R); }
     function rtxt(t, xr, yy, sz, f, col) { txt(t, xr - wid(t, sz, f), yy, sz, f, col); }
     function fit(t, sz, f, max) { while (sz > 5 && wid(t, sz, f) > max) sz -= .5; return sz; }
-    function wrap(t, sz, f, max) {
-      var out = [];
-      clean(t).split('\n').forEach(function (para) {
-        var cur = '';
-        para.split(/ +/).forEach(function (w) {
-          var trial = cur ? cur + ' ' + w : w;
-          if (wid(trial, sz, f) <= max) { cur = trial; return; }
-          if (cur) out.push(cur);
-          cur = '';
-          while (wid(w, sz, f) > max) { var k = w.length; while (k > 1 && wid(w.slice(0, k), sz, f) > max) k--; out.push(w.slice(0, k)); w = w.slice(k); }
-          cur = w;
-        });
-        out.push(cur);
-      });
-      while (out.length > 1 && out[out.length - 1] === '') out.pop();
-      return out;
-    }
+    function wrap(t, sz, f, max) { return T.wrap(clean(t), sz, f || R, max); }
     function newPage() { page = doc.addPage(size); y = PH - M; }
     function need(h) { if (y - h < BOTTOM) newPage(); }
 
@@ -456,8 +441,8 @@
       sp.parties.forEach(function (p, i) {
         var x = M + i * (W / n), yy = py;
         txt(String(p[0]).toUpperCase(), x, yy, 8, Bf, mute); yy -= 14;
-        wrap(p[1] || '—', 11, Bf, colW).forEach(function (l) { txt(l, x, yy, 11, Bf); yy -= 14; });
-        if (p[2] && p[2].trim()) wrap(p[2].trim(), 9.5, R, colW).forEach(function (l) { txt(l, x, yy, 9.5, R); yy -= 12.5; });
+        wrap(p[1] || '—', 11, Bf, colW).forEach(function (l) { txt(l, x, yy, 11, Bf, null, colW); yy -= 14; });
+        if (p[2] && p[2].trim()) wrap(p[2].trim(), 9.5, R, colW).forEach(function (l) { txt(l, x, yy, 9.5, R, null, colW); yy -= 12.5; });
         lows.push(yy);
       });
       y = Math.min.apply(null, lows) - 14;
@@ -494,7 +479,7 @@
           cells.forEach(function (lines, i) {
             var c = b.cols[i] || b.cols[0], f = bold || (c.a === 'r' && i === b.cols.length - 1) ? Bf : R;
             if (c.a === 'r') rtxt(lines[0], xs[i][0] + xs[i][1] - 6, top, fit(lines[0], 9.5, f, xs[i][1] - 10), f);
-            else lines.forEach(function (t, k) { txt(t, xs[i][0] + 6, top - k * 12.5, 9.5, f); });
+            else lines.forEach(function (t, k) { txt(t, xs[i][0] + 6, top - k * 12.5, 9.5, f, null, xs[i][1] - 12); });
           });
           y -= h;
           page.drawLine({ start: { x: M, y: y }, end: { x: M + W, y: y }, thickness: .6, color: line });
@@ -516,11 +501,11 @@
         page.drawRectangle({ x: M, y: y - 38, width: W, height: 38, color: soft });
         txt(b.label, M + 12, y - 23, 11, Bf, ink); rtxt(b.value, M + W - 12, y - 25, fit(b.value, 16, Bf, W * .55), Bf, acc);
         y -= 46;
-        if (b.sub) { wrap(b.sub, 9, R, W).forEach(function (l) { need(14); txt(l, M, y - 4, 9, R, mute); y -= 12; }); y -= 6; }
+        if (b.sub) { wrap(b.sub, 9, R, W).forEach(function (l) { need(14); txt(l, M, y - 4, 9, R, mute, W); y -= 12; }); y -= 6; }
       } else if (b.kind === 'note' && b.text && b.text.trim()) {
         y -= 6; need(30);
         txt(b.title, M, y - 10, 9.5, Bf, mute); y -= 24;
-        wrap(b.text.trim(), 9.5, R, W).forEach(function (l) { if (y < BOTTOM) newPage(); txt(l, M, y, 9.5, R); y -= 13; });
+        wrap(b.text.trim(), 9.5, R, W).forEach(function (l) { if (y < BOTTOM) newPage(); txt(l, M, y, 9.5, R, null, W); y -= 13; });
       }
     }
     if (sp.sign) {
@@ -532,11 +517,11 @@
     var pages = doc.getPages();
     pages.forEach(function (pg, i) {
       page = pg;
-      var f = clean(sp.footer || '');
-      txt(f.length > 90 ? f.slice(0, 90) + '…' : f, M, M - 14, 8, R, mute);
+      var f = Array.from(clean(sp.footer || ''));
+      txt(f.length > 90 ? f.slice(0, 90).join('') + '…' : f.join(''), M, M - 14, 8, R, mute);
       rtxt('Page ' + (i + 1) + ' of ' + pages.length, PW - M, M - 14, 8, R, mute);
     });
-    return { bytes: await doc.save(), pages: pages.length, lost: lost };
+    return { bytes: await doc.save(), pages: pages.length };
   }
   var docUrl = null;
   // build the PDF, save it, and report back through say()
@@ -549,8 +534,7 @@
       docUrl = URL.createObjectURL(new Blob([r.bytes], { type: 'application/pdf' }));
       var a = dlLink; a.href = docUrl; a.download = name; a.hidden = false; a.click();
       var note = 'Saved ' + name + ' (' + r.pages + (r.pages === 1 ? ' page, ' : ' pages, ') + fmtBytes(r.bytes.length) + ').';
-      if (r.lost) say('bad', note + ' Some letters (' + r.lost + ') are not in the PDF font and show as "?". Use Print and choose "Save as PDF" to keep them.');
-      else { say('ok', note); if (window.burst) burst(btn); }
+      say('ok', note); if (window.burst) burst(btn);
     } catch (e) { console.warn(e); say('bad', 'Sorry, the PDF could not be made on this device. Try Print and choose "Save as PDF" instead.'); }
     btn.disabled = false; btn.textContent = old;
   }
@@ -698,7 +682,7 @@
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Live preview</b>See the receipt as you type.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Logo and colour</b>Your logo and accent colour on every receipt.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Tax included or added</b>Works for both price styles.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Part payments and change</b>Shows balance due or change given.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Real PDF</b>Small, sharp and searchable.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Auto numbering</b>R-0001, R-0002 and so on.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Private</b>Nothing leaves your device.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a café sale with 16% tax</h2><p>Two bags of coffee at 1,250.50 and a mug at 400 make a subtotal of 2,901.00. A 10% discount takes off 290.10, leaving 2,610.90, and 16% tax adds 417.74 for a total of 3,028.64. The customer pays 5,000 in cash, so the receipt shows change given of 1,971.36 and “Paid in full”.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Add your tax number in the business details if your country requires it.</li><li>Use the payment reference to match receipts with bank records.</li><li>Press Save draft to keep your business details ready for next time.</li><li>Keep a copy of every PDF for your accounts.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>A price box is red</summary><p>Type numbers only, like 12.50 or 1,250.50.</p></details><details><summary>Some letters show as &quot;?&quot; in the PDF</summary><p>A few scripts are not in the PDF font. Use Print and choose Save as PDF to keep them.</p></details><details><summary>My logo is not saved</summary><p>Very large logos may not fit in browser storage. Use a smaller picture.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>A price box is red</summary><p>Type numbers only, like 12.50 or 1,250.50.</p></details><details><summary>Some words in the PDF cannot be selected</summary><p>Chinese, Japanese and Korean letters and emoji are added as sharp pictures, so they look right but cannot be selected or searched. Other languages are real text.</p></details><details><summary>My logo is not saved</summary><p>Very large logos may not fit in browser storage. Use a smaller picture.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>Is the receipt generator free?</summary><p>Yes. No sign-up, no watermark and no limit.</p></details><details><summary>Is my data uploaded?</summary><p>No. Everything runs in your browser. Your draft and logo are saved only on this device.</p></details><details><summary>Can prices already include tax?</summary><p>Yes. Choose “Already include tax” and the tool shows the tax part inside the total.</p></details><details><summary>What if the customer paid only part?</summary><p>Type the amount received. The receipt shows the balance due, or the change given if they paid more.</p></details><details><summary>Which currencies work?</summary><p>About 40 currencies are listed, or choose Other and type your own symbol.</p></details><details><summary>Can I print on small paper?</summary><p>Yes. Choose A5 for a smaller page, or print and pick your paper size in the print window.</p></details></div>
