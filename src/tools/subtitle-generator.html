@@ -305,6 +305,8 @@ var FF = (function () {
         if (lang) opts.language = lang;
         return pipe(chunk, opts).then(function (r) {
           var cs = (r.chunks || []).filter(function (c) { return c.text && c.text.trim(); }), adv = (end - seek) / 16000;
+          // on music, tones or noise Whisper often invents one stock phrase for the whole window: drop it
+          if (cs.length === 1 && /^\W*(thank you( (so|very) much)?( for watching)?|thanks( for watching)?|you|bye|subtitles by .*|amara\.org.*)\W*$/i.test(cs[0].text.trim())) cs = [];
           var last = cs[cs.length - 1];
           if (end < n && cs.length > 1 && last && (last.timestamp[1] == null || last.timestamp[1] > adv - 0.5) && last.timestamp[0] > 5) {
             // the last sentence was cut by the 30-second window: drop it and start the next window there
@@ -477,10 +479,13 @@ var FF = (function () {
     if (cues.length) { var p = cues[cues.length - 1]; if (p.text === text && d.start - p.end < 1) return; } // repeated line
     var parts = [text];
     if (max && text.length > max) {
-      parts = []; var words = text.split(' '), cur = '';
-      var n = Math.ceil(text.length / max), target = text.length / n;
-      words.forEach(function (w) { if (cur && (cur.length + 1 + w.length > max || (cur.length >= target && /[.,!?;:،。，！？]$/.test(cur)))) { parts.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w; });
+      parts = []; var sp = / /.test(text) ? ' ' : '', words = sp ? text.split(' ') : Array.from(text), cur = ''; // no spaces (Chinese, Japanese, Thai): split between letters
+      var n = Math.ceil(text.length / max), target = text.length / n, lim = Math.min(max, Math.ceil(target) + 8);
+      // even pieces, preferring to break after a comma or full stop, so no caption is left with one lonely word
+      words.forEach(function (w) { if (cur && (cur.length + sp.length + w.length > lim || (cur.length >= target * 0.8 && /[.,!?;:،。，！？、]$/.test(cur)))) { parts.push(cur); cur = w; } else cur = cur ? cur + sp + w : w; });
       if (cur) parts.push(cur);
+      var last = parts.length - 1;
+      if (last > 0 && parts[last].length < 14 && parts[last - 1].length + sp.length + parts[last].length <= max) parts.splice(last - 1, 2, parts[last - 1] + sp + parts[last]);
     }
     var totalLen = parts.reduce(function (a, s) { return a + s.length; }, 0), t = d.start, span = d.end - d.start;
     parts.forEach(function (s) { var e = t + span * s.length / totalLen; cues.push({ start: t, end: e, text: s }); t = e; });
