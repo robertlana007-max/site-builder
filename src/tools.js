@@ -3652,9 +3652,9 @@ module.exports = [
       intro: 'Choose a topic and a mood, add what your post is about, and get ten caption ideas with emojis and hashtags. Switch to Bio for short profile bios that fit Instagram\'s 150-character limit.',
       steps: ['Pick Captions or Bio.', 'Choose a topic and mood, and type what the post is about.', 'Set the amount of emojis, hashtags and the ending.', 'Press Generate, then tap Copy on the one you like.'],
       faq: [
-        ['How long can an Instagram caption be?', 'Up to 2,200 characters and 30 hashtags. Only the first line or two show before "more", so start strong.'],
+        ['How long can an Instagram caption be?', 'Up to 2,200 characters and 5 hashtags. Only the first line or two show before "more", so start strong.'],
         ['How long can an Instagram bio be?', '150 characters. Each bio idea shows its length, and long ones are marked.'],
-        ['How many hashtags should I use?', 'Instagram allows up to 30, but a handful of specific, relevant hashtags usually works better than many general ones.'],
+        ['How many hashtags should I use?', 'Instagram allows up to 5 on a post or Reel. Pick specific, relevant ones rather than very general tags.'],
         ['Does it use AI or send my words anywhere?', 'No. Ideas come from a built-in library of templates, mixed with your words, entirely in your browser.'],
         ['Can I use these captions on other apps?', 'Yes. They work on TikTok, Facebook, Threads and other apps too; check each app\'s limits.']
       ],
