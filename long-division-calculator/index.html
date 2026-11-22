@@ -218,10 +218,13 @@
     var neg = A.neg !== B.neg && /[1-9]/.test(q) , sign = neg ? '−' : '', exact = cur === Z && rep < 0;
     if (mode === 'r') {
       var r = cur, g = gcd(r, d) || BigInt(1), f8 = (r * BigInt(100000000) / d).toString().padStart(8, '0').replace(/0+$/, ''), dec = fmt(qi) + (f8 ? '.' + f8 + (r * BigInt(100000000) % d ? '…' : '') : '');
-      $('ldStats').innerHTML = '<div class="stat"><span>Quotient</span><b>' + sign + fmt(qi) + '</b></div><div class="stat"><span>Remainder</span><b>' + fmt(r) + '</b></div>' +
+      // when the divisor had decimals the division was scaled by 10^k, so scale the remainder back
+      var rs = r.toString(), rTxt = fmt(rs);
+      if (k && r > Z) { rs = rs.padStart(k + 1, '0'); rTxt = (fmt(rs.slice(0, -k)) + '.' + rs.slice(-k)).replace(/0+$/, '').replace(/\.$/, ''); }
+      $('ldStats').innerHTML = '<div class="stat"><span>Quotient</span><b>' + sign + fmt(qi) + '</b></div><div class="stat"><span>Remainder</span><b>' + rTxt + '</b></div>' +
         (r ? '<div class="stat"><span>As a mixed number</span><b>' + sign + (qi === '0' ? '' : fmt(qi) + ' ') + (r / g) + '/' + (d / g) + '</b></div>' : '') +
         '<div class="stat"><span>As a decimal</span><b>' + sign + dec + '</b></div>';
-      say('ok', show(A) + ' ÷ ' + show(B) + ' = ' + sign + fmt(qi) + (r ? ' remainder ' + fmt(r) + '. Check: ' + fmt(qi) + ' × ' + fmt(dvs) + ' + ' + fmt(r) + ' = ' + fmt(dvd) + '.' : ' exactly, with no remainder.'));
+      say('ok', show(A) + ' ÷ ' + show(B) + ' = ' + sign + fmt(qi) + (r ? ' remainder ' + rTxt + '. Check: ' + fmt(qi) + ' × ' + show(B).replace('−', '') + ' + ' + rTxt + ' = ' + show(A).replace('−', '') + '.' : ' exactly, with no remainder.'));
     } else {
       var fr = qf, ov = '';
       if (rep >= 0) { ov = fr.slice(rep); fr = fr.slice(0, rep); }
@@ -232,7 +235,7 @@
       say('ok', show(A) + ' ÷ ' + show(B) + ' = ' + sign + fmt(qi) + (fr || ov ? '.' + fr + (ov ? '(' + ov + ' repeating)' : '') : '') + (exact ? ' exactly.' : more ? '… (it keeps going; shown to ' + maxDp + ' decimal places).' : '.'));
     }
     draw(dvd, dvdInt, ownLen, dvs, q, steps, mode, cur, rep);
-    explain(steps, dvdInt, ownLen, dvs, mode, notes, cur, rep);
+    explain(steps, dvdInt, ownLen, dvs, mode, notes, cur, rep, k);
   }
 
   // ---------- the written layout ----------
@@ -275,7 +278,7 @@
     if (steps.length) { var last = steps[steps.length - 1]; putNum(row(), last.rem.toString(), last.pos, 'r'); }
     $('ldBoard').innerHTML = '<div class="ldc-grid" style="grid-template-columns:repeat(' + W + ', auto)">' + rows.map(function (r) { return r.map(function (c) { return '<span class="' + c.c.trim() + '">' + c.t + '</span>'; }).join(''); }).join('') + '</div>';
   }
-  function explain(steps, dvdInt, ownLen, dv, mode, notes, rem, rep) {
+  function explain(steps, dvdInt, ownLen, dv, mode, notes, rem, rep, k) {
     var out = notes.map(function (t) { return '<li>' + t + '</li>'; });
     steps.forEach(function (s) {
       var t = 'How many times does <b>' + fmt(dv) + '</b> go into <b>' + fmt(s.cur) + '</b>? <b>' + s.qd + '</b> time' + (s.qd === BigInt(1) ? '' : 's') + ' (' + s.qd + ' × ' + fmt(dv) + ' = ' + fmt(s.prod) + '). Write ' + s.qd + ' in the answer. Subtract: ' + fmt(s.cur) + ' − ' + fmt(s.prod) + ' = <b>' + fmt(s.rem) + '</b>.';
@@ -283,7 +286,7 @@
       if (s.down != null) t += ' Bring down the next digit' + (s.pos + 1 >= ownLen ? ' (a 0, because the number has run out of digits)' : '') + ': <b>' + s.down + '</b>.';
       out.push('<li>' + t + '</li>');
     });
-    if (mode === 'r') out.push('<li>There are no digits left to bring down, so the remainder is <b>' + fmt(rem) + '</b>.</li>');
+    if (mode === 'r') out.push('<li>There are no digits left to bring down, so the remainder is <b>' + fmt(rem) + '</b>' + (k && rem > Z ? ' (in the moved-decimal numbers; in your original numbers that is ' + $('ldStats').querySelectorAll('b')[1].textContent + ')' : '') + '.</li>');
     else if (rep >= 0) out.push('<li>This remainder has appeared before, so the same digits will repeat forever. A line over the digits marks the repeating part.</li>');
     $('ldSteps').innerHTML = out.join('');
   }
