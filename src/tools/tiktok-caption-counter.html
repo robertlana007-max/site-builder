@@ -48,6 +48,7 @@
   </div>
   <ul class="tcc-tips" id="tcTips"></ul>
   <div class="btns"><button type="button" class="btn" id="tcCopy">Copy caption</button><button type="button" class="btn ghost" id="tcCopyTags">Copy hashtags only</button><button type="button" class="btn ghost" id="tcDedupe">Remove repeated hashtags</button><button type="button" class="btn ghost" id="tcClear">Clear</button></div>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
 </div>
 <div>
   <div class="tcc-phone" id="tcPhone" aria-label="Preview of the caption on a video"><img id="tcImg" alt="" hidden><div class="tcc-shade"></div><div class="tcc-side"><span></span>♥<span></span>💬<span></span>↗</div><div class="tcc-cap"><b id="tcName">@yourname</b><div class="tcc-text clamp" id="tcPrev"></div><button type="button" class="tcc-more" id="tcMore" hidden>more</button></div></div>
@@ -62,9 +63,12 @@
   function len(t) { if (!seg) return Array.from(t).length; var n = 0; for (var x of seg.segment(t)) n++; return n; }
   function esc(t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
   var HASH = /(^|[^\p{L}\p{N}_&])#([\p{L}\p{N}_]+)/gu, MENT = /(^|[^\p{L}\p{N}_.])@([\p{L}\p{N}_.]+)/gu, EMO = /\p{Extended_Pictographic}/gu;
+  // count whole emojis: a family or a flag is one emoji even though it is made of several code points
+  function emojis(t) { if (!seg) return (t.match(EMO) || []).length; var n = 0; for (var x of seg.segment(t)) if (/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(x.segment)) n++; return n; }
+  function say(c, m) { var e = $('msg'); e.className = 'msg ' + (c || ''); e.textContent = m || ''; }
   function list(re, t) { var out = [], m; re.lastIndex = 0; while ((m = re.exec(t))) out.push(m[2]); return out; }
   function run() {
-    var t = $('tcText').value, lim = +$('tcLimit').value, n = len(t), tags = list(HASH, t), ments = list(MENT, t), words = t.trim() ? t.trim().split(/\s+/).length : 0, emo = (t.match(EMO) || []).length;
+    var t = $('tcText').value, lim = +$('tcLimit').value, n = len(t), tags = list(HASH, t), ments = list(MENT, t), words = t.trim() ? t.trim().split(/\s+/).length : 0, emo = emojis(t);
     $('tcCount').textContent = n.toLocaleString() + ' / ' + lim.toLocaleString(); $('tcCount').className = n > lim ? 'over' : '';
     $('tcLimTxt').textContent = n > lim ? (n - lim).toLocaleString() + ' characters over the limit.' : (lim - n).toLocaleString() + ' characters left.';
     var bar = $('tcBar'); bar.style.width = Math.min(100, n / lim * 100) + '%'; bar.className = n > lim ? 'over' : n > lim * 0.9 ? 'warn' : '';
@@ -100,9 +104,15 @@
   }
   ['tcText', 'tcUser', 'tcLimit'].forEach(function (id) { $(id).addEventListener('input', run); });
   $('tcMore').addEventListener('click', function () { open = !open; run(); });
-  $('tcBg').addEventListener('change', function () { var f = this.files[0]; if (!f || !/^image\//.test(f.type)) return; if (img) URL.revokeObjectURL(img); img = URL.createObjectURL(f); $('tcImg').src = img; $('tcImg').hidden = false; });
+  $('tcBg').addEventListener('change', function () {
+    var f = this.files[0]; if (!f) return;
+    var u = URL.createObjectURL(f), im = new Image();
+    im.onload = function () { if (img) URL.revokeObjectURL(img); img = u; $('tcImg').src = img; $('tcImg').hidden = false; say('', ''); };
+    im.onerror = function () { URL.revokeObjectURL(u); say('bad', '"' + f.name + '" could not be opened as a picture. Choose a JPG, PNG or WebP image.'); };
+    if (!/^image\//.test(f.type)) im.onerror(); else im.src = u;
+  });
   $('tcCopy').addEventListener('click', function () { copyText($('tcText').value, this); });
-  $('tcCopyTags').addEventListener('click', function () { var tags = list(HASH, $('tcText').value); copyText(tags.map(function (x) { return '#' + x; }).join(' '), this); });
+  $('tcCopyTags').addEventListener('click', function () { var tags = list(HASH, $('tcText').value); if (!tags.length) return say('bad', 'There are no hashtags in your caption to copy.'); say('', ''); copyText(tags.map(function (x) { return '#' + x; }).join(' '), this); });
   $('tcDedupe').addEventListener('click', function () {
     var seen = {}, removed = 0;
     $('tcText').value = $('tcText').value.replace(HASH, function (m, pre, tag) { var k = tag.toLowerCase(); if (seen[k]) { removed++; return pre; } seen[k] = 1; return m; }).replace(/[ \t]{2,}/g, ' ');

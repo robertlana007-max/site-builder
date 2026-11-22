@@ -150,9 +150,9 @@
 <div class="cpg-tabs" role="tablist"><button type="button" role="tab" id="cpTabP" aria-selected="true">Palette</button><button type="button" role="tab" id="cpTabG" aria-selected="false">Gradient</button></div>
 <div id="cpPal">
   <div class="fields">
-    <div><label for="cpMode">Colour rule</label><select id="cpMode"><option value="random">Random (nice colours)</option><option value="analogous">Analogous (neighbours)</option><option value="complementary">Complementary (opposites)</option><option value="split">Split complementary</option><option value="triadic">Triadic (three-way)</option><option value="tetradic">Square (four-way)</option><option value="mono">Monochrome (one hue)</option><option value="pastel">Pastel</option><option value="earth">Earthy and muted</option></select></div>
+    <div><label for="cpMode">Colour rule</label><select id="cpMode" data-nomemo><option value="random">Random (nice colours)</option><option value="analogous">Analogous (neighbours)</option><option value="complementary">Complementary (opposites)</option><option value="split">Split complementary</option><option value="triadic">Triadic (three-way)</option><option value="tetradic">Square (four-way)</option><option value="mono">Monochrome (one hue)</option><option value="pastel">Pastel</option><option value="earth">Earthy and muted</option></select></div>
     <div><label for="cpBase">Start from colour (optional)</label><input type="text" id="cpBase" data-nomemo maxlength="7" placeholder="#3b82f6" autocomplete="off"></div>
-    <div><label for="cpN">Colours</label><select id="cpN"><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option></select></div>
+    <div><label for="cpN">Colours</label><select id="cpN" data-nomemo><option>3</option><option>4</option><option selected>5</option><option>6</option><option>7</option><option>8</option></select></div>
   </div>
   <div class="cpg-sw" id="cpSw"></div>
   <p class="msg" style="font-size:13.5px">Tap a code to copy it. 🔒 keeps a colour when you generate again, the pencil lets you pick it yourself. Press the space bar to generate.</p>
@@ -207,13 +207,13 @@
       else if (mode === 'earth') out.push(hsl2hex(R(15, 60) + (i % 2 ? 60 : 0), R(18, 40), R(25, 72)));
       else { var rep = Math.floor(i / (mode === 'tetradic' ? 4 : mode === 'complementary' ? 2 : 3)); out.push(hsl2hex(h + offs[i], s + R(-8, 8) - rep * 8, clamp(l + (rep % 2 ? 18 : -14) * Math.min(rep, 1) + R(-6, 6), 15, 88))); }
     }
-    if (base) out[0] = hsl2hex(base[0], base[1], base[2]);
     return out;
   }
   function generate() {
     var n = +$('cpN').value, base = normHex($('cpBase').value), fresh = harmony($('cpMode').value, n, base ? hex2hsl(base) : null);
     if ($('cpBase').value.trim() && !base) say('bad', '"' + $('cpBase').value.trim() + '" is not a colour code. Use a HEX code like #3b82f6.'); else say('', '');
     var next = [];
+    if (base) fresh[0] = base; // keep the exact colour typed, not a rounded copy
     for (var i = 0; i < n; i++) next.push(locks[i] && cols[i] ? cols[i] : fresh[i]);
     cols = next; locks = locks.slice(0, n); render(); store();
   }
@@ -256,7 +256,7 @@
   }
   $('cpSave').addEventListener('click', function () { var s = savedList(); if (s.some(function (p) { return p.join() === cols.join(); })) return say('', 'This palette is already saved.'); s.unshift(cols.slice()); s = s.slice(0, 40); try { localStorage.setItem(SAVEKEY, JSON.stringify(s)); say('ok', 'Palette saved on this device.'); } catch (e) { say('bad', 'This browser would not let the page save.'); } showSaved(); });
   $('cpSaved').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; var p = savedList()[+b.dataset.i]; if (!p) return; cols = p.slice(); locks = []; $('cpN').value = String(Math.min(8, Math.max(3, cols.length))); render(); store(); say('ok', 'Saved palette opened. Generate keeps locked colours only.'); });
-  function store() { try { localStorage.setItem(SAVEKEY + 'Now', JSON.stringify({ cols: cols, locks: locks, stops: stops })); } catch (e) {} }
+  function store() { try { localStorage.setItem(SAVEKEY + 'Now', JSON.stringify({ cols: cols, locks: locks, stops: stops, mode: $('cpMode').value })); } catch (e) {} }
 
   // ---------- gradient ----------
   var stops = [];
@@ -292,11 +292,12 @@
     ss.forEach(function (s) { gr.addColorStop(s.p / 100, s.c); }); g.fillStyle = gr; g.fillRect(0, 0, w, h);
     c.toBlob(function (b) { var u = URL.createObjectURL(b), el = document.createElement('a'); el.href = u; el.download = 'gradient.png'; document.body.appendChild(el); el.click(); el.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000); say('ok', 'Gradient picture saved (1920 × 1080).'); });
   });
-  $('cpToGrad').addEventListener('click', function () { stops = cols.slice(0, 6).map(function (c, i, a) { return { c: c, p: Math.round(i * 100 / (a.length - 1)) }; }); tab(true); gRender(true); });
+  $('cpToGrad').addEventListener('click', function () { stops = cols.slice(0, 6).map(function (c, i, a) { return { c: c, p: Math.round(i * 100 / (a.length - 1)) }; }); tab(true); gRender(true); if (cols.length > 6) say('', 'A gradient holds up to 6 colours, so the first 6 of your palette are used.'); });
   function tab(g) { $('cpTabP').setAttribute('aria-selected', String(!g)); $('cpTabG').setAttribute('aria-selected', String(g)); $('cpPal').hidden = g; $('cpGrad').hidden = !g; say('', ''); }
   $('cpTabP').addEventListener('click', function () { tab(false); }); $('cpTabG').addEventListener('click', function () { tab(true); });
 
   var now = null; try { now = JSON.parse(localStorage.getItem(SAVEKEY + 'Now')); } catch (e) {}
+  if (now && typeof now.mode === 'string' && $('cpMode').querySelector('option[value="' + now.mode + '"]')) $('cpMode').value = now.mode;
   if (now && Array.isArray(now.cols) && now.cols.length >= 3 && now.cols.every(normHex)) { cols = now.cols.slice(0, 8); locks = Array.isArray(now.locks) ? now.locks.map(Boolean) : []; $('cpN').value = String(cols.length); render(); } else generate();
   stops = now && Array.isArray(now.stops) && now.stops.length >= 2 && now.stops.every(function (s) { return s && normHex(s.c) && s.p >= 0 && s.p <= 100; }) ? now.stops : [{ c: '#6a11cb', p: 0 }, { c: '#2575fc', p: 100 }];
   gRender(true); showSaved();

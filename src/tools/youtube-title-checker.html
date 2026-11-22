@@ -55,6 +55,7 @@
   <div><label for="ycChan">Channel name (for the preview)</label><input type="text" id="ycChan" data-nomemo maxlength="40" placeholder="Your channel"></div>
   <div><label for="ycThumb">Thumbnail (optional)</label><input type="file" id="ycThumb" data-nomemo accept="image/*" style="max-width:100%"></div>
 </div>
+<p class="msg" id="ycMsg" role="status" aria-live="polite" style="margin-top:0"></p>
 <label for="ycDesc">Description</label>
 <textarea id="ycDesc" data-nomemo maxlength="6000" placeholder="Start with one or two sentences that say what the video is about, using your keyword. Add chapters (0:00 Intro), links and up to 3 key hashtags."></textarea>
 <div class="ytc-count"><span>The first 2–3 lines show before "more". Limit: 5,000 characters.</span><b id="ycDN">0 / 5,000</b></div>
@@ -95,7 +96,7 @@
     if (caps > 2 || (tl > 10 && t === t.toUpperCase() && /[A-Z]/.test(t))) c.push(['warn', 'Lots of CAPITAL words can look like shouting. Use them for one word at most.', 3]);
     else c.push(['ok', 'Capital letters are used sensibly.', 8]);
     if (/[!?]{2,}|\.{4,}/.test(t)) c.push(['warn', 'Avoid repeated punctuation like "!!!" or "???".', 2]); else c.push(['ok', 'No repeated punctuation.', 5]);
-    var em = (t.match(EMO) || []).length; if (em > 2) c.push(['warn', em + ' emojis in the title. One or two is plenty.', 2]); else c.push(['ok', em ? 'Emoji use is light.' : 'No emojis (fine for search).', 5]);
+    var em = 0; if (seg) { for (var sg of seg.segment(t)) if (/\p{Extended_Pictographic}|\p{Regional_Indicator}/u.test(sg.segment)) em++; } else em = (t.match(EMO) || []).length; /* a family or flag emoji counts once */ if (em > 2) c.push(['warn', em + ' emojis in the title. One or two is plenty.', 2]); else c.push(['ok', em ? 'Emoji use is light.' : 'No emojis (fine for search).', 5]);
     if (/\d/.test(t)) c.push(['ok', 'A number in the title (like "5 tips" or a year) often helps people click.', 5]);
     var th = (t.match(/#[\p{L}\p{N}_]+/gu) || []).length; if (th) c.push(['warn', th + ' hashtag' + (th > 1 ? 's' : '') + ' in the title. Hashtags fit better in the description.', 0]);
     // description
@@ -150,7 +151,15 @@
     else { view = b.dataset.v; document.querySelectorAll('#ycViews button:not([data-v=dark])').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); }
     run();
   });
-  $('ycThumb').addEventListener('change', function () { var f = this.files[0]; if (!f) return; if (!/^image\//.test(f.type)) { this.value = ''; return; } if (thumb) URL.revokeObjectURL(thumb); thumb = URL.createObjectURL(f); run(); });
+  $('ycThumb').addEventListener('change', function () {
+    var f = this.files[0], m = $('ycMsg'); if (!f) return;
+    function bad() { m.className = 'msg bad'; m.textContent = '"' + f.name + '" could not be opened as a picture. Choose a JPG, PNG or WebP thumbnail.'; }
+    if (!/^image\//.test(f.type)) { this.value = ''; return bad(); }
+    var u = URL.createObjectURL(f), im = new Image();
+    im.onload = function () { if (thumb) URL.revokeObjectURL(thumb); thumb = u; m.className = 'msg'; m.textContent = im.naturalWidth && Math.abs(im.naturalWidth / im.naturalHeight - 16 / 9) > 0.05 ? 'Tip: YouTube thumbnails are 16:9 (for example 1280 × 720). Yours is ' + im.naturalWidth + ' × ' + im.naturalHeight + ', so it is cropped in the preview.' : ''; run(); };
+    im.onerror = function () { URL.revokeObjectURL(u); bad(); };
+    im.src = u;
+  });
   $('ycCopyT').addEventListener('click', function () { copyText($('ycTitle').value, this); });
   $('ycCopyD').addEventListener('click', function () { copyText($('ycDesc').value, this); });
   window.addEventListener('resize', function () { clearTimeout(timer); timer = setTimeout(run, 150); });

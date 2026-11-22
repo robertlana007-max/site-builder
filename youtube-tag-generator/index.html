@@ -177,7 +177,7 @@
   var BROAD = { any: ['tips', 'how to', 'guide'], tutorial: ['tutorial', 'how to', 'diy', 'learn'], review: ['review', 'unboxing', 'tech review'], vlog: ['vlog', 'lifestyle', 'daily vlog'], gaming: ['gaming', 'gameplay', 'gamer'], music: ['music', 'song', 'cover'], shorts: ['shorts', 'youtube shorts', 'trending'], education: ['education', 'study', 'learning'], recipe: ['recipe', 'cooking', 'food', 'easy recipes'], news: ['news', 'explained', 'current events'] };
   var sel = [], KEY = 'gtnYtTags';
   function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
-  function clean(t) { return String(t).toLowerCase().replace(/[#"“”<>]/g, '').replace(/[|:;!?¿¡.,()\[\]{}*/\\]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+  function clean(t) { return String(t).toLowerCase().replace(/[#"“”<>]/g, '').replace(/[|:;!?¿¡.,()\[\]{}*/\\]+/g, ' ').replace(/(^|\s)[-–—]+(?=\s|$)/g, ' ').replace(/\s+/g, ' ').trim(); }
   function cost(t) { return Array.from(t).length + (/\s/.test(t) ? 2 : 0); }
   function total() { return sel.reduce(function (s, t) { return s + cost(t); }, 0) + Math.max(0, sel.length - 1); }
   var TYPEW = ['how to make', 'how to', 'lets play', "let's play", 'official video', 'official music video', 'review', 'tutorial', 'recipe', 'gameplay', 'walkthrough', 'vlog', 'explained', 'guide', 'tips', 'unboxing', 'cover', 'lyrics', 'shorts', 'part', 'episode', 'ep', 'full', 'video', 'new', 'best', 'easy'];
@@ -190,13 +190,15 @@
       var t = ' ' + r.join(' ') + ' ', changed = true;
       while (changed) { changed = false; TYPEW.forEach(function (x) { var a = ' ' + x + ' '; if (t.indexOf(a) === 0) { t = t.slice(x.length + 1); changed = true; } if (t.length >= a.length && t.slice(-a.length) === a) { t = t.slice(0, t.length - x.length - 1); changed = true; } }); var nm = / (lets play|let's play|part|episode|ep|day|vol|season|chapter|level) \d{1,4} $/.exec(t); if (nm) { t = t.slice(0, nm.index) + ' '; changed = true; } }
       return t.trim();
-    }).filter(Boolean).sort(function (a, b) { return b.split(' ').length - a.split(' ').length; });
+    }).filter(Boolean).sort(function (a, b) { return b.split(' ').length - a.split(' ').length || b.length - a.length; });
   }
   function generate() {
     var title = $('ytTitle').value.trim(), extra = $('ytKeys').value.split(',').map(clean).filter(Boolean), type = $('ytType').value, y = new Date().getFullYear(), ch = clean($('ytChannel').value);
     if (!title && !extra.length) { say('bad', 'Type your video title or a few keywords first.'); $('ytTitle').focus(); return; }
-    var R = runs(title), key = R[0] || extra[0] || clean(title), main = [], rel = [], broad = [], seen = {};
+    var R = runs(title), key = R[0] || extra[0] || '', main = [], rel = [], broad = [], seen = {};
+    if (!key && clean(title)) { say('bad', 'Your title only has very common words. Add a keyword about your topic, like "bread" or "football".'); $('ytKeys').focus(); return; }
     if (Array.from(key.replace(/\s/g, '')).length < 2) { say('bad', 'Type a longer title or a keyword with at least 2 letters.'); return; }
+    var latin = /[a-z]/.test(key); // the "how to", "review" phrase patterns are English, so only use them for titles in Latin letters
     function add(list, t) { t = clean(t); if (!t || seen[t] || Array.from(t).length > 100 || Array.from(t).length < 2) return; seen[t] = 1; list.push(t); }
     if (title && Array.from(clean(title)).length <= 70) add(main, title);
     add(main, key);
@@ -204,16 +206,16 @@
     if (kw.length > 3) add(main, kw.slice(0, 3).join(' '));
     if (kw.length >= 3) add(main, kw.slice(-2).join(' '));
     extra.forEach(function (e) { add(main, e); add(rel, key + ' ' + e); });
-    (MOD[type] || MOD.any).forEach(function (m, i) { add(i < 5 ? main : rel, m.replace('{k}', key).replace('{y}', y)); });
+    if (latin) (MOD[type] || MOD.any).forEach(function (m, i) { add(i < 5 ? main : rel, m.replace('{k}', key).replace('{y}', y)); });
     R.slice(1, 4).forEach(function (r) { add(rel, r); add(rel, key + ' ' + r); });
-    if (kw.length >= 2) (MOD[type] || MOD.any).slice(0, 4).forEach(function (m) { add(rel, m.replace('{k}', kw.slice(-1)[0] === kw[0] ? key : kw.slice(-2).join(' ')).replace('{y}', y)); });
+    if (latin && kw.length >= 2) (MOD[type] || MOD.any).slice(0, 4).forEach(function (m) { add(rel, m.replace('{k}', kw.slice(-1)[0] === kw[0] ? key : kw.slice(-2).join(' ')).replace('{y}', y)); });
     for (var i = 0; i < kw.length - 1; i++) add(rel, kw[i] + ' ' + kw[i + 1]);
     kw.concat(extra).forEach(function (x) { if (x.length > 2 && !/^\d+$/.test(x)) add(broad, x); });
-    (BROAD[type] || BROAD.any).forEach(function (b) { add(broad, b); }); if (ch) add(broad, ch);
+    if (latin) (BROAD[type] || BROAD.any).forEach(function (b) { add(broad, b); }); if (ch) add(broad, ch);
     draw('ytMain', main); draw('ytRel', rel.slice(0, 18)); draw('ytBroad', broad.slice(0, 12));
     $('ytOut').hidden = false;
     sel = []; main.concat(rel.slice(0, 6), broad.slice(0, 3)).forEach(function (t) { if (total() + cost(t) + 1 <= 450 && sel.length < 18) sel.push(t); });
-    showSel(); say('ok', 'Picked ' + sel.length + ' tags to start. Tap any tag to add or remove it.');
+    showSel(); say('ok', 'Picked ' + sel.length + (sel.length === 1 ? ' tag' : ' tags') + ' to start. Tap any tag to add or remove it.' + (sel.length < 6 ? ' For more ideas, add a few extra keywords separated by commas.' : ''));
   }
   function draw(id, list) { $(id).innerHTML = list.map(function (t) { return '<button type="button" class="ytg-tag" data-t="' + t.replace(/"/g, '&quot;') + '" aria-pressed="' + (sel.indexOf(t) >= 0) + '"></button>'; }).join(''); Array.prototype.forEach.call($(id).children, function (b) { b.textContent = b.dataset.t; }); }
   function refresh() { document.querySelectorAll('#ytOut .ytg-tag').forEach(function (b) { b.setAttribute('aria-pressed', String(sel.indexOf(b.dataset.t) >= 0)); }); }
