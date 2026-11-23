@@ -185,6 +185,7 @@
   }
   function words(v) { var a = []; if (v & 4) a.push('read'); if (v & 2) a.push('write (change)'); if (v & 1) a.push($('ftype').value === 'd' ? 'enter (open) the folder' : 'run it as a program'); return a.length ? a.join(', ') : 'nothing'; }
   function show(from) {
+    if (from !== 'apply') { $('amsg').textContent = ''; $('amsg').className = 'msg'; }
     WHO.forEach(function (w) { BITS.forEach(function (b) { $(w[0] + b[0]).checked = !!(P[w[0]] & b[1]); }); $(w[0] + 'v').textContent = P[w[0]]; });
     $('suid').checked = !!(P.s & 4); $('sgid').checked = !!(P.s & 2); $('stky').checked = !!(P.s & 1);
     var o = octal(), s = symbolic();
@@ -215,7 +216,7 @@
   });
   $('sym').addEventListener('input', function () {
     var v = $('sym').value.trim();
-    if (v.length === 10 && /^[-dlcbps]/.test(v)) v = v.slice(1);
+    if (v.length === 10 && /^[-dlcbps]/.test(v)) { if (v[0] === 'd' || v[0] === '-') $('ftype').value = v[0] === 'd' ? 'd' : 'f'; v = v.slice(1); }
     if (!/^[r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]$/.test(v)) { msg(v ? 'Symbolic permissions are 9 letters like rwxr-xr-x (r, w, x or -; s/S and t/T for special bits).' : 'Type symbolic permissions like rwxr-xr-x.', !!v); return; }
     P.s = 0;
     WHO.forEach(function (w, i) { var t = v.substr(i * 3, 3), x = t[2]; P[w[0]] = (t[0] === 'r' ? 4 : 0) + (t[1] === 'w' ? 2 : 0) + (x === 'x' || x === 's' || x === 't' ? 1 : 0); if (/[sStT]/.test(x)) P.s |= [4, 2, 1][i]; });
@@ -225,25 +226,29 @@
     var e = $('apply').value.replace(/\s+/g, ''), am = $('amsg');
     if (!e) { am.className = 'msg'; am.textContent = 'Type an expression first, like u+x.'; return; }
     var parts = e.split(','), N = { u: P.u, g: P.g, o: P.o, s: P.s };
+    if (/^[0-7]{1,4}$/.test(e)) { var d = ('0000' + e).slice(-4); N = { s: +d[0], u: +d[1], g: +d[2], o: +d[3] }; parts = []; } // a number works like chmod 755
     for (var i = 0; i < parts.length; i++) {
-      var m = /^([ugoa]*)([-+=])([rwxXst]*)$/.exec(parts[i]);
-      if (!m) { am.className = 'msg bad'; am.textContent = '"' + parts[i] + '" is not understood. Use who (u, g, o, a), then +, - or =, then r, w, x, X, s or t. Example: g+w,o-rwx'; return; }
-      var who = (m[1] || 'a').replace('a', 'ugo'), op = m[2], what = m[3], bits = 0, sp = 0;
-      var anyX = (N.u | N.g | N.o) & 1 || $('ftype').value === 'd';
-      if (what.indexOf('r') >= 0) bits |= 4; if (what.indexOf('w') >= 0) bits |= 2; if (what.indexOf('x') >= 0 || (what.indexOf('X') >= 0 && anyX)) bits |= 1;
-      ['u', 'g', 'o'].forEach(function (w) {
-        if (who.indexOf(w) < 0) return;
-        if (op === '+') N[w] |= bits; else if (op === '-') N[w] &= ~bits; else N[w] = bits;
-        var sb = w === 'u' ? 4 : w === 'g' ? 2 : 0;
-        if (what.indexOf('s') >= 0 && sb) sp |= sb;
-        if (op === '=' && sb) N.s &= ~sb;
+      var m = /^([ugoa]*)((?:[-+=][rwxXst]*)+)$/.exec(parts[i]);
+      if (!m) { am.className = 'msg bad'; am.textContent = '"' + parts[i] + '" is not understood. Use who (u, g, o, a), then +, - or =, then r, w, x, X, s or t. Example: g+w,o-rwx (a number such as 755 also works).'; return; }
+      var who = (m[1] || 'a').replace('a', 'ugo'), ops = m[2].match(/[-+=][rwxXst]*/g);
+      ops.forEach(function (o) {
+        var op = o[0], what = o.slice(1), bits = 0, sp = 0;
+        var anyX = (N.u | N.g | N.o) & 1 || $('ftype').value === 'd';
+        if (what.indexOf('r') >= 0) bits |= 4; if (what.indexOf('w') >= 0) bits |= 2; if (what.indexOf('x') >= 0 || (what.indexOf('X') >= 0 && anyX)) bits |= 1;
+        ['u', 'g', 'o'].forEach(function (w) {
+          if (who.indexOf(w) < 0) return;
+          if (op === '+') N[w] |= bits; else if (op === '-') N[w] &= ~bits; else N[w] = bits;
+          var sb = w === 'u' ? 4 : w === 'g' ? 2 : 0;
+          if (what.indexOf('s') >= 0 && sb) sp |= sb;
+          if (op === '=' && sb) N.s &= ~sb;
+        });
+        if (what.indexOf('t') >= 0) sp |= 1;
+        if (op === '=' && who.indexOf('o') >= 0 && what.indexOf('t') < 0 && m[1].indexOf('o') >= 0) N.s &= ~1;
+        if (op === '-') N.s &= ~sp; else N.s |= sp;
       });
-      if (what.indexOf('t') >= 0) sp |= 1;
-      if (op === '=' && who.indexOf('o') >= 0 && what.indexOf('t') < 0 && m[1].indexOf('o') >= 0) N.s &= ~1;
-      if (op === '-') N.s &= ~sp; else N.s |= sp;
     }
     var before = octal();
-    P = N; show();
+    P = N; show('apply');
     am.className = 'msg ok'; am.textContent = 'Applied: ' + before + ' → ' + octal() + '.';
   }
   $('applyBtn').addEventListener('click', applyExpr);
