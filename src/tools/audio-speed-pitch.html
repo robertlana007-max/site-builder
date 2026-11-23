@@ -1,0 +1,344 @@
+<style>
+.sp-name { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.sp-name b { color: var(--ink); }
+.sp-ctl { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 0 0 14px; }
+.sp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin: 0 0 4px; }
+.sp-head label { margin: 0; }
+.sp-head output { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.sp-ctl input[type=range] { width: 100%; accent-color: var(--accent); height: 32px; }
+.sp-presets { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 0; }
+.sp-presets button { font: inherit; font-size: 14px; padding: 5px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; }
+.sp-presets button:hover { border-color: var(--accent); }
+.sp-ctl.off { opacity: .55; }
+.sp-hint { font-size: 14px; color: var(--muted); margin: 4px 0 0; }
+.sp-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.sp-row .btn { flex: 1 1 160px; }
+.sp-audio { display: block; width: 100%; margin: 0 0 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a song or audio file here</b>MP3, M4A, WAV, OGG, FLAC, or a video to take the sound from. Nothing is uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.mov,.webm,.mkv" hidden data-nomemo>
+<p class="sp-name" id="info"></p>
+<div id="work" hidden>
+  <div class="sp-ctl">
+    <div class="sp-head"><label for="speedR">Speed</label><output id="speedOut">1×</output></div>
+    <input type="range" id="speedR" min="-200" max="200" step="1" value="0" aria-label="Speed, from 0.25 times to 4 times">
+    <div class="sp-presets" id="speedPresets"></div>
+    <div class="fields" style="margin-top:10px"><div><label for="speed">Exact speed (0.25 to 4)</label><input type="number" id="speed" min="0.25" max="4" step="0.01" value="1" inputmode="decimal"></div></div>
+  </div>
+  <div class="sp-ctl" id="pitchBox">
+    <div class="sp-head"><label for="pitchR">Pitch</label><output id="pitchOut">0 semitones</output></div>
+    <input type="range" id="pitchR" min="-12" max="12" step="1" value="0" aria-label="Pitch in semitones, from minus 12 to plus 12">
+    <div class="sp-presets" id="pitchPresets"></div>
+    <div class="fields" style="margin-top:10px"><div><label for="semis">Exact pitch change (semitones, −12 to 12)</label><input type="number" id="semis" min="-12" max="12" step="0.1" value="0" inputmode="decimal"></div></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="vinyl"> Change the pitch together with the speed (like a record player, "nightcore" or "slowed")</label></div>
+  <div class="stats">
+    <div class="stat"><span>Original length</span><b id="oldLen">–</b></div>
+    <div class="stat"><span>New length</span><b id="newLen">–</b></div>
+    <div class="stat"><span>Pitch</span><b id="pitchStat">–</b></div>
+  </div>
+  <div class="fields">
+    <div><label for="from">Preview from (min:sec)</label><input type="text" id="from" value="0:00" inputmode="decimal" autocomplete="off" data-nomemo></div>
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp3">MP3 (plays everywhere)</option><option value="wav">WAV (best quality, big file)</option></select></div>
+    <div id="kbpsBox"><label for="kbps">MP3 quality</label><select id="kbps"><option value="128">128 kbps (small)</option><option value="192" selected>192 kbps (very good)</option><option value="320">320 kbps (best)</option></select></div>
+  </div>
+  <div class="sp-row">
+    <button class="btn ghost" type="button" id="hear">▶ Preview 15 seconds</button>
+  </div>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Change and save</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<audio class="sp-audio" id="result" controls hidden></audio>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+(function () {
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  // ---------- speed and pitch (WSOLA time stretching + band-limited resampling) ----------
+  // stretch: make the sound `factor` times longer without changing its pitch. chs: array of Float32Array (all channels
+  // use the same splice points, so stereo stays stereo). prog(p) reports 0..1.
+  function dspStretch(chs, factor, sr, prog) {
+    var n = chs[0].length, N = Math.round(sr * 0.046) & ~1, Hs = N / 2, Ha = Hs / factor, D = Math.round(sr * 0.014);
+    var outLen = Math.ceil(n * factor), out = chs.map(function () { return new Float32Array(outLen + N); });
+    var win = new Float32Array(N), i, c;
+    for (i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N); // periodic Hann: halves add up to exactly 1
+    // a mono guide signal, decimated by 4 for the coarse search
+    var q = 4, gl = Math.ceil(n / q) + 1, g = new Float32Array(gl);
+    for (i = 0; i < n; i++) { var s = 0; for (c = 0; c < chs.length; c++) s += chs[c][i]; g[(i / q) | 0] += s; }
+    var mono = chs[0];
+    if (chs.length > 1) { mono = new Float32Array(n); for (c = 0; c < chs.length; c++) for (i = 0; i < n; i++) mono[i] += chs[c][i]; }
+    var prev = 0, frames = Math.ceil(outLen / Hs) + 1, L = N / 2, Lq = (L / q) | 0;
+    for (var k = 0; k < frames; k++) {
+      var nominal = Math.round(k * Ha), pos = nominal;
+      if (k > 0) {
+        var want = prev + Hs; // where the previous frame would naturally continue
+        if (nominal - D < 0) pos = Math.max(0, nominal); else {
+          var lo = nominal - D, hi = nominal + D, best = -Infinity, bp = nominal, wq = (want / q) | 0;
+          for (var p = lo; p <= hi; p += q) { // coarse search on the decimated guide
+            var pq = (p / q) | 0, cc = 0, e = 1e-9;
+            for (var j = 0; j < Lq; j++) { var a = g[pq + j] || 0, b = g[wq + j] || 0; cc += a * b; e += a * a; }
+            cc /= Math.sqrt(e); if (cc > best) { best = cc; bp = p; }
+          }
+          best = -Infinity; var fineBest = bp;
+          for (p = bp - q + 1; p <= bp + q - 1; p++) { // fine search at full rate (every 2nd sample)
+            if (p < 0) continue;
+            var cc2 = 0, e2 = 1e-9;
+            var jm = Math.min(L, n - p, n - want);
+            for (j = 0; j < jm; j += 2) { var a2 = mono[p + j], b2 = mono[want + j]; cc2 += a2 * b2; e2 += a2 * a2; }
+            cc2 /= Math.sqrt(e2); if (cc2 > best) { best = cc2; fineBest = p; }
+          }
+          pos = fineBest;
+        }
+      }
+      var o = k * Hs;
+      if (o >= outLen + N) break;
+      for (c = 0; c < chs.length; c++) {
+        var src = chs[c], dst = out[c];
+        for (j = 0; j < N; j++) { var si = pos + j; if (si < n && o + j < dst.length) dst[o + j] += src[si] * win[j]; }
+      }
+      prev = pos;
+      if (prog && (k & 255) === 0) prog(k / frames);
+    }
+    return out.map(function (d) { return d.subarray(0, outLen); });
+  }
+  // resample: read the sound `ratio` times faster (ratio 2 = half as long and an octave higher), with a windowed-sinc filter.
+  function dspResample(x, ratio, prog) {
+    var n = Math.max(1, Math.floor(x.length / ratio)), y = new Float32Array(n), fc = Math.min(1, 1 / ratio), A = 8, half = Math.ceil(A / fc), R = 256;
+    var tab = new Float32Array(A * R + 2); // the Lanczos kernel, looked up instead of computed for every tap
+    for (var k = 0; k < tab.length; k++) { var d0 = k / R; tab[k] = d0 === 0 ? 1 : d0 >= A ? 0 : Math.sin(Math.PI * d0) / (Math.PI * d0) * Math.sin(Math.PI * d0 / A) / (Math.PI * d0 / A); }
+    var last = x.length - 1;
+    for (var i = 0; i < n; i++) {
+      var t = i * ratio, c = Math.floor(t), s = 0, ws = 0, j0 = c - half + 1, j1 = c + half;
+      for (var j = j0; j <= j1; j++) {
+        var d = (t - j) * fc; if (d < 0) d = -d;
+        if (d >= A) continue;
+        var f = d * R, fi = f | 0, w = tab[fi] + (tab[fi + 1] - tab[fi]) * (f - fi);
+        ws += w; if (j >= 0 && j <= last) s += x[j] * w;
+      }
+      y[i] = ws ? s / ws : 0;
+      if (prog && (i & 65535) === 0) prog(i / n);
+    }
+    return y;
+  }
+  // speed: 2 = twice as fast; semis: pitch change in semitones; vinyl: change both together like a record player.
+  function dspSpeedPitch(chs, sr, speed, semis, vinyl, prog) {
+    prog = prog || function () {};
+    var p = Math.pow(2, semis / 12);
+    if (vinyl) { var r = speed; return chs.map(function (c, k) { return dspResample(c, r, function (v) { prog((k + v) / chs.length); }); }); }
+    if (Math.abs(p - 1) < 1e-4 && Math.abs(speed - 1) < 1e-4) return chs.map(function (c) { return c.slice(); });
+    var f = p / speed, st = Math.abs(f - 1) < 1e-4 ? chs.map(function (c) { return c.slice(); }) : dspStretch(chs, f, sr, function (v) { prog(v * (Math.abs(p - 1) < 1e-4 ? 1 : 0.7)); });
+    if (Math.abs(p - 1) < 1e-4) return st;
+    return st.map(function (c, k) { return dspResample(c, p, function (v) { prog(0.7 + 0.3 * (k + v) / st.length); }); });
+  }
+  // Run dspSpeedPitch in a background worker (falls back to the page). Resolves with an array of Float32Array.
+  function dspRun(chs, sr, speed, semis, vinyl, prog) {
+    return new Promise(function (resolve, reject) {
+      function inPage() { setTimeout(function () { try { resolve(dspSpeedPitch(chs, sr, speed, semis, vinyl, prog)); } catch (e) { reject(e); } }, 20); }
+      var w, url;
+      try {
+        url = URL.createObjectURL(new Blob(['(function(){' + dspStretch.toString() + dspResample.toString() + dspSpeedPitch.toString() +
+          'onmessage=function(e){var d=e.data,t=0;var r=dspSpeedPitch(d.chs,d.sr,d.speed,d.semis,d.vinyl,function(p){var n=Date.now();if(n-t>150){t=n;postMessage({p:p});}});postMessage({out:r},r.map(function(c){return c.buffer;}));close();};})();'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.out) { URL.revokeObjectURL(url); resolve(e.data.out); } else if (prog) prog(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      w.postMessage({ chs: chs.map(function (c) { return c.slice(); }), sr: sr, speed: speed, semis: semis, vinyl: vinyl });
+    });
+  }
+  var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var file = null, buf = null, busy = false, ticket = 0, actx = null, src = null, dlUrl = null;
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (x < 10 ? '0' : '') + x.toFixed(1);
+  }
+  function parse(t) {
+    t = String(t).trim().replace(',', '.');
+    if (!/^\d+(\.\d+)?$|^\d+:\d{1,2}(\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(\.\d+)?$/.test(t)) return NaN;
+    return t.split(':').reduce(function (a, x) { return a * 60 + parseFloat(x); }, 0);
+  }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(p * 100) + '%'; }
+
+  // ---------- controls ----------
+  function speed() { var v = parseFloat(String($('speed').value).replace(',', '.')); return isFinite(v) ? Math.max(0.25, Math.min(4, v)) : 1; }
+  function semis() { if ($('vinyl').checked) return 12 * Math.log2(speed()); var v = parseFloat(String($('semis').value).replace(',', '.')); return isFinite(v) ? Math.max(-12, Math.min(12, v)) : 0; }
+  function fmtSemis(v) { v = Math.round(v * 10) / 10; return (v > 0 ? '+' : v < 0 ? '−' : '') + fmtNum(Math.abs(v), Math.abs(v) % 1 ? 1 : 0) + (Math.abs(v) === 1 ? ' semitone' : ' semitones'); }
+  function setSpeed(v, from) {
+    v = Math.max(0.25, Math.min(4, v));
+    if (from !== 'box') $('speed').value = Math.round(v * 100) / 100;
+    if (from !== 'slider') $('speedR').value = Math.round(Math.log2(v) * 100);
+    refresh();
+  }
+  function setSemis(v, from) {
+    v = Math.max(-12, Math.min(12, v));
+    if (from !== 'box') $('semis').value = Math.round(v * 10) / 10;
+    if (from !== 'slider') $('pitchR').value = Math.round(v);
+    refresh();
+  }
+  [0.5, 0.75, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 2].forEach(function (v) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = v + '×'; b.addEventListener('click', function () { setSpeed(v); }); $('speedPresets').appendChild(b);
+  });
+  [[-12, '−1 octave'], [-2, '−2'], [-1, '−1'], [0, 'Original'], [1, '+1'], [2, '+2'], [12, '+1 octave']].forEach(function (q) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = q[1]; b.addEventListener('click', function () { setSemis(q[0]); }); $('pitchPresets').appendChild(b);
+  });
+  $('speedR').addEventListener('input', function () { setSpeed(Math.round(Math.pow(2, $('speedR').value / 100) * 100) / 100, 'slider'); });
+  $('speed').addEventListener('input', function () { var v = parseFloat(String($('speed').value).replace(',', '.')); if (v >= 0.25 && v <= 4) setSpeed(v, 'box'); });
+  $('speed').addEventListener('change', function () { setSpeed(speed()); });
+  $('pitchR').addEventListener('input', function () { setSemis(+$('pitchR').value, 'slider'); });
+  $('semis').addEventListener('input', function () { var v = parseFloat(String($('semis').value).replace(',', '.')); if (v >= -12 && v <= 12) setSemis(v, 'box'); });
+  $('semis').addEventListener('change', function () { setSemis(semis()); });
+  $('vinyl').addEventListener('change', refresh);
+  ['fmt', 'kbps'].forEach(function (id) { $(id).addEventListener('change', refresh); });
+  function refresh() {
+    stopHear(); $('dl').hidden = true;
+    var v = $('vinyl').checked, s = speed();
+    $('speedOut').textContent = fmtNum(s, 2) + '×';
+    $('pitchBox').classList.toggle('off', v);
+    ['pitchR', 'semis'].forEach(function (id) { $(id).disabled = v; });
+    Array.prototype.forEach.call($('pitchPresets').children, function (b) { b.disabled = v; });
+    $('pitchOut').textContent = fmtSemis(semis());
+    $('pitchStat').textContent = fmtSemis(semis());
+    $('kbpsBox').hidden = $('fmt').value !== 'mp3';
+    $('go').textContent = 'Change and save ' + $('fmt').value.toUpperCase();
+    if (buf) { $('oldLen').textContent = clock(buf.duration); $('newLen').textContent = clock(buf.duration / s); }
+  }
+
+  // ---------- open ----------
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { say('bad', 'Please wait until the current file is finished.'); return; }
+    stopHear(); buf = null; file = f; $('work').hidden = true; $('go').disabled = true; $('dl').hidden = true; $('result').hidden = true; $('info').textContent = '';
+    if (!/^(audio|video)\//.test(f.type) && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm|mkv|3gp|aif|aiff)$/i.test(f.name)) return say('bad', '"' + f.name + '" is not an audio file. Choose a song or sound file such as MP3, M4A or WAV.');
+    if (!f.size) return say('bad', '"' + f.name + '" is empty.');
+    if (f.size > 1024 * 1048576) return say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 1 GB are too big to change in a browser.');
+    if (!OAC) return say('bad', 'This browser is too old to change audio. Try a current Chrome, Edge, Firefox or Safari.');
+    var mine = ++ticket; busy = true; say('', 'Reading "' + f.name + '"…');
+    f.arrayBuffer().then(function (data) {
+      return new Promise(function (res, rej) { var p = new OAC(2, 1, 44100).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+    }).then(function (b) {
+      busy = false; if (mine !== ticket) return;
+      if (!(b.duration > 0.2)) throw new Error('short');
+      buf = b;
+      var el = $('info'); el.textContent = ''; var nb = document.createElement('b'); nb.textContent = f.name; el.appendChild(nb);
+      el.appendChild(document.createTextNode(' · ' + fmtBytes(f.size) + ' · ' + clock(b.duration) + (b.numberOfChannels > 1 ? ' · stereo' : ' · mono')));
+      $('work').hidden = false; $('go').disabled = false; $('from').value = '0:00';
+      refresh();
+      say('', b.duration > 1200 ? 'This is a long file. Saving can take a few minutes and needs a lot of memory on a phone.' : 'Choose the speed and pitch, press Preview to listen, then save.');
+    }).catch(function (e) {
+      busy = false; if (mine !== ticket) return;
+      if (e && e.message === 'short') return say('bad', 'This file is too short (under 0.2 seconds of sound).');
+      if (e instanceof RangeError || e && e.name === 'NotReadableError') return say('bad', 'Your device ran out of memory reading this file. Try a shorter file.');
+      say('bad', 'The sound in "' + f.name + '" could not be read. The file may be damaged, have no sound, or use a format this browser cannot decode. Try an MP3 or WAV.');
+    });
+  });
+  function channels(a, b) { var out = []; for (var c = 0; c < Math.min(2, buf.numberOfChannels); c++) out.push(buf.getChannelData(c).subarray(a, b)); return out; }
+
+  // ---------- preview ----------
+  function stopHear() { if (src) { try { src.onended = null; src.stop(); } catch (e) {} src = null; } $('hear').textContent = '▶ Preview 15 seconds'; }
+  $('hear').addEventListener('click', function () {
+    if (!buf || busy) return;
+    if (src) return stopHear();
+    if (!AC) return say('bad', 'This browser cannot play sound here. You can still save the file.');
+    var at = parse($('from').value);
+    if (isNaN(at)) return say('bad', 'Write the preview start like 1:05 or 65.');
+    if (at >= buf.duration) return say('bad', 'The preview start is after the end of the file (' + clock(buf.duration) + ').');
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    var s = speed(), len = Math.min(buf.duration - at, 15 * s), a = Math.floor(at * buf.sampleRate), b = Math.floor((at + len) * buf.sampleRate);
+    busy = true; $('hear').disabled = true; say('', 'Preparing the preview…');
+    dspRun(channels(a, b), buf.sampleRate, s, semis(), $('vinyl').checked).then(function (chs) {
+      busy = false; $('hear').disabled = false;
+      var ab = actx.createBuffer(chs.length, chs[0].length, buf.sampleRate);
+      chs.forEach(function (c, k) { ab.getChannelData(k).set(c); });
+      src = actx.createBufferSource(); src.buffer = ab; src.connect(actx.destination); src.start();
+      src.onended = function () { src = null; stopHear(); };
+      $('hear').textContent = '■ Stop preview'; say('', 'Playing the preview.');
+    }, function () { busy = false; $('hear').disabled = false; say('bad', 'The preview could not be made. Your device may be low on memory.'); });
+  });
+
+  // ---------- save ----------
+  $('go').addEventListener('click', function () {
+    if (!buf || busy) return;
+    stopHear();
+    var s = speed(), st = semis(), vin = $('vinyl').checked, fmt = $('fmt').value, kbps = +$('kbps').value, f = file, t0 = Date.now();
+    busy = true; $('go').disabled = true; $('dl').hidden = true; $('result').hidden = true; bar(0);
+    say('', 'Changing speed and pitch… 0%');
+    dspRun(channels(0, buf.length), buf.sampleRate, s, st, vin, function (p) { bar(p * 0.7); say('', 'Changing speed and pitch… ' + Math.round(p * 100) + '%'); }).then(function (chs) {
+      var peak = 0; chs.forEach(function (c) { for (var i = 0; i < c.length; i++) { var v = c[i] < 0 ? -c[i] : c[i]; if (v > peak) peak = v; } });
+      if (peak > 0.999) chs.forEach(function (c) { for (var i = 0; i < c.length; i++) c[i] *= 0.999 / peak; }); // no clipping
+      if (fmt === 'wav') return wavBlob(chs, buf.sampleRate);
+      say('', 'Saving as MP3…');
+      return encodeMp3(chs, buf.sampleRate, kbps, function (p) { bar(0.7 + p * 0.3); say('', 'Saving as MP3… ' + Math.round(p * 100) + '%'); });
+    }).then(function (blob) {
+      if (dlUrl) URL.revokeObjectURL(dlUrl);
+      dlUrl = URL.createObjectURL(blob);
+      var tag = (vin ? '' : '') + (Math.abs(s - 1) > 1e-3 ? '-' + (Math.round(s * 100) / 100) + 'x' : '') + (!vin && Math.abs(st) > 1e-3 ? '-' + (st > 0 ? 'up' : 'down') + Math.abs(Math.round(st * 10) / 10) : '');
+      $('dl').href = dlUrl; $('dl').download = f.name.replace(/\.[^.]+$/, '') + (tag || '-copy') + '.' + fmt; $('dl').hidden = false;
+      $('dl').textContent = 'Download ' + fmt.toUpperCase();
+      $('result').src = dlUrl; $('result').hidden = false; bar(1);
+      say('ok', 'Done: ' + clock(buf.duration / s) + ' long, ' + fmtBytes(blob.size) + ' · took ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s.');
+    }).catch(function (e) {
+      bar(null);
+      say('bad', e instanceof RangeError ? 'Your device ran out of memory. Try a shorter file or WAV.' : 'Something went wrong while saving. Please try again.');
+    }).then(function () { busy = false; $('go').disabled = !buf; });
+  });
+  refresh();
+})();
+</script>

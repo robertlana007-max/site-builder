@@ -1,0 +1,276 @@
+<style>
+.ht-warn { border: 1px solid #f59e0b; background: color-mix(in srgb, #f59e0b 12%, var(--surface)); color: var(--ink); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 0 0 16px; }
+.ht-step { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin: 0 0 14px; }
+.ht-step h3 { margin: 0 0 6px; font-size: 17px; }
+.ht-step p { margin: 0 0 10px; font-size: 15px; color: var(--muted); }
+.ht-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.ht-row .btn { flex: 1 1 140px; }
+.ht-stage { text-align: center; border: 1px solid var(--line); border-radius: 14px; padding: 18px 12px; margin: 0 0 14px; background: var(--bg); }
+.ht-ear { font-size: 15px; font-weight: 700; color: var(--muted); }
+.ht-freq { font-size: clamp(34px, 10vw, 52px); font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; margin: 4px 0; }
+.ht-dot { width: 22px; height: 22px; border-radius: 50%; margin: 8px auto; background: var(--line); }
+.ht-dot.on { background: var(--accent); }
+.ht-heard { width: 100%; min-height: 96px; font-size: 22px; margin: 6px 0 0; touch-action: manipulation; }
+.ht-prog { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 12px 0 0; }
+.ht-prog i { display: block; height: 100%; width: 0; background: var(--accent); }
+.ht-chart { display: block; width: 100%; height: 280px; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); margin: 0 0 8px; }
+.ht-legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+.ht-legend b { font-weight: 700; }
+.ht-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 0 0 12px; font-variant-numeric: tabular-nums; }
+.ht-table th, .ht-table td { white-space: nowrap; padding: 6px; border-bottom: 1px solid var(--line); text-align: center; }
+.ht-table th:first-child, .ht-table td:first-child { text-align: start; }
+.ht-sum { font-size: 15px; margin: 0 0 12px; }
+</style>
+<p class="ht-warn"><b>This is not a medical hearing test.</b> It is a rough self-check that depends on your headphones, your device volume and the room. It cannot measure hearing loss in decibels the way an audiologist can. If you notice hearing changes, ringing in your ears, pain or dizziness, please see a doctor or a hearing professional.</p>
+<div id="setup">
+  <div class="ht-step">
+    <h3>1. Put on headphones and find a quiet room</h3>
+    <p>Wired or wireless headphones work best. Turn off music, fans and noise cancelling "transparency" modes. Check that left and right are the right way round:</p>
+    <div class="ht-row"><button class="btn ghost" type="button" id="leftChk">Play in LEFT ear</button><button class="btn ghost" type="button" id="rightChk">Play in RIGHT ear</button></div>
+  </div>
+  <div class="ht-step">
+    <h3>2. Set the volume</h3>
+    <p>Turn your device volume down, press the button, then raise the volume slowly until this tone is clearly heard but comfortable, like a quiet conversation. Do not change the volume after this.</p>
+    <div class="ht-row"><button class="btn ghost" type="button" id="refBtn">Play the reference tone</button></div>
+  </div>
+  <div class="ht-step">
+    <h3>3. Choose a test</h3>
+    <div class="fields">
+      <div><label for="kind">Test</label><select id="kind"><option value="full">Full check: 7 pitches, 250 Hz to 8 kHz (about 6 minutes)</option><option value="quick">Quick check: 4 pitches, 500 Hz to 4 kHz (about 3 minutes)</option><option value="range">Highest pitch I can hear (about 1 minute)</option></select></div>
+      <div id="earsBox"><label for="ears">Ears</label><select id="ears"><option value="both">Both ears, one at a time</option><option value="right">Right ear only</option><option value="left">Left ear only</option></select></div>
+    </div>
+    <p id="howTo">You will hear short beeps that get quieter. Press <b>I hear it</b> (or the space bar) every time you hear beeps, even very faint ones. If you hear nothing, do nothing.</p>
+    <div class="btns"><button class="btn" type="button" id="begin">Start the test</button></div>
+  </div>
+</div>
+<div id="run" hidden>
+  <div class="ht-stage" aria-live="polite">
+    <div class="ht-ear" id="earLbl"></div>
+    <div class="ht-freq" id="freqLbl"></div>
+    <div class="ht-dot" id="dot" aria-hidden="true"></div>
+    <button class="btn ht-heard" type="button" id="heard">I hear it</button>
+    <div class="ht-prog" aria-hidden="true"><i id="prog"></i></div>
+  </div>
+  <div class="btns"><button class="btn ghost" type="button" id="quit">Stop the test</button></div>
+</div>
+<p class="msg" id="msg"></p>
+<div id="results" hidden>
+  <h3 style="margin:6px 0 8px">Your results</h3>
+  <p class="ht-sum" id="sum"></p>
+  <canvas class="ht-chart" id="chart" role="img" aria-label="Chart of the quietest beeps you heard at each pitch"></canvas>
+  <div class="ht-legend" id="legend"><span><b style="color:#dc2626">O</b> Right ear</span><span><b style="color:#2563eb">X</b> Left ear</span><span>Higher on the chart means you heard quieter beeps.</span></div>
+  <div class="scroll-x"><table class="ht-table" id="table"></table></div>
+  <div class="btns"><button class="btn ghost" type="button" id="copy">Copy results</button><button class="btn ghost" type="button" id="again">Test again</button></div>
+</div>
+<script>
+(function () {
+  var AC = window.AudioContext || window.webkitAudioContext, actx = null, out = null;
+  var REF = 0.1; // the reference tone plays at -20 dBFS; test levels are in dB relative to it
+  var MIN = -70, MAX = 14;
+  var running = false, timer = 0, raf = 0, heardNow = false, inWindow = false, trial = null, plan = [], idx = 0, results = {}, falseHits = 0, catchTrials = 0, rangeRes = [], gen = 0;
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
+  if (!AC) { say('bad', 'This browser cannot play test tones. Please update it, or try Chrome, Edge, Firefox or Safari.'); ['leftChk', 'rightChk', 'refBtn', 'begin'].forEach(function (id) { $(id).disabled = true; }); }
+  function ctx() { if (!actx) { actx = new AC(); out = actx.createChannelMerger(2); out.connect(actx.destination); } if (actx.resume) actx.resume(); return actx; }
+  function fname(f) { return f >= 1000 ? fmtNum(f / 1000, f % 1000 ? 1 : 0) + ' kHz' : f + ' Hz'; }
+  // Play a tone to one ear (or both) with soft edges. Returns the stop time.
+  function tone(f, ear, gain, at, len) {
+    var c = ctx(), o = c.createOscillator(), g = c.createGain();
+    o.frequency.value = f; o.connect(g);
+    if (ear !== 'right') g.connect(out, 0, 0);
+    if (ear !== 'left') g.connect(out, 0, 1);
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(gain, at + 0.02); g.gain.setValueAtTime(gain, at + len - 0.02); g.gain.linearRampToValueAtTime(0, at + len);
+    o.start(at); o.stop(at + len + 0.02);
+    return o;
+  }
+  $('leftChk').addEventListener('click', function () { var c = ctx(); tone(1000, 'left', REF, c.currentTime + 0.05, 1); say('', 'You should hear a tone only in your LEFT ear. If it is on the right, turn your headphones around.'); });
+  $('rightChk').addEventListener('click', function () { var c = ctx(); tone(1000, 'right', REF, c.currentTime + 0.05, 1); say('', 'You should hear a tone only in your RIGHT ear. If it is on the left, turn your headphones around.'); });
+  $('refBtn').addEventListener('click', function () { var c = ctx(); tone(1000, 'both', REF, c.currentTime + 0.05, 2.5); say('', 'Playing the reference tone for 2.5 seconds. Adjust your device volume until it is clear but comfortable.'); });
+  function showKind() {
+    var r = $('kind').value === 'range';
+    $('earsBox').hidden = r;
+    $('howTo').innerHTML = r ? 'A steady tone starts high and slowly rises in pitch. Press <b>I can\'t hear it</b> (or the space bar) the moment it fades away. It runs twice and uses the average.' : 'You will hear short beeps that get quieter. Press <b>I hear it</b> (or the space bar) every time you hear beeps, even very faint ones. If you hear nothing, do nothing.';
+  }
+  $('kind').addEventListener('change', showKind);
+
+  // ---------- threshold test: down 10 dB after each "heard", up 5 dB after each miss ----------
+  function makePlan() {
+    var fr = $('kind').value === 'quick' ? [1000, 2000, 4000, 500] : [1000, 2000, 4000, 6000, 8000, 500, 250], ears = $('ears').value === 'both' ? ['right', 'left'] : [$('ears').value];
+    var p = []; ears.forEach(function (e) { fr.forEach(function (f) { p.push({ ear: e, f: f }); }); });
+    return p;
+  }
+  function begin() {
+    if (!AC) return;
+    ctx(); gen++; running = true; results = {}; falseHits = 0; catchTrials = 0; rangeRes = [];
+    $('setup').hidden = true; $('results').hidden = true; $('run').hidden = false; say('', '');
+    if ($('kind').value === 'range') { $('heard').textContent = "I can't hear it"; rangeRun(0); return; }
+    $('heard').textContent = 'I hear it';
+    plan = makePlan(); idx = 0; nextFreq();
+  }
+  function nextFreq() {
+    if (!running) return;
+    if (idx >= plan.length) return finish();
+    var it = plan[idx];
+    trial = { ear: it.ear, f: it.f, level: -20, phase: 'down', heardAsc: [], count: 0 };
+    $('earLbl').textContent = (it.ear === 'left' ? 'Left ear' : 'Right ear') + ' · pitch ' + (idx + 1) + ' of ' + plan.length;
+    $('freqLbl').textContent = fname(it.f);
+    $('prog').style.width = (idx / plan.length * 100) + '%';
+    schedule(1200);
+  }
+  function schedule(wait) { var my = gen; clearTimeout(timer); timer = setTimeout(function () { if (my === gen) present(); }, wait); }
+  function present() {
+    if (!running) return;
+    var c = ctx(), silent = trial.count > 1 && Math.random() < 0.12; // now and then a silent check, to spot guessing
+    heardNow = false; inWindow = true;
+    var at = c.currentTime + 0.05, gain = REF * Math.pow(10, trial.level / 20);
+    if (!silent) for (var k = 0; k < 3; k++) tone(trial.f, trial.ear, gain, at + k * 0.45, 0.25);
+    else catchTrials++;
+    var t0 = performance.now(), my = gen;
+    (function blink() { if (my !== gen || !inWindow) { $('dot').classList.remove('on'); return; } var t = (performance.now() - t0) / 1000; $('dot').classList.toggle('on', t < 1.3 && (t % 0.45) < 0.25); raf = requestAnimationFrame(blink); })();
+    clearTimeout(timer);
+    timer = setTimeout(function () { if (my !== gen) return; inWindow = false; respond(silent); }, 2900);
+  }
+  function heardPress() {
+    if (!running) return;
+    if ($('kind').value === 'range') return rangeStop();
+    if (!inWindow) return;
+    heardNow = true;
+  }
+  function respond(silent) {
+    if (silent) { if (heardNow) falseHits++; return schedule(600 + Math.random() * 900); }
+    trial.count++;
+    var t = trial;
+    if (heardNow) {
+      if (t.level <= MIN) return done(MIN); // heard even the quietest beep
+      if (t.phase === 'up') {
+        t.heardAsc.push(t.level);
+        var same = t.heardAsc.filter(function (v) { return v === t.level; }).length;
+        if (same >= 2) return done(t.level); // heard at the same level twice while getting louder
+        if (t.heardAsc.length >= 4) return done(Math.max.apply(null, t.heardAsc.slice(-2)));
+      }
+      t.level = Math.max(MIN, t.level - 10); t.phase = 'down';
+    } else {
+      if (t.level >= MAX) return done(null); // not heard even at the loudest level
+      if (t.count >= 18) return done(t.heardAsc.length ? Math.max.apply(null, t.heardAsc) : null);
+      t.level = Math.min(MAX, t.level + 5); t.phase = 'up';
+    }
+    schedule(700 + Math.random() * 1100);
+  }
+  function done(level) {
+    var it = plan[idx]; (results[it.ear] = results[it.ear] || {})[it.f] = level;
+    idx++; nextFreq();
+  }
+
+  // ---------- highest pitch: a rising tone, press when it disappears ----------
+  var sweep = null;
+  function rangeRun(n) {
+    var c = ctx(), o = c.createOscillator(), g = c.createGain(), at = c.currentTime + 0.1, len = 28, from = 8000, to = 22000;
+    $('earLbl').textContent = 'Both ears · run ' + (n + 1) + ' of 2'; $('freqLbl').textContent = fname(from);
+    o.frequency.setValueAtTime(from, at); o.frequency.exponentialRampToValueAtTime(Math.min(to, c.sampleRate / 2 - 100), at + len);
+    o.connect(g); g.connect(out, 0, 0); g.connect(out, 0, 1);
+    g.gain.setValueAtTime(0, at); g.gain.linearRampToValueAtTime(REF, at + 0.05);
+    o.start(at); o.stop(at + len);
+    sweep = { o: o, g: g, at: at, len: len, from: from, to: Math.min(to, c.sampleRate / 2 - 100), n: n };
+    o.onended = function () { if (sweep && sweep.o === o) rangeStop(true); };
+    var my = gen;
+    (function tick() {
+      if (my !== gen || !sweep || sweep.o !== o) return;
+      var p = Math.max(0, Math.min(1, (c.currentTime - at) / len));
+      $('freqLbl').textContent = fname(Math.round(from * Math.pow(sweep.to / from, p) / 100) * 100);
+      $('prog').style.width = ((n + p) / 2 * 100) + '%';
+      $('dot').classList.add('on');
+      raf = requestAnimationFrame(tick);
+    })();
+  }
+  function rangeStop(ended) {
+    if (!sweep) return;
+    var c = actx, s = sweep, p = Math.max(0, Math.min(1, (c.currentTime - s.at) / s.len)), f = s.from * Math.pow(s.to / s.from, p);
+    sweep = null;
+    try { s.g.gain.cancelScheduledValues(c.currentTime); s.g.gain.setValueAtTime(s.g.gain.value, c.currentTime); s.g.gain.linearRampToValueAtTime(0, c.currentTime + 0.03); s.o.stop(c.currentTime + 0.05); } catch (e) {}
+    $('dot').classList.remove('on');
+    if (p < 0.01 && !ended) { say('bad', 'You pressed right at the start. If you cannot hear 8 kHz at all, your highest pitch is below 8 kHz; try the Full check instead.'); rangeRes.push(8000); }
+    else rangeRes.push(Math.round(f));
+    var my = gen;
+    if (s.n === 0) { clearTimeout(timer); timer = setTimeout(function () { if (my === gen) rangeRun(1); }, 1500); }
+    else finish();
+  }
+
+  // ---------- results ----------
+  function stopAll() { gen++; running = false; inWindow = false; clearTimeout(timer); cancelAnimationFrame(raf); if (sweep) { try { sweep.o.stop(); } catch (e) {} sweep = null; } $('dot').classList.remove('on'); }
+  function finish() {
+    stopAll(); $('prog').style.width = '100%';
+    $('run').hidden = true; $('setup').hidden = false; $('results').hidden = false;
+    var range = $('kind').value === 'range';
+    $('chart').hidden = range; $('legend').hidden = range;
+    if (range) {
+      var avg = Math.round(rangeRes.reduce(function (a, b) { return a + b; }, 0) / rangeRes.length / 100) * 100;
+      var age = avg >= 17000 ? 'typical for people under about 25' : avg >= 15000 ? 'typical for people aged about 25 to 40' : avg >= 12000 ? 'typical for people aged about 40 to 55' : avg >= 10000 ? 'typical for people aged about 55 to 65' : 'common for people over 65, or the headphones may not play high pitches well';
+      $('sum').textContent = 'The highest pitch you heard was about ' + fname(avg) + ' (runs: ' + rangeRes.map(fname).join(' and ') + '). That is ' + age + '. Many headphones and speakers cannot play sounds above 16 to 18 kHz, so a low result can be caused by the equipment.';
+      $('table').innerHTML = '';
+      say('ok', 'Test finished.');
+      text = 'Highest pitch heard: about ' + fname(avg);
+      return;
+    }
+    var freqs = [], ears = Object.keys(results);
+    ears.forEach(function (e) { Object.keys(results[e]).forEach(function (f) { if (freqs.indexOf(+f) < 0) freqs.push(+f); }); });
+    freqs.sort(function (a, b) { return a - b; });
+    var tb = $('table'); tb.innerHTML = '';
+    var hr = document.createElement('tr'); ['Pitch'].concat(freqs.map(fname)).forEach(function (t) { var th = document.createElement('th'); th.textContent = t; hr.appendChild(th); }); tb.appendChild(hr);
+    var lines = [];
+    ['right', 'left'].forEach(function (e) {
+      if (!results[e]) return;
+      var tr = document.createElement('tr'), td = document.createElement('td'); td.textContent = e === 'right' ? 'Right ear' : 'Left ear'; tr.appendChild(td);
+      var parts = [];
+      freqs.forEach(function (f) { var v = results[e][f], c = document.createElement('td'); c.textContent = v == null ? 'not heard' : (v > 0 ? '+' : '') + v + ' dB'; tr.appendChild(c); parts.push(fname(f) + ': ' + c.textContent); });
+      tb.appendChild(tr); lines.push((e === 'right' ? 'Right ear' : 'Left ear') + ' - ' + parts.join(', '));
+    });
+    var notes = [];
+    if (results.left && results.right) {
+      var big = freqs.filter(function (f) { var a = results.left[f], b = results.right[f]; return (a == null) !== (b == null) || (a != null && b != null && Math.abs(a - b) >= 15); });
+      notes.push(big.length ? 'Your ears differ by 15 dB or more at ' + big.map(fname).join(', ') + '. A difference like this can be worth checking with a hearing professional, especially if it is new.' : 'Your two ears gave similar results.');
+    }
+    var miss = []; ears.forEach(function (e) { freqs.forEach(function (f) { if (results[e][f] === null) miss.push((e === 'left' ? 'left ' : 'right ') + fname(f)); }); });
+    if (miss.length) notes.push('You did not hear the loudest beeps at: ' + miss.join(', ') + '. Check that your headphones work at these pitches, and consider a professional hearing test.');
+    if (catchTrials && falseHits / catchTrials > 0.3) notes.push('You pressed "I hear it" several times when no beep was played, so these results are less reliable. Try again in a quieter place.');
+    $('sum').textContent = 'The numbers show the quietest beeps you heard, in dB compared with the reference tone (−40 dB means 40 dB quieter than the reference). Most people hear 1 to 4 kHz best and need louder beeps at low and very high pitches. ' + notes.join(' ');
+    text = 'Hearing self-check (not a medical test)\n' + lines.join('\n') + '\n' + notes.join(' ');
+    drawChart(freqs);
+    say('ok', 'Test finished.');
+  }
+  var text = '';
+  function css(v, fb) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb; }
+  function drawChart(freqs) {
+    var cv = $('chart'), d = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
+    cv.width = W; cv.height = H;
+    var g = cv.getContext('2d'), L = 44 * d, R = 14 * d, T = 14 * d, B = 30 * d, top = MAX, bot = MIN - 5;
+    var lf = Math.log(200), hf = Math.log(10000);
+    function X(f) { return L + (Math.log(f) - lf) / (hf - lf) * (W - L - R); }
+    // higher on the chart = quieter beeps heard = better
+    function Yb(v) { return T + (v - bot) / (top - bot) * (H - T - B); }
+    g.clearRect(0, 0, W, H); g.font = (11 * d) + 'px system-ui, sans-serif'; g.fillStyle = css('--muted', '#888'); g.strokeStyle = css('--line', '#ddd'); g.lineWidth = 1;
+    for (var v = 10; v >= MIN; v -= 20) { var y = Yb(v); g.beginPath(); g.moveTo(L, y); g.lineTo(W - R, y); g.stroke(); g.fillText((v > 0 ? '+' : '') + v, 4 * d, y + 4 * d); }
+    freqs.forEach(function (f) { var x = X(f); g.beginPath(); g.moveTo(x, T); g.lineTo(x, H - B); g.stroke(); var t = fname(f).replace(' ', ''); g.fillText(t, Math.min(W - R - g.measureText(t).width, Math.max(L, x - g.measureText(t).width / 2)), H - 10 * d); });
+    [['right', '#dc2626'], ['left', '#2563eb']].forEach(function (e) {
+      var res = results[e[0]]; if (!res) return;
+      g.strokeStyle = e[1]; g.fillStyle = e[1]; g.lineWidth = 2 * d; g.beginPath(); var first = true;
+      freqs.forEach(function (f) { var val = res[f]; if (val === undefined) return; var x = X(f), y = Yb(val == null ? MAX : val); if (first) g.moveTo(x, y); else g.lineTo(x, y); first = false; });
+      g.stroke();
+      freqs.forEach(function (f) {
+        var val = res[f]; if (val === undefined) return; var x = X(f), y = Yb(val == null ? MAX : val), s = 6 * d;
+        g.beginPath();
+        if (e[0] === 'right') { g.arc(x, y, s, 0, Math.PI * 2); } else { g.moveTo(x - s, y - s); g.lineTo(x + s, y + s); g.moveTo(x + s, y - s); g.lineTo(x - s, y + s); }
+        g.stroke();
+      });
+    });
+  }
+  $('begin').addEventListener('click', begin);
+  $('heard').addEventListener('pointerdown', function (e) { e.preventDefault(); heardPress(); });
+  $('heard').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); heardPress(); } });
+  document.addEventListener('keydown', function (e) { if (e.key === ' ' && running && !e.repeat) { e.preventDefault(); heardPress(); } });
+  $('quit').addEventListener('click', function () { stopAll(); $('run').hidden = true; $('setup').hidden = false; say('', 'Test stopped. Press Start the test to begin again.'); });
+  $('again').addEventListener('click', function () { $('results').hidden = true; begin(); });
+  $('copy').addEventListener('click', function () { if (text) copyText(text, $('copy')); });
+  window.addEventListener('resize', function () { if (!$('results').hidden && !$('chart').hidden) { var fr = []; Object.keys(results).forEach(function (e) { Object.keys(results[e]).forEach(function (f) { if (fr.indexOf(+f) < 0) fr.push(+f); }); }); fr.sort(function (a, b) { return a - b; }); drawChart(fr); } });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && running) { stopAll(); $('run').hidden = true; $('setup').hidden = false; say('bad', 'The test stopped because you left the page. Press Start the test to begin again.'); } });
+  showKind();
+})();
+</script>

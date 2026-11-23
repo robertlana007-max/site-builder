@@ -1,0 +1,505 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.tv-stage { position: relative; margin: 14px auto 6px; border-radius: 10px; overflow: hidden; background: #000; border: 1px solid var(--line); max-width: 100%; }
+.tv-stage video { display: block; width: 100%; height: 100%; }
+.tv-stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: move; }
+.tv-ctl { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; }
+.tv-ctl .btn { flex: none; padding: 8px 14px; }
+.tv-ctl input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.tv-ctl span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.6em; }
+.tv-list { grid-template-columns: minmax(0, 1fr); }
+.tv-list li { min-width: 0; cursor: pointer; }
+.tv-list li.sel { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.tv-list li span small { color: var(--muted); margin-inline-start: 4px; }
+.tv-ed { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin: 0 0 14px; }
+.tv-ed textarea { width: 100%; min-height: 70px; resize: vertical; font: inherit; font-size: 16px; padding: 8px 10px; border-radius: 10px; border: 1px solid var(--line); background: var(--field, var(--bg)); color: var(--ink); margin: 0 0 10px; }
+.tv-time { display: flex; gap: 6px; }
+.tv-time input { flex: 1; min-width: 0; }
+.tv-time .btn { flex: none; padding: 6px 10px; font-size: 13px; }
+.tv-range { display: flex; align-items: center; gap: 10px; }
+.tv-range input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.tv-range output { min-width: 3em; text-align: end; font-weight: 600; font-variant-numeric: tabular-nums; }
+.tv-pos { display: flex; gap: 6px; flex-wrap: wrap; margin: 0 0 10px; }
+.tv-pos button { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; }
+.tv-add { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.tv-add .btn { flex: 1 1 160px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a video here</b>MP4, MOV, WebM, MKV or AVI, up to 1 GB. Your video never leaves your device.</div>
+<input type="file" id="file" accept="video/*,.mkv,.mov,.avi,.m4v,.3gp,.ts,.mts,.wmv,.flv" hidden data-nomemo>
+<p class="vt-info" id="info"></p>
+<div id="editor" hidden>
+  <div class="tv-stage" id="stageBox"><video id="player" playsinline preload="auto"></video><canvas id="over" aria-label="Text preview. Drag a text to move it."></canvas></div>
+  <p class="vt-hint" id="noPlay" hidden>Your browser cannot play this video format, so the preview shows the text on a dark background. The video will still get your text.</p>
+  <div class="tv-ctl"><button class="btn ghost" type="button" id="pp">▶</button><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Video position"><span id="ptime">0:00.0</span></div>
+  <ul class="files tv-list" id="list"></ul>
+  <div class="tv-add"><button class="btn ghost" type="button" id="add">+ Add another text</button><button class="btn ghost" type="button" id="dup">Copy this text</button></div>
+  <div class="tv-ed" id="ed">
+    <label for="t">Text (any language, emoji welcome)</label>
+    <textarea id="t" data-nomemo></textarea>
+    <div class="fields">
+      <div><label for="from">Show from</label><div class="tv-time"><input type="text" id="from" inputmode="decimal" autocomplete="off" data-nomemo><button class="btn ghost" type="button" id="fromNow">Now</button></div></div>
+      <div><label for="to">Until</label><div class="tv-time"><input type="text" id="to" inputmode="decimal" autocomplete="off" data-nomemo><button class="btn ghost" type="button" id="toNow">Now</button></div></div>
+      <div><label for="size">Text size</label><div class="tv-range"><input type="range" id="size" min="2" max="25" step="0.5" value="7" data-nomemo><output id="sizeOut">7</output></div></div>
+      <div><label for="font">Font</label><select id="font" data-nomemo><option value="sans">Clean (sans-serif)</option><option value="bold">Heavy (meme style)</option><option value="serif">Classic (serif)</option><option value="mono">Typewriter</option><option value="hand">Handwriting</option></select></div>
+      <div><label for="look">Style</label><select id="look" data-nomemo><option value="outline">Outline</option><option value="shadow">Shadow</option><option value="box">Box behind the text</option><option value="plain">Plain</option></select></div>
+      <div><label for="color">Text colour</label><input type="color" id="color" value="#ffffff" data-nomemo></div>
+      <div id="boxBox"><label for="boxc">Box / outline colour</label><input type="color" id="boxc" value="#000000" data-nomemo></div>
+      <div><label for="align">Alignment</label><select id="align" data-nomemo><option value="center">Centre</option><option value="left">Left</option><option value="right">Right</option></select></div>
+    </div>
+    <div class="tv-pos" id="pos"><button type="button" data-y="0.1">Top</button><button type="button" data-y="0.5">Middle</button><button type="button" data-y="0.86">Bottom (captions)</button><button type="button" data-x="0.5">Centre left–right</button></div>
+    <div class="checks"><label><input type="checkbox" id="bold" data-nomemo checked> Bold</label><label><input type="checkbox" id="fade" data-nomemo> Fade in and out</label></div>
+    <div class="btns"><button class="btn ghost" type="button" id="del">Remove this text</button></div>
+  </div>
+  <div class="fields">
+    <div><label for="q">Quality</label><select id="q"><option value="18">High (bigger file)</option><option value="22" selected>Good (recommended)</option><option value="27">Smaller file</option></select></div>
+  </div>
+  <p class="vt-hint" id="hint"></p>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Add text to video</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download MP4</a></div>
+<p class="msg" id="msg"></p>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var file = null, info = null, url = null, bad = false, P = $('player'), cv = $('over'), items = [], sel = 0, raf = 0;
+  var FONTS = { sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif', bold: 'Impact, "Arial Black", "Noto Sans", system-ui, sans-serif', serif: 'Georgia, "Times New Roman", "Noto Serif", serif', mono: '"Courier New", ui-monospace, monospace', hand: '"Comic Sans MS", "Segoe Print", "Bradley Hand", cursive' };
+  function parse(s) {
+    s = String(s).trim().replace(',', '.');
+    if (!/^\d+(?:\.\d+)?$|^\d+:\d{1,2}(?:\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(?:\.\d+)?$/.test(s)) return NaN;
+    return s.split(':').reduce(function (t, p) { return t * 60 + parseFloat(p); }, 0);
+  }
+  function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(s); }
+  function newItem(text, a, b) { return { text: text, a: a, b: b, size: 7, font: 'sans', look: 'outline', color: '#ffffff', boxc: '#000000', align: 'center', bold: true, fade: false, x: 0.5, y: 0.86 }; }
+  // Draw one text on a canvas of size W x H. Returns its box {x, y, w, h} in pixels.
+  function paint(g, it, W, H, measureOnly) {
+    var px = Math.max(6, it.size / 100 * H), lh = px * 1.22, pad = px * 0.35;
+    g.save();
+    g.font = (it.bold ? '700 ' : '400 ') + px + 'px ' + FONTS[it.font];
+    g.direction = rtl(it.text) ? 'rtl' : 'ltr';
+    g.textBaseline = 'middle';
+    var maxW = W * 0.92 - pad * 2, lines = [];
+    String(it.text).replace(/\r/g, '').split('\n').forEach(function (para) {
+      var words = para.split(/(\s+)/), line = '';
+      if (!para) { lines.push(''); return; }
+      words.forEach(function (w) {
+        var test = line + w;
+        if (line && g.measureText(test).width > maxW && w.trim()) { lines.push(line.trim()); line = w.trimStart ? w.trimStart() : w.replace(/^\s+/, ''); }
+        else line = test;
+        while (g.measureText(line).width > maxW && line.length > 1) { // one very long word (or a language without spaces): break it
+          var cut = line.length - 1; while (cut > 1 && g.measureText(line.slice(0, cut)).width > maxW) cut--;
+          lines.push(line.slice(0, cut)); line = line.slice(cut);
+        }
+      });
+      lines.push(line.trim());
+    });
+    var tw = 0; lines.forEach(function (l) { tw = Math.max(tw, g.measureText(l).width); });
+    var bw = tw + pad * 2, bh = lines.length * lh + pad * 2;
+    var bx = Math.max(0, Math.min(W - bw, it.x * W - bw / 2)), by = Math.max(0, Math.min(H - bh, it.y * H - bh / 2));
+    if (!measureOnly) {
+      if (it.look === 'box') { g.fillStyle = it.boxc; g.globalAlpha = 0.72; var r = Math.min(px * 0.3, bh / 2); g.beginPath(); if (g.roundRect) g.roundRect(bx, by, bw, bh, r); else g.rect(bx, by, bw, bh); g.fill(); g.globalAlpha = 1; }
+      var ax = it.align === 'left' ? bx + pad : it.align === 'right' ? bx + bw - pad : bx + bw / 2;
+      g.textAlign = it.align === 'left' ? (g.direction === 'rtl' ? 'right' : 'left') : it.align === 'right' ? (g.direction === 'rtl' ? 'left' : 'right') : 'center';
+      if (g.direction === 'rtl' && it.align !== 'center') ax = it.align === 'left' ? bx + pad : bx + bw - pad;
+      lines.forEach(function (l, i) {
+        var y = by + pad + lh * (i + 0.5);
+        if (it.look === 'outline') { g.lineJoin = 'round'; g.miterLimit = 2; g.strokeStyle = it.boxc; g.lineWidth = Math.max(2, px * 0.16); g.strokeText(l, ax, y); }
+        if (it.look === 'shadow') { g.shadowColor = 'rgba(0,0,0,.85)'; g.shadowBlur = px * 0.25; g.shadowOffsetX = px * 0.05; g.shadowOffsetY = px * 0.07; }
+        g.fillStyle = it.color; g.fillText(l, ax, y);
+        g.shadowColor = 'transparent';
+      });
+    }
+    g.restore();
+    var m = it.look === 'outline' ? px * 0.1 : it.look === 'shadow' ? px * 0.4 : 0;
+    return { x: bx - m, y: by - m, w: bw + m * 2, h: bh + m * 2 };
+  }
+  function alpha(it, t) {
+    if (t < it.a || t > it.b) return 0;
+    if (!it.fade) return 1;
+    var d = Math.min(0.4, (it.b - it.a) / 3);
+    return Math.max(0, Math.min(1, (t - it.a) / d, (it.b - t) / d));
+  }
+  function draw() {
+    if (!info) return;
+    var r = cv.getBoundingClientRect(), d = window.devicePixelRatio || 1, W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    var g = cv.getContext('2d'), t = P.currentTime || 0;
+    g.clearRect(0, 0, W, H);
+    items.forEach(function (it, i) {
+      var a = alpha(it, t), show = a > 0 || i === sel;
+      if (!show || !it.text.trim()) return;
+      g.globalAlpha = a > 0 ? a : 0.35; var box = paint(g, it, W, H); g.globalAlpha = 1;
+      if (i === sel) { g.setLineDash([6 * d, 4 * d]); g.strokeStyle = 'rgba(255,255,255,.8)'; g.lineWidth = d; g.strokeRect(box.x, box.y, box.w, box.h); g.setLineDash([]); }
+    });
+  }
+  function tick() { draw(); $('ptime').textContent = VT.clock(P.currentTime || 0); if (info) $('seek').value = Math.round((P.currentTime || 0) / info.duration * 1000); if (!P.paused) raf = requestAnimationFrame(tick); }
+
+  // ---------- list and editor ----------
+  function cur() { return items[sel]; }
+  function list() {
+    var ul = $('list'); ul.innerHTML = '';
+    items.forEach(function (it, i) {
+      var li = document.createElement('li'), s = document.createElement('span');
+      if (i === sel) li.className = 'sel';
+      s.textContent = (i + 1) + '. ' + (it.text.trim().split('\n')[0] || '(empty)');
+      var sm = document.createElement('small'); sm.textContent = '· ' + VT.clock(it.a) + ' – ' + VT.clock(it.b); s.appendChild(sm);
+      li.appendChild(s);
+      var e = document.createElement('button'); e.type = 'button'; e.textContent = '✎'; e.setAttribute('aria-label', 'Edit text ' + (i + 1));
+      li.appendChild(e);
+      li.addEventListener('click', function () { pick(i); });
+      ul.appendChild(li);
+    });
+    $('del').disabled = items.length < 2;
+  }
+  function pick(i) {
+    sel = i; var it = cur();
+    $('t').value = it.text; $('from').value = VT.clock(it.a); $('to').value = VT.clock(it.b);
+    $('size').value = it.size; $('sizeOut').textContent = it.size; $('font').value = it.font; $('look').value = it.look;
+    $('color').value = it.color; $('boxc').value = it.boxc; $('align').value = it.align; $('bold').checked = it.bold; $('fade').checked = it.fade;
+    $('boxBox').hidden = it.look === 'shadow' || it.look === 'plain';
+    list(); draw(); hint();
+  }
+  function hint() {
+    if (!info) return;
+    var bad2 = check();
+    $('hint').className = 'vt-hint';
+    $('hint').textContent = bad2 || (items.length + (items.length === 1 ? ' text' : ' texts') + '. Drag a text on the video to move it. The video is re-encoded to MP4' + (info.audio ? ' and the sound is kept' : '') + '.');
+  }
+  function check() {
+    for (var i = 0; i < items.length; i++) {
+      var it = items[i];
+      if (!it.text.trim()) return 'Text ' + (i + 1) + ' is empty. Type something or remove it.';
+      if (isNaN(it.a) || isNaN(it.b)) return 'The times of text ' + (i + 1) + ' are not valid. Use minutes and seconds like 0:05 or 1:20.5.';
+      if (it.b - it.a < 0.1) return 'In text ' + (i + 1) + ', "Until" must be after "Show from".';
+      if (it.a >= info.duration) return 'Text ' + (i + 1) + ' starts after the end of the video (' + VT.clock(info.duration) + ').';
+    }
+    return '';
+  }
+  function edited() { $('dl').hidden = true; list(); draw(); hint(); }
+  $('t').addEventListener('input', function () { cur().text = $('t').value; edited(); });
+  $('from').addEventListener('input', function () { cur().a = parse($('from').value); edited(); });
+  $('to').addEventListener('input', function () { var v = parse($('to').value); cur().b = isNaN(v) ? v : Math.min(v, info.duration); edited(); });
+  $('fromNow').addEventListener('click', function () { cur().a = Math.round(P.currentTime * 10) / 10; $('from').value = VT.clock(cur().a); edited(); });
+  $('toNow').addEventListener('click', function () { cur().b = Math.round(P.currentTime * 10) / 10; $('to').value = VT.clock(cur().b); edited(); });
+  $('size').addEventListener('input', function () { cur().size = +$('size').value; $('sizeOut').textContent = $('size').value; edited(); });
+  ['font', 'look', 'color', 'boxc', 'align'].forEach(function (id) { $(id).addEventListener('input', function () { cur()[id] = $(id).value; $('boxBox').hidden = cur().look === 'shadow' || cur().look === 'plain'; edited(); }); });
+  ['bold', 'fade'].forEach(function (id) { $(id).addEventListener('change', function () { cur()[id] = $(id).checked; edited(); }); });
+  Array.prototype.forEach.call($('pos').children, function (b) { b.addEventListener('click', function () { if (b.dataset.y) cur().y = +b.dataset.y; if (b.dataset.x) cur().x = +b.dataset.x; edited(); }); });
+  $('add').addEventListener('click', function () {
+    var t = Math.min(P.currentTime || 0, Math.max(0, info.duration - 0.5)), it = newItem('New text', Math.round(t * 10) / 10, Math.min(info.duration, Math.round((t + 3) * 10) / 10));
+    it.y = 0.5; items.push(it); pick(items.length - 1); $('t').focus(); $('t').select();
+  });
+  $('dup').addEventListener('click', function () { var c = JSON.parse(JSON.stringify(cur())); c.y = Math.min(0.95, c.y + 0.08); items.push(c); pick(items.length - 1); });
+  $('del').addEventListener('click', function () { if (items.length < 2) return; items.splice(sel, 1); pick(Math.max(0, sel - 1)); });
+  // drag a text on the preview
+  var drag = null;
+  cv.addEventListener('pointerdown', function (e) {
+    if (!info) return;
+    var r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height, g = cv.getContext('2d'), t = P.currentTime || 0, hit = -1;
+    for (var i = items.length - 1; i >= 0; i--) {
+      if (alpha(items[i], t) <= 0 && i !== sel) continue;
+      var b = paint(g, items[i], cv.width, cv.height, true);
+      if (x * cv.width >= b.x && x * cv.width <= b.x + b.w && y * cv.height >= b.y && y * cv.height <= b.y + b.h) { hit = i; break; }
+    }
+    if (hit < 0) return;
+    if (hit !== sel) pick(hit);
+    drag = { x: x, y: y, ox: cur().x, oy: cur().y }; cv.setPointerCapture(e.pointerId); e.preventDefault();
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (!drag) return;
+    var r = cv.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
+    cur().x = Math.max(0, Math.min(1, drag.ox + x - drag.x)); cur().y = Math.max(0, Math.min(1, drag.oy + y - drag.y)); draw(); $('dl').hidden = true;
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { cv.addEventListener(ev, function () { drag = null; }); });
+
+  // ---------- video ----------
+  function reset() { file = null; info = null; $('editor').hidden = true; cancelAnimationFrame(raf); P.pause(); P.removeAttribute('src'); P.load(); if (url) { URL.revokeObjectURL(url); url = null; } }
+  VT.pick(reset, function (f, i) {
+    file = f; info = i; url = URL.createObjectURL(f); bad = false; $('noPlay').hidden = true; P.src = url;
+    var box = $('stageBox'); box.style.aspectRatio = i.width + ' / ' + i.height; box.style.maxWidth = Math.round(420 * i.width / i.height) + 'px';
+    if (!items.length) items = [newItem('Your text here', 0, Math.round(Math.min(i.duration, 5) * 10) / 10)];
+    items.forEach(function (it) { if (it.b > i.duration) it.b = i.duration; if (it.a >= i.duration) it.a = 0; });
+    $('editor').hidden = false; pick(Math.min(sel, items.length - 1));
+  });
+  P.addEventListener('error', function () { if (P.getAttribute('src')) { bad = true; $('noPlay').hidden = false; } });
+  P.addEventListener('loadeddata', draw); P.addEventListener('seeked', draw);
+  P.addEventListener('play', function () { $('pp').textContent = '❚❚'; tick(); });
+  P.addEventListener('pause', function () { $('pp').textContent = '▶'; draw(); });
+  $('pp').addEventListener('click', function () { if (bad || !info) return; if (P.paused) { var p = P.play(); if (p && p.catch) p.catch(function () {}); } else P.pause(); });
+  $('seek').addEventListener('input', function () { if (!info) return; if (!bad) P.currentTime = $('seek').value / 1000 * info.duration; $('ptime').textContent = VT.clock($('seek').value / 1000 * info.duration); draw(); });
+  window.addEventListener('resize', draw);
+
+  // ---------- export: each text becomes a transparent picture laid over the video ----------
+  function png(it) {
+    var W = info.width, H = info.height, c = document.createElement('canvas'); c.width = W; c.height = H;
+    var g = c.getContext('2d'), b = paint(g, it, W, H, true);
+    var x = Math.max(0, Math.floor(b.x)), y = Math.max(0, Math.floor(b.y)), w = Math.min(W - x, Math.ceil(b.w) + 2), h = Math.min(H - y, Math.ceil(b.h) + 2);
+    paint(g, it, W, H);
+    var o = document.createElement('canvas'); o.width = Math.max(1, w); o.height = Math.max(1, h); o.getContext('2d').drawImage(c, x, y, w, h, 0, 0, w, h);
+    return new Promise(function (res, rej) { o.toBlob(function (bl) { if (!bl) return rej(new Error('Could not draw the text.')); bl.arrayBuffer().then(function (ab) { res({ data: new Uint8Array(ab), x: x, y: y }); }); }, 'image/png'); });
+  }
+  $('go').addEventListener('click', function () {
+    if (!file) return;
+    var err = check(); if (err) { VT.say('bad', err); return; }
+    P.pause();
+    var f = file, i = info, list2 = items.map(function (it) { return JSON.parse(JSON.stringify(it)); }), q = $('q').value;
+    VT.go('Adding text', function (pct) {
+      return Promise.all(list2.map(png)).then(function (pics) {
+        var names = pics.map(function (_, k) { return '/text' + k + '.png'; });
+        return FF.run(f, function (inp) {
+          var a = ['-i', inp];
+          list2.forEach(function (it, k) { if (it.fade) a.push('-loop', '1', '-framerate', String(Math.min(60, Math.round(i.fps) || 30)), '-t', (Math.min(it.b, i.duration) + 0.1).toFixed(2)); a.push('-i', names[k]); });
+          var g2 = [], last = '0:v';
+          list2.forEach(function (it, k) {
+            var b = Math.min(it.b, i.duration), src = (k + 1) + ':v';
+            if (it.fade) { var d = Math.min(0.4, (b - it.a) / 3); g2.push('[' + src + ']format=rgba,fade=t=in:st=' + it.a.toFixed(2) + ':d=' + d.toFixed(2) + ':alpha=1,fade=t=out:st=' + (b - d).toFixed(2) + ':d=' + d.toFixed(2) + ':alpha=1[p' + k + ']'); src = 'p' + k; }
+            g2.push('[' + last + '][' + src + ']overlay=' + pics[k].x + ':' + pics[k].y + ':enable=\'between(t,' + it.a.toFixed(2) + ',' + b.toFixed(2) + ')\'' + (it.fade ? ':eof_action=pass' : '') + '[v' + k + ']');
+            last = 'v' + k;
+          });
+          g2.push('[' + last + ']scale=trunc(iw/2)*2:trunc(ih/2)*2,format=yuv420p[vout]');
+          a.push('-filter_complex', g2.join(';'), '-map', '[vout]');
+          if (i.audio) a.push('-map', '0:a:0?', '-c:a', i.acodec === 'aac' ? 'copy' : 'aac', '-b:a', '160k');
+          a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', q, '-movflags', '+faststart', '-t', i.duration.toFixed(3));
+          return a;
+        }, 'with-text.mp4', i.duration, pct, VT.say, function (ff) {
+          return pics.reduce(function (p, pic, k) { return p.then(function () { return ff.writeFile(names[k], pic.data); }); }, Promise.resolve());
+        }).then(function (data) {
+          VT.done(data, VT.base(f.name) + '-with-text.mp4', 'video/mp4');
+          return 'Your video with ' + list2.length + (list2.length === 1 ? ' text' : ' texts') + ' is ready (' + fmtBytes(data.length) + ')';
+        });
+      });
+    });
+  });
+})();
+</script>

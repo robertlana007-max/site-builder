@@ -1,0 +1,238 @@
+<style>
+.tg-top { text-align: center; margin: 4px 0 6px; }
+.tg-hz { font-size: clamp(48px, 14vw, 84px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; overflow-wrap: anywhere; }
+.tg-hz small { font-size: 18px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-inline-start: 6px; }
+.tg-note { color: var(--muted); font-weight: 600; margin-top: 4px; min-height: 1.4em; }
+.tg-adj { display: flex; align-items: center; gap: 8px; margin: 12px 0 6px; }
+.tg-adj input[type=range] { flex: 1; min-width: 0; accent-color: var(--accent); height: 32px; }
+.tg-adj .btn { flex: none; min-width: 48px; height: 44px; padding: 0 10px; }
+.tg-quick { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; justify-content: center; }
+.tg-quick button { font: inherit; font-size: 14px; padding: 6px 10px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; }
+.tg-quick button:hover { border-color: var(--accent); }
+.tg-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 4px 0 14px; }
+.tg-main .btn { flex: 1 1 160px; min-height: 56px; font-size: 18px; }
+.tg-warn { border: 1px solid #f59e0b; background: color-mix(in srgb, #f59e0b 12%, var(--surface)); color: var(--ink); border-radius: 10px; padding: 10px 12px; font-size: 14px; margin: 0 0 14px; }
+.tg-vol { display: flex; align-items: center; gap: 10px; }
+.tg-vol input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.tg-vol output { min-width: 3.5em; text-align: end; font-variant-numeric: tabular-nums; font-weight: 600; }
+.tg-sweep { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 0 0 14px; }
+.tg-sweep i { display: block; height: 100%; width: 0; background: var(--accent); }
+.tg-hint { font-size: 14px; color: var(--muted); margin: -6px 0 14px; }
+</style>
+<div class="fields">
+  <div><label for="mode">What to play</label><select id="mode"><option value="tone">One steady tone</option><option value="sweep">Frequency sweep (low to high)</option><option value="binaural">Binaural beat (different tone in each ear)</option></select></div>
+  <div><label for="wave">Wave shape</label><select id="wave"><option value="sine">Sine (pure, smooth)</option><option value="square">Square (hollow, buzzy)</option><option value="sawtooth">Sawtooth (bright, sharp)</option><option value="triangle">Triangle (soft, flute-like)</option></select></div>
+</div>
+<div id="toneBox">
+  <div class="tg-top">
+    <div class="tg-hz" aria-live="polite"><span id="hzShow">440</span><small>Hz</small></div>
+    <div class="tg-note" id="note">A4 (concert pitch)</div>
+  </div>
+  <div class="tg-adj">
+    <button class="btn ghost" type="button" id="down" aria-label="One octave lower (half the frequency)">÷2</button>
+    <input type="range" id="slider" min="0" max="1000" step="1" value="0" aria-label="Frequency (logarithmic slider from 1 to 20,000 Hz)">
+    <button class="btn ghost" type="button" id="up" aria-label="One octave higher (double the frequency)">×2</button>
+  </div>
+  <div class="tg-quick" id="quick"></div>
+  <div class="fields">
+    <div><label for="hz">Frequency in Hz (1 to 20,000)</label><input type="number" id="hz" min="1" max="20000" step="any" value="440" inputmode="decimal"></div>
+    <div><label for="chan">Play in</label><select id="chan"><option value="both">Both speakers / ears</option><option value="left">Left only</option><option value="right">Right only</option></select></div>
+  </div>
+</div>
+<div id="sweepBox" hidden>
+  <div class="fields">
+    <div><label for="from">Start frequency (Hz)</label><input type="number" id="from" min="1" max="20000" step="any" value="20" inputmode="decimal"></div>
+    <div><label for="to">End frequency (Hz)</label><input type="number" id="to" min="1" max="20000" step="any" value="20000" inputmode="decimal"></div>
+    <div><label for="secs">Sweep time (seconds)</label><input type="number" id="secs" min="1" max="600" step="1" value="20" inputmode="numeric"></div>
+    <div><label for="curve">Sweep speed</label><select id="curve"><option value="log">Even through the octaves (logarithmic)</option><option value="lin">Same Hz per second (linear)</option></select></div>
+    <div><label for="schan">Play in</label><select id="schan"><option value="both">Both speakers / ears</option><option value="left">Left only</option><option value="right">Right only</option></select></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="loop"> Repeat the sweep</label></div>
+  <div class="tg-sweep" aria-hidden="true"><i id="sweepFill"></i></div>
+</div>
+<div id="binBox" hidden>
+  <div class="fields">
+    <div><label for="left">Left ear (Hz)</label><input type="number" id="left" min="1" max="20000" step="any" value="200" inputmode="decimal"></div>
+    <div><label for="right">Right ear (Hz)</label><input type="number" id="right" min="1" max="20000" step="any" value="210" inputmode="decimal"></div>
+    <div><label for="preset">Beat presets</label><select id="preset"><option value="">Choose a preset…</option><option value="2">2 Hz beat (delta range)</option><option value="6">6 Hz beat (theta range)</option><option value="10">10 Hz beat (alpha range)</option><option value="15">15 Hz beat (beta range)</option><option value="40">40 Hz beat (gamma range)</option></select></div>
+  </div>
+  <p class="tg-hint" id="beatInfo"></p>
+</div>
+<div class="fields">
+  <div><label for="vol">Volume</label><div class="tg-vol"><input type="range" id="vol" min="0" max="100" step="1" value="15"><output id="volOut" for="vol">15%</output></div></div>
+</div>
+<p class="tg-warn" id="warn">Start quietly. Pure tones can sound much louder than music, and high or very low tones can damage speakers and hearing. Turn your device volume down before you press Play, and take headphones off your ears first.</p>
+<div class="tg-main">
+  <button class="btn" type="button" id="play">▶ Play</button>
+</div>
+<div class="fields">
+  <div><label for="len">Length of the WAV file (seconds)</label><input type="number" id="len" min="1" max="600" step="1" value="10" inputmode="numeric"></div>
+</div>
+<div class="btns"><button class="btn ghost" type="button" id="make">Make WAV file</button><a class="btn ghost" id="dl" hidden>Download WAV</a></div>
+<p class="msg" id="msg">Press Play or the space bar. On iPhone, turn off silent mode to hear the tone.</p>
+<script>
+(function () {
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var actx = null, nodes = null, playing = false, sweepT0 = 0, raf = 0, dlUrl = null;
+  var NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t; }
+  if (!AC) { say('bad', 'This browser cannot make sound with Web Audio. Please update it, or try Chrome, Edge, Firefox or Safari.'); $('play').disabled = true; $('make').disabled = true; }
+  function clamp(v) { return Math.max(1, Math.min(20000, v)); }
+  function num(id, def) { var v = parseFloat(String($(id).value).replace(',', '.')); return isFinite(v) ? v : def; }
+  function hz() { return clamp(num('hz', 440)); }
+  function noteName(f) {
+    var n = 12 * Math.log2(f / 440) + 69, r = Math.round(n), cents = Math.round((n - r) * 100);
+    if (r < 0 || r > 135) return '';
+    return NOTES[r % 12] + (Math.floor(r / 12) - 1) + (cents ? ' ' + (cents > 0 ? '+' : '−') + Math.abs(cents) + ' cents' : '') + (f === 440 ? ' (concert pitch)' : '');
+  }
+  function toSlider(f) { return Math.round(Math.log(clamp(f)) / Math.log(20000) * 1000); }
+  function fromSlider(v) { var f = Math.pow(20000, v / 1000); return f < 100 ? Math.round(f * 10) / 10 : Math.round(f); }
+  function showHz(f, from) {
+    if (from !== 'box') $('hz').value = f;
+    if (from !== 'slider') $('slider').value = toSlider(f);
+    $('hzShow').textContent = fmtNum(f, f < 100 ? 1 : 0);
+    $('note').textContent = noteName(f);
+    apply();
+  }
+  [['50 Hz', 50], ['100 Hz', 100], ['A4 440 Hz', 440], ['1 kHz', 1000], ['5 kHz', 5000], ['10 kHz', 10000], ['15 kHz', 15000], ['17.4 kHz', 17400]].forEach(function (q) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = q[0];
+    b.addEventListener('click', function () { showHz(q[1]); });
+    $('quick').appendChild(b);
+  });
+  $('slider').addEventListener('input', function () { showHz(fromSlider(+$('slider').value), 'slider'); });
+  $('hz').addEventListener('input', function () { var v = num('hz', NaN); if (isFinite(v) && v >= 1 && v <= 20000) showHz(v, 'box'); });
+  $('hz').addEventListener('change', function () { showHz(hz()); });
+  $('down').addEventListener('click', function () { showHz(clamp(Math.round(hz() / 2 * 100) / 100)); });
+  $('up').addEventListener('click', function () { showHz(clamp(Math.round(hz() * 2 * 100) / 100)); });
+
+  function mode() { return $('mode').value; }
+  function vol() { var v = +$('vol').value / 100; return v * v * 0.8; } // a gentle curve: the low half of the slider is really quiet
+  function showMode() {
+    $('toneBox').hidden = mode() !== 'tone'; $('sweepBox').hidden = mode() !== 'sweep'; $('binBox').hidden = mode() !== 'binaural';
+    if (mode() === 'binaural') { $('wave').value = 'sine'; }
+    $('wave').disabled = mode() === 'binaural';
+    beatInfo();
+  }
+  function beatInfo() {
+    var l = clamp(num('left', 200)), r = clamp(num('right', 210)), d = Math.abs(l - r);
+    $('beatInfo').textContent = 'Beat: ' + fmtNum(d, 2) + ' Hz. Use headphones: each ear must hear only its own tone. Beats are easiest to notice below about 30 Hz and with tones under 1,000 Hz.';
+  }
+  $('preset').addEventListener('change', function () { var b = +$('preset').value; if (!b) return; $('right').value = Math.round((clamp(num('left', 200)) + b) * 100) / 100; beatInfo(); apply(); });
+  ['left', 'right'].forEach(function (id) { $(id).addEventListener('input', function () { beatInfo(); apply(); }); });
+  $('mode').addEventListener('change', function () { var was = playing; stop(); showMode(); if (was) start(); });
+  ['wave', 'chan', 'schan'].forEach(function (id) { $(id).addEventListener('change', function () { if (playing) { stop(); start(); } }); });
+  ['from', 'to', 'secs', 'curve', 'loop'].forEach(function (id) { $(id).addEventListener('change', function () { if (playing) { stop(); start(); } }); });
+  function showVol() {
+    var v = +$('vol').value; $('volOut').textContent = v + '%';
+    $('warn').style.fontWeight = v > 50 ? '700' : '';
+    if (nodes) nodes.gain.gain.setTargetAtTime(vol(), actx.currentTime, 0.02);
+  }
+  $('vol').addEventListener('input', showVol);
+
+  // Build the sound graph on any context (live or offline). Returns the nodes.
+  function build(ctx, t0, len) {
+    var gain = ctx.createGain(), merger = ctx.createChannelMerger(2), m = mode(), oscs = [];
+    gain.gain.value = 0; gain.connect(ctx.destination);
+    merger.connect(gain);
+    function osc(f, ch) {
+      var o = ctx.createOscillator(); o.type = m === 'binaural' ? 'sine' : $('wave').value; o.frequency.value = f;
+      if (ch === 'both') { o.connect(merger, 0, 0); o.connect(merger, 0, 1); } else o.connect(merger, 0, ch === 'left' ? 0 : 1);
+      o.start(t0); oscs.push(o); return o;
+    }
+    if (m === 'tone') osc(hz(), $('chan').value);
+    else if (m === 'binaural') { osc(clamp(num('left', 200)), 'left'); osc(clamp(num('right', 210)), 'right'); }
+    else {
+      var o = osc(clamp(num('from', 20)), $('schan').value), a = clamp(num('from', 20)), b = clamp(num('to', 20000)), d = Math.max(1, Math.min(600, num('secs', 20)));
+      var reps = len ? Math.ceil(len / d) : ($('loop').checked ? 200 : 1);
+      for (var k = 0; k < reps; k++) {
+        var s = t0 + k * d;
+        o.frequency.setValueAtTime(a, s);
+        if ($('curve').value === 'log') o.frequency.exponentialRampToValueAtTime(b, s + d); else o.frequency.linearRampToValueAtTime(b, s + d);
+        if (!len && !$('loop').checked) break;
+      }
+    }
+    // short fades so the sound starts and stops without a click
+    gain.gain.setValueAtTime(0, t0); gain.gain.linearRampToValueAtTime(vol(), t0 + 0.03);
+    if (len) { gain.gain.setValueAtTime(vol(), t0 + len - 0.03); gain.gain.linearRampToValueAtTime(0, t0 + len); }
+    return { gain: gain, oscs: oscs, merger: merger };
+  }
+  function apply() { // change the playing tone without restarting it
+    if (!playing || !nodes) return;
+    var t = actx.currentTime;
+    if (mode() === 'tone') nodes.oscs[0].frequency.setTargetAtTime(hz(), t, 0.015);
+    if (mode() === 'binaural') { nodes.oscs[0].frequency.setTargetAtTime(clamp(num('left', 200)), t, 0.015); nodes.oscs[1].frequency.setTargetAtTime(clamp(num('right', 210)), t, 0.015); }
+  }
+  function start() {
+    if (!AC) return;
+    if (mode() === 'sweep' && clamp(num('from', 20)) === clamp(num('to', 20000))) { say('bad', 'The start and end frequency are the same. Choose two different frequencies for a sweep.'); return; }
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    var t0 = actx.currentTime + 0.03;
+    nodes = build(actx, t0, 0); playing = true; sweepT0 = t0;
+    $('play').textContent = '■ Stop';
+    say('', mode() === 'binaural' ? 'Playing. Put on headphones to hear the beat.' : 'Playing. Press Stop or the space bar to stop.');
+    if (mode() === 'sweep') sweepTick();
+  }
+  function sweepTick() {
+    cancelAnimationFrame(raf);
+    if (!playing || mode() !== 'sweep') return;
+    var d = Math.max(1, num('secs', 20)), t = actx.currentTime - sweepT0, loop = $('loop').checked;
+    if (!loop && t >= d) { stop(); say('ok', 'Sweep finished.'); return; }
+    var p = (t % d) / d, a = clamp(num('from', 20)), b = clamp(num('to', 20000));
+    var f = $('curve').value === 'log' ? a * Math.pow(b / a, p) : a + (b - a) * p;
+    $('sweepFill').style.width = (p * 100) + '%';
+    say('', 'Now: ' + fmtNum(Math.round(f), 0) + ' Hz' + (noteName(f) ? ' (' + noteName(f).replace(/ \(.*\)/, '') + ')' : ''));
+    raf = requestAnimationFrame(sweepTick);
+  }
+  function stop() {
+    cancelAnimationFrame(raf);
+    if (nodes && actx) {
+      var t = actx.currentTime, n = nodes;
+      n.gain.gain.cancelScheduledValues(t); n.gain.gain.setValueAtTime(n.gain.gain.value, t); n.gain.gain.linearRampToValueAtTime(0, t + 0.03);
+      n.oscs.forEach(function (o) { try { o.stop(t + 0.05); } catch (e) {} });
+      setTimeout(function () { try { n.gain.disconnect(); } catch (e) {} }, 200);
+    }
+    nodes = null; playing = false;
+    $('play').textContent = '▶ Play'; $('sweepFill').style.width = '0';
+  }
+  $('play').addEventListener('click', function () { if (playing) { stop(); say('', 'Stopped.'); } else start(); });
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== ' ' || e.repeat) return;
+    var t = e.target; if (t && (/^(INPUT|TEXTAREA|SELECT|BUTTON|A)$/.test(t.tagName) || t.isContentEditable)) return;
+    e.preventDefault(); $('play').click();
+  });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && playing) { stop(); say('', 'Stopped because the page was hidden.'); } });
+
+  // ---------- WAV file ----------
+  $('make').addEventListener('click', function () {
+    if (!OAC) return say('bad', 'This browser cannot create sound files. Try a current Chrome, Edge, Firefox or Safari.');
+    var len = Math.round(num('len', 10));
+    if (!(len >= 1 && len <= 600)) return say('bad', 'Choose a length from 1 to 600 seconds (10 minutes).');
+    if (mode() === 'sweep' && clamp(num('from', 20)) === clamp(num('to', 20000))) return say('bad', 'The start and end frequency are the same. Choose two different frequencies for a sweep.');
+    if (+$('vol').value === 0) return say('bad', 'The volume is at 0%, so the file would be silent. Raise the volume first.');
+    $('make').disabled = true; $('dl').hidden = true; say('', 'Making the file…');
+    var rate = 44100, ctx = new OAC(2, rate * len, rate);
+    build(ctx, 0, len);
+    var p = ctx.startRendering();
+    (p && p.then ? p : new Promise(function (r) { ctx.oncomplete = function (e) { r(e.renderedBuffer); }; })).then(function (b) {
+      var blob = wavBlob([b.getChannelData(0), b.getChannelData(1)], rate);
+      if (dlUrl) URL.revokeObjectURL(dlUrl);
+      dlUrl = URL.createObjectURL(blob);
+      var m = mode(), name = m === 'tone' ? 'tone-' + String(hz()).replace('.', '_') + 'hz' : m === 'sweep' ? 'sweep-' + Math.round(clamp(num('from', 20))) + '-' + Math.round(clamp(num('to', 20000))) + 'hz' : 'binaural-' + Math.round(clamp(num('left', 200))) + '-' + Math.round(clamp(num('right', 210))) + 'hz';
+      $('dl').href = dlUrl; $('dl').download = name + '.wav'; $('dl').hidden = false;
+      say('ok', 'Your ' + len + '-second WAV file is ready (' + fmtBytes(blob.size) + ').');
+    }, function () { say('bad', 'The file could not be made. Try a shorter length.'); }).then(function () { $('make').disabled = false; });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('.card input, .card select'), function (el) { el.addEventListener('input', function () { $('dl').hidden = true; }); });
+  showMode(); showVol(); showHz(440);
+})();
+</script>

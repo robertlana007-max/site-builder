@@ -1,0 +1,399 @@
+<style>
+.aj-list { grid-template-columns: minmax(0, 1fr); }
+.aj-list li { min-width: 0; }
+.aj-list li span small { color: var(--muted); margin-inline-start: 4px; }
+.aj-list li.aj-bad span { color: var(--bad); }
+.aj-total { font-size: 15px; margin: -6px 0 14px; color: var(--muted); }
+.aj-total b { color: var(--ink); }
+.aj-audio { display: block; width: 100%; margin: 0 0 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop audio files here</b>Add two or more MP3, M4A, WAV, OGG or FLAC files. You can add more at any time. Nothing is uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.mov,.webm,.mkv" multiple hidden data-nomemo>
+<ul class="files aj-list" id="list"></ul>
+<p class="aj-total" id="total" hidden></p>
+<div id="opts" hidden>
+  <div class="fields">
+    <div><label for="join">Between the files</label><select id="join"><option value="none">Play straight on, no pause</option><option value="gap">Add a silent pause</option><option value="xfade">Crossfade (blend into each other)</option></select></div>
+    <div id="secsBox" hidden><label for="secs" id="secsLbl">Seconds</label><input type="number" id="secs" min="0.1" max="15" step="0.1" value="2" inputmode="decimal"></div>
+    <div><label for="fin">Fade in at the start</label><select id="fin"><option value="0">None</option><option value="1">1 second</option><option value="2">2 seconds</option><option value="5">5 seconds</option></select></div>
+    <div><label for="fout">Fade out at the end</label><select id="fout"><option value="0">None</option><option value="2">2 seconds</option><option value="3">3 seconds</option><option value="5">5 seconds</option><option value="10">10 seconds</option></select></div>
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp3">MP3 (plays everywhere)</option><option value="m4a">M4A / AAC (iPhone, smaller)</option><option value="wav">WAV (no quality loss, big file)</option></select></div>
+    <div id="kbpsBox"><label for="kbps">Quality</label><select id="kbps"><option value="128">128 kbps (small)</option><option value="192" selected>192 kbps (very good)</option><option value="256">256 kbps (best)</option></select></div>
+  </div>
+  <div class="checks"><label><input type="checkbox" id="level"> Even out the volume (make quiet and loud files about the same level)</label></div>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Join audio files</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<audio class="aj-audio" id="result" controls hidden></audio>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+(function () {
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  var OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, SR = 44100, MAX_FILES = 50, MAX_SECS = 4 * 3600;
+  var items = [], busy = false, decoding = false, dlUrl = null; // item: { file, buf, err }
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + (x < 10 ? '0' : '') + x.toFixed(1);
+  }
+  function good() { return items.filter(function (it) { return it.buf; }); }
+  function secs() { var v = parseFloat(String($('secs').value).replace(',', '.')); return isFinite(v) ? Math.max(0.1, Math.min(15, v)) : 2; }
+  function plan() { // total length in samples, and where each file starts
+    var g = good(), mode = $('join').value, s = Math.round(secs() * SR), pos = 0, starts = [];
+    g.forEach(function (it, i) {
+      var len = it.buf.length;
+      if (i > 0) {
+        if (mode === 'gap') pos += s;
+        if (mode === 'xfade') pos -= Math.min(s, Math.floor(len / 2), Math.floor(g[i - 1].buf.length / 2));
+      }
+      starts.push(pos); pos += len;
+    });
+    return { starts: starts, total: pos };
+  }
+  function render() {
+    var ul = $('list'); ul.innerHTML = '';
+    items.forEach(function (it, i) {
+      var li = document.createElement('li'), name = document.createElement('span');
+      if (it.err) li.className = 'aj-bad';
+      name.textContent = (i + 1) + '. ' + it.file.name;
+      var sm = document.createElement('small'); sm.textContent = it.err ? '· ' + it.err : it.buf ? '· ' + clock(it.buf.duration) : '· reading…';
+      name.appendChild(sm); name.title = name.textContent; li.appendChild(name);
+      [['↑', 'Move up', i > 0, function () { items.splice(i - 1, 0, items.splice(i, 1)[0]); }],
+       ['↓', 'Move down', i < items.length - 1, function () { items.splice(i + 1, 0, items.splice(i, 1)[0]); }],
+       ['✕', 'Remove', true, function () { items.splice(i, 1); }]].forEach(function (b) {
+        var btn = document.createElement('button'); btn.type = 'button'; btn.textContent = b[0]; btn.setAttribute('aria-label', b[1] + ' ' + it.file.name); btn.disabled = !b[2] || busy;
+        btn.addEventListener('click', function () { if (busy) return; b[3](); render(); });
+        li.appendChild(btn);
+      });
+      ul.appendChild(li);
+    });
+    refresh();
+  }
+  function refresh(keep) {
+    var g = good(), p = plan(), mode = $('join').value;
+    if (!keep) { $('dl').hidden = true; $('result').hidden = true; }
+    $('secsBox').hidden = mode === 'none';
+    $('secsLbl').textContent = mode === 'gap' ? 'Pause length (seconds)' : 'Crossfade length (seconds)';
+    $('kbpsBox').hidden = $('fmt').value === 'wav';
+    $('opts').hidden = g.length < 2;
+    $('total').hidden = !items.length; $('total').innerHTML = '';
+    if (items.length) {
+      var b = document.createElement('b'); b.textContent = g.length + (g.length === 1 ? ' file' : ' files'); $('total').appendChild(b);
+      $('total').appendChild(document.createTextNode(' · ' + clock(p.total / SR) + ' when joined. Use the arrows to change the order.'));
+    }
+    var bad = p.total / SR > MAX_SECS ? 'Together these files are longer than 4 hours, which is too much for a browser to hold in memory. Remove some files.' : '';
+    $('go').disabled = busy || decoding || g.length < 2 || !!bad;
+    $('go').textContent = 'Join and save ' + $('fmt').value.toUpperCase();
+    if (!busy && !decoding && !keep) say(bad ? 'bad' : '', bad || (items.length && g.length < 2 ? 'Add at least one more audio file.' : ''));
+  }
+  ['join', 'secs', 'fin', 'fout', 'fmt', 'kbps', 'level'].forEach(function (id) { $(id).addEventListener('change', function () { refresh(); }); $(id).addEventListener('input', function () { refresh(); }); });
+
+  // ---------- adding files ----------
+  function add(list) {
+    if (busy) { say('bad', 'Please wait until the files are joined.'); return; }
+    var skipped = [];
+    Array.prototype.forEach.call(list, function (f) {
+      if (items.length >= MAX_FILES) { skipped.push(f.name + ' (more than ' + MAX_FILES + ' files)'); return; }
+      if (!/^(audio|video)\//.test(f.type) && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm|mkv|3gp|aif|aiff)$/i.test(f.name)) { skipped.push(f.name + ' (not an audio file)'); return; }
+      if (!f.size) { skipped.push(f.name + ' (empty)'); return; }
+      if (f.size > 500 * 1048576) { skipped.push(f.name + ' (over 500 MB)'); return; }
+      items.push({ file: f, buf: null, err: '' });
+    });
+    render();
+    if (skipped.length) say('bad', 'Skipped: ' + skipped.join(', ') + '.');
+    decodeNext(skipped.length ? 'Skipped: ' + skipped.join(', ') + '.' : '');
+  }
+  function decodeNext(note) {
+    if (decoding) return;
+    var it = items.filter(function (x) { return !x.buf && !x.err; })[0];
+    if (!it) { refresh(true); if (note) say('bad', note); else if (good().length >= 2) say('', 'Ready. Choose how to join the files, then press Join.'); return; }
+    if (!OAC) { it.err = 'this browser cannot read audio'; render(); return; }
+    decoding = true; refresh(true); say('', 'Reading "' + it.file.name + '"…');
+    it.file.arrayBuffer().then(function (data) {
+      return new Promise(function (res, rej) { var p = new OAC(2, 1, SR).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+    }).then(function (b) { if (!(b.duration > 0.05)) it.err = 'too short'; else it.buf = b; },
+      function (e) { it.err = e instanceof RangeError ? 'too big for memory' : 'cannot be read'; })
+      .then(function () { decoding = false; render(); decodeNext(note); });
+  }
+  var dropEl = $('drop'), input = $('file');
+  dropEl.addEventListener('click', function () { input.click(); });
+  dropEl.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', function () { if (input.files.length) add(input.files); input.value = ''; });
+  ['dragenter', 'dragover'].forEach(function (ev) { dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { dropEl.addEventListener(ev, function (e) { e.preventDefault(); dropEl.classList.remove('over'); }); });
+  dropEl.addEventListener('drop', function (e) { if (e.dataTransfer.files.length) add(e.dataTransfer.files); });
+
+  // ---------- joining ----------
+  function rms(b) {
+    var s = 0, n = 0, step = Math.max(1, Math.floor(b.length / 400000));
+    for (var c = 0; c < b.numberOfChannels; c++) { var d = b.getChannelData(c); for (var i = 0; i < d.length; i += step) { if (d[i] !== 0) { s += d[i] * d[i]; n++; } } }
+    return n ? Math.sqrt(s / n) : 0;
+  }
+  function mix() {
+    var g = good(), p = plan(), mode = $('join').value, L = new Float32Array(p.total), R = new Float32Array(p.total), gains = g.map(function () { return 1; });
+    if ($('level').checked) {
+      var r = g.map(rms), logs = r.filter(function (v) { return v > 0; }).map(Math.log), target = logs.length ? Math.exp(logs.reduce(function (a, b) { return a + b; }, 0) / logs.length) : 0;
+      gains = r.map(function (v) { return v > 0 && target ? Math.max(0.25, Math.min(4, target / v)) : 1; });
+    }
+    g.forEach(function (it, k) {
+      var b = it.buf, n = b.length, st = p.starts[k], a = b.getChannelData(0), z = b.numberOfChannels > 1 ? b.getChannelData(1) : a, gain = gains[k];
+      var fadeIn = k > 0 && mode === 'xfade' ? p.starts[k - 1] + g[k - 1].buf.length - st : 0;
+      var fadeOut = k < g.length - 1 && mode === 'xfade' ? st + n - p.starts[k + 1] : 0;
+      for (var i = 0; i < n; i++) {
+        var w = gain;
+        if (fadeIn > 0 && i < fadeIn) w *= Math.sin(i / fadeIn * Math.PI / 2); // equal-power crossfade
+        if (fadeOut > 0 && i >= n - fadeOut) w *= Math.cos((i - (n - fadeOut)) / fadeOut * Math.PI / 2);
+        L[st + i] += a[i] * w; R[st + i] += z[i] * w;
+      }
+    });
+    var fi = Math.min(+$('fin').value * SR, p.total / 2), fo = Math.min(+$('fout').value * SR, p.total / 2);
+    for (var i = 0; i < fi; i++) { L[i] *= i / fi; R[i] *= i / fi; }
+    for (i = 0; i < fo; i++) { var j = p.total - 1 - i; L[j] *= i / fo; R[j] *= i / fo; }
+    var peak = 0; for (i = 0; i < p.total; i++) { var v = Math.max(Math.abs(L[i]), Math.abs(R[i])); if (v > peak) peak = v; }
+    if (peak > 0.97) { var s = 0.97 / peak; for (i = 0; i < p.total; i++) { L[i] *= s; R[i] *= s; } }
+    return [L, R];
+  }
+  $('go').addEventListener('click', function () {
+    if (busy || good().length < 2) return;
+    busy = true; render(); $('go').disabled = true; $('dl').hidden = true; $('result').hidden = true; bar(0.05);
+    var fmt = $('fmt').value, kbps = +$('kbps').value, t0 = Date.now(), n = good().length;
+    say('', 'Joining ' + n + ' files…');
+    new Promise(function (r) { setTimeout(r, 30); }).then(function () {
+      var chs = mix(); bar(0.3);
+      if (fmt === 'wav') return wavBlob(chs, SR);
+      if (fmt === 'mp3') { say('', 'Saving as MP3…'); return encodeMp3(chs, SR, kbps, function (p) { bar(0.3 + p * 0.7); say('', 'Saving as MP3… ' + Math.round(p * 100) + '%'); }); }
+      var wav = new File([wavBlob(chs, SR)], 'joined.wav', { type: 'audio/wav' }), secs2 = chs[0].length / SR; chs = null;
+      return FF.run(wav, function (inp) { return ['-i', inp, '-c:a', 'aac', '-b:a', kbps + 'k', '-movflags', '+faststart']; }, 'joined.m4a', secs2,
+        function (p) { bar(0.3 + p * 0.7); say('', 'Saving as M4A… ' + Math.round(p * 100) + '%'); }, say)
+        .then(function (data) { return new Blob([data], { type: 'audio/mp4' }); });
+    }).then(function (blob) {
+      busy = false; render();
+      if (dlUrl) URL.revokeObjectURL(dlUrl);
+      dlUrl = URL.createObjectURL(blob);
+      $('dl').href = dlUrl; $('dl').download = 'joined-audio.' + fmt; $('dl').textContent = 'Download ' + fmt.toUpperCase(); $('dl').hidden = false;
+      $('result').src = dlUrl; $('result').hidden = false; bar(1);
+      say('ok', 'Joined ' + n + ' files: ' + clock(plan().total / SR) + ', ' + fmtBytes(blob.size) + ' · took ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s.');
+    }).catch(function (e) {
+      busy = false; render(); bar(null);
+      say('bad', e instanceof RangeError ? 'Your device ran out of memory. Try fewer or shorter files, or MP3 instead of WAV.' : e && e.message ? e.message.replace(/video/g, 'audio') : 'Something went wrong while joining. Please try again.');
+    });
+  });
+  refresh();
+})();
+</script>

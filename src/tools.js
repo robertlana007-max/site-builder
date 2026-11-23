@@ -5456,5 +5456,226 @@ module.exports = [
       ['Do all AI crawlers obey robots.txt?', 'The major ones listed say they do, but robots.txt is a request, not a lock.']
     ],
     icon: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6M2 13v2M22 13v2"/><circle cx="12" cy="3" r="1"/>'
+  },
+  {
+    slug: 'video-to-vertical', cat: 'Social media tools', name: 'Video to Vertical',
+    title: 'Video to Vertical 9:16 - Reels, TikTok, Shorts Free',
+    desc: 'Turn any landscape video into a vertical 9:16, 4:5 or square video with a blurred background, zoom and position. Free, private, no upload.',
+    card: 'Make any video vertical for Reels and TikTok.',
+    intro: 'Turn a wide video into an upright 9:16 video for Reels, TikTok and YouTube Shorts, or a 4:5 or square post. Fill the empty space with a blurred copy of the video or a colour, or zoom in to fill the screen. It all happens in your browser.',
+    steps: ['Click the box or drop your video onto it.', 'Choose 9:16, 4:5 or 1:1, and how to fill the empty space: blur, colour or zoom in.', 'Use the zoom and position sliders while you watch the preview.', 'Press Make vertical video, then Download MP4.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The video is processed by a video engine that runs inside your browser, so it never leaves your device.'],
+      ['What is the best size for Reels, TikTok and Shorts?', '9:16, which is 1080 × 1920 pixels in Full HD or 720 × 1280 for a smaller, faster file. Instagram feed posts look best at 4:5 (1080 × 1350).'],
+      ['What does the blurred background do?', 'Instead of black bars, the empty space above and below your video is filled with an enlarged, blurred copy of the same video, so the whole screen looks full.'],
+      ['Can I crop instead of adding a background?', 'Yes. Choose "Nothing: zoom in to fill". The video fills the whole frame and the sides are cut off; use the left-right slider to choose which part stays.'],
+      ['Is the sound kept?', 'Yes. The sound stays exactly as it was, unless you tick "Remove the sound".'],
+      ['Why does it take a while?', 'The whole video has to be re-encoded at the new size on your own device. 720p is about twice as fast as 1080p.']
+    ],
+    icon: '<rect x="7" y="2" width="10" height="20" rx="2"/><path d="M3 8v8M21 8v8M10 12l3-2v4z"/>'
+  },
+  {
+    slug: 'teleprompter', cat: 'Media tools', name: 'Teleprompter',
+    title: 'Online Teleprompter - Free Scrolling Script with Mirror',
+    desc: 'Free online teleprompter: smooth scrolling script, speed and text size control, mirror mode, countdown, keyboard and tap controls, and camera recording.',
+    card: 'Read your script while you record.',
+    intro: 'Paste your script and it scrolls smoothly across the screen while you speak. Change the speed and text size on the fly, mirror the text for a teleprompter glass, and even record yourself with your camera, all in your browser.',
+    steps: ['Paste or type your script in the box.', 'Set the scroll speed, text size, colours and countdown.', 'Press Start teleprompter. Tap the screen or press Space to pause, and use the arrow keys to change the speed.', 'Optional: tick "Show my camera" and press Rec to record yourself.'],
+    faq: [
+      ['Is my script saved?', 'Your script is kept in this browser on this device only, so it is still there next time. It is never uploaded.'],
+      ['How do I control it while reading?', 'Tap the text or press the space bar to pause and continue. Arrow up and down change the speed, + and − change the text size, M mirrors the text, Home jumps back to the start and Esc closes it. On a phone use the buttons at the bottom.'],
+      ['What is mirror mode for?', 'A real teleprompter reflects the screen in a glass in front of the camera, which flips the text. Mirror mode flips it back so it reads correctly in the glass.'],
+      ['Can I record myself?', 'Yes. Tick "Show my camera behind the text", start the teleprompter and press Rec. Your camera and microphone are recorded (without the text) and you can download the video afterwards.'],
+      ['Does it work on phones and tablets?', 'Yes. It opens full screen, keeps the screen awake where the browser allows it, and has large touch buttons.'],
+      ['How fast should it scroll?', 'Start around 6 to 10 and adjust while you read. Most people speak about 130 to 160 words a minute.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="14" rx="2"/><path d="M7 7h10M7 10h10M7 13h6M12 17v4M8 21h8"/>'
+  },
+  {
+    slug: 'sound-meter', cat: 'Media tools', name: 'Sound Meter',
+    title: 'Sound Meter - Decibel Meter Online (dB) Free',
+    desc: 'Measure noise levels with your microphone: live decibel reading, min, average and max, 60-second graph, dB(A) weighting and calibration. Free and private.',
+    card: 'Measure how loud it is with your mic.',
+    intro: 'Use your phone or computer microphone as a decibel meter. See the live sound level, the minimum, average and maximum, and a graph of the last minute. Readings are estimates; calibrate against a real meter for better accuracy.',
+    steps: ['Press Start microphone and allow the microphone.', 'Hold the device still and watch the live level, minimum, average and maximum.', 'Optional: calibrate with a known level, choose dB(A) or flat weighting, and download the readings.'],
+    faq: [
+      ['How accurate is a phone decibel meter?', 'It is an estimate. The digital level from the microphone (dBFS) is measured exactly, but how that relates to real sound pressure depends on your microphone, so readings can be 10 dB or more off until you calibrate.'],
+      ['How do I calibrate it?', 'Next to a real sound level meter (or a sound of known level), type the real reading in "I know the real level now is" and press Calibrate. The offset is remembered on this device.'],
+      ['What is dB(A)?', 'A-weighting makes the meter less sensitive to very low and very high sounds, like the human ear. Most noise rules and hearing advice use dB(A).'],
+      ['What is dBFS?', 'Decibels relative to full scale: 0 dBFS is the loudest sound the microphone can record digitally, and everything else is a negative number.'],
+      ['Is the sound recorded or uploaded?', 'No. The sound is only measured in your browser. Nothing is recorded or sent anywhere. You can download the numbers as a CSV file if you want them.'],
+      ['How loud is too loud?', 'Long exposure above about 85 dB(A) can harm hearing. Short peaks above 100 dB are common at concerts; protect your ears.']
+    ],
+    icon: '<path d="M3 15a9 9 0 0 1 18 0"/><path d="M12 15l4-5"/><circle cx="12" cy="15" r="1.5"/><path d="M6 19h12"/>'
+  },
+  {
+    slug: 'voice-changer', cat: 'Media tools', name: 'Voice Changer',
+    title: 'Voice Changer Online - Robot, Chipmunk, Deep Voice Free',
+    desc: 'Record your voice or open a file and add effects: pitch up or down, robot, chipmunk, deep, echo, reverb and telephone. Save as MP3 or WAV. No upload.',
+    card: 'Change your voice with fun effects.',
+    intro: 'Record your voice or open an audio file, then try fun effects like chipmunk, robot, deep voice, echo, hall reverb and telephone. Listen instantly and save the result as MP3 or WAV. Everything stays on your device.',
+    steps: ['Press Record your voice, or open an audio file.', 'Tap an effect to hear it. Use the slider to make it stronger or weaker.', 'Choose MP3 or WAV and press Save, then Download.'],
+    faq: [
+      ['Is my voice uploaded?', 'No. Recording and all effects happen inside your browser. Your voice never leaves your device.'],
+      ['Which effects are there?', 'Pitch up, pitch down, chipmunk, deep voice, robot, echo, reverb (hall) and telephone, plus Normal to hear the original.'],
+      ['Can I change the voice in a video?', 'You can open a video file and the tool uses its sound. The result is an audio file (MP3 or WAV); add it back to a video with Add Music to Video.'],
+      ['How long can a recording be?', 'Up to 10 minutes from the microphone. Files you open can be longer, but long files take more time and memory.'],
+      ['Why does the chipmunk voice keep the same length?', 'The pitch is changed without changing the speed, so the words stay in time.'],
+      ['Does it work on phones?', 'Yes, in current mobile browsers. Allow the microphone when asked.']
+    ],
+    icon: '<rect x="9" y="2" width="6" height="11" rx="3"/><path d="M5 10a7 7 0 0 0 14 0M12 17v4"/><path d="M19 3l2 2M21 3l-2 2"/>'
+  },
+  {
+    slug: 'audio-joiner', cat: 'Media tools', name: 'Audio Joiner',
+    title: 'Audio Joiner - Merge MP3 Files Online Free',
+    desc: 'Join several MP3, M4A, WAV or OGG files into one in the order you choose, with crossfade or pauses, fades and volume levelling. Save MP3, M4A or WAV.',
+    card: 'Join audio files into one track.',
+    intro: 'Put several songs, voice notes or sound clips one after another and save them as a single file. Change the order, blend them with a crossfade or add a pause, and even out the volume. Nothing is uploaded.',
+    steps: ['Click the box or drop two or more audio files onto it.', 'Use the arrows to put them in order.', 'Choose a crossfade or pause, fades and the format: MP3, M4A or WAV.', 'Press Join and save, then Download.'],
+    faq: [
+      ['Are my files uploaded?', 'No. The files are joined inside your browser, so they never leave your device.'],
+      ['Can I join different formats?', 'Yes. You can mix MP3, M4A, WAV, OGG, FLAC and the sound of videos, as long as your browser can read them. The result is one MP3, M4A or WAV file.'],
+      ['What is a crossfade?', 'The end of one file fades out while the next fades in, so they blend smoothly with no silence between them.'],
+      ['How many files can I join?', 'Up to 50 files and 4 hours in total. Long joins need more memory, which matters most on phones.'],
+      ['What does "Even out the volume" do?', 'It makes quiet files louder and loud files quieter so they play at a similar level, and keeps the result from clipping.'],
+      ['Which format should I choose?', 'MP3 plays everywhere. M4A (AAC) is smaller for the same quality and works well on iPhone. WAV keeps full quality but is large.']
+    ],
+    icon: '<path d="M4 7h6M4 12h6M4 17h6"/><path d="M14 7l3 5-3 5M17 12h4"/>'
+  },
+  {
+    slug: 'audio-speed-pitch', cat: 'Media tools', name: 'Audio Speed and Pitch Changer',
+    title: 'Change Audio Speed & Pitch Online - Free, No Upload',
+    desc: 'Speed up or slow down any song or recording without changing the pitch, or change the key without changing the speed. Preview and save MP3 or WAV.',
+    card: 'Change tempo and key independently.',
+    intro: 'Make a song or recording faster or slower while it stays in the same key, or move it up or down in pitch without changing the speed. You can also change both together like a record player. Everything runs in your browser.',
+    steps: ['Click the box or drop an audio file onto it.', 'Set the speed (0.25× to 4×) and the pitch (−12 to +12 semitones).', 'Press Preview to hear 15 seconds, then choose MP3 or WAV.', 'Press Change and save, then Download.'],
+    faq: [
+      ['Can I slow down a song without making it sound deeper?', 'Yes. Speed and pitch are separate: change only the speed and the song keeps its key; change only the pitch and it keeps its tempo.'],
+      ['What is a semitone?', 'The smallest step in Western music, one piano key. 12 semitones make an octave. +2 moves a song up one whole tone, which is common for singing in a different key.'],
+      ['What does the record player option do?', 'It changes speed and pitch together, like playing a record faster or slower. This is how "nightcore" (faster and higher) and "slowed" (slower and deeper) versions are made.'],
+      ['Is my file uploaded?', 'No. All processing happens on your device.'],
+      ['Does it lower the quality?', 'Small changes sound natural. Very big changes (below 0.5× or above 2×, or more than about 5 semitones) can sound a bit grainy or echoey, as with any time-stretching tool.'],
+      ['How long does it take?', 'Roughly a few seconds per minute of stereo audio on a computer; longer on a phone.']
+    ],
+    icon: '<circle cx="12" cy="13" r="8"/><path d="M12 13l3-3M12 3v2M4 7l1.5 1.5M20 7l-1.5 1.5"/>'
+  },
+  {
+    slug: 'add-text-to-video', cat: 'Media tools', name: 'Add Text to Video',
+    title: 'Add Text to Video Online - Captions & Titles, Free',
+    desc: 'Put titles, captions and text on a video with start and end times, position, fonts, outline, shadow or box. Any language and emoji. MP4, no upload.',
+    card: 'Put titles and captions on a video.',
+    intro: 'Add titles, captions or notes to your video, each shown between the times you choose. Drag the text where you want it, pick a font, colour and style, and save an MP4. Every language and emoji works, and nothing is uploaded.',
+    steps: ['Click the box or drop your video onto it.', 'Type your text, set when it appears and disappears, and drag it into place on the preview.', 'Add more texts with "+ Add another text" and style each one.', 'Press Add text to video, then Download MP4.'],
+    faq: [
+      ['Which languages can I use?', 'Any language your device can show, including Arabic, Hebrew, Hindi, Chinese, Japanese, Korean and emoji. Text is drawn with your device\'s fonts, so what you see in the preview is what you get.'],
+      ['Can I show different texts at different times?', 'Yes. Add as many texts as you like, each with its own start and end time, position and style.'],
+      ['Is my video uploaded?', 'No. The text is drawn and the video is encoded in your browser.'],
+      ['Does it keep the sound?', 'Yes. The original sound is kept.'],
+      ['Can I make subtitles for a whole video?', 'Yes, by adding one text for each line. For long subtitle files, the Subtitle Generator can create them automatically.'],
+      ['Why does it re-encode the video?', 'Text becomes part of the picture, so every frame has to be encoded again. "Good" quality keeps it sharp with a reasonable file size.']
+    ],
+    icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M8 9h8M12 9v7"/>'
+  },
+  {
+    slug: 'add-music-to-video', cat: 'Media tools', name: 'Add Music to Video',
+    title: 'Add Music to Video Online - Free Background Music Mixer',
+    desc: 'Add a song to your video: mix it under the original sound or replace it, set volumes, start point, fades and looping. Fast MP4 export, no upload.',
+    card: 'Put background music on a video.',
+    intro: 'Add background music to any video. Keep the original voices and mix the music quietly underneath, or replace the sound completely. Choose where the song starts, fade it in and out, and repeat it if it is shorter than the video.',
+    steps: ['Drop your video, then drop the music file.', 'Choose whether to mix or replace the sound, and set both volumes.', 'Pick where the song starts, the fades and whether it repeats. Press Preview together.', 'Press Add music to video, then Download MP4.'],
+    faq: [
+      ['Is my video uploaded?', 'No. The music and video are combined in your browser.'],
+      ['Will the video lose quality?', 'Usually not. Most MP4 and MOV videos are copied without re-encoding, so the picture stays exactly the same and it is fast. Other formats are converted to H.264 MP4.'],
+      ['Can I keep people talking and add quiet music?', 'Yes. Choose "Keep it and mix the music under it" and set the music volume to about 20% to 40%.'],
+      ['What if the song is shorter than the video?', 'Tick "Repeat the music" and it loops from your chosen start point. Otherwise the rest of the video has only its own sound or silence.'],
+      ['Can I start the song from the chorus?', 'Yes. Type the time in "Start the song at", for example 0:45.'],
+      ['Can I use any song?', 'Use music you own or have permission to use. Many platforms mute or block videos with copyrighted music.']
+    ],
+    icon: '<rect x="2" y="5" width="13" height="14" rx="2"/><path d="M15 10l4-2v8l-4-2"/><circle cx="7" cy="15" r="1.5"/><path d="M8.5 15V9l3-1"/>'
+  },
+  {
+    slug: 'reverse-video', cat: 'Media tools', name: 'Reverse Video',
+    title: 'Reverse Video & Boomerang Maker - Online, Free',
+    desc: 'Play a video backwards or make a boomerang that goes forwards and back. Choose the part, loops and speed, keep reversed sound, save MP4 or GIF.',
+    card: 'Play videos backwards or make boomerangs.',
+    intro: 'Make any clip play backwards, or turn it into a boomerang that goes forwards and then backwards. Pick the part you want, how many times it repeats and the speed, and save as MP4 or GIF. Nothing is uploaded.',
+    steps: ['Click the box or drop your video onto it.', 'Choose Reverse or Boomerang, and the part of the video to use.', 'Pick how many times it plays, the speed, the sound and MP4 or GIF.', 'Press the button and download the result.'],
+    faq: [
+      ['What is a boomerang video?', 'A short clip that plays forwards and then backwards, so it loops smoothly. Instagram made it popular.'],
+      ['Is the sound reversed too?', 'Yes, if you choose "Reverse the sound too". You can also remove the sound. GIFs never have sound.'],
+      ['How long can the part be?', 'Up to 3 minutes. Reversing needs to hold the video in memory, so the tool works in small pieces; very long parts take a while.'],
+      ['Is my video uploaded?', 'No. Everything is processed by a video engine in your browser.'],
+      ['MP4 or GIF?', 'MP4 is smaller, sharper and keeps sound. GIF plays automatically everywhere, including chats and websites, but is bigger and has no sound.'],
+      ['Why is "Up to 720p" the default?', 'It is about twice as fast as full size and looks good on phones. Choose "Same as the video" for full resolution.']
+    ],
+    icon: '<path d="M11 19l-7-7 7-7v14z"/><path d="M20 19l-7-7 7-7v14z"/>'
+  },
+  {
+    slug: 'audio-waveform-video', cat: 'Media tools', name: 'Audio Waveform Video Maker',
+    title: 'Audio to Video with Waveform - Audiogram Maker Free',
+    desc: 'Turn a song, podcast or voice note into an MP4 with an animated waveform, picture or colour background and title. Sizes for YouTube and Instagram.',
+    card: 'Turn audio into a video with a moving waveform.',
+    intro: 'Turn audio into a shareable video: an animated waveform or bars that move with the sound, on top of your picture or a colour background, with a title. Choose sizes for YouTube, Instagram, Reels and TikTok.',
+    steps: ['Click the box or drop your audio file onto it.', 'Choose the video size, background and waveform style.', 'Type a title and a second line, and choose the part of the audio to use.', 'Press Make video, then Download MP4.'],
+    faq: [
+      ['What is an audiogram?', 'A video made from audio, with a moving waveform so viewers can see the sound. It is a popular way to share podcasts and music on social media.'],
+      ['Which sizes are there?', 'YouTube 720p (1280 × 720) and 1080p (1920 × 1080), Instagram square (1080 × 1080), portrait 4:5 (1080 × 1350), and 9:16 (1080 × 1920) for Reels, Stories, TikTok and Shorts.'],
+      ['Can I use my own picture?', 'Yes. Choose "My picture". If its shape differs from the video, the empty space is filled with a blurred copy.'],
+      ['Is my audio uploaded?', 'No. The video is made in your browser.'],
+      ['How long does it take?', 'About real time or faster for 720p on a computer. Longer audio, bigger sizes and phones take longer. Use the From and To times to make a short clip.'],
+      ['Can I write the title in any language?', 'Yes. The title is drawn with your device\'s fonts, so all scripts and emoji work.']
+    ],
+    icon: '<rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 12v0M8.5 10v4M11 8v8M13.5 10v4M16 11v2M18 12v0"/>'
+  },
+  {
+    slug: 'tone-generator', cat: 'Media tools', name: 'Tone Generator',
+    title: 'Online Tone Generator - Sine, Sweep & Binaural Beats',
+    desc: 'Play a pure tone from 1 Hz to 20,000 Hz in sine, square, sawtooth or triangle, a frequency sweep, or binaural beats. Download WAV. Free, no sign-up.',
+    card: 'Play test tones, sweeps and binaural beats.',
+    intro: 'Generate a steady tone at any frequency from 1 Hz to 20 kHz, sweep from low to high, or play binaural beats with a different tone in each ear. Choose the wave shape and volume, and download the sound as a WAV file.',
+    steps: ['Turn your device volume down first.', 'Choose a tone, sweep or binaural beat, the wave shape and the frequency.', 'Press Play or the space bar, and raise the volume slowly.', 'Optional: set a length and press Make WAV file to download it.'],
+    faq: [
+      ['What frequency range can I play?', 'From 1 Hz to 20,000 Hz. Most people hear from about 20 Hz to 15,000 to 20,000 Hz; small speakers may not play very low tones.'],
+      ['Is it safe?', 'Start with the volume low. Pure tones can sound louder than music, and loud high or low tones can damage speakers and hearing. Never put headphones on while a tone is playing loudly.'],
+      ['What are binaural beats?', 'Two slightly different tones, one in each ear. The brain perceives a soft beat at the difference, for example 200 Hz and 210 Hz give a 10 Hz beat. You need headphones.'],
+      ['What is a frequency sweep for?', 'It glides from one frequency to another, which helps you find rattles, test speakers and subwoofers, or check the range you can hear.'],
+      ['Which wave shape should I use?', 'Sine is a pure, smooth tone for testing. Square, sawtooth and triangle contain extra harmonics and sound buzzier or brighter.'],
+      ['Can I download the tone?', 'Yes. Choose a length from 1 second to 10 minutes and press Make WAV file. The file is 16-bit stereo at 44.1 kHz.']
+    ],
+    icon: '<path d="M2 12c2-6 4-6 6 0s4 6 6 0 4-6 6 0"/><path d="M22 12h0"/>'
+  },
+  {
+    slug: 'bpm-finder', cat: 'Media tools', name: 'BPM Finder',
+    title: 'BPM Finder - Detect Song Tempo Online + Tap Tempo',
+    desc: 'Find the BPM (tempo) of any song file with beat detection, see how confident it is, check it with a click track, or tap along with tap tempo. Free.',
+    card: 'Find the tempo (BPM) of any song.',
+    intro: 'Drop a song to find its tempo in beats per minute. The tool listens for drum hits and other beats, shows how confident it is, and lets you play the song with a click on every beat to check. Or tap along with Tap tempo.',
+    steps: ['Click the box or drop a song onto it.', 'Read the BPM and the confidence level.', 'Press "Play with a click on each beat" to check it by ear, or choose half or double time.', 'For any song you hear, use Tap tempo below.'],
+    faq: [
+      ['How does it find the BPM?', 'It looks for sudden increases in loudness across low, middle and high frequencies (onsets such as drum hits), then finds the beat spacing that lines up best with them through the whole song.'],
+      ['How accurate is it?', 'On music with a steady beat it is usually exact to within 0.5 BPM. Songs with tempo changes, live drumming or no drums are harder, which the confidence level shows.'],
+      ['Why does it say half or double time?', 'Many songs can be counted at two speeds, for example 70 or 140 BPM. If the number feels too slow or fast, press the other option.'],
+      ['Is my song uploaded?', 'No. The song is analysed in your browser.'],
+      ['What is tap tempo?', 'Tap the button, the T key or the space bar on every beat. The tool averages your last taps to show the BPM.'],
+      ['Which files work?', 'MP3, M4A, WAV, OGG, FLAC and the sound of most videos, at least 5 seconds long.']
+    ],
+    icon: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/><path d="M2 4h3M2 8h3"/>'
+  },
+  {
+    slug: 'hearing-test', cat: 'Media tools', name: 'Hearing Test',
+    title: 'Online Hearing Test - Check Both Ears (Not Medical)',
+    desc: 'Check your hearing with headphones: beeps at 7 pitches for each ear, a results chart, and a highest-pitch test. A free self-check, not a medical test.',
+    card: 'Check how well each ear hears beeps.',
+    intro: 'A simple self-check with headphones. You hear beeps at different pitches in each ear, getting quieter until you can no longer hear them, and see a chart comparing your ears. There is also a test for the highest pitch you can hear. This is not a medical test.',
+    steps: ['Put on headphones in a quiet room and check left and right.', 'Play the reference tone and set a comfortable device volume.', 'Choose a test and press Start. Press "I hear it" or the space bar whenever you hear beeps.', 'Read the chart and table. See a professional if you are worried.'],
+    faq: [
+      ['Is this a real hearing test?', 'No. It is a rough self-check. A real hearing test (audiometry) uses calibrated equipment in a quiet booth and gives results in dB HL. This tool cannot diagnose hearing loss.'],
+      ['What do the numbers mean?', 'They show the quietest beeps you heard, in dB compared with the reference tone you set. −40 dB means you heard a beep 40 dB quieter than the reference. Lower (more negative) is better.'],
+      ['Why do I need headphones?', 'To test each ear separately and to keep the volume steady. Speakers let both ears hear the beeps.'],
+      ['What is the highest pitch test?', 'A tone slowly rises from 8 kHz. You press when it fades away. Young people often hear up to 17 to 20 kHz; the limit falls with age. Many headphones cannot play the highest pitches.'],
+      ['Why are my two ears different?', 'Small differences are normal and can come from headphone fit. Differences of 15 dB or more, especially if new, are worth checking with a hearing professional.'],
+      ['Is my data stored?', 'No. Results stay on screen only; nothing is uploaded or saved.']
+    ],
+    icon: '<path d="M6 9a6 6 0 1 1 12 0c0 3-2 4-3 5s-1 3-3 3a2 2 0 0 1-2-2"/><path d="M9 9a3 3 0 0 1 6 0"/>'
   }
 ];

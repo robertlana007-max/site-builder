@@ -1,0 +1,238 @@
+<style>
+.sm-top { text-align: center; margin: 4px 0 8px; }
+.sm-db { font-size: clamp(60px, 18vw, 104px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.sm-db small { font-size: 20px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-inline-start: 6px; }
+.sm-what { color: var(--muted); font-weight: 600; margin-top: 6px; min-height: 1.4em; }
+.sm-bar { height: 14px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 10px 0 14px; }
+.sm-bar i { display: block; height: 100%; width: 0; border-radius: 99px; background: var(--ok); transition: width .08s linear; }
+.sm-bar i.warn { background: #f59e0b; } .sm-bar i.loud { background: var(--bad); }
+.sm-graph { display: block; width: 100%; height: 180px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin: 0 0 6px; }
+.sm-note { font-size: 13px; color: var(--muted); margin: 0 0 14px; }
+.sm-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 14px; }
+.sm-main .btn { flex: 1 1 150px; min-height: 52px; }
+.sm-cal { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+.sm-cal > div { flex: 1 1 180px; }
+.sm-cal .btn { flex: 0 0 auto; }
+.sm-honest { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; font-size: 14px; color: var(--muted); margin: 0 0 14px; }
+.sm-honest b { color: var(--ink); }
+.sm-table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 6px 0 14px; }
+.sm-table td { padding: 5px 6px; border-bottom: 1px solid var(--line); }
+.sm-table td:first-child { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; width: 5.5em; }
+</style>
+<div class="sm-top">
+  <div class="sm-db" aria-live="off"><span id="now">–</span><small id="unit">dB</small></div>
+  <div class="sm-what" id="what">Press Start to measure the sound around you</div>
+</div>
+<div class="sm-bar" aria-hidden="true"><i id="lvl"></i></div>
+<div class="stats">
+  <div class="stat"><span>Minimum</span><b id="min">–</b></div>
+  <div class="stat"><span>Average (Leq)</span><b id="avg">–</b></div>
+  <div class="stat"><span>Maximum</span><b id="max">–</b></div>
+  <div class="stat"><span>Time measured</span><b id="time">0:00</b></div>
+</div>
+<canvas class="sm-graph" id="graph" aria-label="Sound level over the last 60 seconds" role="img"></canvas>
+<p class="sm-note" id="graphNote">The graph shows the last 60 seconds.</p>
+<div class="sm-main">
+  <button class="btn" type="button" id="start">Start microphone</button>
+  <button class="btn ghost" type="button" id="reset" disabled>Reset min / max</button>
+  <button class="btn ghost" type="button" id="csv" disabled>Download readings (CSV)</button>
+</div>
+<p class="msg" id="msg"></p>
+<div class="fields">
+  <div><label for="show">Show the level as</label><select id="show"><option value="spl">Estimated dB (sound level)</option><option value="dbfs">dBFS (raw microphone level)</option></select></div>
+  <div><label for="weight">Frequency weighting</label><select id="weight"><option value="A">A-weighting, dB(A) (like the human ear)</option><option value="Z">None, dB(Z) (flat)</option></select></div>
+  <div><label for="speed">Response</label><select id="speed"><option value="fast">Fast (0.125 s)</option><option value="slow">Slow (1 s)</option></select></div>
+  <div><label for="mic">Microphone</label><select id="mic"><option value="">Default microphone</option></select></div>
+</div>
+<div class="sm-cal">
+  <div><label for="offset">Calibration offset (dB added to dBFS)</label><input type="number" id="offset" step="0.1" value="100" inputmode="decimal"></div>
+  <div><label for="real">I know the real level now is (dB)</label><input type="number" id="real" step="0.1" placeholder="for example 60" inputmode="decimal" data-nomemo></div>
+  <button class="btn ghost" type="button" id="cal">Calibrate</button>
+</div>
+<div class="sm-honest" style="margin-top:14px"><b>How accurate is it?</b> A phone or laptop microphone is not a certified sound level meter. The tool measures the digital level (dBFS) exactly, then adds the calibration offset to estimate the sound level in dB. The default offset of 100 dB is only a typical value, so readings can be 10 dB or more off until you calibrate against a real meter or a known sound. Very loud sounds may also be limited by the microphone.</div>
+<table class="sm-table" aria-label="Typical sound levels">
+  <tr><td>30 dB</td><td>Whisper, quiet bedroom at night</td></tr>
+  <tr><td>40–50 dB</td><td>Quiet office, library, fridge hum</td></tr>
+  <tr><td>60 dB</td><td>Normal conversation, restaurant</td></tr>
+  <tr><td>70 dB</td><td>Vacuum cleaner, busy street</td></tr>
+  <tr><td>85 dB</td><td>Heavy traffic, food blender. Long exposure can harm hearing</td></tr>
+  <tr><td>100 dB+</td><td>Motorbike, concert, nightclub. Protect your ears</td></tr>
+</table>
+<script>
+(function () {
+  var md = navigator.mediaDevices, AC = window.AudioContext || window.webkitAudioContext;
+  var actx = null, stream = null, srcNode = null, anZ = null, anA = null, buf = null, timer = 0, raf = 0, starting = false;
+  var level = null, minV = Infinity, maxV = -Infinity, sumE = 0, sumN = 0, t0 = 0, lastT = 0, hist = [], log = [], lastLog = 0, warmup = 0;
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
+  function unsupported(t) { say('bad', t); $('start').disabled = true; }
+  if (!window.isSecureContext) unsupported('The microphone only works on a secure (https) page. Open this tool from its https:// address.');
+  else if (!md || !md.getUserMedia || !AC) unsupported('This browser cannot use the microphone. Update it, or try Chrome, Edge, Firefox or Safari.');
+  function why(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Microphone access was blocked. Click the lock or microphone icon next to the web address, allow the microphone, then press Start microphone again. On a phone, also check that your browser may use the microphone in the phone settings.';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No microphone was found. Plug one in, or check that your headset is connected and switched on, then try again.';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'The microphone is busy or could not start. Close other apps or tabs that use it (calls, recorders), then try again.';
+    if (n === 'NotSupportedError') return 'This browser does not allow the microphone on this page. Try Chrome, Edge, Firefox or Safari.';
+    return 'The microphone could not start. Reload the page and try again.';
+  }
+  function offset() { var v = parseFloat($('offset').value); return isFinite(v) ? Math.max(-50, Math.min(200, v)) : 100; }
+  function spl() { return $('show').value === 'spl'; }
+  function disp(dbfs) { return dbfs + (spl() ? offset() : 0); }
+  function fmt(v) { return isFinite(v) ? fmtNum(Math.round(v * 10) / 10, 1) : '–'; }
+  function unit() { return spl() ? ($('weight').value === 'A' ? 'dB(A)' : 'dB') : 'dBFS'; }
+
+  // A-weighting (IEC 61672) as three second-order filters, made from the analog formula with the bilinear transform.
+  function aWeighting(ctx) {
+    var K = 2 * ctx.sampleRate, w = [20.598997, 107.65265, 737.86223, 12194.217].map(function (f) { return K * Math.tan(Math.PI * f / ctx.sampleRate); }); // pre-warped poles
+    function digital(b, a) { // b, a: [s^2, s, 1] coefficients
+      function z(c) { return [c[0] * K * K + c[1] * K + c[2], -2 * c[0] * K * K + 2 * c[2], c[0] * K * K - c[1] * K + c[2]]; }
+      var B = z(b), A = z(a), n = A[0];
+      return ctx.createIIRFilter(B.map(function (v) { return v / n; }), A.map(function (v) { return v / n; }));
+    }
+    var f1 = digital([1, 0, 0], [1, 2 * w[0], w[0] * w[0]]), f2 = digital([1, 0, 0], [1, w[1] + w[2], w[1] * w[2]]), f3 = digital([0, 0, 1], [1, 2 * w[3], w[3] * w[3]]), g = ctx.createGain();
+    var fr = new Float32Array([1000]), mag = new Float32Array(1), ph = new Float32Array(1), total = 1;
+    [f1, f2, f3].forEach(function (f) { f.getFrequencyResponse(fr, mag, ph); total *= mag[0]; });
+    g.gain.value = 1 / total; // exactly 0 dB at 1 kHz
+    f1.connect(f2); f2.connect(f3); f3.connect(g);
+    return { input: f1, output: g, parts: [f1, f2, f3] };
+  }
+
+  function listMics() {
+    if (!md.enumerateDevices) return;
+    md.enumerateDevices().then(function (list) {
+      var sel = $('mic'), cur = sel.value; sel.length = 1;
+      list.filter(function (d) { return d.kind === 'audioinput' && d.deviceId && d.deviceId !== 'default'; }).forEach(function (d, i) {
+        var o = document.createElement('option'); o.value = d.deviceId; o.textContent = d.label || 'Microphone ' + (i + 1); sel.appendChild(o);
+      });
+      sel.value = cur; if (sel.value !== cur) sel.value = '';
+    }).catch(function () {});
+  }
+  function start() {
+    if (starting) return;
+    starting = true; $('start').disabled = true; say('', 'Starting the microphone… If your browser asks, choose Allow.');
+    var a = { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    if ($('mic').value) a.deviceId = { exact: $('mic').value };
+    md.getUserMedia({ audio: a, video: false }).catch(function (e) {
+      if (e && e.name === 'OverconstrainedError') { $('mic').value = ''; delete a.deviceId; return md.getUserMedia({ audio: a }); }
+      throw e;
+    }).then(function (s) {
+      stream = s;
+      if (!actx) actx = new AC();
+      if (actx.resume) actx.resume();
+      srcNode = actx.createMediaStreamSource(s);
+      anZ = actx.createAnalyser(); anZ.fftSize = 2048; anA = actx.createAnalyser(); anA.fftSize = 2048;
+      srcNode.connect(anZ);
+      try { var aw = aWeighting(actx); srcNode.connect(aw.input); aw.output.connect(anA); }
+      catch (e) { anA = null; $('weight').value = 'Z'; $('weight').disabled = true; }
+      buf = new Float32Array(2048);
+      var tr = s.getAudioTracks()[0];
+      if (tr) tr.addEventListener('ended', function () { stop(); say('bad', 'The microphone was disconnected. Press Start microphone to continue.'); });
+      starting = false; $('start').disabled = false; $('start').textContent = 'Stop microphone'; $('reset').disabled = false; $('csv').disabled = false;
+      t0 = lastT = performance.now(); level = null; warmup = 0;
+      timer = setInterval(measure, 50); draw();
+      say('ok', 'Measuring. Hold the device still, with the microphone pointing at the sound.');
+      listMics();
+    }).catch(function (e) { starting = false; $('start').disabled = false; say('bad', why(e)); });
+  }
+  function stop() {
+    clearInterval(timer); cancelAnimationFrame(raf); timer = 0;
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    if (srcNode) try { srcNode.disconnect(); } catch (e) {}
+    stream = null; srcNode = null;
+    $('start').textContent = 'Start microphone';
+  }
+  $('start').addEventListener('click', function () { if (stream) { stop(); say('', 'Stopped. Your readings stay on screen until you start again or reset.'); } else { resetStats(); start(); } });
+  function resetStats() { minV = Infinity; maxV = -Infinity; sumE = 0; sumN = 0; hist = []; log = []; t0 = lastT = performance.now(); level = null; warmup = 0; show(); }
+  $('reset').addEventListener('click', function () { resetStats(); say('', 'Readings reset.'); });
+
+  function measure() {
+    var an = $('weight').value === 'A' && anA ? anA : anZ;
+    if (!an) return;
+    an.getFloatTimeDomainData(buf);
+    var ms = 0; for (var i = 0; i < buf.length; i++) ms += buf[i] * buf[i]; ms /= buf.length;
+    var now = performance.now(), dt = (now - lastT) / 1000; lastT = now;
+    var tau = $('speed').value === 'slow' ? 1 : 0.125;
+    level = level == null ? ms : level + (ms - level) * (1 - Math.exp(-dt / tau));
+    var dbfs = Math.max(-100, 10 * Math.log10(Math.max(level, 1e-12)) + 3.01); // a full-scale sine wave reads 0 dBFS
+    warmup += dt;
+    if (warmup > 0.6) { // let the first readings settle
+      if (dbfs < minV) minV = dbfs; if (dbfs > maxV) maxV = dbfs;
+      sumE += ms * dt; sumN += dt;
+    }
+    var sec = (now - t0) / 1000;
+    if (!hist.length || sec - hist[hist.length - 1].t >= 0.1) { hist.push({ t: sec, v: dbfs }); while (hist.length && sec - hist[0].t > 60) hist.shift(); }
+    if (warmup > 0.6 && (sec - lastLog >= 1 || !log.length)) { lastLog = sec; if (log.length < 86400) log.push([new Date(), dbfs]); }
+    cur = dbfs;
+  }
+  var cur = null;
+  function describe(v) {
+    if (!spl()) return v > -1 ? 'At the top of the microphone range (may be clipped)' : '';
+    return v < 35 ? 'Very quiet' : v < 50 ? 'Quiet' : v < 65 ? 'Normal conversation level' : v < 80 ? 'Loud' : v < 90 ? 'Very loud: long exposure can harm hearing' : 'Dangerously loud: protect your ears';
+  }
+  function show() {
+    $('unit').textContent = unit();
+    if (cur == null) { $('now').textContent = '–'; }
+    else {
+      var v = disp(cur);
+      $('now').textContent = fmt(v);
+      $('what').textContent = describe(v) || (spl() ? '' : 'Raw digital level: 0 dBFS is the loudest the microphone can record');
+      var p = Math.max(0, Math.min(1, (cur + 90) / 90)), el = $('lvl');
+      el.style.width = (p * 100) + '%';
+      var s = spl() ? v : cur + 100;
+      el.className = s >= 85 ? 'loud' : s >= 70 ? 'warn' : '';
+    }
+    $('min').textContent = isFinite(minV) ? fmt(disp(minV)) : '–';
+    $('max').textContent = isFinite(maxV) ? fmt(disp(maxV)) : '–';
+    $('avg').textContent = sumN > 0 ? fmt(disp(Math.max(-100, 10 * Math.log10(Math.max(sumE / sumN, 1e-12)) + 3.01))) : '–';
+    var s2 = stream ? Math.floor((performance.now() - t0) / 1000) : Math.floor(hist.length ? hist[hist.length - 1].t : 0);
+    $('time').textContent = Math.floor(s2 / 60) + ':' + (s2 % 60 < 10 ? '0' : '') + s2 % 60;
+  }
+  function css(v, fb) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb; }
+  function graph() {
+    var cv = $('graph'), d = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d));
+    if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; }
+    var g = cv.getContext('2d'), off = spl() ? offset() : 0, top = 0 + off, bottom = -90 + off, ink = css('--muted', '#888'), line = css('--line', '#ddd');
+    var pad = 36 * d;
+    g.clearRect(0, 0, W, H);
+    g.font = (11 * d) + 'px system-ui, sans-serif'; g.fillStyle = ink; g.strokeStyle = line; g.lineWidth = 1;
+    for (var v = Math.ceil(bottom / 15) * 15; v <= top; v += 15) {
+      var y = H - (v - bottom) / (top - bottom) * H;
+      g.beginPath(); g.moveTo(pad, y); g.lineTo(W, y); g.stroke();
+      g.fillText(String(Math.round(v)), 4 * d, Math.min(H - 3 * d, Math.max(11 * d, y + 4 * d)));
+    }
+    if (hist.length < 2) return;
+    var last = hist[hist.length - 1].t;
+    g.strokeStyle = css('--accent', '#2563eb'); g.lineWidth = 2 * d; g.beginPath();
+    hist.forEach(function (p, i) {
+      var x = pad + (W - pad) * (1 - (last - p.t) / 60), y = H - (Math.max(bottom, Math.min(top, p.v + off)) - bottom) / (top - bottom) * H;
+      if (i) g.lineTo(x, y); else g.moveTo(x, y);
+    });
+    g.stroke();
+  }
+  function draw() { cancelAnimationFrame(raf); show(); graph(); if (stream) raf = requestAnimationFrame(draw); }
+  ['show', 'weight', 'speed'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'weight') resetStats(); else if (id === 'speed') { level = null; warmup = 0; } draw(); }); });
+  $('offset').addEventListener('input', function () { draw(); });
+  $('mic').addEventListener('change', function () { if (stream) { stop(); start(); } });
+  $('cal').addEventListener('click', function () {
+    var real = parseFloat($('real').value);
+    if (cur == null || !stream) return say('bad', 'Start the microphone first, then type the level a real sound level meter shows right now.');
+    if (!isFinite(real) || real < 0 || real > 150) return say('bad', 'Type the real sound level in dB, for example 60.');
+    var o = Math.round((real - cur) * 10) / 10;
+    $('offset').value = o; $('show').value = 'spl';
+    $('offset').dispatchEvent(new Event('change', { bubbles: true }));
+    draw(); say('ok', 'Calibrated: the offset is now ' + fmtNum(o, 1) + ' dB. This device and microphone will use it next time too.');
+  });
+  $('csv').addEventListener('click', function () {
+    if (!log.length) return say('bad', 'There are no readings yet.');
+    var rows = ['time,' + (spl() ? 'estimated ' : '') + unit() + ',dBFS'];
+    log.forEach(function (r) { rows.push(r[0].toISOString() + ',' + (Math.round(disp(r[1]) * 10) / 10) + ',' + (Math.round(r[1] * 10) / 10)); });
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([rows.join('\n') + '\n'], { type: 'text/csv' }));
+    a.download = 'sound-levels.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+    say('ok', 'Saved ' + log.length + ' readings (one per second).');
+  });
+  window.addEventListener('resize', graph);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && stream) draw(); });
+  show(); graph();
+})();
+</script>
