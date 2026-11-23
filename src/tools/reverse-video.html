@@ -1,0 +1,392 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.rv-modes { display: flex; gap: 8px; margin: 0 0 14px; }
+.rv-modes button { flex: 1; font: inherit; font-weight: 600; padding: 10px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; }
+.rv-modes button span { display: block; font-size: 22px; line-height: 1.2; }
+.rv-modes button small { display: block; font-weight: 400; font-size: 13px; color: var(--muted); }
+.rv-modes button[aria-pressed=true] { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.rv-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.rv-row .btn { flex: 1 1 150px; }
+.rv-out { display: block; max-width: 100%; max-height: 360px; margin: 14px auto 0; border-radius: 10px; border: 1px solid var(--line); background: #000; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a video here</b>MP4, MOV, WebM, MKV or AVI, up to 1 GB. Your video never leaves your device.</div>
+<input type="file" id="file" accept="video/*,.mkv,.mov,.avi,.m4v,.3gp,.ts,.mts,.wmv,.flv" hidden data-nomemo>
+<p class="vt-info" id="info"></p>
+<div id="editor" hidden>
+  <video class="vt-video" id="player" controls playsinline preload="metadata"></video>
+  <p class="vt-hint" id="noPlay" hidden>Your browser cannot play this video format, so there is no preview. You can still type the start and end times below.</p>
+  <div class="rv-modes" role="group" aria-label="Effect">
+    <button type="button" data-mode="rev" aria-pressed="true"><span aria-hidden="true">⏪</span>Reverse<small>Play it backwards</small></button>
+    <button type="button" data-mode="boom" aria-pressed="false"><span aria-hidden="true">🔁</span>Boomerang<small>Forwards, then backwards</small></button>
+  </div>
+  <div class="rv-row">
+    <button class="btn ghost" type="button" id="setA">Start here</button>
+    <button class="btn ghost" type="button" id="setB">End here</button>
+  </div>
+  <div class="fields">
+    <div><label for="start">Part to use: from</label><input type="text" id="start" value="0:00" inputmode="decimal" autocomplete="off" data-nomemo></div>
+    <div><label for="end">to</label><input type="text" id="end" value="0:00" inputmode="decimal" autocomplete="off" data-nomemo></div>
+    <div><label for="loops">Play it</label><select id="loops"><option value="1">Once</option><option value="2">2 times</option><option value="3" selected>3 times</option><option value="5">5 times</option></select></div>
+    <div><label for="speed">Speed</label><select id="speed"><option value="1">Normal</option><option value="1.5">1.5× faster</option><option value="2">2× faster</option><option value="0.5">Half speed (slow motion)</option></select></div>
+    <div><label for="sound">Sound</label><select id="sound"><option value="rev">Reverse the sound too</option><option value="none">No sound</option></select></div>
+    <div><label for="size">Size</label><select id="size"><option value="0">Same as the video</option><option value="720" selected>Up to 720p (faster)</option><option value="480">Up to 480p (fastest)</option></select></div>
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp4">MP4 video</option><option value="gif">GIF animation (no sound)</option></select></div>
+    <div id="gifBox" hidden><label for="gw">GIF width</label><select id="gw"><option value="320">320 px (small file)</option><option value="480" selected>480 px</option><option value="640">640 px</option></select></div>
+  </div>
+  <p class="vt-hint" id="hint"></p>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Reverse video</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<video class="rv-out" id="result" controls playsinline loop hidden></video>
+<img class="rv-out" id="gifOut" alt="Your GIF" hidden>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var file = null, info = null, url = null, P = $('player'), mode = 'rev', MAXLEN = 180;
+  function parse(s) {
+    s = String(s).trim().replace(',', '.');
+    if (!/^\d+(?:\.\d+)?$|^\d+:\d{1,2}(?:\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(?:\.\d+)?$/.test(s)) return NaN;
+    return s.split(':').reduce(function (t, p) { return t * 60 + parseFloat(p); }, 0);
+  }
+  function range() {
+    var a = parse($('start').value), b = parse($('end').value);
+    if (isNaN(a)) return { err: 'The start time is not a time. Use minutes and seconds like 0:05, or just seconds like 5.' };
+    if (isNaN(b)) return { err: 'The end time is not a time. Use minutes and seconds like 0:12, or just seconds like 12.' };
+    if (a >= info.duration) return { err: 'The start is after the end of the video (' + VT.clock(info.duration) + ').' };
+    b = Math.min(b, info.duration);
+    if (b - a < 0.2) return { err: 'The end must be at least 0.2 seconds after the start.' };
+    if (b - a > MAXLEN) return { err: 'This part is ' + VT.clock(b - a) + ' long. Reversing needs a lot of memory, so choose a part of up to 3 minutes.' };
+    return { a: a, b: b };
+  }
+  function outSize() {
+    var lim = +$('size').value, w = info.width, h = info.height;
+    if (lim && Math.min(w, h) > lim) { var k = lim / Math.min(w, h); w = w * k; h = h * k; }
+    return { w: Math.max(2, Math.round(w / 2) * 2), h: Math.max(2, Math.round(h / 2) * 2) };
+  }
+  function hint() {
+    if (!info) return;
+    var r = range(), gif = $('fmt').value === 'gif';
+    $('gifBox').hidden = !gif; $('sound').disabled = gif || !info.audio; $('size').disabled = false;
+    $('go').textContent = (mode === 'boom' ? 'Make boomerang' : 'Reverse video') + (gif ? ' GIF' : '');
+    if (r.err) { $('hint').textContent = r.err; $('go').disabled = true; return; }
+    var sp = +$('speed').value, one = (r.b - r.a) / sp * (mode === 'boom' ? 2 : 1), total = one * +$('loops').value, s = outSize();
+    $('hint').textContent = 'The result will be ' + VT.clock(total) + ' long (' + s.w + ' × ' + s.h + (gif ? ', GIF without sound' : '') + ').' + (r.b - r.a > 30 ? ' Long parts take a while: the video is reversed in small pieces to save memory.' : '');
+    $('go').disabled = false;
+  }
+  ['start', 'end', 'loops', 'speed', 'sound', 'size', 'fmt', 'gw'].forEach(function (id) { $(id).addEventListener('input', hint); $(id).addEventListener('change', hint); });
+  Array.prototype.forEach.call(document.querySelectorAll('.rv-modes button'), function (b) {
+    b.addEventListener('click', function () { mode = b.dataset.mode; Array.prototype.forEach.call(document.querySelectorAll('.rv-modes button'), function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); $('dl').hidden = true; hint(); });
+  });
+  function reset() { file = null; info = null; $('editor').hidden = true; $('result').hidden = true; $('gifOut').hidden = true; P.pause(); P.removeAttribute('src'); P.load(); if (url) { URL.revokeObjectURL(url); url = null; } }
+  VT.pick(reset, function (f, i) {
+    file = f; info = i; url = URL.createObjectURL(f); $('noPlay').hidden = true; P.hidden = false; P.src = url;
+    $('start').value = VT.clock(0); $('end').value = VT.clock(Math.min(i.duration, MAXLEN));
+    if (!i.audio) $('sound').value = 'none';
+    $('editor').hidden = false; hint();
+    if (i.duration > MAXLEN) VT.say('', 'This video is longer than 3 minutes, so the first 3 minutes are selected. Choose the part you want with Start here and End here.');
+  });
+  P.addEventListener('error', function () { if (P.getAttribute('src')) { P.hidden = true; $('noPlay').hidden = false; } });
+  $('setA').addEventListener('click', function () { if (!info || P.hidden) return; $('start').value = VT.clock(P.currentTime); hint(); });
+  $('setB').addEventListener('click', function () { if (!info || P.hidden) return; $('end').value = VT.clock(P.currentTime); hint(); });
+
+  $('go').addEventListener('click', function () {
+    if (!file) return;
+    var r = range(); if (r.err) { VT.say('bad', r.err); return; }
+    P.pause(); $('result').hidden = true; $('gifOut').hidden = true;
+    var f = file, i = info, len = r.b - r.a, sp = +$('speed').value, loops = +$('loops').value, gif = $('fmt').value === 'gif', gw = +$('gw').value;
+    var snd = !gif && i.audio && $('sound').value === 'rev', s = outSize(), fps = Math.min(60, Math.max(1, Math.round(i.fps) || 30)), boom = mode === 'boom';
+    // pieces small enough to reverse in memory: about 60 frames of a 1080p picture
+    var piece = Math.max(0.4, Math.min(4, 60 / fps * (2073600 / (s.w * s.h)))), n = Math.ceil(len / piece - 1e-6);
+    var vf = 'scale=' + s.w + ':' + s.h + ':flags=bicubic,setsar=1' + (sp !== 1 ? ',setpts=PTS/' + sp : '') + ',format=yuv420p';
+    var enc = ['-an', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-r', String(fps), '-video_track_timescale', '90000'];
+    var steps = n + (boom ? 1 : 0) + 1 + (gif ? 1 : 0), done = 0, parts = [];
+    VT.go(boom ? 'Making the boomerang' : 'Reversing', function (pct) {
+      function stepPct(p) { pct(Math.min(0.99, (done + p) / steps)); }
+      var chain = Promise.resolve();
+      if (boom) chain = chain.then(function () {
+        return FF.run(f, function (inp) { return ['-ss', r.a.toFixed(3), '-i', inp, '-t', len.toFixed(3), '-vf', vf].concat(enc); }, 'fwd.mp4', len / sp, stepPct, VT.say)
+          .then(function (d) { parts.fwd = d; done++; });
+      });
+      for (var k = n - 1; k >= 0; k--) (function (k) { // the last piece first
+        chain = chain.then(function () {
+          var a = r.a + k * piece, l = Math.min(piece, r.b - a);
+          return FF.run(f, function (inp) { return ['-ss', a.toFixed(3), '-i', inp, '-t', l.toFixed(3), '-vf', 'reverse,' + vf].concat(enc); }, 'piece.mp4', l / sp, stepPct, VT.say)
+            .then(function (d) { parts.push(d); done++; });
+        });
+      })(k);
+      return chain.then(function () {
+        var names = [], list = [];
+        if (boom) names.push('/rv-fwd.mp4');
+        parts.forEach(function (_, k) { names.push('/rv-p' + k + '.mp4'); });
+        for (var l = 0; l < loops; l++) names.forEach(function (nm) { list.push("file '" + nm + "'"); });
+        var one = len / sp * (boom ? 2 : 1), total = one * loops;
+        return FF.run(f, function (inp) {
+          var a = ['-f', 'concat', '-safe', '0', '-i', '/rv-list.txt'];
+          if (snd) {
+            var ag = '[1:a]atrim=' + r.a.toFixed(3) + ':' + r.b.toFixed(3) + ',asetpts=PTS-STARTPTS,aresample=48000' + (sp !== 1 ? ',atempo=' + sp : '');
+            ag += boom ? ',asplit[f][b];[b]areverse[r];[f][r]concat=n=2:v=0:a=1' : ',areverse';
+            if (loops > 1) ag += ',aloop=loop=' + (loops - 1) + ':size=' + Math.round(one * 48000);
+            ag += ',atrim=0:' + total.toFixed(3) + '[a]';
+            a.push('-i', inp, '-filter_complex', ag, '-map', '0:v', '-map', '[a]', '-c:a', 'aac', '-b:a', '160k');
+          } else a.push('-map', '0:v');
+          a.push('-c:v', 'copy', '-movflags', '+faststart');
+          return a;
+        }, 'reversed.mp4', total, function (p) { stepPct(p); }, VT.say, function (ff) {
+          var w = Promise.resolve();
+          if (boom) w = w.then(function () { return ff.writeFile('/rv-fwd.mp4', parts.fwd); });
+          parts.forEach(function (d, k) { w = w.then(function () { return ff.writeFile('/rv-p' + k + '.mp4', d); }); });
+          return w.then(function () { return ff.writeFile('/rv-list.txt', new TextEncoder().encode(list.join('\n') + '\n')); });
+        }).then(function (data) {
+          done++;
+          FF.get(VT.say).then(function (ff) { names.concat(['/rv-list.txt']).forEach(function (nm) { ff.deleteFile(nm).catch(function () {}); }); }); // free the memory
+          parts.length = 0; parts.fwd = null;
+          if (!gif) return { data: data, total: total };
+          var mp4 = new File([data], 'r.mp4', { type: 'video/mp4' }), gfps = Math.min(15, fps), w2 = Math.min(gw, s.w);
+          return FF.run(mp4, function (inp) {
+            return ['-i', inp, '-filter_complex', 'fps=' + gfps + ',scale=' + w2 + ':-2:flags=lanczos,split[a][b];[a]palettegen=stats_mode=diff[p];[b][p]paletteuse=dither=bayer:bayer_scale=4', '-loop', '0'];
+          }, 'reversed.gif', total, stepPct, VT.say).then(function (g) { done++; return { data: g, total: total, gif: true }; });
+        });
+      }).then(function (res) {
+        var name = VT.base(f.name) + (boom ? '-boomerang' : '-reversed') + (res.gif ? '.gif' : '.mp4');
+        var u = VT.done(res.data, name, res.gif ? 'image/gif' : 'video/mp4');
+        $('dl').textContent = res.gif ? 'Download GIF' : 'Download MP4';
+        if (res.gif) { $('gifOut').src = u; $('gifOut').hidden = false; } else { $('result').src = u; $('result').hidden = false; }
+        return 'Your ' + (boom ? 'boomerang' : 'reversed video') + ' is ready (' + VT.clock(res.total) + ', ' + fmtBytes(res.data.length) + ')';
+      });
+    }).then(function () { parts.length = 0; parts.fwd = null; });
+  });
+})();
+</script>
