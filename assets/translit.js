@@ -126,12 +126,13 @@
       if (c === '\u0651') { var m = out.match(/(sh|th|kh|dh|gh|zh|ch|[^aiuāīū\s])([aiu]?)$/); if (m) out = out.slice(0, -m[0].length) + m[1] + m[1] + m[2]; continue; } // shadda doubles the consonant
       // the article al- at the start of a word
       if (wordStart && c === 'ا' && next === 'ل' && isL(chars[i + 2])) { out += 'al-'; i++; continue; }
-      if (c === 'ا') { out += wordStart ? (full ? '' : 'a') : LONG[c]; continue; }
+      if (c === 'ا') { if (wordStart) out += full ? '' : 'a'; else { if (/a$/.test(out) && prev === '\u064e') out = out.slice(0, -1); out += LONG[c]; } continue; }
       if (c === 'و' || c === 'ي' || c === 'ی' || c === 'ے') {
         var cons = c === 'و' ? 'w' : 'y';
         if (c === 'ے') { out += LONG[c]; continue; }
         if (wordStart || HARAKA[next] || next === 'ا' || next === '\u0651') { out += cons; continue; }
         if (prev === '\u064e') { out += cons; continue; } // aw, ay diphthongs
+        if ((prev === '\u0650' && c !== 'و') || (prev === '\u064f' && c === 'و')) { out = out.slice(0, -1) + LONG[c]; continue; } // fī, ū: the short vowel mark plus the letter make one long vowel
         out += isL(prev) || prev === '\u0650' || prev === '\u064f' ? LONG[c] : cons; continue;
       }
       if (c === 'ة') { out += full ? (/[aāiu]$/.test(out) ? '' : 'a') + (isL(next) ? 't' : 'h') : 'a'; continue; }
@@ -280,7 +281,8 @@
       else v = ini.s ? 'a' : '';
       var fin = '';
       var f = chars[k];
-      if (isC(f) && !/[ะา\u0e34\u0e35\u0e36\u0e37\u0e38\u0e39\u0e31ำ]/.test(chars[k + 1] || '')) {
+      var clusterNext = /[กขคตปผพ]/.test(f || '') && /[รลว]/.test(chars[k + 1] || '') && /[ะา\u0e34\u0e35\u0e36\u0e37\u0e38\u0e39\u0e31ำ\u0e47]/.test(chars[k + 2] || ''); // คร\u0e31บ starts a new syllable
+      if (isC(f) && !/[ะา\u0e34\u0e35\u0e36\u0e37\u0e38\u0e39\u0e31ำ]/.test(chars[k + 1] || '') && !clusterNext) {
         fin = v === 'ai' && f === 'ย' ? '' : TH_F[f]; // ไทย -> thai
         k++;
       }

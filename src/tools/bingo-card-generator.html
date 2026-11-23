@@ -1,0 +1,436 @@
+<style>
+.bng fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.bng legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.bng textarea { min-height: 130px; font-family: inherit; font-size: 15px; }
+.bng .bng-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.bng .bng-row button { font: inherit; font-size: 14px; font-weight: 600; min-height: 48px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; cursor: pointer; padding: 4px 6px; }
+.bng .bng-row button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.bng .bng-hint { display: block; font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.bng .bng-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.bng .bng-sw { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.bng .bng-sw button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.bng .bng-sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.bng .bng-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.bng .bng-prev canvas { width: 100%; max-width: 480px; height: auto; display: block; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.bng .bng-call { border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 16px; }
+.bng .bng-big { font-size: clamp(40px, 12vw, 84px); font-weight: 800; text-align: center; line-height: 1.1; min-height: 1.1em; color: var(--accent); word-break: break-word; }
+.bng .bng-hist { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; font-size: 14px; }
+.bng .bng-hist span { border: 1px solid var(--line); border-radius: 999px; padding: 2px 10px; background: var(--surface); }
+</style>
+<div class="bng" id="bng">
+<fieldset><legend>Type of bingo</legend>
+  <div class="bng-row" id="bgMode" role="group" aria-label="Type of bingo">
+    <button type="button" data-m="75">75-ball (5 × 5)</button><button type="button" data-m="90">90-ball tickets</button><button type="button" data-m="words">Words or pictures names</button>
+  </div>
+  <div id="bgWordsBox" hidden>
+    <label for="bgWords">Your words, one per line or separated by commas</label>
+    <textarea id="bgWords" data-nomemo maxlength="20000" placeholder="apple&#10;banana&#10;cherry&#10;…"></textarea>
+    <span class="bng-hint" id="bgWordCount">You need at least as many words as squares on a card.</span>
+    <div class="fields"><div><label for="bgGrid">Card size</label><select id="bgGrid"><option value="3">3 × 3</option><option value="4">4 × 4</option><option value="5" selected>5 × 5</option></select></div></div>
+  </div>
+  <label class="bng-check" id="bgFreeBox"><input type="checkbox" id="bgFree" checked>Free square in the middle</label>
+</fieldset>
+<fieldset><legend>Cards</legend>
+  <div class="fields">
+    <div><label for="bgTitle">Title on each card</label><input type="text" id="bgTitle" data-nomemo maxlength="50" placeholder="e.g. Family Bingo Night"></div>
+    <div><label for="bgCount">Number of cards</label><input type="number" id="bgCount" min="1" max="500" step="1" value="12" inputmode="numeric"></div>
+    <div><label for="bgPer">Cards per page</label><select id="bgPer"><option value="1">1</option><option value="2">2</option><option value="4" selected>4</option><option value="6">6</option></select></div>
+    <div><label for="bgPaper">Paper</label><select id="bgPaper" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+  </div>
+  <div class="bng-sw" id="bgSw"></div>
+  <label class="bng-check"><input type="checkbox" id="bgSheet" checked>Add a caller's sheet at the end</label>
+</fieldset>
+<div class="btns" style="margin:0 0 14px"><button type="button" class="btn" id="bgMake">Make cards</button></div>
+<div class="bng-prev" id="bgPrevBox" hidden><canvas id="bgCanvas" width="595" height="842" aria-label="First page of cards"></canvas></div>
+<div class="btns">
+  <button type="button" class="btn" id="bgPdf" disabled>Download PDF</button>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="bng-call" id="bgCaller">
+  <b>Caller</b>
+  <span class="bng-hint">Call the numbers or words on this screen in a fair random order. Nothing is repeated.</span>
+  <div class="bng-big" id="bgNow" aria-live="polite">–</div>
+  <div class="btns" style="justify-content:center"><button type="button" class="btn" id="bgNext">Call next</button><button type="button" class="btn ghost" id="bgRestart">Start a new game</button></div>
+  <div class="bng-hist" id="bgHist"></div>
+</div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @GD-START (shared drawing helper)
+  // ---------- tiny drawing engine: the same list of shapes is drawn on a canvas (preview, PNG) and into a PDF ----------
+  var GD = (function () {
+    var FONTS = {
+      sans: ['GD Noto Sans', 'noto-sans-subset-400.ttf', 400, 1], sansb: ['GD Noto Sans', 'noto-sans-subset-700.ttf', 700, 1],
+      serif: ['GD Noto Serif', 'noto-serif-subset-400.ttf', 400, 1], serifb: ['GD Noto Serif', 'noto-serif-subset-700.ttf', 700, 1],
+      script: ['GD Great Vibes', 'great-vibes-latin-400-normal.woff2', 400], hand: ['GD Dancing Script', 'dancing-script-latin-400-normal.woff2', 400],
+      display: ['GD Anton', 'anton-latin-400-normal.woff2', 400], caveat: ['GD Caveat', 'caveat-latin-400-normal.woff2', 400]
+    };
+    var bufs = {}, prom = {}, mc = document.createElement('canvas').getContext('2d');
+    function load(k) {
+      if (!prom[k]) prom[k] = fetch('../assets/vendor/fonts/' + FONTS[k][1]).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) {
+        bufs[k] = b; return new FontFace(FONTS[k][0], b.slice(0), { weight: String(FONTS[k][2]) }).load().then(function (f) { document.fonts.add(f); });
+      }).catch(function (e) { prom[k] = null; throw e; });
+      return prom[k];
+    }
+    function loadAll(keys) { return Promise.all(keys.map(load)); }
+    function css(k, s) { var F = FONTS[k] || FONTS.sans; return F[2] + ' ' + s + 'px "' + F[0] + '", sans-serif'; }
+    function chars(t) { return Array.from(String(t)); }
+    function width(t, k, s, ls) { mc.font = css(k, s); return mc.measureText(String(t)).width + (ls || 0) * Math.max(0, chars(t).length - 1); }
+    function fit(t, k, s, maxW, min, ls) { min = min || 3; while (s > min && width(t, k, s, ls) > maxW) s = Math.max(min, s * 0.96); return s; }
+    function wrap(t, k, s, maxW) {
+      var out = [];
+      String(t == null ? '' : t).replace(/\r\n?/g, '\n').split('\n').forEach(function (para) {
+        var cur = '';
+        para.split(/ +/).forEach(function (w) {
+          var trial = cur ? cur + ' ' + w : w;
+          if (width(trial, k, s) <= maxW) { cur = trial; return; }
+          if (cur) out.push(cur);
+          cur = '';
+          while (w && width(w, k, s) > maxW) { var c = chars(w), n = c.length; while (n > 1 && width(c.slice(0, n).join(''), k, s) > maxW) n--; out.push(c.slice(0, n).join('')); w = c.slice(n).join(''); }
+          cur = w;
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function startX(o) { var w = width(o.t, o.font, o.s, o.ls); return o.align === 'center' ? o.x - w / 2 : o.align === 'right' ? o.x - w : o.x; }
+    function rgb(h) { h = String(h || '#000').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+    function rrPath(x, y, w, h, r) { r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); return 'M' + (x + r) + ' ' + y + 'H' + (x + w - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w) + ' ' + (y + r) : '') + 'V' + (y + h - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w - r) + ' ' + (y + h) : '') + 'H' + (x + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + x + ' ' + (y + h - r) : '') + 'V' + (y + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y : '') + 'Z'; }
+    // draw an image into a w x h canvas: cover/contain, optional round clip
+    function raster(o, scale) {
+      var img = o.img, W = Math.max(1, Math.round(o.w * scale)), H = Math.max(1, Math.round(o.h * scale)), c = document.createElement('canvas');
+      c.width = W; c.height = H; var g = c.getContext('2d');
+      if (o.clip) { g.beginPath(); if (o.clip === 'circle') g.ellipse(W / 2, H / 2, W / 2, H / 2, 0, 0, Math.PI * 2); else g.roundRect ? g.roundRect(0, 0, W, H, o.clip * scale) : g.rect(0, 0, W, H); g.clip(); }
+      var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = o.fit === 'contain' ? Math.min(W / iw, H / ih) : Math.max(W / iw, H / ih);
+      g.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+      return c;
+    }
+    function drawCanvas(ops, ctx, scale) {
+      ops.forEach(function (o) {
+        ctx.save(); ctx.globalAlpha = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'circle' || o.k === 'path') {
+          var p;
+          if (o.k === 'rect') p = new Path2D(rrPath(o.x * scale, o.y * scale, o.w * scale, o.h * scale, (o.r || 0) * scale));
+          else if (o.k === 'circle') { p = new Path2D(); p.arc(o.x * scale, o.y * scale, o.r * scale, 0, Math.PI * 2); }
+          else { ctx.translate(o.x * scale, o.y * scale); ctx.scale(o.sc * scale, o.sc * scale); if (o.rot) ctx.rotate(o.rot); p = new Path2D(o.d); }
+          var u = o.k === 'path' ? o.sc * scale : 1;
+          if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(p); }
+          if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale / u; ctx.stroke(p); }
+        } else if (o.k === 'line') {
+          ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale; if (o.dash) ctx.setLineDash(o.dash.map(function (d) { return d * scale; }));
+          ctx.beginPath(); ctx.moveTo(o.x1 * scale, o.y1 * scale); ctx.lineTo(o.x2 * scale, o.y2 * scale); ctx.stroke();
+        } else if (o.k === 'text') {
+          ctx.font = css(o.font, o.s * scale); ctx.fillStyle = o.fill; ctx.textBaseline = 'alphabetic';
+          var x = startX(o);
+          if (o.ls) chars(o.t).forEach(function (ch) { ctx.fillText(ch, x * scale, o.y * scale); x += width(ch, o.font, o.s) + o.ls; });
+          else ctx.fillText(o.t, x * scale, o.y * scale);
+        } else if (o.k === 'img' && o.img) {
+          ctx.drawImage(raster(o, scale), o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+        }
+        ctx.restore();
+      });
+    }
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
+    async function drawPdf(env, page, ops, ox, oy) {
+      var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
+      function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
+      async function font(k) {
+        if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
+        return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      }
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i], op = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'path') {
+          var d = o.k === 'rect' ? rrPath(o.x + ox, o.y + oy, o.w, o.h, o.r) : o.d, sc = o.k === 'path' ? o.sc : 1;
+          var opt = { x: o.k === 'path' ? o.x + ox : 0, y: H - (o.k === 'path' ? o.y + oy : 0), scale: sc, opacity: op, borderOpacity: op };
+          if (o.rot) opt.rotate = P.degrees(-o.rot * 180 / Math.PI);
+          if (o.fill) opt.color = col(o.fill);
+          if (o.stroke) { opt.borderColor = col(o.stroke); opt.borderWidth = (o.lw || 1) / sc; } else opt.borderWidth = 0;
+          page.drawSvgPath(d, opt);
+        } else if (o.k === 'circle') {
+          var c = { x: o.x + ox, y: H - o.y - oy, size: o.r, opacity: op, borderOpacity: op };
+          if (o.fill) c.color = col(o.fill); if (o.stroke) { c.borderColor = col(o.stroke); c.borderWidth = o.lw || 1; }
+          page.drawCircle(c);
+        } else if (o.k === 'line') {
+          page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
+        } else if (o.k === 'text') {
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!t.trim()) continue;
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
+        } else if (o.k === 'img' && o.img) {
+          env.imgs = env.imgs || new Map();
+          var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
+          if (!em) {
+            var cv = raster(o, Math.min(300 / 72, 2400 / Math.max(o.w, o.h))), png = o.clip || o.alpha;
+            var url = png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92), bytes = await fetch(url).then(function (r) { return r.arrayBuffer(); });
+            em = png ? await env.doc.embedPng(bytes) : await env.doc.embedJpg(bytes); env.imgs.set(key, em);
+          }
+          page.drawImage(em, { x: o.x + ox, y: H - o.y - oy - o.h, width: o.w, height: o.h, opacity: op });
+        }
+      }
+    }
+    var libs = null;
+    function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
+      await pdfLibs();
+      var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
+      doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
+    }
+    function readImage(file, maxSide, cb) {
+      if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
+      if (file.size > 25 * 1048576) return cb(null, 'That picture is over 25 MB. Choose a smaller one.');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 600, h = img.naturalHeight || 600, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var png = /png|gif|svg|webp/.test(file.type), out = new Image(); out.onload = function () { cb(out); }; out.onerror = function () { cb(null, 'That picture could not be opened.'); };
+        out.src = png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9); out.alpha = png;
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); cb(null, '"' + file.name + '" could not be opened. HEIC photos need converting to JPG first.'); };
+      img.src = url;
+    }
+    function download(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); return u; }
+    return { FONTS: FONTS, load: load, loadAll: loadAll, width: width, fit: fit, wrap: wrap, drawCanvas: drawCanvas, drawPdf: drawPdf, newPdf: newPdf, readImage: readImage, download: download, rgb: rgb };
+  })();
+  // @GD-END
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var COLORS = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#ea580c', '#db2777', '#111827'];
+  var mode = '75', color = COLORS[0], cards = null, ready = false, busy = false;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  $('bgPaper').value = UT.letter() ? 'letter' : 'a4';
+  COLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.dataset.c = c; b.setAttribute('aria-label', 'Colour ' + c); b.addEventListener('click', function () { color = c; marks(); if (cards) paint(); }); $('bgSw').appendChild(b); });
+  function marks() {
+    [].forEach.call($('bgMode').children, function (b) { b.setAttribute('aria-pressed', b.dataset.m === mode); });
+    [].forEach.call($('bgSw').children, function (b) { b.setAttribute('aria-pressed', b.dataset.c === color); });
+    $('bgWordsBox').hidden = mode !== 'words';
+    $('bgFreeBox').hidden = mode === '90' || (mode === 'words' && +$('bgGrid').value % 2 === 0);
+  }
+  [].forEach.call($('bgMode').children, function (b) { b.addEventListener('click', function () { mode = b.dataset.m; marks(); cards = null; $('bgPrevBox').hidden = true; $('bgPdf').disabled = true; say('', ''); restart(); }); });
+  $('bgGrid').addEventListener('change', marks);
+
+  function words() { var seen = {}, out = []; $('bgWords').value.split(/[\n,;，、،]+/).forEach(function (w) { w = w.trim().replace(/\s+/g, ' '); var k = w.toLocaleLowerCase(); if (w && !seen[k]) { seen[k] = 1; out.push(w); } }); return out; }
+  function pickN(arr, n) { var a = arr.slice(); for (var i = 0; i < n; i++) { var j = i + UT.rnd(a.length - i), t = a[i]; a[i] = a[j]; a[j] = t; } return a.slice(0, n); }
+  function range(a, b) { var o = []; for (var i = a; i <= b; i++) o.push(i); return o; }
+  // 75-ball: column B has 1-15, I 16-30, N 31-45, G 46-60, O 61-75
+  function card75(free) {
+    var cols = [];
+    for (var c = 0; c < 5; c++) cols.push(pickN(range(c * 15 + 1, c * 15 + 15), 5));
+    var g = []; for (var r = 0; r < 5; r++) for (var c2 = 0; c2 < 5; c2++) g.push(free && r === 2 && c2 === 2 ? null : cols[c2][r]);
+    return { n: 5, cells: g };
+  }
+  // 90-ball ticket: 3 rows x 9 columns, 5 numbers in every row, columns 1-9, 10-19 … 80-90, each column used
+  function ticket90() {
+    for (var tries = 0; tries < 200; tries++) {
+      var cnt = [1, 1, 1, 1, 1, 1, 1, 1, 1], extra = 6;
+      while (extra) { var c = UT.rnd(9); if (cnt[c] < 3) { cnt[c]++; extra--; } }
+      var rows = [0, 0, 0], grid = [[], [], []], ok = true;
+      var order = range(0, 8).sort(function (a, b) { return cnt[b] - cnt[a] || UT.rnd(3) - 1; });
+      order.forEach(function (c) {
+        var need = rows.map(function (n, r) { return [5 - n, r]; }).filter(function (x) { return x[0] > 0; }).sort(function (a, b) { return b[0] - a[0] || UT.rnd(3) - 1; });
+        if (need.length < cnt[c]) { ok = false; return; }
+        var use = need.slice(0, cnt[c]).map(function (x) { return x[1]; }).sort();
+        use.forEach(function (r) { rows[r]++; grid[r][c] = true; });
+      });
+      if (!ok || rows.some(function (n) { return n !== 5; })) continue;
+      var cells = [];
+      for (var col = 0; col < 9; col++) {
+        var lo = col === 0 ? 1 : col * 10, hi = col === 8 ? 90 : col * 10 + 9, nums = pickN(range(lo, hi), cnt[col]).sort(function (a, b) { return a - b; }), k = 0;
+        for (var r = 0; r < 3; r++) cells[r * 9 + col] = grid[r][col] ? nums[k++] : null;
+      }
+      return { n: 9, rows: 3, cells: cells };
+    }
+    throw new Error('ticket');
+  }
+  function cardWords(list, n, free) {
+    var need = n * n - (free ? 1 : 0), pick = pickN(list, need), g = [], k = 0;
+    for (var i = 0; i < n * n; i++) g.push(free && i === (n * n - 1) / 2 ? null : pick[k++]);
+    return { n: n, cells: g };
+  }
+  function build() {
+    var count = +$('bgCount').value, list = mode === 'words' ? words() : null, n = +$('bgGrid').value, free = $('bgFree').checked && (mode === '75' || (mode === 'words' && n % 2 === 1));
+    if (!$('bgCount').value || !(count >= 1 && count <= 500 && count === Math.floor(count))) return { err: 'Choose between 1 and 500 cards.' };
+    if (mode === 'words') {
+      var need = n * n - (free ? 1 : 0);
+      if (list.length < need) return { err: 'A ' + n + ' × ' + n + ' card needs at least ' + need + ' different words. You have ' + list.length + '.' };
+    }
+    var seenSet = {}, seenPos = {}, out = [], strict = true, fails = 0;
+    while (out.length < count) {
+      var c = mode === '75' ? card75(free) : mode === '90' ? ticket90() : cardWords(list, n, free);
+      var pos = c.cells.join('|'), set = c.cells.filter(function (x) { return x !== null; }).map(String).sort().join('|');
+      if (seenPos[pos] || (strict && seenSet[set])) { if (++fails > 3000) { if (strict) { strict = false; fails = 0; continue; } return { err: 'There are not enough different words to make ' + count + ' unique cards. Add more words or make fewer cards.' }; } continue; }
+      seenPos[pos] = seenSet[set] = 1; c.id = out.length + 1; out.push(c);
+    }
+    return { cards: out, free: free, list: list, sameSets: !strict };
+  }
+  function pageSize() { return $('bgPaper').value === 'letter' ? [612, 792] : [595.28, 841.89]; }
+  function cardOps(ops, c, x, y, w, h) {
+    var title = $('bgTitle').value.trim() || 'BINGO', head = mode === '75' ? ['B', 'I', 'N', 'G', 'O'] : null, cols = c.n, rows = c.rows || c.n;
+    ops.push({ k: 'rect', x: x, y: y, w: w, h: h, r: 8, stroke: color, lw: 1.6, fill: '#ffffff' });
+    var ts = GD.fit(title, 'sansb', Math.min(20, h * 0.09), w - 20, 6);
+    ops.push({ k: 'text', t: title, x: x + w / 2, y: y + 8 + ts, font: 'sansb', s: ts, fill: color, align: 'center' });
+    var top = y + ts + 16, foot = 14, gx = x + 10, gw = w - 20, hh = head ? Math.min(28, (h - (top - y) - foot) * 0.14) : 0, gh = h - (top - y) - foot - hh - 6;
+    var cw = gw / cols, ch = Math.min(gh / rows, mode === '90' ? cw * 1.1 : cw * 1.05), gy = top + hh;
+    gx = x + (w - cw * cols) / 2;
+    if (head) head.forEach(function (L, i) { ops.push({ k: 'rect', x: gx + i * cw + 1, y: top, w: cw - 2, h: hh - 2, r: 4, fill: color }); ops.push({ k: 'text', t: L, x: gx + (i + 0.5) * cw, y: top + hh / 2 + hh * 0.22, font: 'sansb', s: hh * 0.6, fill: '#ffffff', align: 'center' }); });
+    for (var r = 0; r < rows; r++) for (var col = 0; col < cols; col++) {
+      var v = c.cells[r * cols + col], cx = gx + col * cw, cy = gy + r * ch;
+      ops.push({ k: 'rect', x: cx, y: cy, w: cw, h: ch, stroke: '#374151', lw: 0.8, fill: v === null && mode !== '90' ? tint(0.15) : v === null ? tint(0.07) : '#ffffff' });
+      if (v === null && mode !== '90') { var fs = Math.min(ch * 0.3, cw * 0.28); ops.push({ k: 'text', t: 'FREE', x: cx + cw / 2, y: cy + ch / 2 + fs * 0.36, font: 'sansb', s: fs, fill: color, align: 'center' }); }
+      else if (v !== null) {
+        if (mode === 'words') {
+          var s = Math.min(ch * 0.26, 14), L = GD.wrap(String(v), 'sansb', s, cw - 8);
+          while (s > 5 && (L.length * s * 1.15 > ch - 6 || L.some(function (l) { return GD.width(l, 'sansb', s) > cw - 6; }))) { s *= 0.92; L = GD.wrap(String(v), 'sansb', s, cw - 8); }
+          var ty = cy + ch / 2 - (L.length * s * 1.15) / 2 + s * 0.85;
+          L.forEach(function (l, i) { ops.push({ k: 'text', t: l, x: cx + cw / 2, y: ty + i * s * 1.15, font: 'sansb', s: s, fill: '#111827', align: 'center' }); });
+        } else { var ns = Math.min(ch * 0.46, cw * 0.46); ops.push({ k: 'text', t: String(v), x: cx + cw / 2, y: cy + ch / 2 + ns * 0.36, font: 'sansb', s: ns, fill: '#111827', align: 'center' }); }
+      }
+    }
+    ops.push({ k: 'text', t: 'Card ' + c.id, x: x + w - 10, y: y + h - 5, font: 'sans', s: 7.5, fill: '#6b7280', align: 'right' });
+  }
+  function tint(a) { var c = GD.rgb(color); return '#' + c.map(function (v) { return Math.round((v * a + 1 - a) * 255).toString(16).padStart(2, '0'); }).join(''); }
+  function pages(res) {
+    var P = pageSize(), W = P[0], H = P[1], M = 28, per = +$('bgPer').value, out = [];
+    if (mode === '90' && per === 1) per = 2;
+    var cols = per === 1 ? 1 : per === 2 ? 1 : 2, rows = Math.ceil(per / cols);
+    if (mode === '90') { cols = 1; rows = per; }
+    var cw = (W - 2 * M - (cols - 1) * 14) / cols, chh = (H - 2 * M - (rows - 1) * 14) / rows;
+    for (var i = 0; i < res.cards.length; i += per) {
+      var ops = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }];
+      res.cards.slice(i, i + per).forEach(function (c, k) {
+        var w = cw, h = chh;
+        if (mode !== '90') { var side = Math.min(cw, chh); w = Math.min(cw, side * 1.0); h = Math.min(chh, side * 1.12); }
+        else h = Math.min(chh, cw * 0.42);
+        var x = M + (k % cols) * (cw + 14) + (cw - w) / 2, y = M + Math.floor(k / cols) * (chh + 14) + (chh - h) / 2;
+        cardOps(ops, c, x, y, w, h);
+      });
+      out.push({ ops: ops, W: W, H: H });
+    }
+    if ($('bgSheet').checked) out = out.concat(sheet(res, W, H, M));
+    return out;
+  }
+  // caller's sheet: every number or word in a random calling order, with boxes to tick
+  function sheet(res, W, H, M) {
+    var items = mode === '75' ? range(1, 75).map(function (n) { return 'BINGO'[Math.floor((n - 1) / 15)] + ' ' + n; }) : mode === '90' ? range(1, 90).map(String) : res.list.slice();
+    UT.shuffle(items);
+    var out = [], ops, y, colN = mode === 'words' ? 3 : 5, cw = (W - 2 * M) / colN, lh = 15, perCol, k = 0;
+    while (k < items.length) {
+      ops = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }]; y = M;
+      ops.push({ k: 'text', t: "Caller's sheet" + (out.length ? ' (continued)' : ''), x: M, y: y + 16, font: 'sansb', s: 16, fill: color });
+      ops.push({ k: 'text', t: 'Call in this order and tick each one. ' + res.cards.length + ' cards were made (Card 1 to Card ' + res.cards.length + ').', x: M, y: y + 34, font: 'sans', s: 9, fill: '#4b5563' });
+      y += 50; perCol = Math.floor((H - M - y) / lh);
+      for (var c = 0; c < colN && k < items.length; c++) for (var r = 0; r < perCol && k < items.length; r++, k++) {
+        var x = M + c * cw, yy = y + r * lh;
+        ops.push({ k: 'rect', x: x, y: yy, w: 9, h: 9, r: 1.5, stroke: '#6b7280', lw: 0.8 });
+        ops.push({ k: 'text', t: (k + 1) + '.', x: x + 30, y: yy + 8, font: 'sans', s: 8, fill: '#9ca3af', align: 'right' });
+        var t = items[k], s = GD.fit(t, 'sansb', 10, cw - 40, 5);
+        ops.push({ k: 'text', t: t, x: x + 34, y: yy + 8.5, font: 'sansb', s: s, fill: '#111827' });
+      }
+      out.push({ ops: ops, W: W, H: H });
+    }
+    return out;
+  }
+  function paint() {
+    if (!cards || !ready) return;
+    var pg = pages(cards)[0], cv = $('bgCanvas'), sc = 1.6;
+    cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
+    GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+  }
+  function make() {
+    if (!ready) return say('', 'Loading…');
+    var r = build();
+    if (r.err) { cards = null; $('bgPrevBox').hidden = true; $('bgPdf').disabled = true; return say('bad', r.err); }
+    cards = r; $('bgCanvas')._cards = r;
+    $('bgPrevBox').hidden = false; $('bgPdf').disabled = false;
+    var pages1 = Math.ceil(r.cards.length / (mode === '90' && +$('bgPer').value === 1 ? 2 : +$('bgPer').value));
+    say('ok', r.cards.length + ' different cards ready on ' + pages1 + ' page' + (pages1 > 1 ? 's' : '') + '.' + (r.sameSets ? ' Some cards share the same words in a different order, because the word list is short.' : '') + ' The preview shows the first page.');
+    paint(); restart();
+  }
+  $('bgMake').addEventListener('click', make);
+  ['bgPer', 'bgPaper', 'bgSheet'].forEach(function (id) { $(id).addEventListener('change', paint); });
+  $('bgTitle').addEventListener('input', paint);
+  $('bgWords').addEventListener('input', function () { var n = words().length, g = +$('bgGrid').value; $('bgWordCount').textContent = n + ' words. A ' + g + ' × ' + g + ' card needs ' + (g * g - ($('bgFree').checked && g % 2 ? 1 : 0)) + '.'; });
+  $('bgPdf').addEventListener('click', async function () {
+    if (!cards || busy) return;
+    busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
+    try {
+      var ps = pages(cards), env = await GD.newPdf($('bgTitle').value.trim() || 'Bingo cards', 'GetToolNest Bingo Card Generator', function (t) { say('', t); });
+      for (var i = 0; i < ps.length; i++) { await GD.drawPdf(env, env.doc.addPage([ps[i].W, ps[i].H]), ps[i].ops); if (i % 10 === 9) { say('', 'Making the PDF… page ' + (i + 1) + ' of ' + ps.length); await new Promise(function (r) { setTimeout(r, 0); }); } }
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), 'bingo-cards.pdf');
+      say('ok', 'PDF saved with ' + cards.cards.length + ' cards (' + ps.length + ' pages' + ($('bgSheet').checked ? ', including the caller\'s sheet' : '') + ').');
+    } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false;
+  });
+  // ---------- on-screen caller ----------
+  var bag = [], called = [];
+  function restart() {
+    bag = mode === '75' ? range(1, 75).map(function (n) { return 'BINGO'[Math.floor((n - 1) / 15)] + ' ' + n; }) : mode === '90' ? range(1, 90).map(String) : words();
+    called = []; $('bgNow').textContent = '–'; $('bgHist').innerHTML = ''; $('bgNext').disabled = false;
+  }
+  $('bgNext').addEventListener('click', function () {
+    if (!called.length && !bag.length) restart();
+    if (!bag.length) { $('bgNow').textContent = mode === 'words' ? 'Add words above' : '–'; if (called.length) { $('bgNow').textContent = 'All called'; this.disabled = true; } return; }
+    var v = bag.splice(UT.rnd(bag.length), 1)[0]; called.push(v);
+    $('bgNow').textContent = v;
+    var s = document.createElement('span'); s.textContent = v; $('bgHist').insertBefore(s, $('bgHist').firstChild);
+    if (!bag.length) this.disabled = true;
+  });
+  $('bgRestart').addEventListener('click', restart);
+  marks(); restart();
+  GD.loadAll(['sans', 'sansb']).then(function () { ready = true; }, function () { ready = true; });
+})();
+</script>

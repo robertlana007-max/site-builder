@@ -218,6 +218,25 @@
       }
       return prev[lb];
     }
+    var STOP = {}; ('i im me my mine we our you your a an the to of for in on at by with from into onto and or but is are was be can could would should will do does did how what which where why want wants need needs like please help some any this that these those it its online free tool tools app website site way easy quick quickly best simple just get let') .split(' ').forEach(function (w) { STOP[w] = 1; });
+    // Everyday task words → words used in tool names (more come from src/aliases when they load).
+    var SYN = {
+      smaller: ['compress', 'reduce'], small: ['compress'], shrink: ['compress', 'reduce'], reduce: ['compress'], lighter: ['compress'], kb: ['compress'], mb: ['compress'], size: ['resize', 'compress'],
+      bigger: ['resize', 'upscale'], larger: ['resize', 'upscale'], enlarge: ['upscale', 'resize'], sharper: ['upscale'], clear: ['upscale'], blurry: ['upscale'],
+      join: ['merge'], combine: ['merge'], together: ['merge'], attach: ['merge'], add: ['merge'], one: ['merge'],
+      cut: ['trim', 'split', 'crop', 'cutter'], separate: ['split'], divide: ['split'], break: ['split'], extract: ['split', 'extract'],
+      picture: ['image', 'photo'], pictures: ['image'], photo: ['image'], photos: ['image'], pic: ['image'], pics: ['image'], img: ['image'], selfie: ['image', 'photo'], jpeg: ['jpg'],
+      words: ['text', 'word'], writing: ['text'], letters: ['text'], typed: ['text'],
+      sound: ['audio', 'mp3'], song: ['audio', 'mp3'], music: ['audio', 'mp3'], voice: ['audio', 'voice'],
+      film: ['video'], clip: ['video'], movie: ['video'], reel: ['video', 'vertical'],
+      change: ['convert', 'converter'], turn: ['convert', 'converter'], transform: ['convert'], save: ['convert', 'download'],
+      money: ['calculator', 'currency'], cost: ['calculator'], price: ['calculator'], interest: ['loan', 'interest'], tax: ['tax'],
+      delete: ['remove'], erase: ['remove'], rid: ['remove'], background: ['background'], bg: ['background'],
+      sign: ['signature', 'sign'], lock: ['protect'], password: ['protect', 'unlock', 'password'], open: ['unlock'], scan: ['scanner', 'ocr'], read: ['ocr', 'reader'],
+      make: ['maker', 'generator', 'creator'], create: ['maker', 'generator'], build: ['maker', 'builder'], cv: ['resume'],
+      count: ['counter'], timer: ['timer', 'countdown'], weight: ['bmi', 'weight'], fat: ['body fat', 'bmi']
+    };
+    function synOf(w) { var x = (window.TOOL_SYNONYMS && window.TOOL_SYNONYMS[w]) || []; return (SYN[w] || []).concat(x); }
     var index = null, aliasState = 0;
     function loadAliases() { // fetch the alias list once, the first time someone uses search
       if (aliasState || window.TOOL_ALIASES) return; aliasState = 1;
@@ -252,16 +271,23 @@
     }
     function rank(e, words, q, loose) {
       var score = 0, miss = 0;
-      for (var i = 0; i < words.length; i++) { var s = wordScore(e, words[i]); if (!s) miss++; score += s; }
+      for (var i = 0; i < words.length; i++) {
+        var s = wordScore(e, words[i]), alts = synOf(words[i]);
+        for (var j = 0; j < alts.length && s < 4; j++) s = Math.max(s, wordScore(e, alts[j]) * 0.85);
+        if (!s) miss++; score += s;
+      }
       if (!score) return 0;
-      if (!loose && miss > (words.length >= 3 ? 1 : 0)) return 0;
+      if (!loose && miss > (words.length >= 3 ? Math.floor(words.length / 2) : 0)) return 0;
       if (e.name === q) score += 20; else if (e.name.indexOf(q) === 0) score += 8; else if (e.name.indexOf(q) !== -1) score += 5;
       for (var k = 0; k < e.aliasList.length; k++) if (e.aliasList[k] && (e.aliasList[k] === q || e.aliasList[k].indexOf(q) === 0)) { score += e.aliasList[k] === q ? 12 : 4; break; }
       return score - miss * 2;
     }
     function mark() { links.forEach(function (a, i) { a.classList.toggle('sel', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); }); }
     function render() {
-      var q = norm(input.value), words = q.split(' ').filter(Boolean), list, close = false;
+      var q = norm(input.value), all = q.split(' ').filter(Boolean), list, close = false;
+      // People often describe the job ("how do i make my photo smaller"): drop filler words, keep the meaning.
+      var words = all.filter(function (w) { return !STOP[w]; }); if (!words.length) words = all;
+      if (words.length >= 3) { var core = words.filter(function (w) { return !/^(make|makes|making|made|create|change|turn)$/.test(w); }); if (core.length >= 2) words = core; }
       loadAliases();
       if (!index) build();
       function find(loose) { return index.map(function (e) { return [rank(e, words, q, loose), e.t]; }).filter(function (x) { return x[0] > 0; })

@@ -335,7 +335,7 @@ write('index.html', layout({
   <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
   <h1>Use any tool you need, <span class="hl">completely free</span></h1>
   <p class="sub">Scroll down and pick whatever you need. All ${tools.length} tools for PDFs, pictures, money, text and code are free for everyone: zero ads, unlimited use, no sign-up and nothing to install.</p>
-  <p class="find-tip"><span aria-hidden="true">🔎</span> We have a lot of tools, so the one you need might take a little while to find. The quickest way is to search for it: type its name, or simply what you want to do, in your own language. Don’t worry about spelling mistakes, we will still find it for you.</p>
+  <p class="find-tip"><span aria-hidden="true">🔎</span> We have a lot of tools, so the one you need might take a little while to find. The quickest way is to search for it: type its name, or simply describe what you want to do in your own words and your own language, like “make my photo smaller” or “join two PDF files”. Don’t worry about spelling mistakes, we will still find it for you.</p>
   <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search in any language, e.g. “merge pdf” or “unir pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
   <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Zero ads</li><li>${icon('check')}Unlimited use</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>

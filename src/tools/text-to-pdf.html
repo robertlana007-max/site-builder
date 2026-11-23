@@ -113,6 +113,7 @@
         }
         return w * size / 1000;
       }
+      function plain(s) { for (var ch of s) { var cp = ch.codePointAt(0); if (!base.has(cp) || (cp >= 0x0300 && cp <= 0x036F)) return false; } return true; }
       var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
       function graphemes(s) { return seg ? Array.from(seg.segment(s), function (x) { return x.segment; }) : Array.from(s); }
       // wrap one paragraph, keeping runs of spaces (they matter for code and tables)
@@ -154,7 +155,11 @@
       var total = pages.length, ink = L.rgb(.07, .07, .09), grey = L.rgb(.4, .42, .46);
       for (var pi = 0; pi < total; pi++) {
         var page = doc.addPage([PW, PH]);
-        pages[pi].forEach(function (l) { if (l.t) T.draw(page, l.t, { x: M, y: l.y, size: l.size, font: l.font, color: ink, width: W, align: 'start' }); });
+        pages[pi].forEach(function (l) {
+          if (!l.t) return;
+          if (l.font === R && plain(l.t)) page.drawText(l.t, { x: M, y: l.y, size: l.size, font: R, color: ink }); // quick path for plain Latin, Greek and Cyrillic lines
+          else T.draw(page, l.t, { x: M, y: l.y, size: l.size, font: l.font, color: ink, width: W, align: 'start' });
+        });
         if (numMode !== 'none') {
           var label = numMode === 'cof' ? 'Page ' + (pi + 1) + ' of ' + total : String(pi + 1), ns = Math.max(7, size * .8), nw = R.widthOfTextAtSize(label, ns);
           page.drawText(label, { x: numMode === 'r' ? PW - M - nw : (PW - nw) / 2, y: M * .5 + ns * .2, size: ns, font: R, color: grey });
@@ -165,7 +170,7 @@
       doc.setCreator('GetToolNest Text to PDF'); doc.setProducer('GetToolNest');
       PT.say('', 'Saving…');
       var out = await doc.save();
-      PT.done(out, (title ? title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) : name) + '.pdf', 'application/pdf', 'Made ' + total + (total === 1 ? ' page' : ' pages') + ' from ' + fmtNum(lines, 0) + (lines === 1 ? ' line' : ' lines') + (T.pictures ? ' (' + T.pictures + ' bits of text in scripts without a built-in font were drawn as sharp pictures)' : ''));
+      PT.done(out, (title ? title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) : name) + '.pdf', 'application/pdf', 'Made ' + total + (total === 1 ? ' page' : ' pages') + ' from ' + fmtNum(lines, 0) + (lines === 1 ? ' line' : ' lines') + (T.pictures ? '. Text in scripts without a built-in font (such as Chinese or emoji) was drawn as sharp pictures' : ''));
     }).then(function () { busy = false; $('go').disabled = !t.value.trim(); });
   });
 })();

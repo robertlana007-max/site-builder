@@ -1,0 +1,155 @@
+<style>
+.pr-info { margin: 0 0 16px; }
+.pr-info ul { margin: 6px 0 0; padding-inline-start: 20px; font-weight: 400; }
+.pr-custom { display: grid; grid-template-columns: 1fr 1fr auto; gap: 8px; align-items: end; }
+.pr-custom select { width: auto; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Change the paper size of its pages. The file never leaves your device.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="notice pr-info" id="prInfo" hidden><p id="prInfoText"></p><ul id="prInfoList"></ul></div>
+<div class="fields">
+  <div><label for="prSize">New paper size</label><select id="prSize">
+    <option value="a4">A4 (210 × 297 mm)</option><option value="letter">Letter (8.5 × 11 in)</option><option value="legal">Legal (8.5 × 14 in)</option>
+    <option value="a3">A3 (297 × 420 mm)</option><option value="a5">A5 (148 × 210 mm)</option><option value="b5">B5 (176 × 250 mm)</option>
+    <option value="tabloid">Tabloid (11 × 17 in)</option><option value="custom">Custom size…</option></select></div>
+  <div><label for="prOrient">Orientation</label><select id="prOrient"><option value="auto">Same as each page</option><option value="p">Portrait (tall)</option><option value="l">Landscape (wide)</option></select></div>
+  <div><label for="prFit">Fit</label><select id="prFit"><option value="fit">Fit the whole page (may add white edges)</option><option value="fill">Fill the paper (cuts off edges)</option><option value="none">Keep the content size, just change the paper</option></select></div>
+  <div><label for="prMargin">White margin (mm)</label><input type="number" id="prMargin" min="0" max="100" step="1" value="0"></div>
+  <div><label for="prRange">Pages to change</label><input type="text" id="prRange" data-nomemo placeholder="All pages, or e.g. 1-3, 7" autocomplete="off"></div>
+</div>
+<div class="pr-custom" id="prCustom" hidden>
+  <div><label for="prW">Width</label><input type="number" id="prW" min="1" step="0.1" value="210"></div>
+  <div><label for="prH">Height</label><input type="number" id="prH" min="1" step="0.1" value="297"></div>
+  <div><label for="prUnit">Unit</label><select id="prUnit"><option value="mm">mm</option><option value="in">inches</option><option value="pt">points</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Resize pages</button><a class="btn ghost" id="dl" hidden>Download resized PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, busy = false, count = 0;
+  var MM = 72 / 25.4, SIZES = { a4: [210, 297], letter: [215.9, 279.4], legal: [215.9, 355.6], a3: [297, 420], a5: [148, 210], b5: [176, 250], tabloid: [279.4, 431.8] };
+  var NAMES = { a4: 'A4', letter: 'Letter', legal: 'Legal', a3: 'A3', a5: 'A5', b5: 'B5', tabloid: 'Tabloid' };
+  var reg = ''; try { reg = (new Intl.Locale(navigator.language || 'en')).maximize().region || ''; } catch (e) { reg = ((navigator.language || '').split('-')[1] || '').toUpperCase(); }
+  $('prSize').value = /^(US|CA|MX|PH|CL|CO|VE|GT|PR|CR|PA|DO|SV|NI|HN|BZ)$/.test(reg) ? 'letter' : 'a4'; // a remembered choice is restored over this
+  if ($('prSize').value === 'letter') { $('prUnit').value = 'in'; $('prW').value = '8.5'; $('prH').value = '11'; }
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so they can be changed ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (b) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(b));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+  async function openLib() {
+    try { return await PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); }
+    catch (e) {
+      if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + file.name + '" could not be read as a PDF.');
+      bytes = await QP(bytes);
+      return PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+    }
+  }
+
+  function sync() {
+    $('prCustom').hidden = $('prSize').value !== 'custom';
+    $('prMargin').disabled = $('prFit').value === 'fill';
+    $('dl').hidden = true;
+  }
+  ['prSize', 'prFit', 'prUnit', 'prW', 'prH'].forEach(function (id) { $(id).addEventListener('change', sync); $(id).addEventListener('input', function () { $('dl').hidden = true; }); });
+  sync();
+
+  function name(w, h) {
+    var a = Math.min(w, h) / MM, b = Math.max(w, h) / MM;
+    for (var k in SIZES) if (Math.abs(a - SIZES[k][0]) < 1.5 && Math.abs(b - SIZES[k][1]) < 1.5) return NAMES[k] + (w > h ? ' landscape' : '');
+    return Math.round(w / MM) + ' × ' + Math.round(h / MM) + ' mm';
+  }
+  function visible(page) { var v = PT.view(page); return [v.width, v.height]; }
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; $('go').disabled = true; $('prInfo').hidden = true; PT.say('', 'Opening ' + f.name + '…');
+    (async function () {
+      file = f; bytes = new Uint8Array(await f.arrayBuffer());
+      var d = await openLib(), groups = {}, order = [];
+      count = d.getPageCount();
+      d.getPages().forEach(function (p, i) { var v = visible(p), k = name(v[0], v[1]); if (!groups[k]) { groups[k] = []; order.push(k); } groups[k].push(i + 1); });
+      var list = $('prInfoList'); list.innerHTML = '';
+      if (order.length === 1) $('prInfoText').textContent = (count === 1 ? 'The page is ' : 'All ' + count + ' pages are ') + order[0] + '.';
+      else {
+        $('prInfoText').textContent = 'This PDF has pages of ' + order.length + ' sizes:';
+        order.slice(0, 8).forEach(function (k) { var li = document.createElement('li'), g = groups[k]; li.textContent = k + ': ' + (g.length > 6 ? g.length + ' pages' : 'page' + (g.length > 1 ? 's ' : ' ') + g.join(', ')); list.appendChild(li); });
+      }
+      $('prInfo').className = 'notice pr-info'; $('prInfo').hidden = false;
+      $('drop').querySelector('b').textContent = f.name;
+      PT.say('', f.name + ' · ' + count + (count === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size));
+    })().catch(function (e) { file = null; PT.say('bad', e && e.message ? e.message : 'Something went wrong with this file.'); }).then(function () { busy = false; $('go').disabled = !file; });
+  });
+
+  function target() {
+    var k = $('prSize').value;
+    if (k !== 'custom') return [SIZES[k][0] * MM, SIZES[k][1] * MM];
+    var u = { mm: MM, in: 72, pt: 1 }[$('prUnit').value], w = parseFloat($('prW').value) * u, h = parseFloat($('prH').value) * u;
+    if (!(w >= 36 && h >= 36)) throw new Error('The custom size is too small. Use at least 13 mm (0.5 in) on each side.');
+    if (w > 14400 || h > 14400) throw new Error('The custom size is too big. PDF pages can be at most 5 m (200 in) on each side.');
+    return [w, h];
+  }
+  // move an annotation together with the page content: p -> s * p + t
+  function moveAnnots(page, s, tx, ty) {
+    var L = PDFLib, a = page.node.Annots(); if (!a) return;
+    function pts(arr) { if (!(arr instanceof L.PDFArray)) return; for (var i = 0; i < arr.size(); i++) { var v = arr.lookup(i); if (v instanceof L.PDFNumber) arr.set(i, L.PDFNumber.of(v.asNumber() * s + (i % 2 ? ty : tx))); else if (v instanceof L.PDFArray) pts(v); } }
+    for (var i = 0; i < a.size(); i++) {
+      var o = a.lookup(i); if (!(o instanceof L.PDFDict)) continue;
+      ['Rect', 'QuadPoints', 'Vertices', 'L', 'CL', 'InkList'].forEach(function (k) { pts(o.lookup(L.PDFName.of(k))); });
+    }
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    PT.run(async function () {
+      var L = PDFLib, size = target(), mode = $('prFit').value, orient = $('prOrient').value, m = mode === 'fill' ? 0 : Math.max(0, parseFloat($('prMargin').value) || 0) * MM;
+      if (2 * m >= Math.min(size[0], size[1]) - 36) throw new Error('The margin is too wide for this paper. Use a smaller margin.');
+      var d = await openLib(), pages = d.getPages(), pick = $('prRange').value.trim() ? PT.ranges($('prRange').value, pages.length) : pages.map(function (p, i) { return i; });
+      var base = [Math.min(size[0], size[1]), Math.max(size[0], size[1])], custom = $('prSize').value === 'custom';
+      pick.forEach(function (i) {
+        var page = pages[i], box = page.getCropBox(), r = ((Math.round((page.getRotation().angle || 0) / 90) * 90) % 360 + 360) % 360, side = r === 90 || r === 270;
+        var vw = side ? box.height : box.width, vh = side ? box.width : box.height;
+        var land = orient === 'auto' ? vw > vh : orient === 'l', tw, th;
+        if (custom && orient === 'auto') { tw = size[0]; th = size[1]; if ((vw > vh) !== (tw > th) && Math.abs(tw - th) > 1) { tw = size[1]; th = size[0]; } }
+        else { tw = land ? base[1] : base[0]; th = land ? base[0] : base[1]; }
+        var s = mode === 'none' ? 1 : mode === 'fill' ? Math.max(tw / vw, th / vh) : Math.min((tw - 2 * m) / vw, (th - 2 * m) / vh);
+        var mw = side ? th : tw, mh = side ? tw : th; // paper in the page's own (unrotated) coordinates
+        var tx = (mw - box.width * s) / 2 - box.x * s, ty = (mh - box.height * s) / 2 - box.y * s;
+        // wrap the page content: scale and move it, and clip it to what was visible before
+        page.node.normalize(); page.getContentStream && page.getContentStream();
+        var start = d.context.register(d.context.contentStream([L.pushGraphicsState(), L.concatTransformationMatrix(s, 0, 0, s, tx, ty), L.rectangle(box.x, box.y, box.width, box.height), L.clip(), L.endPath()]));
+        var end = d.context.register(d.context.contentStream([L.popGraphicsState()]));
+        page.node.wrapContentStreams(start, end);
+        moveAnnots(page, s, tx, ty);
+        page.setMediaBox(0, 0, mw, mh); page.setCropBox(0, 0, mw, mh); page.setBleedBox(0, 0, mw, mh); page.setTrimBox(0, 0, mw, mh); page.setArtBox(0, 0, mw, mh);
+      });
+      PT.say('', 'Saving…');
+      var label = custom ? Math.round(base[0] / MM) + ' × ' + Math.round(base[1] / MM) + ' mm' : NAMES[$('prSize').value];
+      PT.done(await d.save({ updateFieldAppearances: false }), PT.base(file.name) + '-' + label.replace(/\W+/g, '').toLowerCase() + '.pdf', 'application/pdf', 'Changed ' + pick.length + (pick.length === 1 ? ' page' : ' pages') + ' to ' + label);
+    }).then(function () { busy = false; });
+  });
+})();
+</script>
