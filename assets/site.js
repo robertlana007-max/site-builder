@@ -238,12 +238,23 @@
     };
     function synOf(w) { var x = (window.TOOL_SYNONYMS && window.TOOL_SYNONYMS[w]) || []; return (SYN[w] || []).concat(x); }
     var index = null, aliasState = 0;
-    function loadAliases() { // fetch the alias list once, the first time someone uses search
-      if (aliasState || window.TOOL_ALIASES) return; aliasState = 1;
-      var s = document.createElement('script'); s.src = REL + 'assets/tools-aliases.js'; s.async = true;
-      s.onload = function () { aliasState = 2; index = null; if (document.activeElement === input || input.value) render(); };
-      s.onerror = function () { aliasState = 0; };
+    // Alias files (other names, typos, task phrases, other languages) load only when someone searches:
+    // English core first, then the visitor's browser languages, the language of the script they type in,
+    // and, if nothing matches, the remaining Latin-alphabet languages.
+    var loaded = {}, pending = 0;
+    function loadFile(name) {
+      if (loaded[name]) return; loaded[name] = 1; pending++;
+      var s = document.createElement('script'); s.src = REL + 'assets/aliases/' + name + '.js'; s.async = true;
+      s.onload = s.onerror = function () { pending--; index = null; if (!pending && (document.activeElement === input || input.value)) render(); };
       document.head.appendChild(s);
+    }
+    var SCRIPTS = [[/[؀-ۿݐ-ݿ]/, ['ar', 'fa', 'ur', 'ps']], [/[ऀ-ॿ]/, ['hi', 'mr', 'ne']], [/[ঀ-৿]/, ['bn']], [/[਀-੿]/, ['pa']], [/[઀-૿]/, ['gu']], [/[஀-௿]/, ['ta']], [/[ఀ-౿]/, ['te']], [/[ಀ-೿]/, ['kn']], [/[ഀ-ൿ]/, ['ml']], [/[඀-෿]/, ['si']], [/[က-႟]/, ['my']], [/[฀-๿]/, ['th']], [/[ក-៿]/, ['km']], [/[຀-໿]/, ['lo']], [/[぀-ヿ]/, ['ja']], [/[一-鿿]/, ['zh', 'ja']], [/[가-힯ᄀ-ᇿ]/, ['ko']], [/[Ѐ-ӿ]/, ['ru', 'uk', 'bg', 'sr', 'kk', 'uz']], [/[Ͱ-Ͽ]/, ['el']], [/[ሀ-፿]/, ['am']]];
+    var LATIN = 'es pt fr de it nl pl ro cs sk hu sv da no fi tr az uz id ms tl vi sw ha yo so zu hr hi ur'.split(' ');
+    function loadAliases(q, needMore) {
+      loadFile('core'); loadFile('list');
+      (navigator.languages || [navigator.language || '']).forEach(function (l) { l = String(l).toLowerCase().split('-')[0]; if (l && l !== 'en') loadFile(l === 'nb' || l === 'nn' ? 'no' : l === 'fil' ? 'tl' : l); });
+      for (var i = 0; i < SCRIPTS.length; i++) if (SCRIPTS[i][0].test(q)) SCRIPTS[i][1].forEach(loadFile);
+      if (needMore && /[a-z]/.test(q)) LATIN.forEach(loadFile);
     }
     function build() {
       var AL = window.TOOL_ALIASES || {};
@@ -288,12 +299,12 @@
       // People often describe the job ("how do i make my photo smaller"): drop filler words, keep the meaning.
       var words = all.filter(function (w) { return !STOP[w]; }); if (!words.length) words = all;
       if (words.length >= 3) { var core = words.filter(function (w) { return !/^(make|makes|making|made|create|change|turn)$/.test(w); }); if (core.length >= 2) words = core; }
-      loadAliases();
+      loadAliases(q, false);
       if (!index) build();
       function find(loose) { return index.map(function (e) { return [rank(e, words, q, loose), e.t]; }).filter(function (x) { return x[0] > 0; })
         .sort(function (a, b) { return b[0] - a[0]; }).slice(0, 8).map(function (x) { return x[1]; }); }
       if (!q) list = input.dataset.empty === 'all' ? (window.TOOLS || []).slice(0, 8) : [];
-      else { list = find(false); if (!list.length) { list = find(true).slice(0, 5); close = list.length > 0; } }
+      else { list = find(false); if (!list.length) { loadAliases(q, true); list = find(true).slice(0, 5); close = list.length > 0; } }
       box.innerHTML = ''; links = []; sel = 0;
       if (close) { var h = document.createElement('p'); h.className = 'f-none'; h.textContent = 'No exact match for "' + input.value.trim() + '". Closest tools:'; box.appendChild(h); }
       list.forEach(function (t) {

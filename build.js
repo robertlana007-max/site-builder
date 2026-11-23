@@ -287,11 +287,20 @@ const bySlug = s => { const t = tools.find(t => t.slug === s); if (!t) throw new
 write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [t.slug, t.name, t.cat, COLOR[t.cat], t.card])) + ';\n');
 // Search aliases (other names, common typos, other languages), loaded only when someone uses the search box.
 {
-  let AL = {};
-  try { AL = require('./src/aliases.js'); } catch (e) { AL = {}; }
-  const out = {};
-  for (const t of tools) { const a = Array.isArray(AL[t.slug]) ? AL[t.slug] : []; if (a.length) out[t.slug] = a.map(s => String(s).replace(/\|/g, ' ')).join('|'); }
-  write('assets/tools-aliases.js', 'window.TOOL_ALIASES=' + JSON.stringify(out) + ';\n');
+  // src/aliases/core.js = English names, typos, task phrases (+ __synonyms); src/aliases/<lang>.js = one file per language.
+  // Each is published as assets/aliases/<name>.js and loaded by the search box only when needed.
+  const dir = path.join(ROOT, 'src', 'aliases'), slugs = new Set(tools.map(t => t.slug));
+  const pack = (AL) => { const out = {}; for (const s of Object.keys(AL || {})) { if (!slugs.has(s) || !Array.isArray(AL[s]) || !AL[s].length) continue; out[s] = AL[s].map(x => String(x).replace(/\|/g, ' ')).join('|'); } return out; };
+  const langs = [];
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir).filter(f => /^[a-z]{2,3}(-[a-z]+)?\.js$|^core\.js$/.test(f))) {
+      let AL = {}; try { AL = require(path.join(dir, f)); } catch (e) { console.warn('aliases: skipped ' + f + ': ' + e.message); continue; }
+      const name = f.replace(/\.js$/, ''), syn = name === 'core' && AL.__synonyms ? AL.__synonyms : null;
+      write('assets/aliases/' + name + '.js', 'window.TOOL_ALIASES=window.TOOL_ALIASES||{};(function(a,s){for(var k in a)window.TOOL_ALIASES[k]=(window.TOOL_ALIASES[k]?window.TOOL_ALIASES[k]+"|":"")+a[k];' + (syn ? 'window.TOOL_SYNONYMS=s;' : '') + '})(' + JSON.stringify(pack(AL)) + ',' + JSON.stringify(syn || 0) + ');\n');
+      if (name !== 'core') langs.push(name);
+    }
+  }
+  write('assets/aliases/list.js', 'window.ALIAS_LANGS=' + JSON.stringify(langs.sort()) + ';\n');
 }
 
 // ---------- home ----------
