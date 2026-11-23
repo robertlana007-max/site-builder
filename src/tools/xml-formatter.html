@@ -69,10 +69,10 @@
     for (var i = 0; i < toks.length; i++) {
       var k = toks[i];
       if (close[i] > i + 2) { out.push({ d: depth, s: toks.slice(i, close[i] + 1).join('') }); i = close[i]; continue; }
-      if (k.charAt(0) !== '<') { // text
-        var tx = k.trim();
-        if (!tx) continue;
-        out.push({ d: depth, s: tx, text: true }); continue;
+      if (k.charAt(0) !== '<') { // text: only an element's sole content gets here (mixed content is copied above), so keep it exactly
+        var last = out[out.length - 1];
+        if (!k.trim() && !(last && last.open && toks[i - 1] === last.src && /^<\//.test(toks[i + 1] || ''))) continue; // spaces between tags
+        out.push({ d: depth, s: k, text: true }); continue;
       }
       if (k.indexOf('<!--') === 0) { if (!noCom) out.push({ d: depth, s: k }); continue; }
       if (k.indexOf('</') === 0) {
@@ -80,7 +80,7 @@
         var prev = out[out.length - 1], prev2 = out[out.length - 2];
         // <a></a> or <a>text</a> stay on one line
         if (prev && prev.open && prev.d === depth) { if (self) { prev.s = prev.s.replace(/\s*>$/, '/>'); prev.open = false; } else prev.s += k; prev.open = false; continue; }
-        if (prev && prev.text && prev2 && prev2.open && prev2.d === depth && !/\n/.test(prev.s)) { prev2.s += prev.s + k; prev2.open = false; out.pop(); continue; }
+        if (prev && prev.text && prev2 && prev2.open && prev2.d === depth) { prev2.s += prev.s + k; prev2.open = false; out.pop(); continue; }
         out.push({ d: depth, s: k }); continue;
       }
       if (/^<!\[CDATA\[/.test(k)) { out.push({ d: depth, s: k, text: true }); continue; }
@@ -91,7 +91,7 @@
         if (parts && parts.length > 3) tag = parts[0] + '\n' + parts.slice(1, -1).map(function (a) { return pad(depth + 1) + a; }).join('\n') + parts[parts.length - 1];
       }
       if (minify) tag = tag.replace(/\s+(\/?>)$/, '$1').replace(/\s{2,}(?=(?:[^"']|"[^"]*"|'[^']*')*$)/g, ' ');
-      out.push({ d: depth, s: tag, open: !isSelf });
+      out.push({ d: depth, s: tag, open: !isSelf, src: k });
       if (!isSelf) depth++;
     }
     if (minify) return out.map(function (o) { return o.s; }).join('');

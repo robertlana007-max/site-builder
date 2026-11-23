@@ -339,12 +339,15 @@
     var skip = [], m, out = [];
     SKIP.lastIndex = 0; while ((m = SKIP.exec(t))) skip.push([m.index, m.index + m[0].length]);
     var si = 0, caps = $('spCaps').checked, nums = $('spNums').checked;
+    // Words in another script (Arabic, Chinese, Greek... next to English) are not checked against this dictionary.
+    var script = lang() === 'ru' ? /\p{Script=Cyrillic}/u : /\p{Script=Latin}/u;
     WORD.lastIndex = 0;
     while ((m = WORD.exec(t))) {
       var a = m.index, w = m[0];
       while (si < skip.length && skip[si][1] <= a) si++;
       if (si < skip.length && skip[si][0] <= a) continue;
       if (!/\p{L}/u.test(w)) continue; // plain numbers
+      if (!script.test(w)) continue;
       if (nums && /\p{N}/u.test(w)) continue;
       if (caps && w.length > 1 && w === w.toUpperCase() && w !== w.toLowerCase()) continue;
       out.push({ w: w, i: a });
@@ -371,7 +374,7 @@
         $('spW').textContent = fmtNum(toks.length);
         render(t, mistakes);
         var u = Object.keys(bad).length;
-        say(mistakes.length ? '' : 'ok', mistakes.length ? 'Found ' + fmtNum(mistakes.length) + ' possible mistake' + (mistakes.length === 1 ? '' : 's') + ' (' + langName(l) + '). Click an underlined word for suggestions.' : (toks.length ? 'No spelling mistakes found (' + langName(l) + ').' : 'There are no words to check with these settings.'));
+        say(mistakes.length ? '' : 'ok', mistakes.length ? 'Found ' + fmtNum(mistakes.length) + ' possible mistake' + (mistakes.length === 1 ? '' : 's') + ' (' + langName(l) + '). Click an underlined word for suggestions.' : (toks.length ? 'No spelling mistakes found (' + langName(l) + ').' + (toks.length < 3 && foreign(t, l) ? ' Words in other alphabets are not checked.' : '') : foreign(t, l) ? 'This text uses a different alphabet from ' + langName(l) + ', so nothing was checked. Choose the language of your text above.' : 'There are no words to check with these settings.'));
       });
     }).catch(function (why) {
       if (me !== runNo) return;
@@ -379,6 +382,7 @@
       say('bad', why === 'old' ? 'Your browser is too old to unpack the dictionary. Please update it (Chrome, Edge, Firefox 113+ or Safari 16.4+).' : why === 'net' ? 'The ' + langName(l) + ' dictionary could not be downloaded. Check your connection and press Check spelling again.' : 'The spell checker could not start in this browser (' + why + '). Try reloading the page.');
     });
   }
+  function foreign(t, l) { return /\p{L}/u.test(t.replace(l === 'ru' ? /\p{Script=Cyrillic}/gu : /\p{Script=Latin}/gu, '')); }
   function render(t, ms) {
     var html = '', pos = 0, LIMIT = 300000;
     ms.forEach(function (k, n) {

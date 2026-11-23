@@ -106,8 +106,8 @@
     var city = pick(d.c), n = int(1, 199);
     var street = d.addr.replace('{st}', pick(d.st).n).replace('{n}', n).replace('{n2}', int(1, 30)).replace('{n3}', int(1, 20));
     var pc = pattern(d.pc);
-    var addrFull = loc === 'ja-JP' ? '〒' + pc + ' ' + city.n + street : loc === 'zh-CN' ? city.n + street + ' ' + pc : loc === 'en-US' ? street + ', ' + city.n + ' ' + pc : loc === 'en-GB' || loc === 'en-IN' ? street + ', ' + city.n + ' ' + pc : street + ', ' + pc + ' ' + city.n;
-    var co = d.coFirst ? (loc === 'ja-JP' || loc === 'zh-CN' ? (loc === 'ja-JP' ? d.co[0] + pick(d.s).n + pick(['商事', '工業', '電機', '物産']) : pick(d.s).n + pick(['华', '鑫', '腾', '盛']) + pick(['科技', '贸易', '实业']) + pick(d.co)) : pick(d.co) + ' ' + pick(d.s).n + ' ' + pick(['Mandiri', 'Sejahtera', 'Group', 'Trading'])) : pick(d.s).n + ' ' + pick(d.co);
+    var addrFull = loc === 'ja-JP' ? '〒' + pc + ' ' + city.n + street : loc === 'zh-CN' ? city.n + street + ' ' + pc : loc === 'en-US' ? street + ', ' + city.n + ' ' + pc : loc === 'en-GB' || loc === 'en-IN' ? street + ', ' + city.n + ' ' + pc : loc === 'ar-EG' ? street + '، ' + city.n + ' ' + pc : street + ', ' + pc + ' ' + city.n;
+    var co = d.coFirst || loc === 'zh-CN' ? (loc === 'ja-JP' || loc === 'zh-CN' ? (loc === 'ja-JP' ? d.co[0] + pick(d.s).n + pick(['商事', '工業', '電機', '物産']) : pick(d.s).n + pick(['华', '鑫', '腾', '盛']) + pick(['科技', '贸易', '实业']) + '有限公司') : pick(d.co) + ' ' + pick(d.s).n + ' ' + pick(['Mandiri', 'Sejahtera', 'Group', 'Trading'])) : pick(d.s).n + ' ' + pick(d.co);
     if (loc === 'ru-RU') co = pick(d.co) + ' «' + pick(['Север', 'Альфа', 'Восток', 'Прогресс', 'Вектор']) + '»';
     if (loc === 'ar-EG') co = pick(['شركة النيل', 'شركة الأمل', 'شركة المستقبل', 'شركة الهرم']) + ' ' + pick(d.co);
     return { first: first.n, last: last.n, full: full, gender: fem ? 'female' : 'male', email: user.replace(/\d+$/, '') + (rnd() < 0.5 ? int(1, 99) : '') + '@' + pick(['example.com', 'example.org', 'example.net']), username: user, phone: pattern(d.ph), street: street, city: city.n, postcode: pc, country: d.country, ccode: d.cc, address: addrFull, company: co, slug: fl };
@@ -121,14 +121,14 @@
       case 'uuid': var h = []; for (var k = 0; k < 16; k++) h.push(int(0, 255)); h[6] = (h[6] & 15) | 64; h[8] = (h[8] & 63) | 128; var x = h.map(function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join(''); return x.slice(0, 8) + '-' + x.slice(8, 12) + '-' + x.slice(12, 16) + '-' + x.slice(16, 20) + '-' + x.slice(20);
       case 'password': var cs = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?', pw = ''; for (var j = 0; j < 14; j++) pw += cs.charAt(int(0, cs.length - 1)); return pw;
       case 'dob': return iso(dob(p, now));
-      case 'age': return Math.floor((now - dob(p, now)) / (365.25 * 864e5));
+      case 'age': var b = dob(p, now), t = new Date(now), y = t.getUTCFullYear() - b.getUTCFullYear(); if (t.getUTCMonth() < b.getUTCMonth() || (t.getUTCMonth() === b.getUTCMonth() && t.getUTCDate() < b.getUTCDate())) y--; return y; // age in whole years, as on a calendar
       case 'date': return iso(new Date(now - rnd() * 730 * 864e5));
       case 'datetime': return new Date(now - rnd() * 730 * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
       case 'int': return int(1, 1000);
       case 'price': return +(int(99, 99999) / 100).toFixed(2);
       case 'bool': return rnd() < 0.5;
       case 'ip': return pick(['192.0.2.', '198.51.100.', '203.0.113.']) + int(1, 254);
-      case 'ipv6': return '2001:db8:' + [int(0, 65535), int(0, 65535), int(0, 65535), int(0, 65535)].map(function (v) { return v.toString(16); }).join(':') + '::' + int(1, 65535).toString(16);
+      case 'ipv6': return '2001:db8:' + [int(0, 65535), int(0, 65535), int(0, 65535), int(0, 65535), int(0, 65535), int(1, 65535)].map(function (v) { return v.toString(16); }).join(':');
       case 'url': return 'https://www.' + pick(['example.com', 'example.org', 'example.net']) + '/' + pick(['blog', 'shop', 'news', 'products', 'about', 'docs']) + '/' + (p.slug || 'page') + '-' + int(1, 999);
       case 'color': return '#' + ('00000' + int(0, 0xFFFFFF).toString(16)).slice(-6);
       case 'lat': return +(rnd() * 180 - 90).toFixed(6);
@@ -170,7 +170,14 @@
     rnd = seed ? seeded(seed) : cryptoRnd();
     var now = seed ? Date.UTC(2026, 0, 1) : Date.now(), loc = $('fdLoc').value, locs = Object.keys(D), rows = [];
     for (var i = 0; i < n; i++) { var p = person(loc === 'mix' ? pick(locs) : loc), r = []; for (var j = 0; j < c.length; j++) r.push(value(c[j][0], p, i, now)); rows.push(r); }
-    var fmt = $('fdFmt').value, out;
+    data = { rows: rows, names: names, n: n, seed: seed };
+    render();
+  }
+  // Write the generated rows in the chosen format (changing the format or table name keeps the same rows).
+  var data = null;
+  function render() {
+    if (!data) return;
+    var rows = data.rows, names = data.names, n = data.n, seed = data.seed, fmt = $('fdFmt').value, out;
     if (fmt === 'csv') { out = '\ufeff' + names.map(csvCell).join(',') + '\r\n' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n'; ext = 'csv'; }
     else if (fmt === 'json' || fmt === 'jsonl') {
       var objs = rows.map(function (r) { var o = {}; names.forEach(function (k, j) { o[k] = r[j]; }); return o; });
@@ -189,6 +196,8 @@
   $('fdAdd').addEventListener('click', function () { if ($('fdFields').children.length >= 40) return say('', 'That is the maximum of 40 columns.'); var used = cols().map(function (c) { return c[0]; }), next = TYPES.filter(function (t) { return used.indexOf(t[0]) === -1; })[0] || TYPES[0]; addRow(next[0], COLNAME[next[0]]); save(); });
   $('fdReset').addEventListener('click', function () { $('fdFields').innerHTML = ''; DEFAULT.forEach(function (x) { addRow(x[0], x[1]); }); save(); });
   $('fdGo').addEventListener('click', generate);
+  $('fdFmt').addEventListener('change', render);
+  $('fdTable').addEventListener('input', function () { if ($('fdFmt').value === 'sql') render(); });
   $('fdCp').addEventListener('click', function () { if (!last) return say('', 'Press Generate first.'); copyText(last.replace(/^\ufeff/, ''), $('fdCp')); });
   $('fdDl').addEventListener('click', function () {
     if (!last) return say('', 'Press Generate first.');
@@ -196,5 +205,15 @@
     document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
   });
   load();
+  // Start with the visitor's own country or language when it is in the list (a saved choice still wins).
+  try {
+    var want = (navigator.languages || [navigator.language || '']).map(String), opts = [].map.call($('fdLoc').options, function (o) { return o.value; });
+    want.some(function (l) {
+      var exact = opts.filter(function (v) { return v.toLowerCase() === l.toLowerCase(); })[0];
+      var lang = opts.filter(function (v) { return v.split('-')[0] === l.split('-')[0].toLowerCase(); })[0];
+      if (exact || lang) { $('fdLoc').value = exact || lang; return true; }
+      return false;
+    });
+  } catch (e) {}
 })();
 </script>
