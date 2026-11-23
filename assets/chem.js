@@ -169,25 +169,36 @@
       var l = species.some(function (sp) { return !sp.side && sp.counts[els[i]]; }), r = species.some(function (sp) { return sp.side && sp.counts[els[i]]; });
       if (!l || !r) return { error: (EL[els[i]].name) + ' (' + els[i] + ') appears only on the ' + (l ? 'left' : 'right') + ' side. Atoms cannot appear or disappear, so check the formulas.' };
     }
-    var basis = nullspace(M, species.length);
+    var basis = nullspace(M, species.length), alt = null;
+    if (basis.length > 1) { // also try with the pivots taken from the other end, which often gives positive free choices
+      var n = species.length;
+      alt = nullspace(M.map(function (r) { return r.slice().reverse(); }), n).map(function (v) { return v.slice().reverse(); });
+    }
     if (!basis.length) return { error: 'This equation cannot be balanced. Check that every formula is right and that no product or reactant is missing.' };
     function positive(v) { var s = v.some(function (x) { return x > 0n; }) ? 1n : -1n; v = v.map(function (x) { return x * s; }); return v.every(function (x) { return x > 0n; }) ? v : null; }
     var best = null;
     if (basis.length === 1) best = positive(basis[0]);
-    else {
+    else [basis, alt].forEach(function (basis) {
       // several independent reactions are mixed together: look for the smallest all-positive combination
-      var dim = Math.min(basis.length, 4), lim = dim <= 2 ? 12 : dim === 3 ? 6 : 4, w = [];
-      (function rec(k) {
-        if (k === dim) {
-          var v = species.map(function (_, j) { var s = 0n; for (var q = 0; q < dim; q++) s += BigInt(w[q]) * basis[q][j]; return s; });
-          var g = 0n; v.forEach(function (x) { g = bgcd(g, x); }); if (!g) return;
-          v = positive(v.map(function (x) { return x / g; }));
-          if (v) { var sum = v.reduce(function (a, b) { return a + b; }, 0n); if (!best || sum < best.sum) { best = v; best.sum = sum; } }
-          return;
-        }
-        for (var t = -lim; t <= lim; t++) { w[k] = t; rec(k + 1); }
-      })(0);
-    }
+      var dim = basis.length, w = [];
+      var tryW = function () {
+        var v = species.map(function (_, j) { var s = 0n; for (var q = 0; q < dim; q++) s += BigInt(w[q]) * basis[q][j]; return s; });
+        var g = 0n; v.forEach(function (x) { g = bgcd(g, x); }); if (!g) return;
+        v = positive(v.map(function (x) { return x / g; }));
+        if (v) { var sum = v.reduce(function (a, b) { return a + b; }, 0n); if (!best || sum < best.sum) { best = v; best.sum = sum; } }
+      };
+      if (dim <= 3) {
+        var lim = dim === 2 ? 12 : 6;
+        (function rec(k) { if (k === dim) return tryW(); for (var t = -lim; t <= lim; t++) { w[k] = t; rec(k + 1); } })(0);
+      } else {
+        // many free choices: each basis vector has 1 at its own free substance, so positive weights keep those positive
+        var seed = 7;
+        var rnd = function () { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
+        for (var q = 0; q < dim; q++) w[q] = 1;
+        tryW();
+        for (var tr = 0; tr < 2000; tr++) { for (q = 0; q < dim; q++) w[q] = 1 + Math.floor(rnd() * 6); tryW(); }
+      }
+    });
     if (!best) return { error: basis.length === 1 ? 'No balanced version exists with all coefficients positive. A substance may be on the wrong side, or a formula may be wrong.' : 'This equation can be balanced in many ways but none with small positive numbers was found. Check the formulas.' };
     return { coefs: best.slice(0, species.length), multiple: basis.length > 1, elements: els, hasCharge: hasCharge };
   }
