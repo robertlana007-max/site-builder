@@ -457,8 +457,8 @@ const THEME = (() => {
     const r = rand(t.slug + '#motif'), b = (a, c, dp = 0) => +(a + r() * (c - a)).toFixed(dp);
     const inner = ICON[t.slug] || t.icon || ICON.star;
     const ic = (st, draw) => `<svg class="i" viewBox="0 0 24 24" style="${st}">${draw ? inner.replace(/<(path|circle|rect|line|polyline|polygon|ellipse)\b/g, '<$1 pathLength="100"') : inner}</svg>`;
-    if (mo === 0) return ic(`--x:${b(60, 78)}%;--y:${b(-18, 22)}%;--s:${b(150, 210)}px;--r:${b(-24, 24)}deg;--o:${b(.12, .17, 2)}`, true);
-    if (mo === 1) return Array.from({ length: 6 }, (_, i) => ic(`--x:${b(50 + (i % 3) * 15, 60 + (i % 3) * 15)}%;--y:${b(i < 3 ? 4 : 46, i < 3 ? 34 : 74)}%;--s:${b(18, 42)}px;--r:${b(-40, 40)}deg;--o:${b(.17, .3, 2)};--d:${(.3 + i * .12).toFixed(2)}s;--t:${b(3, 6, 1)}s`)).join('');
+    if (mo === 0) return ic(`--x:${b(68, 80)}%;--y:${b(-18, 22)}%;--s:${b(150, 200)}px;--r:${b(-24, 24)}deg;--o:${b(.12, .17, 2)}`, true);
+    if (mo === 1) return Array.from({ length: 6 }, (_, i) => ic(`--x:${b(71 + (i % 3) * 8, 76 + (i % 3) * 8)}%;--y:${b(i < 3 ? 4 : 48, i < 3 ? 30 : 74)}%;--s:${b(18, 42)}px;--r:${b(-40, 40)}deg;--o:${b(.17, .3, 2)};--d:${(.3 + i * .12).toFixed(2)}s;--t:${b(3, 6, 1)}s`)).join('');
     if (mo === 2) {
       const n = b(3, 4), R = b(58, 74), off = b(0, 90), s = b(18, 26);
       return `<span class="tv-orb" style="--x:${b(78, 88)}%;--y:${b(42, 58)}%">${ic(`--s:${b(54, 70)}px;--r:${b(-20, 20)}deg;--o:.22`)}<b style="--t:${b(22, 36)}s">${Array.from({ length: n }, (_, i) => ic(`--s:${s}px;--a:${Math.round(off + i * 360 / n)}deg;--R:${R}px;--o:.26;--r:0deg`)).join('')}</b></span>`;
@@ -467,8 +467,8 @@ const THEME = (() => {
       const svgTxt = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 40 40" fill="none" stroke="#000" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
       return `<span class="tv-tile" style="--u:url('data:image/svg+xml,${encodeURIComponent(svgTxt)}');--g:${b(36, 54)}px;--r:${b(-22, 22)}deg;--o:${b(.11, .15, 2)}"></span>`;
     }
-    const cx = b(90, 98), R = b(130, 170), a0 = b(190, 205), a1 = b(265, 280);
-    return Array.from({ length: 6 }, (_, i) => { const a = (a0 + (a1 - a0) * i / 5) * Math.PI / 180; return ic(`--x:calc(${cx}% + ${Math.round(R * Math.cos(a))}px);--y:calc(100% + ${Math.round(R * Math.sin(a) - 10)}px);--s:${16 + i * 4}px;--r:${b(-30, 30)}deg;--o:${b(.2, .3, 2)};--d:${(.3 + i * .1).toFixed(2)}s;--t:${b(3, 6, 1)}s`); }).join('');
+    const cx = b(92, 98), R = b(120, 150), a0 = b(190, 205), a1 = b(265, 280);
+    return Array.from({ length: 6 }, (_, i) => { const a = (a1 - (a1 - a0) * i / 5) * Math.PI / 180; return ic(`--x:calc(${cx}% + ${Math.round(R * Math.cos(a))}px);--y:calc(100% + ${Math.round(R * Math.sin(a) - 10)}px);--s:${36 - i * 4}px;--r:${b(-30, 30)}deg;--o:${b(.2, .3, 2)};--d:${(.3 + i * .1).toFixed(2)}s;--t:${b(3, 6, 1)}s`); }).join('');
   };
   for (const t of tools) { const o = out[t.slug]; o.art = `<div class="tv-art" aria-hidden="true"><i></i><i></i><i></i><i></i><span class="tv-m mo-${o.pick.mo}">${motif(t, o.pick.mo)}</span></div>`; }
   return out;
