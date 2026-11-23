@@ -1,0 +1,161 @@
+<label for="jtIn">JSON</label>
+<textarea id="jtIn" data-nomemo style="min-height:240px;font-family:var(--mono);font-size:13.5px" spellcheck="false" placeholder='{"id": 1, "name": "Ana", "tags": ["admin"], "address": {"city": "Lisbon"}}'></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="jtOut">Output</label><select id="jtOut"><option value="interface">TypeScript interfaces</option><option value="type">TypeScript types</option><option value="schema">JSON Schema</option></select></div>
+  <div><label for="jtName">Root name</label><input type="text" id="jtName" value="Root" maxlength="60" spellcheck="false"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="jtExp" checked>export</label>
+  <label><input type="checkbox" id="jtRo">readonly properties</label>
+  <label><input type="checkbox" id="jtAllOpt">Make every property optional</label>
+  <label><input type="checkbox" id="jtDates">Detect dates, emails and URLs (JSON Schema formats)</label>
+</div>
+<div class="btns">
+  <button class="btn" id="jtGo">Convert</button>
+  <button class="btn ghost" id="jtCp">Copy</button>
+  <button class="btn ghost" id="jtDl">Download</button>
+  <button class="btn ghost" id="jtEx">Try an example</button>
+  <button class="btn ghost" id="jtClr">Clear</button>
+</div>
+<p class="msg" id="jtMsg"></p>
+<textarea id="jtRes" data-nomemo readonly style="min-height:260px;font-family:var(--mono);font-size:13.5px" spellcheck="false" aria-label="Result"></textarea>
+<script>
+(function () {
+  var EXAMPLE = '{\n  "id": 42,\n  "name": "Ana Silva",\n  "email": "ana@example.com",\n  "active": true,\n  "score": 9.5,\n  "createdAt": "2026-01-15T10:30:00Z",\n  "tags": ["admin", "editor"],\n  "address": { "city": "Lisbon", "zip": "1100-148", "geo": { "lat": 38.72, "lng": -9.14 } },\n  "orders": [\n    { "id": 1, "total": 19.99, "items": [{ "sku": "A1", "qty": 2 }] },\n    { "id": 2, "total": 5, "coupon": "SAVE5", "items": [] }\n  ],\n  "manager": null,\n  "first-name": "Ana"\n}';
+  function say(cls, t) { $('jtMsg').className = 'msg ' + cls; $('jtMsg').textContent = t; }
+
+  // ---- 1. infer a shape from the data, merging every element of an array ----
+  function infer(v) {
+    if (v === null) return { k: 'null' };
+    if (Array.isArray(v)) { var it = null; for (var i = 0; i < v.length; i++) it = merge(it, infer(v[i])); return { k: 'array', items: it }; }
+    if (typeof v === 'object') { var f = {}, keys = Object.keys(v); keys.forEach(function (key) { f[key] = { s: infer(v[key]), n: 1 }; }); return { k: 'object', f: f, keys: keys, seen: 1 }; }
+    if (typeof v === 'number') return { k: Number.isInteger(v) ? 'integer' : 'number' };
+    if (typeof v === 'string') return { k: 'string', fmt: fmtOf(v) };
+    return { k: typeof v };
+  }
+  function fmtOf(s) {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/.test(s)) return 'date-time';
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return 'date';
+    if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(s)) return 'email';
+    if (/^https?:\/\/\S+$/.test(s)) return 'uri';
+    if (/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s)) return 'uuid';
+    return '';
+  }
+  function members(s) { return !s ? [] : s.k === 'union' ? s.t : [s]; }
+  function merge(a, b) {
+    if (!a) return b; if (!b) return a;
+    var list = members(a).slice();
+    members(b).forEach(function (x) {
+      var i = list.findIndex(function (y) { return y.k === x.k || (isNum(y) && isNum(x)); });
+      if (i === -1) { list.push(x); return; }
+      var y = list[i];
+      if (isNum(y) && isNum(x)) list[i] = { k: y.k === 'integer' && x.k === 'integer' ? 'integer' : 'number' };
+      else if (x.k === 'string') list[i] = { k: 'string', fmt: y.fmt === x.fmt ? y.fmt : '' };
+      else if (x.k === 'array') list[i] = { k: 'array', items: merge(y.items, x.items) };
+      else if (x.k === 'object') {
+        var f = {}, keys = y.keys.slice();
+        y.keys.forEach(function (k) { f[k] = { s: y.f[k].s, n: y.f[k].n }; });
+        x.keys.forEach(function (k) { if (f[k]) { f[k] = { s: merge(f[k].s, x.f[k].s), n: f[k].n + x.f[k].n }; } else { f[k] = { s: x.f[k].s, n: x.f[k].n }; keys.push(k); } });
+        list[i] = { k: 'object', f: f, keys: keys, seen: y.seen + x.seen };
+      }
+    });
+    return list.length === 1 ? list[0] : { k: 'union', t: list };
+  }
+  function isNum(s) { return s.k === 'number' || s.k === 'integer'; }
+
+  // ---- 2. TypeScript ----
+  function pascal(s) {
+    var w = String(s).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').split(/[^A-Za-z0-9]+/).filter(Boolean);
+    var n = w.map(function (x) { return x.charAt(0).toUpperCase() + x.slice(1); }).join('');
+    if (!n) n = 'Item'; if (/^\d/.test(n)) n = 'T' + n;
+    return n;
+  }
+  function singular(n) { return /ies$/.test(n) ? n.replace(/ies$/, 'y') : /(ss|us|is)$/.test(n) ? n : /(ches|shes|xes|ses)$/.test(n) ? n.replace(/es$/, '') : /s$/.test(n) ? n.slice(0, -1) : n + 'Item'; }
+  var RESERVED = /^(string|number|boolean|object|any|unknown|never|null|undefined|Array|Date|Promise|Record|Map|Set|Partial|Omit|Pick)$/;
+  function ts(root, rootName) {
+    var decls = [], used = {}, bySig = {}, kw = $('jtOut').value === 'type' ? 'type' : 'interface', exp = $('jtExp').checked ? 'export ' : '', ro = $('jtRo').checked ? 'readonly ' : '', allOpt = $('jtAllOpt').checked;
+    function uniq(n) { if (RESERVED.test(n)) n += 'Type'; var x = n, i = 2; while (used[x]) x = n + i++; used[x] = 1; return x; }
+    function key(k) { return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(k) ? k : JSON.stringify(k); }
+    function typeOf(s, hint) {
+      if (!s) return 'unknown';
+      if (s.k === 'union') { var parts = s.t.map(function (x) { return typeOf(x, hint); }); return parts.map(function (p) { return / \| /.test(p) && !/^\(/.test(p) ? '(' + p + ')' : p; }).join(' | '); }
+      if (s.k === 'integer' || s.k === 'number') return 'number';
+      if (s.k === 'string' || s.k === 'boolean' || s.k === 'null') return s.k;
+      if (s.k === 'array') { var t = typeOf(s.items, singular(hint)); return s.items ? (/[ |{]/.test(t) ? '(' + t + ')[]' : t + '[]') : 'unknown[]'; }
+      if (s.k === 'object') return objName(s, hint);
+      return 'unknown';
+    }
+    function objName(s, hint) {
+      if (!s.keys.length) return 'Record<string, unknown>';
+      var body = s.keys.map(function (k) { var f = s.f[k], opt = allOpt || f.n < s.seen; return '  ' + ro + key(k) + (opt ? '?' : '') + ': ' + typeOf(f.s, pascal(k)) + ';'; });
+      var sig = body.join('\n');
+      if (bySig[sig]) return bySig[sig];
+      var name = uniq(pascal(hint));
+      bySig[sig] = name;
+      decls.push(kw === 'interface' ? exp + 'interface ' + name + ' {\n' + sig + '\n}' : exp + 'type ' + name + ' = {\n' + sig + '\n};');
+      return name;
+    }
+    var rootType = typeOf(root, rootName);
+    if (root && root.k === 'object' && root.keys.length) return decls.reverse().join('\n\n') + '\n';
+    var main = exp + 'type ' + uniq(pascal(rootName)) + ' = ' + rootType + ';';
+    return [main].concat(decls.reverse()).join('\n\n') + '\n';
+  }
+
+  // ---- 3. JSON Schema (draft 2020-12) ----
+  function schema(root, rootName) {
+    var dates = $('jtDates').checked, allOpt = $('jtAllOpt').checked;
+    function sc(s) {
+      if (!s) return {};
+      if (s.k === 'union') {
+        var simple = s.t.every(function (x) { return x.k !== 'object' && x.k !== 'array'; });
+        if (simple) { var o = { type: s.t.map(function (x) { return x.k; }) }; return o; }
+        return { anyOf: s.t.map(sc) };
+      }
+      if (s.k === 'array') return s.items ? { type: 'array', items: sc(s.items) } : { type: 'array' };
+      if (s.k === 'object') {
+        var o2 = { type: 'object', properties: {} }, req = [];
+        s.keys.forEach(function (k) { o2.properties[k] = sc(s.f[k].s); if (!allOpt && s.f[k].n >= s.seen) req.push(k); });
+        if (req.length) o2.required = req;
+        return o2;
+      }
+      var r = { type: s.k };
+      if (s.k === 'string' && dates && s.fmt) r.format = s.fmt;
+      return r;
+    }
+    var out = { $schema: 'https://json-schema.org/draft/2020-12/schema', title: rootName };
+    var body = sc(root); for (var k in body) out[k] = body[k];
+    return JSON.stringify(out, null, 2) + '\n';
+  }
+
+  function run() {
+    var t = $('jtIn').value.replace(/^\ufeff/, '').trim(), name = $('jtName').value.trim() || 'Root';
+    if (!t) { $('jtRes').value = ''; return say('', 'Paste some JSON first.'); }
+    var data;
+    try { data = JSON.parse(t); }
+    catch (e) {
+      var msg = e.message, at = /position (\d+)/.exec(msg);
+      if (at && !/line \d+/.test(msg)) { var before = t.slice(0, +at[1]).split('\n'); msg += ' (line ' + before.length + ', column ' + (before[before.length - 1].length + 1) + ')'; }
+      $('jtRes').value = ''; return say('bad', 'Invalid JSON: ' + msg);
+    }
+    var shape = infer(data), out = $('jtOut').value === 'schema' ? schema(shape, name) : ts(shape, name);
+    $('jtRes').value = out;
+    var count = (out.match(/^(export )?(interface|type) /gm) || []).length;
+    say('ok', $('jtOut').value === 'schema' ? 'JSON Schema ready (draft 2020-12).' : 'Made ' + count + ' TypeScript ' + ($('jtOut').value === 'type' ? 'type' : 'interface') + (count === 1 ? '' : 's') + '. Properties missing from some array items are marked optional (?).');
+  }
+  var timer;
+  $('jtGo').addEventListener('click', run);
+  $('jtIn').addEventListener('input', function () { clearTimeout(timer); if ($('jtIn').value.length < 200000) timer = setTimeout(function () { if ($('jtIn').value.trim()) run(); }, 400); });
+  ['jtOut', 'jtExp', 'jtRo', 'jtAllOpt', 'jtDates'].forEach(function (id) { $(id).addEventListener('change', function () { if ($('jtIn').value.trim()) run(); }); });
+  $('jtName').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(function () { if ($('jtIn').value.trim()) run(); }, 300); });
+  $('jtCp').addEventListener('click', function () { if ($('jtRes').value) copyText($('jtRes').value, $('jtCp')); else say('', 'Convert some JSON first.'); });
+  $('jtDl').addEventListener('click', function () {
+    if (!$('jtRes').value) return say('', 'Convert some JSON first.');
+    var sch = $('jtOut').value === 'schema', a = document.createElement('a');
+    a.href = URL.createObjectURL(new Blob([$('jtRes').value], { type: sch ? 'application/schema+json' : 'text/plain' }));
+    a.download = (pascal($('jtName').value || 'Root').replace(/^./, function (c) { return c.toLowerCase(); })) + (sch ? '.schema.json' : '.ts');
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('jtEx').addEventListener('click', function () { $('jtIn').value = EXAMPLE; run(); });
+  $('jtClr').addEventListener('click', function () { $('jtIn').value = ''; $('jtRes').value = ''; say('', ''); $('jtIn').focus(); });
+})();
+</script>
