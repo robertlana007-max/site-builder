@@ -1,0 +1,262 @@
+<style>
+.tt-keys { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+.tt-keys button { font: 600 14px/1 var(--mono); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; min-width: 40px; padding: 9px 10px; cursor: pointer; }
+.tt-keys button:hover { border-color: var(--accent); color: var(--accent); }
+.tt-wrap { overflow: auto; max-height: 520px; border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; }
+.tt-tbl { border-collapse: collapse; width: 100%; font-family: var(--mono); font-size: 14px; text-align: center; }
+.tt-tbl th, .tt-tbl td { padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.tt-tbl th { position: sticky; top: 0; background: var(--surface); font-weight: 700; z-index: 1; }
+.tt-tbl td.t { color: var(--ok); font-weight: 700; }
+.tt-tbl td.f { color: var(--muted); }
+.tt-tbl .res { background: var(--accent-soft); }
+.tt-tbl th.res { background: var(--accent-soft); }
+.tt-tbl .sep { border-inline-start: 2px solid var(--line); }
+.tt-kv { display: grid; grid-template-columns: max-content 1fr; gap: 6px 12px; margin-top: 14px; font-size: 15px; }
+.tt-kv span { color: var(--muted); }
+.tt-kv code { font-family: var(--mono); overflow-wrap: anywhere; }
+@media (max-width: 520px) { .tt-kv { grid-template-columns: 1fr; } .tt-kv span { margin-top: 6px; } }
+</style>
+<label for="ex">Boolean expression</label>
+<input type="text" id="ex" value="(A and B) or not C" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="for example (A ∧ B) → C, or A'B + C">
+<div class="tt-keys" id="keys" aria-label="Insert symbol"><button type="button" data-k=" ∧ " title="AND">∧</button><button type="button" data-k=" ∨ " title="OR">∨</button><button type="button" data-k="¬" title="NOT">¬</button><button type="button" data-k=" ⊕ " title="XOR">⊕</button><button type="button" data-k=" → " title="IMPLIES">→</button><button type="button" data-k=" ↔ " title="IF AND ONLY IF">↔</button><button type="button" data-k=" ↑ " title="NAND">↑</button><button type="button" data-k=" ↓ " title="NOR">↓</button><button type="button" data-k="(">(</button><button type="button" data-k=")">)</button></div>
+<div class="fields">
+  <div><label for="vals">Show values as</label><select id="vals"><option value="10">1 and 0</option><option value="TF">T and F</option></select></div>
+  <div><label for="order">Row order</label><select id="order"><option value="0">Start with all 0 (false)</option><option value="1">Start with all 1 (true)</option></select></div>
+  <div><label for="nota">Notation for formulas</label><select id="nota"><option value="logic">Logic: A ∧ B ∨ ¬C</option><option value="digital">Digital: AB + C'</option><option value="code">Code: A && B || !C</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="steps" checked>Show a column for each step</label><label><input type="checkbox" id="long">Long variable names (AB is one variable, not A AND B)</label></div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="stats" id="st"></div>
+  <div class="tt-kv" id="kv"></div>
+  <div class="btns"><button class="btn ghost" id="cpCsv" type="button">Copy as CSV</button><button class="btn ghost" id="cpMd" type="button">Copy as Markdown</button><button class="btn ghost" id="cpSop" type="button">Copy simplified formula</button></div>
+  <div class="tt-wrap"><table class="tt-tbl" id="tbl"></table></div>
+</div>
+<details class="more" style="margin-top:16px"><summary>Operators you can type</summary><div><p class="msg" style="margin-top:4px">
+  NOT: <code>not A</code>, <code>!A</code>, <code>~A</code>, <code>¬A</code>, <code>A'</code> · AND: <code>and</code>, <code>&amp;</code>, <code>&amp;&amp;</code>, <code>∧</code>, <code>*</code>, <code>·</code> or just <code>AB</code> · OR: <code>or</code>, <code>|</code>, <code>||</code>, <code>∨</code>, <code>+</code> · XOR: <code>xor</code>, <code>^</code>, <code>⊕</code> · NAND: <code>nand</code>, <code>↑</code> · NOR: <code>nor</code>, <code>↓</code> · IMPLIES: <code>-&gt;</code>, <code>=&gt;</code>, <code>→</code>, <code>implies</code> · IF AND ONLY IF: <code>&lt;-&gt;</code>, <code>&lt;=&gt;</code>, <code>↔</code>, <code>==</code>, <code>iff</code>, <code>xnor</code> · constants <code>0</code>, <code>1</code>, <code>true</code>, <code>false</code>. Order: NOT first, then AND, XOR, OR, →, ↔. Separate several expressions with commas to compare them.</p></div></details>
+<script>
+(function () {
+  var KW = { and: 'and', or: 'or', not: 'not', xor: 'xor', nand: 'nand', nor: 'nor', xnor: 'iff', implies: 'imp', iff: 'iff', true: '1', false: '0' };
+  var MAXV = 12, last = null, timer;
+  function E(m) { this.message = m; }
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function lex(s, long) {
+    var out = [], i = 0, m;
+    var OPS = [['<->', 'iff'], ['<=>', 'iff'], ['==', 'iff'], ['->', 'imp'], ['=>', 'imp'], ['&&', 'and'], ['||', 'or'], ['↔', 'iff'], ['⇔', 'iff'], ['≡', 'iff'], ['→', 'imp'], ['⇒', 'imp'], ['∧', 'and'], ['&', 'and'], ['*', 'and'], ['·', 'and'], ['⋅', 'and'], ['∨', 'or'], ['|', 'or'], ['+', 'or'], ['⊕', 'xor'], ['^', 'xor'], ['↑', 'nand'], ['↓', 'nor'], ['¬', 'not'], ['!', 'not'], ['~', 'not'], ['=', 'iff'], ['(', '('], [')', ')'], ["'", 'post'], ['’', 'post']];
+    while (i < s.length) {
+      if (/\s/.test(s[i])) { i++; continue; }
+      var hit = null;
+      for (var k = 0; k < OPS.length; k++) if (s.substr(i, OPS[k][0].length) === OPS[k][0]) { hit = OPS[k]; break; }
+      if (hit) { out.push({ k: hit[1] }); i += hit[0].length; continue; }
+      if ((m = /^[A-Za-z_][A-Za-z0-9_]*/.exec(s.slice(i)))) {
+        var w = m[0], lw = w.toLowerCase();
+        if (KW[lw]) { var kk = KW[lw]; out.push(kk === '1' || kk === '0' ? { k: 'c', v: +kk } : { k: kk }); }
+        else if (long || /[0-9_]/.test(w) || w.length === 1) out.push({ k: 'v', v: w });
+        else w.split('').forEach(function (c, j) { if (j) out.push({ k: 'and', implicit: true }); out.push({ k: 'v', v: c }); });
+        i += w.length; continue;
+      }
+      if (/[01⊤⊥]/.test(s[i])) { out.push({ k: 'c', v: s[i] === '1' || s[i] === '⊤' ? 1 : 0 }); i++; continue; }
+      throw new E('"' + s[i] + '" is not understood. Use letters for variables and operators such as and, or, not, ->.');
+    }
+    return out;
+  }
+  function parse(s, long) {
+    var t = lex(s, long), i = 0;
+    if (!t.length) throw new E('Type an expression, for example (A and B) or not C.');
+    function peek() { return t[i] && t[i].k; }
+    function bin(next, ops) {
+      return function () { var a = next(); while (ops.indexOf(peek()) >= 0) { var op = t[i++].k; a = { op: op, a: a, b: next() }; } return a; };
+    }
+    function prim() {
+      var tk = t[i++];
+      if (!tk) throw new E('The expression ends too early. Something is missing at the end.');
+      var node;
+      if (tk.k === 'not') node = { op: 'not', a: prim() };
+      else if (tk.k === '(') { node = iff(); if (peek() !== ')') throw new E('A bracket "(" is not closed.'); i++; }
+      else if (tk.k === 'v') node = { v: tk.v };
+      else if (tk.k === 'c') node = { c: tk.v };
+      else if (tk.k === ')') throw new E('There is a ")" without a matching "(", or something is missing before it.');
+      else throw new E('Something is missing before "' + ({ and: 'AND', or: 'OR', xor: 'XOR', imp: '→', iff: '↔', nand: 'NAND', nor: 'NOR', post: "'" }[tk.k] || tk.k) + '".');
+      while (peek() === 'post') { i++; node = { op: 'not', a: node }; }
+      return node;
+    }
+    function andx() { // includes implicit AND by juxtaposition: A(B+C), (A)(B)
+      var a = prim();
+      for (;;) {
+        var p = peek();
+        if (p === 'and' || p === 'nand') { i++; a = { op: p, a: a, b: prim() }; continue; }
+        if (p === 'v' || p === 'c' || p === '(' || p === 'not') { a = { op: 'and', a: a, b: prim() }; continue; }
+        break;
+      }
+      return a;
+    }
+    var xorx = bin(andx, ['xor']), orx = bin(xorx, ['or', 'nor']);
+    function imp() { var a = orx(); if (peek() === 'imp') { i++; return { op: 'imp', a: a, b: imp() }; } return a; }
+    function iff() { var a = imp(); while (peek() === 'iff') { i++; a = { op: 'iff', a: a, b: imp() }; } return a; }
+    var r = iff();
+    if (i < t.length) throw new E(t[i].k === ')' ? 'There is a ")" without a matching "(".' : 'Something is missing between parts of the expression.');
+    return r;
+  }
+  var SYM = {
+    logic: { not: '¬', and: ' ∧ ', or: ' ∨ ', xor: ' ⊕ ', nand: ' ↑ ', nor: ' ↓ ', imp: ' → ', iff: ' ↔ ' },
+    digital: { not: "'", and: '·', or: ' + ', xor: ' ⊕ ', nand: ' NAND ', nor: ' NOR ', imp: ' → ', iff: ' ⊙ ' },
+    code: { not: '!', and: ' && ', or: ' || ', xor: ' ^ ', nand: ' NAND ', nor: ' NOR ', imp: ' -> ', iff: ' == ' }
+  };
+  var PREC = { iff: 1, imp: 2, or: 3, nor: 3, xor: 4, and: 5, nand: 5, not: 6 };
+  function show(n, nota) {
+    var S = SYM[nota];
+    if (n.v !== undefined) return n.v;
+    if (n.c !== undefined) return nota === 'logic' ? (n.c ? '⊤' : '⊥') : String(n.c);
+    var simple = function (c) { return c.v !== undefined || c.c !== undefined || c.op === 'not'; };
+    if (n.op === 'not') { var inner = show(n.a, nota); if (nota === 'digital') return (simple(n.a) && n.a.op !== 'not' ? inner : '(' + inner + ')') + "'"; return S.not + (simple(n.a) ? inner : '(' + inner + ')'); }
+    function wrap(c, side) {
+      var t = show(c, nota);
+      if (simple(c)) return t;
+      var need = PREC[c.op] < PREC[n.op] || (PREC[c.op] === PREC[n.op] && (c.op !== n.op || n.op === 'nand' || n.op === 'nor' || (n.op === 'imp' && side === 'L')));
+      return need ? '(' + t + ')' : t;
+    }
+    var op = S[n.op];
+    if (nota === 'digital' && n.op === 'and') {
+      var tiny = function (c) { return (c.v !== undefined && c.v.length === 1) || (c.op === 'not' && c.a.v !== undefined && c.a.v.length === 1); };
+      if (tiny(n.a) && tiny(n.b)) op = '';
+    }
+    return wrap(n.a, 'L') + op + wrap(n.b, 'R');
+  }
+  function evalN(n, env) {
+    if (n.v !== undefined) return env[n.v];
+    if (n.c !== undefined) return n.c;
+    var a = evalN(n.a, env);
+    if (n.op === 'not') return 1 - a;
+    var b = evalN(n.b, env);
+    switch (n.op) { case 'and': return a & b; case 'or': return a | b; case 'xor': return a ^ b; case 'nand': return 1 - (a & b); case 'nor': return 1 - (a | b); case 'imp': return (1 - a) | b; case 'iff': return a === b ? 1 : 0; }
+  }
+  function varsOf(n, out) { if (n.v !== undefined) { if (out.indexOf(n.v) < 0) out.push(n.v); } else if (n.a) { varsOf(n.a, out); if (n.b) varsOf(n.b, out); } return out; }
+  function subs(n, out, nota) { if (n.op) { subs(n.a, out, nota); if (n.b) subs(n.b, out, nota); var k = show(n, nota); if (!out.some(function (x) { return x.k === k; })) out.push({ k: k, n: n }); } return out; }
+  // Quine-McCluskey
+  function qm(ones, n) {
+    if (!ones.length) return [];
+    if (ones.length === (1 << n)) return [{ v: 0, m: (1 << n) - 1 }];
+    var groups = ones.map(function (x) { return { v: x, m: 0 }; }), primes = [], seen = {};
+    while (groups.length) {
+      var next = [], used = new Array(groups.length), map = {};
+      for (var i = 0; i < groups.length; i++) for (var j = i + 1; j < groups.length; j++) {
+        var a = groups[i], b = groups[j];
+        if (a.m !== b.m) continue;
+        var d = a.v ^ b.v;
+        if (d && !(d & (d - 1))) { used[i] = used[j] = true; var nv = a.v & ~d, nm = a.m | d, key = nv + ',' + nm; if (!map[key]) { map[key] = 1; next.push({ v: nv, m: nm }); } }
+      }
+      groups.forEach(function (g, k) { var key = g.v + ',' + g.m; if (!used[k] && !seen[key]) { seen[key] = 1; primes.push(g); } });
+      groups = next;
+      if (groups.length > 20000) break;
+    }
+    function covers(p, x) { return (x & ~p.m) === p.v; }
+    function lits(p) { var c = 0; for (var b = 0; b < n; b++) if (!(p.m & (1 << b))) c++; return c; }
+    var need = ones.slice(), chosen = [];
+    // essential prime implicants
+    var changed = true;
+    while (changed) {
+      changed = false;
+      for (var q = 0; q < need.length; q++) {
+        var cov = primes.filter(function (p) { return covers(p, need[q]); });
+        if (cov.length === 1) { var p0 = cov[0]; chosen.push(p0); need = need.filter(function (x) { return !covers(p0, x); }); changed = true; break; }
+      }
+    }
+    var cand = primes.filter(function (p) { return chosen.indexOf(p) < 0 && need.some(function (x) { return covers(p, x); }); });
+    if (need.length && cand.length <= 22) {
+      var best = null;
+      (function rec(k, pick, left) {
+        if (!left.length) { var cost = [pick.length, pick.reduce(function (s, p) { return s + lits(p); }, 0)]; if (!best || cost[0] < best.c[0] || (cost[0] === best.c[0] && cost[1] < best.c[1])) best = { p: pick.slice(), c: cost }; return; }
+        if (k >= cand.length || (best && pick.length >= best.c[0])) return;
+        if (!cand.slice(k).some(function (p) { return covers(p, left[0]); })) return;
+        rec(k + 1, pick.concat([cand[k]]), left.filter(function (x) { return !covers(cand[k], x); }));
+        rec(k + 1, pick, left);
+      })(0, [], need);
+      chosen = chosen.concat(best.p);
+    } else while (need.length) { // greedy for big cases
+      cand.sort(function (a, b) { return need.filter(function (x) { return covers(b, x); }).length - need.filter(function (x) { return covers(a, x); }).length || lits(a) - lits(b); });
+      var pk = cand.shift(); chosen.push(pk); need = need.filter(function (x) { return !covers(pk, x); });
+    }
+    return chosen;
+  }
+  function termText(p, vars, nota, n) {
+    var parts = [];
+    for (var i = 0; i < n; i++) { var bit = 1 << (n - 1 - i); if (p.m & bit) continue; var on = p.v & bit; parts.push(on ? vars[i] : nota === 'digital' ? vars[i] + "'" : SYM[nota].not + vars[i]); }
+    if (!parts.length) return nota === 'logic' ? '⊤' : '1';
+    var join = nota === 'digital' ? (vars.some(function (v) { return v.length > 1; }) ? '·' : '') : SYM[nota].and;
+    return parts.length > 1 && nota !== 'digital' ? '(' + parts.join(join) + ')' : parts.join(join);
+  }
+  function run() {
+    var src = $('ex').value, nota = $('nota').value, long = $('long').checked, TF = $('vals').value === 'TF', desc = $('order').value === '1';
+    $('out').hidden = true; last = null;
+    if (!src.trim()) return msg('Type an expression, for example (A and B) or not C.');
+    var exprs;
+    try { exprs = src.split(/[,;]/).map(function (x) { return x.trim(); }).filter(Boolean).map(function (x) { return parse(x, long); }); }
+    catch (e) { if (!(e instanceof E)) throw e; return msg(e.message, true); }
+    if (exprs.length > 6) return msg('Compare up to 6 expressions at a time.', true);
+    var vars = []; exprs.forEach(function (x) { varsOf(x, vars); });
+    vars.sort(function (a, b) { return a.length - b.length || (a < b ? -1 : a > b ? 1 : 0); });
+    if (vars.length > MAXV) return msg('This has ' + vars.length + ' variables. Up to ' + MAXV + ' are supported (' + fmtNum(1 << MAXV) + ' rows).', true);
+    msg(vars.length ? '' : 'There are no variables, so the table has a single row.');
+    var n = vars.length, rows = 1 << n, cols = [];
+    if ($('steps').checked) exprs.forEach(function (x) { subs(x, [], nota).forEach(function (s) { if (s.n !== x && !cols.some(function (c) { return c.k === s.k; })) cols.push({ k: s.k, n: s.n, sub: true }); }); });
+    exprs.forEach(function (x, i) { cols.push({ k: show(x, nota), n: x, res: true, idx: i }); });
+    var data = [], minterms = exprs.map(function () { return []; });
+    for (var r = 0; r < rows; r++) {
+      var idx = desc ? rows - 1 - r : r, env = {};
+      vars.forEach(function (v, j) { env[v] = (idx >> (n - 1 - j)) & 1; });
+      var row = vars.map(function (v) { return env[v]; });
+      cols.forEach(function (c) { var val = evalN(c.n, env); row.push(val); if (c.res && val) minterms[c.idx].push(idx); });
+      data.push(row);
+    }
+    minterms.forEach(function (m) { m.sort(function (a, b) { return a - b; }); });
+    var V = TF ? ['F', 'T'] : ['0', '1'];
+    var head = '<thead><tr>' + vars.map(function (v) { return '<th>' + v + '</th>'; }).join('') + cols.map(function (c, j) { return '<th class="' + (c.res ? 'res' : '') + (j === 0 ? ' sep' : '') + '">' + c.k.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</th>'; }).join('') + '</tr></thead>';
+    var body = data.map(function (row) { return '<tr>' + row.map(function (x, j) { var c = cols[j - n]; return '<td class="' + (x ? 't' : 'f') + (c && c.res ? ' res' : '') + (j === n ? ' sep' : '') + '">' + V[x] + '</td>'; }).join('') + '</tr>'; }).join('');
+    $('tbl').innerHTML = head + '<tbody>' + body + '</tbody>';
+    // summary for the first expression
+    var m0 = minterms[0], cnt = m0.length, kind = cnt === rows ? 'Tautology (always true)' : cnt === 0 ? 'Contradiction (always false)' : 'Contingency (sometimes true)';
+    var simp = '';
+    if (n <= 10) {
+      var pr = qm(m0, n);
+      simp = !pr.length ? (nota === 'logic' ? '⊥' : '0') : pr.map(function (p) { return termText(p, vars, nota, n); }).join(nota === 'digital' ? ' + ' : SYM[nota].or);
+      if (pr.length === 1 && nota !== 'digital') simp = simp.replace(/^\((.*)\)$/, '$1');
+    }
+    var maxt = []; for (var q = 0; q < rows; q++) if (m0.indexOf(q) < 0) maxt.push(q);
+    $('st').innerHTML = [['Variables', n], ['Rows', fmtNum(rows)], ['True rows', fmtNum(cnt)], ['False rows', fmtNum(rows - cnt)]].map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + s[1] + '</b></div>'; }).join('');
+    var kv = [['Result', kind]];
+    if (exprs.length > 1) {
+      var same = minterms.every(function (m) { return m.join() === m0.join(); });
+      kv.push(['Comparison', same ? 'All ' + exprs.length + ' expressions are equivalent (same result in every row).' : 'The expressions are not equivalent. Compare the shaded result columns.']);
+    }
+    var lim = function (a) { return a.length > 64 ? a.slice(0, 64).join(', ') + ', … (' + a.length + ' in total)' : a.join(', '); };
+    if (n) {
+      kv.push(['Simplified (sum of products)', simp ? '<code>' + simp.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</code>' : 'Shown for up to 10 variables.']);
+      kv.push(['Minterms', cnt ? 'Σm(' + lim(m0) + ')' : 'none']);
+      kv.push(['Maxterms', maxt.length ? 'ΠM(' + lim(maxt) + ')' : 'none']);
+      if (n <= 5 && cnt && cnt < rows) kv.push(['Canonical sum of products', '<code>' + m0.map(function (x) { return termText({ v: x, m: 0 }, vars, nota, n); }).join(nota === 'digital' ? ' + ' : SYM[nota].or).replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</code>']);
+    }
+    $('kv').innerHTML = kv.map(function (x) { return '<span>' + x[0] + '</span><div>' + x[1] + '</div>'; }).join('');
+    last = { vars: vars, cols: cols, data: data, V: V, simp: simp };
+    $('out').hidden = false;
+  }
+  function table(sep, md) {
+    var h = last.vars.concat(last.cols.map(function (c) { return c.k; }));
+    var q = function (s) { s = String(s); return !md && /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : md ? s.replace(/\|/g, '\\|') : s; };
+    var lines = [h.map(q).join(sep)];
+    if (md) lines.push(h.map(function () { return '---'; }).join(sep));
+    last.data.forEach(function (r) { lines.push(r.map(function (x) { return last.V[x]; }).join(sep)); });
+    return md ? lines.map(function (l) { return '| ' + l + ' |'; }).join('\n') : lines.join('\n');
+  }
+  $('ex').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 200); });
+  ['vals', 'order', 'nota', 'steps', 'long'].forEach(function (id) { $(id).addEventListener('change', run); });
+  $('keys').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var el = $('ex'), s = el.selectionStart == null ? el.value.length : el.selectionStart, en = el.selectionEnd == null ? s : el.selectionEnd, k = b.getAttribute('data-k');
+    el.value = el.value.slice(0, s) + k + el.value.slice(en); el.focus(); el.setSelectionRange(s + k.length, s + k.length); run();
+  });
+  $('cpCsv').addEventListener('click', function () { if (last) copyText(table(',', false), $('cpCsv')); });
+  $('cpMd').addEventListener('click', function () { if (last) copyText(table(' | ', true), $('cpMd')); });
+  $('cpSop').addEventListener('click', function () { if (last && last.simp) copyText(last.simp, $('cpSop')); });
+  run();
+})();
+</script>

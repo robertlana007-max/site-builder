@@ -1,0 +1,133 @@
+<style>
+.zs-cv { width: 100%; height: 240px; display: block; border: 1px solid var(--line); border-radius: 12px; margin-top: 14px; }
+.zs-big { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-top: 14px; font-size: 15px; }
+.zs-big b { font-size: 24px; display: block; overflow-wrap: anywhere; }
+.zs-tbl td:last-child { text-align: end; font-variant-numeric: tabular-nums; }
+</style>
+<div class="fields">
+  <div><label for="mode">What do you want to find?</label><select id="mode">
+    <option value="x">z-score from a value (x, mean, SD)</option>
+    <option value="z">Probability from a z-score</option>
+    <option value="p">z-score from a probability or percentile</option>
+    <option value="b">Probability between two values</option>
+  </select></div>
+</div>
+<div class="fields" id="fx">
+  <div data-m="x b"><label for="x" id="xl">Value (x)</label><input type="number" id="x" step="any" value="85"></div>
+  <div data-m="b"><label for="x2">Second value (x₂)</label><input type="number" id="x2" step="any" value="90"></div>
+  <div data-m="x b"><label for="mu">Mean (μ)</label><input type="number" id="mu" step="any" value="70"></div>
+  <div data-m="x b"><label for="sd">Standard deviation (σ)</label><input type="number" id="sd" step="any" min="0" value="10"></div>
+  <div data-m="z"><label for="z">z-score</label><input type="number" id="z" step="any" value="1.96"></div>
+  <div data-m="p"><label for="p">Probability (0 to 1) or percentile (%)</label><input type="text" id="p" value="0.95" inputmode="decimal" autocomplete="off"></div>
+  <div data-m="p"><label for="pt">The probability is the area</label><select id="pt"><option value="l">to the left (below z)</option><option value="r">to the right (above z)</option><option value="c">in the middle (between −z and z)</option><option value="t">in both tails (two-tailed)</option></select></div>
+</div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="zs-big" id="big"></div>
+  <div class="stats" id="st"></div>
+  <canvas class="zs-cv" id="cv" aria-label="Normal distribution curve with the area shaded"></canvas>
+  <p class="msg" id="cap"></p>
+  <h3>All areas for this z-score</h3>
+  <div class="scroll-x"><table class="sched zs-tbl"><tbody id="tb"></tbody></table></div>
+</div>
+<script>
+(function () {
+  function erfc(x) { // accurate in both tails
+    if (x < 0) return 2 - erfc(-x);
+    if (x < 2.5) { var s = 0, term = x, n = 0; do { s += term / (2 * n + 1); n++; term *= -x * x / n; } while (Math.abs(term) > 1e-17 && n < 200); return 1 - 2 / Math.sqrt(Math.PI) * s; }
+    var f = 0; for (var k = 80; k >= 1; k--) f = k / 2 / (x + f);
+    return Math.exp(-x * x) / Math.sqrt(Math.PI) / (x + f);
+  }
+  function cdf(z) { return 0.5 * erfc(-z / Math.SQRT2); }
+  function pdf(z) { return Math.exp(-z * z / 2) / Math.sqrt(2 * Math.PI); }
+  function inv(p) { // Acklam's algorithm refined with two Newton steps
+    if (p <= 0) return -Infinity; if (p >= 1) return Infinity;
+    var a = [-39.69683028665376, 220.9460984245205, -275.9285104469687, 138.3577518672690, -30.66479806614716, 2.506628277459239],
+      b = [-54.47609879822406, 161.5858368580409, -155.6989798598866, 66.80131188771972, -13.28068155288572],
+      c = [-0.007784894002430293, -0.3223964580411365, -2.400758277161838, -2.549732539343734, 4.374664141464968, 2.938163982698783],
+      d = [0.007784695709041462, 0.3224671290700398, 2.445134137142996, 3.754408661907416], q, r, x;
+    if (p < 0.02425) { q = Math.sqrt(-2 * Math.log(p)); x = (((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    else if (p <= 1 - 0.02425) { q = p - 0.5; r = q * q; x = (((((a[0] * r + a[1]) * r + a[2]) * r + a[3]) * r + a[4]) * r + a[5]) * q / (((((b[0] * r + b[1]) * r + b[2]) * r + b[3]) * r + b[4]) * r + 1); }
+    else { q = Math.sqrt(-2 * Math.log(1 - p)); x = -(((((c[0] * q + c[1]) * q + c[2]) * q + c[3]) * q + c[4]) * q + c[5]) / ((((d[0] * q + d[1]) * q + d[2]) * q + d[3]) * q + 1); }
+    for (var i = 0; i < 2; i++) { var e = (p < 0.5 ? cdf(x) - p : (1 - p) - (1 - cdf(x))) ; x -= e / pdf(x); }
+    return x;
+  }
+  function f(v, d) { if (!isFinite(v)) return v > 0 ? '∞' : '−∞'; if (v !== 0 && Math.abs(v) < 1e-4) return v.toExponential(4).replace('e', ' × 10^'); return String(+v.toFixed(d == null ? 6 : d)); }
+  function pct(v) { if (v !== 0 && v < 1e-4) return f(v * 100) + '%'; return String(+(v * 100).toFixed(4)) + '%'; }
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function num(id) { var v = $(id).value.trim(); return v === '' ? NaN : +v; }
+  function vis() { var m = $('mode').value; document.querySelectorAll('[data-m]').forEach(function (el) { el.hidden = el.getAttribute('data-m').split(' ').indexOf(m) < 0; }); $('xl').textContent = m === 'b' ? 'First value (x₁)' : 'Value (x)'; }
+  var shade = null;
+  function run() {
+    vis();
+    var m = $('mode').value, z, z2 = null, big = '', cap = '', mu = num('mu'), sd = num('sd');
+    $('out').hidden = true; msg('');
+    if (m === 'x' || m === 'b') {
+      var x = num('x');
+      if (isNaN(x) || isNaN(mu) || isNaN(sd)) return msg('Fill in the value, the mean and the standard deviation.');
+      if (!(sd > 0)) return msg('The standard deviation must be greater than 0.', true);
+      z = (x - mu) / sd;
+      if (m === 'x') {
+        big = 'z = (x − μ) / σ = (' + f(x) + ' − ' + f(mu) + ') / ' + f(sd) + '<b>z = ' + f(z, 4) + '</b>';
+        shade = { type: 'l', z: z };
+        cap = f(x) + ' is ' + f(Math.abs(z), 3) + ' standard deviation' + (Math.abs(z) === 1 ? '' : 's') + (z >= 0 ? ' above' : ' below') + ' the mean. It is higher than about ' + pct(cdf(z)) + ' of values (the percentile).';
+      } else {
+        var x2 = num('x2'); if (isNaN(x2)) return msg('Fill in the second value.');
+        z2 = (x2 - mu) / sd; if (z2 < z) { var t = z; z = z2; z2 = t; }
+        var pb = cdf(z2) - cdf(z);
+        big = 'P(' + f(Math.min(x, x2)) + ' < X < ' + f(Math.max(x, x2)) + ') = P(' + f(z, 4) + ' < Z < ' + f(z2, 4) + ')<b>' + f(pb) + ' = ' + pct(pb) + '</b>';
+        shade = { type: 'b', z: z, z2: z2 };
+        cap = 'About ' + pct(pb) + ' of values lie between ' + f(Math.min(x, x2)) + ' and ' + f(Math.max(x, x2)) + '.';
+      }
+    } else if (m === 'z') {
+      z = num('z'); if (isNaN(z)) return msg('Type a z-score, for example 1.96.');
+      big = 'P(Z < ' + f(z, 4) + ')<b>' + f(cdf(z)) + '</b>';
+      shade = { type: 'l', z: z };
+      cap = 'A z-score of ' + f(z, 4) + ' is at the ' + pct(cdf(z)) + ' percentile.';
+    } else {
+      var raw = $('p').value.trim().replace(',', '.'), isPct = /%$/.test(raw), p = parseFloat(raw);
+      if (raw === '' || isNaN(p) || !/^-?\d*\.?\d+(e-?\d+)?\s*%?$/i.test(raw)) return msg(raw === '' ? 'Type a probability such as 0.95, or a percentile such as 95%.' : 'Type a number such as 0.95 or 95%.', !!raw);
+      if (isPct || p > 1) p /= 100;
+      if (!(p > 0 && p < 1)) return msg('The probability must be between 0 and 1 (or 0% and 100%), not including the ends.', true);
+      var pt = $('pt').value;
+      z = pt === 'l' ? inv(p) : pt === 'r' ? -inv(p) : pt === 'c' ? inv(0.5 + p / 2) : inv(1 - p / 2);
+      var lbl = { l: 'P(Z < z) = ', r: 'P(Z > z) = ', c: 'P(−z < Z < z) = ', t: 'P(|Z| > z) = ' }[pt];
+      big = lbl + f(p) + '<b>z = ' + (pt === 'c' || pt === 't' ? '±' : '') + f(z, 4) + '</b>';
+      shade = pt === 'l' ? { type: 'l', z: z } : pt === 'r' ? { type: 'r', z: z } : pt === 'c' ? { type: 'b', z: -z, z2: z } : { type: 't', z: z };
+      cap = (pt === 'c' || pt === 't') ? 'Critical values ±' + f(z, 4) + '. For example 95% in the middle gives ±1.96.' : 'This z-score cuts off ' + pct(p) + ' of the area to the ' + (pt === 'l' ? 'left' : 'right') + '.';
+      if (!isNaN(mu) && !isNaN(sd) && sd > 0) void 0;
+    }
+    var L = cdf(z), R = cdf(-z), two = 2 * Math.min(L, R);
+    $('big').innerHTML = big;
+    $('st').innerHTML = [['z-score', f(z, 4)], ['Percentile', pct(L)], ['p-value (one-tailed)', f(Math.min(L, R))], ['p-value (two-tailed)', f(two)]].map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + s[1] + '</b></div>'; }).join('');
+    $('tb').innerHTML = [['Area to the left, P(Z < ' + f(z, 4) + ')', f(L)], ['Area to the right, P(Z > ' + f(z, 4) + ')', f(R)], ['Area between −|z| and |z|', f(1 - two)], ['Area in both tails, P(|Z| > |z|)', f(two)], ['Area between 0 and z', f(Math.abs(L - 0.5))], ['Height of the curve at z (density)', f(pdf(z))]].map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+    $('cap').textContent = cap;
+    $('out').hidden = false;
+    draw();
+  }
+  function draw() {
+    if ($('out').hidden || !shade) return;
+    var cv = $('cv'), dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+    cv.width = W * dpr; cv.height = H * dpr; var c = cv.getContext('2d'); c.setTransform(dpr, 0, 0, dpr, 0, 0);
+    var cs = getComputedStyle(document.documentElement), ink = cs.getPropertyValue('--muted').trim(), acc = cs.getPropertyValue('--accent').trim();
+    c.clearRect(0, 0, W, H);
+    var lo = -4, hi = 4, top = 0.42;
+    function X(z) { return (z - lo) / (hi - lo) * W; } function Y(y) { return H - 24 - y / top * (H - 34); }
+    function area(a, b) { a = Math.max(lo, a); b = Math.min(hi, b); if (b <= a) return; c.beginPath(); c.moveTo(X(a), Y(0)); for (var i = 0; i <= 200; i++) { var z = a + (b - a) * i / 200; c.lineTo(X(z), Y(pdf(z))); } c.lineTo(X(b), Y(0)); c.closePath(); c.fill(); }
+    c.fillStyle = acc; c.globalAlpha = 0.3;
+    var s = shade;
+    if (s.type === 'l') area(lo, s.z); else if (s.type === 'r') area(s.z, hi); else if (s.type === 'b') area(s.z, s.z2); else { area(lo, -Math.abs(s.z)); area(Math.abs(s.z), hi); }
+    c.globalAlpha = 1; c.strokeStyle = acc; c.lineWidth = 2; c.beginPath();
+    for (var i = 0; i <= 300; i++) { var z = lo + (hi - lo) * i / 300; if (i) c.lineTo(X(z), Y(pdf(z))); else c.moveTo(X(z), Y(pdf(z))); } c.stroke();
+    c.strokeStyle = ink; c.lineWidth = 1; c.beginPath(); c.moveTo(0, Y(0)); c.lineTo(W, Y(0)); c.stroke();
+    c.fillStyle = ink; c.font = '11px system-ui, sans-serif'; c.textAlign = 'center';
+    for (var k = -3; k <= 3; k++) { c.fillText(k, X(k), H - 8); c.beginPath(); c.moveTo(X(k), Y(0)); c.lineTo(X(k), Y(0) + 4); c.stroke(); }
+    [s.z, s.z2].forEach(function (zz) { if (zz == null || !isFinite(zz)) return; var cz = Math.max(lo, Math.min(hi, zz)); c.strokeStyle = acc; c.setLineDash([4, 3]); c.beginPath(); c.moveTo(X(cz), Y(0)); c.lineTo(X(cz), 8); c.stroke(); c.setLineDash([]); });
+  }
+  ['x', 'x2', 'mu', 'sd', 'z', 'p'].forEach(function (id) { $(id).addEventListener('input', run); });
+  ['mode', 'pt'].forEach(function (id) { $(id).addEventListener('change', run); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(draw, 150); });
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  run();
+})();
+</script>

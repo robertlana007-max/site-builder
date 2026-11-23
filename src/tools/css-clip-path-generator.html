@@ -1,0 +1,136 @@
+<style>
+.cp-wrap { display: grid; place-items: center; background: var(--bg); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 14px; }
+.cp-area { position: relative; width: min(100%, 360px); aspect-ratio: 1; touch-action: none; user-select: none; -webkit-user-select: none; }
+.cp-ghost, .cp-shape { position: absolute; inset: 0; background-size: cover; background-position: center; }
+.cp-ghost { opacity: .18; }
+.cp-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.cp-pt { position: absolute; width: 22px; height: 22px; margin: -11px 0 0 -11px; border-radius: 50%; background: #fff; border: 3px solid var(--accent); box-shadow: 0 1px 4px rgba(0, 0, 0, .35); cursor: grab; touch-action: none; padding: 0; }
+.cp-pt.on { background: var(--accent); }
+.cp-pt:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.cp-shapes { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 14px; }
+.cp-shapes button { font: 500 13px/1 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 6px 8px; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+.cp-shapes button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
+.cp-shapes i { width: 22px; height: 22px; background: currentColor; display: block; }
+.cp-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0 0; }
+</style>
+<label>Shape</label>
+<div class="cp-shapes" id="shapes"></div>
+<div class="cp-wrap"><div class="cp-area" id="area"><div class="cp-ghost" id="ghost"></div><div class="cp-shape" id="shape"></div><svg class="cp-svg" id="svg" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><polygon id="outline" fill="none" stroke="currentColor" stroke-width=".4" stroke-dasharray="1.5 1" vector-effect="non-scaling-stroke"/></svg></div></div>
+<p class="msg" id="hint" style="margin-top:-4px">Drag the points to change the shape. Tap a point to select it; use the arrow keys to nudge it.</p>
+<div class="btns" id="polyBtns" style="margin:0 0 14px"><button class="btn ghost" id="addPt" type="button">Add point</button><button class="btn ghost" id="delPt" type="button">Remove selected point</button></div>
+<div class="fields" id="circleF" hidden>
+  <div><label for="cr">Radius: <span id="crV"></span>%</label><input type="range" id="cr" min="1" max="75" data-nomemo></div>
+</div>
+<div class="fields" id="ellF" hidden>
+  <div><label for="erx">Horizontal radius: <span id="erxV"></span>%</label><input type="range" id="erx" min="1" max="75" data-nomemo></div>
+  <div><label for="ery">Vertical radius: <span id="eryV"></span>%</label><input type="range" id="ery" min="1" max="75" data-nomemo></div>
+</div>
+<div class="fields" id="insF" hidden>
+  <div><label for="it">Top: <span id="itV"></span>%</label><input type="range" id="it" min="0" max="49" data-nomemo></div>
+  <div><label for="ir">Right: <span id="irV"></span>%</label><input type="range" id="ir" min="0" max="49" data-nomemo></div>
+  <div><label for="ib">Bottom: <span id="ibV"></span>%</label><input type="range" id="ib" min="0" max="49" data-nomemo></div>
+  <div><label for="il">Left: <span id="ilV"></span>%</label><input type="range" id="il" min="0" max="49" data-nomemo></div>
+  <div><label for="iround">Corner round: <span id="iroundV"></span>%</label><input type="range" id="iround" min="0" max="50" data-nomemo></div>
+</div>
+<div class="fields">
+  <div><label for="bgs">Preview background</label><select id="bgs" data-nomemo><option value="g">Colorful gradient</option><option value="p">Photo pattern</option><option value="i">My own image…</option></select></div>
+  <div class="checks" style="align-items:end;margin:0"><label><input type="checkbox" id="snap" checked>Snap to whole percent</label></div>
+</div>
+<input type="file" id="img" accept="image/*" hidden data-nomemo>
+<p class="msg" id="msg"></p>
+<label>CSS code</label>
+<pre class="cp-code" id="code"></pre>
+<div class="btns"><button class="btn" id="cp" type="button">Copy CSS</button></div>
+<script>
+(function () {
+  function star(n, r1, r2) { var p = []; for (var i = 0; i < n * 2; i++) { var a = -Math.PI / 2 + i * Math.PI / n, r = i % 2 ? r2 : r1; p.push([50 + r * Math.cos(a), 50 + r * Math.sin(a)]); } return p; }
+  function reg(n) { var p = []; for (var i = 0; i < n; i++) { var a = -Math.PI / 2 + i * 2 * Math.PI / n; p.push([50 + 50 * Math.cos(a), 50 + 50 * Math.sin(a)]); } return p; }
+  var SHAPES = {
+    Triangle: [[50, 0], [100, 100], [0, 100]], Trapezoid: [[20, 0], [80, 0], [100, 100], [0, 100]], Parallelogram: [[25, 0], [100, 0], [75, 100], [0, 100]],
+    Rhombus: [[50, 0], [100, 50], [50, 100], [0, 50]], Pentagon: reg(5), Hexagon: [[25, 0], [75, 0], [100, 50], [75, 100], [25, 100], [0, 50]], Octagon: [[30, 0], [70, 0], [100, 30], [100, 70], [70, 100], [30, 100], [0, 70], [0, 30]],
+    Star: star(5, 50, 20), 'Arrow right': [[0, 30], [60, 30], [60, 10], [100, 50], [60, 90], [60, 70], [0, 70]], Chevron: [[75, 0], [100, 50], [75, 100], [0, 100], [25, 50], [0, 0]],
+    Cross: [[35, 0], [65, 0], [65, 35], [100, 35], [100, 65], [65, 65], [65, 100], [35, 100], [35, 65], [0, 65], [0, 35], [35, 35]],
+    Message: [[0, 0], [100, 0], [100, 75], [75, 75], [75, 100], [50, 75], [0, 75]], 'Slanted edge': [[0, 0], [100, 0], [100, 80], [0, 100]],
+    Circle: 'circle', Ellipse: 'ellipse', Inset: 'inset'
+  };
+  var S = { kind: 'polygon', pts: SHAPES.Triangle.map(function (p) { return p.slice(); }), sel: 0, c: { r: 40, x: 50, y: 50 }, e: { rx: 45, ry: 30, x: 50, y: 50 }, i: { t: 10, r: 10, b: 10, l: 10, round: 8 } };
+  var BG = { g: 'linear-gradient(135deg, #f97316, #ec4899 45%, #6366f1)', p: 'repeating-linear-gradient(45deg, #0ea5e9 0 14px, #38bdf8 14px 28px), #0ea5e9' }, userImg = null, active = 'Triangle';
+  function r1(x) { return Math.round(x * 10) / 10; }
+  function pc(x) { return (x === 0 ? '0' : r1(x)) + '%'; }
+  function value() {
+    if (S.kind === 'polygon') return 'polygon(' + S.pts.map(function (p) { return pc(p[0]) + ' ' + pc(p[1]); }).join(', ') + ')';
+    if (S.kind === 'circle') return 'circle(' + pc(S.c.r) + ' at ' + pc(S.c.x) + ' ' + pc(S.c.y) + ')';
+    if (S.kind === 'ellipse') return 'ellipse(' + pc(S.e.rx) + ' ' + pc(S.e.ry) + ' at ' + pc(S.e.x) + ' ' + pc(S.e.y) + ')';
+    return 'inset(' + [S.i.t, S.i.r, S.i.b, S.i.l].map(pc).join(' ') + (S.i.round ? ' round ' + pc(S.i.round) : '') + ')';
+  }
+  function handles() { // points the user can drag, in %
+    if (S.kind === 'polygon') return S.pts;
+    if (S.kind === 'circle') return [[S.c.x, S.c.y]];
+    if (S.kind === 'ellipse') return [[S.e.x, S.e.y]];
+    return [];
+  }
+  function paint() {
+    var v = value(), bg = S.bg === 'i' && userImg ? 'url("' + userImg + '")' : BG[S.bg || 'g'];
+    $('shape').style.background = $('ghost').style.background = bg; $('shape').style.backgroundSize = $('ghost').style.backgroundSize = 'cover'; $('shape').style.backgroundPosition = $('ghost').style.backgroundPosition = 'center';
+    $('shape').style.clipPath = v; $('shape').style.webkitClipPath = v;
+    $('outline').setAttribute('points', S.kind === 'polygon' ? S.pts.map(function (p) { return p[0] + ',' + p[1]; }).join(' ') : '');
+    $('code').textContent = 'clip-path: ' + v + ';\n-webkit-clip-path: ' + v + ';';
+    var hs = handles(), area = $('area'), els = area.querySelectorAll('.cp-pt');
+    if (els.length !== hs.length) {
+      els.forEach(function (e) { e.remove(); });
+      hs.forEach(function (_, i) { var b = document.createElement('button'); b.type = 'button'; b.className = 'cp-pt'; b.dataset.i = i; b.setAttribute('aria-label', S.kind === 'polygon' ? 'Point ' + (i + 1) : 'Center'); area.appendChild(b); });
+      els = area.querySelectorAll('.cp-pt');
+    }
+    els.forEach(function (e, i) { e.style.left = hs[i][0] + '%'; e.style.top = hs[i][1] + '%'; e.classList.toggle('on', S.kind === 'polygon' && i === S.sel); });
+    $('polyBtns').hidden = S.kind !== 'polygon'; $('circleF').hidden = S.kind !== 'circle'; $('ellF').hidden = S.kind !== 'ellipse'; $('insF').hidden = S.kind !== 'inset';
+    $('delPt').disabled = S.pts.length <= 3; $('addPt').disabled = S.pts.length >= 40;
+    $('hint').textContent = S.kind === 'polygon' ? 'Drag the points to change the shape. Tap a point to select it; use the arrow keys to nudge it.' : S.kind === 'inset' ? 'Use the sliders to set each edge.' : 'Drag the center point, and use the sliders for the size.';
+    [['cr', S.c.r], ['erx', S.e.rx], ['ery', S.e.ry], ['it', S.i.t], ['ir', S.i.r], ['ib', S.i.b], ['il', S.i.l], ['iround', S.i.round]].forEach(function (x) { if (document.activeElement !== $(x[0])) $(x[0]).value = x[1]; $(x[0] + 'V').textContent = x[1]; });
+  }
+  function choose(name) {
+    active = name; var s = SHAPES[name];
+    if (typeof s === 'string') S.kind = s; else { S.kind = 'polygon'; S.pts = s.map(function (p) { return [r1(p[0]), r1(p[1])]; }); S.sel = 0; }
+    document.querySelectorAll('#shapes button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.n === name ? 'true' : 'false'); });
+    paint();
+  }
+  Object.keys(SHAPES).forEach(function (n) {
+    var b = document.createElement('button'); b.type = 'button'; b.dataset.n = n; b.setAttribute('aria-pressed', 'false');
+    var s = SHAPES[n], cp = typeof s === 'string' ? (s === 'circle' ? 'circle(50%)' : s === 'ellipse' ? 'ellipse(50% 32%)' : 'inset(15% round 20%)') : 'polygon(' + s.map(function (p) { return p[0] + '% ' + p[1] + '%'; }).join(',') + ')';
+    b.innerHTML = '<i style="clip-path:' + cp + ';-webkit-clip-path:' + cp + '"></i>' + n;
+    b.addEventListener('click', function () { choose(n); });
+    $('shapes').appendChild(b);
+  });
+  // dragging
+  var drag = null;
+  function pos(e) { var r = $('area').getBoundingClientRect(), x = (e.clientX - r.left) / r.width * 100, y = (e.clientY - r.top) / r.height * 100; x = Math.max(0, Math.min(100, x)); y = Math.max(0, Math.min(100, y)); if ($('snap').checked) { x = Math.round(x); y = Math.round(y); } else { x = r1(x); y = r1(y); } return [x, y]; }
+  function setH(i, p) { if (S.kind === 'polygon') S.pts[i] = p; else if (S.kind === 'circle') { S.c.x = p[0]; S.c.y = p[1]; } else if (S.kind === 'ellipse') { S.e.x = p[0]; S.e.y = p[1]; } }
+  $('area').addEventListener('pointerdown', function (e) {
+    var h = e.target.closest('.cp-pt'); if (!h) return;
+    e.preventDefault(); var i = +h.dataset.i; S.sel = i; drag = { i: i, id: e.pointerId }; h.setPointerCapture(e.pointerId); h.focus({ preventScroll: true }); paint();
+  });
+  $('area').addEventListener('pointermove', function (e) { if (!drag || e.pointerId !== drag.id) return; setH(drag.i, pos(e)); paint(); });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { $('area').addEventListener(ev, function () { drag = null; }); });
+  $('area').addEventListener('keydown', function (e) {
+    var h = e.target.closest('.cp-pt'); if (!h) return;
+    var d = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] }[e.key]; if (!d) return;
+    e.preventDefault(); var i = +h.dataset.i, p = handles()[i].slice(), k = e.shiftKey ? 5 : 1;
+    setH(i, [Math.max(0, Math.min(100, r1(p[0] + d[0] * k))), Math.max(0, Math.min(100, r1(p[1] + d[1] * k)))]); S.sel = i; paint();
+  });
+  $('addPt').addEventListener('click', function () { // split the edge after the selected point
+    if (S.pts.length >= 40) return;
+    var i = S.sel, a = S.pts[i], b = S.pts[(i + 1) % S.pts.length];
+    S.pts.splice(i + 1, 0, [r1((a[0] + b[0]) / 2), r1((a[1] + b[1]) / 2)]); S.sel = i + 1; paint();
+  });
+  $('delPt').addEventListener('click', function () { if (S.pts.length <= 3) return; S.pts.splice(S.sel, 1); S.sel = Math.max(0, S.sel - 1); paint(); });
+  [['cr', function (v) { S.c.r = v; }], ['erx', function (v) { S.e.rx = v; }], ['ery', function (v) { S.e.ry = v; }], ['it', function (v) { S.i.t = v; }], ['ir', function (v) { S.i.r = v; }], ['ib', function (v) { S.i.b = v; }], ['il', function (v) { S.i.l = v; }], ['iround', function (v) { S.i.round = v; }]].forEach(function (x) { $(x[0]).addEventListener('input', function () { x[1](+$(x[0]).value); paint(); }); });
+  $('bgs').addEventListener('change', function () { var v = $('bgs').value; if (v === 'i' && !userImg) { $('img').click(); return; } S.bg = v; paint(); });
+  $('img').addEventListener('change', function () {
+    var f = $('img').files[0]; if (!f) { if (!userImg) $('bgs').value = S.bg || 'g'; return; }
+    if (!/^image\//.test(f.type)) { $('msg').className = 'msg bad'; $('msg').textContent = 'That file is not an image. Choose a JPG, PNG, WebP or GIF.'; $('bgs').value = S.bg || 'g'; return; }
+    if (userImg) URL.revokeObjectURL(userImg);
+    userImg = URL.createObjectURL(f); S.bg = 'i'; $('msg').className = 'msg'; $('msg').textContent = 'Using your image for the preview. It stays on your device.'; paint();
+  });
+  $('cp').addEventListener('click', function () { copyText($('code').textContent, $('cp')); });
+  choose('Triangle');
+})();
+</script>

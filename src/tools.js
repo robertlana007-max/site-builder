@@ -4803,5 +4803,234 @@ module.exports = [
         ['Can I download the weeks of a year?', 'Yes. Copy the year table or download it as a CSV file for a spreadsheet.']
       ],
       icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M10 14h4v4"/>'
+  },
+  {
+    slug: 'css-gradient-generator', cat: 'Developer tools', name: 'CSS Gradient Generator',
+    title: 'CSS Gradient Generator - Linear, Radial & Conic',
+    desc: 'Create linear, radial and conic CSS gradients with draggable color stops, opacity and a live preview, then copy the CSS code.',
+    card: 'Design CSS gradients and copy the code.',
+    intro: 'Pick colors, drag color stops and set the angle to design a gradient. The preview updates live and the CSS is ready to copy.',
+    steps: ['Choose linear, radial or conic.', 'Edit the colors and drag the stops on the bar.', 'Adjust the angle or center.', 'Click Copy CSS and paste it into your stylesheet.'],
+    faq: [
+      ['Which browsers support these gradients?', 'Linear and radial gradients work in every current browser. Conic gradients need a browser from 2020 or later; the CSS includes a solid fallback color.'],
+      ['How do I make a transparent gradient?', 'Lower the Opacity slider on a color stop. That stop is written as an rgba() color, so whatever is behind the element shows through.'],
+      ['How many colors can I use?', 'Up to 16 color stops. Click the stop bar or press Add color to add one.'],
+      ['Can I make stripes?', 'Yes. Turn on Repeating, or put two stops at the same position to create a sharp edge.'],
+      ['Is the code free to use?', 'Yes. The CSS you create is yours to use in any project.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15L15 3M3 21L21 3M9 21l12-12"/>'
+  },
+  {
+    slug: 'css-box-shadow-generator', cat: 'Developer tools', name: 'CSS Box Shadow Generator',
+    title: 'CSS Box Shadow Generator - Layers, Inset & Preview',
+    desc: 'Design CSS box shadows with sliders: offset, blur, spread, color, inset and multiple layers, with a live preview and copy-ready code.',
+    card: 'Design layered CSS box shadows visually.',
+    intro: 'Use sliders to set the offset, blur, spread and color of a shadow, stack several layers, and copy the box-shadow CSS.',
+    steps: ['Start from a preset or the default soft shadow.', 'Adjust offset, blur, spread, color and opacity.', 'Add layers or switch on Inset if you need them.', 'Click Copy CSS.'],
+    faq: [
+      ['What does spread do?', 'Spread makes the shadow bigger (positive) or smaller (negative) than the box before it is blurred.'],
+      ['Why use more than one layer?', 'Real shadows have a sharp dark part close to the object and a soft wide part further away. Two or more layers imitate that.'],
+      ['What is an inset shadow?', 'An inset shadow is drawn inside the box, which makes it look pressed in.'],
+      ['Does box-shadow work on images?', 'Yes, on any element. For the outline of a transparent PNG, use filter: drop-shadow() instead.']
+    ],
+    icon: '<rect x="3" y="3" width="14" height="14" rx="2"/><path d="M21 7v12a2 2 0 0 1-2 2H7"/>'
+  },
+  {
+    slug: 'css-border-radius-generator', cat: 'Developer tools', name: 'CSS Border Radius Generator',
+    title: 'CSS Border Radius Generator - Rounded & Elliptical',
+    desc: 'Round each corner separately, make elliptical blob shapes, preview live and copy the shortest border-radius CSS. Pixels or percent.',
+    card: 'Round corners and make blob shapes in CSS.',
+    intro: 'Set the curve of each corner with sliders, switch on elliptical corners for organic shapes, and copy the border-radius code.',
+    steps: ['Choose pixels or percent.', 'Move the sliders, for all corners or each one separately.', 'Tick Elliptical corners for blob shapes.', 'Click Copy CSS.'],
+    faq: [
+      ['What does the slash in border-radius mean?', 'Values before the slash are the horizontal radii and values after it are the vertical radii, in the order top left, top right, bottom right, bottom left.'],
+      ['How do I make a circle?', 'Use 50% on all corners on a square element. On a rectangle, 50% gives an oval.'],
+      ['Why is my 500px radius the same as 100px?', 'When the curves would overlap, browsers scale all radii down so they fit, so very large values all look the same.'],
+      ['Does border-radius work on images?', 'Yes. Put it on the img element, or on a parent with overflow: hidden.']
+    ],
+    icon: '<path d="M4 20V10a6 6 0 0 1 6-6h10"/><path d="M4 4h2M18 20h2v-2"/>'
+  },
+  {
+    slug: 'css-clip-path-generator', cat: 'Developer tools', name: 'CSS Clip Path Generator',
+    title: 'CSS Clip Path Generator - Polygon Shapes & Circles',
+    desc: 'Make CSS clip-path shapes: drag polygon points, pick stars, arrows, hexagons, circles and insets, preview on your image and copy the code.',
+    card: 'Cut elements into shapes with clip-path.',
+    intro: 'Choose a shape and drag its points on the preview to create a clip-path. Preview it on your own image and copy the CSS.',
+    steps: ['Pick a starting shape.', 'Drag the points, or use the sliders for circles and insets.', 'Optionally preview your own image.', 'Click Copy CSS.'],
+    faq: [
+      ['Which browsers support clip-path?', 'All current browsers support polygon(), circle(), ellipse() and inset(). The code also includes -webkit-clip-path for older Safari.'],
+      ['Can I animate a clip-path?', 'Yes, with a CSS transition or animation, as long as both shapes are the same type and polygons have the same number of points.'],
+      ['Why is my shadow gone?', 'clip-path also cuts off box-shadow. Put filter: drop-shadow() on a wrapping element instead.'],
+      ['Is my image uploaded?', 'No. The preview image is opened only in your browser.']
+    ],
+    icon: '<path d="M12 3l9 7-3.5 11h-11L3 10z"/><circle cx="12" cy="3" r="1.4"/><circle cx="21" cy="10" r="1.4"/>'
+  },
+  {
+    slug: 'flexbox-grid-playground', cat: 'Developer tools', name: 'Flexbox and Grid Playground',
+    title: 'Flexbox & CSS Grid Playground - Visual Layout Tool',
+    desc: 'Try CSS flexbox and grid properties on live boxes: justify, align, wrap, grow, columns, spans. See the layout change and copy the CSS.',
+    card: 'Try flexbox and grid properties on live boxes.',
+    intro: 'Change flexbox or grid settings and watch real boxes move. Select a box to set its own properties, then copy the CSS and HTML.',
+    steps: ['Choose Flexbox or Grid.', 'Change the container settings.', 'Click a box to edit its own settings.', 'Copy the CSS and HTML.'],
+    faq: [
+      ['What is the difference between flexbox and grid?', 'Flexbox lays items out in one direction, a row or a column. Grid places items in rows and columns at the same time.'],
+      ['Why does align-content not change anything?', 'It only affects multiple lines, so set flex-wrap to wrap and add enough boxes to fill more than one row.'],
+      ['Can I type my own values?', 'Yes. Text fields such as gap, flex-basis and grid-template-columns accept any valid CSS value.'],
+      ['Is the preview the same as a real browser?', 'Yes. The boxes are real HTML elements laid out by your browser using the CSS shown.']
+    ],
+    icon: '<rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'
+  },
+  {
+    slug: 'code-playground', cat: 'Developer tools', name: 'Code Playground',
+    title: 'HTML, CSS & JS Code Playground - Live Online Editor',
+    desc: 'Write HTML, CSS and JavaScript and see the result live with a console. Safe sandbox, share links, templates and download as one HTML file.',
+    card: 'Live HTML, CSS and JS editor with console.',
+    intro: 'Type HTML, CSS and JavaScript and see the result instantly in a sandboxed preview, with console output, errors, share links and download.',
+    steps: ['Write your code in the HTML, CSS and JS tabs.', 'Watch the preview update, or press Run.', 'Check the console for logs and errors.', 'Share a link or download the HTML file.'],
+    faq: [
+      ['Is my code uploaded?', 'No. It runs in your browser and is saved only in this browser. A share link contains the code itself after the # sign, which browsers do not send to servers.'],
+      ['Is it safe to run code from others?', 'The preview runs in a sandbox that cannot read this site, your cookies or saved data, and cannot redirect the page. Still, only run code you are willing to have running in a tab.'],
+      ['Can I use libraries like jQuery or React?', 'Yes, when you are online, by adding a script tag with the library address in the HTML tab.'],
+      ['Why did my loop stop?', 'Loops that run longer than 2.5 seconds are stopped to keep the page responsive.'],
+      ['Does it work offline?', 'Yes, once the page has loaded, as long as your code does not load anything from the internet.']
+    ],
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 13l-2 2 2 2M15 13l2 2-2 2"/>'
+  },
+  {
+    slug: 'ip-subnet-calculator', cat: 'Developer tools', name: 'IP Subnet Calculator',
+    title: 'IP Subnet Calculator - IPv4 CIDR, Mask & IPv6',
+    desc: 'Calculate network, broadcast, host range, subnet and wildcard masks for any IPv4 CIDR, split subnets, size by hosts, plus IPv6 basics.',
+    card: 'Network, broadcast, hosts and masks from CIDR.',
+    intro: 'Enter an IP address with a prefix to get its network, broadcast address, usable hosts, masks and binary form, split it into subnets, or work with IPv6.',
+    steps: ['Type an address such as 192.168.1.10/24.', 'Read the network, hosts, mask and broadcast.', 'Optionally split it into smaller subnets.', 'Copy the details or the subnet list.'],
+    faq: [
+      ['How many hosts does a /24 have?', '256 addresses, of which 254 can be used by devices. The first is the network address and the last is the broadcast address.'],
+      ['What is CIDR notation?', 'The /number after an address is the prefix length: how many bits, from the left, belong to the network. /24 equals the mask 255.255.255.0.'],
+      ['Why does /31 show 2 usable hosts?', 'RFC 3021 allows both addresses of a /31 to be used on point-to-point links, where no broadcast is needed.'],
+      ['Does it support IPv6?', 'Yes, for the basics: expand and compress addresses, network range, first and last address, address type and counts.']
+    ],
+    icon: '<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-2h14v2"/>'
+  },
+  {
+    slug: 'chmod-calculator', cat: 'Developer tools', name: 'Chmod Calculator',
+    title: 'Chmod Calculator - Octal ↔ Symbolic Permissions',
+    desc: 'Convert Linux file permissions between checkboxes, octal (755) and symbolic (rwxr-xr-x), with setuid, setgid, sticky bits and chmod commands.',
+    card: 'Convert file permissions: 755 ↔ rwxr-xr-x.',
+    intro: 'Tick read, write and execute for owner, group and others, or type 755 or rwxr-xr-x, and get the matching permissions, a plain explanation and the chmod command.',
+    steps: ['Tick the boxes, or type an octal or symbolic value.', 'Add special bits if needed.', 'Read the explanation.', 'Copy the chmod command.'],
+    faq: [
+      ['What does 755 mean?', 'The owner can read, write and execute (7 = 4+2+1); the group and others can read and execute (5 = 4+1).'],
+      ['What is the difference between 644 and 755?', '755 adds execute for everyone. Use 644 for normal files and 755 for folders and programs.'],
+      ['What are setuid, setgid and sticky?', 'setuid and setgid make a program run with the file owner\'s or group\'s rights; setgid on a folder makes new files inherit its group; sticky on a folder lets only owners delete their own files.'],
+      ['Does this change my files?', 'No. It only calculates. Run the copied command in your terminal to change a file.']
+    ],
+    icon: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M9 15h.01M12 15h.01M15 15h.01"/>'
+  },
+  {
+    slug: 'chemical-equation-balancer', cat: 'Study tools', name: 'Chemical Equation Balancer',
+    title: 'Chemical Equation Balancer - With Atom Check',
+    desc: 'Balance chemical equations instantly, including ions, electrons, brackets and hydrates. Shows coefficients and an atom-by-atom check table.',
+    card: 'Balance chemical equations with an atom check.',
+    intro: 'Type a chemical equation and get the balanced version with the smallest whole-number coefficients, plus a table that checks every atom and the charge.',
+    steps: ['Type the reactants, an = sign and the products.', 'Read the balanced equation.', 'Check the atom table.', 'Copy the result.'],
+    faq: [
+      ['How does it balance equations?', 'It writes one equation per element (and one for charge) and solves them exactly with linear algebra, then scales the answer to the smallest whole numbers.'],
+      ['Can it balance redox equations?', 'Yes, if you include the ions, H+ or OH-, water and, for half equations, electrons (e-).'],
+      ['How do I type charges?', 'Use ^ or braces: Fe^3+, SO4^2-, Cr2O7{2-}. A single + or - at the end also works, as in NH4+ or Cl-.'],
+      ['Why do I get "cannot be balanced"?', 'No set of positive whole numbers makes the atoms match, usually because a formula is wrong or a substance is missing.']
+    ],
+    icon: '<path d="M12 3v18M5 21h14"/><path d="M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/>'
+  },
+  {
+    slug: 'molar-mass-calculator', cat: 'Study tools', name: 'Molar Mass Calculator',
+    title: 'Molar Mass Calculator - g/mol, % Composition',
+    desc: 'Find the molar mass of any chemical formula with element breakdown and percent composition. Brackets, hydrates, ions, and grams to moles.',
+    card: 'Molar mass, % composition and grams to moles.',
+    intro: 'Type a chemical formula to get its molar mass in g/mol, the mass and percentage of each element, and convert between grams, moles and particles.',
+    steps: ['Type a chemical formula such as H2SO4.', 'Read the molar mass and element breakdown.', 'Enter grams or moles to convert.', 'Copy the result.'],
+    faq: [
+      ['What is molar mass?', 'The mass of one mole of a substance, in grams per mole. Numerically it is the sum of the atomic masses of all atoms in the formula.'],
+      ['What is the molar mass of water?', '18.015 g/mol: 2 × 1.008 for hydrogen plus 15.999 for oxygen.'],
+      ['How do I enter a hydrate?', 'Use a dot or a star, for example CuSO4·5H2O or CuSO4*5H2O.'],
+      ['Which atomic weights are used?', 'IUPAC standard atomic weights (abridged), the same values most current textbooks use.']
+    ],
+    icon: '<path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/><path d="M7 15h10"/>'
+  },
+  {
+    slug: 'derivative-calculator', cat: 'Study tools', name: 'Derivative Calculator',
+    title: 'Derivative Calculator with Steps - Free & Online',
+    desc: 'Differentiate any function with step-by-step rules: product, quotient, chain. Higher and partial derivatives, tangent lines and a graph.',
+    card: 'Derivatives with steps, tangent lines and graph.',
+    intro: 'Type a function to get its derivative with each rule explained, plus higher derivatives, the tangent line at a point and a graph.',
+    steps: ['Type a function such as x^2 sin(x).', 'Choose the variable and which derivative.', 'Read the answer and the steps.', 'Optionally enter a point for the slope and tangent line.'],
+    faq: [
+      ['Does it show the steps?', 'Yes. Each step names the rule used (power, product, quotient, chain and so on) and shows the derivative of that part.'],
+      ['How do I know the answer is right?', 'Each first derivative is compared with a numerical derivative at several points, and a check mark confirms they match.'],
+      ['Is log base 10 or natural?', 'log(x) is base 10 and ln(x) is the natural logarithm. Use log(x, b) for base b.'],
+      ['Can it do implicit differentiation?', 'Not directly. It does partial derivatives: other letters are treated as constants.'],
+      ['Does it work offline?', 'Yes, once the page has loaded. Everything runs in your browser.']
+    ],
+    icon: '<path d="M3 20c4 0 5-14 9-14s5 8 9 8"/><path d="M7 4l10 10"/>'
+  },
+  {
+    slug: 'integral-calculator', cat: 'Study tools', name: 'Integral Calculator',
+    title: 'Integral Calculator - Definite & Indefinite, Steps',
+    desc: 'Find antiderivatives with steps, definite integrals with exact and numerical values, infinite limits and a shaded graph. Answers are verified.',
+    card: 'Antiderivatives and definite integrals with steps.',
+    intro: 'Type a function to find its antiderivative, with steps for common integrals, or switch to definite to get the area between two limits, including infinity.',
+    steps: ['Type the function to integrate.', 'Choose indefinite or definite and enter the limits.', 'Read the answer and steps.', 'Check the shaded graph.'],
+    faq: [
+      ['Does it show steps?', 'Yes, for integrals solved by basic rules and substitution. For harder ones it names the usual technique and shows the answer is verified by differentiation.'],
+      ['Can it do improper integrals?', 'Yes. Use inf or -inf as a limit. The value is computed numerically with an error estimate.'],
+      ['Why is there no answer for e^(x^2)?', 'Some integrals have no antiderivative in elementary functions. Use a definite integral for a numerical value.'],
+      ['How accurate are the decimal values?', 'Usually to 10 or more significant digits. The tool reports the estimated error.'],
+      ['Is my work sent anywhere?', 'No. All calculations run in your browser.']
+    ],
+    icon: '<path d="M14 4c-2-1-4 0-4 3v10c0 3-2 4-4 3"/><path d="M15 10h5M15 14h5"/>'
+  },
+  {
+    slug: 'probability-calculator', cat: 'Study tools', name: 'Probability Calculator',
+    title: 'Probability Calculator - nCr, nPr, Binomial, Events',
+    desc: 'Calculate combinations, permutations, factorials, two-event probabilities (independent or dependent), binomial probabilities and at-least-once chances.',
+    card: 'nCr, nPr, binomial and two-event probability.',
+    intro: 'Count combinations and permutations, combine the probabilities of two events, find binomial probabilities, or the chance of something happening at least once.',
+    steps: ['Choose the kind of calculation.', 'Enter the numbers or probabilities.', 'Read the results and the formula used.'],
+    faq: [
+      ['What is the difference between nCr and nPr?', 'nCr counts selections where order does not matter; nPr counts arrangements where order matters. nPr = nCr × r!.'],
+      ['How do I find P(A or B)?', 'P(A or B) = P(A) + P(B) − P(A and B). The tool works out P(A and B) from the relationship you choose.'],
+      ['What is a binomial probability?', 'The chance of exactly k successes in n independent trials that each succeed with probability p.'],
+      ['How big can n be?', 'Up to 5,000 for exact counting and 100,000 for the binomial distribution.']
+    ],
+    icon: '<rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/><path d="M7 7h.01M12 12h.01M9.5 9.5h.01"/>'
+  },
+  {
+    slug: 'z-score-calculator', cat: 'Study tools', name: 'Z-Score Calculator',
+    title: 'Z-Score Calculator - Percentile, p-Value & Curve',
+    desc: 'Convert values to z-scores and percentiles, z-scores to p-values, probabilities to z (critical values), with a shaded normal distribution curve.',
+    card: 'Z-scores, percentiles and p-values with a curve.',
+    intro: 'Find a z-score from a value, mean and standard deviation, turn z-scores into probabilities and p-values, or find the z for any probability, with a shaded normal curve.',
+    steps: ['Choose what you want to find.', 'Enter the value and mean and standard deviation, a z-score or a probability.', 'Read the z-score, percentile and p-values.', 'Check the shaded curve.'],
+    faq: [
+      ['What is a z-score?', 'The number of standard deviations a value lies above (positive) or below (negative) the mean: z = (x − μ) / σ.'],
+      ['What z-score is 95% confidence?', '±1.96 for a two-sided 95% interval. For a one-sided 95% bound it is 1.645.'],
+      ['How do I get a p-value from a z-score?', 'Choose Probability from a z-score. The one-tailed p-value is the smaller tail area and the two-tailed p-value is double that.'],
+      ['Does it replace a z-table?', 'Yes, with more decimals and both tails at once.']
+    ],
+    icon: '<path d="M2 20h20"/><path d="M3 19c3 0 4-13 9-13s6 13 9 13"/><path d="M15 9v11"/>'
+  },
+  {
+    slug: 'truth-table-generator', cat: 'Study tools', name: 'Truth Table Generator',
+    title: 'Truth Table Generator - Logic & Boolean Expressions',
+    desc: 'Make truth tables for logic expressions with AND, OR, NOT, XOR, implies and iff. Step columns, tautology check, minterms and simplified form.',
+    card: 'Truth tables for any logic expression.',
+    intro: 'Type a logic or Boolean expression to get its full truth table with step columns, a tautology check, minterms and a simplified formula.',
+    steps: ['Type an expression such as (A and B) or not C.', 'Read the truth table and summary.', 'Compare expressions by separating them with commas.', 'Copy the table or the simplified formula.'],
+    faq: [
+      ['Which operators can I use?', 'AND, OR, NOT, XOR, NAND, NOR, implies (→) and iff (↔), as words, symbols like ∧ ∨ ¬, programming symbols like && || !, or digital notation like AB + C\'.'],
+      ['What is a tautology?', 'An expression that is true in every row of its truth table, such as p or not p.'],
+      ['How is the formula simplified?', 'With the Quine–McCluskey method, which finds a minimal sum of products for up to 10 variables.'],
+      ['How many variables can I use?', 'Up to 12, which gives 4,096 rows.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M13 13l2 2 3-4"/>'
   }
 ];

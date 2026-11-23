@@ -1,0 +1,155 @@
+<style>
+.pc-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+.pc-tabs button { font: 600 14px/1 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 10px 14px; cursor: pointer; }
+.pc-tabs button[aria-selected="true"] { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.pc-big { word-break: break-all; font-family: var(--mono); font-size: 13px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; margin-top: 10px; max-height: 160px; overflow: auto; }
+.pc-chart { display: flex; align-items: flex-end; gap: 1px; height: 140px; border-bottom: 1px solid var(--line); margin-top: 14px; }
+.pc-chart i { flex: 1; background: var(--line); min-width: 1px; border-radius: 2px 2px 0 0; }
+.pc-chart i.on { background: var(--accent); }
+.pc-work { font-size: 14px; color: var(--muted); margin-top: 10px; overflow-wrap: anywhere; }
+</style>
+<div class="pc-tabs" role="tablist" id="tabs">
+  <button type="button" role="tab" data-t="comb" aria-selected="true">Combinations and permutations</button>
+  <button type="button" role="tab" data-t="two" aria-selected="false">Two events (A and B)</button>
+  <button type="button" role="tab" data-t="bin" aria-selected="false">Binomial (k successes in n trials)</button>
+  <button type="button" role="tab" data-t="rep" aria-selected="false">At least once</button>
+</div>
+<input type="hidden" id="tab" value="comb">
+
+<section data-p="comb">
+  <div class="fields">
+    <div><label for="cn">Total items (n)</label><input type="number" id="cn" min="0" step="1" value="10"></div>
+    <div><label for="cr">Items chosen (r)</label><input type="number" id="cr" min="0" step="1" value="3"></div>
+  </div>
+  <div class="stats" id="cOut"></div>
+  <p class="pc-work" id="cWork"></p>
+  <div id="cBig"></div>
+</section>
+
+<section data-p="two" hidden>
+  <div class="fields">
+    <div><label for="pa">P(A)</label><input type="text" id="pa" value="0.5" inputmode="decimal" autocomplete="off"></div>
+    <div><label for="pb">P(B)</label><input type="text" id="pb" value="0.4" inputmode="decimal" autocomplete="off"></div>
+    <div><label for="rel">How are A and B related?</label><select id="rel"><option value="ind">Independent</option><option value="dep">Dependent (I know P(B given A))</option><option value="mut">Mutually exclusive (cannot both happen)</option></select></div>
+    <div id="pbaBox" hidden><label for="pba">P(B given A)</label><input type="text" id="pba" value="0.3" inputmode="decimal" autocomplete="off"></div>
+  </div>
+  <div class="stats" id="tOut"></div>
+  <p class="pc-work" id="tWork"></p>
+</section>
+
+<section data-p="bin" hidden>
+  <div class="fields">
+    <div><label for="bn">Number of trials (n)</label><input type="number" id="bn" min="0" step="1" value="10"></div>
+    <div><label for="bp">Chance of success each time (p)</label><input type="text" id="bp" value="0.5" inputmode="decimal" autocomplete="off"></div>
+    <div><label for="bk">Number of successes (k)</label><input type="number" id="bk" min="0" step="1" value="5"></div>
+  </div>
+  <div class="stats" id="bOut"></div>
+  <p class="pc-work" id="bWork"></p>
+  <div class="pc-chart" id="bChart" aria-hidden="true"></div>
+  <p class="msg" style="font-size:13px">Bars show the chance of each number of successes; the highlighted bar is k.</p>
+</section>
+
+<section data-p="rep" hidden>
+  <div class="fields">
+    <div><label for="rp">Chance it happens in one try (p)</label><input type="text" id="rp" value="1/6" inputmode="decimal" autocomplete="off"></div>
+    <div><label for="rn">Number of tries (n)</label><input type="number" id="rn" min="1" step="1" value="4"></div>
+  </div>
+  <div class="stats" id="rOut"></div>
+  <p class="pc-work" id="rWork"></p>
+</section>
+<p class="msg" id="msg"></p>
+<p class="msg" style="font-size:13px">Probabilities can be typed as decimals (0.25), percentages (25%) or fractions (1/4).</p>
+<script>
+(function () {
+  function msg(t) { $('msg').className = 'msg' + (t ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function prob(id, name) {
+    var s = $(id).value.trim().replace(',', '.'), v;
+    if (/^\d*\.?\d+\s*%$/.test(s)) v = parseFloat(s) / 100;
+    else if (/^\d+\s*\/\s*\d+$/.test(s)) { var q = s.split('/'); v = +q[0] / +q[1]; }
+    else if (/^\d*\.?\d+(e-?\d+)?$/i.test(s)) v = parseFloat(s);
+    else throw new Error((s ? '"' + s + '" is not a probability. ' : '') + 'Type ' + name + ' as 0.25, 25% or 1/4.');
+    if (!(v >= 0 && v <= 1)) throw new Error(name + ' must be between 0 and 1 (0% to 100%).');
+    return v;
+  }
+  function int(id, name, max) {
+    var s = $(id).value.trim(), v = +s;
+    if (s === '' || !Number.isInteger(v) || v < 0) throw new Error(name + ' must be a whole number, 0 or more.');
+    if (max && v > max) throw new Error(name + ' can be at most ' + fmtNum(max) + ' here.');
+    return v;
+  }
+  function f(v) { if (!isFinite(v)) return '–'; if (v === 0) return '0'; if (Math.abs(v) < 1e-6) return v.toExponential(4); return String(+v.toPrecision(8)); }
+  function pc(v) { return v === 0 ? '0%' : v < 1e-6 ? '< 0.0001%' : String(+(v * 100).toPrecision(6)) + '%'; }
+  function stat(a) { return a.map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + s[1] + '</b></div>'; }).join(''); }
+  // exact big numbers
+  function bigFact(n) { var r = 1n; for (var i = 2n; i <= BigInt(n); i++) r *= i; return r; }
+  function bigPerm(n, r) { var x = 1n; for (var i = 0; i < r; i++) x *= BigInt(n - i); return x; }
+  function bigComb(n, r) { if (r > n - r) r = n - r; var x = 1n; for (var i = 1; i <= r; i++) x = x * BigInt(n - r + i) / BigInt(i); return x; }
+  function show(b) { var s = b.toString(); if (s.length <= 15) return Number(b).toLocaleString('en-US'); return s[0] + '.' + s.slice(1, 5) + ' × 10^' + (s.length - 1); }
+  function digits(b) { return b.toString().length; }
+  function comb() {
+    var n = int('cn', 'n', 5000), r = int('cr', 'r', 5000), out = [], big = [];
+    var C = r <= n ? bigComb(n, r) : 0n, P = r <= n ? bigPerm(n, r) : 0n, CR = n + r - 1 >= 0 && n > 0 ? bigComb(n + r - 1, r) : (r === 0 ? 1n : 0n), PR = BigInt(n) ** BigInt(r), nf = bigFact(n);
+    out.push(['Combinations nCr (order does not matter)', show(C)], ['Permutations nPr (order matters)', show(P)], ['Combinations with repetition', show(CR)], ['Permutations with repetition nʳ', show(PR)], ['n! (factorial)', show(nf)]);
+    $('cOut').innerHTML = stat(out);
+    $('cWork').textContent = (r > n ? 'r is larger than n, so there is no way to choose ' + r + ' different items from ' + n + ' without repeats. ' : '') + 'nCr = n! / (r!(n − r)!), nPr = n! / (n − r)!, with repetition: (n + r − 1)! / (r!(n − 1)!) and nʳ.';
+    [['nCr', C], ['nPr', P], ['n!', nf]].forEach(function (x) { if (digits(x[1]) > 15) big.push('<label>Exact ' + x[0] + ' (' + digits(x[1]) + ' digits)</label><div class="pc-big">' + x[1].toString() + '</div>'); });
+    $('cBig').innerHTML = big.join('');
+  }
+  function two() {
+    var a = prob('pa', 'P(A)'), b = prob('pb', 'P(B)'), rel = $('rel').value, ab, work;
+    $('pbaBox').hidden = rel !== 'dep';
+    if (rel === 'ind') { ab = a * b; work = 'Independent: P(A and B) = P(A) × P(B) = ' + f(a) + ' × ' + f(b) + ' = ' + f(ab) + '.'; }
+    else if (rel === 'mut') { if (a + b > 1 + 1e-12) throw new Error('Mutually exclusive events cannot have P(A) + P(B) above 1.'); ab = 0; work = 'Mutually exclusive: A and B cannot both happen, so P(A and B) = 0 and P(A or B) = P(A) + P(B).'; }
+    else { var ba = prob('pba', 'P(B given A)'); ab = a * ba; work = 'Dependent: P(A and B) = P(A) × P(B given A) = ' + f(a) + ' × ' + f(ba) + ' = ' + f(ab) + '.'; if (ab > b + 1e-12) throw new Error('These numbers are impossible: P(A and B) = ' + f(ab) + ' would be larger than P(B) = ' + f(b) + '.'); }
+    if (ab > Math.min(a, b) + 1e-12 || a + b - ab > 1 + 1e-12) throw new Error('These probabilities cannot all be true at once. Check the numbers.');
+    var or = a + b - ab;
+    $('tOut').innerHTML = stat([['P(A and B)', f(ab)], ['P(A or B)', f(or)], ['P(not A)', f(1 - a)], ['P(not B)', f(1 - b)], ['P(exactly one)', f(or - ab)], ['P(neither)', f(1 - or)], ['P(A given B)', b > 0 ? f(ab / b) : '–'], ['P(B given A)', a > 0 ? f(ab / a) : '–']]);
+    $('tWork').textContent = work + ' P(A or B) = P(A) + P(B) − P(A and B) = ' + f(or) + '.';
+  }
+  function lgamma(x) { // Lanczos
+    var g = 7, c = [0.99999999999980993, 676.5203681218851, -1259.1392167224028, 771.32342877765313, -176.61502916214059, 12.507343278686905, -0.13857109526572012, 9.9843695780195716e-6, 1.5056327351493116e-7];
+    if (x < 0.5) return Math.log(Math.PI / Math.sin(Math.PI * x)) - lgamma(1 - x);
+    x -= 1; var a = c[0], t = x + g + 0.5; for (var i = 1; i < 9; i++) a += c[i] / (x + i);
+    return 0.5 * Math.log(2 * Math.PI) + (x + 0.5) * Math.log(t) - t + Math.log(a);
+  }
+  function pmf(n, k, p) {
+    if (p === 0) return k === 0 ? 1 : 0; if (p === 1) return k === n ? 1 : 0;
+    return Math.exp(lgamma(n + 1) - lgamma(k + 1) - lgamma(n - k + 1) + k * Math.log(p) + (n - k) * Math.log(1 - p));
+  }
+  function bin() {
+    var n = int('bn', 'n', 100000), p = prob('bp', 'p'), k = int('bk', 'k');
+    if (k > n) throw new Error('k cannot be larger than n.');
+    var eq = pmf(n, k, p), le = 0, ps = [];
+    for (var i = 0; i <= n; i++) { var v = pmf(n, i, p); ps.push(v); if (i <= k) le += v; }
+    var lt = le - eq, ge = 1 - lt, gt = 1 - le;
+    var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
+    $('bOut').innerHTML = stat([['P(X = ' + k + ')', f(eq)], ['P(X ≤ ' + k + ')', f(clamp(le))], ['P(X < ' + k + ')', f(clamp(lt))], ['P(X ≥ ' + k + ')', f(clamp(ge))], ['P(X > ' + k + ')', f(clamp(gt))], ['Mean np', f(n * p)], ['Standard deviation', f(Math.sqrt(n * p * (1 - p)))]]);
+    $('bWork').textContent = 'P(X = k) = C(n, k) × pᵏ × (1 − p)ⁿ⁻ᵏ = C(' + n + ', ' + k + ') × ' + f(p) + '^' + k + ' × ' + f(1 - p) + '^' + (n - k) + ' = ' + f(eq) + ' (' + pc(eq) + ').';
+    // chart: show at most 120 bars around the mean
+    var mean = n * p, sd = Math.sqrt(n * p * (1 - p)), lo = 0, hi = n;
+    if (n > 120) { lo = Math.max(0, Math.floor(Math.min(k, mean - 5 * sd)) - 2); hi = Math.min(n, Math.ceil(Math.max(k, mean + 5 * sd)) + 2); if (hi - lo > 120) { lo = Math.max(0, k - 60); hi = Math.min(n, lo + 120); } }
+    var mx = 0; for (i = lo; i <= hi; i++) mx = Math.max(mx, ps[i]);
+    var html = ''; for (i = lo; i <= hi; i++) html += '<i' + (i === k ? ' class="on"' : '') + ' style="height:' + (mx ? Math.max(0.5, ps[i] / mx * 100) : 0) + '%" title="' + i + ': ' + f(ps[i]) + '"></i>';
+    $('bChart').innerHTML = html;
+  }
+  function rep() {
+    var p = prob('rp', 'p'), n = int('rn', 'n', 1e9);
+    if (n < 1) throw new Error('n must be at least 1.');
+    var none = Math.pow(1 - p, n), one = 1 - none, half = p > 0 && p < 1 ? Math.ceil(Math.log(0.5) / Math.log(1 - p)) : p === 1 ? 1 : Infinity;
+    $('rOut').innerHTML = stat([['At least once', f(one) + ' (' + pc(one) + ')'], ['Never', f(none) + ' (' + pc(none) + ')'], ['Every time', f(Math.pow(p, n))], ['Tries for a 50% chance', isFinite(half) ? fmtNum(half) : 'never'], ['Expected number of times', f(n * p)]]);
+    $('rWork').textContent = 'P(at least once) = 1 − (1 − p)ⁿ = 1 − (1 − ' + f(p) + ')^' + n + ' = ' + f(one) + '. For example, the chance of at least one six in 4 rolls of a die is 1 − (5/6)⁴ ≈ 0.5177.';
+  }
+  var RUN = { comb: comb, two: two, bin: bin, rep: rep };
+  function run() {
+    var t = $('tab').value; if (!RUN[t]) t = 'comb';
+    document.querySelectorAll('[data-p]').forEach(function (s) { s.hidden = s.getAttribute('data-p') !== t; });
+    document.querySelectorAll('#tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.getAttribute('data-t') === t ? 'true' : 'false'); });
+    try { msg(''); RUN[t](); document.querySelector('[data-p="' + t + '"]').style.opacity = ''; }
+    catch (e) { msg(e.message); document.querySelector('[data-p="' + t + '"] .stats').innerHTML = ''; ['cWork', 'tWork', 'bWork', 'rWork', 'cBig', 'bChart'].forEach(function (id) { if ($(id).closest('[data-p="' + t + '"]')) $(id).innerHTML = ''; }); }
+  }
+  $('tabs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $('tab').value = b.getAttribute('data-t'); run(); });
+  document.querySelector('.card').addEventListener('input', function (e) { if (e.target.closest('[data-p]')) run(); });
+  $('rel').addEventListener('change', run);
+  run();
+})();
+</script>

@@ -1,0 +1,131 @@
+<style>
+.cm-tbl { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+.cm-tbl th, .cm-tbl td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: center; }
+.cm-tbl th:first-child, .cm-tbl td:first-child { text-align: start; }
+.cm-tbl td:first-child b { display: block; } .cm-tbl td:first-child small { color: var(--muted); }
+.cm-tbl input { width: 24px; height: 24px; margin: 0; cursor: pointer; }
+.cm-tbl .oct { font: 700 20px var(--mono); color: var(--accent); }
+.cm-pre { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 16px; }
+.cm-pre button { font: 600 13px/1 var(--mono); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 8px; padding: 8px 10px; cursor: pointer; }
+.cm-pre button:hover { border-color: var(--accent); color: var(--accent); }
+.cm-big { font: 700 28px/1.2 var(--mono); letter-spacing: .04em; }
+.cm-exp { margin: 12px 0 0; padding-inline-start: 20px; color: var(--muted); font-size: 15px; }
+</style>
+<div class="fields">
+  <div><label for="oct">Octal (numeric)</label><input type="text" id="oct" value="755" inputmode="numeric" maxlength="4" spellcheck="false" autocomplete="off"></div>
+  <div><label for="sym">Symbolic</label><input type="text" id="sym" value="rwxr-xr-x" maxlength="10" spellcheck="false" autocomplete="off" autocapitalize="off" data-nomemo></div>
+</div>
+<p class="msg" id="msg" style="margin-top:-6px"></p>
+<div class="scroll-x"><table class="cm-tbl" aria-label="Permissions">
+  <thead><tr><th>Who</th><th>Read (4)</th><th>Write (2)</th><th>Execute (1)</th><th>Value</th></tr></thead>
+  <tbody id="grid"></tbody>
+</table></div>
+<div class="checks" id="special">
+  <label><input type="checkbox" id="suid" data-nomemo>setuid (4000) – run as the file's owner</label>
+  <label><input type="checkbox" id="sgid" data-nomemo>setgid (2000) – run as the group / new files inherit the folder's group</label>
+  <label><input type="checkbox" id="stky" data-nomemo>sticky (1000) – in a shared folder only owners can delete their files</label>
+</div>
+<label for="ftype">This is a</label>
+<select id="ftype" style="max-width:260px;margin-bottom:14px"><option value="f">File</option><option value="d">Folder (directory)</option></select>
+<div class="stats">
+  <div class="stat"><span>Octal</span><b class="cm-big" id="oOut">755</b></div>
+  <div class="stat"><span>Symbolic (as in ls -l)</span><b class="cm-big" id="sOut">-rwxr-xr-x</b></div>
+</div>
+<div class="kv"><span>Numeric</span><code id="c1"></code><button class="btn ghost" data-c="c1" type="button">Copy</button></div>
+<div class="kv"><span>Symbolic</span><code id="c2"></code><button class="btn ghost" data-c="c2" type="button">Copy</button></div>
+<ul class="cm-exp" id="exp"></ul>
+<h3>Change it with a chmod expression</h3>
+<div class="fields"><div><label for="apply">Expression such as u+x, g-w, o=r or a+rX</label><input type="text" id="apply" placeholder="for example g+w,o-rwx" spellcheck="false" autocomplete="off" autocapitalize="off" data-nomemo></div></div>
+<div class="btns" style="margin-top:-6px"><button class="btn ghost" id="applyBtn" type="button">Apply to the permissions above</button></div>
+<p class="msg" id="amsg"></p>
+<h3>Common permissions</h3>
+<div class="cm-pre" id="pre"></div>
+<script>
+(function () {
+  var WHO = [['u', 'Owner', 'the file\'s owner (user)'], ['g', 'Group', 'members of the file\'s group'], ['o', 'Others', 'everyone else']], BITS = [['r', 4], ['w', 2], ['x', 1]];
+  var P = { u: 7, g: 5, o: 5, s: 0 }; // s: special bits 4 setuid, 2 setgid, 1 sticky
+  var PRE = [['644', 'Files: owner edits, all read'], ['755', 'Programs and folders'], ['600', 'Private file'], ['700', 'Private folder or script'], ['664', 'Shared group file'], ['775', 'Shared group folder'], ['444', 'Read-only for all'], ['400', 'Owner read only (SSH keys)'], ['777', 'Everyone everything (unsafe)'], ['1777', 'Shared temp folder (sticky)'], ['2775', 'Group folder (setgid)'], ['4755', 'setuid program']];
+  $('grid').innerHTML = WHO.map(function (w) {
+    return '<tr><td><b>' + w[1] + '</b><small>' + w[0] + '</small></td>' + BITS.map(function (b) { return '<td><input type="checkbox" data-nomemo id="' + w[0] + b[0] + '" aria-label="' + w[1] + ' ' + { r: 'read', w: 'write', x: 'execute' }[b[0]] + '"></td>'; }).join('') + '<td class="oct" id="' + w[0] + 'v"></td></tr>';
+  }).join('');
+  function octal() { return (P.s ? String(P.s) : '') + P.u + P.g + P.o; }
+  function symbolic() {
+    var s = '';
+    WHO.forEach(function (w, i) {
+      var v = P[w[0]], sp = [4, 2, 1][i] & P.s;
+      s += v & 4 ? 'r' : '-'; s += v & 2 ? 'w' : '-';
+      var x = v & 1;
+      s += sp ? (i < 2 ? (x ? 's' : 'S') : (x ? 't' : 'T')) : (x ? 'x' : '-');
+    });
+    return s;
+  }
+  function words(v) { var a = []; if (v & 4) a.push('read'); if (v & 2) a.push('write (change)'); if (v & 1) a.push($('ftype').value === 'd' ? 'enter (open) the folder' : 'run it as a program'); return a.length ? a.join(', ') : 'nothing'; }
+  function show(from) {
+    WHO.forEach(function (w) { BITS.forEach(function (b) { $(w[0] + b[0]).checked = !!(P[w[0]] & b[1]); }); $(w[0] + 'v').textContent = P[w[0]]; });
+    $('suid').checked = !!(P.s & 4); $('sgid').checked = !!(P.s & 2); $('stky').checked = !!(P.s & 1);
+    var o = octal(), s = symbolic();
+    if (from !== 'oct') $('oct').value = o;
+    if (from !== 'sym') $('sym').value = s;
+    $('oOut').textContent = o; $('sOut').textContent = ($('ftype').value === 'd' ? 'd' : '-') + s;
+    var file = $('ftype').value === 'd' ? 'folder' : 'file';
+    $('c1').textContent = 'chmod ' + o + ' ' + file;
+    var sy = WHO.map(function (w) { var v = P[w[0]], t = (v & 4 ? 'r' : '') + (v & 2 ? 'w' : '') + (v & 1 ? 'x' : ''); return w[0] + '=' + t; }).join(',');
+    if (P.s) sy += ',' + [P.s & 4 ? 'u+s' : '', P.s & 2 ? 'g+s' : '', P.s & 1 ? '+t' : ''].filter(Boolean).join(',');
+    $('c2').textContent = 'chmod ' + sy + ' ' + file;
+    var ex = WHO.map(function (w) { return '<li><b>' + w[1] + '</b> (' + w[2] + ') can ' + words(P[w[0]]) + '.</li>'; });
+    if (P.s & 4) ex.push('<li><b>setuid</b>: ' + (file === 'file' ? 'when run, the program gets the owner\'s rights.' : 'has no effect on folders on most systems.') + (P.u & 1 ? '' : ' Shown as a capital S because the owner cannot execute it, so it usually has no effect.') + '</li>');
+    if (P.s & 2) ex.push('<li><b>setgid</b>: ' + (file === 'file' ? 'when run, the program gets the group\'s rights.' : 'new files inside get this folder\'s group.') + '</li>');
+    if (P.s & 1) ex.push('<li><b>sticky</b>: ' + (file === 'folder' ? 'only the owner of a file (or root) can delete or rename it in this folder, as in /tmp.' : 'has no effect on regular files on modern systems; it is meant for folders.') + '</li>');
+    if (P.o & 2) ex.push('<li style="color:var(--bad)">Warning: everyone can change this ' + file + '. This is rarely a good idea on a server.</li>');
+    $('exp').innerHTML = ex.join('');
+  }
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  $('grid').addEventListener('change', function () { WHO.forEach(function (w) { P[w[0]] = BITS.reduce(function (a, b) { return a + ($(w[0] + b[0]).checked ? b[1] : 0); }, 0); }); msg(''); show(); });
+  $('special').addEventListener('change', function () { P.s = ($('suid').checked ? 4 : 0) + ($('sgid').checked ? 2 : 0) + ($('stky').checked ? 1 : 0); msg(''); show(); });
+  $('ftype').addEventListener('change', function () { show(); });
+  $('oct').addEventListener('input', function () {
+    var v = $('oct').value.trim();
+    if (!/^[0-7]{3,4}$/.test(v)) { msg(v ? 'Octal permissions are 3 or 4 digits from 0 to 7, like 644 or 2755.' : 'Type an octal value like 755.', !!v); return; }
+    if (v.length === 4) { P.s = +v[0]; v = v.slice(1); } else P.s = 0;
+    P.u = +v[0]; P.g = +v[1]; P.o = +v[2]; msg(''); show('oct');
+  });
+  $('sym').addEventListener('input', function () {
+    var v = $('sym').value.trim();
+    if (v.length === 10 && /^[-dlcbps]/.test(v)) v = v.slice(1);
+    if (!/^[r-][w-][xsS-][r-][w-][xsS-][r-][w-][xtT-]$/.test(v)) { msg(v ? 'Symbolic permissions are 9 letters like rwxr-xr-x (r, w, x or -; s/S and t/T for special bits).' : 'Type symbolic permissions like rwxr-xr-x.', !!v); return; }
+    P.s = 0;
+    WHO.forEach(function (w, i) { var t = v.substr(i * 3, 3), x = t[2]; P[w[0]] = (t[0] === 'r' ? 4 : 0) + (t[1] === 'w' ? 2 : 0) + (x === 'x' || x === 's' || x === 't' ? 1 : 0); if (/[sStT]/.test(x)) P.s |= [4, 2, 1][i]; });
+    msg(''); show('sym');
+  });
+  function applyExpr() {
+    var e = $('apply').value.replace(/\s+/g, ''), am = $('amsg');
+    if (!e) { am.className = 'msg'; am.textContent = 'Type an expression first, like u+x.'; return; }
+    var parts = e.split(','), N = { u: P.u, g: P.g, o: P.o, s: P.s };
+    for (var i = 0; i < parts.length; i++) {
+      var m = /^([ugoa]*)([-+=])([rwxXst]*)$/.exec(parts[i]);
+      if (!m) { am.className = 'msg bad'; am.textContent = '"' + parts[i] + '" is not understood. Use who (u, g, o, a), then +, - or =, then r, w, x, X, s or t. Example: g+w,o-rwx'; return; }
+      var who = (m[1] || 'a').replace('a', 'ugo'), op = m[2], what = m[3], bits = 0, sp = 0;
+      var anyX = (N.u | N.g | N.o) & 1 || $('ftype').value === 'd';
+      if (what.indexOf('r') >= 0) bits |= 4; if (what.indexOf('w') >= 0) bits |= 2; if (what.indexOf('x') >= 0 || (what.indexOf('X') >= 0 && anyX)) bits |= 1;
+      ['u', 'g', 'o'].forEach(function (w) {
+        if (who.indexOf(w) < 0) return;
+        if (op === '+') N[w] |= bits; else if (op === '-') N[w] &= ~bits; else N[w] = bits;
+        var sb = w === 'u' ? 4 : w === 'g' ? 2 : 0;
+        if (what.indexOf('s') >= 0 && sb) sp |= sb;
+        if (op === '=' && sb) N.s &= ~sb;
+      });
+      if (what.indexOf('t') >= 0) sp |= 1;
+      if (op === '=' && who.indexOf('o') >= 0 && what.indexOf('t') < 0 && m[1].indexOf('o') >= 0) N.s &= ~1;
+      if (op === '-') N.s &= ~sp; else N.s |= sp;
+    }
+    var before = octal();
+    P = N; show();
+    am.className = 'msg ok'; am.textContent = 'Applied: ' + before + ' → ' + octal() + '.';
+  }
+  $('applyBtn').addEventListener('click', applyExpr);
+  $('apply').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); applyExpr(); } });
+  PRE.forEach(function (p) { var b = document.createElement('button'); b.type = 'button'; b.textContent = p[0]; b.title = p[1]; b.setAttribute('aria-label', p[0] + ': ' + p[1]); b.addEventListener('click', function () { $('oct').value = p[0]; $('oct').dispatchEvent(new Event('input', { bubbles: true })); }); $('pre').appendChild(b); });
+  document.querySelectorAll('[data-c]').forEach(function (b) { b.addEventListener('click', function () { copyText($(b.dataset.c).textContent, b); }); });
+  show();
+})();
+</script>

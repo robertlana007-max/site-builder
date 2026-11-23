@@ -1,0 +1,222 @@
+<style>
+.ic-ex { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+.ic-ex button { font: 500 13px/1 var(--mono); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+.ic-ex button:hover { border-color: var(--accent); color: var(--accent); }
+.ic-show { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-top: 4px; min-height: 52px; }
+.ic-show small, .ic-res small { display: block; font-size: 13px; color: var(--muted); font-family: system-ui, sans-serif; }
+.ic-res { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-top: 12px; }
+.ic-res .cx { font-size: 1.3em; }
+.ic-res .ic-num { font: 700 22px/1.3 system-ui, sans-serif; margin-top: 4px; overflow-wrap: anywhere; }
+.ic-steps { list-style: none; margin: 8px 0 0; padding: 0; }
+.ic-steps li { border-inline-start: 3px solid var(--line); padding: 6px 0 6px 12px; margin: 6px 0; }
+.ic-steps li b { font-size: 14px; }
+.ic-steps li p { margin: 2px 0; font-size: 14px; color: var(--muted); }
+.ic-steps li .cx { font-size: 1.02em; line-height: 2.1; }
+.ic-cv { width: 100%; height: 300px; display: block; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
+.ic-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: flex-end; margin-top: 6px; }
+.ic-ok { font-size: 13.5px; color: var(--ok); margin-top: 8px; }
+.ic-int { font-size: 1.6em; vertical-align: -0.15em; }
+</style>
+<label for="fx">Function to integrate f(x)</label>
+<input type="text" id="fx" value="x e^x" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="for example 3x^2 + 2x, sin(x), x e^x">
+<div class="ic-ex" id="exs" aria-label="Examples"><button type="button">3x^2 + 2x - 5</button><button type="button">sin(3x)</button><button type="button">1/x</button><button type="button">x ln(x)</button><button type="button">1/(1 + x^2)</button><button type="button">x/(x^2 + 1)</button><button type="button">sec(x)^2</button><button type="button">e^(-x^2)</button></div>
+<div class="fields">
+  <div><label for="mode">Type of integral</label><select id="mode"><option value="i">Indefinite (antiderivative)</option><option value="d">Definite (from a to b)</option></select></div>
+  <div><label for="var">Variable</label><input type="text" id="var" value="x" maxlength="8" spellcheck="false" autocomplete="off" autocapitalize="off"></div>
+  <div class="ic-b"><label for="lo">Lower limit a</label><input type="text" id="lo" value="0" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="0, -1, pi, -inf"></div>
+  <div class="ic-b"><label for="hi">Upper limit b</label><input type="text" id="hi" value="1" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="1, 2pi, inf"></div>
+</div>
+<div class="ic-show"><small>You entered</small><div class="cx" id="seen">–</div></div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="ic-res"><small id="resLbl">Result</small><div class="cx" id="res"></div><div class="ic-num" id="num"></div></div>
+  <div class="btns"><button class="btn ghost" id="cp" type="button">Copy result</button></div>
+  <p class="ic-ok" id="chk"></p>
+  <h3 id="stepsH">Steps</h3>
+  <ol class="ic-steps" id="steps"></ol>
+  <p class="msg" id="how"></p>
+  <h3>Graph</h3>
+  <canvas class="ic-cv" id="cv" aria-label="Graph of the function"></canvas>
+  <div class="ic-row"><span class="msg" id="legend" style="margin:0 auto 0 0;font-size:13px"></span><button class="btn ghost" id="zin" type="button" style="min-height:34px;padding:4px 12px">Zoom in</button><button class="btn ghost" id="zout" type="button" style="min-height:34px;padding:4px 12px">Zoom out</button></div>
+</div>
+<details class="more" style="margin-top:16px"><summary>How to type functions and limits</summary><div>
+  <p class="msg" style="margin-top:4px">Powers: <code>x^2</code>, roots: <code>sqrt(x)</code>, multiplication can be left out: <code>3x sin(x)</code>. Functions: sin, cos, tan, sec, csc, cot, arcsin, arccos, arctan, sinh, cosh, tanh, <code>ln(x)</code> (natural log), <code>log(x)</code> (base 10), <code>e^x</code>, <code>abs(x)</code>. Limits can be numbers or expressions like <code>pi/2</code>, <code>sqrt(2)</code> or <code>e</code>; use <code>inf</code> and <code>-inf</code> for infinity. Other letters such as a or k are treated as constants in an indefinite integral.</p>
+</div></details>
+<script src="../assets/calculus.js"></script>
+<script>
+(function () {
+  var C = window.Calc, span = 6, center = 0, last = null, timer, runId = 0, nerdState = 0, nerdWait = [];
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function fmt(v) { if (!isFinite(v)) return isNaN(v) ? 'undefined' : (v > 0 ? '∞' : '−∞'); var a = Math.abs(v); return a !== 0 && (a < 1e-6 || a >= 1e12) ? v.toExponential(10).replace(/\.?0+e/, 'e') : String(+v.toPrecision(12)); }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  // nerdamer (about 430 KB) is loaded only when the basic rules are not enough
+  function withNerd(cb) {
+    if (window.nerdamer) return cb(true);
+    nerdWait.push(cb);
+    if (nerdState === 1) return;
+    nerdState = 1;
+    var s = document.createElement('script'); s.src = '../assets/vendor/nerdamer/nerdamer.min.js';
+    s.onload = function () { nerdState = 2; var w = nerdWait; nerdWait = []; w.forEach(function (f) { f(!!window.nerdamer); }); };
+    s.onerror = function () { nerdState = 0; var w = nerdWait; nerdWait = []; w.forEach(function (f) { f(false); }); };
+    document.head.appendChild(s);
+  }
+  function verify(f, F, v, others) {
+    var env = {}; others.forEach(function (s, i) { env[s] = 1.3 + i * 0.7; });
+    var n = 0, bad = 0;
+    [0.31, 0.77, 1.29, 2.13, 3.7, -0.43, -1.61, -2.9, 0.05, 5.3].forEach(function (x0) {
+      var h = 1e-5 * Math.max(1, Math.abs(x0)), e1 = Object.assign({}, env), e2 = Object.assign({}, env), e3 = Object.assign({}, env);
+      e1[v] = x0 + h; e2[v] = x0 - h; e3[v] = x0;
+      var d = (C.evaluate(F, e1) - C.evaluate(F, e2)) / (2 * h), y = C.evaluate(f, e3);
+      if (!isFinite(d) || !isFinite(y) || Math.abs(y) > 1e7) return;
+      n++; if (Math.abs(d - y) > 1e-4 * Math.max(1, Math.abs(y))) bad++;
+    });
+    return n >= 3 && !bad;
+  }
+  // ln(u) -> ln|u| unless u is clearly always positive, so the answer is valid for negative u too
+  function absLn(x, v) {
+    if (x.t === 'f') {
+      var a = absLn(x.a, v);
+      if (x.n === 'ln' && !(a.t === 'f' && a.n === 'abs')) {
+        var pos = true, env = {};
+        for (var t = -20; t <= 20 && pos; t += 0.173) { env[v] = t; var y = C.evaluate(a, env); if (isFinite(y) && y <= 0) pos = false; }
+        if (!pos) return C.fn('ln', C.fn('abs', a));
+      }
+      return C.fn(x.n, a);
+    }
+    if (x.t === '+' ) return C.add(x.a.map(function (y) { return absLn(y, v); }));
+    if (x.t === '*') return C.mul(x.a.map(function (y) { return absLn(y, v); }));
+    if (x.t === '^') return C.pow(absLn(x.b, v), absLn(x.e, v));
+    return x;
+  }
+  function methodHint(f, v) {
+    var s = C.text(f);
+    var hasPoly = new RegExp('\\b' + v + '\\b').test(s.replace(/\([^()]*\)/g, ''));
+    if (/(sin|cos|e\^|ln|atan|asin)/.test(s) && hasPoly && f.t === '*') return 'Integrals like this are usually solved with integration by parts: ∫ u dv = u·v − ∫ v du.';
+    if (f.t === '*' && f.a.some(function (y) { return y.t === '^' && C.isN(y.e) && C.val(y.e) < 0 && y.b.t === '+'; })) return 'Integrals of fractions like this are usually solved with partial fractions or a substitution u = (the denominator).';
+    if (/(sin|cos|tan|sec)\(.*\)\^/.test(s) || /(sin|cos)\(.*\)\*(sin|cos)/.test(s)) return 'Integrals of trigonometric powers are usually solved with identities such as sin²x = (1 − cos 2x)/2, or a substitution.';
+    return 'This needs a technique such as substitution or integration by parts.';
+  }
+  function stepsHtml(steps, v) {
+    return steps.filter(function (s) { return s.r; }).map(function (s) {
+      return '<li style="margin-inline-start:' + Math.min(s.depth, 4) * 12 + 'px"><b>' + s.rule + '</b><p>' + esc(s.note) + '</p><div class="cx"><span class="ic-int">∫</span>' + C.html(C.simplify(s.x)) + ' d<i>' + v + '</i> = ' + C.html(s.r) + '</div></li>';
+    }).join('');
+  }
+  function bound(id) {
+    var t = $(id).value.trim();
+    if (!t) throw new C.Err('Enter both limits a and b.');
+    var n = C.parse(t, { vars: [], strictVars: true, allowInf: true }), val = C.evaluate(n, {});
+    if (isNaN(val)) throw new C.Err('A limit must be a number, like 0, 2.5, pi/2 or inf.');
+    return { node: n, v: val };
+  }
+  function run() {
+    var id = ++runId, src = $('fx').value, v = ($('var').value || 'x').trim(), def = $('mode').value === 'd';
+    document.querySelectorAll('.ic-b').forEach(function (el) { el.hidden = !def; });
+    last = null; $('out').hidden = true;
+    if (!/^[A-Za-z]\w*$/.test(v) || v === 'e' || v === 'pi') { $('seen').textContent = '–'; msg('The variable must be a letter such as x or t (not e or pi, which are constants).', true); return; }
+    if (!src.trim()) { $('seen').textContent = '–'; msg('Type a function to integrate, for example 3x^2 + 2x.'); return; }
+    var f, A, B;
+    try {
+      f = C.simplify(C.parse(src, { vars: [v] }));
+      if (def) { A = bound('lo'); B = bound('hi'); }
+    } catch (e) { if (!(e instanceof C.Err)) throw e; $('seen').textContent = '–'; msg(e.message, true); return; }
+    if (C.size(f) > 300) { msg('This function is too long. Please split it into smaller parts.', true); return; }
+    var others = Object.keys(C.symbols(f)).filter(function (s) { return s !== v; });
+    if (def && others.length) { msg('A definite integral needs numbers only. Replace ' + others.join(', ') + ' with numbers, or switch to Indefinite.', true); return; }
+    $('seen').innerHTML = def ? '<span class="ic-int">∫</span><sub>' + C.html(A.node) + '</sub><sup>' + C.html(B.node) + '</sup> ' + C.html(f) + ' d<i>' + v + '</i>' : '<span class="ic-int">∫</span> ' + C.html(f) + ' d<i>' + v + '</i>';
+    msg(others.length ? 'Treating ' + others.join(', ') + ' as constant' + (others.length > 1 ? 's' : '') + '.' : '');
+    var steps = [], F = C.integ(f, v, steps), how = 'rules';
+    if (!F) { steps = []; try { var ex = C.expand(f); if (C.size(ex) < 400) F = C.integ(ex, v, steps); } catch (e) { if (!(e instanceof C.Err) && !(e instanceof RangeError)) throw e; } }
+    if (F && !verify(f, C.simplify(F), v, others)) { F = null; steps = []; }
+    if (F) return show(f, F, v, others, steps, how, def, A, B);
+    msg('Working on it…');
+    withNerd(function (ok) {
+      if (id !== runId) return;
+      var G = null;
+      if (ok) {
+        try {
+          var out = window.nerdamer('integrate(' + C.nerd(f) + ',' + v + ')').toString();
+          if (!/integrate|\bi\b|gamma|fresnel|Shi|Chi|\binfinity\b/i.test(out)) G = C.parse(out, { logIsLn: true, vars: [v] });
+        } catch (e) { G = null; }
+        if (G) { G = absLn(C.simplify(G), v); if (!verify(f, G, v, others)) G = null; }
+      }
+      msg(others.length ? 'Treating ' + others.join(', ') + ' as constant' + (others.length > 1 ? 's' : '') + '.' : '');
+      show(f, G, v, others, [], ok ? 'engine' : 'noengine', def, A, B);
+    });
+  }
+  function show(f, F, v, others, steps, how, def, A, B) {
+    if (F) F = C.tidy(F);
+    var html = '', numTxt = '', check = '', copy = '';
+    if (!def) {
+      if (!F) {
+        $('out').hidden = true;
+        msg(how === 'noengine' ? 'The algebra engine could not be loaded. Check your connection and try again; basic integrals still work.' : 'No antiderivative in standard functions was found. Some integrals, such as ∫ e^(−x²) dx, have none at all, and others are beyond this tool. Switch to Definite to get an accurate number for any limits.', true);
+        return;
+      }
+      $('resLbl').textContent = 'Antiderivative';
+      html = '<span class="ic-int">∫</span>' + C.html(f) + ' d<i>' + v + '</i> = ' + C.html(F) + ' + <i>C</i>';
+      copy = C.text(F) + ' + C';
+      check = '✓ Checked: differentiating this answer gives back the original function.';
+      var sp = C.text(F).match(/\b(erf|Si|Ci|Ei)\(/);
+      if (sp) msg({ erf: 'erf is the error function, erf(x) = (2/√π) ∫₀ˣ e^(−t²) dt. It is not an elementary function, but it is standard and tabulated.', Si: 'Si is the sine integral, Si(x) = ∫₀ˣ sin(t)/t dt, a standard special function.', Ci: 'Ci is the cosine integral, a standard special function.', Ei: 'Ei is the exponential integral, a standard special function.' }[sp[1]]);
+    } else {
+      var fe = C.compile(f, v), N = C.integrateNum(fe, A.v, B.v), exactTxt = '';
+      var blowUp = false;
+      if (isFinite(A.v) && isFinite(B.v)) for (var k = 0; k <= 400; k++) { var y = fe(A.v + (B.v - A.v) * k / 400); if (k > 0 && k < 400 && !isFinite(y)) blowUp = true; }
+      if (F && isFinite(A.v) && isFinite(B.v) && !blowUp) {
+        try {
+          var Fa = C.subst(F, v, A.node), Fb = C.subst(F, v, B.node), ex = C.tidy(C.sub(Fb, Fa)), ev = C.evaluate(ex, {});
+          if (isFinite(ev) && N.ok && Math.abs(ev - N.value) <= 1e-6 * Math.max(1, Math.abs(ev)) && C.size(ex) < 60) exactTxt = C.html(ex);
+          if (isFinite(ev) && N.ok && Math.abs(ev - N.value) <= 1e-6 * Math.max(1, Math.abs(ev))) N.value = ev;
+        } catch (e) { if (!(e instanceof C.Err)) throw e; }
+      }
+      $('resLbl').textContent = 'Value of the definite integral';
+      if (!N.ok || !isFinite(N.value) || blowUp) {
+        html = '<span class="ic-int">∫</span><sub>' + C.html(A.node) + '</sub><sup>' + C.html(B.node) + '</sup> ' + C.html(f) + ' d<i>' + v + '</i>';
+        numTxt = 'Does not converge';
+        check = '';
+        msg(blowUp ? 'The function goes to infinity inside the interval, so this integral has no finite value (or it needs to be split at that point).' : 'The integral does not settle on a finite value. It probably diverges (grows without limit).', true);
+        copy = 'diverges';
+      } else {
+        html = '<span class="ic-int">∫</span><sub>' + C.html(A.node) + '</sub><sup>' + C.html(B.node) + '</sup> ' + C.html(f) + ' d<i>' + v + '</i>' + (exactTxt ? ' = ' + exactTxt : '');
+        numTxt = exactTxt && /^−?\d+$/.test(exactTxt) ? '' : '≈ ' + fmt(N.value);
+        copy = String(+N.value.toPrecision(15));
+        check = F && exactTxt ? '✓ Checked: F(b) − F(a) from the antiderivative and a separate numerical calculation agree.' : '✓ Computed numerically (adaptive Gauss–Kronrod), estimated error below ' + (N.error < 1e-12 ? '10⁻¹²' : N.error.toExponential(1)) + '.';
+      }
+    }
+    $('res').innerHTML = html; $('num').textContent = numTxt;
+    $('chk').textContent = check;
+    $('steps').innerHTML = stepsHtml(steps, v);
+    var hasSteps = !!$('steps').children.length;
+    $('stepsH').hidden = !F; $('steps').hidden = !hasSteps;
+    if (F) $('stepsH').textContent = def ? 'Steps for the antiderivative F(x)' : 'Steps';
+    $('how').textContent = F && !hasSteps ? 'This antiderivative was found by the built-in algebra engine (nerdamer), which does not report its working. ' + methodHint(f, v) + ' The answer was checked by differentiating it.' : F && def ? 'Then the value is F(b) − F(a).' : '';
+    if (def && F) $('how').textContent += ' F(' + v + ') = ' + C.text(F) + '.';
+    $('out').hidden = false;
+    last = { f: f, v: v, others: others, def: def, a: def ? A.v : null, b: def ? B.v : null, F: F, copy: copy };
+    if (def && isFinite(A.v) && isFinite(B.v)) { center = (A.v + B.v) / 2; span = Math.max(1, Math.abs(B.v - A.v) * 0.8); }
+    else if (def) { center = isFinite(A.v) ? A.v + 4 : isFinite(B.v) ? B.v - 4 : 0; span = 6; }
+    $('legend').innerHTML = '<span style="color:var(--accent)">━</span> f(' + v + ')' + (def ? ' &nbsp; shaded area = integral (below the axis counts as negative)' : F ? ' &nbsp; <span style="color:#e8590c">┅</span> F(' + v + ') with C = 0' : '');
+    draw();
+  }
+  function draw() {
+    if (!last || $('out').hidden) return;
+    var env1 = {}; last.others.forEach(function (s) { env1[s] = 1; });
+    function mk(x) { return function (t) { var e = Object.assign({}, env1); e[last.v] = t; return C.evaluate(x, e); }; }
+    var acc = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2563eb', fns = [{ f: mk(last.f), color: acc }];
+    if (!last.def && last.F) fns.push({ f: mk(last.F), color: '#e8590c', dash: [7, 5] });
+    var o = { xmin: center - span, xmax: center + span, fns: fns };
+    if (last.def) o.shade = { f: mk(last.f), a: Math.min(last.a, last.b), b: Math.max(last.a, last.b), color: 'rgba(110,140,255,.28)' };
+    C.plot($('cv'), o);
+  }
+  function later() { clearTimeout(timer); timer = setTimeout(run, 250); }
+  ['fx', 'var', 'lo', 'hi'].forEach(function (id) { $(id).addEventListener('input', later); });
+  $('mode').addEventListener('change', run);
+  $('exs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $('fx').value = b.textContent; span = 6; center = 0; run(); });
+  $('cp').addEventListener('click', function () { if (last) copyText(last.copy, $('cp')); });
+  $('zin').addEventListener('click', function () { span = Math.max(0.01, span / 2); draw(); });
+  $('zout').addEventListener('click', function () { span = Math.min(1e6, span * 2); draw(); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(draw, 150); });
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  run();
+})();
+</script>

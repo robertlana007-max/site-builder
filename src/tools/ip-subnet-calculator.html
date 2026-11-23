@@ -1,0 +1,175 @@
+<style>
+.sn-tbl { width: 100%; border-collapse: collapse; font-size: 14.5px; }
+.sn-tbl th, .sn-tbl td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
+.sn-tbl th { color: var(--muted); font-weight: 600; width: 38%; font-size: 13.5px; }
+.sn-tbl td { font-family: var(--mono); overflow-wrap: anywhere; }
+.sn-bin b { color: var(--accent); font-weight: 700; } .sn-bin i { font-style: normal; color: var(--muted); }
+.sn-list { width: 100%; border-collapse: collapse; font: 13.5px var(--mono); }
+.sn-list th, .sn-list td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: start; white-space: nowrap; }
+.sn-list th { font-family: system-ui, sans-serif; color: var(--muted); font-size: 13px; position: sticky; top: 0; background: var(--surface); }
+.sn-st .stat b { font-size: 18px; }
+.sn-scroll { max-height: 420px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; margin-top: 10px; }
+</style>
+<div class="fields">
+  <div style="grid-column:1/-1"><label for="ip">IP address (IPv4 or IPv6), optionally with /prefix</label><input type="text" id="ip" value="192.168.1.10/24" spellcheck="false" autocomplete="off" autocapitalize="off" inputmode="url" placeholder="192.168.1.10/24 or 2001:db8::1/48"></div>
+  <div id="pfxBox"><label for="pfx">Subnet mask / prefix</label><select id="pfx" data-nomemo></select></div>
+  <div id="needBox"><label for="need">Or: hosts needed</label><input type="number" id="need" min="1" step="1" placeholder="for example 50" data-nomemo></div>
+</div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="stats sn-st" id="st"></div>
+  <div class="scroll-x" style="margin-top:12px"><table class="sn-tbl"><tbody id="tb"></tbody></table></div>
+  <div class="btns"><button class="btn ghost" id="cpAll" type="button">Copy all details</button></div>
+  <div id="splitBox">
+    <h3>Split into smaller subnets</h3>
+    <div class="fields"><div><label for="split">New prefix</label><select id="split" data-nomemo></select></div></div>
+    <p class="msg" id="smsg" style="margin-top:-6px"></p>
+    <div class="sn-scroll" id="sScroll" hidden><table class="sn-list"><thead><tr><th>#</th><th>Network</th><th>Usable range</th><th>Broadcast</th></tr></thead><tbody id="sl"></tbody></table></div>
+    <div class="btns"><button class="btn ghost" id="cpCsv" type="button" hidden>Copy list as CSV</button></div>
+  </div>
+</div>
+<script>
+(function () {
+  var cur = null;
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  // ---------- IPv4 ----------
+  function p4(s) {
+    var m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(s); if (!m) return null;
+    var n = 0; for (var i = 1; i <= 4; i++) { if (+m[i] > 255 || (m[i].length > 1 && m[i][0] === '0')) return null; n = n * 256 + +m[i]; } return n;
+  }
+  function s4(n) { return [n >>> 24, n >>> 16 & 255, n >>> 8 & 255, n & 255].join('.'); }
+  function maskOf(p) { return p === 0 ? 0 : (0xFFFFFFFF << (32 - p)) >>> 0; }
+  function bin4(n, p) { var b = n.toString(2).padStart(32, '0'), out = ''; for (var i = 0; i < 32; i++) { if (i && i % 8 === 0) out += '.'; out += (i < p ? '<b>' : '<i>') + b[i] + (i < p ? '</b>' : '</i>'); } return out; }
+  function type4(n) {
+    var R = [['0.0.0.0', 8, 'This network (“0.0.0.0”, not routable)'], ['10.0.0.0', 8, 'Private (RFC 1918)'], ['100.64.0.0', 10, 'Shared address space for carrier-grade NAT (RFC 6598)'], ['127.0.0.0', 8, 'Loopback (this computer)'], ['169.254.0.0', 16, 'Link-local (automatic address when DHCP fails)'], ['172.16.0.0', 12, 'Private (RFC 1918)'], ['192.0.0.0', 24, 'IETF protocol assignments'], ['192.0.2.0', 24, 'Documentation (TEST-NET-1)'], ['192.168.0.0', 16, 'Private (RFC 1918)'], ['198.18.0.0', 15, 'Benchmark testing'], ['198.51.100.0', 24, 'Documentation (TEST-NET-2)'], ['203.0.113.0', 24, 'Documentation (TEST-NET-3)'], ['224.0.0.0', 4, 'Multicast'], ['255.255.255.255', 32, 'Limited broadcast'], ['240.0.0.0', 4, 'Reserved for future use']];
+    for (var i = 0; i < R.length; i++) { var m = maskOf(R[i][1]); if (((n & m) >>> 0) === p4(R[i][0])) return R[i][2]; }
+    return 'Public (globally routable)';
+  }
+  function class4(n) { var a = n >>> 24; return a < 128 ? 'A' : a < 192 ? 'B' : a < 224 ? 'C' : a < 240 ? 'D (multicast)' : 'E (reserved)'; }
+  function range4(net, p) {
+    var size = Math.pow(2, 32 - p), bc = net + size - 1;
+    if (p === 32) return { first: net, last: net, hosts: 1, bc: bc, note: '/32 is a single address (a host route).' };
+    if (p === 31) return { first: net, last: bc, hosts: 2, bc: bc, note: '/31 is a point-to-point link: both addresses are usable and there is no broadcast (RFC 3021).' };
+    return { first: net + 1, last: bc - 1, hosts: size - 2, bc: bc };
+  }
+  function v4(addr, p) {
+    var mask = maskOf(p), net = (addr & mask) >>> 0, r = range4(net, p), size = Math.pow(2, 32 - p);
+    var rows = [
+      ['IP address', s4(addr)], ['Network address', s4(net) + '/' + p], ['Usable host range', r.hosts ? s4(r.first) + ' – ' + s4(r.last) : '–'], ['Broadcast address', p >= 31 ? 'none' : s4(r.bc)],
+      ['Total addresses', fmtNum(size)], ['Usable hosts', fmtNum(r.hosts)], ['Subnet mask', s4(mask)], ['Wildcard mask', s4(~mask >>> 0)], ['CIDR notation', '/' + p],
+      ['IP class', class4(addr)], ['Address type', type4(addr)], ['Binary address', '<span class="sn-bin">' + bin4(addr, p) + '</span>'], ['Binary mask', '<span class="sn-bin">' + bin4(mask, p) + '</span>'],
+      ['Hex address', '0x' + addr.toString(16).toUpperCase().padStart(8, '0')], ['Integer', String(addr)], ['Reverse DNS zone', s4(addr).split('.').reverse().join('.') + '.in-addr.arpa'], ['IPv4-mapped IPv6', '::ffff:' + s4(addr)]
+    ];
+    if (r.note) rows.push(['Note', r.note]);
+    if (addr === net && p < 31) rows.push(['Note', 'This is the network address itself, which is not given to a device.']);
+    else if (addr === r.bc && p < 31) rows.push(['Note', 'This is the broadcast address, which is not given to a device.']);
+    return { rows: rows, stats: [['Network', s4(net) + '/' + p], ['Usable hosts', fmtNum(r.hosts)], ['Mask', s4(mask)], ['Broadcast', p >= 31 ? 'none' : s4(r.bc)]], net: net, p: p };
+  }
+  // ---------- IPv6 ----------
+  function p6(s) {
+    s = s.toLowerCase(); var zone = s.indexOf('%'); if (zone >= 0) s = s.slice(0, zone);
+    if (!/^[0-9a-f:.]+$/.test(s) || /:::/.test(s) || (s.match(/::/g) || []).length > 1) return null;
+    var m = /(\d+\.\d+\.\d+\.\d+)$/.exec(s);
+    if (m) { var v = p4(m[1]); if (v === null) return null; s = s.slice(0, m.index) + (v >>> 16).toString(16) + ':' + (v & 65535).toString(16); }
+    var halves = s.split('::'), a = halves[0] ? halves[0].split(':') : [], b = halves.length > 1 && halves[1] ? halves[1].split(':') : [];
+    if (halves.length === 1 && a.length !== 8) return null;
+    var fill = 8 - a.length - b.length; if (fill < (halves.length > 1 ? 1 : 0)) return null;
+    var parts = a.concat(new Array(halves.length > 1 ? fill : 0).fill('0'), b);
+    if (parts.length !== 8) return null;
+    var n = 0n; for (var i = 0; i < 8; i++) { if (!/^[0-9a-f]{1,4}$/.test(parts[i])) return null; n = (n << 16n) | BigInt(parseInt(parts[i], 16)); }
+    return n;
+  }
+  function groups(n) { var g = []; for (var i = 7; i >= 0; i--) g.push(Number((n >> BigInt(i * 16)) & 0xFFFFn)); return g; }
+  function full6(n) { return groups(n).map(function (x) { return x.toString(16).padStart(4, '0'); }).join(':'); }
+  function short6(n) { // RFC 5952
+    var g = groups(n), best = -1, bl = 0;
+    for (var i = 0; i < 8;) { if (g[i] === 0) { var j = i; while (j < 8 && g[j] === 0) j++; if (j - i > bl && j - i > 1) { best = i; bl = j - i; } i = j; } else i++; }
+    var h = g.map(function (x) { return x.toString(16); });
+    if (best < 0) return h.join(':');
+    return h.slice(0, best).join(':') + '::' + h.slice(best + bl).join(':');
+  }
+  function type6(n) {
+    var T = [['::1', 128, 'Loopback'], ['::', 128, 'Unspecified address'], ['::ffff:0:0', 96, 'IPv4-mapped address'], ['64:ff9b::', 96, 'IPv4/IPv6 translation (NAT64)'], ['2001:db8::', 32, 'Documentation'], ['2001::', 32, 'Teredo tunnelling'], ['2002::', 16, '6to4'], ['fc00::', 7, 'Unique local address (private)'], ['fe80::', 10, 'Link-local'], ['ff00::', 8, 'Multicast'], ['2000::', 3, 'Global unicast (public)']];
+    for (var i = 0; i < T.length; i++) { var m = mask6(T[i][1]); if ((n & m) === p6(T[i][0])) return T[i][2]; }
+    return 'Reserved';
+  }
+  function mask6(p) { return p === 0 ? 0n : ((1n << 128n) - 1n) ^ ((1n << BigInt(128 - p)) - 1n); }
+  function v6(addr, p) {
+    var m = mask6(p), net = addr & m, last = net | (((1n << BigInt(128 - p)) - 1n)), count = 1n << BigInt(128 - p);
+    var cnt = (128 - p) > 40 ? '2^' + (128 - p) + ' ≈ ' + Number(count).toExponential(3).replace('e+', ' × 10^') : count.toLocaleString('en-US');
+    var nib = full6(net).replace(/:/g, '').slice(0, Math.ceil(p / 4)).split('').reverse().join('.');
+    var rows = [['IP address', short6(addr)], ['Full (expanded)', full6(addr)], ['Network', short6(net) + '/' + p], ['First address', short6(net)], ['Last address', short6(last)], ['Addresses in this network', cnt], ['Prefix mask', short6(m)], ['Address type', type6(addr)], ['Reverse DNS zone', (nib ? nib + '.' : '') + 'ip6.arpa']];
+    if (p <= 64) rows.push(['Number of /64 networks', p === 64 ? '1' : (64 - p > 40 ? '2^' + (64 - p) : (1n << BigInt(64 - p)).toLocaleString('en-US'))]);
+    if (p > 64 && p < 127) rows.push(['Note', 'Networks smaller than /64 break automatic address setup (SLAAC). /64 is the usual size for a LAN.']);
+    return { rows: rows, stats: [['Network', short6(net) + '/' + p], ['Addresses', (128 - p) > 40 ? '2^' + (128 - p) : count.toLocaleString('en-US')], ['Type', type6(addr).replace(/ \(.*\)/, '')]], six: true };
+  }
+  for (var i = 32; i >= 0; i--) { var o = document.createElement('option'); o.value = i; o.textContent = '/' + i + ' – ' + s4(maskOf(i)); $('pfx').appendChild(o); }
+  $('pfx').value = 24;
+  function run(from) {
+    var raw = $('ip').value.trim().replace(/\s+/g, ' '), ip = raw, p = null;
+    $('out').hidden = true; cur = null;
+    if (!raw) return msg('Type an IP address, for example 192.168.1.10/24.');
+    var m = /^(.*?)(?:\s*\/\s*(\d{1,3})|\s+(\d+\.\d+\.\d+\.\d+))$/.exec(raw);
+    if (m) { ip = m[1].trim(); if (m[2] !== undefined) p = +m[2]; else { var mk = p4(m[3]); if (mk === null) return msg('"' + m[3] + '" is not a valid subnet mask.', true); var b = mk.toString(2).padStart(32, '0'); if (!/^1*0*$/.test(b)) return msg(m[3] + ' is not a valid subnet mask: the 1 bits must all come first (like 255.255.255.0).', true); p = b.indexOf('0') < 0 ? 32 : b.indexOf('0'); } }
+    if (ip.indexOf(':') >= 0) {
+      var a6 = p6(ip);
+      if (a6 === null) return msg('"' + ip + '" is not a valid IPv6 address. Example: 2001:db8::1/64.', true);
+      if (p === null) p = 64;
+      if (p > 128) return msg('An IPv6 prefix is from /0 to /128.', true);
+      $('pfxBox').hidden = $('needBox').hidden = true; $('splitBox').hidden = true;
+      msg(m ? '' : 'No prefix given, so /64 (a typical network) is used.');
+      return show(v6(a6, p));
+    }
+    $('pfxBox').hidden = $('needBox').hidden = false;
+    var a4 = p4(ip);
+    if (a4 === null) return msg(/^\d+(\.\d+){0,2}$/.test(ip) ? 'An IPv4 address has four numbers separated by dots, like 192.168.1.10.' : '"' + ip + '" is not a valid IP address. Each of the four numbers must be 0 to 255, without leading zeros.', true);
+    if (from === 'need') {
+      var need = +$('need').value;
+      if (!(need >= 1) || !Number.isInteger(need)) return msg('Hosts needed must be a whole number of 1 or more.', true);
+      if (need > 4294967294) return msg('No IPv4 network is that large.', true);
+      p = need === 1 ? 32 : need === 2 ? 31 : 32 - Math.ceil(Math.log2(need + 2));
+      $('ip').value = ip + '/' + p;
+    } else if (p === null) p = +$('pfx').value; else if (p > 32) return msg('An IPv4 prefix is from /0 to /32.', true);
+    if (from !== 'need') $('need').value = '';
+    $('pfx').value = p;
+    msg(from === 'need' ? 'The smallest network for ' + fmtNum(+$('need').value) + ' hosts is /' + p + '.' : '');
+    show(v4(a4, p));
+  }
+  function show(r) {
+    cur = r;
+    $('st').innerHTML = r.stats.map(function (s) { return '<div class="stat"><span>' + s[0] + '</span><b>' + esc(s[1]) + '</b></div>'; }).join('');
+    $('tb').innerHTML = r.rows.map(function (x) { return '<tr><th>' + x[0] + '</th><td>' + (/^<span/.test(x[1]) ? x[1] : esc(x[1])) + '</td></tr>'; }).join('');
+    $('out').hidden = false;
+    if (!r.six) {
+      $('splitBox').hidden = false;
+      var sel = $('split'), keep = +sel.value; sel.innerHTML = '';
+      for (var q = r.p + 1; q <= Math.min(32, r.p + 24); q++) { var o = document.createElement('option'); o.value = q; o.textContent = '/' + q + ' – ' + fmtNum(Math.pow(2, q - r.p)) + ' subnets of ' + fmtNum(Math.pow(2, 32 - q)) + ' addresses'; sel.appendChild(o); }
+      if (!sel.options.length) { $('smsg').textContent = 'A /32 cannot be split further.'; $('sScroll').hidden = $('cpCsv').hidden = true; sel.parentNode.hidden = true; return; }
+      sel.parentNode.hidden = false;
+      sel.value = keep > r.p && keep <= 32 && keep <= r.p + 24 ? keep : Math.min(32, r.p + 1);
+      split();
+    }
+  }
+  var csv = '';
+  function split() {
+    if (!cur || cur.six) return;
+    var q = +$('split').value, n = Math.pow(2, q - cur.p), size = Math.pow(2, 32 - q), show = Math.min(n, 1024), rows = '', lines = ['#,Network,First usable,Last usable,Broadcast'];
+    for (var i = 0; i < show; i++) {
+      var net = cur.net + i * size, r = range4(net, q);
+      rows += '<tr><td>' + (i + 1) + '</td><td>' + s4(net) + '/' + q + '</td><td>' + s4(r.first) + ' – ' + s4(r.last) + '</td><td>' + (q >= 31 ? '–' : s4(r.bc)) + '</td></tr>';
+      lines.push([i + 1, s4(net) + '/' + q, s4(r.first), s4(r.last), q >= 31 ? '' : s4(r.bc)].join(','));
+    }
+    csv = lines.join('\n');
+    $('sl').innerHTML = rows; $('sScroll').hidden = false; $('cpCsv').hidden = false;
+    $('smsg').textContent = fmtNum(n) + ' subnets of /' + q + ', each with ' + fmtNum(range4(0, q).hosts) + ' usable hosts.' + (n > show ? ' The first ' + fmtNum(show) + ' are listed.' : '');
+  }
+  var t; $('ip').addEventListener('input', function () { clearTimeout(t); t = setTimeout(run, 200); });
+  $('pfx').addEventListener('change', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim() + '/' + $('pfx').value; run(); $('ip').dispatchEvent(new Event('change', { bubbles: true })); });
+  $('need').addEventListener('input', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim(); if ($('need').value) run('need'); });
+  $('split').addEventListener('change', split);
+  $('cpAll').addEventListener('click', function () { if (cur) copyText(cur.rows.map(function (r) { return r[0] + ': ' + r[1].replace(/<[^>]+>/g, ''); }).join('\n'), $('cpAll')); });
+  $('cpCsv').addEventListener('click', function () { copyText(csv, $('cpCsv')); });
+  run();
+})();
+</script>
