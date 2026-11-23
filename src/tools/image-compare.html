@@ -85,7 +85,7 @@
       c.getContext('2d', { willReadFrequently: true }).drawImage(im, 0, 0, c.width, c.height);
       var ts = Math.min(1, 240 / Math.max(c.width, c.height)), t = canvas(Math.max(1, Math.round(c.width * ts)), Math.max(1, Math.round(c.height * ts)));
       t.getContext('2d').drawImage(c, 0, 0, t.width, t.height);
-      c.thumb = t.toDataURL('image/png'); c.scaled = s < 1; c.ow = w; c.oh = h;
+      c.thumb = t.toDataURL('image/png'); c.scaled = s < 1; c.s = s; c.ow = w; c.oh = h;
       imgs[k] = c; names[k] = f.name; showSlot(k); say('', '');
       $('swap').disabled = !(imgs.A && imgs.B);
       compare();
@@ -95,12 +95,14 @@
 
   function compare() {
     if (!imgs.A || !imgs.B) { $('work').hidden = true; if (imgs.A || imgs.B) say('', 'Now add image ' + (imgs.A ? 'B' : 'A') + '.'); return; }
-    var A = imgs.A, B = imgs.B, w = A.width, h = A.height, same = A.width === B.width && A.height === B.height;
+    var A = imgs.A, B = imgs.B, w = A.width, h = A.height, same = A.ow === B.ow && A.oh === B.oh;
     var bb = canvas(w, h), bx = bb.getContext('2d', { willReadFrequently: true });
-    if (same || $('fit').value === 'scale') bx.drawImage(B, 0, 0, w, h); else bx.drawImage(B, 0, 0);
+    // corner mode: B is drawn at the same scale as A (A may have been scaled down if it was very large)
+    var bw = Math.max(1, Math.round(B.ow * A.s)), bh = Math.max(1, Math.round(B.oh * A.s));
+    if (same || $('fit').value === 'scale') bx.drawImage(B, 0, 0, w, h); else bx.drawImage(B, 0, 0, bw, bh);
     var da = A.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h), db = bx.getImageData(0, 0, w, h);
     var a = da.data, b = db.data, n = w * h, thr = +$('thr').value / 100 * 255, mask = new Uint8Array(n), cnt = 0, mag = new Uint8ClampedArray(n);
-    var outside = !same && $('fit').value === 'corner' ? [B.width, B.height] : null;
+    var outside = !same && $('fit').value === 'corner' ? [bw, bh] : null;
     for (var i = 0, p = 0; i < n; i++, p += 4) {
       var dr = Math.abs(a[p] - b[p]), dg = Math.abs(a[p + 1] - b[p + 1]), dbl = Math.abs(a[p + 2] - b[p + 2]), dal = Math.abs(a[p + 3] - b[p + 3]);
       var m = Math.max(dr, dg, dbl, dal);

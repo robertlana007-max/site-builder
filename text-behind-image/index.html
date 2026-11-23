@@ -346,9 +346,18 @@
     x.restore();
     return { cx: cx, cy: cy, bw: bw, bh: bh };
   }
-  function measure(x, t, ls) { var a = Array.from(t); return x.measureText(t).width + ls * Math.max(0, a.length - 1); }
-  function each(x, t, x0, y, ls, stroke) { // letter spacing, drawn letter by letter only when needed
-    if (!ls) { stroke ? x.strokeText(t, x0, y) : x.fillText(t, x0, y); return; }
+  // Joined scripts (Arabic, Urdu, Hindi, Thai…) must never be drawn letter by letter: that breaks the shapes and reverses right-to-left words.
+  var COMPLEX = /[\u0590-\u08FF\u0900-\u0DFF\u0E00-\u0EFF\u1000-\u109F\u1780-\u17FF\uFB1D-\uFDFF\uFE70-\uFEFF]/;
+  function native(x) { return 'letterSpacing' in x; }
+  function measure(x, t, ls) {
+    if (COMPLEX.test(t)) ls = 0;
+    if (native(x)) { x.letterSpacing = ls + 'px'; return x.measureText(t).width - ls; }
+    return x.measureText(t).width + ls * Math.max(0, Array.from(t).length - 1);
+  }
+  function each(x, t, x0, y, ls, stroke) { // letter spacing: the browser's own when it has it, otherwise letter by letter (simple scripts only)
+    if (COMPLEX.test(t)) ls = 0;
+    if (native(x)) x.letterSpacing = ls + 'px';
+    if (!ls || native(x)) { stroke ? x.strokeText(t, x0, y) : x.fillText(t, x0, y); return; }
     var pos = x0; Array.from(t).forEach(function (ch) { stroke ? x.strokeText(ch, pos, y) : x.fillText(ch, pos, y); pos += x.measureText(ch).width + ls; });
   }
 
@@ -441,6 +450,7 @@
   // ---------- save at full size ----------
   function save(type) {
     if (!src || !mt || busy) return;
+    if (!lines().join('').trim()) { say('bad', 'Type some text first. Without text the picture would be the same as your photo.'); $('txt').focus(); return; }
     var btn = $(type === 'image/png' ? 'dlpng' : 'dljpg'); btn.disabled = true; say('', 'Preparing full size…');
     setTimeout(function () {
       loadFont($('font').value).then(function () {
