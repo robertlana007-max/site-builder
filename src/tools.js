@@ -4019,5 +4019,613 @@ module.exports = [
         ['How do the suggestions work?', 'The tool keeps the hue and saturation and finds the closest lighter or darker shade of the text or background colour that reaches your chosen level.']
       ],
       icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
+  },
+  {
+      slug: 'retirement-calculator',
+      cat: 'Finance calculators',
+      name: 'Retirement Calculator',
+      title: 'Retirement Calculator - How Much Do I Need to Retire?',
+      desc: 'Work out how much you need to retire, what your savings will grow to, the gap, the extra to save each month and how long your money lasts. Any currency.',
+      card: 'Savings target, gap and how long money lasts.',
+      intro: 'Enter your age, savings, monthly saving, expected returns, inflation and the income you want in retirement. See the savings you need, what you are on track for in today\'s money, the extra to save each month and the age your money runs out.',
+      steps: [
+    'Enter your current age, retirement age and the age to plan until.',
+    'Add your savings so far, what you save each month and how fast that grows.',
+    'Set expected returns, inflation, the yearly income you want and any pension.',
+    'Read the target, shortfall or surplus and the extra to save, then check the chart and table.'
+  ],
+      faq: [
+    [
+      'How is the savings target worked out?',
+      'Target = (income you want − pension or other income) ÷ withdrawal rate. With 40,000 a year and a 4% rate you need 1,000,000 in today\'s money.'
+    ],
+    [
+      'What is the 4% rule?',
+      'A rule of thumb from US studies: withdrawing about 4% of savings in the first year, then raising it with inflation, has historically lasted around 30 years. Many planners now use 3–4%.'
+    ],
+    [
+      'Why show "today\'s money"?',
+      'Prices rise, so 1,000,000 in 30 years buys much less than today. Dividing by inflation shows amounts in what they would buy now, which is easier to judge.'
+    ],
+    [
+      'Does it include tax or state pensions?',
+      'Tax is not included. Add any state, workplace or other pension in "Pension or other income" in today\'s money.'
+    ],
+    [
+      'Is this financial advice?',
+      'No. It is a simple projection with steady returns. Real markets go up and down, so treat the results as a guide and review them every year.'
+    ]
+  ],
+      icon: '<path d="M3 20h18"/><path d="M5 20v-6M10 20v-9M15 20v-6M20 20V8"/><path d="M4 9l5-4 5 3 6-5"/>'
+  },
+  {
+      slug: 'net-worth-calculator',
+      cat: 'Finance calculators',
+      name: 'Net Worth Calculator',
+      title: 'Net Worth Calculator - Assets, Debts and Progress Tracker',
+      desc: 'List what you own and what you owe to see your net worth and debt ratio. Save snapshots on your device to track progress over time. Any currency.',
+      card: 'Assets minus debts, with a saved history.',
+      intro: 'Add what you own (cash, investments, property) and what you owe (mortgage, loans, cards) to see your net worth. Your list and monthly snapshots are saved on this device only, so you can track progress over time.',
+      steps: [
+    'Pick your currency.',
+    'Type the value of each asset and each debt; add or remove rows as needed.',
+    'Read your net worth, totals and debt-to-asset ratio.',
+    'Save a snapshot now and again to see your progress on the chart.'
+  ],
+      faq: [
+    [
+      'What is net worth?',
+      'Net worth = everything you own minus everything you owe. A positive number means your assets are worth more than your debts.'
+    ],
+    [
+      'Where is my data stored?',
+      'Only in your browser on this device. Nothing is uploaded. "Clear everything" removes it.'
+    ],
+    [
+      'What value should I use for my home or car?',
+      'Use what it would sell for today, not what you paid. Online valuation tools and similar listings can help.'
+    ],
+    [
+      'What is the debt-to-asset ratio?',
+      'Total debts ÷ total assets × 100. Lower is stronger; above 100% means you owe more than you own.'
+    ],
+    [
+      'Should I include my pension?',
+      'Many people do, using the current value on the latest statement. Be consistent from snapshot to snapshot.'
+    ]
+  ],
+      icon: '<path d="M12 3v18"/><path d="M5 7h14"/><path d="M5 7l-3 7a3 3 0 0 0 6 0z"/><path d="M19 7l-3 7a3 3 0 0 0 6 0z"/><path d="M8 21h8"/>'
+  },
+  {
+      slug: 'debt-payoff-calculator',
+      cat: 'Finance calculators',
+      name: 'Debt Payoff Calculator',
+      title: 'Debt Payoff Calculator - Snowball vs Avalanche Planner',
+      desc: 'Compare debt snowball and avalanche plans for all your debts. See your debt-free date, total interest, interest saved and a month-by-month schedule.',
+      card: 'Snowball vs avalanche, payoff date and schedule.',
+      intro: 'List your debts with balance, interest rate and minimum payment, and add any extra you can pay each month. Compare the avalanche (highest rate first) and snowball (smallest balance first) plans side by side.',
+      steps: [
+    'Enter each debt\'s name, balance, yearly interest rate and minimum payment.',
+    'Type the extra amount you can pay each month.',
+    'Compare avalanche, snowball and minimum-only plans.',
+    'Check the chart and month-by-month schedule, then download it as CSV.'
+  ],
+      faq: [
+    [
+      'What is the avalanche method?',
+      'Pay the minimum on every debt and put all extra money on the debt with the highest interest rate. It usually saves the most interest.'
+    ],
+    [
+      'What is the snowball method?',
+      'Pay the minimum on every debt and put extra money on the smallest balance first. Quick wins can help you stay motivated.'
+    ],
+    [
+      'What happens when a debt is paid off?',
+      'Its minimum payment rolls over to the next debt in the plan, so your total monthly payment stays the same and debts fall faster.'
+    ],
+    [
+      'Why does it say "never"?',
+      'If payments do not cover the monthly interest, the balance never goes down. Raise the minimum or the extra amount.'
+    ],
+    [
+      'Are minimum payments fixed?',
+      'Yes, this tool keeps each minimum the same. Some cards lower the minimum as the balance falls, which makes minimum-only plans take even longer.'
+    ]
+  ],
+      icon: '<path d="M4 4v16h16"/><path d="M7 7l4 5 3-2 5 6"/><circle cx="19" cy="16" r="1.5"/>'
+  },
+  {
+      slug: 'rent-vs-buy-calculator',
+      cat: 'Finance calculators',
+      name: 'Rent vs Buy Calculator',
+      title: 'Rent vs Buy Calculator - Is Buying a Home Worth It?',
+      desc: 'Compare renting and buying a home over the years you plan to stay. Includes mortgage, taxes, upkeep, home growth, rent rises and investing the difference.',
+      card: 'Compare wealth from renting vs buying.',
+      intro: 'Enter the home price, mortgage, costs of owning and your rent. The calculator compares what you would have after the years you plan to stay if you buy or if you rent and invest the money you save.',
+      steps: [
+    'Enter how many years you plan to stay.',
+    'Fill in the home price, down payment, mortgage and owning costs.',
+    'Fill in your rent, rent increases and the return you could earn on savings.',
+    'Read the verdict, break-even year, chart and year-by-year table.'
+  ],
+      faq: [
+    [
+      'How does the comparison work?',
+      'Both people start with the same cash (down payment plus buying costs). Each month, whoever spends less invests the difference. At the end we compare the buyer\'s home equity plus savings with the renter\'s savings.'
+    ],
+    [
+      'What counts as the buyer\'s wealth?',
+      'The home\'s value after selling costs, minus the mortgage left, plus any money the buyer invested.'
+    ],
+    [
+      'What is the break-even year?',
+      'The first year in which buying leaves you at least as well off as renting.'
+    ],
+    [
+      'Are taxes and tax breaks included?',
+      'No. Rules differ widely by country. Property tax is included as a yearly percentage you can set.'
+    ],
+    [
+      'Which numbers matter most?',
+      'Usually how long you stay, home price growth, the rent level and the investment return. Try a few scenarios.'
+    ]
+  ],
+      icon: '<path d="M3 11l9-7 9 7"/><path d="M5 10v10h14V10"/><path d="M10 20v-5h4v5"/>'
+  },
+  {
+      slug: 'overtime-calculator',
+      cat: 'Finance calculators',
+      name: 'Overtime Calculator',
+      title: 'Overtime Calculator - Time and a Half and Double Time Pay',
+      desc: 'Work out overtime pay at 1.5×, 2× or any rate. Enter weekly totals or hours day by day with daily and weekly limits, and see weekly, monthly and yearly pay.',
+      card: 'Overtime and double-time pay for the week.',
+      intro: 'Enter your hourly pay and the hours you worked. Use weekly totals, or enter each day and let the tool split hours into regular, overtime and double time using your limits. See your pay for the week, month and year.',
+      steps: [
+    'Pick your currency and type your normal hourly pay.',
+    'Choose "Weekly totals" or "Day by day".',
+    'Enter your hours and overtime rates (for example 1.5 and 2).',
+    'Read regular, overtime and double-time pay and the weekly total.'
+  ],
+      faq: [
+    [
+      'What is time and a half?',
+      'Overtime paid at 1.5 times your normal hourly rate. At 20 an hour, each overtime hour pays 30.'
+    ],
+    [
+      'How does the day-by-day mode split hours?',
+      'Hours above the daily limits become overtime or double time first. Then any regular hours above the weekly limit also become overtime.'
+    ],
+    [
+      'Which limits should I use?',
+      'It depends on your country, state and contract. Many places use 40 hours a week or 8 hours a day; leave a limit blank if it does not apply to you.'
+    ],
+    [
+      'Is this before or after tax?',
+      'All amounts are before tax and other deductions.'
+    ],
+    [
+      'How is the yearly amount worked out?',
+      'Weekly pay × 52, and the monthly amount is weekly pay × 52 ÷ 12.'
+    ]
+  ],
+      icon: '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2.5"/><path d="M9 2h6"/><path d="M19 5l1.5-1.5"/>'
+  },
+  {
+      slug: 'hourly-salary-converter',
+      cat: 'Finance calculators',
+      name: 'Hourly to Salary Converter',
+      title: 'Hourly to Salary Converter - Hourly, Monthly, Yearly Pay',
+      desc: 'Convert pay between hourly, daily, weekly, every two weeks, twice a month, monthly and yearly, using your own hours per day, days per week and paid weeks.',
+      card: 'Convert hourly, weekly, monthly and yearly pay.',
+      intro: 'Type a pay amount and choose how often it is paid. Set your hours per day, days per week and paid weeks per year, and see the same pay as hourly, daily, weekly, every two weeks, twice a month, monthly and yearly.',
+      steps: [
+    'Pick your currency, type the amount and choose what it is paid per.',
+    'Set hours per day, days per week and paid weeks per year.',
+    'Read the same pay in every other period.',
+    'Copy all the results if you need them.'
+  ],
+      faq: [
+    [
+      'How is hourly pay turned into a salary?',
+      'Yearly = hourly × hours per day × days per week × paid weeks per year. At 25 an hour, 8 hours, 5 days and 52 weeks that is 52,000.'
+    ],
+    [
+      'Why is monthly not weekly × 4?',
+      'A month has about 4.33 weeks, so monthly = yearly ÷ 12. Weekly × 4 would leave out about four weeks a year.'
+    ],
+    [
+      'What is the difference between every two weeks and twice a month?',
+      'Every two weeks is 26 payments a year; twice a month is 24. So each twice-a-month payment is slightly larger.'
+    ],
+    [
+      'What should I use for paid weeks?',
+      'Use 52 if your holidays are paid. If you take unpaid time off, lower it, for example 48.'
+    ],
+    [
+      'Is this before tax?',
+      'Yes, all amounts are gross pay before tax and deductions.'
+    ]
+  ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/><path d="M17 17l3 3M20 17v3h-3"/>'
+  },
+  {
+      slug: 'macro-calculator',
+      cat: 'Calculators',
+      name: 'Macro Calculator',
+      title: 'Macro Calculator - Protein, Carbs and Fat for Your Goal',
+      desc: 'Find your daily calories and grams of protein, carbs and fat for losing, keeping or gaining weight. Uses Mifflin-St Jeor. Metric or imperial units.',
+      card: 'Daily calories and protein, carbs and fat.',
+      intro: 'Enter your sex, age, weight, height, activity level and goal. The calculator estimates your daily calories with the Mifflin-St Jeor formula and splits them into grams of protein, carbs and fat per day and per meal.',
+      steps: [
+    'Choose units and enter your sex, age, weight and height.',
+    'Pick your activity level and goal.',
+    'Choose an eating style or set your own percentages.',
+    'Read your daily calories and grams of protein, carbs and fat.'
+  ],
+      faq: [
+    [
+      'Which formula is used?',
+      'Mifflin-St Jeor: 10 × weight (kg) + 6.25 × height (cm) − 5 × age + 5 for men or − 161 for women. That is multiplied by your activity level to get daily calories.'
+    ],
+    [
+      'How are grams worked out?',
+      'Protein and carbs have about 4 kcal per gram and fat about 9. Grams = calories × share ÷ calories per gram.'
+    ],
+    [
+      'Which eating style is best?',
+      'There is no single best split. Balanced suits most people; higher protein can help keep muscle when losing weight. Choose one you can stick to.'
+    ],
+    [
+      'Why is there a warning about low calories?',
+      'Below about 1,200 kcal (women) or 1,500 kcal (men) a day is generally too low without medical supervision.'
+    ],
+    [
+      'Is this medical advice?',
+      'No. It is an estimate for healthy adults. Ask a doctor or dietitian if you are pregnant, under 18 or have a health condition.'
+    ]
+  ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9l7.5 5"/><path d="M12 12L4.5 17"/>'
+  },
+  {
+      slug: 'running-pace-calculator',
+      cat: 'Calculators',
+      name: 'Running Pace Calculator',
+      title: 'Running Pace Calculator - Pace, Time, Distance & Race Times',
+      desc: 'Find your running pace, finish time or distance in km or miles. Get even splits and race time predictions for 5K to marathon with Riegel\'s formula.',
+      card: 'Pace, finish time, splits and race predictions.',
+      intro: 'Choose what to find: pace, time or distance. Enter the other two in kilometers or miles to see pace per km and per mile, speed, even splits and predicted times for the mile, 5K, 10K, 15K, half marathon and marathon.',
+      steps: [
+    'Choose "Find pace", "Find time" or "Find distance".',
+    'Enter the distance (or pick a race), the time and/or the pace.',
+    'Read pace per km and mile, speed and finish time.',
+    'Check the even splits and race predictions.'
+  ],
+      faq: [
+    [
+      'How is pace calculated?',
+      'Pace = time ÷ distance. 50 minutes for 10 km is 5:00 per km, or about 8:03 per mile.'
+    ],
+    [
+      'How do race predictions work?',
+      'They use Riegel\'s formula: time₂ = time₁ × (distance₂ ÷ distance₁)^1.06. It assumes you train properly for the new distance.'
+    ],
+    [
+      'How accurate are predictions?',
+      'They are best for nearby distances. Predicting a marathon from a 5K is usually optimistic unless you have done the long-run training.'
+    ],
+    [
+      'How long is a half marathon and marathon?',
+      'A half marathon is 21.0975 km (13.1 mi) and a marathon is 42.195 km (26.2 mi).'
+    ],
+    [
+      'Can I use it for walking or cycling?',
+      'Yes. Pace, time and distance work for any activity; race predictions are meant for running.'
+    ]
+  ],
+      icon: '<circle cx="14" cy="4.5" r="2"/><path d="M9 21l3-6-3-3 2-5 4 3h4"/><path d="M12 15l3 2v4"/><path d="M7 11l2-4"/>'
+  },
+  {
+      slug: 'one-rep-max-calculator',
+      cat: 'Calculators',
+      name: 'One Rep Max Calculator',
+      title: 'One Rep Max Calculator - 1RM with Epley, Brzycki & More',
+      desc: 'Estimate your one-rep max from a weight and reps with Epley, Brzycki, Lombardi and four more formulas. Get a training percentage table in kg or lb.',
+      card: 'Estimate 1RM and training weights.',
+      intro: 'Enter the weight you lifted and how many reps you did. The calculator estimates your one-rep max with seven published formulas, shows their average and range, and lists training weights from 50% to 100%.',
+      steps: [
+    'Choose kg or lb and type the weight you lifted.',
+    'Type the number of reps (1–20).',
+    'Read the average 1RM and each formula.',
+    'Use the percentage table to plan training weights.'
+  ],
+      faq: [
+    [
+      'What is a one-rep max?',
+      'The heaviest weight you can lift once with good form for a given exercise.'
+    ],
+    [
+      'Which formula is most accurate?',
+      'Studies find they are all close for 10 reps or fewer. Epley and Brzycki are most common; the average of several is a good estimate.'
+    ],
+    [
+      'Why limit reps to 20?',
+      'Above about 10 reps the formulas disagree more, and above 20 they are unreliable.'
+    ],
+    [
+      'Is it safe to test a true 1RM?',
+      'Only with good technique, a proper warm-up and a spotter. An estimate avoids the risk of a max attempt.'
+    ],
+    [
+      'What does rounding do?',
+      'It rounds the training weights to the nearest 1, 2.5 or 5 so they match the plates you have.'
+    ]
+  ],
+      icon: '<path d="M3 9v6M6 7v10M18 7v10M21 9v6"/><path d="M6 12h12"/>'
+  },
+  {
+      slug: 'heart-rate-zones-calculator',
+      cat: 'Calculators',
+      name: 'Heart Rate Zones Calculator',
+      title: 'Heart Rate Zones Calculator - Max HR and Karvonen Zones',
+      desc: 'Find your 5 heart rate training zones from your age and resting heart rate. Choose a max heart rate formula and use % of max or the Karvonen method.',
+      card: 'Max heart rate and 5 training zones.',
+      intro: 'Enter your age and, if you know it, your resting heart rate. Choose a max heart rate formula or enter a measured max. See five training zones in beats per minute using % of max or the Karvonen heart rate reserve method.',
+      steps: [
+    'Type your age and, optionally, your resting heart rate.',
+    'Choose a max heart rate formula or enter your own max.',
+    'Choose the zone method or leave it on automatic.',
+    'Read your five zones in beats per minute.'
+  ],
+      faq: [
+    [
+      'Which max heart rate formula should I use?',
+      'Tanaka (208 − 0.7 × age) is more accurate for adults than the classic 220 − age. Gulati is designed for women. A measured max is best.'
+    ],
+    [
+      'What is the Karvonen method?',
+      'Target = (max − resting) × intensity + resting. It uses your resting heart rate, so zones fit your fitness better.'
+    ],
+    [
+      'How do I measure resting heart rate?',
+      'Count your pulse for 60 seconds after waking up, before getting out of bed, on a few days and take the average.'
+    ],
+    [
+      'How wrong can formulas be?',
+      'Real max heart rate can differ from any formula by 10–20 bpm.'
+    ],
+    [
+      'Should I check with a doctor?',
+      'Yes if you have a heart condition, take medicine that affects heart rate, or are starting exercise after a long break.'
+    ]
+  ],
+      icon: '<path d="M20.8 5.6a5.5 5.5 0 0 0-7.8 0L12 6.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-7.6a5.5 5.5 0 0 0 0-7.8z"/><path d="M3 12h4l2-3 3 6 2-3h7"/>'
+  },
+  {
+      slug: 'period-ovulation-calculator',
+      cat: 'Calculators',
+      name: 'Period and Ovulation Calculator',
+      title: 'Period and Ovulation Calculator - Next Period & Fertile Days',
+      desc: 'Estimate your next periods, ovulation day and fertile window from your last period and cycle length. Calendar view and .ics export. Not contraception.',
+      card: 'Next period, ovulation and fertile window.',
+      intro: 'Enter the first day of your last period and your usual cycle length. See estimates for your next periods, ovulation and fertile window on a calendar. This is an estimate only: it is not a method of contraception and not medical advice.',
+      steps: [
+    'Pick the first day of your last period.',
+    'Enter your usual cycle length and period length.',
+    'Read your next period, estimated ovulation and fertile window.',
+    'Check the calendar or add the dates to your calendar app.'
+  ],
+      faq: [
+    [
+      'Can I use this to avoid pregnancy?',
+      'No. It is an estimate based on average cycles and is not a method of contraception. Ovulation can come early or late. Talk to a doctor or nurse about birth control.'
+    ],
+    [
+      'How is ovulation estimated?',
+      'Ovulation is estimated as the next period start date minus the luteal phase, which is usually about 14 days.'
+    ],
+    [
+      'What is the fertile window?',
+      'The 5 days before ovulation, ovulation day and the day after, because sperm can live for several days.'
+    ],
+    [
+      'My cycles are irregular. Will it work?',
+      'Predictions are much less reliable for irregular cycles. Use your average cycle length and talk to a doctor if cycles vary a lot.'
+    ],
+    [
+      'Is my date saved?',
+      'Only if you tick "Remember my period date on this device only". It is stored in this browser and never uploaded.'
+    ]
+  ],
+      icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M8 2v4M16 2v4M3 10h18"/><circle cx="12" cy="15.5" r="2.5"/>'
+  },
+  {
+      slug: 'paint-calculator',
+      cat: 'Calculators',
+      name: 'Paint Calculator',
+      title: 'Paint Calculator - How Much Paint for Walls and Ceiling',
+      desc: 'Work out how much paint you need for a room or wall, minus doors and windows, for any number of coats. Liters or gallons, with suggested cans to buy.',
+      card: 'Paint needed for walls, ceiling and cans to buy.',
+      intro: 'Enter your room size, doors and windows, number of coats and the coverage on the paint can. See the area to paint, liters or gallons needed for walls and ceiling, and a mix of can sizes to buy.',
+      steps: [
+    'Choose metric or imperial and a whole room or one wall.',
+    'Enter the measurements and tick the ceiling if needed.',
+    'Enter doors, windows, coats and the coverage from the can.',
+    'Read the paint needed and the suggested cans.'
+  ],
+      faq: [
+    [
+      'How is the paint amount worked out?',
+      'Paint = area to paint × coats ÷ coverage, plus the extra % you choose. Wall area = room perimeter × height minus doors and windows.'
+    ],
+    [
+      'How much does a liter or gallon cover?',
+      'Most wall paints cover about 10–12 m² per liter or 350–400 ft² per US gallon per coat. Check your can.'
+    ],
+    [
+      'How many coats do I need?',
+      'Usually two. A big color change, fresh plaster or bare wood may need a primer or a third coat.'
+    ],
+    [
+      'Why is the ceiling separate?',
+      'Ceilings often use a different paint, so walls and ceiling are worked out and bought separately.'
+    ],
+    [
+      'How are cans suggested?',
+      'It picks the mix of standard can sizes that covers what you need with the least left over, then the fewest cans.'
+    ]
+  ],
+      icon: '<rect x="3" y="3" width="15" height="6" rx="1.5"/><path d="M18 6h2a1 1 0 0 1 1 1v3a1 1 0 0 1-1 1h-8v3"/><rect x="10" y="14" width="4" height="7" rx="1"/>'
+  },
+  {
+      slug: 'tile-calculator',
+      cat: 'Calculators',
+      name: 'Tile Calculator',
+      title: 'Tile Calculator - How Many Tiles and Boxes Do I Need?',
+      desc: 'Work out how many floor or wall tiles you need from the area, tile size and grout gap, with extra for cuts. See boxes to buy and the cost.',
+      card: 'Tiles and boxes for a floor or wall.',
+      intro: 'Enter the area to tile, the tile size and grout gap, and an allowance for cuts and breakage. See the tiles needed, the tiles to buy, the number of boxes and the estimated cost.',
+      steps: [
+    'Choose units and floor or wall.',
+    'Enter the area measurements and any area to leave out.',
+    'Enter the tile size, grout gap and extra % for cuts.',
+    'Add tiles per box and price to see boxes and cost.'
+  ],
+      faq: [
+    [
+      'How is the number of tiles worked out?',
+      'Tiles = area ÷ ((tile length + gap) × (tile width + gap)), rounded up, then increased by the extra % for cuts and breakage.'
+    ],
+    [
+      'How much extra should I add?',
+      'About 10% for most rooms, 15% for diagonal or herringbone layouts and 20% for rooms with many corners.'
+    ],
+    [
+      'Should I include the grout gap?',
+      'Yes. Each tile takes up its own size plus one gap, so including it gives a slightly more accurate count.'
+    ],
+    [
+      'Why buy all boxes at once?',
+      'Tiles from different batches can differ slightly in color and size.'
+    ],
+    [
+      'Does it work for walls?',
+      'Yes. Choose "Wall", enter width and height, and leave out doors and windows.'
+    ]
+  ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1.5"/><path d="M3 9h18M3 15h18M9 3v6M15 9v6M9 15v6"/>'
+  },
+  {
+      slug: 'pet-age-calculator',
+      cat: 'Calculators',
+      name: 'Pet Age Calculator',
+      title: 'Pet Age Calculator - Dog and Cat Age in Human Years',
+      desc: 'Convert your dog\'s or cat\'s age to human years with the vet chart by dog size, the epigenetic 16·ln(age)+31 formula and the old ×7 rule, explained.',
+      card: 'Dog and cat age in human years.',
+      intro: 'Choose dog or cat, enter the age and, for dogs, the adult size. See your pet\'s age in human years using the veterinary chart, the newer epigenetic formula for dogs and the old × 7 rule, with an explanation of why they differ.',
+      steps: [
+    'Choose dog or cat.',
+    'Enter the age in years and months.',
+    'For dogs, choose the adult size.',
+    'Compare the results and read the life stage.'
+  ],
+      faq: [
+    [
+      'Is one dog year really seven human years?',
+      'No. Dogs mature very fast in the first two years and then age more slowly. The × 7 rule is too low for young dogs and ignores size.'
+    ],
+    [
+      'Why does dog size matter?',
+      'Large and giant breeds have shorter lives, so after middle age they age faster than small dogs.'
+    ],
+    [
+      'What is the 16 × ln(age) + 31 formula?',
+      'It comes from a 2020 study that compared age-related DNA changes in Labrador retrievers with humans. It is only meaningful for dogs aged 1 year or more.'
+    ],
+    [
+      'How are cat years worked out?',
+      'A cat is about 15 human years at age 1 and 24 at age 2, then about 4 human years for each cat year.'
+    ],
+    [
+      'What are life stages?',
+      'Vet guidelines group pets into stages such as puppy or kitten, young adult, mature adult and senior, which guide check-ups and care.'
+    ]
+  ],
+      icon: '<circle cx="5" cy="10" r="1.8"/><circle cx="9" cy="5.5" r="1.8"/><circle cx="15" cy="5.5" r="1.8"/><circle cx="19" cy="10" r="1.8"/><path d="M12 11c-3 0-6 4.5-6 7a2.5 2.5 0 0 0 3 2.4c1-.3 2-.7 3-.7s2 .4 3 .7A2.5 2.5 0 0 0 18 18c0-2.5-3-7-6-7z"/>'
+  },
+  {
+      slug: 'zodiac-sign-calculator',
+      cat: 'Calculators',
+      name: 'Zodiac Sign Calculator',
+      title: 'Zodiac Sign Calculator - Western and Chinese Zodiac by Date',
+      desc: 'Find your Western star sign and Chinese zodiac animal and element from your date of birth, with Lunar New Year handled correctly and fun descriptions.',
+      card: 'Star sign and Chinese zodiac from your birthday.',
+      intro: 'Pick your date of birth to see your Western zodiac sign with its element and dates, and your Chinese zodiac animal, element and yin or yang, based on the Lunar New Year date for your birth year. Just for fun.',
+      steps: [
+    'Pick your date of birth.',
+    'Read your Western sign, element and quality.',
+    'Read your Chinese zodiac animal, element and the dates of that lunar year.',
+    'Copy your signs to share.'
+  ],
+      faq: [
+    [
+      'Why is my Chinese sign from the year before?',
+      'The Chinese zodiac year starts at Lunar New Year, between late January and mid-February. If you were born before it, your sign comes from the previous year.'
+    ],
+    [
+      'How is the Lunar New Year date found?',
+      'The tool uses the Chinese calendar built into your browser to find the exact first day of each lunar year.'
+    ],
+    [
+      'What does "on the cusp" mean?',
+      'Born on the first or last day of a sign. Sign dates can shift by a day from year to year.'
+    ],
+    [
+      'How is the Chinese element chosen?',
+      'By the last digit of the lunar year: 0–1 Metal, 2–3 Water, 4–5 Wood, 6–7 Fire, 8–9 Earth. Even years are yang and odd years are yin.'
+    ],
+    [
+      'Is my birth date saved?',
+      'No. It is not stored or sent anywhere.'
+    ]
+  ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2"/><path d="M12 8l1.2 2.8L16 12l-2.8 1.2L12 16l-1.2-2.8L8 12l2.8-1.2z"/>'
+  },
+  {
+      slug: 'cooking-converter',
+      cat: 'Calculators',
+      name: 'Cooking Converter',
+      title: 'Cooking Converter - Cups to Grams, Oven Temps, Recipe Scaler',
+      desc: 'Convert cups, spoons, ml and grams for flour, sugar, butter and more, change oven °C, °F and gas marks, and scale a whole ingredient list to new servings.',
+      card: 'Cups to grams, oven temps and recipe scaling.',
+      intro: 'Convert cooking measures by ingredient (cups, spoons, ml, grams, ounces) with US, metric, Australian or old UK cups. Convert oven temperatures between °C, °F, fan and gas mark, and paste a recipe to scale every ingredient at once.',
+      steps: [
+    'Type an amount, choose its unit and the ingredient.',
+    'Pick the cup and spoon standard your recipe uses.',
+    'Convert an oven temperature between °C, °F, fan and gas mark.',
+    'Paste an ingredient list and set servings to scale it.'
+  ],
+      faq: [
+    [
+      'Why does a cup of flour weigh less than a cup of sugar?',
+      'Different ingredients have different densities. A US cup of flour is about 125 g, sugar about 200 g and butter about 227 g.'
+    ],
+    [
+      'How big is a cup?',
+      'A US cup is 236.6 ml, a metric cup (Australia, Canada, New Zealand and others) is 250 ml, and old UK recipes used 284 ml.'
+    ],
+    [
+      'How much should I lower the oven for fan?',
+      'About 20 °C (25 °F) lower than the conventional temperature.'
+    ],
+    [
+      'How does the recipe scaler work?',
+      'It multiplies the number at the start of each line by new servings ÷ original servings, including fractions like 1 1/2 and ½.'
+    ],
+    [
+      'Are the weights exact?',
+      'They are averages. How you fill a cup changes dry ingredients by 10–15%, so a scale is most accurate.'
+    ]
+  ],
+      icon: '<path d="M4 11h16l-1.5 8a2 2 0 0 1-2 1.7h-9A2 2 0 0 1 5.5 19z"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 4V2"/>'
   }
 ];

@@ -1,0 +1,156 @@
+<style>
+.pnt .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.pnt fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.pnt legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.pnt .pnt-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+.pnt table.sched td, .pnt table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .pnt .stats { grid-template-columns: 1fr 1fr; } .pnt .stat { padding: 10px 12px; } }
+</style>
+<div class="pnt" id="pnt">
+<div class="fields">
+  <div><label for="pntUnit">Units</label><select id="pntUnit"><option value="m">Metric (meters, liters)</option><option value="i">Imperial (feet, US gallons)</option></select></div>
+  <div><label for="pntShape">What are you painting?</label><select id="pntShape"><option value="room">A whole room (4 walls)</option><option value="wall">One wall or a set width of wall</option></select></div>
+</div>
+<fieldset>
+  <legend>Size</legend>
+  <div class="fields">
+    <div id="pntLBox"><label for="pntL" id="pntLL">Room length (m)</label><input type="number" id="pntL" min="0" step="any" inputmode="decimal" value="4"></div>
+    <div><label for="pntW" id="pntWL">Room width (m)</label><input type="number" id="pntW" min="0" step="any" inputmode="decimal" value="3.5"></div>
+    <div><label for="pntH" id="pntHL">Wall height (m)</label><input type="number" id="pntH" min="0" step="any" inputmode="decimal" value="2.5"></div>
+  </div>
+  <div class="checks" id="pntCeilBox"><label><input type="checkbox" id="pntCeil"> Paint the ceiling too</label></div>
+</fieldset>
+<fieldset>
+  <legend>Leave out doors and windows</legend>
+  <div class="fields">
+    <div><label for="pntDoors">Doors</label><input type="number" id="pntDoors" min="0" step="1" inputmode="numeric" value="1"></div>
+    <div><label for="pntDoorA" id="pntDoorAL">Area of each door (m²)</label><input type="number" id="pntDoorA" min="0" step="any" inputmode="decimal" value="1.9"></div>
+    <div><label for="pntWins">Windows</label><input type="number" id="pntWins" min="0" step="1" inputmode="numeric" value="1"></div>
+    <div><label for="pntWinA" id="pntWinAL">Area of each window (m²)</label><input type="number" id="pntWinA" min="0" step="any" inputmode="decimal" value="1.5"></div>
+  </div>
+  <span class="pnt-hint" id="pntDoorHint">A standard door is about 0.9 × 2.1 m (1.9 m²).</span>
+</fieldset>
+<fieldset>
+  <legend>Paint</legend>
+  <div class="fields">
+    <div><label for="pntCoats">Coats</label><input type="number" id="pntCoats" min="1" max="6" step="1" inputmode="numeric" value="2"></div>
+    <div><label for="pntCov" id="pntCovL">Coverage (m² per liter)</label><input type="number" id="pntCov" min="0" step="any" inputmode="decimal" value="10"></div>
+    <div><label for="pntExtra">Extra for waste and touch-ups (%)</label><input type="number" id="pntExtra" min="0" max="100" step="any" inputmode="decimal" value="10"></div>
+    <div><label for="pntPrice" id="pntPriceL">Price per liter (optional)</label><input type="number" id="pntPrice" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <span class="pnt-hint" id="pntCovHint">Check the tin: most wall paints cover 10–12 m² per liter on smooth walls. Rough or new plaster takes more.</span>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Wall area to paint</span><b id="pntWallA">–</b></div>
+  <div class="stat"><span>Paint for walls</span><b id="pntWallP">–</b></div>
+  <div class="stat" id="pntCeilS1"><span>Ceiling area</span><b id="pntCeilA">–</b></div>
+  <div class="stat" id="pntCeilS2"><span>Paint for ceiling</span><b id="pntCeilP">–</b></div>
+  <div class="stat"><span>Total paint</span><b id="pntTot">–</b></div>
+  <div class="stat" id="pntCostS"><span>Estimated cost</span><b id="pntCost">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Cans to buy</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>For</th><th>Paint needed</th><th>Suggested cans</th><th>You get</th></tr></thead><tbody id="pntCans"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="pntCopy">Copy shopping list</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  var FT2 = 0.09290304, GAL = 3.785411784, last = null;
+  var SIZES = { m: [[10, '10 L'], [5, '5 L'], [2.5, '2.5 L'], [1, '1 L']], i: [[5, '5 gal bucket'], [1, '1 gal'], [0.25, '1 quart']] };
+  // cheapest-in-volume mix of can sizes that holds at least `need`, then fewest cans
+  function cans(need, sizes) {
+    if (need <= 0) return { list: [], vol: 0 };
+    var best = null, s = sizes.map(function (x) { return x[0]; }), last = s.length - 1;
+    (function rec(i, used, k) {
+      if (i === last) {
+        var c = Math.max(0, Math.ceil((need - used) / s[i] - 1e-9)), vol = used + c * s[i], kk = k.concat(c), n = kk.reduce(function (x, y) { return x + y; }, 0);
+        if (!best || vol < best.vol - 1e-9 || (Math.abs(vol - best.vol) < 1e-9 && n < best.n)) best = { vol: vol, n: n, k: kk };
+        return;
+      }
+      var lim = i === 0 ? Math.ceil(need / s[0] - 1e-9) : Math.ceil(s[i - 1] / s[i]);
+      for (var c2 = 0; c2 <= lim; c2++) rec(i + 1, used + c2 * s[i], k.concat(c2));
+    })(0, 0, []);
+    return { list: best.k.map(function (k, i) { return k ? k + ' × ' + sizes[i][1] : ''; }).filter(Boolean), vol: best.vol };
+  }
+  function labels() {
+    var imp = $('pntUnit').value === 'i', u = imp ? 'ft' : 'm', room = $('pntShape').value === 'room';
+    $('pntLBox').hidden = !room; $('pntCeilBox').hidden = !room;
+    $('pntLL').textContent = 'Room length (' + u + ')'; $('pntWL').textContent = (room ? 'Room width (' : 'Wall width (') + u + ')'; $('pntHL').textContent = (room ? 'Wall height (' : 'Wall height (') + u + ')';
+    $('pntDoorAL').textContent = 'Area of each door (' + u + '²)'; $('pntWinAL').textContent = 'Area of each window (' + u + '²)';
+    $('pntCovL').textContent = imp ? 'Coverage (ft² per gallon)' : 'Coverage (m² per liter)';
+    $('pntPriceL').textContent = imp ? 'Price per gallon (optional)' : 'Price per liter (optional)';
+    $('pntDoorHint').textContent = imp ? 'A standard door is about 3 × 7 ft (21 ft²); a typical window about 15 ft².' : 'A standard door is about 0.9 × 2.1 m (1.9 m²); a typical window about 1.5 m².';
+    $('pntCovHint').textContent = imp ? 'Check the can: most wall paints cover 350–400 ft² per US gallon on smooth walls. Rough or new surfaces take more.' : 'Check the tin: most wall paints cover 10–12 m² per liter on smooth walls. Rough or new plaster takes more.';
+  }
+  function calc() {
+    labels();
+    var imp = $('pntUnit').value === 'i', u = imp ? 'ft²' : 'm²', vu = imp ? 'gal' : 'L', room = $('pntShape').value === 'room';
+    var L = num('pntL'), W = num('pntW'), H = num('pntH'), doors = num('pntDoors') || 0, dA = num('pntDoorA') || 0, wins = num('pntWins') || 0, wA = num('pntWinA') || 0;
+    var coats = num('pntCoats'), cov = num('pntCov'), extra = num('pntExtra') || 0, price = num('pntPrice') || 0, ceil = room && $('pntCeil').checked;
+    var fail = function (t) { ['pntWallA', 'pntWallP', 'pntCeilA', 'pntCeilP', 'pntTot', 'pntCost'].forEach(function (i) { $(i).textContent = '–'; }); $('pntCans').innerHTML = ''; last = null; say('bad', t); };
+    if (room && !(L > 0)) return fail('Enter the room length.');
+    if (!(W > 0)) return fail(room ? 'Enter the room width.' : 'Enter the wall width.');
+    if (!(H > 0)) return fail('Enter the wall height.');
+    var big = imp ? 3300 : 1000;
+    if ((room && L > big) || W > big || H > big / 10) return fail('Those measurements look too big for a room. Check the units (' + (imp ? 'feet' : 'meters') + ').');
+    if (doors < 0 || wins < 0 || dA < 0 || wA < 0 || extra < 0 || price < 0) return fail('Numbers cannot be negative.');
+    if (!(coats >= 1 && coats <= 6) || Math.floor(coats) !== coats) return fail('Enter 1 to 6 coats.');
+    if (!(cov > 0)) return fail('Enter how much area one ' + (imp ? 'gallon' : 'liter') + ' covers (see the paint can).');
+    var gross = room ? 2 * (L + W) * H : W * H, gaps = doors * dA + wins * wA, wall = gross - gaps;
+    if (wall <= 0) return fail('Doors and windows add up to more than the wall area. Check their sizes.');
+    var ceilA = ceil ? L * W : 0;
+    var k = coats / cov * (1 + extra / 100), wallP = wall * k, ceilP = ceilA * k;
+    var sz = SIZES[imp ? 'i' : 'm'], cw = cans(wallP, sz), cc = cans(ceilP, sz);
+    $('pntWallA').textContent = nfx(wall, 2) + ' ' + u; $('pntWallP').textContent = nfx(wallP, 2) + ' ' + vu;
+    $('pntCeilS1').hidden = $('pntCeilS2').hidden = !ceil;
+    $('pntCeilA').textContent = nfx(ceilA, 2) + ' ' + u; $('pntCeilP').textContent = nfx(ceilP, 2) + ' ' + vu;
+    $('pntTot').textContent = nfx(wallP + ceilP, 2) + ' ' + vu;
+    $('pntCostS').hidden = !price; $('pntCost').textContent = price ? fmtNum((cw.vol + cc.vol) * price, 2) : '–';
+    var other = imp ? nfx((wallP + ceilP) * GAL, 1) + ' L' : nfx((wallP + ceilP) / GAL, 2) + ' US gal';
+    var rows = [['Walls', wallP, cw]]; if (ceil) rows.push(['Ceiling', ceilP, cc]);
+    $('pntCans').innerHTML = rows.map(function (r) { return '<tr><td>' + r[0] + '</td><td>' + nfx(r[1], 2) + ' ' + vu + '</td><td>' + esc(r[2].list.join(' + ')) + '</td><td>' + nfx(r[2].vol, 2) + ' ' + vu + '</td></tr>'; }).join('');
+    say('ok', 'Walls: ' + nfx(gross, 2) + ' ' + u + ' minus ' + nfx(gaps, 2) + ' ' + u + ' for doors and windows, × ' + coats + (coats === 1 ? ' coat' : ' coats') + ' ÷ ' + nfx(cov, 2) + ' ' + u + ' per ' + (imp ? 'gallon' : 'liter') + (extra ? ' + ' + nfx(extra, 1) + '% extra' : '') + '. Total paint is about ' + other + '.' + (price ? ' Cost uses the cans suggested below.' : ''));
+    last = { rows: rows, vu: vu, wall: wall, ceilA: ceilA, u: u };
+  }
+  // keep numbers when switching units
+  var prev = imperialDefault() ? 'i' : 'm';
+  if (prev === 'i') { $('pntUnit').value = 'i'; $('pntL').value = 13; $('pntW').value = 11.5; $('pntH').value = 8; $('pntDoorA').value = 21; $('pntWinA').value = 15; $('pntCov').value = 350; }
+  $('pntUnit').addEventListener('change', function () {
+    var now = $('pntUnit').value; if (now === prev) return;
+    var lf = now === 'i' ? 1 / 0.3048 : 0.3048, af = now === 'i' ? 1 / FT2 : FT2, cf = now === 'i' ? GAL / FT2 : FT2 / GAL, pf = now === 'i' ? GAL : 1 / GAL;
+    ['pntL', 'pntW', 'pntH'].forEach(function (id) { var v = num(id); if (v > 0) $(id).value = round(v * lf, 2); });
+    ['pntDoorA', 'pntWinA'].forEach(function (id) { var v = num(id); if (v > 0) $(id).value = round(v * af, 1); });
+    var c = num('pntCov'); if (c > 0) $('pntCov').value = round(c * cf, 0);
+    var p = num('pntPrice'); if (p > 0) $('pntPrice').value = round(p * pf, 2);
+    prev = now; calc();
+  });
+  $('pntCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText(last.rows.map(function (r) { return r[0] + ': ' + nfx(r[1], 2) + ' ' + last.vu + ' → buy ' + r[2].list.join(' + '); }).join('\n') + '\nWall area: ' + nfx(last.wall, 2) + ' ' + last.u, this);
+  });
+  $('pnt').addEventListener('input', calc);
+  $('pnt').addEventListener('change', calc);
+  calc();
+})();
+</script>

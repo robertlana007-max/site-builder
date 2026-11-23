@@ -1,0 +1,188 @@
+<style>
+.ckc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 18px; min-width: 0; }
+.ckc legend { font-weight: 700; font-size: 16px; padding: 0 6px; }
+.ckc .ckc-big { font-size: clamp(20px, 5vw, 26px); font-weight: 700; margin: 4px 0 10px; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.ckc .ckc-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; margin: 8px 0 12px; }
+.ckc .ckc-grid div { border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--bg); font-variant-numeric: tabular-nums; }
+.ckc .ckc-grid span { display: block; font-size: 12.5px; color: var(--muted); }
+.ckc .ckc-grid b { font-size: 16.5px; overflow-wrap: anywhere; }
+.ckc .ckc-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+.ckc textarea { min-height: 170px; }
+.ckc table.sched td, .ckc table.sched th { white-space: nowrap; }
+.ckc .checks { margin-bottom: 12px; }
+</style>
+<div class="ckc" id="ckc">
+<fieldset>
+  <legend>Ingredient converter</legend>
+  <div class="fields">
+    <div><label for="ckcAmt">Amount</label><input type="text" id="ckcAmt" inputmode="decimal" value="1" placeholder="e.g. 1 1/2"></div>
+    <div><label for="ckcFrom">Unit</label><select id="ckcFrom"></select></div>
+    <div><label for="ckcIng">Ingredient</label><select id="ckcIng"></select></div>
+    <div><label for="ckcStd">Cups and spoons</label><select id="ckcStd">
+      <option value="us">US (cup 236.6 ml, tbsp 14.8 ml)</option><option value="metric">Metric (cup 250 ml, tbsp 15 ml)</option><option value="au">Australia (cup 250 ml, tbsp 20 ml)</option><option value="uk">Old UK imperial (cup 284 ml, tbsp 17.8 ml)</option></select></div>
+  </div>
+  <div class="ckc-big" id="ckcMain" aria-live="polite">–</div>
+  <div class="ckc-grid" id="ckcAll"></div>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+</fieldset>
+<fieldset>
+  <legend>Oven temperature</legend>
+  <div class="fields">
+    <div><label for="ckcT">Temperature</label><input type="text" id="ckcT" inputmode="decimal" value="180"></div>
+    <div><label for="ckcTU">Unit</label><select id="ckcTU"><option value="c">°C</option><option value="f">°F</option><option value="g">Gas mark</option></select></div>
+    <div><label for="ckcFan">Oven type in the recipe</label><select id="ckcFan"><option value="conv">Conventional (top and bottom heat)</option><option value="fan">Fan / convection</option></select></div>
+  </div>
+  <div class="ckc-grid" id="ckcTOut"></div>
+  <p class="msg" id="ckcTMsg" role="status" aria-live="polite"></p>
+  <details><summary>Gas mark table</summary>
+    <div class="scroll-x"><table class="sched"><thead><tr><th>Gas mark</th><th>°C</th><th>°C fan</th><th>°F</th><th>Description</th></tr></thead><tbody id="ckcGas"></tbody></table></div>
+  </details>
+</fieldset>
+<fieldset>
+  <legend>Recipe scaler</legend>
+  <div class="fields">
+    <div><label for="ckcFromS">Recipe makes (servings)</label><input type="number" id="ckcFromS" min="0" step="any" inputmode="decimal" value="4"></div>
+    <div><label for="ckcToS">I want (servings)</label><input type="number" id="ckcToS" min="0" step="any" inputmode="decimal" value="6"></div>
+  </div>
+  <div><label for="ckcRec">Paste your ingredient list (one per line)</label><textarea id="ckcRec" class="plain" data-nomemo spellcheck="false" placeholder="2 cups flour&#10;1 1/2 tsp baking powder&#10;½ cup sugar&#10;200 g butter&#10;3 eggs&#10;Pinch of salt"></textarea></div>
+  <div class="checks"><label><input type="checkbox" id="ckcAllNums"> Also scale numbers later in the line, e.g. "200 g (7 oz)"</label></div>
+  <div><label for="ckcOut">Scaled list</label><textarea id="ckcOut" class="plain" data-nomemo readonly spellcheck="false" placeholder="Your scaled ingredients appear here."></textarea></div>
+  <p class="msg" id="ckcSMsg" role="status" aria-live="polite"></p>
+  <div class="btns"><button type="button" class="btn" id="ckcCopy">Copy scaled list</button><button type="button" class="btn ghost" id="ckcEx">Try an example</button></div>
+</fieldset>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // Cups and spoons in ml for each standard
+  var STD = { us: { cup: 236.5882365, tbsp: 14.78676478, tsp: 4.92892159 }, metric: { cup: 250, tbsp: 15, tsp: 5 }, au: { cup: 250, tbsp: 20, tsp: 5 }, uk: { cup: 284.130625, tbsp: 17.758164, tsp: 5.919388 } };
+  // [id, label, ml or g per unit, kind]
+  var U = [['ml', 'Milliliters (ml)', 1, 'v'], ['l', 'Liters (l)', 1000, 'v'], ['tsp', 'Teaspoons (tsp)', 0, 'v'], ['tbsp', 'Tablespoons (tbsp)', 0, 'v'], ['cup', 'Cups', 0, 'v'],
+    ['floz', 'Fluid ounces (US fl oz)', 29.5735295625, 'v'], ['flozuk', 'Fluid ounces (UK fl oz)', 28.4130625, 'v'], ['pt', 'Pints (US)', 473.176473, 'v'], ['ptuk', 'Pints (UK)', 568.26125, 'v'],
+    ['g', 'Grams (g)', 1, 'w'], ['kg', 'Kilograms (kg)', 1000, 'w'], ['oz', 'Ounces (oz)', 28.349523125, 'w'], ['lb', 'Pounds (lb)', 453.59237, 'w']];
+  // grams per ml (from common kitchen weight charts; flour etc. are spooned and leveled, not packed)
+  var ING = [['water', 'Water', 1], ['milk', 'Milk', 1.03], ['cream', 'Cream', 1.0], ['yogurt', 'Yogurt', 1.04], ['flour', 'Flour, all-purpose / plain', 0.53], ['bflour', 'Flour, bread', 0.55], ['wflour', 'Flour, whole wheat', 0.51], ['cflour', 'Flour, cake', 0.48],
+    ['starch', 'Cornstarch / cornflour', 0.54], ['cocoa', 'Cocoa powder', 0.36], ['sugar', 'Sugar, white granulated', 0.85], ['brown', 'Sugar, brown (packed)', 0.93], ['icing', 'Sugar, powdered / icing', 0.51], ['honey', 'Honey', 1.42],
+    ['syrup', 'Maple syrup', 1.32], ['butter', 'Butter', 0.96], ['oil', 'Oil, vegetable / olive', 0.92], ['rice', 'Rice, uncooked white', 0.79], ['oats', 'Oats, rolled', 0.38], ['salt', 'Salt, table', 1.22], ['bpowder', 'Baking powder', 0.81],
+    ['soda', 'Baking soda / bicarbonate', 1.22], ['nuts', 'Nuts, chopped', 0.51], ['choc', 'Chocolate chips', 0.72], ['pb', 'Peanut butter', 1.08], ['raisins', 'Raisins', 0.61], ['cheese', 'Cheese, grated (hard)', 0.42], ['coconut', 'Coconut, shredded', 0.36]];
+  var GAS = [['1/4', 110, 225, 'Very cool'], ['1/2', 120, 250, 'Very cool'], ['1', 140, 275, 'Cool'], ['2', 150, 300, 'Cool'], ['3', 170, 325, 'Moderate'], ['4', 180, 350, 'Moderate'], ['5', 190, 375, 'Moderately hot'], ['6', 200, 400, 'Hot'], ['7', 220, 425, 'Hot'], ['8', 230, 450, 'Very hot'], ['9', 240, 475, 'Very hot'], ['10', 260, 500, 'Extremely hot']];
+  var VUL = { '½': .5, '⅓': 1 / 3, '⅔': 2 / 3, '¼': .25, '¾': .75, '⅕': .2, '⅖': .4, '⅗': .6, '⅘': .8, '⅙': 1 / 6, '⅚': 5 / 6, '⅛': .125, '⅜': .375, '⅝': .625, '⅞': .875 };
+  var VF = Object.keys(VUL).join('');
+  $('ckcFrom').innerHTML = U.map(function (u) { return '<option value="' + u[0] + '">' + u[1] + '</option>'; }).join('');
+  $('ckcFrom').value = 'cup';
+  $('ckcIng').innerHTML = ING.map(function (i) { return '<option value="' + i[0] + '">' + i[1] + '</option>'; }).join('');
+  $('ckcIng').value = 'flour';
+  var reg = region();
+  $('ckcStd').value = reg === 'US' || reg === 'LR' ? 'us' : reg === 'AU' ? 'au' : 'metric';
+  if (imperialDefault()) { $('ckcT').value = 350; $('ckcTU').value = 'f'; }
+  // "1 1/2", "1½", "3/4", "2.5", "2,5" -> number
+  function qty(s) {
+    s = String(s || '').trim().replace(/(\d),(\d)/, '$1.$2');
+    var m = new RegExp('^(\\d+(?:\\.\\d+)?)?\\s*(?:(\\d+)\\s*/\\s*(\\d+)|([' + VF + ']))?$').exec(s);
+    if (!m || (!m[1] && !m[2] && !m[4])) return NaN;
+    var whole = m[1] ? +m[1] : 0;
+    if (m[2]) { if (+m[3] === 0) return NaN; if (m[1] && /\./.test(m[1])) return NaN; return whole + m[2] / m[3]; }
+    if (m[4]) return whole + VUL[m[4]];
+    return whole;
+  }
+  // 1.5 -> "1 1/2" when it is a kitchen fraction, else up to 2 decimals
+  function nice(v, frac) {
+    if (!isFinite(v)) return '–';
+    if (frac && v < 1000) {
+      var w = Math.floor(v + 1e-9), r = v - w, F = [[1, 8], [1, 4], [1, 3], [3, 8], [1, 2], [5, 8], [2, 3], [3, 4], [7, 8]];
+      if (r < 0.01) return String(w);
+      if (r > 0.99) return String(w + 1);
+      for (var i = 0; i < F.length; i++) if (Math.abs(r - F[i][0] / F[i][1]) < 0.011) return (w ? w + ' ' : '') + F[i][0] + '/' + F[i][1];
+    }
+    return nfx(v, v >= 100 ? 0 : v >= 10 ? 1 : 2);
+  }
+  function unitMl(id) { var s = STD[$('ckcStd').value], u = U.filter(function (x) { return x[0] === id; })[0]; return id === 'cup' || id === 'tbsp' || id === 'tsp' ? s[id] : u[2]; }
+  function conv() {
+    var a = qty($('ckcAmt').value), from = $('ckcFrom').value, ing = ING.filter(function (x) { return x[0] === $('ckcIng').value; })[0], fu = U.filter(function (x) { return x[0] === from; })[0];
+    if (isNaN(a) || a < 0) { $('ckcMain').textContent = '–'; $('ckcAll').innerHTML = ''; return say('bad', 'Enter an amount like 2, 1.5, 3/4 or 1 1/2.'); }
+    if (a > 1e7) { $('ckcMain').textContent = '–'; $('ckcAll').innerHTML = ''; return say('bad', 'That amount is too large for a kitchen.'); }
+    var ml, g, d = ing[2];
+    if (fu[3] === 'v') { ml = a * unitMl(from); g = ml * d; } else { g = a * fu[2]; ml = g / d; }
+    var cells = U.map(function (u) {
+      var v = u[3] === 'v' ? ml / unitMl(u[0]) : g / u[2], name = u[1].replace(/ \(.*\)$/, '').replace('Fluid ounces', 'fl oz') + (u[0] === 'floz' ? ' (US)' : u[0] === 'flozuk' ? ' (UK)' : u[0] === 'pt' ? ' (US)' : u[0] === 'ptuk' ? ' (UK)' : '');
+      if (u[0] === 'pt' || u[0] === 'ptuk') name = 'Pints' + (u[0] === 'pt' ? ' (US)' : ' (UK)');
+      return '<div><span>' + name + '</span><b>' + nice(v, u[0] === 'cup' || u[0] === 'tbsp' || u[0] === 'tsp') + '</b></div>';
+    });
+    $('ckcAll').innerHTML = cells.join('');
+    var target = fu[3] === 'v' ? nfx(g, g >= 100 ? 0 : 1) + ' g' : nice(ml / unitMl('cup'), true) + (nice(ml / unitMl('cup'), true) === '1' || ml / unitMl('cup') < 1 ? ' cup (' : ' cups (') + nfx(ml, ml >= 100 ? 0 : 1) + ' ml)';
+    var SH = { ml: 'ml', l: 'l', tsp: 'tsp', tbsp: 'tbsp', cup: a === 1 || a < 1 ? 'cup' : 'cups', floz: 'US fl oz', flozuk: 'UK fl oz', pt: a === 1 || a < 1 ? 'US pint' : 'US pints', ptuk: a === 1 || a < 1 ? 'UK pint' : 'UK pints', g: 'g', kg: 'kg', oz: 'oz', lb: 'lb' };
+    $('ckcMain').textContent = $('ckcAmt').value.trim() + ' ' + SH[from] + ' ' + ing[1].toLowerCase() + ' ≈ ' + target;
+    say('', ing[0] === 'water' ? 'Water: 1 ml weighs 1 g.' : 'Based on about ' + nfx(d * unitMl('cup'), 0) + ' g per cup of ' + ing[1].toLowerCase() + '. Weights of dry ingredients vary with how you fill the cup, so a kitchen scale is most accurate.');
+  }
+  function c2f(c) { return c * 9 / 5 + 32; } function f2c(f) { return (f - 32) * 5 / 9; }
+  function gasOf(c) { // nearest gas mark for a conventional °C
+    if (c < 100 || c > 275) return null;
+    var best = GAS[0]; GAS.forEach(function (g) { if (Math.abs(g[1] - c) < Math.abs(best[1] - c)) best = g; }); return best[0];
+  }
+  function oven() {
+    var tu = $('ckcTU').value, raw = $('ckcT').value.trim(), fan = $('ckcFan').value === 'fan', c, gasRow = null;
+    if (tu === 'g') { var gq = qty(raw), row = GAS.filter(function (g) { return qty(g[0]) === gq; })[0]; if (!row) { $('ckcTOut').innerHTML = ''; return sayT('bad', 'Enter a gas mark from 1/4 to 10 (for example 4 or 1/2).'); } c = row[1]; fan = false; gasRow = row; }
+    else { var t = qty(raw); if (isNaN(t)) { $('ckcTOut').innerHTML = ''; return sayT('bad', 'Enter an oven temperature.'); } c = tu === 'c' ? t : f2c(t); }
+    if (c < 30 || c > 330) { $('ckcTOut').innerHTML = ''; return sayT('bad', 'That is outside the range of a home oven (about 50–300 °C / 120–570 °F).'); }
+    var conv = fan ? c + 20 : c, fanC = conv - 20, g = gasOf(conv);
+    var r = function (v) { return Math.round(v); };
+    $('ckcTOut').innerHTML = [['Conventional °C', r(conv) + ' °C'], ['Fan / convection °C', r(fanC) + ' °C'], ['Conventional °F', (gasRow ? gasRow[2] : r(c2f(conv))) + ' °F'], ['Convection °F', (gasRow ? gasRow[2] - 25 : r(c2f(fanC))) + ' °F'], ['Gas mark', g || '–']].map(function (x) { return '<div><span>' + x[0] + '</span><b>' + x[1] + '</b></div>'; }).join('');
+    sayT('', 'Fan (convection) ovens cook hotter, so recipes usually lower the temperature by about 20 °C (25 °F). Gas marks are for conventional ovens.' + (g ? '' : ' There is no gas mark for this temperature.'));
+  }
+  function sayT(cls, t) { say(cls, t, 'ckcTMsg'); }
+  $('ckcGas').innerHTML = GAS.map(function (g) { return '<tr><td>' + g[0] + '</td><td>' + g[1] + '</td><td>' + (g[1] - 20) + '</td><td>' + g[2] + '</td><td>' + g[3] + '</td></tr>'; }).join('');
+  // ---------- recipe scaler ----------
+  var NUM = '(?:\\d+\\s+\\d+\\s*/\\s*\\d+|\\d+\\s*/\\s*\\d+|\\d+(?:[.,]\\d+)?(?:\\s*[' + VF + '])?|[' + VF + '])';
+  var LEAD = new RegExp('^(\\s*(?:[-*•·]\\s*)?)(' + NUM + ')(\\s*(?:-|–|to)\\s*(' + NUM + '))?(?![\\d.)/,])');
+  function scaleLine(line, k, all) {
+    var hit = false, frac = /\//.test(line) || new RegExp('[' + VF + ']').test(line) || /\b(cups?|tbsps?|tsps?|tablespoons?|teaspoons?)\b/i.test(line);
+    var fmt = function (s) { var v = qty(s.replace(/\s+/g, ' ').replace(/(\d)\s*\/\s*(\d)/g, '$1/$2')); return isNaN(v) ? s : nice(v * k, frac || /\//.test(s)); };
+    var out = line.replace(LEAD, function (m0, pre, a, rng, b) { hit = true; return pre + fmt(a) + (rng ? rng.replace(b, fmt(b)) : ''); });
+    if (all) {
+      var head = hit ? out.match(LEAD)[0] : '', rest = out.slice(head.length);
+      rest = rest.replace(new RegExp('(^|[^\\w.,/])(' + NUM + ')(?![.)](?:\\s|$))(?![\\w]*\\s*(?:°|degrees|min|minutes|hours?|hrs?|mins?|seconds?|secs?|cm|mm|inch|inches|in\\b|x\\b|×))', 'g'), function (m0, p, n) { hit = true; return p + fmt(n); });
+      out = head + rest;
+    }
+    return { text: out, hit: hit };
+  }
+  function scale() {
+    var a = num('ckcFromS'), b = num('ckcToS'), txt = $('ckcRec').value;
+    if (!(a > 0) || !(b > 0)) { $('ckcOut').value = ''; return say('bad', 'Enter both serving numbers (above 0).', 'ckcSMsg'); }
+    if (a > 1e5 || b > 1e5) { $('ckcOut').value = ''; return say('bad', 'Use up to 100,000 servings.', 'ckcSMsg'); }
+    var k = b / a;
+    if (!txt.trim()) { $('ckcOut').value = ''; return say('', 'Multiply by ' + nfx(k, 3) + '. Paste an ingredient list above to scale it.', 'ckcSMsg'); }
+    if (txt.length > 50000) { $('ckcOut').value = ''; return say('bad', 'That list is too long. Paste up to 50,000 characters.', 'ckcSMsg'); }
+    var n = 0, lines = txt.split(/\r?\n/).map(function (l) { var r = scaleLine(l, k, $('ckcAllNums').checked); if (r.hit) n++; return r.text; });
+    $('ckcOut').value = lines.join('\n');
+    say('ok', 'Multiplied by ' + nfx(k, 3) + ': ' + n + (n === 1 ? ' line' : ' lines') + ' changed. Lines without a number at the start (like "pinch of salt") stay the same. Check eggs and baking times yourself.', 'ckcSMsg');
+  }
+  $('ckcEx').addEventListener('click', function () {
+    $('ckcRec').value = '2 cups all-purpose flour\n1 1/2 tsp baking powder\n½ cup sugar\n200 g butter (7 oz)\n3 eggs\n1-2 tbsp milk\nPinch of salt'; $('ckcFromS').value = 4; $('ckcToS').value = 6; scale();
+  });
+  $('ckcCopy').addEventListener('click', function () { if (!$('ckcOut').value) return say('bad', 'Paste an ingredient list first.', 'ckcSMsg'); copyText($('ckcOut').value, this); });
+  ['ckcAmt', 'ckcFrom', 'ckcIng', 'ckcStd'].forEach(function (id) { $(id).addEventListener('input', conv); $(id).addEventListener('change', conv); });
+  ['ckcT', 'ckcTU', 'ckcFan'].forEach(function (id) { $(id).addEventListener('input', oven); $(id).addEventListener('change', oven); });
+  ['ckcFromS', 'ckcToS', 'ckcRec', 'ckcAllNums'].forEach(function (id) { $(id).addEventListener('input', scale); $(id).addEventListener('change', scale); });
+  conv(); oven(); scale();
+})();
+</script>

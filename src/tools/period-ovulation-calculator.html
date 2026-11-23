@@ -1,0 +1,153 @@
+<style>
+.poc .stat b { font-size: clamp(16px, 4.4vw, 20px); overflow-wrap: normal; word-break: normal; }
+.poc .poc-warn { border: 1px solid var(--line); border-inline-start: 4px solid #f59e0b; border-radius: 10px; padding: 10px 12px; margin: 0 0 14px; font-size: 14.5px; }
+.poc h3 { margin: 18px 0 8px; }
+.poc table.sched td, .poc table.sched th { white-space: nowrap; }
+.poc .poc-cals { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 16px; }
+.poc .poc-cal h4 { margin: 0 0 6px; font-size: 15px; }
+.poc .poc-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; font-size: 13.5px; text-align: center; font-variant-numeric: tabular-nums; }
+.poc .poc-grid > * { padding: 6px 0; border-radius: 8px; }
+.poc .poc-grid .dow { color: var(--muted); font-size: 12px; font-weight: 600; }
+.poc .poc-grid .pd { background: #fecdd3; color: #881337; font-weight: 700; }
+.poc .poc-grid .fw { background: #d1fae5; color: #065f46; }
+.poc .poc-grid .ov { background: #059669; color: #fff; font-weight: 700; }
+.poc .poc-grid .td { box-shadow: 0 0 0 2px var(--accent) inset; }
+.poc .poc-key { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13.5px; color: var(--muted); margin: 10px 0 0; }
+.poc .poc-key i { display: inline-block; width: 12px; height: 12px; border-radius: 4px; margin-inline-end: 6px; vertical-align: -2px; }
+@media (max-width: 480px) { .poc .stats { grid-template-columns: 1fr 1fr; } .poc .stat { padding: 10px 12px; } }
+</style>
+<div class="poc" id="poc">
+<p class="poc-warn"><b>Important:</b> this is an estimate based on average cycles. It is <b>not a method of contraception</b> and not medical advice. Cycles vary, and ovulation can happen earlier or later than predicted. Talk to a doctor or nurse about birth control, fertility or irregular periods.</p>
+<div class="fields">
+  <div><label for="pocLast">First day of your last period</label><input type="date" id="pocLast" data-nomemo></div>
+  <div><label for="pocCycle">Usual cycle length (days)</label><input type="number" id="pocCycle" min="20" max="45" step="1" inputmode="numeric" value="28"></div>
+  <div><label for="pocLen">Period length (days)</label><input type="number" id="pocLen" min="1" max="10" step="1" inputmode="numeric" value="5"></div>
+  <div><label for="pocLut">Luteal phase (days)</label><input type="number" id="pocLut" min="9" max="17" step="1" inputmode="numeric" value="14"></div>
+  <div><label for="pocN">Cycles to show</label><select id="pocN"><option value="3">3</option><option value="6" selected>6</option><option value="12">12</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="pocKeep" data-nomemo> Remember my period date on this device only</label></div>
+<div class="stats">
+  <div class="stat"><span>Next period starts</span><b id="pocNext">–</b></div>
+  <div class="stat"><span>Estimated ovulation</span><b id="pocOv">–</b></div>
+  <div class="stat"><span>Fertile window</span><b id="pocFw">–</b></div>
+  <div class="stat"><span>Today is cycle day</span><b id="pocDay">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Calendar</h3>
+<div class="poc-cals" id="pocCals"></div>
+<div class="poc-key"><span><i style="background:#fecdd3"></i>Expected period</span><span><i style="background:#d1fae5"></i>Fertile window (estimate)</span><span><i style="background:#059669"></i>Ovulation (estimate)</span><span><i style="box-shadow:0 0 0 2px var(--accent) inset"></i>Today</span></div>
+<h3>Upcoming cycles</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Period starts</th><th>Period ends</th><th>Fertile window</th><th>Ovulation</th></tr></thead><tbody id="pocRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="pocCopy">Copy dates</button><button type="button" class="btn ghost" id="pocIcs">Add to calendar (.ics)</button></div>
+<a id="dl" hidden></a>
+<p class="msg">The luteal phase (from ovulation to the next period) is usually 12–16 days; 14 is the common average. Ovulation is estimated as the next period date minus the luteal phase. The fertile window is the 5 days before ovulation plus ovulation day and the day after.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  var DAY = 864e5, last = null;
+  function parse(s) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? Date.UTC(+m[1], +m[2] - 1, +m[3]) : NaN; }
+  function todayUTC() { var d = new Date(); return Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function fmt(t, y) { var o = { weekday: 'short', day: 'numeric', month: 'short', timeZone: 'UTC' }; if (y) o.year = 'numeric'; try { return new Date(t).toLocaleDateString(undefined, o); } catch (e) { return new Date(t).toISOString().slice(0, 10); } }
+  function iso(t) { return new Date(t).toISOString().slice(0, 10); }
+  var SUN = ['US', 'CA', 'MX', 'BR', 'JP', 'PH', 'IL', 'SA', 'AE', 'IN', 'PK', 'KE', 'ZA', 'HK', 'TW', 'KR', 'TH', 'ID', 'PE', 'CO', 'VE', 'AR', 'GT', 'BD'];
+  var wk0 = SUN.indexOf(region()) !== -1 ? 0 : 1;
+  function calc() {
+    var start = parse($('pocLast').value), cyc = num('pocCycle'), len = num('pocLen'), lut = num('pocLut'), n = +$('pocN').value, today = todayUTC();
+    var fail = function (t, cls) { ['pocNext', 'pocOv', 'pocFw', 'pocDay'].forEach(function (i) { $(i).textContent = '–'; }); $('pocRows').innerHTML = ''; $('pocCals').innerHTML = ''; last = null; say(cls || 'bad', t); };
+    if (isNaN(start)) return fail('Pick the date your last period started.', '');
+    if (start > today) return fail('That date is in the future. Enter the first day of your most recent period.');
+    if (!(cyc >= 20 && cyc <= 45) || Math.floor(cyc) !== cyc) return fail('Enter a cycle length from 20 to 45 days. Cycles outside this range are worth checking with a doctor.');
+    if (!(len >= 1 && len <= 10) || Math.floor(len) !== len) return fail('Enter a period length from 1 to 10 days.');
+    if (!(lut >= 9 && lut <= 17) || Math.floor(lut) !== lut) return fail('Enter a luteal phase from 9 to 17 days (14 is typical).');
+    if (lut + 5 >= cyc) return fail('The luteal phase is too long for this cycle length. Lower it or check your cycle length.');
+    // find the cycle that contains today, then list n cycles from there
+    var since = Math.floor((today - start) / DAY), k0 = Math.floor(since / cyc), cur = start + k0 * cyc * DAY, cycles = [];
+    for (var k = 0; k <= n; k++) {
+      var s = cur + k * cyc * DAY, next = s + cyc * DAY, ov = next - lut * DAY;
+      cycles.push({ s: s, e: s + (len - 1) * DAY, ov: ov, f0: ov - 5 * DAY, f1: ov + DAY, next: next });
+    }
+    var c0 = cycles[0], nextP = c0.next, day = since - k0 * cyc + 1;
+    // this cycle's ovulation may already be past: show the next one in that case
+    var ovC = c0.ov + DAY < today ? cycles[1] : c0;
+    $('pocNext').textContent = fmt(nextP, true);
+    $('pocOv').textContent = fmt(ovC.ov, true);
+    $('pocFw').textContent = fmt(ovC.f0) + ' – ' + fmt(ovC.f1);
+    $('pocDay').textContent = day + ' of ' + cyc;
+    var toNext = Math.round((nextP - today) / DAY), notes = [];
+    notes.push('Next period in about ' + toNext + (toNext === 1 ? ' day.' : ' days.'));
+    if (today >= ovC.f0 && today <= ovC.f1) notes.push('You may be in your fertile window now.');
+    if (k0 >= 3) notes.push('Your last period date was ' + k0 + ' cycles ago. Predictions are more reliable if you enter your most recent period.');
+    say(k0 >= 3 ? 'bad' : 'ok', notes.join(' '));
+    last = cycles.slice(0, n);
+    $('pocRows').innerHTML = last.map(function (c) { return '<tr><td>' + fmt(c.s, true) + '</td><td>' + fmt(c.e) + '</td><td>' + fmt(c.f0) + ' – ' + fmt(c.f1) + '</td><td>' + fmt(c.ov) + '</td></tr>'; }).join('');
+    cal(cycles, today);
+  }
+  function cal(cycles, today) {
+    var mark = {};
+    cycles.forEach(function (c) {
+      for (var t = c.s; t <= c.e; t += DAY) mark[t] = 'pd';
+      for (t = c.f0; t <= c.f1; t += DAY) if (!mark[t]) mark[t] = t === c.ov ? 'ov' : 'fw';
+      mark[c.ov] = mark[c.ov] === 'pd' ? 'pd' : 'ov';
+    });
+    var d0 = new Date(Math.min(cycles[0].s, today)), html = '', names = [];
+    for (var i = 0; i < 7; i++) { try { names.push(new Date(Date.UTC(2024, 0, 7 + (i + wk0) % 7)).toLocaleDateString(undefined, { weekday: 'narrow', timeZone: 'UTC' })); } catch (e) { names.push('SMTWTFS'[(i + wk0) % 7]); } }
+    for (var m = 0; m < 3; m++) {
+      var y = d0.getUTCFullYear(), mo = d0.getUTCMonth() + m, first = Date.UTC(y, mo, 1), dim = new Date(Date.UTC(y, mo + 1, 0)).getUTCDate(), lead = (new Date(first).getUTCDay() - wk0 + 7) % 7;
+      var title; try { title = new Date(first).toLocaleDateString(undefined, { month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { title = iso(first).slice(0, 7); }
+      var cells = names.map(function (n) { return '<span class="dow" aria-hidden="true">' + n + '</span>'; }).join('');
+      for (i = 0; i < lead; i++) cells += '<span></span>';
+      for (var dd = 1; dd <= dim; dd++) {
+        var t = Date.UTC(y, mo, dd), c = (mark[t] || '') + (t === today ? ' td' : ''), lab = { pd: ', expected period', fw: ', fertile window', ov: ', estimated ovulation' }[mark[t]] || '';
+        cells += '<span class="' + c.trim() + '"' + (lab || t === today ? ' title="' + fmt(t) + lab + (t === today ? ', today' : '') + '"' : '') + '>' + dd + '</span>';
+      }
+      html += '<div class="poc-cal"><h4>' + title + '</h4><div class="poc-grid">' + cells + '</div></div>';
+    }
+    $('pocCals').innerHTML = html;
+  }
+  $('pocCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Pick the date your last period started first.');
+    copyText(last.map(function (c) { return 'Period: ' + fmt(c.s, true) + ' – ' + fmt(c.e) + ' | Fertile: ' + fmt(c.f0) + ' – ' + fmt(c.f1) + ' | Ovulation: ' + fmt(c.ov); }).join('\n') + '\n(Estimates only, not contraception or medical advice.)', this);
+  });
+  $('pocIcs').addEventListener('click', function () {
+    if (!last) return say('bad', 'Pick the date your last period started first.');
+    var d = function (t) { return iso(t).replace(/-/g, ''); }, stamp = new Date().toISOString().replace(/[-:]/g, '').replace(/\.\d+/, '');
+    var ev = function (uid, a, b, sum) { return ['BEGIN:VEVENT', 'UID:' + uid + '@gettoolnest', 'DTSTAMP:' + stamp, 'DTSTART;VALUE=DATE:' + d(a), 'DTEND;VALUE=DATE:' + d(b + DAY), 'SUMMARY:' + sum, 'DESCRIPTION:Estimate only. Not contraception or medical advice.', 'TRANSP:TRANSPARENT', 'END:VEVENT'].join('\r\n'); };
+    var out = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GetToolNest//Cycle estimate//EN', 'CALSCALE:GREGORIAN'];
+    last.forEach(function (c, i) { out.push(ev('p' + d(c.s) + i, c.s, c.e, 'Expected period')); out.push(ev('f' + d(c.f0) + i, c.f0, c.f1, 'Fertile window (estimate)')); });
+    out.push('END:VCALENDAR');
+    var a = $('dl'); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([out.join('\r\n') + '\r\n'], { type: 'text/calendar' })); a.download = 'cycle-estimates.ics'; a.click();
+    say('ok', 'Saved cycle-estimates.ics with ' + last.length + ' periods and fertile windows. Open it to add them to your calendar app.');
+  });
+  // The date is private: it is kept only if asked, only in this browser, and never with synced settings.
+  var KEY = 'gtn-poc-date';
+  (function () { var v = load(KEY); if (v && /^\d{4}-\d{2}-\d{2}$/.test(v)) { $('pocLast').value = v; $('pocKeep').checked = true; } })();
+  function keepDate() { store(KEY, $('pocKeep').checked && $('pocLast').value ? $('pocLast').value : null); }
+  $('pocKeep').addEventListener('change', keepDate); $('pocLast').addEventListener('change', keepDate); $('pocLast').addEventListener('input', keepDate);
+  if ($('clearBtn')) $('clearBtn').addEventListener('click', function () { store(KEY, null); });
+  $('poc').addEventListener('input', calc);
+  $('poc').addEventListener('change', calc);
+  calc();
+})();
+</script>

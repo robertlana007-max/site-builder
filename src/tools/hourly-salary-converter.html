@@ -1,0 +1,131 @@
+<style>
+.hsc .hsc-out { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-top: 16px; }
+.hsc .hsc-out .stat { cursor: default; }
+.hsc .hsc-out .stat.on { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+.hsc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.hsc .hsc-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+@media (max-width: 480px) { .hsc .hsc-out { grid-template-columns: 1fr 1fr; } .hsc .stat { padding: 10px 12px; } }
+</style>
+<div class="hsc" id="hsc">
+<div class="fields">
+  <div><label for="hscCur">Currency</label><select id="hscCur" data-cur></select></div>
+  <div hidden><label for="hscSym">Your currency symbol</label><input type="text" id="hscSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div><label for="hscAmt">Pay amount</label><input type="number" id="hscAmt" min="0" step="any" inputmode="decimal" value="25"></div>
+  <div><label for="hscPer">Paid per</label><select id="hscPer"><option value="h">Hour</option><option value="d">Day</option><option value="w">Week</option><option value="bw">Two weeks</option><option value="sm">Half month (twice a month)</option><option value="m">Month</option><option value="y">Year</option></select></div>
+</div>
+<div class="fields">
+  <div><label for="hscHpd">Hours per day</label><input type="number" id="hscHpd" min="0" max="24" step="any" inputmode="decimal" value="8"></div>
+  <div><label for="hscDpw">Days per week</label><input type="number" id="hscDpw" min="0" max="7" step="any" inputmode="decimal" value="5"></div>
+  <div><label for="hscWpy">Paid weeks per year</label><input type="number" id="hscWpy" min="1" max="53" step="any" inputmode="decimal" value="52"></div>
+</div>
+<span class="hsc-hint">Use 52 paid weeks if holidays are paid. If you take unpaid time off, lower it (for example 48 for four unpaid weeks).</span>
+<div class="hsc-out" id="hscOut">
+  <div class="stat" data-p="h"><span>Hourly</span><b id="hscH">–</b></div>
+  <div class="stat" data-p="d"><span>Daily</span><b id="hscD">–</b></div>
+  <div class="stat" data-p="w"><span>Weekly</span><b id="hscW">–</b></div>
+  <div class="stat" data-p="bw"><span>Every two weeks</span><b id="hscBW">–</b></div>
+  <div class="stat" data-p="sm"><span>Twice a month</span><b id="hscSM">–</b></div>
+  <div class="stat" data-p="m"><span>Monthly</span><b id="hscM">–</b></div>
+  <div class="stat" data-p="y"><span>Yearly</span><b id="hscY">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="btns"><button type="button" class="btn ghost" id="hscCopy">Copy all</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  var OUT = { h: 'hscH', d: 'hscD', w: 'hscW', bw: 'hscBW', sm: 'hscSM', m: 'hscM', y: 'hscY' }, NAMES = { h: 'Hourly', d: 'Daily', w: 'Weekly', bw: 'Every two weeks', sm: 'Twice a month', m: 'Monthly', y: 'Yearly' };
+  var last = null;
+  // Everything goes through the yearly amount: yearly = hourly x hours/day x days/week x paid weeks/year.
+  function toYear(amt, per, hpd, dpw, wpy) {
+    var hoursY = hpd * dpw * wpy, daysY = dpw * wpy;
+    return { h: amt * hoursY, d: amt * daysY, w: amt * wpy, bw: amt * wpy / 2, sm: amt * 24, m: amt * 12, y: amt }[per];
+  }
+  function calc() {
+    var amt = num('hscAmt'), per = $('hscPer').value, hpd = num('hscHpd'), dpw = num('hscDpw'), wpy = num('hscWpy');
+    document.querySelectorAll('.hsc-out .stat').forEach(function (s) { s.classList.toggle('on', s.dataset.p === per); });
+    var err = !(amt >= 0) ? 'Enter how much you are paid.' : amt > 1e13 ? 'That amount is too large.' : !(hpd > 0 && hpd <= 24) ? 'Hours per day must be more than 0 and at most 24.'
+      : !(dpw > 0 && dpw <= 7) ? 'Days per week must be more than 0 and at most 7.' : !(wpy >= 1 && wpy <= 53) ? 'Paid weeks per year must be from 1 to 53.' : '';
+    if (err) { Object.keys(OUT).forEach(function (k) { $(OUT[k]).textContent = '–'; }); last = null; return say('bad', err); }
+    var Y = toYear(amt, per, hpd, dpw, wpy), hoursY = hpd * dpw * wpy;
+    var v = { y: Y, m: Y / 12, sm: Y / 24, bw: Y / wpy * 2, w: Y / wpy, d: Y / (dpw * wpy), h: Y / hoursY };
+    Object.keys(OUT).forEach(function (k) { $(OUT[k]).textContent = money(v[k]); });
+    last = v;
+    say('', 'Based on ' + nfx(hpd, 2) + ' hours a day, ' + nfx(dpw, 2) + ' days a week and ' + nfx(wpy, 2) + ' paid weeks a year = ' + nfx(hoursY, 2) + ' paid hours a year. Amounts are before tax.');
+  }
+  $('hscCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText(Object.keys(OUT).map(function (k) { return NAMES[k] + ': ' + money(last[k]); }).join('\n'), this);
+  });
+  $('hsc').addEventListener('input', function (e) { if (e.target.id !== 'hscCur') calc(); });
+  $('hscPer').addEventListener('change', calc);
+  curWire(calc);
+  calc();
+})();
+</script>

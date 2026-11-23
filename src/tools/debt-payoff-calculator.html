@@ -1,0 +1,341 @@
+<style>
+.dpc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.dpc .dpc-list { display: grid; gap: 10px; margin: 0 0 12px; }
+.dpc .dpc-row { display: grid; grid-template-columns: minmax(0, 1.3fr) repeat(3, minmax(0, 1fr)) 40px; gap: 8px; align-items: end; border: 1px solid var(--line); border-radius: 12px; padding: 10px; }
+.dpc .dpc-row label { font-size: 13px; color: var(--muted); display: block; margin-bottom: 4px; }
+.dpc .dpc-row input { min-width: 0; }
+.dpc .dpc-x { width: 40px; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+.dpc .dpc-x:hover { color: var(--bad); border-color: var(--bad); }
+@media (max-width: 600px) { .dpc .dpc-row { grid-template-columns: 1fr 1fr; } .dpc .dpc-row > div:first-child { grid-column: 1 / -1; } .dpc .dpc-x { width: 100%; } }
+.dpc .dpc-cmp { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-top: 16px; }
+.dpc .dpc-card { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: var(--bg); }
+.dpc .dpc-card.best { border-color: var(--ok); box-shadow: 0 0 0 1px var(--ok) inset; }
+.dpc .dpc-card h4 { margin: 0 0 6px; font-size: 16px; }
+.dpc .dpc-card p { margin: 2px 0; font-size: 14.5px; font-variant-numeric: tabular-nums; }
+.dpc .dpc-card ol { margin: 6px 0 0; padding-inline-start: 20px; font-size: 14px; }
+.dpc .dpc-tag { display: inline-block; font-size: 12px; font-weight: 700; color: var(--ok); margin-inline-start: 6px; }
+.dpc .dpc-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0 8px; }
+.dpc .dpc-head h3 { margin: 0; }
+.dpc table.sched td, .dpc table.sched th { white-space: nowrap; }
+.dpc table.sched td:last-child { white-space: normal; min-width: 140px; text-align: start; }
+.fch { position: relative; margin: 16px 0 4px; }
+.fch canvas { display: block; width: 100%; height: 240px; touch-action: pan-y; }
+.fch-tip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); margin-top: 6px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.fch-tip b { color: var(--ink); }
+.fch-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+@media (max-width: 480px) { .dpc .stats { grid-template-columns: 1fr 1fr; } .dpc .stat { padding: 10px 12px; } }
+</style>
+<div class="dpc" id="dpc">
+<div class="fields">
+  <div><label for="dpcCur">Currency</label><select id="dpcCur" data-cur></select></div>
+  <div hidden><label for="dpcSym">Your currency symbol</label><input type="text" id="dpcSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div><label for="dpcExtra">Extra you can pay each month</label><input type="number" id="dpcExtra" min="0" step="any" inputmode="decimal" value="100"></div>
+</div>
+<h3>Your debts</h3>
+<div class="dpc-list" id="dpcList"></div>
+<div class="btns" style="margin-top:0"><button type="button" class="btn ghost" id="dpcAdd">+ Add a debt</button><button type="button" class="btn ghost" id="dpcSample">Fill in an example</button><button type="button" class="btn ghost" id="dpcReset">Clear list</button></div>
+<div class="stats">
+  <div class="stat"><span>Total debt</span><b id="dpcTotal">–</b></div>
+  <div class="stat"><span>Monthly budget for debts</span><b id="dpcBudget">–</b></div>
+  <div class="stat"><span>Debt-free in (best plan)</span><b id="dpcFree">–</b></div>
+  <div class="stat"><span>Interest saved vs minimums only</span><b id="dpcSaved">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="dpc-cmp" id="dpcCmp"></div>
+<div class="dpc-head"><h3>Total balance over time</h3></div>
+<div class="fch"><canvas id="dpcChart" role="img" aria-label="Line chart of total debt balance by month for each plan"></canvas><div class="fch-tip" id="dpcTip" aria-live="off"></div></div>
+<div class="dpc-head"><h3>Month-by-month plan</h3>
+  <div class="seg" role="group" aria-label="Plan shown in the table"><button type="button" data-v="av" aria-pressed="true">Avalanche</button><button type="button" data-v="sb" aria-pressed="false">Snowball</button></div>
+</div>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Month</th><th>Paid</th><th>Interest</th><th>Balance left</th><th>Paid off</th></tr></thead><tbody id="dpcRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="dpcCsv">Download plan (CSV)</button><button type="button" class="btn ghost" id="dpcCopy">Copy summary</button></div>
+<a id="dl" hidden></a>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  // ---------- small canvas chart (line or stacked bars), redraws on resize and theme change ----------
+  function Chart(cv, tip) {
+    var spec = null, geo = null, hover = -1;
+    function css(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+    function draw() {
+      if (!spec || !cv.isConnected) return;
+      var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      var ink = css('--muted', '#5f6b7a'), line = css('--line', '#e3e6eb'), font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      var L = spec.labels, n = L.length, S = spec.series, max = 0, min = 0;
+      if (!n) return;
+      for (var i = 0; i < n; i++) {
+        var stack = 0;
+        S.forEach(function (s) { var v = +s.data[i] || 0; if (spec.type === 'bar') stack += v; else { if (v > max) max = v; if (v < min) min = v; } });
+        if (spec.type === 'bar' && stack > max) max = stack;
+      }
+      if (max === min) max = min + 1;
+      // nice step
+      var raw = (max - min) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (s) { return s >= raw; });
+      var top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+      g.font = font;
+      var padL = 8 + Math.max(g.measureText(shortNum(top)).width, g.measureText(shortNum(bot)).width), padR = 10, padT = 10, padB = 24;
+      var pw = W - padL - padR, ph = H - padT - padB;
+      function Y(v) { return padT + ph - (v - bot) / (top - bot) * ph; }
+      g.strokeStyle = line; g.fillStyle = ink; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+      for (var v = bot; v <= top + step / 2; v += step) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(shortNum(v), padL - 6, y); }
+      var bw = pw / n, X = function (i) { return padL + bw * (i + .5); };
+      // x labels: as many as fit
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      var lw = 0; for (i = 0; i < n; i += Math.max(1, Math.floor(n / 20))) lw = Math.max(lw, g.measureText(L[i]).width);
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / Math.max(46, lw + 12)))));
+      for (i = 0; i < n; i++) if (i % every === 0 || i === n - 1 && n - 1 - (Math.floor((n - 1) / every) * every) > every / 2) g.fillText(L[i], X(i), H - padB + 6);
+      if (spec.type === 'bar') {
+        var w = Math.max(1, Math.min(36, bw * .7));
+        for (i = 0; i < n; i++) {
+          var base = 0;
+          S.forEach(function (s) { var v = Math.max(0, +s.data[i] || 0); if (!v) return; g.fillStyle = s.color; var y1 = Y(base + v), y0 = Y(base); g.fillRect(X(i) - w / 2, y1, w, Math.max(0, y0 - y1 - (base ? 1 : 0))); base += v; });
+        }
+      } else {
+        S.forEach(function (s) {
+          g.beginPath();
+          for (var i = 0; i < n; i++) { var x = n === 1 ? padL + pw / 2 : padL + pw * i / (n - 1), y = Y(+s.data[i] || 0); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.strokeStyle = s.color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
+          if (s.fill && n > 1) { g.lineTo(padL + pw, Y(Math.max(bot, 0))); g.lineTo(padL, Y(Math.max(bot, 0))); g.closePath(); g.globalAlpha = .12; g.fillStyle = s.color; g.fill(); g.globalAlpha = 1; }
+        });
+      }
+      geo = { padL: padL, pw: pw, n: n, bw: bw, type: spec.type };
+      if (hover >= 0 && hover < n) {
+        var hx = spec.type === 'bar' ? X(hover) : (n === 1 ? padL + pw / 2 : padL + pw * hover / (n - 1));
+        g.strokeStyle = ink; g.globalAlpha = .5; g.beginPath(); g.moveTo(hx + .5, padT); g.lineTo(hx + .5, padT + ph); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    function showTip(i) {
+      if (!tip) return;
+      if (i < 0) { tip.hidden = true; return; }
+      tip.hidden = false;
+      tip.innerHTML = '<b>' + esc(spec.labels[i]) + '</b>' + spec.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ': ' + esc(spec.fmt ? spec.fmt(+s.data[i] || 0) : s.data[i]) + '</span>'; }).join('');
+    }
+    function pick(e) {
+      if (!geo) return;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left - geo.padL, i;
+      i = geo.type === 'bar' ? Math.floor(x / geo.bw) : Math.round(x / (geo.pw / Math.max(1, geo.n - 1)));
+      i = Math.max(0, Math.min(geo.n - 1, i));
+      if (i !== hover) { hover = i; draw(); showTip(i); }
+    }
+    cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+    cv.addEventListener('pointerleave', function () { hover = -1; draw(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(cv);
+    new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return { set: function (s) { spec = s; if (hover >= s.labels.length) hover = -1; draw(); if (tip) showTip(hover >= 0 ? hover : s.labels.length - 1); } };
+  }
+  var KEY = 'gtn-debtpayoff-v1', MAXM = 1200;
+  var SAMPLE = [['Credit card', 4500, 22.9, 135], ['Store card', 900, 27, 30], ['Car loan', 12000, 7.5, 310], ['Personal loan', 3000, 11.5, 95]];
+  var chart = Chart($('dpcChart'), $('dpcTip')), view = 'av', last = null;
+  var keep = function () { return !window.Prefs || Prefs.get().rememberInputs !== false; };
+  var debts;
+  try { debts = JSON.parse(load(KEY) || 'null'); } catch (e) { debts = null; }
+  if (!Array.isArray(debts)) debts = [['', '', '', ''], ['', '', '', '']];
+  function save() { if (keep()) store(KEY, JSON.stringify(debts)); }
+  function render() {
+    $('dpcList').innerHTML = debts.map(function (d, i) {
+      var n = i + 1, f = function (k, lab, ph, extra) { return '<div><label for="dpcD' + n + k + '">' + lab + '</label><input data-nomemo id="dpcD' + n + k + '" data-f="' + k + '" ' + extra + ' placeholder="' + ph + '" value="' + esc(d['nbrm'.indexOf(k)]) + '"></div>'; };
+      return '<div class="dpc-row" data-i="' + i + '">' + f('n', 'Debt ' + n + ' name', 'e.g. Credit card', 'type="text" maxlength="40"') +
+        f('b', 'Balance', '0', 'type="number" min="0" step="any" inputmode="decimal"') + f('r', 'Interest (% per year)', '0', 'type="number" min="0" step="any" inputmode="decimal"') +
+        f('m', 'Minimum payment', '0', 'type="number" min="0" step="any" inputmode="decimal"') + '<button type="button" class="dpc-x" aria-label="Remove debt ' + n + '">×</button></div>';
+    }).join('');
+  }
+  function val(s) { var t = String(s == null ? '' : s).replace(/[\s,']/g, ''); return t === '' ? NaN : +t; }
+  // Simulates paying the debts month by month.
+  // order: 'av' highest rate first, 'sb' smallest balance first, 'min' minimum payments only (no extra, no roll-over).
+  function sim(list, extra, order) {
+    var ds = list.map(function (d, i) { return { i: i, name: d.name, bal: d.bal, b0: d.bal, apr: d.apr, min: d.min, off: 0, int: 0 }; });
+    var budget = ds.reduce(function (s, d) { return s + d.min; }, 0) + (order === 'min' ? 0 : extra);
+    var rank = ds.slice().sort(order === 'sb' ? function (a, b) { return a.b0 - b.b0 || b.apr - a.apr; } : function (a, b) { return b.apr - a.apr || a.b0 - b.b0; });
+    var rows = [], totInt = 0, totPaid = 0, m = 0, eps = 0.005;
+    while (m < MAXM && ds.some(function (d) { return d.bal > eps; })) {
+      m++;
+      var mInt = 0, paid = 0, done = [];
+      ds.forEach(function (d) { if (d.bal > eps) { var x = d.bal * d.apr / 1200; d.bal += x; d.int += x; mInt += x; } });
+      var pool = budget;
+      ds.forEach(function (d) { if (d.bal > eps) { var p = Math.min(d.min, d.bal, pool); d.bal -= p; pool -= p; paid += p; } });
+      if (order !== 'min') rank.forEach(function (d) { if (d.bal > eps && pool > 0) { var p = Math.min(pool, d.bal); d.bal -= p; pool -= p; paid += p; } });
+      ds.forEach(function (d) { if (!d.off && d.bal <= eps) { d.off = m; d.bal = 0; done.push(d.name); } });
+      totInt += mInt; totPaid += paid;
+      rows.push({ m: m, paid: paid, int: mInt, bal: ds.reduce(function (s, d) { return s + d.bal; }, 0), done: done });
+    }
+    var never = ds.some(function (d) { return d.bal > eps; });
+    return { months: never ? Infinity : m, int: totInt, paid: totPaid, rows: rows, never: never, order: rank.map(function (d) { return d; }), ds: ds, budget: budget };
+  }
+  function monthLabel(k) { var d = new Date(), t = d.getFullYear() * 12 + d.getMonth() + k; return MONTHS[t % 12] + ' ' + Math.floor(t / 12); }
+  function dur(n) { if (!isFinite(n)) return 'Never'; var y = Math.floor(n / 12), m = n % 12; return (y ? y + (y === 1 ? ' yr ' : ' yrs ') : '') + (m || !y ? m + (m === 1 ? ' mo' : ' mos') : '').trim(); }
+  function read() {
+    var list = [], err = '';
+    debts.forEach(function (d, i) {
+      var b = val(d[1]), r = val(d[2]), mn = val(d[3]), blank = !String(d[0]).trim() && isNaN(b) && isNaN(r) && isNaN(mn);
+      if (blank || err) return;
+      var nm = String(d[0]).trim() || 'Debt ' + (i + 1);
+      if (!(b > 0)) err = nm + ': enter a balance above 0.';
+      else if (!(r >= 0) || r > 100) err = nm + ': enter an interest rate from 0 to 100% per year.';
+      else if (!(mn > 0)) err = nm + ': enter a minimum payment above 0.';
+      else if (b > 1e12 || mn > 1e12) err = nm + ': that amount is too large.';
+      else list.push({ name: nm, bal: b, apr: r, min: mn });
+    });
+    return { list: list, err: err };
+  }
+  function clear(msg, cls) { ['dpcTotal', 'dpcBudget', 'dpcFree', 'dpcSaved'].forEach(function (i) { $(i).textContent = '–'; }); $('dpcCmp').innerHTML = ''; $('dpcRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null; say(cls || 'bad', msg); }
+  function card(title, s, best, base, note) {
+    var saved = base && !base.never ? base.int - s.int : null;
+    return '<div class="dpc-card' + (best ? ' best' : '') + '"><h4>' + title + (best ? '<span class="dpc-tag">Saves the most</span>' : '') + '</h4>' +
+      '<p>Debt-free: <b>' + (s.never ? 'Never at this payment' : dur(s.months) + ' (' + monthLabel(s.months) + ')') + '</b></p>' +
+      '<p>Total interest: <b>' + (s.never ? '–' : money(s.int)) + '</b></p>' + (s.never ? '' : '<p>Total paid: ' + money(s.paid) + '</p>') +
+      (saved != null && note ? '<p>Interest saved: <b>' + money(Math.max(0, saved)) + '</b></p>' : '') +
+      (note && !s.never ? '<ol>' + s.order.map(function (d) { return '<li>' + esc(d.name) + ' – paid off in month ' + d.off + '</li>'; }).join('') + '</ol>' : '') + '</div>';
+  }
+  function calc() {
+    var r = read(), extra = num('dpcExtra');
+    if (isNaN(extra)) extra = 0;
+    if (r.err) return clear(r.err);
+    if (extra < 0) return clear('The extra payment cannot be negative.');
+    if (extra > 1e12) return clear('The extra payment is too large.');
+    if (!r.list.length) return clear('Add at least one debt with a balance, interest rate and minimum payment.', '');
+    var av = sim(r.list, extra, 'av'), sb = sim(r.list, extra, 'sb'), mn = sim(r.list, 0, 'min');
+    var tot = r.list.reduce(function (s, d) { return s + d.bal; }, 0);
+    $('dpcTotal').textContent = money(tot);
+    $('dpcBudget').textContent = money(av.budget);
+    if (av.never) {
+      $('dpcFree').textContent = 'Never'; $('dpcSaved').textContent = '–';
+      $('dpcCmp').innerHTML = ''; $('dpcRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null;
+      return say('bad', 'Your payments do not cover the interest, so the debt would never be paid off (or it takes over 100 years). Raise the minimum payments or the extra amount.');
+    }
+    var best = av.int <= sb.int + 0.005 ? av : sb;
+    $('dpcFree').textContent = dur(best.months);
+    $('dpcSaved').textContent = mn.never ? 'Minimums never finish' : money(Math.max(0, mn.int - best.int));
+    $('dpcCmp').innerHTML = card('Avalanche (highest interest first)', av, av.int < sb.int - 0.005, mn, true) + card('Snowball (smallest balance first)', sb, sb.int < av.int - 0.005, mn, true) + card('Minimum payments only', mn, false, null, false);
+    var diff = sb.int - av.int, notes = [];
+    if (Math.abs(diff) < 0.5) notes.push('Both plans cost about the same here.');
+    else notes.push((diff > 0 ? 'Avalanche saves ' : 'Snowball saves ') + money(Math.abs(diff)) + ' in interest compared with ' + (diff > 0 ? 'snowball' : 'avalanche') + '.');
+    if (mn.never) notes.push('With minimum payments only, at least one debt never gets paid off because its minimum does not cover its interest.');
+    else if (mn.int - best.int < 0.5) notes.push('Add an extra amount each month to see how much sooner you could be debt-free.');
+    else notes.push('Paying ' + money(extra) + ' extra and rolling over each freed-up minimum saves ' + money(Math.max(0, mn.int - best.int)) + ' and ' + Math.max(0, mn.months - best.months) + ' months compared with minimums only.');
+    say('ok', notes.join(' '));
+    last = { av: av, sb: sb, mn: mn, extra: extra, tot: tot };
+    table(); draw();
+  }
+  function table() {
+    if (!last) return;
+    var s = last[view];
+    $('dpcRows').innerHTML = s.rows.map(function (r) { return '<tr><td>' + monthLabel(r.m) + '</td><td>' + money(r.paid) + '</td><td>' + money(r.int) + '</td><td>' + money(r.bal) + '</td><td>' + esc(r.done.join(', ')) + '</td></tr>'; }).join('');
+  }
+  function draw() {
+    if (!last) return;
+    var L = Math.max(last.av.rows.length, last.sb.rows.length, last.mn.never ? 0 : last.mn.rows.length);
+    L = Math.min(L, MAXM);
+    var labels = [], series = function (s) { var out = [last.tot]; for (var i = 0; i < L; i++) out.push(s.rows[i] ? s.rows[i].bal : 0); return out; };
+    for (var i = 0; i <= L; i++) labels.push(i ? monthLabel(i).replace(/ \d\d(\d\d)$/, " '$1") : 'Now');
+    var S = [{ name: 'Avalanche', color: cssv('--accent', '#2563eb'), data: series(last.av) }, { name: 'Snowball', color: '#f59e0b', data: series(last.sb) }];
+    if (!last.mn.never) S.push({ name: 'Minimums only', color: '#94a3b8', data: series(last.mn) });
+    chart.set({ type: 'line', labels: labels, fmt: function (v) { return money(v, 0); }, series: S });
+  }
+  $('dpcList').addEventListener('input', function (e) {
+    var row = e.target.closest('.dpc-row'); if (!row) return;
+    debts[+row.dataset.i]['nbrm'.indexOf(e.target.dataset.f)] = e.target.value; save(); calc();
+  });
+  $('dpcList').addEventListener('click', function (e) {
+    var b = e.target.closest('.dpc-x'); if (!b) return;
+    debts.splice(+b.closest('.dpc-row').dataset.i, 1); if (!debts.length) debts.push(['', '', '', '']); save(); render(); calc();
+  });
+  $('dpcAdd').addEventListener('click', function () {
+    if (debts.length >= 30) return say('bad', 'You can add up to 30 debts.');
+    debts.push(['', '', '', '']); save(); render(); calc(); var f = $('dpcD' + debts.length + 'n'); if (f) f.focus();
+  });
+  $('dpcSample').addEventListener('click', function () { debts = SAMPLE.map(function (d) { return d.map(String); }); save(); render(); calc(); });
+  $('dpcReset').addEventListener('click', function () { debts = [['', '', '', ''], ['', '', '', '']]; store(KEY, null); render(); calc(); });
+  if ($('clearBtn')) $('clearBtn').addEventListener('click', function () { store(KEY, null); });
+  document.querySelectorAll('.dpc .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { view = b.dataset.v; document.querySelectorAll('.dpc .seg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); table(); });
+  });
+  $('dpcCsv').addEventListener('click', function () {
+    if (!last) return say('bad', 'Enter your debts first.');
+    var s = last[view], q = function (t) { t = String(t); return /[",\r\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t; };
+    var lines = ['Month,Paid,Interest,Balance left,Paid off'];
+    s.rows.forEach(function (r) { lines.push([monthLabel(r.m), r.paid.toFixed(2), r.int.toFixed(2), r.bal.toFixed(2), q(r.done.join('; '))].join(',')); });
+    var a = $('dl'); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv' })); a.download = 'debt-payoff-' + (view === 'av' ? 'avalanche' : 'snowball') + '.csv'; a.click();
+    say('ok', 'Saved the ' + (view === 'av' ? 'avalanche' : 'snowball') + ' plan with ' + s.rows.length + ' months.');
+  });
+  $('dpcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Enter your debts first.');
+    var f = function (n, s) { return n + ': debt-free in ' + dur(s.months) + ', interest ' + (s.never ? 'never finishes' : money(s.int)); };
+    copyText('Debt payoff plan (' + money(last.tot) + ' total, ' + money(last.extra) + ' extra per month)\n' + f('Avalanche', last.av) + '\n' + f('Snowball', last.sb) + '\n' + (last.mn.never ? 'Minimums only: never finishes' : f('Minimums only', last.mn)), this);
+  });
+  $('dpcExtra').addEventListener('input', calc);
+  render();
+  curWire(calc);
+  calc();
+})();
+</script>

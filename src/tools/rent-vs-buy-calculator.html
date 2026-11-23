@@ -1,0 +1,297 @@
+<style>
+.rvb .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.rvb fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.rvb legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.rvb .rvb-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0 8px; }
+.rvb .rvb-head h3 { margin: 0; }
+.rvb .stat.rvb-win b { color: var(--ok); }
+.rvb .rvb-verdict { font-size: 18px; font-weight: 700; margin: 14px 0 0; }
+.rvb table.sched td, .rvb table.sched th { white-space: nowrap; }
+.rvb table.sched { min-width: 560px; }
+.fch { position: relative; margin: 16px 0 4px; }
+.fch canvas { display: block; width: 100%; height: 240px; touch-action: pan-y; }
+.fch-tip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); margin-top: 6px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.fch-tip b { color: var(--ink); }
+.fch-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+@media (max-width: 480px) { .rvb .stats { grid-template-columns: 1fr 1fr; } .rvb .stat { padding: 10px 12px; } }
+</style>
+<div class="rvb" id="rvb">
+<div class="fields">
+  <div><label for="rvbCur">Currency</label><select id="rvbCur" data-cur></select></div>
+  <div hidden><label for="rvbSym">Your currency symbol</label><input type="text" id="rvbSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div><label for="rvbYears">How many years you will stay</label><input type="number" id="rvbYears" min="1" max="50" step="1" inputmode="numeric" value="10"></div>
+</div>
+<fieldset>
+  <legend>Buying</legend>
+  <div class="fields">
+    <div><label for="rvbPrice">Home price</label><input type="number" id="rvbPrice" min="0" step="any" inputmode="decimal" value="300000"></div>
+    <div><label for="rvbDown">Down payment (%)</label><input type="number" id="rvbDown" min="0" max="100" step="any" inputmode="decimal" value="20"></div>
+    <div><label for="rvbRate">Mortgage interest (% per year)</label><input type="number" id="rvbRate" min="0" step="any" inputmode="decimal" value="6"></div>
+    <div><label for="rvbTerm">Mortgage term (years)</label><input type="number" id="rvbTerm" min="1" max="50" step="1" inputmode="numeric" value="25"></div>
+  </div>
+  <div class="fields">
+    <div><label for="rvbBuyCost">Buying costs (% of price)</label><input type="number" id="rvbBuyCost" min="0" step="any" inputmode="decimal" value="3"></div>
+    <div><label for="rvbSellCost">Selling costs (% of price)</label><input type="number" id="rvbSellCost" min="0" step="any" inputmode="decimal" value="5"></div>
+    <div><label for="rvbTax">Property tax (% per year)</label><input type="number" id="rvbTax" min="0" step="any" inputmode="decimal" value="1"></div>
+    <div><label for="rvbMaint">Upkeep and repairs (% per year)</label><input type="number" id="rvbMaint" min="0" step="any" inputmode="decimal" value="1"></div>
+  </div>
+  <div class="fields">
+    <div><label for="rvbIns">Home insurance (per year)</label><input type="number" id="rvbIns" min="0" step="any" inputmode="decimal" value="1200"></div>
+    <div><label for="rvbFees">Service or HOA fees (per month)</label><input type="number" id="rvbFees" min="0" step="any" inputmode="decimal" value="0"></div>
+    <div><label for="rvbGrow">Home value growth (% per year)</label><input type="number" id="rvbGrow" step="any" inputmode="decimal" value="3"></div>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Renting</legend>
+  <div class="fields">
+    <div><label for="rvbRent">Monthly rent</label><input type="number" id="rvbRent" min="0" step="any" inputmode="decimal" value="1300"></div>
+    <div><label for="rvbRentUp">Rent increase (% per year)</label><input type="number" id="rvbRentUp" step="any" inputmode="decimal" value="3"></div>
+    <div><label for="rvbRentIns">Renter's insurance (per month)</label><input type="number" id="rvbRentIns" min="0" step="any" inputmode="decimal" value="15"></div>
+    <div><label for="rvbInv">Investment return on savings (% per year)</label><input type="number" id="rvbInv" step="any" inputmode="decimal" value="5"></div>
+  </div>
+</fieldset>
+<p class="rvb-verdict" id="rvbVerdict" aria-live="polite"></p>
+<div class="stats">
+  <div class="stat" id="rvbBuyBox"><span>Your wealth if you buy</span><b id="rvbBuyW">–</b></div>
+  <div class="stat" id="rvbRentBox"><span>Your wealth if you rent</span><b id="rvbRentW">–</b></div>
+  <div class="stat"><span>Buying breaks even after</span><b id="rvbBreak">–</b></div>
+  <div class="stat"><span>Mortgage payment (monthly)</span><b id="rvbPay">–</b></div>
+  <div class="stat"><span>First-month cost to own</span><b id="rvbOwn1">–</b></div>
+  <div class="stat"><span>Cash needed up front</span><b id="rvbCash">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="rvb-head"><h3>Wealth over time</h3></div>
+<div class="fch"><canvas id="rvbChart" role="img" aria-label="Line chart comparing your wealth when buying and when renting, year by year"></canvas><div class="fch-tip" id="rvbTip" aria-live="off"></div></div>
+<div class="rvb-head"><h3>Year by year</h3></div>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Year</th><th>Owning costs</th><th>Rent paid</th><th>Home equity</th><th>Buyer's wealth</th><th>Renter's wealth</th></tr></thead><tbody id="rvbRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="rvbCsv">Download table (CSV)</button><button type="button" class="btn ghost" id="rvbCopy">Copy summary</button></div>
+<a id="dl" hidden></a>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  // ---------- small canvas chart (line or stacked bars), redraws on resize and theme change ----------
+  function Chart(cv, tip) {
+    var spec = null, geo = null, hover = -1;
+    function css(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+    function draw() {
+      if (!spec || !cv.isConnected) return;
+      var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      var ink = css('--muted', '#5f6b7a'), line = css('--line', '#e3e6eb'), font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      var L = spec.labels, n = L.length, S = spec.series, max = 0, min = 0;
+      if (!n) return;
+      for (var i = 0; i < n; i++) {
+        var stack = 0;
+        S.forEach(function (s) { var v = +s.data[i] || 0; if (spec.type === 'bar') stack += v; else { if (v > max) max = v; if (v < min) min = v; } });
+        if (spec.type === 'bar' && stack > max) max = stack;
+      }
+      if (max === min) max = min + 1;
+      // nice step
+      var raw = (max - min) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (s) { return s >= raw; });
+      var top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+      g.font = font;
+      var padL = 8 + Math.max(g.measureText(shortNum(top)).width, g.measureText(shortNum(bot)).width), padR = 10, padT = 10, padB = 24;
+      var pw = W - padL - padR, ph = H - padT - padB;
+      function Y(v) { return padT + ph - (v - bot) / (top - bot) * ph; }
+      g.strokeStyle = line; g.fillStyle = ink; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+      for (var v = bot; v <= top + step / 2; v += step) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(shortNum(v), padL - 6, y); }
+      var bw = pw / n, X = function (i) { return padL + bw * (i + .5); };
+      // x labels: as many as fit
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      var lw = 0; for (i = 0; i < n; i += Math.max(1, Math.floor(n / 20))) lw = Math.max(lw, g.measureText(L[i]).width);
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / Math.max(46, lw + 12)))));
+      for (i = 0; i < n; i++) if (i % every === 0 || i === n - 1 && n - 1 - (Math.floor((n - 1) / every) * every) > every / 2) g.fillText(L[i], X(i), H - padB + 6);
+      if (spec.type === 'bar') {
+        var w = Math.max(1, Math.min(36, bw * .7));
+        for (i = 0; i < n; i++) {
+          var base = 0;
+          S.forEach(function (s) { var v = Math.max(0, +s.data[i] || 0); if (!v) return; g.fillStyle = s.color; var y1 = Y(base + v), y0 = Y(base); g.fillRect(X(i) - w / 2, y1, w, Math.max(0, y0 - y1 - (base ? 1 : 0))); base += v; });
+        }
+      } else {
+        S.forEach(function (s) {
+          g.beginPath();
+          for (var i = 0; i < n; i++) { var x = n === 1 ? padL + pw / 2 : padL + pw * i / (n - 1), y = Y(+s.data[i] || 0); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.strokeStyle = s.color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
+          if (s.fill && n > 1) { g.lineTo(padL + pw, Y(Math.max(bot, 0))); g.lineTo(padL, Y(Math.max(bot, 0))); g.closePath(); g.globalAlpha = .12; g.fillStyle = s.color; g.fill(); g.globalAlpha = 1; }
+        });
+      }
+      geo = { padL: padL, pw: pw, n: n, bw: bw, type: spec.type };
+      if (hover >= 0 && hover < n) {
+        var hx = spec.type === 'bar' ? X(hover) : (n === 1 ? padL + pw / 2 : padL + pw * hover / (n - 1));
+        g.strokeStyle = ink; g.globalAlpha = .5; g.beginPath(); g.moveTo(hx + .5, padT); g.lineTo(hx + .5, padT + ph); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    function showTip(i) {
+      if (!tip) return;
+      if (i < 0) { tip.hidden = true; return; }
+      tip.hidden = false;
+      tip.innerHTML = '<b>' + esc(spec.labels[i]) + '</b>' + spec.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ': ' + esc(spec.fmt ? spec.fmt(+s.data[i] || 0) : s.data[i]) + '</span>'; }).join('');
+    }
+    function pick(e) {
+      if (!geo) return;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left - geo.padL, i;
+      i = geo.type === 'bar' ? Math.floor(x / geo.bw) : Math.round(x / (geo.pw / Math.max(1, geo.n - 1)));
+      i = Math.max(0, Math.min(geo.n - 1, i));
+      if (i !== hover) { hover = i; draw(); showTip(i); }
+    }
+    cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+    cv.addEventListener('pointerleave', function () { hover = -1; draw(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(cv);
+    new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return { set: function (s) { spec = s; if (hover >= s.labels.length) hover = -1; draw(); if (tip) showTip(hover >= 0 ? hover : s.labels.length - 1); } };
+  }
+  var chart = Chart($('rvbChart'), $('rvbTip')), last = null;
+  var IDS = ['rvbBuyW', 'rvbRentW', 'rvbBreak', 'rvbPay', 'rvbOwn1', 'rvbCash'];
+  function mrate(pct) { return Math.pow(1 + pct / 100, 1 / 12) - 1; }
+  // Both people start with the same cash (down payment + buying costs). Each month, whoever spends less
+  // invests the difference. Wealth = investments (+ home value after selling costs - loan left, for the buyer).
+  function model(o) {
+    var loan = o.price * (1 - o.down / 100), n = o.term * 12, r = o.rate / 1200;
+    var pay = loan <= 0 ? 0 : r === 0 ? loan / n : loan * r / (1 - Math.pow(1 + r, -n));
+    var cash = o.price * o.down / 100 + o.price * o.buyCost / 100;
+    var gH = mrate(o.grow), gI = mrate(o.inv), bal = loan, home = o.price, rent = o.rent, buyInv = 0, rentInv = cash;
+    var years = [], yOwn = 0, yRent = 0, first = null, own1 = null;
+    for (var m = 1; m <= o.years * 12; m++) {
+      var mort = 0;
+      if (bal > 0.005) { var i = bal * r, p = Math.min(pay - i, bal); if (pay - i > bal) mort = bal + i; else mort = pay; bal -= p; }
+      var own = mort + home * o.tax / 1200 + home * o.maint / 1200 + o.ins / 12 + o.fees;
+      var rcost = rent + o.rentIns;
+      if (m === 1) own1 = own;
+      buyInv *= 1 + gI; rentInv *= 1 + gI;
+      if (own > rcost) rentInv += own - rcost; else buyInv += rcost - own;
+      home *= 1 + gH; yOwn += own; yRent += rcost;
+      if (m % 12 === 0) {
+        var equity = home * (1 - o.sellCost / 100) - bal, bw = equity + buyInv;
+        years.push({ y: m / 12, own: yOwn, rent: yRent, equity: equity, buy: bw, renter: rentInv, home: home, bal: bal });
+        if (first == null && bw >= rentInv) first = m / 12;
+        yOwn = 0; yRent = 0; rent *= 1 + o.rentUp / 100;
+      }
+    }
+    var end = years[years.length - 1];
+    return { pay: pay, cash: cash, own1: own1, years: years, first: first, buy: end.buy, renter: end.renter, loan: loan };
+  }
+  function read() {
+    var g = function (id, d) { var v = num(id); return isNaN(v) ? d : v; };
+    return { years: num('rvbYears'), price: num('rvbPrice'), down: g('rvbDown', 0), rate: g('rvbRate', 0), term: num('rvbTerm'), buyCost: g('rvbBuyCost', 0), sellCost: g('rvbSellCost', 0),
+      tax: g('rvbTax', 0), maint: g('rvbMaint', 0), ins: g('rvbIns', 0), fees: g('rvbFees', 0), grow: g('rvbGrow', 0), rent: num('rvbRent'), rentUp: g('rvbRentUp', 0), rentIns: g('rvbRentIns', 0), inv: g('rvbInv', 0) };
+  }
+  function check(o) {
+    if (!(o.years >= 1 && o.years <= 50) || Math.floor(o.years) !== o.years) return 'Enter how many years you will stay as a whole number from 1 to 50.';
+    if (!(o.price > 0)) return 'Enter a home price above 0.';
+    if (o.price > 1e13) return 'The home price is too large.';
+    if (o.down < 0 || o.down > 100) return 'The down payment must be between 0% and 100%.';
+    if (!(o.term >= 1 && o.term <= 50)) return 'Enter a mortgage term from 1 to 50 years.';
+    if (o.rate < 0 || o.rate > 50) return 'Enter a mortgage rate from 0% to 50%.';
+    if (!(o.rent >= 0)) return 'Enter the monthly rent (0 or more).';
+    if ([o.buyCost, o.sellCost, o.tax, o.maint, o.ins, o.fees, o.rentIns].some(function (v) { return v < 0; })) return 'Costs cannot be negative.';
+    if (o.buyCost > 50 || o.sellCost > 50 || o.tax > 20 || o.maint > 20) return 'Some percentages look too high. Check buying and selling costs, tax and upkeep.';
+    if ([o.grow, o.inv, o.rentUp].some(function (v) { return v < -50 || v > 50; })) return 'Growth, rent increase and investment return must be between -50% and 50%.';
+    return '';
+  }
+  function calc() {
+    var o = read(), err = check(o);
+    if (err) { IDS.forEach(function (i) { $(i).textContent = '–'; }); $('rvbVerdict').textContent = ''; $('rvbRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null; return say('bad', err); }
+    var r = model(o); last = { o: o, r: r };
+    $('rvbBuyW').textContent = money(r.buy, 0); $('rvbRentW').textContent = money(r.renter, 0);
+    $('rvbBuyBox').className = 'stat' + (r.buy >= r.renter ? ' rvb-win' : ''); $('rvbRentBox').className = 'stat' + (r.renter > r.buy ? ' rvb-win' : '');
+    $('rvbBreak').textContent = r.first == null ? 'Not within ' + o.years + ' yrs' : r.first + (r.first === 1 ? ' year' : ' years');
+    $('rvbPay').textContent = money(r.pay); $('rvbOwn1').textContent = money(r.own1); $('rvbCash').textContent = money(r.cash, 0);
+    var d = r.buy - r.renter;
+    $('rvbVerdict').textContent = Math.abs(d) < 1 ? 'Buying and renting come out about the same after ' + o.years + ' years.' :
+      (d > 0 ? 'Buying' : 'Renting') + ' leaves you about ' + money(Math.abs(d), 0) + ' better off after ' + o.years + (o.years === 1 ? ' year.' : ' years.');
+    var notes = ['Wealth means what you would have at the end: for the buyer, the home value after selling costs minus the loan left, plus any savings; for the renter, the invested savings.'];
+    if (o.down === 100) notes.push('You are paying cash for the home, so there is no mortgage.');
+    say('', notes.join(' '));
+    $('rvbRows').innerHTML = r.years.map(function (y) { return '<tr><td>' + y.y + '</td><td>' + money(y.own, 0) + '</td><td>' + money(y.rent, 0) + '</td><td>' + money(y.equity, 0) + '</td><td>' + money(y.buy, 0) + '</td><td>' + money(y.renter, 0) + '</td></tr>'; }).join('');
+    var L = ['Start'].concat(r.years.map(function (y) { return 'Y' + y.y; }));
+    var b0 = o.price * (1 - o.sellCost / 100) - r.loan;
+    chart.set({ type: 'line', labels: L, fmt: function (v) { return money(v, 0); }, series: [
+      { name: 'Buy', color: cssv('--accent', '#2563eb'), data: [b0].concat(r.years.map(function (y) { return y.buy; })) },
+      { name: 'Rent', color: '#f59e0b', data: [r.cash].concat(r.years.map(function (y) { return y.renter; })) }] });
+  }
+  $('rvbCsv').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    var lines = ['Year,Owning costs,Rent paid,Home equity after selling costs,Buyer wealth,Renter wealth'];
+    last.r.years.forEach(function (y) { lines.push([y.y, y.own.toFixed(2), y.rent.toFixed(2), y.equity.toFixed(2), y.buy.toFixed(2), y.renter.toFixed(2)].join(',')); });
+    var a = $('dl'); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/csv' })); a.download = 'rent-vs-buy.csv'; a.click();
+    say('ok', 'Saved rent-vs-buy.csv.');
+  });
+  $('rvbCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText($('rvbVerdict').textContent + '\nWealth if you buy: ' + money(last.r.buy, 0) + '\nWealth if you rent: ' + money(last.r.renter, 0) + '\nMortgage payment: ' + money(last.r.pay) + '\nBreak-even: ' + $('rvbBreak').textContent, this);
+  });
+  $('rvb').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  curWire(calc);
+  calc();
+})();
+</script>

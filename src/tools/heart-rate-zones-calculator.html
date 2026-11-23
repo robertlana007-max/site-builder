@@ -1,0 +1,93 @@
+<style>
+.hrz .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.hrz .hrz-zones { display: grid; gap: 8px; margin-top: 16px; }
+.hrz .hrz-z { display: grid; grid-template-columns: 74px minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; border-inline-start: 6px solid var(--zc); }
+.hrz .hrz-z b { font-size: 15px; }
+.hrz .hrz-z strong { font-size: 18px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.hrz .hrz-z small { grid-column: 2 / -1; color: var(--muted); font-size: 13.5px; }
+.hrz .hrz-z span { font-weight: 600; }
+@media (max-width: 480px) { .hrz .hrz-z { grid-template-columns: minmax(0, 1fr) auto; } .hrz .hrz-z small { grid-column: 1 / -1; } .hrz .hrz-z > b { grid-column: 1 / -1; } }
+@media (max-width: 480px) { .hrz .stats { grid-template-columns: 1fr 1fr; } .hrz .stat { padding: 10px 12px; } }
+</style>
+<div class="hrz" id="hrz">
+<div class="fields">
+  <div><label for="hrzAge">Age (years)</label><input type="number" id="hrzAge" min="10" max="100" step="1" inputmode="numeric" value="35"></div>
+  <div><label for="hrzRest">Resting heart rate (bpm, optional)</label><input type="number" id="hrzRest" min="25" max="120" step="1" inputmode="numeric" placeholder="e.g. 60"></div>
+  <div><label for="hrzF">Max heart rate formula</label><select id="hrzF">
+    <option value="tanaka">Tanaka: 208 − 0.7 × age</option><option value="fox">Classic: 220 − age</option><option value="gellish">Gellish: 207 − 0.7 × age</option><option value="nes">Nes (HUNT): 211 − 0.64 × age</option><option value="gulati">Gulati (women): 206 − 0.88 × age</option><option value="own">I know my max heart rate</option></select></div>
+  <div id="hrzOwnBox" hidden><label for="hrzOwn">Your max heart rate (bpm)</label><input type="number" id="hrzOwn" min="100" max="230" step="1" inputmode="numeric" placeholder="e.g. 188"></div>
+  <div><label for="hrzM">Zone method</label><select id="hrzM"><option value="auto">Automatic (Karvonen if resting HR is given)</option><option value="max">% of max heart rate</option><option value="hrr">Karvonen (% of heart rate reserve)</option></select></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Max heart rate</span><b id="hrzMax">–</b></div>
+  <div class="stat"><span>Heart rate reserve</span><b id="hrzRes">–</b></div>
+  <div class="stat"><span>Method used</span><b id="hrzUsed">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="hrz-zones" id="hrzZones"></div>
+<p class="msg">These are estimates. Real max heart rate can differ from formulas by 10–20 bpm. If you have a heart condition, take medicine that affects heart rate, or are starting exercise after a long break, talk to a doctor first.</p>
+<div class="btns"><button type="button" class="btn ghost" id="hrzCopy">Copy zones</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  var FORM = { tanaka: function (a) { return 208 - 0.7 * a; }, fox: function (a) { return 220 - a; }, gellish: function (a) { return 207 - 0.7 * a; }, nes: function (a) { return 211 - 0.64 * a; }, gulati: function (a) { return 206 - 0.88 * a; } };
+  var Z = [
+    [1, 'Very light', 50, 60, '#94a3b8', 'Warm-up, cool-down and recovery. Easy breathing.'],
+    [2, 'Light', 60, 70, '#3b82f6', 'Easy endurance and fat burning. You can talk in full sentences.'],
+    [3, 'Moderate', 70, 80, '#10b981', 'Aerobic fitness. Breathing is harder; short sentences only.'],
+    [4, 'Hard', 80, 90, '#f59e0b', 'Threshold training. Talking is difficult; you can hold it for minutes.'],
+    [5, 'Maximum', 90, 100, '#ef4444', 'All-out efforts and short intervals. Only seconds to a few minutes.']];
+  var last = null;
+  function calc() {
+    var age = num('hrzAge'), rest = num('hrzRest'), f = $('hrzF').value, m = $('hrzM').value, own = num('hrzOwn');
+    $('hrzOwnBox').hidden = f !== 'own';
+    var fail = function (t) { ['hrzMax', 'hrzRes', 'hrzUsed'].forEach(function (i) { $(i).textContent = '–'; }); $('hrzZones').innerHTML = ''; last = null; say('bad', t); };
+    var max;
+    if (f === 'own') { if (!(own >= 100 && own <= 230)) return fail('Enter your measured max heart rate (100 to 230 bpm).'); max = own; }
+    else { if (!(age >= 10 && age <= 100)) return fail('Enter an age from 10 to 100.'); max = FORM[f](age); }
+    var hasRest = !isNaN(rest);
+    if (hasRest && !(rest >= 25 && rest <= 120)) return fail('Resting heart rate is usually between 40 and 100 bpm. Enter a number from 25 to 120, or leave it blank.');
+    if (hasRest && rest >= max - 20) return fail('Your resting heart rate must be well below your max heart rate.');
+    var use = m === 'auto' ? (hasRest ? 'hrr' : 'max') : m;
+    if (use === 'hrr' && !hasRest) return fail('The Karvonen method needs your resting heart rate. Measure your pulse for 60 seconds after waking up, then type it in.');
+    var R = hasRest ? max - rest : null;
+    var bpm = function (p) { return use === 'hrr' ? R * p / 100 + rest : max * p / 100; };
+    $('hrzMax').textContent = Math.round(max) + ' bpm';
+    $('hrzRes').textContent = R == null ? 'Needs resting HR' : Math.round(R) + ' bpm';
+    $('hrzUsed').textContent = use === 'hrr' ? 'Karvonen' : '% of max';
+    last = Z.map(function (z) { return { z: z, lo: Math.round(bpm(z[2])), hi: Math.round(bpm(z[3])) }; });
+    $('hrzZones').innerHTML = last.map(function (x) {
+      return '<div class="hrz-z" style="--zc:' + x.z[4] + '"><b>Zone ' + x.z[0] + '</b><span>' + x.z[1] + ' · ' + x.z[2] + '–' + x.z[3] + '%</span><strong>' + x.lo + '–' + x.hi + ' bpm</strong><small>' + x.z[5] + '</small></div>';
+    }).join('');
+    say('ok', use === 'hrr' ? 'Karvonen: target = (max − resting) × % + resting. It fits your fitness better because it uses your resting heart rate.' : 'Zones are a percentage of your max heart rate' + (hasRest ? '.' : '. Add your resting heart rate to use the more personal Karvonen method.'));
+  }
+  $('hrzCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Max heart rate: ' + $('hrzMax').textContent + ' (' + $('hrzUsed').textContent + ')\n' + last.map(function (x) { return 'Zone ' + x.z[0] + ' ' + x.z[1] + ' (' + x.z[2] + '–' + x.z[3] + '%): ' + x.lo + '–' + x.hi + ' bpm'; }).join('\n'), this);
+  });
+  $('hrz').addEventListener('input', calc);
+  $('hrz').addEventListener('change', calc);
+  calc();
+})();
+</script>
