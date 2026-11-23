@@ -1,0 +1,210 @@
+<style>
+.wc-me { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 18px; padding: 16px 18px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); margin-bottom: 16px; }
+.wc-me b { font-size: clamp(34px, 9vw, 52px); letter-spacing: -.03em; font-variant-numeric: tabular-nums; line-height: 1.05; }
+.wc-me div { min-width: 0; }
+.wc-me small { display: block; color: var(--muted); font-size: 14px; overflow-wrap: anywhere; }
+.wc-bar { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; margin-bottom: 12px; }
+.wc-bar select { width: auto; }
+.wc-bar label { margin: 0; font-weight: 400; font-size: 15px; }
+.wc-grid { list-style: none; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.wc-card { position: relative; border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; background: var(--bg); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; }
+.wc-card.night { background: color-mix(in srgb, #1e293b 9%, var(--bg)); }
+.wc-name { font-weight: 700; overflow-wrap: anywhere; padding-inline-end: 54px; }
+.wc-name small { display: block; font-weight: 400; color: var(--muted); font-size: 13px; }
+.wc-time { font-size: 30px; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wc-time .s { font-size: 17px; color: var(--muted); font-weight: 600; }
+.wc-sub { font-size: 13px; color: var(--muted); grid-column: 1 / -1; }
+.wc-sub span { white-space: nowrap; }
+.wc-face { grid-row: 2 / span 1; grid-column: 2; align-self: center; }
+.wc-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 0 6px; border-radius: 6px; background: var(--accent-soft); color: var(--accent); margin-inline-start: 4px; vertical-align: 3px; }
+.wc-btns { position: absolute; top: 8px; inset-inline-end: 8px; display: flex; gap: 4px; }
+.wc-btns button { font: inherit; font-size: 13px; width: 30px; height: 30px; padding: 0; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.wc-btns button:hover:not([disabled]) { border-color: var(--accent); color: var(--accent); }
+.wc-btns button[disabled] { opacity: .3; cursor: default; }
+@media (pointer: coarse) { .wc-btns button { width: 36px; height: 36px; } .wc-name { padding-inline-end: 80px; } }
+.wc-picks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.wc-picks button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 6px 12px; cursor: pointer; max-width: 100%; overflow-wrap: anywhere; text-align: start; }
+.wc-picks button:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+<div class="wc-me" aria-live="off">
+  <b id="wcMeTime">--:--</b>
+  <div><strong>Your time</strong><small id="wcMeSub"></small></div>
+</div>
+<div class="wc-bar">
+  <label for="wcFmt" style="font-weight:600">Clock</label>
+  <select id="wcFmt"><option value="24">24-hour</option><option value="12">12-hour (AM/PM)</option></select>
+  <label><input type="checkbox" id="wcSecs" checked> Seconds</label>
+  <label><input type="checkbox" id="wcFaces"> Clock faces</label>
+  <select id="wcSort" aria-label="Order of the clocks"><option value="mine">My order</option><option value="time">West to east</option><option value="name">A to Z</option></select>
+</div>
+<ul class="wc-grid" id="wcList" aria-label="World clocks"></ul>
+<p class="msg" id="wcMsg"></p>
+<div style="margin-top:14px">
+  <label for="wcFind">Add a city or time zone</label>
+  <input type="text" id="wcFind" data-nomemo autocomplete="off" placeholder="Search a city, country or zone, e.g. Lagos, Brazil, Asia/Kathmandu">
+  <div class="wc-picks" id="wcPicks"></div>
+</div>
+<div class="btns"><button class="btn ghost" id="wcReset" type="button">Reset to the starting cities</button></div>
+<script>
+(function () {
+  var CITY = "__CITIES__".split(';').map(function (s) { var p = s.split('|'); return { name: p[0], country: p[1], zone: p[2], lat: +p[3], lon: +p[4] }; });
+  var KEY = 'gtn-world-clock', local = 'UTC';
+  try { local = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'; } catch (e) { /* old browser */ }
+  var ALL = []; try { ALL = Intl.supportedValuesOf('timeZone').slice(); } catch (e) { ALL = CITY.map(function (c) { return c.zone; }); }
+  if (ALL.indexOf('UTC') === -1) ALL.push('UTC');
+  var START = ['Los Angeles|America/Los_Angeles', 'New York|America/New_York', 'São Paulo|America/Sao_Paulo', 'London|Europe/London', 'Lagos|Africa/Lagos', 'Dubai|Asia/Dubai', 'Mumbai|Asia/Kolkata', 'Beijing|Asia/Shanghai', 'Tokyo|Asia/Tokyo', 'Sydney|Australia/Sydney'].map(function (s) { return 'c:' + s; });
+
+  function canon(z) { try { return new Intl.DateTimeFormat('en-US', { timeZone: z }).resolvedOptions().timeZone; } catch (e) { return null; } }
+  var fmts = {};
+  function parts(t, z) {
+    var f = fmts[z] || (fmts[z] = new Intl.DateTimeFormat('en-US', { timeZone: z, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }));
+    var o = {}; f.formatToParts(new Date(t)).forEach(function (p) { o[p.type] = p.value; });
+    var h = +o.hour; if (h === 24) h = 0;
+    return { y: +o.year, mo: +o.month, d: +o.day, h: h, mi: +o.minute, s: +o.second };
+  }
+  function offMin(t, z) { var p = parts(t, z), u = Date.UTC(p.y, p.mo - 1, p.d, p.h, p.mi, p.s); return Math.round((u - Math.floor(t / 1000) * 1000) / 60000); }
+  function utcLabel(m) { var s = m < 0 ? '−' : '+'; m = Math.abs(m); return 'UTC' + s + Math.floor(m / 60) + (m % 60 ? ':' + String(m % 60).padStart(2, '0') : ''); }
+  function abbr(t, z) { try { var p = new Intl.DateTimeFormat('en-US', { timeZone: z, timeZoneName: 'short' }).formatToParts(new Date(t)); for (var i = 0; i < p.length; i++) if (p[i].type === 'timeZoneName') return /^GMT[+-]/.test(p[i].value) ? '' : p[i].value; } catch (e) { /* none */ } return ''; }
+  function loc() { return navigator.language || undefined; }
+  function clock(p, secs) {
+    var mm = String(p.mi).padStart(2, '0'), s = secs ? '<span class="s">:' + String(p.s).padStart(2, '0') + '</span>' : '';
+    if ($('wcFmt').value === '12') return (p.h % 12 || 12) + ':' + mm + s + ' <span class="s">' + (p.h < 12 ? 'AM' : 'PM') + '</span>';
+    return String(p.h).padStart(2, '0') + ':' + mm + s;
+  }
+  function plainTime(t, z) { return new Intl.DateTimeFormat(loc(), { timeZone: z, hour: 'numeric', minute: '2-digit', hour12: $('wcFmt').value === '12' }).format(new Date(t)); }
+  function dayText(t, z) { return new Intl.DateTimeFormat(loc(), { timeZone: z, weekday: 'short', day: 'numeric', month: 'short' }).format(new Date(t)); }
+
+  // sunrise and sunset (the standard sunrise equation), as times in ms; null when the sun does not rise or set that day
+  function sun(t, lat, lon) {
+    var r = Math.PI / 180, JD = t / 864e5 + 2440587.5, n = Math.round(JD - 2451545.0 + 0.0008 - lon / 360) , J = n - lon / 360;
+    var M = (357.5291 + 0.98560028 * J) % 360, C = 1.9148 * Math.sin(M * r) + 0.02 * Math.sin(2 * M * r) + 0.0003 * Math.sin(3 * M * r);
+    var L = (M + C + 180 + 102.9372) % 360, Jt = 2451545.0 + J + 0.0053 * Math.sin(M * r) - 0.0069 * Math.sin(2 * L * r);
+    var dec = Math.asin(Math.sin(L * r) * Math.sin(23.4397 * r)), cw = (Math.sin(-0.833 * r) - Math.sin(lat * r) * Math.sin(dec)) / (Math.cos(lat * r) * Math.cos(dec));
+    if (cw < -1) return { polar: 'day' }; if (cw > 1) return { polar: 'night' };
+    var w = Math.acos(cw) / r / 360, ms = function (j) { return (j - 2440587.5) * 864e5; };
+    return { rise: ms(Jt - w), set: ms(Jt + w) };
+  }
+
+  // ---------- list ----------
+  function load() { try { return JSON.parse(localStorage.getItem(KEY)) || {}; } catch (e) { return {}; } }
+  var saved = load(), ids = Array.isArray(saved.ids) ? saved.ids : START.slice();
+  if (saved.fmt === '12' || saved.fmt === '24') $('wcFmt').value = saved.fmt;
+  else { try { $('wcFmt').value = new Intl.DateTimeFormat(loc(), { hour: 'numeric' }).resolvedOptions().hour12 ? '12' : '24'; } catch (e) { /* keep 24 */ } }
+  if (typeof saved.secs === 'boolean') $('wcSecs').checked = saved.secs;
+  if (typeof saved.faces === 'boolean') $('wcFaces').checked = saved.faces;
+  if (saved.sort) $('wcSort').value = saved.sort;
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ ids: ids, fmt: $('wcFmt').value, secs: $('wcSecs').checked, faces: $('wcFaces').checked, sort: $('wcSort').value })); } catch (e) { $('wcMsg').textContent = 'Your browser did not let this page save the list.'; } }
+  function entry(id) {
+    if (id.slice(0, 2) === 'c:') {
+      var p = id.slice(2).split('|'), c = CITY.find(function (x) { return x.name === p[0] && x.zone === p[1]; });
+      return c && canon(c.zone) ? { id: id, name: c.name, sub: c.country, zone: c.zone, lat: c.lat, lon: c.lon } : null;
+    }
+    var z = id.slice(2); if (!canon(z)) return null;
+    var bits = z.split('/'); return { id: id, name: z === 'UTC' ? 'UTC' : bits[bits.length - 1].replace(/_/g, ' '), sub: z === 'UTC' ? 'Coordinated Universal Time' : z.replace(/_/g, ' '), zone: z };
+  }
+  ids = ids.filter(function (id) { return typeof id === 'string' && entry(id); });
+
+  var cards = [];
+  function build() {
+    var ul = $('wcList'); ul.innerHTML = ''; cards = [];
+    var list = ids.map(entry).filter(Boolean), now = Date.now(), sort = $('wcSort').value;
+    if (sort === 'time') list.sort(function (a, b) { return offMin(now, a.zone) - offMin(now, b.zone) || a.name.localeCompare(b.name); });
+    if (sort === 'name') list.sort(function (a, b) { return a.name.localeCompare(b.name); });
+    list.forEach(function (e) {
+      var li = document.createElement('li'); li.className = 'wc-card';
+      var nm = document.createElement('div'); nm.className = 'wc-name'; nm.textContent = e.name;
+      var sm = document.createElement('small'); sm.textContent = e.sub; nm.appendChild(sm);
+      var tm = document.createElement('div'); tm.className = 'wc-time';
+      var sub = document.createElement('div'); sub.className = 'wc-sub';
+      var btns = document.createElement('div'); btns.className = 'wc-btns';
+      var k = ids.indexOf(e.id);
+      if (sort === 'mine') [['↑', 'Move up', k > 0, -1], ['↓', 'Move down', k < ids.length - 1, 1]].forEach(function (b) {
+        var bt = document.createElement('button'); bt.type = 'button'; bt.textContent = b[0]; bt.disabled = !b[2]; bt.setAttribute('aria-label', b[1] + ' ' + e.name);
+        bt.addEventListener('click', function () { var j = ids.indexOf(e.id); ids.splice(j + b[3], 0, ids.splice(j, 1)[0]); save(); build(); });
+        btns.appendChild(bt);
+      });
+      var x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove ' + e.name);
+      x.addEventListener('click', function () { ids = ids.filter(function (i) { return i !== e.id; }); save(); build(); $('wcMsg').textContent = e.name + ' removed.'; });
+      btns.appendChild(x);
+      li.appendChild(nm); li.appendChild(tm);
+      var face = null;
+      if ($('wcFaces').checked) { face = faceSvg(); face.classList.add('wc-face'); li.appendChild(face); tm.style.gridColumn = '1'; }
+      li.appendChild(sub); li.appendChild(btns); ul.appendChild(li);
+      cards.push({ e: e, li: li, tm: tm, sub: sub, face: face, day: '' });
+    });
+    if (!list.length) { var p = document.createElement('li'); p.className = 'wc-sub'; p.textContent = 'No clocks yet. Search for a city below to add one.'; ul.appendChild(p); }
+    tick(true);
+  }
+  function faceSvg() {
+    var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg');
+    s.setAttribute('viewBox', '0 0 100 100'); s.setAttribute('width', '58'); s.setAttribute('height', '58'); s.setAttribute('aria-hidden', 'true');
+    var html = '<circle cx="50" cy="50" r="46" fill="var(--surface)" stroke="currentColor" stroke-opacity=".35" stroke-width="3"/>';
+    for (var i = 0; i < 12; i++) html += '<line x1="50" y1="8" x2="50" y2="' + (i % 3 ? 13 : 16) + '" stroke="currentColor" stroke-opacity=".5" stroke-width="' + (i % 3 ? 2 : 3.5) + '" transform="rotate(' + i * 30 + ' 50 50)"/>';
+    html += '<line class="h" x1="50" y1="50" x2="50" y2="27" stroke="currentColor" stroke-width="6" stroke-linecap="round"/><line class="m" x1="50" y1="50" x2="50" y2="16" stroke="currentColor" stroke-width="4" stroke-linecap="round"/><line class="sec" x1="50" y1="58" x2="50" y2="12" stroke="#e5484d" stroke-width="2"/><circle cx="50" cy="50" r="4" fill="currentColor"/>';
+    s.innerHTML = html; return s;
+  }
+  function rel(m) {
+    if (!m) return 'Same time as you';
+    var a = Math.abs(m), h = Math.floor(a / 60), mi = a % 60;
+    return (m > 0 ? '+' : '−') + (h ? h + ' h' : '') + (h && mi ? ' ' : '') + (mi ? mi + ' min' : '') + (m > 0 ? ' ahead of you' : ' behind you');
+  }
+  function tick(force) {
+    var now = Date.now(), secs = $('wcSecs').checked, me = parts(now, local), myOff = offMin(now, local);
+    $('wcMeTime').innerHTML = clock(me, secs);
+    $('wcMeSub').textContent = new Intl.DateTimeFormat(loc(), { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(now)) + ' · ' + local.replace(/_/g, ' ') + ' · ' + utcLabel(myOff);
+    var myDay = Date.UTC(me.y, me.mo - 1, me.d);
+    cards.forEach(function (c) {
+      var z = c.e.zone, p = parts(now, z);
+      c.tm.innerHTML = clock(p, secs);
+      if (c.face) {
+        c.face.querySelector('.h').setAttribute('transform', 'rotate(' + ((p.h % 12) * 30 + p.mi * .5) + ' 50 50)');
+        c.face.querySelector('.m').setAttribute('transform', 'rotate(' + (p.mi * 6 + p.s * .1) + ' 50 50)');
+        var sc = c.face.querySelector('.sec'); sc.style.display = secs ? '' : 'none'; sc.setAttribute('transform', 'rotate(' + p.s * 6 + ' 50 50)');
+      }
+      if (!force && p.s !== 0 && c.day) return; // the rest changes at most once a minute
+      var off = offMin(now, z), dd = Math.round((Date.UTC(p.y, p.mo - 1, p.d) - myDay) / 864e5), tag = dd === 1 ? 'Tomorrow' : dd === -1 ? 'Yesterday' : '';
+      var bits = [dayText(now, z) + (tag ? ' · ' + tag : ''), rel(off - myOff), (abbr(now, z) ? abbr(now, z) + ' · ' : '') + utcLabel(off)], night = null;
+      if (c.e.lat != null) {
+        var noon = Date.UTC(p.y, p.mo - 1, p.d, 12) - off * 60000, sn = sun(noon, c.e.lat, c.e.lon);
+        if (sn.polar) { night = sn.polar === 'night'; bits.push(night ? '☾ Polar night: no sunrise today' : '☀ Midnight sun: no sunset today'); }
+        else { night = now < sn.rise || now > sn.set; bits.push((night ? '☾ Night' : '☀ Day') + ' · sunrise ' + plainTime(sn.rise, z) + ', sunset ' + plainTime(sn.set, z)); }
+      } else { night = p.h < 6 || p.h >= 18; bits.push(night ? '☾ Night' : '☀ Day'); }
+      c.li.classList.toggle('night', night);
+      var key = bits.join('|');
+      if (key !== c.day) { c.day = key; c.sub.innerHTML = ''; bits.forEach(function (b, i) { if (i) c.sub.appendChild(document.createTextNode(' · ')); var s = document.createElement('span'); s.textContent = b; c.sub.appendChild(s); if (i === 1) c.sub.appendChild(document.createElement('br')); }); }
+    });
+  }
+  var timer = null;
+  function loop() { clearTimeout(timer); tick(false); timer = setTimeout(loop, 1000 - Date.now() % 1000 + 5); }
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) { tick(true); loop(); } });
+  ['wcFmt', 'wcSecs', 'wcFaces', 'wcSort'].forEach(function (id) { $(id).addEventListener('change', function () { save(); build(); }); });
+  $('wcReset').addEventListener('click', function () { ids = START.slice(); $('wcSort').value = 'mine'; save(); build(); $('wcMsg').textContent = 'The starting cities are back.'; });
+
+  // ---------- search ----------
+  function fold(s) { return s.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_/]/g, ' '); }
+  function find(q) {
+    q = fold(q.trim()); if (!q) return [];
+    var out = [], seen = {};
+    CITY.forEach(function (c) { var n = fold(c.name), co = fold(c.country); var sc = n.indexOf(q) === 0 ? 0 : n.indexOf(q) > 0 ? 1 : co.indexOf(q) === 0 ? 2 : fold(c.zone).indexOf(q) !== -1 ? 3 : -1; if (sc >= 0) out.push({ id: 'c:' + c.name + '|' + c.zone, label: c.name + ', ' + c.country, sc: sc }); });
+    ALL.forEach(function (z) { var f = fold(z); if (f.indexOf(q) !== -1) { var c = canon(z); if (seen[c]) return; seen[c] = 1; out.push({ id: 'z:' + z, label: z.replace(/_/g, ' '), sc: 4 }); } });
+    if ('utc gmt'.indexOf(q) !== -1 && !seen.UTC) out.push({ id: 'z:UTC', label: 'UTC (Coordinated Universal Time)', sc: 0 });
+    out.sort(function (a, b) { return a.sc - b.sc || a.label.localeCompare(b.label); });
+    return out.slice(0, 14);
+  }
+  $('wcFind').addEventListener('input', function () {
+    var box = $('wcPicks'), q = $('wcFind').value, res = find(q); box.innerHTML = '';
+    res.forEach(function (r) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = '+ ' + r.label;
+      b.addEventListener('click', function () {
+        if (ids.indexOf(r.id) !== -1) { $('wcMsg').textContent = r.label + ' is already in your list.'; return; }
+        ids.push(r.id); save(); build(); $('wcFind').value = ''; box.innerHTML = ''; $('wcMsg').textContent = r.label + ' added.';
+      });
+      box.appendChild(b);
+    });
+    if (q.trim() && !res.length) { var p = document.createElement('span'); p.className = 'wc-sub'; p.textContent = 'No city or time zone matches "' + q.trim() + '". Try the country name or a bigger city nearby.'; box.appendChild(p); }
+  });
+  $('wcFind').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); var b = $('wcPicks').querySelector('button'); if (b) b.click(); } });
+
+  build(); loop();
+})();
+</script>
