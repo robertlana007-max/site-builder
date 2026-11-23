@@ -35,7 +35,7 @@
   <div class="aw-img" id="imgBox" hidden><button class="btn ghost" type="button" id="imgBtn">Choose a picture</button><span id="imgName">JPG, PNG or WebP. It fills the frame; the edges are filled with a blurred copy if the shape differs.</span><input type="file" id="img" accept="image/*" hidden data-nomemo></div>
   <h3 class="aw-sec">Waveform</h3>
   <div class="fields">
-    <div><label for="style">Style</label><select id="style"><option value="cline">Smooth wave</option><option value="p2p">Filled wave</option><option value="bars">Frequency bars</option><option value="point">Dots</option></select></div>
+    <div><label for="style">Style</label><select id="style"><option value="bars">Bars</option><option value="p2p">Smooth wave</option><option value="cline">Filled wave</option><option value="point">Dots</option></select></div>
     <div><label for="wc">Colour</label><input type="color" id="wc" value="#ffffff"></div>
     <div><label for="wpos">Position</label><select id="wpos"><option value="0.5">Middle</option><option value="0.78" selected>Lower part</option><option value="0.25">Upper part</option></select></div>
     <div><label for="wh">Height</label><div class="aw-range"><input type="range" id="wh" min="10" max="60" step="1" value="28"><output id="whOut">28%</output></div></div>
@@ -349,10 +349,10 @@ var VT = (function () {
     var b = waveBox(pw, ph), st = $('style').value, n = 96; g.strokeStyle = g.fillStyle = $('wc').value; g.lineWidth = Math.max(1, ph / 300);
     var vals = [];
     for (var i = 0; i < n; i++) vals.push(data ? data[Math.floor(i / n * data.length)] : Math.sin(i / n * Math.PI * 6) * 0.6 * Math.sin(i / n * Math.PI));
-    if (st === 'bars') { var bw = b.w / n; vals.forEach(function (v, i) { var hh = Math.abs(v) * b.h; g.fillRect(b.x + i * bw, b.y + b.h - hh, Math.max(1, bw * 0.7), hh); }); return; }
     var mid = b.y + b.h / 2;
+    if (st === 'bars') { var bw = b.w / 64; for (var j = 0; j < 64; j++) { var v0 = Math.abs(vals[Math.floor(j / 64 * n)]), hh = Math.max(1, v0 * b.h / 2); g.fillRect(b.x + j * bw, mid - hh, bw / 2, hh * 2); } return; }
     if (st === 'point') { vals.forEach(function (v, i) { g.fillRect(b.x + i / n * b.w, mid - v * b.h / 2, 2, 2); }); return; }
-    if (st === 'p2p') { vals.forEach(function (v, i) { var hh = Math.abs(v) * b.h / 2; g.fillRect(b.x + i / n * b.w, mid - hh, Math.max(1, b.w / n * 0.6), hh * 2); }); return; }
+    if (st === 'cline') { vals.forEach(function (v, i) { var hh = Math.abs(v) * b.h / 2; g.fillRect(b.x + i / n * b.w, mid - hh, b.w / n + 0.5, hh * 2); }); return; }
     g.beginPath(); vals.forEach(function (v, i) { var x = b.x + i / (n - 1) * b.w, y = mid - v * b.h / 2; if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
   }
   function hint() {
@@ -410,10 +410,10 @@ var VT = (function () {
     var r = range(); if (!r.err && (S.currentTime < r.a || S.currentTime >= r.b)) S.currentTime = r.a;
     var p = S.play(); if (p && p.catch) p.catch(function () { VT.say('bad', 'Your browser cannot play this audio file here, but you can still make the video.'); stopHear(); });
     $('hear').textContent = '■ Stop preview';
-    var td = new Float32Array(2048), fd = new Uint8Array(1024);
+    var td = new Float32Array(2048);
     (function loop() {
       if (S.paused) return;
-      if (an) { if ($('style').value === 'bars') { an.getByteFrequencyData(fd); var v = []; for (var i = 0; i < 96; i++) v.push(fd[Math.floor(Math.pow(i / 96, 2) * 700)] / 255); draw(v); } else { an.getFloatTimeDomainData(td); draw(td); } }
+      if (an) { an.getFloatTimeDomainData(td); if ($('style').value === 'bars') { var v = []; for (var i = 0; i < 96; i++) { var m = 0; for (var k = 0; k < 21; k++) m = Math.max(m, Math.abs(td[i * 21 + k])); v.push(Math.sqrt(m)); } draw(v); } else draw(td); }
       raf = requestAnimationFrame(loop);
     })();
   });
@@ -429,8 +429,8 @@ var VT = (function () {
     busy = true;
     VT.go('Making your video', function (pct) {
       return new Promise(function (res, rej) { c.toBlob(function (bl) { if (!bl) rej(new Error('The picture could not be made.')); else bl.arrayBuffer().then(res); }, 'image/png'); }).then(function (png) {
-        var viz = st === 'bars'
-          ? 'showfreqs=s=' + b.w + 'x' + b.h + ':mode=bar:ascale=sqrt:fscale=log:win_size=2048:colors=' + col + ':rate=' + fps
+        var viz = st === 'bars' // 64 bars: draw 128 columns, blank every second one, then enlarge with sharp edges
+          ? 'showwaves=s=128x' + b.h + ':mode=cline:colors=' + col + ':rate=' + fps + ':scale=sqrt:draw=full,format=rgba,geq=r=\'r(X,Y)\':g=\'g(X,Y)\':b=\'b(X,Y)\':a=\'if(mod(X,2),0,alpha(X,Y))\',scale=' + b.w + ':' + b.h + ':flags=neighbor'
           : 'showwaves=s=' + b.w + 'x' + b.h + ':mode=' + st + ':colors=' + col + ':rate=' + fps + ':scale=sqrt:draw=full';
         var graph = '[1:a]aformat=channel_layouts=mono,' + viz + ',format=rgba[w];[0:v][w]overlay=' + b.x + ':' + b.y + ':shortest=1,format=yuv420p[v]';
         return FF.run(f, function (inp) {

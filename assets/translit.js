@@ -41,13 +41,13 @@
     uk: {
       simple: extend(CYR_SIMPLE, table('г=h и=y є=ie ї=i й=i ю=iu я=ia ь= ’= \'=')),
       icao: extend(CYR_SIMPLE, table('г=h и=y є=ie ї=i й=i ю=iu я=ia ь= ’= \'=')),
-      alalc: extend(CYR_SIMPLE, table('г=h ґ=g и=y є=i\u0361e і=i ї=ï й=ĭ ц=t\u0361s ю=i\u0361u я=i\u0361a ь=ʹ')),
+      alalc: extend(CYR_SIMPLE, table('г=h ґ=g и=y є=i\u0361e і=i ї=ï й=ĭ ц=t\u0361s ю=i\u0361u я=i\u0361a ь=ʹ ’=ʺ \'=ʺ')),
       iso9: CYR_ISO9
     },
     be: {
       simple: extend(CYR_SIMPLE, table('г=h ў=w і=i ы=y э=e е=ie ё=io ю=iu я=ia й=j ь=\' ’= \'=')),
       icao: extend(CYR_SIMPLE, table('г=h ў=u і=i е=e ё=e ю=iu я=ia й=i ь=')),
-      alalc: extend(CYR_SIMPLE, table('г=h ў=ŭ і=i ё=ë й=ĭ ц=t\u0361s э=ė ю=i\u0361u я=i\u0361a ь=ʹ')),
+      alalc: extend(CYR_SIMPLE, table('г=h ў=ŭ і=i ё=ë й=ĭ ц=t\u0361s э=ė ю=i\u0361u я=i\u0361a ь=ʹ ’=ʺ \'=ʺ')),
       iso9: CYR_ISO9
     },
     bg: {
@@ -125,8 +125,10 @@
       if (c === '\u0652') continue; // sukun
       if (c === '\u0651') { var m = out.match(/(sh|th|kh|dh|gh|zh|ch|[^aiuāīū\s])([aiu]?)$/); if (m) out = out.slice(0, -m[0].length) + m[1] + m[1] + m[2]; continue; } // shadda doubles the consonant
       // the article al- at the start of a word
-      if (wordStart && c === 'ا' && next === 'ل' && isL(chars[i + 2])) { out += 'al-'; i++; continue; }
-      if (c === 'ا') { if (wordStart) out += full ? '' : 'a'; else { if (/a$/.test(out) && prev === '\u064e') out = out.slice(0, -1); out += LONG[c]; } continue; }
+      if (wordStart && c === 'ا') { var j = i + 1; while (HARAKA[chars[j]]) j++; var k = j + 1; while (chars[k] === '\u0652') k++; if (chars[j] === 'ل' && isL(chars[k])) { out += 'al-'; i = k - 1; continue; } }
+      // a word-initial alif only carries a vowel: use its vowel mark, or guess a (i under إ) when the text has no marks: اردو -> ardū
+      if (wordStart && (c === 'أ' || c === 'إ')) { out += HARAKA[next] ? '' : c === 'إ' ? 'i' : 'a'; continue; }
+      if (c === 'ا') { if (wordStart) out += HARAKA[next] ? '' : 'a'; else { if (/a$/.test(out) && prev === '\u064e') out = out.slice(0, -1); out += LONG[c]; } continue; }
       if (c === 'و' || c === 'ي' || c === 'ی' || c === 'ے') {
         var cons = c === 'و' ? 'w' : 'y';
         if (c === 'ے') { out += LONG[c]; continue; }
@@ -135,7 +137,7 @@
         if ((prev === '\u0650' && c !== 'و') || (prev === '\u064f' && c === 'و')) { out = out.slice(0, -1) + LONG[c]; continue; } // fī, ū: the short vowel mark plus the letter make one long vowel
         out += isL(prev) || prev === '\u0650' || prev === '\u064f' ? LONG[c] : cons; continue;
       }
-      if (c === 'ة') { out += full ? (/[aāiu]$/.test(out) ? '' : 'a') + (isL(next) ? 't' : 'h') : 'a'; continue; }
+      if (c === 'ة') { out += full ? (/[aāiu]$/.test(out) ? '' : 'a') + (isL(next) ? 't' : 'h') : /a$/.test(out) ? '' : 'a'; continue; }
       if (M[c] !== undefined) { out += (wordStart && /^[ʾ']/.test(M[c]) && !full) ? M[c].slice(1) : (wordStart && M[c] === 'ʾ' ? '' : M[c]); continue; }
       out += c;
     }
@@ -309,13 +311,19 @@
       if (prev && prev.f) {
         var pf = prev.f;
         if (s.i === 11) ini = ''; // handled by the liaison below
+        else if ((pf === 27 || pf === 6 || pf === 15) && (s.i === 0 || s.i === 3 || s.i === 12)) ini = s.i === 0 ? 'k' : s.i === 3 ? 't' : 'ch'; // ㅎ makes the next sound aspirated: 좋다 -> jota
+        else if (pf === 27 && s.i === 9) ini = 's'; // 좋습니다 -> josseumnida
+        else if (pf === 7 && s.i === 18 && s.v === 20) ini = ''; // 굳히다 -> guchida (handled below)
         else if (s.i === 5) ini = (pf === 8 || pf === 4) ? 'l' : 'n'; // ㄹ after ㄹ/ㄴ is l, after others n
         else if (s.i === 2 && pf === 8) ini = 'l';
       }
       out += ini + KO_V[s.v];
       if (s.f) {
         var nx = dec(chars[x + 1]), f = KO_F[s.f];
-        if (nx && nx.i === 11) out += f[1];               // liaison: 한국어 -> hangugeo
+        if (nx && (s.f === 7 || s.f === 25) && nx.i === 11 && nx.v === 20) out += s.f === 7 ? 'j' : 'ch'; // palatalization: 같이 -> gachi, 해돋이 -> haedoji
+        else if (nx && s.f === 7 && nx.i === 18 && nx.v === 20) out += 'ch';                         // 굳히다 -> guchida
+        else if (nx && (s.f === 27 || s.f === 6 || s.f === 15) && (nx.i === 0 || nx.i === 3 || nx.i === 12 || nx.i === 9)) out += s.f === 6 ? 'n' : s.f === 15 ? 'l' : nx.i === 9 ? 's' : '';
+        else if (nx && nx.i === 11) out += f[1];               // liaison: 한국어 -> hangugeo
         else if (nx && (nx.i === 2 || nx.i === 6)) {        // nasal assimilation: 국민 -> gungmin, 합니다 -> hamnida
           var snd = f[0]; out += snd === 'k' ? 'ng' : snd === 'p' ? 'm' : snd === 't' ? 'n' : snd === 'l' && nx.i === 2 ? 'l' : snd;
         } else if (nx && nx.i === 5) { var sd = f[0]; out += sd === 'n' ? 'l' : sd === 'k' ? 'ng' : sd === 'p' ? 'm' : sd === 't' ? 'n' : sd; }
@@ -349,9 +357,8 @@
       if (c === 'ん') { var nx = chars[i + 1] || '', nr = KANA[nx] || ''; out += 'n' + (/^[aeiouy]/.test(nr) ? '\'' : ''); lastV = ''; continue; }
       if (KANA[c] !== undefined) {
         var r = KANA[c];
-        // long vowels written with kana: おう / おお / うう -> ō / ū  (only within a word written in hiragana; katakana uses ー)
-        var isKatakana = /[ァ-ヶ]/.test(origin[i]);
-        if (long !== 'double' && !isKatakana && ((c === 'う' && /o$|u$/.test(out) && lastV) || (c === 'お' && /o$/.test(out) && lastV))) {
+        // long vowels written with kana: おう / おお / うう (トウ / オオ / ウウ) -> ō / ū, as in Hepburn: とうきょう / トウキョウ -> Tōkyō
+        if (long !== 'double' && ((c === 'う' && /o$|u$/.test(out) && lastV) || (c === 'お' && /o$/.test(out) && lastV))) {
           if (long === 'macron') out = out.slice(0, -1) + (out.slice(-1) === 'o' ? 'ō' : 'ū');
           lastV = ''; continue;
         }

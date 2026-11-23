@@ -131,7 +131,7 @@
       if (c === '}' || c === ')' || c === ']') depth--;
       if (c === '+' && depth === 0 && s[i - 1] !== '^') {
         var rest = s.slice(i + 1).replace(/^\s+/, ''), spaced = /\s/.test(s[i - 1] || '') || /\s/.test(s[i + 1] || '');
-        if (rest === '' ) { cur += c; continue; }
+        if (rest === '') { if (/\s/.test(s[i - 1] || '') || !cur.trim()) throw new ChemErr('Something is missing after the last "+". Remove it or add the missing substance.'); cur += c; continue; }
         if (/^[A-Z(\[{\d]/.test(rest) || (/^e(?![a-z])/.test(rest) && (spaced || /[A-Za-z)\]}\d+-]/.test(s[i - 1] || '')))) { if (cur.trim()) { parts.push(cur.trim()); cur = ''; continue; } }
         if (spaced && cur.trim() && !/^\+/.test(rest)) { parts.push(cur.trim()); cur = ''; continue; }
       }

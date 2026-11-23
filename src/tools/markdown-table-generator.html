@@ -114,10 +114,22 @@
     if (f !== '' || row.length) { row.push(f); rows.push(row); }
     return rows;
   }
+  // Split one Markdown table line into cells: \| is a pipe inside a cell, \\ a backslash.
+  function mdSplit(l) {
+    var cells = [], f = '', i = l.charAt(0) === '|' ? 1 : 0;
+    for (; i < l.length; i++) {
+      var ch = l.charAt(i);
+      if (ch === '\\' && (l.charAt(i + 1) === '|' || l.charAt(i + 1) === '\\')) { f += l.charAt(++i); continue; }
+      if (ch === '|') { cells.push(f); f = ''; continue; }
+      f += ch;
+    }
+    if (f.trim() || l.charAt(l.length - 1) !== '|' || l.length === 1) cells.push(f);
+    return cells.map(function (x) { return x.trim().replace(/<br\s*\/?>/gi, '\n'); });
+  }
   function parseMd(t) {
     var lines = t.split(/\r?\n/).filter(function (l) { return l.trim(); }), al = null, rows = [];
     lines.forEach(function (l) {
-      var s = l.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, ''), cells = s.split(/(?<!\\)\|/).map(function (x) { return x.trim().replace(/\\\|/g, '|').replace(/<br\s*\/?>/gi, '\n'); });
+      var cells = mdSplit(l.trim());
       if (cells.every(function (x) { return /^:?-{1,}:?$/.test(x); })) { al = cells.map(function (x) { return /^:.*:$/.test(x) ? 'c' : /:$/.test(x) ? 'r' : /^:/.test(x) ? 'l' : ''; }); return; }
       rows.push(cells);
     });
@@ -141,7 +153,7 @@
       rows.forEach(function (r, i) { var y = at.r + i; while (data.length <= y) data.push([]); r.forEach(function (x, j) { var cx = at.c + j; if (cx < MAXC) { while (data[y].length < cx) data[y].push(''); data[y][cx] = x; } }); });
     } else { data = rows.map(function (r) { return r.slice(); }); align = p.align ? p.align.slice() : []; }
     draw();
-    say(cut ? 'bad' : 'ok', 'Imported ' + fmtNum(rows.length) + ' rows.' + (cut ? ' Only the first ' + MAXC + ' columns were kept.' : ''));
+    say(cut ? 'bad' : 'ok', 'Imported ' + fmtNum(rows.length) + ' row' + (rows.length === 1 ? '' : 's') + '.' + (cut ? ' Only the first ' + MAXC + ' columns were kept.' : ''));
   }
 
   $('mtGrid').addEventListener('input', function (e) {

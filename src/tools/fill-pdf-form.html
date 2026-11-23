@@ -406,7 +406,15 @@
           throw new Error('The field "' + F.label + '" could not be filled' + (F.kind === 'text' && /length/i.test(String(e && e.message)) ? ': the text is longer than this field allows.' : '.'));
         }
       });
-      var T = await PDFText.create(d, { text: texts, onStatus: function (m) { PT.say('', m); } }), pages = d.getPages();
+      // fields now name the Noto font in their default look: list it in the form's resources, so readers that redraw fields can find it
+      try {
+        var ac = form.acroForm.dict, dr = ac.lookup(L.PDFName.of('DR'), L.PDFDict);
+        if (!dr) { dr = d.context.obj({}); ac.set(L.PDFName.of('DR'), dr); }
+        var df = dr.lookup(L.PDFName.of('Font'), L.PDFDict);
+        if (!df) { df = d.context.obj({}); dr.set(L.PDFName.of('Font'), df); }
+        df.set(L.PDFName.of(font.name), font.ref);
+      } catch (e) { /* the fields keep their own drawings */ }
+      var T = await PDFText.create(d,{ text: texts, onStatus: function (m) { PT.say('', m); } }), pages = d.getPages();
       // answers in scripts the form font cannot show (Arabic, Chinese…)
       special.forEach(function (s) {
         if (flat) {
