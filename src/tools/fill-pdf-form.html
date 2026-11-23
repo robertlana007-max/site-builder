@@ -1,0 +1,459 @@
+<style>
+.ff-info { margin: 0 0 14px; }
+.ff-list { display: grid; gap: 12px; margin-bottom: 16px; }
+.ff-list h3 { margin: 6px 0 0; font-size: 15px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+.ff-row { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); }
+.ff-row.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.ff-row > label, .ff-row > .ff-lab { display: block; font-size: 14px; font-weight: 600; margin: 0 0 6px; overflow-wrap: anywhere; }
+.ff-row small { display: block; font-weight: 400; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.ff-row textarea { min-height: 80px; font-family: inherit; font-size: 15px; }
+.ff-row select[multiple] { min-height: 110px; }
+.ff-opts { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.ff-opts label { font-weight: 400; font-size: 15px; margin: 0; }
+.ff-tools { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.ff-tools .btn { min-height: 40px; padding: 6px 13px; }
+.ff-tools .btn[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.ff-tools select { width: auto; min-height: 40px; padding: 6px 10px; }
+.ff-sheet.arm { cursor: copy; outline: 3px dashed var(--accent); outline-offset: 2px; }
+.ff-layer { position: absolute; inset: 0; }
+.ff-w { position: absolute; background: rgba(37, 99, 235, .12); border: 1px solid rgba(37, 99, 235, .55); border-radius: 2px; cursor: pointer; overflow: hidden; color: #1d4ed8; font: 11px/1.15 Arial, sans-serif; white-space: nowrap; padding: 0 2px; box-sizing: border-box; }
+.ff-w.on { background: rgba(37, 99, 235, .28); border-color: #1d4ed8; }
+.ff-it { position: absolute; display: flex; align-items: flex-start; touch-action: none; }
+.ff-it input { font-family: Arial, "Noto Sans", sans-serif; line-height: 1.2; padding: 0; margin: 0; border: 1px dashed #2563eb; border-radius: 0; background: rgba(255, 255, 255, .6); min-height: 0; width: auto; box-shadow: none; }
+.ff-it svg { display: block; border: 1px dashed transparent; }
+.ff-it:hover svg, .ff-it.on svg { border-color: #2563eb; }
+.ff-grip, .ff-x { flex: none; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid #fff; color: #fff; font: 700 12px/16px system-ui, sans-serif; cursor: move; touch-action: none; margin-inline-start: 2px; }
+.ff-grip { background: #2563eb; } .ff-x { background: #e5484d; cursor: pointer; }
+@media (pointer: coarse) { .ff-grip, .ff-x { width: 30px; height: 30px; line-height: 24px; } }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF form here</b>Fill it in on your device. The file is never uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div id="ffWork" hidden>
+  <div class="notice ff-info" id="ffInfo"><p id="ffInfoText"></p></div>
+  <div class="ff-list" id="ffList"></div>
+  <h3 style="margin:8px 0 8px;font-size:17px">Type anywhere on the page</h3>
+  <div class="ff-tools">
+    <button class="btn ghost" type="button" id="ffAddText" aria-pressed="false">+ Text</button>
+    <button class="btn ghost" type="button" id="ffAddCheck" aria-pressed="false" aria-label="Add a tick mark">+ ✓</button>
+    <button class="btn ghost" type="button" id="ffAddCross" aria-pressed="false" aria-label="Add a cross mark">+ ✗</button>
+    <button class="btn ghost" type="button" id="ffAddDate" aria-pressed="false">+ Date</button>
+    <select id="ffSize" aria-label="Text size"><option value="8">8 pt</option><option value="10">10 pt</option><option value="11" selected>11 pt</option><option value="12">12 pt</option><option value="14">14 pt</option><option value="18">18 pt</option><option value="24">24 pt</option></select>
+    <select id="ffColor" aria-label="Text colour"><option value="#111111">Black</option><option value="#1d4ed8">Blue</option><option value="#b91c1c">Red</option></select>
+  </div>
+  <div class="pager">
+    <button class="btn ghost" id="ffPrev" type="button" aria-label="Previous page">‹</button>
+    <span id="ffPageNo">Page 1 of 1</span>
+    <button class="btn ghost" id="ffNext" type="button" aria-label="Next page">›</button>
+    <span class="grow"></span>
+    <span id="ffHint">Pick + Text, then tap the page where it goes.</span>
+  </div>
+  <div class="stage"><div class="sheet ff-sheet" id="ffSheet"><canvas id="ffCv"></canvas><div class="ff-layer" id="ffLayer"></div></div></div>
+  <div class="checks" style="margin-top:14px">
+    <label><input type="checkbox" id="ffFlat"> Flatten: make the filled answers part of the page, so they can no longer be changed</label>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Save filled PDF</button><a class="btn ghost" id="dl" hidden>Download filled PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script src="../assets/pdf-text.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, doc = null, pdf = null, n = 0, cur = 1, fields = [], items = [], busy = false, unlocked = false, xfa = false;
+  var view = { scale: 1, w: 1, h: 1, vp: null }, arm = null, sel = null, uid = 0;
+  var cv = $('ffCv'), layer = $('ffLayer'), sheet = $('ffSheet');
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so the form can be changed ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (b) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(b));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+
+  function info(text, cls) { $('ffInfo').className = 'notice ff-info ' + (cls || ''); $('ffInfoText').textContent = text; }
+  function nice(s) { return String(s || '').replace(/^.*\./, '').replace(/[_]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').replace(/\s*\[\d+\]$/, '').trim().replace(/^./, function (c) { return c.toUpperCase(); }) || 'Field'; }
+  function dirty() { $('dl').hidden = true; }
+
+  // ---------- fields ----------
+  function tooltip(f) { try { var tu = f.acroField.dict.lookup(PDFLib.PDFName.of('TU')); return tu && tu.decodeText ? tu.decodeText().trim() : ''; } catch (e) { return ''; } }
+  function pageOfWidgets(f) {
+    var ws = f.acroField.getWidgets(), pages = doc.getPages(), out = [];
+    ws.forEach(function (w) {
+      var pi = -1, pref = w.P();
+      if (pref) pi = pages.findIndex(function (p) { return p.ref === pref; });
+      if (pi < 0) pi = pages.findIndex(function (p) { var a = p.node.Annots(); if (!a) return false; for (var i = 0; i < a.size(); i++) if (a.lookup(i) === w.dict) return true; return false; });
+      var r = w.getRectangle();
+      out.push({ page: pi, x: r.x, y: r.y, w: r.width, h: r.height, widget: w });
+    });
+    return out;
+  }
+  function kindOf(f) {
+    var L = PDFLib;
+    if (f instanceof L.PDFTextField) return 'text';
+    if (f instanceof L.PDFCheckBox) return 'check';
+    if (f instanceof L.PDFRadioGroup) return 'radio';
+    if (f instanceof L.PDFDropdown) return 'drop';
+    if (f instanceof L.PDFOptionList) return 'list';
+    if (f instanceof L.PDFSignature) return 'sign';
+    return 'button';
+  }
+  function valueOf(F) {
+    var f = F.field;
+    try {
+      if (F.kind === 'text') return f.getText() || '';
+      if (F.kind === 'check') return f.isChecked();
+      if (F.kind === 'radio') return f.getSelected() || '';
+      if (F.kind === 'drop') return (f.getSelected() || [])[0] || '';
+      if (F.kind === 'list') return (f.getSelected() || []).slice();
+    } catch (e) { /* unreadable value */ }
+    return F.kind === 'check' ? false : F.kind === 'list' ? [] : '';
+  }
+  function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+  function buildList() {
+    var box = $('ffList'), lastPage = null; box.innerHTML = '';
+    fields.forEach(function (F) {
+      if (F.kind === 'sign' || F.kind === 'button') return;
+      if (F.page !== lastPage) { var h = document.createElement('h3'); h.textContent = F.page >= 0 ? 'Page ' + (F.page + 1) : 'Other fields'; box.appendChild(h); lastPage = F.page; }
+      var row = document.createElement('div'), id = 'ffF' + F.i, lab;
+      row.className = 'ff-row'; F.row = row;
+      var title = F.label, sub = F.label.replace(/\W/g, '').toLowerCase() !== F.name.replace(/^.*\./, '').replace(/\W|_/g, '').toLowerCase() ? F.name : '';
+      if (F.kind === 'check' || F.kind === 'radio') { lab = document.createElement('div'); lab.className = 'ff-lab'; }
+      else { lab = document.createElement('label'); lab.htmlFor = id; }
+      lab.textContent = title;
+      if (sub) { var sm = document.createElement('small'); sm.textContent = sub; lab.appendChild(sm); }
+      row.appendChild(lab);
+      var f = F.field, ro = false;
+      try { ro = f.isReadOnly(); } catch (e) { ro = false; }
+      var el;
+      if (F.kind === 'text') {
+        var multi = false; try { multi = f.isMultiline(); } catch (e) { /* no flag */ }
+        el = document.createElement(multi ? 'textarea' : 'input');
+        if (!multi) el.type = 'text';
+        var max; try { max = f.getMaxLength(); } catch (e) { max = undefined; }
+        if (max) el.maxLength = max;
+        try { if (f.isPassword()) el.type = 'password'; } catch (e) { /* no flag */ }
+        el.value = F.start; el.className = multi ? 'plain' : '';
+        el.addEventListener('input', function () { F.value = el.value; F.paint(); dirty(); });
+      } else if (F.kind === 'check') {
+        var l = document.createElement('label'); l.className = 'ff-opts';
+        el = document.createElement('input'); el.type = 'checkbox'; el.checked = F.start;
+        el.addEventListener('change', function () { F.value = el.checked; F.paint(); dirty(); });
+        l.appendChild(el); l.appendChild(document.createTextNode('Ticked'));
+        row.appendChild(l); el.dataset.nomemo = '';
+      } else if (F.kind === 'radio') {
+        var wrap = document.createElement('div'); wrap.className = 'ff-opts'; wrap.setAttribute('role', 'radiogroup'); wrap.setAttribute('aria-label', title);
+        var opts = []; try { opts = f.getOptions(); } catch (e) { opts = []; }
+        [''].concat(opts).forEach(function (o) {
+          var l2 = document.createElement('label'), r = document.createElement('input');
+          r.type = 'radio'; r.name = id; r.value = o; r.checked = F.start === o; r.disabled = ro;
+          r.addEventListener('change', function () { if (r.checked) { F.value = o; F.paint(); dirty(); } });
+          l2.appendChild(r); l2.appendChild(document.createTextNode(o === '' ? '(none)' : o)); wrap.appendChild(l2);
+          if (!el) el = r;
+        });
+        row.appendChild(wrap);
+      } else if (F.kind === 'drop' || F.kind === 'list') {
+        var o2 = []; try { o2 = f.getOptions(); } catch (e) { o2 = []; }
+        var edit = false; try { edit = F.kind === 'drop' && f.isEditable(); } catch (e) { edit = false; }
+        var many = false; try { many = F.kind === 'list' && f.isMultiselect(); } catch (e) { many = false; }
+        if (edit) {
+          el = document.createElement('input'); el.type = 'text'; el.setAttribute('list', id + 'L'); el.value = F.start;
+          var dl = document.createElement('datalist'); dl.id = id + 'L'; o2.forEach(function (o) { var op = document.createElement('option'); op.value = o; dl.appendChild(op); }); row.appendChild(dl);
+          el.addEventListener('input', function () { F.value = el.value; F.paint(); dirty(); });
+        } else {
+          el = document.createElement('select'); if (many) el.multiple = true;
+          if (!many) { var e0 = document.createElement('option'); e0.value = ''; e0.textContent = '(none)'; el.appendChild(e0); }
+          o2.forEach(function (o) { var op = document.createElement('option'); op.value = o; op.textContent = o; op.selected = F.kind === 'list' ? F.start.indexOf(o) !== -1 : F.start === o; el.appendChild(op); });
+          if (F.kind === 'drop' && F.start && o2.indexOf(F.start) === -1) { var ox = document.createElement('option'); ox.value = ox.textContent = F.start; ox.selected = true; el.appendChild(ox); }
+          el.addEventListener('change', function () { F.value = F.kind === 'list' ? Array.prototype.filter.call(el.options, function (o) { return o.selected && o.value; }).map(function (o) { return o.value; }) : el.value; F.paint(); dirty(); });
+        }
+      }
+      if (el && F.kind !== 'radio' && F.kind !== 'check') { el.id = id; row.appendChild(el); }
+      if (el) { el.dataset.nomemo = ''; if (ro) el.disabled = true; el.addEventListener('focus', function () { focusField(F, false); }); }
+      if (ro) { var s2 = document.createElement('small'); s2.textContent = 'Read only: this field is locked by the form.'; row.appendChild(s2); }
+      F.el = el; F.ro = ro; box.appendChild(row);
+    });
+  }
+  function focusField(F, fromPage) {
+    fields.forEach(function (x) { if (x.row) x.row.classList.toggle('on', x === F); });
+    Array.prototype.forEach.call(layer.querySelectorAll('.ff-w'), function (w) { w.classList.toggle('on', +w.dataset.f === F.i); });
+    if (fromPage && F.el) { F.row.scrollIntoView({ block: 'center', behavior: 'smooth' }); setTimeout(function () { try { F.el.focus({ preventScroll: true }); } catch (e) { F.el.focus(); } }, 250); }
+  }
+
+  // ---------- page view ----------
+  function show(i) {
+    cur = Math.max(1, Math.min(n, i));
+    $('ffPageNo').textContent = 'Page ' + cur + ' of ' + n;
+    $('ffPrev').disabled = cur === 1; $('ffNext').disabled = cur === n;
+    var mine = cur;
+    return pdf.getPage(cur).then(function (page) {
+      if (mine !== cur) return;
+      var vp1 = page.getViewport({ scale: 1 }), room = Math.max(200, Math.min(900, $('ffWork').clientWidth - 2));
+      var scale = room / vp1.width, dpr = Math.min(2, window.devicePixelRatio || 1), vp = page.getViewport({ scale: scale * dpr });
+      cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      cv.style.width = sheet.style.width = vp1.width * scale + 'px'; cv.style.height = sheet.style.height = vp1.height * scale + 'px';
+      view = { scale: scale, w: vp1.width, h: vp1.height, vp: vp1 };
+      paintLayer();
+      return page.render({ canvasContext: cv.getContext('2d'), viewport: vp, annotationMode: pdfjsLib.AnnotationMode.DISABLE }).promise.then(function () { page.cleanup(); });
+    }).catch(function () { PT.say('bad', 'Page ' + mine + ' could not be shown.'); });
+  }
+  $('ffPrev').addEventListener('click', function () { show(cur - 1); });
+  $('ffNext').addEventListener('click', function () { show(cur + 1); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (pdf) show(cur); }, 200); });
+
+  function shown(F) {
+    if (F.kind === 'check') return F.value ? '✓' : '';
+    if (F.kind === 'list') return F.value.join(', ');
+    return String(F.value || '');
+  }
+  function paintLayer() {
+    layer.innerHTML = '';
+    var s = view.scale;
+    fields.forEach(function (F) {
+      if (F.kind === 'sign' || F.kind === 'button') return;
+      F.spots.forEach(function (sp) {
+        if (sp.page !== cur - 1) return;
+        var r = view.vp.convertToViewportRectangle([sp.x, sp.y, sp.x + sp.w, sp.y + sp.h]);
+        var d = document.createElement('div'); d.className = 'ff-w'; d.dataset.f = F.i;
+        d.style.left = Math.min(r[0], r[2]) * s + 'px'; d.style.top = Math.min(r[1], r[3]) * s + 'px';
+        d.style.width = Math.abs(r[2] - r[0]) * s + 'px'; d.style.height = Math.abs(r[3] - r[1]) * s + 'px';
+        d.title = F.label;
+        var radioOn = F.kind === 'radio' && sp.opt != null && sp.opt === F.value;
+        d.textContent = F.kind === 'radio' ? (radioOn ? '●' : '') : shown(F);
+        d.style.fontSize = Math.max(7, Math.min(14, Math.abs(r[3] - r[1]) * s * .7)) + 'px';
+        d.addEventListener('pointerdown', function (e) { if (!arm) e.stopPropagation(); });
+        d.addEventListener('click', function (e) { if (arm) return; e.stopPropagation(); focusField(F, true); });
+        sp.el = d; layer.appendChild(d);
+      });
+    });
+    items.filter(function (it) { return it.page === cur; }).forEach(addItemEl);
+  }
+
+  // ---------- type anywhere ----------
+  var ARMS = { ffAddText: 'text', ffAddCheck: 'check', ffAddCross: 'cross', ffAddDate: 'date' };
+  Object.keys(ARMS).forEach(function (id) {
+    $(id).addEventListener('click', function () {
+      arm = arm === ARMS[id] ? null : ARMS[id];
+      Object.keys(ARMS).forEach(function (k) { $(k).setAttribute('aria-pressed', String(arm === ARMS[k])); });
+      sheet.classList.toggle('arm', !!arm);
+      $('ffHint').textContent = arm ? 'Now tap the page where it goes.' : 'Pick + Text, then tap the page where it goes.';
+    });
+  });
+  function today() { try { return new Date().toLocaleDateString(navigator.language || undefined); } catch (e) { return new Date().toISOString().slice(0, 10); } }
+  sheet.addEventListener('click', function (e) {
+    if (!arm || !pdf) return;
+    var r = sheet.getBoundingClientRect(), x = (e.clientX - r.left) / view.scale, y = (e.clientY - r.top) / view.scale, size = +$('ffSize').value;
+    var it = { id: ++uid, page: cur, kind: arm === 'date' ? 'text' : arm, text: arm === 'date' ? today() : '', size: size, color: $('ffColor').value };
+    if (it.kind === 'text') { it.x = x; it.y = y - size * .6; } else { it.x = x - size * .5; it.y = y - size * .5; }
+    items.push(it); arm = null; Object.keys(ARMS).forEach(function (k) { $(k).setAttribute('aria-pressed', 'false'); }); sheet.classList.remove('arm');
+    $('ffHint').textContent = 'Drag ⠿ to move. Press ✕ to delete.';
+    addItemEl(it); dirty(); refresh();
+    if (it.kind === 'text') { it.input.focus(); if (it.text) it.input.select(); }
+  });
+  function svgMark(kind, px, color) {
+    var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg'), p = document.createElementNS(ns, 'path');
+    s.setAttribute('viewBox', '0 0 10 10'); s.setAttribute('width', px); s.setAttribute('height', px);
+    p.setAttribute('d', kind === 'check' ? 'M1.2 5.4 L4 8.2 L8.8 1.8' : 'M1.8 1.8 L8.2 8.2 M8.2 1.8 L1.8 8.2');
+    p.setAttribute('fill', 'none'); p.setAttribute('stroke', color); p.setAttribute('stroke-width', '1.3'); p.setAttribute('stroke-linecap', 'round'); p.setAttribute('stroke-linejoin', 'round');
+    s.appendChild(p); return s;
+  }
+  function addItemEl(it) {
+    var s = view.scale, d = document.createElement('div');
+    d.className = 'ff-it'; d.style.left = it.x * s + 'px'; d.style.top = it.y * s + 'px';
+    if (it.kind === 'text') {
+      var inp = document.createElement('input'); inp.type = 'text'; inp.value = it.text; inp.dataset.nomemo = ''; inp.setAttribute('aria-label', 'Text on the page');
+      inp.style.fontSize = it.size * s + 'px'; inp.style.color = it.color; inp.style.height = it.size * 1.2 * s + 'px';
+      var fit = function () { inp.size = Math.max(4, Array.from(inp.value).length + 1); };
+      fit();
+      inp.addEventListener('input', function () { it.text = inp.value; fit(); dirty(); });
+      inp.addEventListener('focus', function () { sel = it; $('ffSize').value = String(it.size); $('ffColor').value = it.color; });
+      inp.addEventListener('keydown', function (e) { if (e.key === 'Enter') inp.blur(); });
+      inp.addEventListener('click', function (e) { e.stopPropagation(); });
+      inp.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      d.appendChild(inp); it.input = inp;
+    } else {
+      var mk = svgMark(it.kind, it.size * s, it.color);
+      mk.addEventListener('click', function (e) { e.stopPropagation(); sel = it; $('ffSize').value = String(it.size); $('ffColor').value = it.color; });
+      d.appendChild(mk);
+    }
+    var g = document.createElement('button'); g.type = 'button'; g.className = 'ff-grip'; g.textContent = '⠿'; g.setAttribute('aria-label', 'Move');
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'ff-x'; x.textContent = '✕'; x.setAttribute('aria-label', 'Delete');
+    x.addEventListener('click', function (e) { e.stopPropagation(); items = items.filter(function (o) { return o !== it; }); if (sel === it) sel = null; d.remove(); dirty(); refresh(); });
+    x.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+    var drag = null;
+    g.addEventListener('click', function (e) { e.stopPropagation(); });
+    g.addEventListener('pointerdown', function (e) { e.stopPropagation(); e.preventDefault(); drag = { sx: e.clientX, sy: e.clientY, x: it.x, y: it.y }; try { g.setPointerCapture(e.pointerId); } catch (er) { /* old browsers */ } });
+    g.addEventListener('pointermove', function (e) {
+      if (!drag) return;
+      it.x = Math.max(0, Math.min(view.w - 4, drag.x + (e.clientX - drag.sx) / view.scale)); it.y = Math.max(0, Math.min(view.h - 4, drag.y + (e.clientY - drag.sy) / view.scale));
+      d.style.left = it.x * view.scale + 'px'; d.style.top = it.y * view.scale + 'px';
+    });
+    g.addEventListener('pointerup', function () { if (drag) dirty(); drag = null; });
+    d.appendChild(g); d.appendChild(x); layer.appendChild(d);
+  }
+  ['ffSize', 'ffColor'].forEach(function (id) {
+    $(id).addEventListener('change', function () { if (!sel || !document.body.contains(layer)) return; sel.size = +$('ffSize').value; sel.color = $('ffColor').value; if (sel.page === cur) paintLayer(); dirty(); });
+  });
+  function refresh() { $('go').disabled = busy || !doc; }
+  $('ffFlat').addEventListener('change', dirty);
+
+  // ---------- open ----------
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; refresh(); PT.say('', 'Opening ' + f.name + '…');
+    (async function () {
+      var b = new Uint8Array(await f.arrayBuffer()), d, was = false;
+      try { d = await PDFLib.PDFDocument.load(b, { updateMetadata: false }); }
+      catch (e) {
+        if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + f.name + '" could not be read as a PDF.');
+        b = await QP(b); was = true; d = await PDFLib.PDFDocument.load(b, { updateMetadata: false });
+      }
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+      var p = await pdfjsLib.getDocument({ data: b.slice() }).promise;
+      if (pdf) pdf.destroy();
+      file = f; bytes = b; doc = d; pdf = p; n = p.numPages; unlocked = was; items = []; sel = null; arm = null;
+      var form = d.getForm(), list = [];
+      xfa = false; try { xfa = form.hasXFA(); } catch (e) { xfa = false; }
+      try { list = form.getFields(); } catch (e) { list = []; }
+      fields = list.map(function (fd, i) {
+        var F = { i: i, field: fd, kind: kindOf(fd), name: fd.getName() };
+        F.label = tooltip(fd) || nice(F.name);
+        try { F.spots = pageOfWidgets(fd); } catch (e) { F.spots = []; }
+        if (F.kind === 'radio') { // which widget stands for which choice
+          var opts = []; try { opts = fd.getOptions(); } catch (e) { opts = []; }
+          F.spots.forEach(function (sp) { try { var on = sp.widget.getOnValue(); sp.opt = on ? on.decodeText() : null; } catch (e) { sp.opt = null; } if (sp.opt != null && opts.indexOf(sp.opt) === -1) sp.opt = null; });
+        }
+        F.page = F.spots.length ? Math.min.apply(null, F.spots.map(function (s) { return s.page < 0 ? 1e9 : s.page; })) : -1;
+        if (F.page === 1e9) F.page = -1;
+        var top = F.spots.length ? F.spots[0] : { y: 0, x: 0, h: 0 };
+        F.top = top.y + top.h; F.left = top.x;
+        F.start = valueOf(F); F.value = JSON.parse(JSON.stringify(F.start));
+        F.paint = function () { F.spots.forEach(function (sp) { if (!sp.el) return; sp.el.textContent = F.kind === 'radio' ? (sp.opt != null && sp.opt === F.value ? '●' : '') : shown(F); }); };
+        return F;
+      });
+      fields.sort(function (a, b) { return (a.page < 0 ? 1e9 : a.page) - (b.page < 0 ? 1e9 : b.page) || b.top - a.top || a.left - b.left; });
+      buildList();
+      var usable = fields.filter(function (F) { return F.kind !== 'sign' && F.kind !== 'button'; }).length, signs = fields.filter(function (F) { return F.kind === 'sign'; }).length;
+      var pages = {}; fields.forEach(function (F) { if (F.kind !== 'sign' && F.kind !== 'button' && F.page >= 0) pages[F.page] = 1; });
+      var np = Object.keys(pages).length;
+      if (usable) info('Found ' + usable + ' form ' + (usable === 1 ? 'field' : 'fields') + (np ? ' on ' + np + (np === 1 ? ' page' : ' pages') : '') + '. Fill them in below, or tap a blue box on the page.' + (signs ? ' ' + signs + ' signature field(s) are left as they are: use the free Sign PDF tool for those.' : '') + (xfa ? ' This form also had an Adobe XFA layer, which is removed so every PDF reader shows your answers.' : '') + (was ? ' The form was locked against changes; the saved copy is unlocked.' : ''), 'ok');
+      else info(xfa ? 'This is a dynamic Adobe XFA form, which only Adobe Reader can fill as a form. You can still type anywhere on the page below.' : 'This PDF has no fillable form fields. You can still type anywhere on it: press + Text, then tap the page where the text goes.', '');
+      $('ffWork').hidden = false;
+      $('drop').querySelector('b').textContent = f.name;
+      Object.keys(ARMS).forEach(function (k) { $(k).setAttribute('aria-pressed', 'false'); }); sheet.classList.remove('arm');
+      busy = false; refresh(); await show(1);
+      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size));
+    })().catch(function (e) { busy = false; refresh(); PT.say('bad', e && e.message ? e.message : 'Something went wrong with this file.'); });
+  });
+
+  // ---------- save ----------
+  var noto = null;
+  function notoBytes() { if (!noto) noto = fetch('../assets/vendor/fonts/noto-sans-subset-400.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).catch(function (e) { noto = null; throw e; }); return noto; }
+  function covers(font, s) { var g = font.embedder.font; return Array.from(String(s)).every(function (c) { var cp = c.codePointAt(0); return cp < 32 || g.hasGlyphForCodePoint(cp); }); }
+  function rgb(hex) { var v = parseInt(hex.slice(1), 16); return PDFLib.rgb((v >> 16) / 255, (v >> 8 & 255) / 255, (v & 255) / 255); }
+
+  $('go').addEventListener('click', function () {
+    if (!doc || busy) return;
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    busy = true;
+    PT.run(async function () {
+      var L = PDFLib, d = await L.PDFDocument.load(bytes, { updateMetadata: false }), form = d.getForm(), flat = $('ffFlat').checked;
+      d.registerFontkit(fontkit);
+      var font = await d.embedFont(await notoBytes(), { subset: true });
+      var texts = items.map(function (it) { return it.text || ''; }), special = [], changed = 0;
+      try { if (form.hasXFA()) form.deleteXFA(); } catch (e) { /* none */ }
+      var byName = {}; form.getFields().forEach(function (f) { byName[f.getName()] = f; });
+      fields.forEach(function (F) {
+        var f = byName[F.name];
+        if (!f || F.ro || F.kind === 'sign' || F.kind === 'button') return;
+        var v = F.value, touched = !same(v, F.start);
+        try {
+          if (touched) {
+            changed++;
+            if (F.kind === 'text') f.setText(v || undefined);
+            else if (F.kind === 'check') { if (v) f.check(); else f.uncheck(); }
+            else if (F.kind === 'radio') { if (v) f.select(v); else f.clear(); }
+            else if (F.kind === 'drop') { if (v) f.select(v); else f.clear(); }
+            else if (F.kind === 'list') { if (v.length) f.select(v); else f.clear(); }
+          }
+          var str = F.kind === 'list' ? v.join(' ') : String(v || '');
+          if (F.kind === 'text' || F.kind === 'drop' || F.kind === 'list') {
+            if (!covers(font, str)) { special.push({ F: F, f: f, text: str }); texts.push(str); }
+            else if (touched || flat) f.updateAppearances(font);
+          } else if (touched || flat) {
+            try { if (f.needsAppearancesUpdate()) f.updateAppearances(); } catch (e) { /* keeps its own look */ }
+          }
+        } catch (e) {
+          throw new Error('The field "' + F.label + '" could not be filled' + (F.kind === 'text' && /length/i.test(String(e && e.message)) ? ': the text is longer than this field allows.' : '.'));
+        }
+      });
+      var T = await PDFText.create(d, { text: texts, onStatus: function (m) { PT.say('', m); } }), pages = d.getPages();
+      // answers in scripts the form font cannot show (Arabic, Chinese…)
+      special.forEach(function (s) {
+        if (flat) {
+          s.F.spots.forEach(function (sp) {
+            var pg = pages[sp.page]; if (!pg || !s.text) return;
+            var multi = false; try { multi = s.f.isMultiline && s.f.isMultiline(); } catch (e) { multi = false; }
+            var size = multi ? Math.min(11, sp.h / 3) : Math.max(6, Math.min(12, sp.h * .62)), al = 'start';
+            try { al = ['start', 'center', 'right'][s.f.getAlignment ? s.f.getAlignment() : 0] || 'start'; } catch (e) { al = 'start'; }
+            var lines = multi ? T.wrap(s.text, size, font, sp.w - 4) : [s.text];
+            if (!multi) while (size > 5 && T.width(s.text, size, font) > sp.w - 4) size -= .5;
+            lines.forEach(function (ln, k) {
+              var y = multi ? sp.y + sp.h - 2 - size * (k + 1) * 1.15 + size * .2 : sp.y + (sp.h - size * .7) / 2;
+              if (y < sp.y - 1) return;
+              T.draw(pg, ln, { x: sp.x + 2, y: y, size: size, font: font, color: L.rgb(0, 0, 0), width: sp.w - 4, align: al });
+            });
+          });
+          form.removeField(s.f);
+        } else {
+          // the reader draws these answers itself, with its own fonts
+          s.f.acroField.getWidgets().forEach(function (w) { w.dict.delete(L.PDFName.of('AP')); });
+          form.acroForm.dict.set(L.PDFName.of('NeedAppearances'), L.PDFBool.True);
+        }
+      });
+      // text, ticks and crosses typed anywhere
+      items.forEach(function (it) {
+        var pg = pages[it.page - 1]; if (!pg) return;
+        if (it.kind === 'text' && !it.text.trim()) return;
+        var v = PT.view(pg), base = it.kind === 'text' ? it.y + it.size * .98 : it.y + it.size, p0 = v.at(it.x, v.height - base), a = v.angle * Math.PI / 180;
+        pg.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(Math.cos(a), Math.sin(a), -Math.sin(a), Math.cos(a), p0.x, p0.y));
+        if (it.kind === 'text') T.draw(pg, it.text, { x: 0, y: 0, size: it.size, font: font, color: rgb(it.color) });
+        else {
+          var k = it.size / 10, path = it.kind === 'check' ? 'M1.2 5.4 L4 8.2 L8.8 1.8' : 'M1.8 1.8 L8.2 8.2 M8.2 1.8 L1.8 8.2';
+          pg.drawSvgPath(path, { x: 0, y: it.size, scale: k, borderColor: rgb(it.color), borderWidth: 1.3 * k, borderLineCap: L.LineCapStyle.Round });
+        }
+        pg.pushOperators(L.popGraphicsState());
+      });
+      if (flat) form.flatten({ updateFieldAppearances: false });
+      // pdf-lib can leave links to removed boxes (radio buttons) in a page's list of annotations; drop them
+      pages.forEach(function (pg) {
+        var a = pg.node.Annots(); if (!a) return;
+        for (var i = a.size() - 1; i >= 0; i--) { var r = a.get(i); if (r instanceof L.PDFRef && !d.context.lookup(r)) a.remove(i); }
+      });
+      PT.say('', 'Saving…');
+      var out = await d.save({ updateFieldAppearances: false });
+      var placed = items.filter(function (it) { return it.kind !== 'text' || it.text.trim(); }).length;
+      PT.done(out, PT.base(file.name) + '-filled.pdf', 'application/pdf', (changed ? 'Filled ' + changed + (changed === 1 ? ' field' : ' fields') : 'No form answers changed') + (placed ? ', added ' + placed + (placed === 1 ? ' item' : ' items') + ' to the page' : '') + (flat ? ', flattened' : '') + (special.length && !flat ? '. Some answers use a script the form font lacks: they show in Chrome, Edge, Firefox and Adobe Reader. Tick Flatten for a fixed look everywhere' : ''));
+    }).then(function () { busy = false; refresh(); });
+  });
+})();
+</script>

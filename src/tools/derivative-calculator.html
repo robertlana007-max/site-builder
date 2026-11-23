@@ -1,0 +1,142 @@
+<style>
+.dc-ex { display: flex; flex-wrap: wrap; gap: 6px; margin: -6px 0 14px; }
+.dc-ex button { font: 500 13px/1 var(--mono); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+.dc-ex button:hover { border-color: var(--accent); color: var(--accent); }
+.dc-show { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; margin-top: 12px; min-height: 52px; }
+.dc-show small, .dc-res small { display: block; font-size: 13px; color: var(--muted); font-family: system-ui, sans-serif; }
+.dc-res { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 12px 16px; margin-top: 12px; }
+.dc-res .cx { font-size: 1.3em; }
+.dc-steps { list-style: none; margin: 8px 0 0; padding: 0; }
+.dc-steps li { border-inline-start: 3px solid var(--line); padding: 6px 0 6px 12px; margin: 6px 0; }
+.dc-steps li b { font-size: 14px; }
+.dc-steps li p { margin: 2px 0; font-size: 14px; color: var(--muted); }
+.dc-steps li .cx { font-size: 1.02em; line-height: 2.1; }
+.dc-cv { width: 100%; height: 300px; display: block; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; touch-action: pan-y; }
+.dc-leg { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); margin-top: 6px; align-items: center; }
+.dc-leg i { display: inline-block; width: 18px; height: 3px; border-radius: 2px; vertical-align: middle; margin-inline-end: 5px; }
+.dc-ok { font-size: 13.5px; color: var(--ok); margin-top: 8px; }
+.dc-list { margin: 6px 0 0; padding: 0; list-style: none; }
+.dc-list li { padding: 4px 0; border-bottom: 1px solid var(--line); }
+</style>
+<label for="fx">Function f(x)</label>
+<input type="text" id="fx" value="x^2 sin(x)" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="for example x^3 - 2x + 1, sin(2x), e^x/x">
+<div class="dc-ex" id="exs" aria-label="Examples"><button type="button">x^3 - 4x^2 + 7</button><button type="button">sin(x)cos(x)</button><button type="button">e^(2x) ln(x)</button><button type="button">(x^2 + 1)/(x - 1)</button><button type="button">sqrt(1 + x^2)</button><button type="button">tan(3x^2)</button><button type="button">x^x</button><button type="button">arctan(1/x)</button></div>
+<div class="fields">
+  <div><label for="var">Differentiate with respect to</label><input type="text" id="var" value="x" maxlength="8" spellcheck="false" autocomplete="off" autocapitalize="off"></div>
+  <div><label for="ord">Which derivative</label><select id="ord"><option value="1">First f′(x)</option><option value="2">Second f″(x)</option><option value="3">Third f‴(x)</option><option value="4">Fourth</option><option value="5">Fifth</option></select></div>
+  <div><label for="at">Value at x = (optional)</label><input type="text" id="at" placeholder="for example 2 or pi/4" spellcheck="false" autocomplete="off" autocapitalize="off"></div>
+</div>
+<div class="dc-show"><small>You entered</small><div class="cx" id="seen">–</div></div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="dc-res"><small id="resLbl">Derivative</small><div class="cx" id="res"></div></div>
+  <div class="btns"><button class="btn ghost" id="cp" type="button">Copy result</button><button class="btn ghost" id="cpSteps" type="button">Copy steps</button></div>
+  <p class="dc-ok" id="chk"></p>
+  <div id="pt" hidden><h3>At the chosen point</h3><div class="stats" id="ptStats"></div><p class="msg" id="tan"></p></div>
+  <div id="higher" hidden><h3>Each derivative in turn</h3><ul class="dc-list" id="hlist"></ul></div>
+  <h3 id="stepsH">Steps</h3>
+  <ol class="dc-steps" id="steps"></ol>
+  <h3>Graph</h3>
+  <canvas class="dc-cv" id="cv" aria-label="Graph of the function and its derivative"></canvas>
+  <div class="dc-leg"><span><i style="background:var(--accent)"></i>f(x)</span><span><i style="background:#e8590c"></i><span id="legD">f′(x)</span></span><span id="legT" hidden><i style="background:#0f9d58"></i>tangent line</span>
+    <span style="margin-inline-start:auto"><button class="btn ghost" id="zin" type="button" style="min-height:34px;padding:4px 12px">Zoom in</button> <button class="btn ghost" id="zout" type="button" style="min-height:34px;padding:4px 12px">Zoom out</button></span></div>
+</div>
+<details class="more" style="margin-top:16px"><summary>How to type functions</summary><div>
+  <p class="msg" style="margin-top:4px">Powers: <code>x^2</code>, roots: <code>sqrt(x)</code> or <code>x^(1/3)</code>, multiplication can be left out: <code>3x sin(x)</code>. Functions: sin, cos, tan, sec, csc, cot, arcsin (asin), arccos, arctan, sinh, cosh, tanh, <code>ln(x)</code> (natural log), <code>log(x)</code> (base 10), <code>log(x, 2)</code> (any base), <code>e^x</code> or <code>exp(x)</code>, <code>abs(x)</code> or <code>|x|</code>. Constants: <code>pi</code> and <code>e</code>. Other letters, like a or k, are treated as constants.</p>
+</div></details>
+<script src="../assets/calculus.js"></script>
+<script>
+(function () {
+  var C = window.Calc, ORD = ['', 'f′', 'f″', 'f‴', 'f⁽⁴⁾', 'f⁽⁵⁾'], span = 10, center = 0, last = null, timer;
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function fmt(v) { if (!isFinite(v)) return isNaN(v) ? 'undefined' : (v > 0 ? '∞' : '−∞'); var a = Math.abs(v); return a !== 0 && (a < 1e-6 || a >= 1e12) ? v.toExponential(8).replace(/\.?0+e/, 'e') : String(+v.toPrecision(10)); }
+  function numCheck(f, d, v) {
+    var fe = C.compile(f, v), de = C.compile(d, v), n = 0, bad = 0;
+    [0.37, 0.83, 1.41, 2.29, -0.61, -1.73, 3.3, 0.11].forEach(function (x0) {
+      var h = 1e-5 * Math.max(1, Math.abs(x0)), a = (fe(x0 + h) - fe(x0 - h)) / (2 * h), b = de(x0);
+      if (!isFinite(a) || !isFinite(b) || Math.abs(a) > 1e8) return;
+      n++; if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(b))) bad++;
+    });
+    return n >= 3 ? (bad ? 'bad' : 'ok') : 'skip';
+  }
+  function stepsHtml(steps, v) {
+    var out = '', dv = 'd/d' + v;
+    steps.forEach(function (s) {
+      if (!s.r) return;
+      out += '<li style="margin-inline-start:' + Math.min(s.depth, 4) * 12 + 'px"><b>' + s.rule + '</b><p>' + s.note.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</p><div class="cx">' + dv + ' [' + C.html(C.simplify(s.x)) + '] = ' + C.html(s.r) + '</div></li>';
+    });
+    return out;
+  }
+  function stepsText(steps, v) { return steps.filter(function (s) { return s.r; }).map(function (s) { return new Array(s.depth + 1).join('  ') + s.rule + ': d/d' + v + ' [' + C.text(C.simplify(s.x)) + '] = ' + C.text(s.r); }).join('\n'); }
+  function run() {
+    var src = $('fx').value, v = ($('var').value || 'x').trim(), ord = +$('ord').value || 1;
+    last = null; $('out').hidden = true;
+    if (!/^[A-Za-z]\w*$/.test(v) || v === 'e' || v === 'pi') { $('seen').textContent = '–'; msg('The variable must be a letter such as x, t or y (not e or pi, which are constants).', true); return; }
+    if (!src.trim()) { $('seen').textContent = '–'; msg('Type a function to differentiate, for example x^2 sin(x).'); return; }
+    var f;
+    try { f = C.parse(src, { vars: [v] }); } catch (e) { if (!(e instanceof C.Err)) throw e; $('seen').textContent = '–'; msg(e.message, true); return; }
+    if (C.size(f) > 400) { msg('This function is too long. Please split it into smaller parts.', true); return; }
+    $('seen').innerHTML = C.html(C.simplify(f));
+    var others = Object.keys(C.symbols(f)).filter(function (s) { return s !== v; });
+    var steps = [], ds = [], cur = C.simplify(f), d;
+    try {
+      for (var k = 1; k <= ord; k++) { d = C.tidy(C.derive(cur, v, k === 1 ? steps : null)); ds.push(d); cur = d; if (C.size(d) > 3000) throw new C.Err('The result grows too large to show. Try a lower derivative.'); }
+    } catch (e) { if (!(e instanceof C.Err)) throw e; msg(e.message, true); return; }
+    msg(others.length ? 'Treating ' + others.join(', ') + ' as constant' + (others.length > 1 ? 's' : '') + ' (partial derivative with respect to ' + v + ').' : '');
+    d = ds[ds.length - 1];
+    var label = (others.length ? '∂' : 'd') + (ord > 1 ? '<sup>' + ord + '</sup>' : '') + '/' + (others.length ? '∂' : 'd') + v + (ord > 1 ? '<sup>' + ord + '</sup>' : '');
+    $('resLbl').innerHTML = (ord === 1 ? 'Derivative' : 'Derivative of order ' + ord) + ' (' + label + ')';
+    $('res').innerHTML = (others.length ? '' : ORD[ord] + '(' + v + ') = ') + C.html(d);
+    $('out').hidden = false;
+    // independent check: compare with a numerical derivative (first derivative only, other letters set to 1.3)
+    var chk = 'skip';
+    if (!others.length) chk = numCheck(ds.length > 1 ? ds[ds.length - 2] : C.simplify(f), d, v);
+    $('chk').textContent = chk === 'ok' ? '✓ Checked: the result matches a numerical derivative at several points.' : chk === 'bad' ? 'Warning: the numerical check did not match at some points. Please double-check this result.' : '';
+    $('chk').style.color = chk === 'bad' ? 'var(--bad)' : '';
+    // higher orders list
+    if (ord > 1) { $('higher').hidden = false; $('hlist').innerHTML = ds.map(function (x, i) { return '<li class="cx">' + ORD[i + 1] + '(' + v + ') = ' + C.html(x) + '</li>'; }).join(''); } else $('higher').hidden = true;
+    $('stepsH').textContent = ord > 1 ? 'Steps for the first derivative' : 'Steps';
+    $('steps').innerHTML = stepsHtml(steps, v) || '<li>No steps: the derivative follows directly.</li>';
+    // value at a point
+    var atSrc = $('at').value.trim(), x0 = NaN;
+    $('pt').hidden = true; $('legT').hidden = true;
+    if (atSrc && !others.length) {
+      try { var an = C.parse(atSrc, { vars: [], strictVars: true }); x0 = C.evaluate(an, {}); } catch (e) { if (!(e instanceof C.Err)) throw e; msg('Value at x: ' + e.message, true); }
+      if (atSrc && !isFinite(x0) && !$('msg').classList.contains('bad')) msg('The value at x must be a number, like 2, -0.5 or pi/4.', true);
+    }
+    var env = {}; env[v] = x0;
+    var y0 = C.evaluate(C.simplify(f), env), m = C.evaluate(d, env), tangent = null;
+    if (isFinite(x0)) {
+      $('pt').hidden = false;
+      $('ptStats').innerHTML = '<div class="stat"><span>f(' + fmt(x0) + ')</span><b>' + fmt(y0) + '</b></div><div class="stat"><span>' + ORD[ord] + '(' + fmt(x0) + ')</span><b>' + fmt(m) + '</b></div>';
+      if (ord === 1 && isFinite(y0) && isFinite(m)) {
+        tangent = { m: m, x0: x0, y0: y0, color: '#0f9d58' };
+        var b = y0 - m * x0;
+        $('tan').textContent = 'Tangent line at x = ' + fmt(x0) + ':  y = ' + fmt(m) + v + (b < 0 ? ' − ' + fmt(-b) : ' + ' + fmt(b)) + '. The slope of the curve at this point is ' + fmt(m) + '.';
+        $('legT').hidden = false;
+      } else $('tan').textContent = isFinite(m) ? '' : 'The derivative is not defined at this point.';
+    }
+    last = { f: C.simplify(f), d: d, v: v, ord: ord, x0: x0, tangent: tangent, others: others, steps: steps };
+    $('legD').textContent = ORD[ord] + '(x)';
+    if (isFinite(x0)) center = x0; else center = 0;
+    draw();
+  }
+  function draw() {
+    if (!last || $('out').hidden) return;
+    var env1 = {}; last.others.forEach(function (s) { env1[s] = 1; });
+    function mk(x) { return function (t) { var e = Object.assign({}, env1); e[last.v] = t; return C.evaluate(x, e); }; }
+    C.plot($('cv'), { xmin: center - span, xmax: center + span, fns: [{ f: mk(last.f), color: getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#2563eb' }, { f: mk(last.d), color: '#e8590c', dash: [7, 5] }], line: last.tangent, points: last.tangent ? [{ x: last.x0, y: last.tangent.y0, color: '#0f9d58' }] : null });
+  }
+  function later() { clearTimeout(timer); timer = setTimeout(run, 220); }
+  ['fx', 'var', 'at'].forEach(function (id) { $(id).addEventListener('input', later); });
+  $('ord').addEventListener('change', run);
+  $('exs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $('fx').value = b.textContent; span = 10; run(); });
+  $('cp').addEventListener('click', function () { if (last) copyText(C.text(last.d), $('cp')); });
+  $('cpSteps').addEventListener('click', function () { if (last) copyText('f(' + last.v + ') = ' + C.text(last.f) + '\n' + stepsText(last.steps, last.v) + '\nResult: ' + C.text(last.d), $('cpSteps')); });
+  $('zin').addEventListener('click', function () { span = Math.max(0.01, span / 2); draw(); });
+  $('zout').addEventListener('click', function () { span = Math.min(1e6, span * 2); draw(); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(draw, 150); });
+  new MutationObserver(draw).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  run();
+})();
+</script>

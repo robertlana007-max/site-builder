@@ -199,21 +199,77 @@
   // ---------- finder: instant tool search, used by the hero box and the Ctrl K palette ----------
   function finder(input, box, onPick) {
     var sel = 0, links = [];
-    function rank(t, words) {
-      var name = t[1].toLowerCase(), hay = name + ' ' + t[2].toLowerCase() + ' ' + t[4].toLowerCase() + ' ' + t[0], score = 0;
-      for (var i = 0; i < words.length; i++) {
-        if (hay.indexOf(words[i]) === -1) return 0;
-        score += name.indexOf(words[i]) === 0 ? 4 : name.indexOf(words[i]) !== -1 ? 2 : 1;
+    // Forgiving search: typos, other names (aliases from src/aliases.js) and other languages.
+    function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_\-–—/.,:;!?()"'’]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function dist(a, b, max) { // Damerau-Levenshtein with early exit
+      var la = a.length, lb = b.length; if (Math.abs(la - lb) > max) return max + 1;
+      var prev2 = null, prev = [], cur, i, j;
+      for (j = 0; j <= lb; j++) prev[j] = j;
+      for (i = 1; i <= la; i++) {
+        cur = [i]; var best = i;
+        for (j = 1; j <= lb; j++) {
+          var c = a[i - 1] === b[j - 1] ? 0 : 1;
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + c);
+          if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) cur[j] = Math.min(cur[j], prev2[j - 2] + 1);
+          if (cur[j] < best) best = cur[j];
+        }
+        if (best > max) return max + 1;
+        prev2 = prev; prev = cur;
       }
-      return score;
+      return prev[lb];
+    }
+    var index = null, aliasState = 0;
+    function loadAliases() { // fetch the alias list once, the first time someone uses search
+      if (aliasState || window.TOOL_ALIASES) return; aliasState = 1;
+      var s = document.createElement('script'); s.src = REL + 'assets/tools-aliases.js'; s.async = true;
+      s.onload = function () { aliasState = 2; index = null; if (document.activeElement === input || input.value) render(); };
+      s.onerror = function () { aliasState = 0; };
+      document.head.appendChild(s);
+    }
+    function build() {
+      var AL = window.TOOL_ALIASES || {};
+      index = (window.TOOLS || []).map(function (t) {
+        if (AL[t[0]] && !t[5]) t = t.concat([AL[t[0]]]);
+        var name = norm(t[1]), extra = norm(t[2] + ' ' + t[4] + ' ' + t[0]), alias = norm(t[5] || '');
+        var toks = {}; (name + ' ' + extra + ' ' + alias).split(' ').forEach(function (w) { if (w) toks[w] = 1; });
+        return { t: t, name: name, nameToks: name.split(' '), all: name + ' ' + extra + ' ' + alias, flat: (name + '|' + alias.split('|').join('|')).replace(/ /g, ''), aliasList: (t[5] || '').split('|').map(norm), toks: Object.keys(toks) };
+      });
+    }
+    function wordScore(e, w) {
+      var wide = /[^\x00-\x7f]/.test(w), best = 0, i, tk;
+      for (i = 0; i < e.nameToks.length; i++) { tk = e.nameToks[i]; if (tk === w) return 6; if (tk.indexOf(w) === 0 && (w.length > 1 || wide)) best = Math.max(best, 5); }
+      if (e.all.indexOf(w) !== -1 && (w.length > 2 || wide)) best = Math.max(best, e.name.indexOf(w) !== -1 ? 4 : 3);
+      if (!best && w.length >= 5 && e.flat.indexOf(w) !== -1) best = 3; // words typed together, e.g. "mergepdf"
+      if (best || w.length < 4) return best;
+      var max = w.length >= 6 ? 2 : 1;
+      for (i = 0; i < e.toks.length; i++) {
+        tk = e.toks[i]; if (tk.length < 3) continue;
+        if (dist(w, tk, max) <= max) { best = Math.max(best, e.nameToks.indexOf(tk) !== -1 ? 2.5 : 2); }
+        else if (tk.length > w.length && dist(w, tk.slice(0, w.length), max) <= max) best = Math.max(best, 1.5); // typo while still typing
+        if (best >= 2.5) break;
+      }
+      return best;
+    }
+    function rank(e, words, q, loose) {
+      var score = 0, miss = 0;
+      for (var i = 0; i < words.length; i++) { var s = wordScore(e, words[i]); if (!s) miss++; score += s; }
+      if (!score) return 0;
+      if (!loose && miss > (words.length >= 3 ? 1 : 0)) return 0;
+      if (e.name === q) score += 20; else if (e.name.indexOf(q) === 0) score += 8; else if (e.name.indexOf(q) !== -1) score += 5;
+      for (var k = 0; k < e.aliasList.length; k++) if (e.aliasList[k] && (e.aliasList[k] === q || e.aliasList[k].indexOf(q) === 0)) { score += e.aliasList[k] === q ? 12 : 4; break; }
+      return score - miss * 2;
     }
     function mark() { links.forEach(function (a, i) { a.classList.toggle('sel', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); }); }
     function render() {
-      var q = input.value.trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), list;
+      var q = norm(input.value), words = q.split(' ').filter(Boolean), list, close = false;
+      loadAliases();
+      if (!index) build();
+      function find(loose) { return index.map(function (e) { return [rank(e, words, q, loose), e.t]; }).filter(function (x) { return x[0] > 0; })
+        .sort(function (a, b) { return b[0] - a[0]; }).slice(0, 8).map(function (x) { return x[1]; }); }
       if (!q) list = input.dataset.empty === 'all' ? (window.TOOLS || []).slice(0, 8) : [];
-      else list = (window.TOOLS || []).map(function (t) { return [rank(t, words), t]; }).filter(function (x) { return x[0]; })
-        .sort(function (a, b) { return b[0] - a[0]; }).slice(0, 8).map(function (x) { return x[1]; });
+      else { list = find(false); if (!list.length) { list = find(true).slice(0, 5); close = list.length > 0; } }
       box.innerHTML = ''; links = []; sel = 0;
+      if (close) { var h = document.createElement('p'); h.className = 'f-none'; h.textContent = 'No exact match for "' + input.value.trim() + '". Closest tools:'; box.appendChild(h); }
       list.forEach(function (t) {
         var a = document.createElement('a'), dot = document.createElement('i'), cat = document.createElement('small');
         a.className = 'f-item'; a.href = REL + t[0] + '/'; a.style.setProperty('--c', t[3]);

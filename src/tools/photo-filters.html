@@ -1,0 +1,212 @@
+<style>
+.pf-stage { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; line-height: 0; text-align: center; margin: 0 0 12px; position: relative;
+  background: repeating-conic-gradient(var(--line) 0 25%, var(--bg) 0 50%) 0 0 / 18px 18px; }
+.pf-stage canvas { max-width: 100%; max-height: 60vh; height: auto; touch-action: pan-y; }
+.pf-hold { position: absolute; top: 8px; left: 8px; padding: 4px 8px; border-radius: 6px; background: rgba(17,24,39,.72); color: #fff; font: 600 12px/1.4 system-ui, sans-serif; pointer-events: none; }
+.pf-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin: 0 0 14px; }
+.pf-grid button { padding: 4px 4px 6px; border: 2px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); cursor: pointer; font: 600 12.5px/1.2 inherit; font-family: inherit; min-width: 0; }
+.pf-grid button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); color: var(--accent); }
+.pf-grid canvas { width: 100%; aspect-ratio: 1; display: block; border-radius: 6px; margin-bottom: 4px; background: var(--bg); }
+.pf-thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 0 10px; }
+.pf-thumbs button { flex: none; width: 60px; height: 60px; padding: 0; border: 2px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--bg); cursor: pointer; }
+.pf-thumbs button[aria-pressed="true"] { border-color: var(--accent); }
+.pf-thumbs img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pf-sub { font-size: 14px; color: var(--muted); margin: -4px 0 12px; }
+.pf-cols input[type=color] { width: 100%; height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--field); padding: 3px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop photos here</b>JPG, PNG or WebP, one or many. Filters run on your device; nothing is uploaded.</div>
+<input type="file" id="file" accept="image/*" multiple hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 16px"><button class="btn ghost" id="sample" type="button">Try with a sample photo</button></div>
+<div id="work" hidden>
+  <div class="pf-thumbs" id="thumbs" hidden></div>
+  <div class="pf-stage" id="stage"><canvas id="cv" aria-label="Filtered photo preview"></canvas><span class="pf-hold" id="holdTag" hidden>Original</span></div>
+  <p class="pf-sub">Press and hold the picture to see the original.</p>
+</div>
+<div class="pf-grid" id="grid" role="group" aria-label="Filters"></div>
+<div class="fields">
+  <div><label for="amt">Intensity: <span id="amtV">100</span>%</label><input type="range" id="amt" min="0" max="100" value="100"></div>
+  <div><label for="br">Brightness: <span id="brV">0</span></label><input type="range" id="br" min="-50" max="50" value="0"></div>
+  <div><label for="ct">Contrast: <span id="ctV">0</span></label><input type="range" id="ct" min="-50" max="50" value="0"></div>
+  <div><label for="sat">Saturation: <span id="satV">0</span></label><input type="range" id="sat" min="-100" max="100" value="0"></div>
+</div>
+<div class="fields pf-cols" id="duoRow" hidden>
+  <div><label for="d1">Duotone shadows</label><input type="color" id="d1" value="#1e1b4b"></div>
+  <div><label for="d2">Duotone highlights</label><input type="color" id="d2" value="#fbbf24"></div>
+</div>
+<div class="fields">
+  <div><label for="fmt">Format</label><select id="fmt"><option value="image/jpeg">JPG</option><option value="image/png">PNG</option><option value="image/webp">WebP</option></select></div>
+  <div><label for="q">Quality: <span id="qV">92</span>%</label><input type="range" id="q" min="50" max="100" value="92"></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Download photo</button><button class="btn ghost" id="all" hidden>Download all (ZIP)</button><button class="btn ghost" id="reset" type="button">Reset adjustments</button><a id="dl" hidden></a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  'use strict';
+  var MAX_SIDE = 8000, MAX_AREA = 24e6, PREV = 1000;
+  var FILTERS = [
+    ['none', 'Original'], ['bw', 'Black & white'], ['sepia', 'Sepia'], ['vintage', 'Vintage'], ['warm', 'Warm'], ['cool', 'Cool'],
+    ['invert', 'Invert'], ['duotone', 'Duotone'], ['noir', 'Noir'], ['vivid', 'Vivid'], ['fade', 'Faded'], ['bright', 'Bright'], ['drama', 'Dramatic'], ['green', 'Forest']
+  ];
+  var items = [], cur = 0, filter = 'none', job = 0, cv = $('cv'), held = false, prevCache = null;
+  function say(c, t) { PT.say(c, t); }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  function hexRgb(h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+
+  // ---------- the filter maths, per pixel (works in every browser, unlike canvas filters) ----------
+  function apply(data, w, h, f, o) {
+    var d = data.data, amt = o.amt, br = o.br * 2.55, ct = 1 + o.ct / 50 * (o.ct > 0 ? 1 : 0.6), sat = 1 + o.sat / 100;
+    var d1 = hexRgb(o.d1), d2 = hexRgb(o.d2), cx = w / 2, cy = h / 2, rmax = Math.sqrt(cx * cx + cy * cy);
+    var vig = f === 'vintage' ? 0.45 : f === 'drama' ? 0.6 : f === 'noir' ? 0.35 : 0;
+    for (var y = 0, p = 0; y < h; y++) {
+      for (var x = 0; x < w; x++, p += 4) {
+        var r = d[p], g = d[p + 1], b = d[p + 2], R = r, G = g, B = b, L = 0.299 * r + 0.587 * g + 0.114 * b;
+        switch (f) {
+          case 'bw': R = G = B = L; break;
+          case 'sepia': R = 0.393 * r + 0.769 * g + 0.189 * b; G = 0.349 * r + 0.686 * g + 0.168 * b; B = 0.272 * r + 0.534 * g + 0.131 * b; break;
+          case 'vintage': R = 0.6 * r + 0.4 * (0.393 * r + 0.769 * g + 0.189 * b) + 12; G = 0.6 * g + 0.4 * (0.349 * r + 0.686 * g + 0.168 * b) + 6; B = 0.6 * b + 0.4 * (0.272 * r + 0.534 * g + 0.131 * b) - 4;
+            R = 30 + R * 0.86; G = 26 + G * 0.86; B = 34 + B * 0.8; break;
+          case 'warm': R = r * 1.08 + 12; G = g * 1.02 + 4; B = b * 0.86; break;
+          case 'cool': R = r * 0.88; G = g * 1.0 + 2; B = b * 1.08 + 14; break;
+          case 'invert': R = 255 - r; G = 255 - g; B = 255 - b; break;
+          case 'duotone': var t = L / 255; R = d1[0] + (d2[0] - d1[0]) * t; G = d1[1] + (d2[1] - d1[1]) * t; B = d1[2] + (d2[2] - d1[2]) * t; break;
+          case 'noir': var n = (L - 128) * 1.5 + 128; R = G = B = n; break;
+          case 'vivid': R = L + (r - L) * 1.55; G = L + (g - L) * 1.55; B = L + (b - L) * 1.55; R = (R - 128) * 1.1 + 128; G = (G - 128) * 1.1 + 128; B = (B - 128) * 1.1 + 128; break;
+          case 'fade': R = 40 + (L + (r - L) * 0.75) * 0.78; G = 40 + (L + (g - L) * 0.75) * 0.78; B = 46 + (L + (b - L) * 0.75) * 0.76; break;
+          case 'bright': R = r + (255 - r) * 0.22; G = g + (255 - g) * 0.22; B = b + (255 - b) * 0.22; break;
+          case 'drama': R = (L + (r - L) * 0.75 - 128) * 1.4 + 128; G = (L + (g - L) * 0.75 - 128) * 1.4 + 128; B = (L + (b - L) * 0.75 - 128) * 1.4 + 128; break;
+          case 'green': R = r * 0.9; G = g * 1.06 + 6; B = b * 0.92 + 4; R = (R - 128) * 1.08 + 128; G = (G - 128) * 1.08 + 128; B = (B - 128) * 1.08 + 128; break;
+        }
+        if (vig) { var dx = x - cx, dy = y - cy, t2, v = Math.sqrt(dx * dx + dy * dy) / rmax, t2 = Math.max(0, v - 0.45) / 0.55, k = 1 - vig * t2 * t2; R *= k; G *= k; B *= k; }
+        // intensity: blend with the original
+        R = r + (R - r) * amt; G = g + (G - g) * amt; B = b + (B - b) * amt;
+        // adjustments
+        if (o.sat) { var l2 = 0.299 * R + 0.587 * G + 0.114 * B; R = l2 + (R - l2) * sat; G = l2 + (G - l2) * sat; B = l2 + (B - l2) * sat; }
+        if (o.ct) { R = (R - 128) * ct + 128; G = (G - 128) * ct + 128; B = (B - 128) * ct + 128; }
+        if (o.br) { R += br; G += br; B += br; }
+        d[p] = R; d[p + 1] = G; d[p + 2] = B; // Uint8ClampedArray clamps and rounds
+      }
+    }
+    return data;
+  }
+  function opts() { return { amt: +$('amt').value / 100, br: +$('br').value, ct: +$('ct').value, sat: +$('sat').value, d1: $('d1').value, d2: $('d2').value }; }
+  function filtered(src, w, h, f, o) {
+    var c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
+    x.drawImage(src, 0, 0, w, h); var id = x.getImageData(0, 0, w, h); x.putImageData(apply(id, w, h, f, o), 0, 0);
+    return c;
+  }
+
+  // ---------- filter buttons with small previews ----------
+  FILTERS.forEach(function (f) {
+    var b = document.createElement('button'), c = canvas(72, 72), s = document.createElement('span');
+    b.type = 'button'; b.dataset.f = f[0]; b.setAttribute('aria-pressed', String(f[0] === filter)); s.textContent = f[1];
+    b.appendChild(c); b.appendChild(s); $('grid').appendChild(b);
+    b.addEventListener('click', function () { filter = f[0]; Array.prototype.forEach.call($('grid').children, function (o) { o.setAttribute('aria-pressed', String(o === b)); }); $('duoRow').hidden = filter !== 'duotone'; draw(); });
+  });
+  function swatches() {
+    var it = items[cur], base = canvas(72, 72), bx = base.getContext('2d');
+    if (it) { var k = Math.max(72 / it.img.width, 72 / it.img.height); bx.drawImage(it.img, (72 - it.img.width * k) / 2, (72 - it.img.height * k) / 2, it.img.width * k, it.img.height * k); }
+    else { var g = bx.createLinearGradient(0, 0, 72, 72); g.addColorStop(0, '#f59e0b'); g.addColorStop(0.5, '#ef4444'); g.addColorStop(1, '#3b82f6'); bx.fillStyle = g; bx.fillRect(0, 0, 72, 72); bx.fillStyle = '#16a34a'; bx.fillRect(0, 48, 72, 24); bx.fillStyle = '#fff'; bx.beginPath(); bx.arc(50, 22, 10, 0, 7); bx.fill(); }
+    var o = { amt: 1, br: 0, ct: 0, sat: 0, d1: $('d1').value, d2: $('d2').value };
+    Array.prototype.forEach.call($('grid').children, function (b) { var c = b.querySelector('canvas'); c.getContext('2d').drawImage(filtered(base, 72, 72, b.dataset.f, o), 0, 0); });
+  }
+
+  // ---------- preview ----------
+  var raf = 0;
+  function draw() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(function () {
+      raf = 0; var it = items[cur]; if (!it) return;
+      var s = Math.min(1, PREV / Math.max(it.img.width, it.img.height)), w = Math.max(1, Math.round(it.img.width * s)), h = Math.max(1, Math.round(it.img.height * s));
+      if (!prevCache || prevCache.it !== it) { var pc = canvas(w, h); pc.getContext('2d').drawImage(it.img, 0, 0, w, h); prevCache = { it: it, c: pc }; }
+      cv.width = w; cv.height = h; var x = cv.getContext('2d');
+      x.clearRect(0, 0, w, h);
+      x.drawImage(held ? prevCache.c : filtered(prevCache.c, w, h, filter, opts()), 0, 0);
+      $('holdTag').hidden = !held;
+    });
+  }
+  function hold(v) { return function (e) { if (!items.length) return; held = v; draw(); if (v && e.cancelable && e.type !== 'pointerdown') e.preventDefault(); }; }
+  cv.addEventListener('pointerdown', hold(true)); ['pointerup', 'pointerleave', 'pointercancel'].forEach(function (ev) { cv.addEventListener(ev, hold(false)); });
+  cv.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  ['amt', 'br', 'ct', 'sat', 'q'].forEach(function (id) { $(id).addEventListener('input', function () { $(id + 'V').textContent = $(id).value; if (id !== 'q') draw(); }); });
+  ['d1', 'd2'].forEach(function (id) { $(id).addEventListener('input', function () { draw(); swatches(); }); });
+  $('fmt').addEventListener('change', function () { $('q').disabled = $('fmt').value === 'image/png'; });
+  $('reset').addEventListener('click', function () { [['amt', 100], ['br', 0], ['ct', 0], ['sat', 0]].forEach(function (p) { $(p[0]).value = p[1]; $(p[0]).dispatchEvent(new Event('input', { bubbles: true })); }); });
+
+  // ---------- files ----------
+  function thumbs() {
+    var t = $('thumbs'); t.innerHTML = ''; t.hidden = items.length < 2;
+    items.forEach(function (it, i) {
+      var b = document.createElement('button'), im = new Image(); b.type = 'button'; b.setAttribute('aria-pressed', String(i === cur)); b.setAttribute('aria-label', 'Show ' + it.name);
+      im.src = it.thumb; im.alt = ''; b.appendChild(im); b.addEventListener('click', function () { cur = i; thumbs(); swatches(); draw(); }); t.appendChild(b);
+    });
+    $('all').hidden = items.length < 2; $('go').disabled = !items.length; $('work').hidden = !items.length;
+    $('go').textContent = items.length > 1 ? 'Download this photo' : 'Download photo';
+  }
+  function add(files) {
+    var mine = ++job, list = files.filter(function (f) { return /^image\//.test(f.type) && !/hei[cf]|svg/i.test(f.type); }), skipped = files.length - list.length;
+    if (!list.length) { say('bad', files.length === 1 ? '"' + files[0].name + '" is not a photo this tool can open. Please choose JPG, PNG or WebP.' : 'None of those files are photos. Please choose JPG, PNG or WebP.'); return; }
+    if (list.length > 100) { skipped += list.length - 100; list = list.slice(0, 100); }
+    items = []; cur = 0; prevCache = null; say('', 'Opening ' + list.length + ' photo' + (list.length > 1 ? 's' : '') + '…');
+    (function next(i) {
+      if (mine !== job) return;
+      if (i >= list.length) {
+        thumbs(); swatches(); draw();
+        if (!items.length) { say('bad', 'Could not read ' + (list.length > 1 ? 'those files' : '"' + list[0].name + '"') + '. They may be damaged or in a format your browser cannot open.'); return; }
+        say('', items.length + ' photo' + (items.length > 1 ? 's' : '') + ' ready. Pick a filter.' + (skipped ? ' ' + skipped + ' file(s) were skipped.' : '') + (items.some(function (q) { return q.scaled; }) ? ' Very large photos were scaled down to ' + MAX_SIDE + ' px.' : ''));
+        return;
+      }
+      loadImage(list[i], function (im) {
+        if (mine !== job) return;
+        if (im && im.naturalWidth) {
+          var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, MAX_SIDE / Math.max(w, h), Math.sqrt(MAX_AREA / (w * h)));
+          var c = canvas(Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+          var t = canvas(60, 60), k = Math.max(60 / w, 60 / h); t.getContext('2d').drawImage(im, (60 - w * k) / 2, (60 - h * k) / 2, w * k, h * k);
+          items.push({ img: c, name: list[i].name.replace(/\.[^.]+$/, '') || 'photo', thumb: t.toDataURL(), scaled: s < 1, alpha: /png|webp|gif/i.test(list[i].type) });
+        } else skipped++;
+        next(i + 1);
+      });
+    })(0);
+  }
+  PT.drop(true, add);
+  $('sample').addEventListener('click', function () {
+    var c = canvas(1000, 700), x = c.getContext('2d'), g = x.createLinearGradient(0, 0, 0, 700);
+    g.addColorStop(0, '#5aa9e6'); g.addColorStop(0.6, '#bde0fe'); g.addColorStop(0.61, '#e9c46a'); g.addColorStop(1, '#f4a261'); x.fillStyle = g; x.fillRect(0, 0, 1000, 700);
+    x.fillStyle = '#ffffff'; [[180, 120], [560, 90], [800, 160]].forEach(function (p) { x.beginPath(); x.arc(p[0], p[1], 40, 0, 7); x.arc(p[0] + 45, p[1] + 5, 50, 0, 7); x.arc(p[0] + 95, p[1], 38, 0, 7); x.fill(); });
+    x.fillStyle = '#2a9d8f'; x.fillRect(120, 380, 30, 200); x.fillStyle = '#e76f51'; x.beginPath(); x.arc(135, 360, 80, 0, 7); x.fill();
+    x.fillStyle = '#264653'; x.fillRect(600, 420, 220, 160); x.fillStyle = '#e63946'; x.beginPath(); x.moveTo(580, 425); x.lineTo(710, 320); x.lineTo(840, 425); x.fill();
+    c.toBlob(function (b) { add([new File([b], 'sample.jpg', { type: 'image/jpeg' })]); }, 'image/jpeg', 0.9);
+  });
+
+  // ---------- save ----------
+  function ext() { return { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[$('fmt').value]; }
+  function encode(it) {
+    var type = $('fmt').value, c = filtered(it.img, it.img.width, it.img.height, filter, opts());
+    if (type === 'image/jpeg') { var j = canvas(c.width, c.height), jx = j.getContext('2d'); jx.fillStyle = '#fff'; jx.fillRect(0, 0, j.width, j.height); jx.drawImage(c, 0, 0); c = j; }
+    return PT.blob(c, type, +$('q').value / 100).then(function (b) { if (!b) throw new Error('enc'); return b; });
+  }
+  function saveBlob(b, n) { var a = document.createElement('a'), u = URL.createObjectURL(b); a.href = u; a.download = n; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 60000); }
+  function label() { return filter === 'none' ? 'edited' : filter; }
+  $('go').addEventListener('click', function () {
+    var it = items[cur], btn = $('go'); if (!it) return; btn.disabled = true; say('', 'Saving…');
+    setTimeout(function () {
+      encode(it).then(function (b) { var n = it.name + '-' + label() + '.' + ext(); saveBlob(b, n); say('ok', 'Saved ' + n + ' (' + fmtBytes(b.size) + ').'); if (window.burst) burst(btn); })
+        .catch(function () { say('bad', 'Your browser could not save this photo (it may be out of memory). Try JPG or a smaller photo.'); }).then(function () { btn.disabled = false; });
+    }, 20);
+  });
+  $('all').addEventListener('click', function () {
+    var btn = $('all'), files = [], used = {}; btn.disabled = true;
+    (function next(i) {
+      if (i >= items.length) { var z = PT.zip(files); saveBlob(z, 'filtered-photos.zip'); say('ok', 'Saved ' + files.length + ' photos in filtered-photos.zip (' + fmtBytes(z.size) + ').'); btn.disabled = false; return; }
+      say('', 'Filtering photo ' + (i + 1) + ' of ' + items.length + '…');
+      setTimeout(function () {
+        encode(items[i]).then(function (b) { return b.arrayBuffer(); }).then(function (a) {
+          var n = items[i].name + '-' + label(), k = n; for (var j = 2; used[k]; j++) k = n + '-' + j; used[k] = 1;
+          files.push({ name: k + '.' + ext(), data: new Uint8Array(a) }); next(i + 1);
+        }).catch(function () { say('bad', 'Ran out of memory on photo ' + (i + 1) + '. Try fewer or smaller photos.'); btn.disabled = false; });
+      }, 10);
+    })(0);
+  });
+  swatches();
+})();
+</script>

@@ -1,0 +1,302 @@
+<style>
+.pam-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 10px; }
+.pam-bar .seg { flex-wrap: wrap; }
+.pam-bar .btn { min-height: 38px; padding: 6px 12px; }
+.pam-wrap { border: 1px solid var(--line); border-radius: 12px; background: var(--bg); padding: 8px; text-align: center; line-height: 0; margin: 0 0 10px; }
+.pam-wrap canvas { touch-action: none; cursor: crosshair; max-width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
+.pam-pal { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; margin: 0 0 12px; }
+.pam-pal button { width: 30px; height: 30px; border-radius: 7px; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); padding: 0; cursor: pointer; }
+.pam-pal button[aria-pressed="true"] { box-shadow: 0 0 0 3px var(--accent); }
+.pam-pal button.clear { background: repeating-conic-gradient(#ccc 0 25%, #fff 0 50%) 0 0 / 10px 10px; }
+.pam-pal input[type=color] { width: 46px; height: 34px; padding: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); cursor: pointer; }
+.pam-frames { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 0 6px; }
+.pam-frames button { flex: none; width: 52px; height: 52px; padding: 2px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 8px 8px; position: relative; }
+.pam-frames button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.pam-frames canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.pam-frames span { position: absolute; right: 2px; bottom: 1px; font: 700 10px/1 system-ui, sans-serif; color: #111; background: rgba(255,255,255,.8); border-radius: 3px; padding: 1px 2px; }
+.pam-h { font-size: 15px; margin: 14px 0 8px; }
+.pam-sub { font-size: 13.5px; color: var(--muted); margin: 0 0 10px; }
+</style>
+<div class="fields">
+  <div><label for="gw">Width (pixels)</label><select id="gw" data-nomemo><option>8</option><option selected>16</option><option>24</option><option>32</option><option>48</option><option>64</option><option>96</option><option>128</option></select></div>
+  <div><label for="gh">Height (pixels)</label><select id="gh" data-nomemo><option>8</option><option selected>16</option><option>24</option><option>32</option><option>48</option><option>64</option><option>96</option><option>128</option></select></div>
+  <div><label for="palSet">Palette</label><select id="palSet"><option value="basic">Basic (16)</option><option value="retro">Retro console (16)</option><option value="handheld">Handheld green (4)</option><option value="pastel">Pastel (12)</option><option value="skin">Skin and earth (12)</option></select></div>
+</div>
+<div class="pam-bar">
+  <div class="seg" role="group" aria-label="Drawing tool">
+    <button type="button" data-tool="pen" aria-pressed="true">Pencil</button>
+    <button type="button" data-tool="erase" aria-pressed="false">Eraser</button>
+    <button type="button" data-tool="fill" aria-pressed="false">Fill</button>
+    <button type="button" data-tool="pick" aria-pressed="false">Pick colour</button>
+  </div>
+  <div class="seg" role="group" aria-label="Mirror">
+    <button type="button" data-mir="" aria-pressed="true">No mirror</button>
+    <button type="button" data-mir="x" aria-pressed="false">Mirror ↔</button>
+    <button type="button" data-mir="y" aria-pressed="false">Mirror ↕</button>
+    <button type="button" data-mir="xy" aria-pressed="false">Both</button>
+  </div>
+</div>
+<div class="pam-pal" id="pal" role="group" aria-label="Colours"></div>
+<div class="pam-wrap" id="wrap"><canvas id="cv" width="512" height="512" aria-label="Pixel art drawing grid"></canvas></div>
+<div class="pam-bar">
+  <button type="button" class="btn ghost" id="undo" disabled>Undo</button>
+  <button type="button" class="btn ghost" id="redo" disabled>Redo</button>
+  <button type="button" class="btn ghost" id="clear">Clear</button>
+  <button type="button" class="btn ghost" id="imp">Import picture</button>
+  <label style="font-size:14px;font-weight:400;margin:0"><input type="checkbox" id="grid" checked>Grid lines</label>
+</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="checks" style="margin:0 0 6px"><label><input type="checkbox" id="usePal">When importing, use only the colours in the palette</label></div>
+<h3 class="pam-h">Animation frames (optional)</h3>
+<div class="pam-frames" id="frames" role="group" aria-label="Frames"></div>
+<div class="pam-bar">
+  <button type="button" class="btn ghost" id="fAdd">New frame</button>
+  <button type="button" class="btn ghost" id="fDup">Duplicate</button>
+  <button type="button" class="btn ghost" id="fDel" disabled>Delete frame</button>
+  <button type="button" class="btn ghost" id="play" disabled>Play</button>
+  <label style="font-size:14px;font-weight:400;margin:0"><input type="checkbox" id="onion">Show previous frame faintly</label>
+</div>
+<div class="fields">
+  <div><label for="fps">Speed: <span id="fpsV">6</span> frames per second</label><input type="range" id="fps" min="1" max="24" value="6"></div>
+  <div><label for="scale">Export size</label><select id="scale"><option value="1">1× (actual pixels)</option><option value="4">4×</option><option value="8">8×</option><option value="16" selected>16×</option><option value="32">32×</option></select></div>
+</div>
+<div class="btns">
+  <button type="button" class="btn" id="png">Download PNG</button>
+  <button type="button" class="btn ghost" id="gif">Download GIF</button>
+  <button type="button" class="btn ghost" id="sheet" hidden>Download sprite sheet</button>
+</div>
+<p class="pam-sub" style="margin-top:10px">Your drawing is kept in this browser, so it is still here if you reload the page.</p>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/gifenc/gifenc.js"></script>
+<script>
+(function () {
+  'use strict';
+  var PALS = {
+    basic: ['#000000', '#ffffff', '#7f7f7f', '#c3c3c3', '#880015', '#ed1c24', '#ff7f27', '#fff200', '#22b14c', '#b5e61d', '#00a2e8', '#99d9ea', '#3f48cc', '#7092be', '#a349a4', '#ffaec9'],
+    retro: ['#000000', '#1d2b53', '#7e2553', '#008751', '#ab5236', '#5f574f', '#c2c3c7', '#fff1e8', '#ff004d', '#ffa300', '#ffec27', '#00e436', '#29adff', '#83769c', '#ff77a8', '#ffccaa'],
+    handheld: ['#0f380f', '#306230', '#8bac0f', '#9bbc0f'],
+    pastel: ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff', '#fffffc', '#e5e5e5', '#6d6875', '#22223b'],
+    skin: ['#2d1b12', '#5a3a29', '#8d5524', '#c68642', '#e0ac69', '#f1c27d', '#ffdbac', '#3b5e2b', '#6a8d3a', '#87ceeb', '#4a6fa5', '#f5f5dc']
+  };
+  var KEY = 'gtn-pixel-art-v1';
+  var W = 16, H = 16, frames = [], fi = 0, color = '#000000', tool = 'pen', mir = '', undo = [], redo = [], cell = 16, playing = 0, recent = [];
+  var cv = $('cv'), ctx = cv.getContext('2d');
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+  // colours are stored as 0xAARRGGBB numbers; 0 means see-through
+  function pack(hex) { var n = parseInt(hex.slice(1), 16); return (0xff000000 | n) >>> 0; }
+  function unhex(v) { return '#' + ('00000' + (v & 0xffffff).toString(16)).slice(-6); }
+  function blank() { return new Uint32Array(W * H); }
+
+  // ---------- storage (per browser, so a reload keeps the drawing) ----------
+  var saveT;
+  function persist() {
+    clearTimeout(saveT);
+    saveT = setTimeout(function () {
+      try { localStorage.setItem(KEY, JSON.stringify({ w: W, h: H, fi: fi, color: color, frames: frames.map(function (f) { return Array.prototype.slice.call(f); }) })); } catch (e) {}
+    }, 300);
+  }
+  function restore() {
+    try {
+      var s = JSON.parse(localStorage.getItem(KEY) || 'null');
+      if (!s || !s.frames || !s.frames.length || [8, 16, 24, 32, 48, 64, 96, 128].indexOf(s.w) < 0 || [8, 16, 24, 32, 48, 64, 96, 128].indexOf(s.h) < 0) return false;
+      W = s.w; H = s.h; frames = s.frames.slice(0, 64).map(function (a) { var u = new Uint32Array(W * H); for (var i = 0; i < u.length && i < a.length; i++) u[i] = a[i] >>> 0; return u; });
+      fi = Math.min(frames.length - 1, Math.max(0, s.fi | 0)); if (/^#[0-9a-f]{6}$/.test(s.color)) color = s.color;
+      return true;
+    } catch (e) { return false; }
+  }
+
+  // ---------- drawing ----------
+  function layout() {
+    var avail = Math.max(120, $('wrap').clientWidth - 18), maxH = Math.max(200, window.innerHeight * 0.62);
+    cell = Math.max(2, Math.floor(Math.min(avail / W, maxH / H, 40)));
+    cv.width = W * cell; cv.height = H * cell; draw();
+  }
+  function draw() {
+    var f = frames[fi], x = ctx, c = cell;
+    for (var y = 0; y < H; y++) for (var i = 0; i < W; i++) { x.fillStyle = ((i + y) & 1) ? '#e6e6e6' : '#ffffff'; x.fillRect(i * c, y * c, c, c); }
+    if ($('onion').checked && fi > 0) { x.globalAlpha = 0.25; paintFrame(x, frames[fi - 1], c); x.globalAlpha = 1; }
+    paintFrame(x, f, c);
+    if ($('grid').checked && c >= 5) {
+      x.strokeStyle = 'rgba(0,0,0,.14)'; x.lineWidth = 1; x.beginPath();
+      for (var gx = 1; gx < W; gx++) { x.moveTo(gx * c + 0.5, 0); x.lineTo(gx * c + 0.5, H * c); }
+      for (var gy = 1; gy < H; gy++) { x.moveTo(0, gy * c + 0.5); x.lineTo(W * c, gy * c + 0.5); }
+      x.stroke();
+      if (mir) { x.strokeStyle = 'rgba(37,99,235,.7)'; x.lineWidth = 2; x.beginPath(); if (mir.indexOf('x') >= 0) { x.moveTo(W * c / 2, 0); x.lineTo(W * c / 2, H * c); } if (mir.indexOf('y') >= 0) { x.moveTo(0, H * c / 2); x.lineTo(W * c, H * c / 2); } x.stroke(); }
+    }
+  }
+  function paintFrame(x, f, c) { for (var y = 0; y < H; y++) for (var i = 0; i < W; i++) { var v = f[y * W + i]; if (v >>> 24) { x.fillStyle = unhex(v); x.fillRect(i * c, y * c, c, c); } } }
+  function setPx(i, y, v) {
+    if (i < 0 || y < 0 || i >= W || y >= H) return;
+    var f = frames[fi], pts = [[i, y]];
+    if (mir.indexOf('x') >= 0) pts.push([W - 1 - i, y]);
+    if (mir.indexOf('y') >= 0) pts.push([i, H - 1 - y]);
+    if (mir === 'xy') pts.push([W - 1 - i, H - 1 - y]);
+    pts.forEach(function (p) { f[p[1] * W + p[0]] = v; });
+  }
+  function fill(i, y, v) {
+    var f = frames[fi], target = f[y * W + i]; if (target === v) return;
+    var st = [[i, y]];
+    while (st.length) {
+      var p = st.pop(), px = p[0], py = p[1];
+      if (px < 0 || py < 0 || px >= W || py >= H || f[py * W + px] !== target) continue;
+      f[py * W + px] = v; st.push([px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]);
+    }
+  }
+  function snapshot() { undo.push({ fi: fi, data: frames.map(function (f) { return f.slice(); }), w: W, h: H }); if (undo.length > 60) undo.shift(); redo = []; btnState(); }
+  function restoreSnap(s) { W = s.w; H = s.h; frames = s.data.map(function (f) { return f.slice(); }); fi = Math.min(s.fi, frames.length - 1); $('gw').value = W; $('gh').value = H; layout(); thumbs(); persist(); }
+  function btnState() { $('undo').disabled = !undo.length; $('redo').disabled = !redo.length; $('fDel').disabled = frames.length < 2; $('play').disabled = frames.length < 2; $('sheet').hidden = frames.length < 2; }
+  $('undo').addEventListener('click', function () { if (!undo.length) return; redo.push({ fi: fi, data: frames.map(function (f) { return f.slice(); }), w: W, h: H }); restoreSnap(undo.pop()); btnState(); });
+  $('redo').addEventListener('click', function () { if (!redo.length) return; undo.push({ fi: fi, data: frames.map(function (f) { return f.slice(); }), w: W, h: H }); restoreSnap(redo.pop()); btnState(); });
+  document.addEventListener('keydown', function (e) {
+    if (/^(INPUT|TEXTAREA|SELECT)$/.test((e.target || {}).tagName || '')) return;
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') { e.preventDefault(); $(e.shiftKey ? 'redo' : 'undo').click(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') { e.preventDefault(); $('redo').click(); }
+  });
+
+  // ---------- pointer ----------
+  var down = false, last = null, val = 0;
+  function cellAt(e) { var b = cv.getBoundingClientRect(); return [Math.floor((e.clientX - b.left) / b.width * W), Math.floor((e.clientY - b.top) / b.height * H)]; }
+  function line(a, b) { // Bresenham, so fast strokes leave no gaps
+    var x0 = a[0], y0 = a[1], x1 = b[0], y1 = b[1], dx = Math.abs(x1 - x0), dy = -Math.abs(y1 - y0), sx = x0 < x1 ? 1 : -1, sy = y0 < y1 ? 1 : -1, er = dx + dy;
+    for (var n = 0; n < 1000; n++) { setPx(x0, y0, val); if (x0 === x1 && y0 === y1) break; var e2 = 2 * er; if (e2 >= dy) { er += dy; x0 += sx; } if (e2 <= dx) { er += dx; y0 += sy; } }
+  }
+  cv.addEventListener('pointerdown', function (e) {
+    if (playing) stop();
+    var p = cellAt(e); if (p[0] < 0 || p[1] < 0 || p[0] >= W || p[1] >= H) return;
+    e.preventDefault();
+    if (tool === 'pick') { var v = frames[fi][p[1] * W + p[0]]; if (v >>> 24) { setColor(unhex(v)); setTool('pen'); } else setTool('erase'); return; }
+    snapshot();
+    if (tool === 'fill') { fill(p[0], p[1], pack(color)); use(color); draw(); thumbs(); persist(); return; }
+    val = tool === 'erase' ? 0 : pack(color); if (tool === 'pen') use(color);
+    down = true; last = p; try { cv.setPointerCapture(e.pointerId); } catch (er) {}
+    setPx(p[0], p[1], val); draw();
+  });
+  cv.addEventListener('pointermove', function (e) { if (!down) return; var p = cellAt(e); line(last, p); last = p; draw(); });
+  function up() { if (!down) return; down = false; thumbs(); persist(); }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+
+  // ---------- palette and tools ----------
+  function setColor(c) { color = c; $('picker').value = c; palette(); persist(); }
+  function use(c) { recent = [c].concat(recent.filter(function (r) { return r !== c; })).slice(0, 8); }
+  function palette() {
+    var box = $('pal'), list = PALS[$('palSet').value] || PALS.basic; box.innerHTML = '';
+    var pk = document.createElement('input'); pk.type = 'color'; pk.id = 'picker'; pk.value = color; pk.setAttribute('aria-label', 'Any colour'); pk.setAttribute('data-nomemo', '');
+    pk.addEventListener('input', function () { color = pk.value; if (tool !== 'fill') setTool('pen'); Array.prototype.forEach.call(box.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.c === color)); }); persist(); });
+    box.appendChild(pk);
+    list.concat(recent.filter(function (r) { return list.indexOf(r) < 0; })).forEach(function (c) {
+      var b = document.createElement('button'); b.type = 'button'; b.dataset.c = c; b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c); b.setAttribute('aria-pressed', String(c === color));
+      b.addEventListener('click', function () { setColor(c); if (tool === 'erase' || tool === 'pick') setTool('pen'); });
+      box.appendChild(b);
+    });
+  }
+  function setTool(t) { tool = t; Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.tool === t)); }); }
+  Array.prototype.forEach.call(document.querySelectorAll('[data-tool]'), function (b) { b.addEventListener('click', function () { setTool(b.dataset.tool); }); });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mir]'), function (b) {
+    b.addEventListener('click', function () { mir = b.dataset.mir; Array.prototype.forEach.call(document.querySelectorAll('[data-mir]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); }); draw(); });
+  });
+  $('palSet').addEventListener('change', palette);
+  $('grid').addEventListener('change', draw); $('onion').addEventListener('change', draw);
+  $('clear').addEventListener('click', function () { snapshot(); frames[fi] = blank(); draw(); thumbs(); persist(); say('', 'Frame cleared. Press Undo to bring it back.'); });
+
+  // ---------- grid size ----------
+  function resize() {
+    var nw = +$('gw').value, nh = +$('gh').value; if (nw === W && nh === H) return;
+    snapshot();
+    frames = frames.map(function (f) { var u = new Uint32Array(nw * nh); for (var y = 0; y < Math.min(H, nh); y++) for (var i = 0; i < Math.min(W, nw); i++) u[y * nw + i] = f[y * W + i]; return u; });
+    W = nw; H = nh; layout(); thumbs(); persist();
+    say('', 'Grid is now ' + W + ' × ' + H + '. Your drawing was kept from the top-left corner; Undo goes back.');
+  }
+  $('gw').addEventListener('change', resize); $('gh').addEventListener('change', resize);
+
+  // ---------- frames ----------
+  function thumbs() {
+    var box = $('frames'); box.innerHTML = '';
+    frames.forEach(function (f, i) {
+      var b = document.createElement('button'), c = canvas(W, H), s = document.createElement('span'); b.type = 'button'; b.setAttribute('aria-pressed', String(i === fi)); b.setAttribute('aria-label', 'Frame ' + (i + 1));
+      paintFrame(c.getContext('2d'), f, 1); s.textContent = i + 1; b.appendChild(c); b.appendChild(s);
+      b.addEventListener('click', function () { if (playing) stop(); fi = i; thumbs(); draw(); persist(); });
+      box.appendChild(b);
+    });
+    btnState();
+  }
+  $('fAdd').addEventListener('click', function () { if (frames.length >= 64) { say('bad', 'You can have up to 64 frames.'); return; } snapshot(); frames.splice(fi + 1, 0, blank()); fi++; thumbs(); draw(); persist(); });
+  $('fDup').addEventListener('click', function () { if (frames.length >= 64) { say('bad', 'You can have up to 64 frames.'); return; } snapshot(); frames.splice(fi + 1, 0, frames[fi].slice()); fi++; thumbs(); draw(); persist(); });
+  $('fDel').addEventListener('click', function () { if (frames.length < 2) return; snapshot(); frames.splice(fi, 1); fi = Math.max(0, fi - 1); thumbs(); draw(); persist(); });
+  function stop() { clearInterval(playing); playing = 0; $('play').textContent = 'Play'; draw(); }
+  $('play').addEventListener('click', function () {
+    if (playing) { stop(); return; }
+    var start = fi; $('play').textContent = 'Stop';
+    playing = setInterval(function () { fi = (fi + 1) % frames.length; var on = $('onion').checked; $('onion').checked = false; draw(); $('onion').checked = on; }, 1000 / +$('fps').value);
+    void start;
+  });
+  $('fps').addEventListener('input', function () { $('fpsV').textContent = $('fps').value; if (playing) { stop(); $('play').click(); } });
+
+  // ---------- import a picture ----------
+  $('imp').addEventListener('click', function () { $('file').click(); });
+  $('file').addEventListener('change', function () {
+    var f = $('file').files[0]; $('file').value = ''; if (!f) return;
+    if (!/^image\//.test(f.type) || /hei[cf]/i.test(f.type)) { say('bad', '"' + f.name + '" is not a picture this tool can open. Please choose JPG, PNG, WebP or GIF.'); return; }
+    loadImage(f, function (im) {
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged.'); return; }
+      snapshot();
+      var c = canvas(W, H), x = c.getContext('2d', { willReadFrequently: true }), s = Math.min(W / im.naturalWidth, H / im.naturalHeight), dw = im.naturalWidth * s, dh = im.naturalHeight * s;
+      x.imageSmoothingQuality = 'high'; x.drawImage(im, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      var d = x.getImageData(0, 0, W, H).data, u = blank(), pal = $('usePal').checked ? (PALS[$('palSet').value]).map(function (h) { var n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255, h]; }) : null;
+      for (var i = 0; i < W * H; i++) {
+        if (d[i * 4 + 3] < 128) continue;
+        var r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+        if (pal) { var best = 0, bd = 1e9; pal.forEach(function (p, k) { var dd = (p[0] - r) * (p[0] - r) * 0.3 + (p[1] - g) * (p[1] - g) * 0.59 + (p[2] - b) * (p[2] - b) * 0.11; if (dd < bd) { bd = dd; best = k; } }); r = pal[best][0]; g = pal[best][1]; b = pal[best][2]; }
+        u[i] = (0xff000000 | (r << 16) | (g << 8) | b) >>> 0;
+      }
+      frames[fi] = u; draw(); thumbs(); persist();
+      say('ok', 'Imported "' + f.name + '" as ' + W + ' × ' + H + ' pixels. Use a bigger grid for more detail.');
+    });
+  });
+
+  // ---------- export ----------
+  function frameCanvas(f, sc) { var c = canvas(W * sc, H * sc); paintFrame(c.getContext('2d'), f, sc); return c; }
+  function saveBlob(b, n) { var a = document.createElement('a'), u = URL.createObjectURL(b); a.href = u; a.download = n; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 60000); say('ok', 'Saved ' + n + ' (' + fmtBytes(b.size) + ').'); }
+  function empty(f) { for (var i = 0; i < f.length; i++) if (f[i]) return false; return true; }
+  $('png').addEventListener('click', function () {
+    var sc = +$('scale').value;
+    if (empty(frames[fi])) say('', 'This frame is empty, so the PNG is fully see-through.');
+    frameCanvas(frames[fi], sc).toBlob(function (b) { if (b) saveBlob(b, 'pixel-art-' + W + 'x' + H + (frames.length > 1 ? '-frame' + (fi + 1) : '') + '.png'); }, 'image/png');
+  });
+  $('sheet').addEventListener('click', function () {
+    var sc = +$('scale').value, n = frames.length, c = canvas(W * sc * n, H * sc), x = c.getContext('2d');
+    frames.forEach(function (f, i) { x.drawImage(frameCanvas(f, sc), i * W * sc, 0); });
+    c.toBlob(function (b) { if (b) saveBlob(b, 'pixel-art-sheet-' + n + 'x' + W + 'x' + H + '.png'); }, 'image/png');
+  });
+  $('gif').addEventListener('click', function () {
+    if (!self.gifenc) { say('bad', 'The GIF maker did not load. Check your connection and reload the page.'); return; }
+    var G = self.gifenc, sc = Math.min(+$('scale').value, Math.floor(1024 / Math.max(W, H)) || 1);
+    // one shared palette: index 0 is see-through, then every colour used (at most 255)
+    var seen = {}, colors = [];
+    frames.forEach(function (f) { for (var i = 0; i < f.length; i++) if (f[i] && !seen[f[i]]) { seen[f[i]] = 1; colors.push(f[i]); } });
+    var reduce = colors.length > 255, pal = [[0, 0, 0]], idxOf = {};
+    if (reduce) { // imported photos can have many colours: let gifenc pick the best 255
+      var all = new Uint8Array(colors.length * 4); colors.forEach(function (v, i) { all[i * 4] = v >> 16 & 255; all[i * 4 + 1] = v >> 8 & 255; all[i * 4 + 2] = v & 255; all[i * 4 + 3] = 255; });
+      var q = G.quantize(all, 255, { format: 'rgb565' }), map = G.applyPalette(all, q, 'rgb565');
+      q.forEach(function (c) { pal.push([c[0], c[1], c[2]]); }); colors.forEach(function (v, i) { idxOf[v] = map[i] + 1; });
+    } else colors.forEach(function (v, i) { pal.push([v >> 16 & 255, v >> 8 & 255, v & 255]); idxOf[v] = i + 1; });
+    var size = 2; while (size < pal.length) size *= 2; while (pal.length < size) pal.push([0, 0, 0]);
+    var enc = G.GIFEncoder(), w = W * sc, h = H * sc, delay = Math.round(1000 / +$('fps').value);
+    frames.forEach(function (f, k) {
+      var idx = new Uint8Array(w * h);
+      for (var y = 0; y < h; y++) { var sy = (y / sc) | 0; for (var x = 0; x < w; x++) { var v = f[sy * W + ((x / sc) | 0)]; idx[y * w + x] = v ? idxOf[v] : 0; } }
+      enc.writeFrame(idx, w, h, k === 0 ? { palette: pal, delay: delay, transparent: true, transparentIndex: 0, repeat: 0, dispose: 2 } : { delay: delay, transparent: true, transparentIndex: 0, dispose: 2 });
+    });
+    enc.finish();
+    saveBlob(new Blob([enc.bytes()], { type: 'image/gif' }), 'pixel-art-' + W + 'x' + H + (frames.length > 1 ? '-' + frames.length + '-frames' : '') + '.gif');
+    if (reduce) say('ok', $('msg').textContent + ' Your art has more than 255 colours, so the GIF uses the closest 255.');
+  });
+
+  // ---------- start ----------
+  if (!restore()) { frames = [blank()]; }
+  else say('', 'Welcome back: your last drawing was restored.');
+  $('gw').value = W; $('gh').value = H;
+  palette(); setTool('pen'); thumbs(); layout();
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(layout, 100); });
+})();
+</script>

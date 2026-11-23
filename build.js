@@ -285,6 +285,14 @@ const bySlug = s => { const t = tools.find(t => t.slug === s); if (!t) throw new
 
 // Search index used by the finder, the palette and the "My tools" lists.
 write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [t.slug, t.name, t.cat, COLOR[t.cat], t.card])) + ';\n');
+// Search aliases (other names, common typos, other languages), loaded only when someone uses the search box.
+{
+  let AL = {};
+  try { AL = require('./src/aliases.js'); } catch (e) { AL = {}; }
+  const out = {};
+  for (const t of tools) { const a = Array.isArray(AL[t.slug]) ? AL[t.slug] : []; if (a.length) out[t.slug] = a.map(s => String(s).replace(/\|/g, ' ')).join('|'); }
+  write('assets/tools-aliases.js', 'window.TOOL_ALIASES=' + JSON.stringify(out) + ';\n');
+}
 
 // ---------- home ----------
 const keepLine = cfg.firebase

@@ -122,7 +122,7 @@
       if (m) return Promise.resolve(m);
       return fetch(base + 'hunspell.wasm').then(function (r) { if (!r.ok) throw new Error('net'); return r.arrayBuffer(); }, function () { throw new Error('net'); }).then(function (wasm) {
         importScripts(base + 'hunspell.js');
-        return self.Hunspell({ wasmBinary: wasm, print: function () {}, printErr: function () {} });
+        return self.Hunspell({ wasmBinary: wasm, locateFile: function (f) { return base + f; }, print: function () {}, printErr: function () {} });
       }).then(function (mod) { m = mod; return m; });
     }
     function spell(h, w) { var p = str(w), ok = m._Hunspell_spell(h, p); m._free(p); return !!ok; }
@@ -166,6 +166,14 @@
       if (d.type === 'suggest') {
         var w = d.word, s = suggest(h, w);
         if (!s.length && /’/.test(w)) s = suggest(h, w.replace(/’/g, "'")).map(function (x) { return x.replace(/'/g, '’'); });
+        // A capitalised word (often just the start of a sentence) also gets the suggestions of its lowercase form,
+        // so "Teh" offers "The" and not only names like "Te". At a sentence start those come first.
+        var low = w.toLocaleLowerCase(d.lang);
+        if (low !== w && w.slice(1) === low.slice(1)) {
+          var cap = suggest(h, low).map(function (x) { return x.charAt(0).toLocaleUpperCase(d.lang) + x.slice(1); });
+          var all = d.start ? cap.concat(s) : s.slice(0, 2).concat(cap, s.slice(2));
+          s = all.filter(function (x, i) { return all.indexOf(x) === i; });
+        }
         postMessage({ type: 'result', id: d.id, list: s.slice(0, 8) });
       }
     };
@@ -277,7 +285,7 @@
     $('spWord').textContent = '“' + k.w + '”';
     $('spSugg').innerHTML = '<span class="msg" style="margin:0">Looking for suggestions…</span>';
     var me = current;
-    ask({ type: 'suggest', lang: lang(), word: k.w }).then(function (r) {
+    ask({ type: 'suggest', lang: lang(), word: k.w, start: /(^|[.!?¡¿…:]\s*|\n\s*)$/.test($('spTxt').value.slice(Math.max(0, k.i - 20), k.i)) }).then(function (r) {
       if (current !== me) return;
       var list = r.list || [];
       $('spSugg').innerHTML = list.length ? list.map(function (s) { return '<button type="button" class="btn" data-s="' + esc(s) + '">' + esc(s) + '</button>'; }).join('') : '<span class="msg" style="margin:0">No suggestions. Edit the word in the text box, ignore it or add it to your dictionary.</span>';

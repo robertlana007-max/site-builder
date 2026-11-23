@@ -287,6 +287,10 @@
       if (name === 'log10' && a.q === 1 && a.p > 0) { var l = Math.round(Math.log10(a.p)); if (Math.pow(10, l) === a.p) return N(l); }
       if (name === 'log2' && a.q === 1 && a.p > 0) { var l2 = Math.round(Math.log2(a.p)); if (Math.pow(2, l2) === a.p) return N(l2); }
     }
+    if (a.t === 'f') { // f(f⁻¹(u))
+      if ((name === 'sin' && a.n === 'asin') || (name === 'cos' && a.n === 'acos') || (name === 'tan' && a.n === 'atan') || (name === 'sinh' && a.n === 'asinh') || (name === 'cosh' && a.n === 'acosh') || (name === 'tanh' && a.n === 'atanh')) return a.a;
+      if ((name === 'cos' && a.n === 'asin') || (name === 'sin' && a.n === 'acos')) return sPow(sAdd([N(1), sMul([N(-1), sPow(a.a, N(2))])]), HALF());
+    }
     if (name === 'ln' && a.t === 's' && a.n === 'e') return N(1);
     if (name === 'ln' && a.t === '^' && a.b.t === 's' && a.b.n === 'e') return a.e;
     if (name === 'abs' && a.t === '^' && isInt(a.e) && a.e.p % 2 === 0) return a;
@@ -479,6 +483,7 @@
       case 's': return x.n === 'pi' ? 'π' : '<i>' + esc(x.n) + '</i>';
       case 'f':
         if (x.n === 'abs') return '|' + H(x.a) + '|';
+        if (x.a.t === 'f' && x.a.n === 'abs') return '<span class="cx-fn">' + (FNAME[x.n] || x.n) + '</span>|' + H(x.a.a) + '|';
         return '<span class="cx-fn">' + (FNAME[x.n] || x.n) + '</span>(' + H(x.a) + ')';
       case '^':
         if (isN(x.e) && exact(x.e) && x.e.p === 1 && (x.e.q === 2 || x.e.q === 3)) return (x.e.q === 3 ? '∛' : '√') + '<span class="cx-rad">' + H(x.b) + '</span>';
@@ -499,7 +504,7 @@
   }
   function Hexp(e) { // exponents are printed small and inline
     if (isN(e)) return numTxt(e).replace('-', '−');
-    return T(e).replace(/\*/g, '·').replace(/-/g, '−').replace(/pi/g, 'π');
+    return esc(T(e)).replace(/(\d)\*(?=[A-Za-z(])/g, '$1').replace(/\*/g, '·').replace(/-/g, '−').replace(/pi/g, 'π');
   }
   function isNegTerm(t) { return (isN(t) && val(t) < 0) || (t.t === '*' && isN(t.a[0]) && val(t.a[0]) < 0); }
   function negTerm(t) { if (isN(t)) return neg(t); var a = t.a.slice(); a[0] = neg(a[0]); if (isOne(a[0])) a.shift(); return a.length === 1 ? a[0] : mul(a); }
@@ -541,14 +546,14 @@
         return x.n + '(' + T(x.a, nerd) + ')';
       case '^':
         if (!nerd && isN(x.e) && exact(x.e) && x.e.p === 1 && x.e.q === 2) return 'sqrt(' + T(x.b) + ')';
-        if (!nerd && isN(x.e) && val(x.e) < 0) { var inv = pow(x.b, neg(x.e)), it = T(isOne(neg(x.e)) ? x.b : inv); return '1/' + (isOne(neg(x.e)) && (x.b.t === '+' || x.b.t === '*') ? '(' + it + ')' : it); }
+        if (isN(x.e) && val(x.e) < 0) { var inv = pow(x.b, neg(x.e)), it = T(isOne(neg(x.e)) ? x.b : inv, nerd); return '1/' + (isOne(neg(x.e)) && (x.b.t === '+' || x.b.t === '*') ? '(' + it + ')' : it); }
         var b = T(x.b, nerd); if (x.b.t === '+' || x.b.t === '*' || x.b.t === '^' || (isN(x.b) && val(x.b) < 0)) b = '(' + b + ')';
         var e = T(x.e, nerd); if (x.e.t === '+' || x.e.t === '*' || x.e.t === '^') e = '(' + e + ')';
         return b + '^' + e;
       case '*':
-        if (!nerd) {
+        if (true) {
           var fp = fracParts(x), c = fp.c, cn = exact(c) ? c.p : c.f, cd = exact(c) ? c.q : 1;
-          var wrap = function (y) { var s1 = T(y); return y.t === '+' ? '(' + s1 + ')' : s1; };
+          var wrap = function (y) { var s1 = T(y, nerd); return y.t === '+' ? '(' + s1 + ')' : s1; };
           var tops = fp.top.map(wrap), num;
           if (!tops.length) num = String(cn);
           else if (cn === 1) num = tops.join('*');
@@ -558,7 +563,7 @@
           var bots = (cd !== 1 ? [String(cd)] : []).concat(fp.bot.map(wrap));
           var den = bots.join('*');
           if (bots.length > 1) den = '(' + den + ')';
-          if (tops.length === 1 && fp.top[0].t === '+' && cn !== 1) num = (cn === -1 ? '-' : cn + '*') + '(' + T(fp.top[0]) + ')';
+          if (tops.length === 1 && fp.top[0].t === '+' && cn !== 1) num = (cn === -1 ? '-' : cn + '*') + '(' + T(fp.top[0], nerd) + ')';
           return num + '/' + den;
         }
         return x.a.map(function (y) { var s = T(y, nerd); return y.t === '+' ? '(' + s + ')' : s; }).join('*');
