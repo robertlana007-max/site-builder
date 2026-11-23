@@ -1,0 +1,92 @@
+<style>
+.cb-ex { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 14px; }
+.cb-ex button { font: 500 13px/1 var(--mono); border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 7px 11px; cursor: pointer; }
+.cb-ex button:hover { border-color: var(--accent); color: var(--accent); }
+.cb-res { background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 12px; padding: 14px 16px; margin-top: 12px; font-size: 22px; line-height: 1.7; overflow-wrap: anywhere; }
+.cb-res small { display: block; font-size: 13px; color: var(--muted); }
+.cb-res b { color: var(--accent); margin-inline-end: 2px; }
+.cb-res sub, .cb-res sup { font-size: .65em; line-height: 0; }
+.cb-res em { font-style: normal; color: var(--muted); font-size: .8em; }
+.cb-ar { display: inline-block; margin: 0 .35em; color: var(--muted); }
+.cb-tbl td:not(:first-child), .cb-tbl th:not(:first-child) { text-align: center; }
+.cb-tbl sub, .cb-tbl sup { font-size: .7em; }
+.cb-good { color: var(--ok); font-weight: 700; }
+</style>
+<label for="eq">Chemical equation</label>
+<input type="text" id="eq" value="Fe + O2 = Fe2O3" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="for example H2 + O2 = H2O">
+<div class="cb-ex" id="exs" aria-label="Examples"><button type="button">C3H8 + O2 = CO2 + H2O</button><button type="button">KMnO4 + HCl = KCl + MnCl2 + H2O + Cl2</button><button type="button">Cu + HNO3 = Cu(NO3)2 + NO + H2O</button><button type="button">Ca3(PO4)2 + H2SO4 = CaSO4 + H3PO4</button><button type="button">MnO4^- + Fe^2+ + H^+ = Mn^2+ + Fe^3+ + H2O</button><button type="button">CuSO4·5H2O = CuSO4 + H2O</button></div>
+<p class="msg" id="msg"></p>
+<div id="out" hidden>
+  <div class="cb-res"><small>Balanced equation</small><div id="res"></div></div>
+  <div class="btns"><button class="btn ghost" id="cp" type="button">Copy balanced equation</button></div>
+  <p class="msg" id="notes"></p>
+  <h3>Check: atoms on each side</h3>
+  <div class="scroll-x"><table class="sched cb-tbl"><thead><tr><th>Element</th><th>Left side</th><th>Right side</th><th>Balanced</th></tr></thead><tbody id="tb"></tbody></table></div>
+  <h3>Coefficients</h3>
+  <div class="scroll-x"><table class="sched cb-tbl"><thead><tr><th>Substance</th><th>Side</th><th>Coefficient</th><th>Molar mass (g/mol)</th></tr></thead><tbody id="tc"></tbody></table></div>
+</div>
+<details class="more" style="margin-top:16px"><summary>How to type equations</summary><div>
+  <p class="msg" style="margin-top:4px">Separate substances with <code>+</code> and the two sides with <code>=</code>, <code>-&gt;</code> or <code>→</code>. Element symbols need the right capital letters: <code>Co</code> is cobalt, <code>CO</code> is carbon monoxide. Brackets work: <code>Ca(OH)2</code>, <code>K4[Fe(CN)6]</code>. Hydrates: <code>CuSO4·5H2O</code> or <code>CuSO4*5H2O</code>. Ions: <code>Fe^3+</code>, <code>SO4^2-</code>, <code>Cr2O7{2-}</code>, <code>NH4+</code> or <code>OH-</code>; electrons as <code>e-</code>. States such as (s), (l), (g) and (aq) are allowed and kept.</p>
+</div></details>
+<script src="../assets/chem.js"></script>
+<script>
+(function () {
+  var last = '', timer;
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t || ''; }
+  function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;'); }
+  function plainCharge(sp) { return sp.text; }
+  function run() {
+    var src = $('eq').value;
+    $('out').hidden = true; last = '';
+    if (!src.trim()) { msg('Type an equation, for example H2 + O2 = H2O. Leave out the numbers in front; they are worked out for you.'); return; }
+    var sp, r;
+    try { sp = Chem.parseEquation(src); } catch (e) { if (!(e instanceof Chem.Err)) throw e; msg(e.message, true); return; }
+    if (sp.length > 30) { msg('This equation has more than 30 substances. Please shorten it.', true); return; }
+    r = Chem.balance(sp);
+    if (r.error) { msg(r.error, true); return; }
+    msg('');
+    var html = '', txt = '';
+    [0, 1].forEach(function (side) {
+      var list = [];
+      sp.forEach(function (s, i) { if (s.side === side) list.push((r.coefs[i] > 1n ? '<b>' + r.coefs[i] + '</b>' : '') + Chem.pretty(s.text).replace(/<small>/g, '<em>').replace(/<\/small>/g, '</em>')); });
+      html += list.join(' + ');
+      txt += sp.filter(function (s) { return s.side === side; }).map(function (s) { var c = r.coefs[sp.indexOf(s)]; return (c > 1n ? c + ' ' : '') + s.text; }).join(' + ');
+      if (!side) { html += '<span class="cb-ar">→</span>'; txt += ' → '; }
+    });
+    $('res').innerHTML = html; last = txt;
+    // independent atom count check
+    var rows = '', allOk = true;
+    r.elements.forEach(function (e) {
+      var L = 0n, R = 0n;
+      sp.forEach(function (s, i) { var n = BigInt(s.counts[e] || 0) * r.coefs[i]; if (s.side) R += n; else L += n; });
+      if (L !== R) allOk = false;
+      rows += '<tr><td>' + esc(Chem.EL[e].name) + ' (' + e + ')</td><td>' + L + '</td><td>' + R + '</td><td class="cb-good">' + (L === R ? '✓' : '✗') + '</td></tr>';
+    });
+    if (r.hasCharge) {
+      var qL = 0n, qR = 0n;
+      sp.forEach(function (s, i) { var q = BigInt(s.charge) * r.coefs[i]; if (s.side) qR += q; else qL += q; });
+      if (qL !== qR) allOk = false;
+      var fq = function (q) { return q > 0n ? '+' + q : q < 0n ? '−' + (-q) : '0'; };
+      rows += '<tr><td>Total charge</td><td>' + fq(qL) + '</td><td>' + fq(qR) + '</td><td class="cb-good">' + (qL === qR ? '✓' : '✗') + '</td></tr>';
+    }
+    $('tb').innerHTML = rows;
+    $('tc').innerHTML = sp.map(function (s, i) {
+      var mm = s.electron ? '≈ 0' : Chem.molarMass(s.counts).toFixed(3);
+      return '<tr><td>' + Chem.pretty(s.text) + '</td><td>' + (s.side ? 'Product' : 'Reactant') + '</td><td>' + r.coefs[i] + '</td><td>' + mm + '</td></tr>';
+    }).join('');
+    var notes = [];
+    if (sp.some(function (s) { return s.hadCoef; })) notes.push('The numbers you typed in front of formulas were ignored and worked out again.');
+    sp.forEach(function (s) { if (s.guessed) notes.push('"' + s.text + '" was read as an ion with charge ' + Math.abs(s.charge) + (s.charge > 0 ? '+' : '−') + '. If you meant a subscript, write it as ' + s.text.replace(/[+-]$/, '') + '^' + s.text.slice(-1) + '.'); });
+    if (r.multiple) notes.push('This equation can be balanced in more than one way, because it mixes independent reactions. The smallest balanced version is shown.');
+    if (!allOk) notes.push('Something went wrong in the check. Please report this equation.');
+    var mass = 0, massR = 0; sp.forEach(function (s, i) { var m = Chem.molarMass(s.counts) * Number(r.coefs[i]); if (s.side) massR += m; else mass += m; });
+    notes.push('Mass is conserved: ' + mass.toFixed(3) + ' g of reactants give ' + massR.toFixed(3) + ' g of products (per mole of reaction).');
+    $('notes').textContent = notes.join(' ');
+    $('out').hidden = false;
+  }
+  $('eq').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, 200); });
+  $('exs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; $('eq').value = b.textContent; run(); $('eq').dispatchEvent(new Event('change', { bubbles: true })); });
+  $('cp').addEventListener('click', function () { if (last) copyText(last, $('cp')); });
+  run();
+})();
+</script>

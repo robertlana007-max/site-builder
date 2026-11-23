@@ -56,7 +56,36 @@
 <script>
 (function () {
   'use strict';
-/*@UT*/
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
   function circ(x, y, r) { return 'M' + (x - r) + ' ' + y + 'a' + r + ' ' + r + ' 0 1 0 ' + 2 * r + ' 0a' + r + ' ' + r + ' 0 1 0 ' + -2 * r + ' 0z'; }
   var ICONS = {
     leaf: 'M5 19c0-8 6-14 15-14 0 9-6 15-14 15M5 19l7-7', star: 'M12 3l2.7 5.6 6.2.9-4.5 4.3 1.1 6.1L12 17l-5.5 2.9 1.1-6.1-4.5-4.3 6.2-.9z',
