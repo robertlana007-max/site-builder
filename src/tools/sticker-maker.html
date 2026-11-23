@@ -192,7 +192,7 @@
     return { matte: matte, at: at, failText: failText };
   })();
   var S = 512, MARGIN = 16, MAXIN = 1024, MAXN = 30;
-  var items = [], sel = 0, modelKey = 'fast', job = 0, busy = false;
+  var items = [], sel = 0, modelKey = 'fast', job = 0, busy = false, skipNote = '';
   var FONTS = { anton: ['GTN Anton', 'anton-latin-400-normal.woff2', '400'], sans: ['GTN Noto Sans', 'noto-sans-subset-700.ttf', '700'], caveat: ['GTN Caveat', 'caveat-latin-400-normal.woff2', '400'], dancing: ['GTN Dancing', 'dancing-script-latin-400-normal.woff2', '400'] };
   var fontP = {};
   function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
@@ -284,16 +284,15 @@
   }
   function cutOne(it, mine) {
     var src = it.src;
-    if (modelKey === 'none') { var whole = cropToAlpha(src) || src; it.cut = whole; it.warn = ''; return Promise.resolve(); }
+    if (modelKey === 'none') { var whole = cropToAlpha(src) || src; it.cut = whole; it.warn = ''; it.mt = null; return Promise.resolve(); }
     return SEG.matte(src, modelKey, function (f, t) { if (mine === job) progress(f, t); }).then(function (mt) {
       var w = src.width, h = src.height, mask = SEG.at(mt, w, h, +$('soft').value), c = canvas(w, h), x = c.getContext('2d', { willReadFrequently: true });
       x.drawImage(src, 0, 0); var id = x.getImageData(0, 0, w, h), d = id.data, keep = 0;
       for (var i = 0; i < w * h; i++) { d[i * 4 + 3] = d[i * 4 + 3] * mask[i] / 255; if (mask[i] > 128) keep++; }
       x.putImageData(id, 0, 0);
       var cr = keep > w * h * 0.002 && !mt.flat ? cropToAlpha(c) : null;
-      if (!cr) { it.cut = cropToAlpha(src) || src; it.warn = 'No clear subject was found in "' + it.name + '", so the whole picture was used.'; }
-      else { it.cut = cr; it.warn = ''; }
-      it.mt = mt;
+      if (!cr) { it.cut = cropToAlpha(src) || src; it.warn = 'No clear subject was found in "' + it.name + '", so the whole picture was used.'; it.mt = null; }
+      else { it.cut = cr; it.warn = ''; it.mt = mt; }
     });
   }
   function processAll(list) {
@@ -301,9 +300,14 @@
     var i = 0;
     function next() {
       if (mine !== job) return;
-      if (i >= list.length) { busy = false; $('notice').hidden = true; gallery(); var w = items.filter(function (q) { return q.warn; }).length; say(w ? '' : 'ok', items.length + ' sticker' + (items.length > 1 ? 's' : '') + ' ready.' + (w ? ' ' + w + ' had no clear subject, so the whole picture was used (marked ⚠). Try Best quality for those.' : ' Tap a sticker to add text, then download.')); return; }
+      if (i >= list.length) { busy = false; $('notice').hidden = true; gallery(); var w = items.filter(function (q) { return q.warn; }).length; say(w ? '' : 'ok', items.length + ' sticker' + (items.length > 1 ? 's' : '') + ' ready.' + (w ? ' ' + w + ' had no clear subject, so the whole picture was used (marked ⚠). Try Best quality for those.' : ' Tap a sticker to add text, then download.') + skipNote); skipNote = ''; return; }
       var it = list[i++]; progress(null, 'Cutting out ' + i + ' of ' + list.length + '…');
-      cutOne(it, mine).then(function () { if (mine === job) { gallery(); next(); } }).catch(function (e) { if (mine !== job) return; busy = false; $('notice').hidden = true; gallery(); say('bad', SEG.failText(e)); });
+      cutOne(it, mine).then(function () { if (mine === job) { gallery(); next(); } }).catch(function (e) {
+        if (mine !== job) return; busy = false; $('notice').hidden = true;
+        // keep every picture usable: anything not cut out yet falls back to the whole picture
+        items.forEach(function (q) { if (!q.cut) { q.cut = cropToAlpha(q.src) || q.src; q.mt = null; q.warn = 'The cut-out failed for "' + q.name + '", so the whole picture was used.'; } });
+        gallery(); say('bad', SEG.failText(e));
+      });
     }
     next();
   }
@@ -318,7 +322,8 @@
       if (i >= list.length) {
         if (!fresh.length) { say('bad', 'Could not read ' + (list.length > 1 ? 'those pictures' : '"' + list[0].name + '"') + '. They may be damaged or in a format your browser cannot open.'); return; }
         sel = items.length; items = items.concat(fresh); processAll(fresh);
-        if (skipped + failed) setTimeout(function () { if (!busy) return; toastish((skipped + failed) + ' file(s) were skipped.'); }, 50);
+        var sk = []; if (failed) sk.push(failed + (failed > 1 ? ' files could' : ' file could') + ' not be opened'); if (skipped) sk.push(skipped + (skipped > 1 ? ' files were' : ' file was') + ' skipped (not photos, or over the ' + MAXN + '-sticker limit)');
+        skipNote = sk.length ? ' ' + sk.join('; ') + '.' : '';
         return;
       }
       loadImage(list[i], function (im) {
@@ -332,7 +337,6 @@
       });
     })(0);
   }
-  function toastish(t) { if (window.toast) toast(t); }
   PT.drop(true, add);
 
   // ---------- controls ----------

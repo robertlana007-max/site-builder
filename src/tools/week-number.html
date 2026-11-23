@@ -1,0 +1,142 @@
+<style>
+.wn-big { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 16px; padding: 16px 18px; border-radius: 14px; background: var(--accent-soft); border: 1px solid var(--accent); margin: 4px 0 6px; }
+.wn-big b { font-size: clamp(36px, 10vw, 56px); letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.wn-big span { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.wn-tbl { width: 100%; border-collapse: collapse; font-size: 15px; font-variant-numeric: tabular-nums; }
+.wn-tbl th, .wn-tbl td { text-align: start; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.wn-tbl th { font-size: 13px; color: var(--muted); font-weight: 600; }
+.wn-tbl td small { display: block; color: var(--muted); font-size: 12.5px; }
+.wn-tbl tr.on td { background: var(--accent-soft); font-weight: 700; }
+.wn-scroll { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; margin-top: 10px; }
+.wn-scroll .wn-tbl th { position: sticky; top: 0; background: var(--surface); }
+#wnStats .stat b { font-size: 19px; }
+.wn-h { font-size: 18px; margin: 26px 0 10px; }
+.wn-go { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+</style>
+<div class="fields">
+  <div><label for="wnDate">Date</label><input type="date" id="wnDate" data-nomemo></div>
+  <div><label for="wnSys">Week system</label><select id="wnSys"><option value="iso">ISO 8601 (Monday start, used in Europe, Asia and most of the world)</option><option value="us">Sunday start, week 1 has 1 January (USA, Canada, Japan…)</option><option value="me">Saturday start, week 1 has 1 January (parts of the Middle East)</option></select></div>
+</div>
+<div class="btns" style="margin-top:0"><button class="btn ghost" type="button" id="wnToday">Today</button><button class="btn ghost" type="button" id="wnPrev">‹ Week before</button><button class="btn ghost" type="button" id="wnNext">Week after ›</button></div>
+<div class="wn-big" aria-live="polite"><b id="wnBig">Week –</b><span id="wnBigSub"></span></div>
+<div class="stats" id="wnStats"></div>
+<h3 class="wn-h">The same date in other week systems</h3>
+<div style="overflow-x:auto"><table class="wn-tbl" id="wnOther"></table></div>
+
+<h3 class="wn-h">Find the dates of a week</h3>
+<div class="wn-go">
+  <div><label for="wnGoYear">Year</label><input type="number" id="wnGoYear" data-nomemo min="1" max="9999" step="1"></div>
+  <div><label for="wnGoWeek">Week number</label><input type="number" id="wnGoWeek" data-nomemo min="1" max="53" step="1"></div>
+</div>
+<p class="msg" id="wnGoOut"></p>
+
+<h3 class="wn-h">All weeks of the year</h3>
+<div class="fields" style="margin-bottom:0">
+  <div><label for="wnYear">Year</label><input type="number" id="wnYear" data-nomemo min="1" max="9999" step="1"></div>
+</div>
+<div class="btns" style="margin-top:8px"><button class="btn ghost" type="button" id="wnCopy">Copy table</button><button class="btn ghost" type="button" id="wnCsv">Download CSV</button></div>
+<div class="wn-scroll" id="wnScroll"><table class="wn-tbl" id="wnYearTbl"></table></div>
+<p class="msg" id="wnMsg"></p>
+<script>
+(function () {
+  var D = 864e5, SYS = { iso: { name: 'ISO 8601', start: 1 }, us: { name: 'Sunday start', start: 0 }, me: { name: 'Saturday start', start: 6 } };
+  var reg = ''; try { reg = (new Intl.Locale(navigator.language || 'en')).maximize().region || ''; } catch (e) { reg = ((navigator.language || '').split('-')[1] || '').toUpperCase(); }
+  if (/^(US|CA|JP|PH|IL|BR|MX)$/.test(reg)) $('wnSys').value = 'us'; // a remembered choice is restored over this
+
+  // all dates are whole days in UTC, so clock changes never shift them
+  function ymd(t) { var d = new Date(t); return [d.getUTCFullYear(), d.getUTCMonth() + 1, d.getUTCDate()]; }
+  function mk(y, m, d) { var x = new Date(Date.UTC(2000, m - 1, d)); x.setUTCFullYear(y); return x.getTime(); }
+  function dow(t) { return new Date(t).getUTCDay(); }
+  function jan1(y) { return mk(y, 1, 1); }
+  // week of day t: { year, week, start }
+  function weekOf(t, sys) {
+    if (sys === 'iso') {
+      var th = t + (3 - (dow(t) + 6) % 7) * D, y = ymd(th)[0];
+      return { year: y, week: 1 + Math.floor((th - jan1(y)) / D / 7), start: t - ((dow(t) + 6) % 7) * D };
+    }
+    var s = SYS[sys].start, y2 = ymd(t)[0], j = jan1(y2), off = (dow(j) - s + 7) % 7;
+    return { year: y2, week: Math.floor(((t - j) / D + off) / 7) + 1, start: t - ((dow(t) - s + 7) % 7) * D };
+  }
+  function weeksIn(y, sys) {
+    if (sys === 'iso') { var j = dow(jan1(y)), leap = (y % 4 === 0 && y % 100 !== 0) || y % 400 === 0; return j === 4 || (leap && j === 3) ? 53 : 52; }
+    return weekOf(mk(y, 12, 31), sys).week;
+  }
+  function weekStart(y, w, sys) {
+    if (sys === 'iso') { var j4 = mk(y, 1, 4); return j4 - ((dow(j4) + 6) % 7) * D + (w - 1) * 7 * D; }
+    var j = jan1(y), off = (dow(j) - SYS[sys].start + 7) % 7; return j - off * D + (w - 1) * 7 * D;
+  }
+  var lang = navigator.language || undefined;
+  function fd(t, o) { return new Intl.DateTimeFormat(lang, Object.assign({ timeZone: 'UTC' }, o || { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })).format(new Date(t)); }
+  function iso(t) { var a = ymd(t); return String(a[0]).padStart(4, '0') + '-' + String(a[1]).padStart(2, '0') + '-' + String(a[2]).padStart(2, '0'); }
+  function range(start) { return fd(start) + ' – ' + fd(start + 6 * D); }
+  function today() { var n = new Date(); return mk(n.getFullYear(), n.getMonth() + 1, n.getDate()); }
+  function readDate() { var v = $('wnDate').value, m = /^(\d{1,4})-(\d{2})-(\d{2})$/.exec(v); return m ? mk(+m[1], +m[2], +m[3]) : null; }
+  function setDate(t) { $('wnDate').value = iso(t); }
+
+  function stat(label, value) { var d = document.createElement('div'); d.className = 'stat'; var s = document.createElement('span'); s.textContent = label; var b = document.createElement('b'); b.textContent = value; d.appendChild(s); d.appendChild(b); $('wnStats').appendChild(d); }
+  function show() {
+    var t = readDate(), sys = $('wnSys').value;
+    $('wnStats').innerHTML = ''; $('wnOther').innerHTML = '';
+    if (t == null) { $('wnBig').textContent = 'Week –'; $('wnBigSub').textContent = 'Pick a date.'; return; }
+    var w = weekOf(t, sys), y = ymd(t)[0], doy = Math.round((t - jan1(y)) / D) + 1, len = Math.round((jan1(y + 1) - jan1(y)) / D);
+    $('wnBig').textContent = 'Week ' + w.week;
+    $('wnBigSub').textContent = fd(t, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }) + (w.year !== y ? ' · counts as week ' + w.week + ' of ' + w.year : '') + (sys === 'iso' ? ' · ' + w.year + '-W' + String(w.week).padStart(2, '0') + '-' + ((dow(t) + 6) % 7 + 1) : '');
+    var sh = { weekday: 'short', day: 'numeric', month: 'short' };
+    stat('Week runs', fd(w.start, sh) + ' – ' + fd(w.start + 6 * D, sh));
+    stat('Weeks in ' + w.year, weeksIn(w.year, sys));
+    stat('Day of the year', doy + ' of ' + len);
+    stat('Days left in ' + y, len - doy);
+    var head = document.createElement('tr'); ['System', 'Week', 'Week runs'].forEach(function (h) { var th = document.createElement('th'); th.textContent = h; head.appendChild(th); }); $('wnOther').appendChild(head);
+    Object.keys(SYS).forEach(function (k) {
+      var x = weekOf(t, k), tr = document.createElement('tr'), a = document.createElement('td'), b = document.createElement('td'), c = document.createElement('td');
+      if (k === sys) tr.className = 'on';
+      a.textContent = SYS[k].name; var sm = document.createElement('small'); sm.textContent = k === 'iso' ? 'Monday to Sunday; week 1 has the first Thursday' : k === 'us' ? 'Sunday to Saturday; week 1 has 1 January' : 'Saturday to Friday; week 1 has 1 January'; a.appendChild(sm);
+      b.textContent = x.week + (x.year !== y ? ' (' + x.year + ')' : ''); c.textContent = range(x.start);
+      tr.appendChild(a); tr.appendChild(b); tr.appendChild(c); $('wnOther').appendChild(tr);
+    });
+    if (!$('wnGoYear').value) $('wnGoYear').value = w.year;
+    if (!$('wnGoWeek').value) $('wnGoWeek').value = w.week;
+    if (!$('wnYear').value) $('wnYear').value = w.year;
+    go(); table();
+  }
+  function go() {
+    var y = +$('wnGoYear').value, w = +$('wnGoWeek').value, sys = $('wnSys').value, out = $('wnGoOut');
+    if (!$('wnGoYear').value || !$('wnGoWeek').value) { out.className = 'msg'; out.textContent = ''; return; }
+    if (!Number.isInteger(y) || y < 1 || y > 9999) { out.className = 'msg bad'; out.textContent = 'Enter a year from 1 to 9999.'; return; }
+    var n = weeksIn(y, sys);
+    if (!Number.isInteger(w) || w < 1 || w > n) { out.className = 'msg bad'; out.textContent = y + ' has ' + n + ' weeks in the ' + SYS[sys].name + ' system. Enter a week from 1 to ' + n + '.'; return; }
+    var s = weekStart(y, w, sys);
+    out.className = 'msg ok'; out.textContent = 'Week ' + w + ' of ' + y + ' (' + SYS[sys].name + '): ' + range(s) + '.';
+  }
+  var rowsCsv = [];
+  function table() {
+    var y = +$('wnYear').value, sys = $('wnSys').value, tb = $('wnYearTbl'); tb.innerHTML = ''; rowsCsv = [];
+    if (!Number.isInteger(y) || y < 1 || y > 9999) { $('wnMsg').className = 'msg bad'; $('wnMsg').textContent = 'Enter a year from 1 to 9999.'; return; }
+    $('wnMsg').className = 'msg'; $('wnMsg').textContent = '';
+    var head = document.createElement('tr'); ['Week', 'Starts', 'Ends'].forEach(function (h) { var th = document.createElement('th'); th.textContent = h; head.appendChild(th); }); tb.appendChild(head);
+    var n = weeksIn(y, sys), sel = readDate(), selW = sel != null ? weekOf(sel, sys) : null, onRow = null;
+    for (var w = 1; w <= n; w++) {
+      var s = weekStart(y, w, sys), tr = document.createElement('tr');
+      if (selW && selW.year === y && selW.week === w) { tr.className = 'on'; onRow = tr; }
+      [String(w), fd(s), fd(s + 6 * D)].forEach(function (v) { var td = document.createElement('td'); td.textContent = v; tr.appendChild(td); });
+      tb.appendChild(tr); rowsCsv.push([w, iso(s), iso(s + 6 * D)]);
+    }
+    if (onRow) { var box = $('wnScroll'); box.scrollTop = onRow.offsetTop - box.clientHeight / 2; }
+  }
+  $('wnCopy').addEventListener('click', function () { copyText('Week\tStarts\tEnds\n' + rowsCsv.map(function (r) { return r.join('\t'); }).join('\n'), $('wnCopy')); });
+  $('wnCsv').addEventListener('click', function () {
+    if (!rowsCsv.length) return;
+    var a = document.createElement('a'), url = URL.createObjectURL(new Blob(['Week,Starts,Ends\r\n' + rowsCsv.map(function (r) { return r.join(','); }).join('\r\n') + '\r\n'], { type: 'text/csv' }));
+    a.href = url; a.download = 'weeks-' + $('wnYear').value + '-' + $('wnSys').value + '.csv'; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  });
+  $('wnDate').addEventListener('input', function () { $('wnGoYear').value = ''; $('wnGoWeek').value = ''; $('wnYear').value = ''; show(); });
+  $('wnSys').addEventListener('change', function () { $('wnGoYear').value = ''; $('wnGoWeek').value = ''; show(); });
+  ['wnGoYear', 'wnGoWeek'].forEach(function (id) { $(id).addEventListener('input', go); });
+  $('wnYear').addEventListener('input', table);
+  $('wnToday').addEventListener('click', function () { setDate(today()); $('wnDate').dispatchEvent(new Event('input')); });
+  $('wnPrev').addEventListener('click', function () { var t = readDate(); setDate((t == null ? today() : t) - 7 * D); $('wnDate').dispatchEvent(new Event('input')); });
+  $('wnNext').addEventListener('click', function () { var t = readDate(); setDate((t == null ? today() : t) + 7 * D); $('wnDate').dispatchEvent(new Event('input')); });
+  setDate(today()); show();
+})();
+</script>

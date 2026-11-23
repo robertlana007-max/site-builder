@@ -1,0 +1,286 @@
+<link rel="stylesheet" href="../assets/vendor/cm/codemirror.css">
+<style>
+.pg-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 10px; }
+.pg-tabs { display: inline-flex; padding: 3px; gap: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+.pg-tabs button { font: 700 13.5px/1 var(--mono); height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.pg-tabs button[aria-selected="true"] { background: var(--surface); color: var(--accent); box-shadow: 0 1px 3px rgba(0, 0, 0, .12); }
+.pg-tabs button small { font: 600 10px var(--mono); color: var(--muted); margin-inline-start: 4px; }
+.pg-bar .btn { min-height: 38px; padding: 6px 14px; }
+.pg-bar label { margin: 0; font-weight: 500; font-size: 14px; display: flex; align-items: center; }
+.pg-ed { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; }
+.pg-ed .CodeMirror { height: 300px; font-family: var(--mono); font-size: 14px; line-height: 1.55; background: var(--surface); color: var(--ink); }
+.pg-ed .CodeMirror-gutters { background: var(--bg); border-right: 1px solid var(--line); }
+.pg-ed .CodeMirror-linenumber { color: var(--muted); }
+.pg-ed .CodeMirror-cursor { border-left: 2px solid var(--ink); }
+.pg-ed .CodeMirror-selected, .pg-ed .CodeMirror-focused .CodeMirror-selected { background: color-mix(in srgb, var(--accent) 24%, transparent) !important; }
+.pg-ed .CodeMirror-matchingbracket { color: inherit !important; background: color-mix(in srgb, var(--ok) 25%, transparent); outline: 1px solid var(--ok); }
+.pg-ed .cm-keyword { color: #7c3aed; font-weight: 600; } .pg-ed .cm-def { color: #2563eb; } .pg-ed .cm-variable-2 { color: #0369a1; } .pg-ed .cm-variable-3, .pg-ed .cm-type { color: #0e7490; }
+.pg-ed .cm-string, .pg-ed .cm-string-2 { color: #15803d; } .pg-ed .cm-number { color: #c2410c; } .pg-ed .cm-comment { color: #6b7280; font-style: italic; } .pg-ed .cm-atom { color: #b45309; }
+.pg-ed .cm-tag { color: #be123c; } .pg-ed .cm-attribute { color: #b45309; } .pg-ed .cm-property { color: #1d4ed8; } .pg-ed .cm-builtin { color: #0f766e; } .pg-ed .cm-meta, .pg-ed .cm-qualifier { color: #9333ea; } .pg-ed .cm-error { color: #dc2626; }
+:root[data-theme="dark"] .pg-ed .cm-keyword { color: #c792ea; } :root[data-theme="dark"] .pg-ed .cm-def { color: #82aaff; } :root[data-theme="dark"] .pg-ed .cm-string, :root[data-theme="dark"] .pg-ed .cm-string-2 { color: #c3e88d; } :root[data-theme="dark"] .pg-ed .cm-number { color: #f78c6c; }
+:root[data-theme="dark"] .pg-ed .cm-comment { color: #7f848e; } :root[data-theme="dark"] .pg-ed .cm-tag { color: #f07178; } :root[data-theme="dark"] .pg-ed .cm-attribute { color: #ffcb6b; } :root[data-theme="dark"] .pg-ed .cm-property { color: #89ddff; } :root[data-theme="dark"] .pg-ed .cm-variable-2 { color: #eeffff; } :root[data-theme="dark"] .pg-ed .cm-qualifier, :root[data-theme="dark"] .pg-ed .cm-meta { color: #c792ea; }
+.pg-frame { width: 100%; height: 360px; border: 1px solid var(--line); border-radius: 12px; background: #fff; display: block; margin-top: 12px; resize: vertical; }
+.pg-con { border: 1px solid var(--line); border-radius: 12px; margin-top: 12px; overflow: hidden; background: var(--bg); }
+.pg-con-h { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-bottom: 1px solid var(--line); font-size: 13px; font-weight: 700; color: var(--muted); }
+.pg-con-h button { font: 600 12.5px inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 7px; padding: 4px 10px; cursor: pointer; }
+.pg-log { max-height: 200px; min-height: 60px; overflow: auto; font: 12.5px/1.5 var(--mono); }
+.pg-log div { padding: 3px 10px; border-bottom: 1px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; }
+.pg-log .warn { background: color-mix(in srgb, #f59e0b 14%, transparent); }
+.pg-log .error { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+.pg-log .info { color: var(--accent); }
+.pg-log .res { color: var(--muted); }
+.pg-log .empty { color: var(--muted); font-style: italic; border: 0; }
+.pg-repl { display: flex; border-top: 1px solid var(--line); }
+.pg-repl span { padding: 8px 4px 8px 10px; color: var(--accent); font: 700 13px var(--mono); }
+.pg-repl input { border: 0; border-radius: 0; min-height: 36px; font: 13px var(--mono); background: transparent; padding: 6px 8px; }
+.pg-repl input:focus { box-shadow: none; }
+.pg-share { display: flex; gap: 8px; margin-top: 10px; }
+.pg-share input { font: 12px var(--mono); }
+</style>
+<div class="pg-bar">
+  <div class="pg-tabs" role="tablist" aria-label="Code"><button type="button" role="tab" data-l="h" aria-selected="true">HTML</button><button type="button" role="tab" data-l="c" aria-selected="false">CSS</button><button type="button" role="tab" data-l="j" aria-selected="false">JS</button></div>
+  <button class="btn" id="run" type="button" title="Run (Ctrl+Enter)">▶ Run</button>
+  <label><input type="checkbox" id="auto" checked>Auto-run</label>
+</div>
+<div class="pg-ed" id="ed"></div>
+<iframe class="pg-frame" id="frame" title="Result preview" sandbox="allow-scripts allow-modals allow-forms allow-popups" referrerpolicy="no-referrer"></iframe>
+<div class="pg-con">
+  <div class="pg-con-h"><span id="conT">Console</span><button type="button" id="clr">Clear</button></div>
+  <div class="pg-log" id="log" aria-live="polite"></div>
+  <div class="pg-repl"><span aria-hidden="true">›</span><input type="text" id="repl" placeholder="Type JavaScript and press Enter to run it in the preview" spellcheck="false" autocomplete="off" autocapitalize="off" data-nomemo aria-label="Console input"></div>
+</div>
+<div class="btns">
+  <select id="tpl" aria-label="Start from a template" style="width:auto" data-nomemo><option value="">Start from a template…</option><option value="hello">Hello world</option><option value="counter">Click counter</option><option value="todo">To-do list</option><option value="canvas">Canvas animation</option><option value="flex">CSS card layout</option><option value="blank">Blank</option></select>
+  <button class="btn ghost" id="share" type="button">Share link</button>
+  <button class="btn ghost" id="dl" type="button">Download HTML</button>
+  <button class="btn ghost" id="cpAll" type="button">Copy as one file</button>
+</div>
+<div class="pg-share" id="shareBox" hidden><input type="text" id="shareUrl" readonly data-nomemo aria-label="Share link"><button class="btn ghost" id="cpLink" type="button">Copy</button></div>
+<p class="msg" id="msg">Your code runs in a locked-down sandbox and is saved in this browser only. Share links contain the code itself; nothing is uploaded.</p>
+<script src="../assets/vendor/cm/codemirror.js"></script>
+<script src="../assets/vendor/cm/mode/xml.js"></script>
+<script src="../assets/vendor/cm/mode/javascript.js"></script>
+<script src="../assets/vendor/cm/mode/css.js"></script>
+<script src="../assets/vendor/cm/mode/htmlmixed.js"></script>
+<script src="../assets/vendor/cm/addon/closebrackets.js"></script>
+<script src="../assets/vendor/cm/addon/closetag.js"></script>
+<script src="../assets/vendor/cm/addon/matchbrackets.js"></script>
+<script src="../assets/vendor/cm/addon/comment.js"></script>
+<script>
+(function () {
+  var KEY = 'gtn-playground', token = '', timer, count = 0;
+  var TPL = {
+    hello: { h: '<h1>Hello, world!</h1>\n<p>Edit the HTML, CSS and JS tabs. The preview updates as you type.</p>\n<button id="btn">Say hello</button>', c: 'body {\n  font-family: system-ui, sans-serif;\n  padding: 24px;\n  color: #1f2937;\n}\nh1 { color: #4f46e5; }\nbutton {\n  padding: 10px 18px;\n  border: 0;\n  border-radius: 8px;\n  background: #4f46e5;\n  color: white;\n  font-size: 16px;\n  cursor: pointer;\n}', j: "document.getElementById('btn').addEventListener('click', function () {\n  console.log('Hello from the console!', { time: new Date().toLocaleTimeString() });\n});\nconsole.log('Page loaded');" },
+    counter: { h: '<div class="box">\n  <p>You clicked <b id="n">0</b> times</p>\n  <button id="plus">+1</button>\n  <button id="reset">Reset</button>\n</div>', c: 'body { font: 18px system-ui, sans-serif; display: grid; place-items: center; min-height: 90vh; margin: 0; background: #f1f5f9; }\n.box { background: white; padding: 28px 36px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.08); text-align: center; }\nbutton { font-size: 18px; padding: 8px 16px; margin: 4px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer; }', j: "let n = 0;\nconst out = document.getElementById('n');\ndocument.getElementById('plus').onclick = () => { out.textContent = ++n; console.log('count is', n); };\ndocument.getElementById('reset').onclick = () => { n = 0; out.textContent = n; console.warn('counter reset'); };" },
+    todo: { h: '<h2>To-do list</h2>\n<form id="f"><input id="t" placeholder="New task" required> <button>Add</button></form>\n<ul id="list"></ul>', c: 'body { font-family: system-ui, sans-serif; max-width: 420px; margin: 24px auto; }\nli { padding: 6px 0; cursor: pointer; }\nli.done { text-decoration: line-through; color: #94a3b8; }\ninput { padding: 8px; width: 70%; }', j: "const list = document.getElementById('list');\ndocument.getElementById('f').addEventListener('submit', e => {\n  e.preventDefault();\n  const li = document.createElement('li');\n  li.textContent = document.getElementById('t').value;\n  li.onclick = () => li.classList.toggle('done');\n  list.appendChild(li);\n  e.target.reset();\n  console.log('Tasks:', list.children.length);\n});" },
+    canvas: { h: '<canvas id="c" width="600" height="300"></canvas>', c: 'body { margin: 0; background: #0f172a; }\ncanvas { width: 100%; height: auto; display: block; }', j: "const c = document.getElementById('c'), x = c.getContext('2d');\nconst balls = Array.from({ length: 30 }, () => ({ x: Math.random() * 600, y: Math.random() * 300, vx: Math.random() * 4 - 2, vy: Math.random() * 4 - 2, r: 4 + Math.random() * 10, h: Math.random() * 360 }));\nfunction frame() {\n  x.fillStyle = 'rgba(15, 23, 42, .25)';\n  x.fillRect(0, 0, 600, 300);\n  for (const b of balls) {\n    b.x += b.vx; b.y += b.vy;\n    if (b.x < b.r || b.x > 600 - b.r) b.vx *= -1;\n    if (b.y < b.r || b.y > 300 - b.r) b.vy *= -1;\n    x.beginPath(); x.arc(b.x, b.y, b.r, 0, Math.PI * 2);\n    x.fillStyle = `hsl(${b.h}, 80%, 60%)`; x.fill();\n  }\n  requestAnimationFrame(frame);\n}\nframe();" },
+    flex: { h: '<div class="cards">\n  <div class="card"><h3>Fast</h3><p>Runs in your browser.</p></div>\n  <div class="card"><h3>Private</h3><p>Nothing is uploaded.</p></div>\n  <div class="card"><h3>Free</h3><p>No sign-up needed.</p></div>\n</div>', c: 'body { font-family: system-ui, sans-serif; background: #f8fafc; padding: 20px; }\n.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 16px; }\n.card { background: white; border-radius: 14px; padding: 18px; box-shadow: 0 4px 14px rgba(0,0,0,.07); }\n.card h3 { margin: 0 0 6px; color: #0f766e; }', j: '' },
+    blank: { h: '', c: '', j: '' }
+  };
+  var code = { h: '', c: '', j: '' }, lang = 'h';
+  var MODES = { h: 'htmlmixed', c: 'css', j: 'javascript' };
+  var cm = CodeMirror($('ed'), { lineNumbers: true, mode: 'htmlmixed', matchBrackets: true, autoCloseBrackets: true, autoCloseTags: true, indentUnit: 2, tabSize: 2, lineWrapping: true, viewportMargin: 50,
+    extraKeys: { 'Ctrl-Enter': function () { run(); }, 'Cmd-Enter': function () { run(); }, 'Ctrl-/': 'toggleComment', 'Cmd-/': 'toggleComment', Tab: function (c) { if (c.somethingSelected()) c.indentSelection('add'); else c.replaceSelection('  '); } } });
+  var docs = { h: CodeMirror.Doc('', 'htmlmixed'), c: CodeMirror.Doc('', 'css'), j: CodeMirror.Doc('', 'javascript') };
+  cm.swapDoc(docs.h);
+  function load(c) { ['h', 'c', 'j'].forEach(function (k) { docs[k].setValue(c[k] || ''); docs[k].clearHistory(); }); }
+  function cur() { return { h: docs.h.getValue(), c: docs.c.getValue(), j: docs.j.getValue() }; }
+  function tab(l) {
+    lang = l; cm.swapDoc(docs[l]);
+    document.querySelectorAll('.pg-tabs button').forEach(function (b) { b.setAttribute('aria-selected', b.dataset.l === l ? 'true' : 'false'); });
+    cm.focus();
+  }
+  document.querySelector('.pg-tabs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (b) tab(b.dataset.l); });
+  function msg(t, bad) { $('msg').className = 'msg' + (bad ? ' bad' : ''); $('msg').textContent = t; }
+
+  // ---- stop endless loops: add a time check to the condition of each for / while / do-while loop ----
+  function guard(src) {
+    var out = '', i = 0, n = src.length, prev = '', id = 0;
+    function regexAllowed() { return !prev || /[(,=:[!&|?{};+\-*%<>~^]$/.test(prev) || /^(return|typeof|instanceof|in|of|new|delete|void|throw|case|do|else|yield|await)$/.test(prev); }
+    while (i < n) {
+      var ch = src[i], nx = src[i + 1];
+      if (ch === '/' && nx === '/') { var e = src.indexOf('\n', i); e = e < 0 ? n : e; out += src.slice(i, e); i = e; continue; }
+      if (ch === '/' && nx === '*') { var e2 = src.indexOf('*/', i + 2); e2 = e2 < 0 ? n : e2 + 2; out += src.slice(i, e2); i = e2; continue; }
+      if (ch === '"' || ch === "'" || ch === '`') {
+        var j = i + 1, depth = 0;
+        while (j < n) {
+          if (src[j] === '\\') { j += 2; continue; }
+          if (ch === '`' && src[j] === '$' && src[j + 1] === '{') { depth++; j += 2; continue; }
+          if (ch === '`' && depth && src[j] === '}') { depth--; j++; continue; }
+          if (src[j] === ch && !depth) break;
+          if (ch !== '`' && src[j] === '\n') break;
+          j++;
+        }
+        out += src.slice(i, j + 1); i = j + 1; prev = 'str'; continue;
+      }
+      if (ch === '/' && regexAllowed()) {
+        var k = i + 1, cls = false;
+        while (k < n && src[k] !== '\n') { if (src[k] === '\\') { k += 2; continue; } if (src[k] === '[') cls = true; else if (src[k] === ']') cls = false; else if (src[k] === '/' && !cls) break; k++; }
+        k++; while (k < n && /[a-z]/i.test(src[k])) k++;
+        out += src.slice(i, k); i = k; prev = 'regex'; continue;
+      }
+      var m = /^[A-Za-z_$][\w$]*/.exec(src.slice(i, i + 64));
+      if (m) {
+        var w = m[0]; out += w; i += w.length;
+        if ((w === 'for' || w === 'while') && !/[\w$.]$/.test(out.slice(0, -w.length))) {
+          var s = i; while (s < n && /\s/.test(src[s])) s++;
+          if (w === 'for' && src.substr(s, 5) === 'await') { prev = w; continue; }
+          if (src[s] === '(') {
+            // find the matching bracket, skipping strings
+            var d = 0, q = s, semis = [], inStr = null;
+            for (; q < n; q++) {
+              var c2 = src[q];
+              if (inStr) { if (c2 === '\\') q++; else if (c2 === inStr) inStr = null; continue; }
+              if (c2 === '"' || c2 === "'" || c2 === '`') { inStr = c2; continue; }
+              if (c2 === '(') d++; else if (c2 === ')') { d--; if (!d) break; } else if (c2 === ';' && d === 1) semis.push(q);
+            }
+            if (q < n) {
+              var head = src.slice(s + 1, q), g = '__gtnLoop(' + (id++) + ')';
+              if (w === 'while') { out += src.slice(i, s) + '(' + g + ' && (' + guard(head) + '))'; i = q + 1; prev = ')'; continue; }
+              if (semis.length === 2) {
+                var a = src.slice(s + 1, semis[0]), b = src.slice(semis[0] + 1, semis[1]), c3 = src.slice(semis[1] + 1, q);
+                out += src.slice(i, s) + '(' + guard(a) + ';' + g + (b.trim() ? ' && (' + guard(b) + ')' : '') + ';' + guard(c3) + ')'; i = q + 1; prev = ')'; continue;
+              }
+            }
+          }
+        }
+        prev = w; continue;
+      }
+      out += ch; if (!/\s/.test(ch)) prev = ch; i++;
+    }
+    return out;
+  }
+  // ---- the bridge that runs inside the sandbox: sends console output and errors to this page ----
+  function bridge(tok, jsStart, jsLines, htmlStart, htmlLines) {
+    return '<script>(function(){var T=' + JSON.stringify(tok) + ',P=parent,S=Date.now(),L={};' +
+      'function fmt(v,d,seen){d=d||0;seen=seen||[];var t=typeof v;if(v===null)return"null";if(t==="undefined")return"undefined";if(t==="string")return d?JSON.stringify(v):v;if(t==="number"||t==="boolean"||t==="bigint")return String(v)+(t==="bigint"?"n":"");if(t==="symbol")return v.toString();if(t==="function")return"ƒ "+(v.name||"anonymous")+"()";' +
+      'if(v instanceof Error)return v.name+": "+v.message;if(typeof Node!=="undefined"&&v instanceof Node){if(v.nodeType===1){var s="<"+v.tagName.toLowerCase();if(v.id)s+="#"+v.id;if(v.className&&typeof v.className==="string")s+="."+v.className.trim().split(/\\s+/).join(".");return s+">";}return v.nodeName;}' +
+      'if(seen.indexOf(v)>=0)return"[circular]";if(d>3)return Array.isArray(v)?"[…]":"{…}";seen=seen.concat([v]);' +
+      'if(v instanceof Map)return"Map("+v.size+") {"+Array.from(v).slice(0,50).map(function(e){return fmt(e[0],d+1,seen)+" => "+fmt(e[1],d+1,seen)}).join(", ")+"}";if(v instanceof Set)return"Set("+v.size+") {"+Array.from(v).slice(0,50).map(function(e){return fmt(e,d+1,seen)}).join(", ")+"}";' +
+      'if(v instanceof Date)return v.toISOString();if(v instanceof RegExp)return String(v);' +
+      'if(Array.isArray(v)||ArrayBuffer.isView(v)){var a=Array.prototype.slice.call(v,0,100).map(function(x){return fmt(x,d+1,seen)});if(v.length>100)a.push("… "+(v.length-100)+" more");return"["+a.join(", ")+"]";}' +
+      'var k;try{k=Object.keys(v)}catch(e){return String(v)}var o=k.slice(0,60).map(function(x){var val;try{val=v[x]}catch(e){val="?"}return x+": "+fmt(val,d+1,seen)});if(k.length>60)o.push("…");var n=v.constructor&&v.constructor.name&&v.constructor.name!=="Object"?v.constructor.name+" ":"";return n+"{"+o.join(", ")+"}";}' +
+      'function send(type,args){try{P.postMessage({gtnpg:T,type:type,text:Array.prototype.map.call(args,function(a){return fmt(a)}).join(" ")},"*")}catch(e){}}' +
+      '["log","info","warn","error","debug"].forEach(function(m){var o=console[m];console[m]=function(){send(m==="debug"?"log":m,arguments);try{o&&o.apply(console,arguments)}catch(e){}}});' +
+      'console.clear=function(){send("clear",[])};console.table=function(x){send("log",[x])};console.dir=function(x){send("log",[x])};' +
+      'console.assert=function(c){if(!c)send("error",["Assertion failed:"].concat(Array.prototype.slice.call(arguments,1)))};' +
+      'var C={};console.count=function(l){l=l===undefined?"default":l;C[l]=(C[l]||0)+1;send("log",[l+": "+C[l]])};var TM={};console.time=function(l){TM[l||"default"]=performance.now()};console.timeEnd=function(l){l=l||"default";if(TM[l]!=null){send("log",[l+": "+(performance.now()-TM[l]).toFixed(2)+" ms"]);delete TM[l]}};' +
+      'function where(line){if(line>=' + jsStart + '&&line<' + (jsStart + jsLines) + ')return" (JS line "+(line-' + jsStart + '+1)+")";if(line>=' + htmlStart + '&&line<' + (htmlStart + htmlLines) + ')return" (HTML line "+(line-' + htmlStart + '+1)+")";return""}' +
+      'addEventListener("error",function(e){if(e.target&&e.target!==window&&e.target.tagName){send("error",["Could not load "+e.target.tagName.toLowerCase()+": "+(e.target.src||e.target.href||"")]);return}send("error",[(e.message||"Error")+where(e.lineno)])},true);' +
+      'addEventListener("unhandledrejection",function(e){var r=e.reason;send("error",["Uncaught (in promise) "+(r&&r.message?r.name+": "+r.message:fmt(r))])});' +
+      'var started={};window.__gtnLoop=function(id){var t=Date.now();if(!started.t){started.t=t;setTimeout(function(){started.t=0},0)}if(t-started.t>2500){started.t=t+1e9;throw new Error("A loop ran for more than 2.5 seconds and was stopped, so the page does not freeze. Check the loop condition.")}return true};' +
+      'addEventListener("message",function(e){if(e.source!==P||!e.data||e.data.gtnpg!==T||e.data.type!=="eval")return;try{var r=(0,eval)(e.data.code);send("res",[r])}catch(err){send("error",[err&&err.name?err.name+": "+err.message:fmt(err)])}});' +
+      '})();<\/script>';
+  }
+  function esc(s) { return s.replace(/<\/(script)/gi, '<\\/$1'); }
+  function build(c, forDownload) {
+    var full = /<html[\s>]|<head[\s>]|<body[\s>]|<!doctype/i.test(c.h);
+    var style = c.c.trim() ? '<style>\n' + c.c.replace(/<\/style/gi, '<\\/style') + '\n</style>\n' : '';
+    var js = c.j.trim() ? c.j : '';
+    if (forDownload) {
+      var head = '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>My page</title>\n' + style;
+      var scr = js ? '<script>\n' + esc(js) + '\n<\/script>\n' : '';
+      if (full) return c.h.replace(/<head[^>]*>/i, function (m) { return m + '\n' + style; }).replace(/<\/body>/i, scr + '</body>');
+      return '<!doctype html>\n<html lang="en">\n<head>\n' + head + '</head>\n<body>\n' + c.h + '\n' + scr + '</body>\n</html>\n';
+    }
+    var gj = js ? guard(js) : '';
+    // build with markers first, so error line numbers can be mapped back to the editors (the bridge is a single line)
+    var BR = '\u0001BRIDGE\u0001', HM = '\u0001H\u0001', JM = '\u0001J\u0001', doc;
+    var tail = '<script>\n' + JM + esc(gj) + '\n<\/script>\n';
+    if (full) {
+      doc = HM + c.h;
+      if (/<head[^>]*>/i.test(doc)) doc = doc.replace(/<head[^>]*>/i, function (m) { return m + BR + style.replace(/\n/g, ' '); });
+      else doc = BR + style.replace(/\n/g, ' ') + doc;
+      doc = /<\/body>/i.test(doc) ? doc.replace(/<\/body>/i, function (m) { return tail + m; }) : doc + '\n' + tail;
+    } else {
+      doc = '<!doctype html>\n<html>\n<head>\n<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n' + BR + '\n' + style + '</head>\n<body>\n' + HM + c.h + '\n' + tail + '</body>\n</html>';
+    }
+    var lineOf = function (mark) { var i = doc.indexOf(mark); return i < 0 ? 0 : doc.slice(0, i).split('\n').length; };
+    var hs = lineOf(HM), js0 = lineOf(JM);
+    doc = doc.replace(HM, '').replace(JM, '');
+    return doc.replace(BR, function () { return bridge(token, js0, gj.split('\n').length, hs, c.h.split('\n').length); });
+  }
+  function add(type, text) {
+    var log = $('log'), e = log.querySelector('.empty'); if (e) e.remove();
+    if (log.children.length > 500) log.removeChild(log.firstChild);
+    var d = document.createElement('div'); d.className = type; d.textContent = (type === 'res' ? '← ' : type === 'cmd' ? '› ' : '') + text; log.appendChild(d); log.scrollTop = log.scrollHeight;
+    if (type !== 'cmd' && type !== 'res') count++; $('conT').textContent = 'Console' + (count ? ' (' + count + ')' : '');
+  }
+  function clearLog() { $('log').innerHTML = '<div class="empty">Output from console.log() and errors appear here.</div>'; count = 0; $('conT').textContent = 'Console'; }
+  window.addEventListener('message', function (e) {
+    var f = $('frame');
+    if (!f || e.source !== f.contentWindow || !e.data || e.data.gtnpg !== token) return; // only the current sandbox run
+    if (e.data.type === 'clear') { clearLog(); return; }
+    add(['log', 'info', 'warn', 'error', 'res'].indexOf(e.data.type) >= 0 ? e.data.type : 'log', String(e.data.text).slice(0, 20000));
+  });
+  function run() {
+    var c = cur();
+    token = Math.random().toString(36).slice(2) + Date.now().toString(36);
+    clearLog();
+    var size = c.h.length + c.c.length + c.j.length;
+    if (size > 2000000) { msg('This code is larger than 2 MB. Please make it smaller.', true); return; }
+    // a fresh iframe each run, so timers and listeners from the last run are gone
+    var old = $('frame'), f = old.cloneNode(false); f.removeAttribute('srcdoc');
+    f.style.height = old.style.height;
+    old.parentNode.replaceChild(f, old);
+    f.srcdoc = build(c);
+    save();
+  }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(cur())); } catch (e) {} }
+  ['h', 'c', 'j'].forEach(function (k) { docs[k].on('change', function () { clearTimeout(timer); if ($('auto').checked) timer = setTimeout(run, 700); else timer = setTimeout(save, 700); }); });
+  $('run').addEventListener('click', run);
+  $('clr').addEventListener('click', clearLog);
+  $('repl').addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    var v = $('repl').value; if (!v.trim()) return;
+    add('cmd', v); $('repl').value = '';
+    var f = $('frame'); try { f.contentWindow.postMessage({ gtnpg: token, type: 'eval', code: v }, '*'); } catch (err) { add('error', 'The preview is not ready. Press Run first.'); }
+  });
+  $('tpl').addEventListener('change', function () {
+    var t = TPL[$('tpl').value]; if (!t) return;
+    var now = cur();
+    if ((now.h + now.c + now.j).trim() && !confirm('Replace your current code with this template?')) { $('tpl').value = ''; return; }
+    load(t); $('tpl').value = ''; tab('h'); run();
+  });
+  // share links: the code is compressed into the part of the address after #, which is never sent to a server
+  function b64u(bytes) { var s = ''; for (var i = 0; i < bytes.length; i += 0x8000) s += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+  function unb64u(s) { s = s.replace(/-/g, '+').replace(/_/g, '/'); while (s.length % 4) s += '='; var b = atob(s), u = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u; }
+  function pipe(bytes, stream) { return new Response(new Blob([bytes]).stream().pipeThrough(stream)).arrayBuffer().then(function (b) { return new Uint8Array(b); }); }
+  function encode(obj) {
+    var bytes = new TextEncoder().encode(JSON.stringify(obj));
+    if (window.CompressionStream) return pipe(bytes, new CompressionStream('deflate-raw')).then(function (z) { return 'pg=' + b64u(z); }).catch(function () { return 'pg0=' + b64u(bytes); });
+    return Promise.resolve('pg0=' + b64u(bytes));
+  }
+  function decode(hash) {
+    var m = /^#(pg0?)=([A-Za-z0-9_-]+)$/.exec(hash); if (!m) return Promise.resolve(null);
+    var bytes; try { bytes = unb64u(m[2]); } catch (e) { return Promise.reject(e); }
+    var p = m[1] === 'pg' ? (window.DecompressionStream ? pipe(bytes, new DecompressionStream('deflate-raw')) : Promise.reject(new Error('old browser'))) : Promise.resolve(bytes);
+    return p.then(function (b) { var o = JSON.parse(new TextDecoder().decode(b)); return { h: String(o.h || ''), c: String(o.c || ''), j: String(o.j || '') }; });
+  }
+  $('share').addEventListener('click', function () {
+    encode(cur()).then(function (h) {
+      var url = location.href.split('#')[0] + '#' + h;
+      try { history.replaceState(null, '', '#' + h); } catch (e) {}
+      $('shareBox').hidden = false; $('shareUrl').value = url; copyText(url, $('share'));
+      msg(url.length > 8000 ? 'Link copied, but it is very long (' + fmtNum(url.length) + ' characters). Some apps cut long links; for big projects use Download HTML instead.' : 'Link copied. Anyone who opens it sees this code; it is stored inside the link, not on a server.', url.length > 8000);
+    });
+  });
+  $('cpLink').addEventListener('click', function () { copyText($('shareUrl').value, $('cpLink')); });
+  $('dl').addEventListener('click', function () {
+    var a = document.createElement('a'), url = URL.createObjectURL(new Blob([build(cur(), true)], { type: 'text/html' }));
+    a.href = url; a.download = 'index.html'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+  });
+  $('cpAll').addEventListener('click', function () { copyText(build(cur(), true), $('cpAll')); });
+  // start: a shared link wins, then the saved draft, then the hello template
+  var saved = null; try { saved = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
+  decode(location.hash).then(function (shared) {
+    if (shared) { load(shared); msg('Loaded the code from the shared link. Your own saved draft is replaced when you edit.'); }
+    else if (saved && typeof saved === 'object' && (saved.h || saved.c || saved.j)) load({ h: String(saved.h || ''), c: String(saved.c || ''), j: String(saved.j || '') });
+    else load(TPL.hello);
+    run();
+  }).catch(function () { load(saved && saved.h !== undefined ? saved : TPL.hello); msg('The shared link is damaged or incomplete, so it could not be opened.', true); run(); });
+  window.addEventListener('hashchange', function () { // a shared link pasted into this same tab
+    decode(location.hash).then(function (shared) { if (shared) { load(shared); tab('h'); run(); msg('Loaded the code from the shared link.'); } }).catch(function () { msg('The shared link is damaged or incomplete, so it could not be opened.', true); });
+  });
+})();
+</script>

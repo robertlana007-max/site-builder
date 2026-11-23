@@ -1,0 +1,162 @@
+<style>
+.chm-top { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+@media (max-width: 640px) { .chm-top { grid-template-columns: 1fr; } }
+.chm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 4px; }
+.chm-chips button { font: inherit; font-size: 13.5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.chm-chips button:hover, .chm-chips button.on { border-color: var(--accent); color: var(--accent); }
+.chm-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(46px, 1fr)); gap: 4px; margin-top: 12px; max-height: 430px; overflow-y: auto; padding: 2px; }
+.chm-grid button { font: 22px/1 system-ui, "Segoe UI Symbol", "Noto Sans Symbols", "Noto Sans", sans-serif; height: 48px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); cursor: pointer; padding: 0; overflow: hidden; }
+.chm-grid button:hover, .chm-grid button.on { border-color: var(--accent); background: var(--surface); }
+.chm-grid button small { font: 600 9px/1 var(--mono); color: var(--muted); }
+.chm-det { display: grid; grid-template-columns: 120px 1fr; gap: 16px; border: 1px solid var(--line); border-radius: 12px; padding: 14px; margin-top: 14px; background: var(--surface); }
+@media (max-width: 520px) { .chm-det { grid-template-columns: 1fr; } }
+.chm-big { font-size: 64px; line-height: 110px; height: 110px; text-align: center; border: 1px solid var(--line); border-radius: 10px; background: var(--bg); overflow: hidden; }
+.chm-det h3 { margin: 0 0 4px; font-size: 16px; overflow-wrap: anywhere; }
+.chm-det .sub { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+.chm-codes { display: grid; grid-template-columns: auto 1fr auto; gap: 4px 8px; align-items: center; font-size: 13.5px; }
+.chm-codes span { color: var(--muted); }
+.chm-codes code { font-family: var(--mono); overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 6px; padding: 3px 7px; }
+.chm-codes button { font: inherit; font-size: 12.5px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 6px; padding: 3px 8px; cursor: pointer; }
+.chm-pager { display: flex; gap: 8px; align-items: center; margin-top: 8px; font-size: 14px; color: var(--muted); }
+.chm-pager .btn { min-height: 36px; padding: 4px 12px; }
+.chm-col { display: flex; gap: 8px; margin-top: 14px; }
+.chm-col input { flex: 1; min-width: 0; font-size: 18px; }
+</style>
+<div class="chm-top">
+  <div><label for="cmQ">Search by name, character or code</label><input type="text" id="cmQ" data-nomemo placeholder="e.g. arrow, heart, euro, U+00E9, é" spellcheck="false" autocomplete="off"></div>
+  <div><label for="cmBlock">Unicode block</label><select id="cmBlock" data-nomemo></select></div>
+</div>
+<div class="chm-chips" id="cmChips"></div>
+<p class="msg" id="cmMsg" style="margin-top:6px"></p>
+<div class="chm-grid" id="cmGrid" role="listbox" aria-label="Characters"></div>
+<div class="chm-pager" id="cmPager" hidden><button class="btn ghost" id="cmPrev">‹ Previous</button><span id="cmPage"></span><button class="btn ghost" id="cmNext">Next ›</button></div>
+<div class="chm-det" id="cmDet" hidden>
+  <div class="chm-big" id="cmBig"></div>
+  <div>
+    <h3 id="cmName"></h3>
+    <div class="sub" id="cmSub"></div>
+    <div class="chm-codes" id="cmCodes"></div>
+  </div>
+</div>
+<label for="cmCol" style="margin-top:16px">Your collected characters</label>
+<div class="chm-col"><input type="text" id="cmCol" data-nomemo placeholder="Click Add to collect characters here" spellcheck="false"><button class="btn" id="cmColCp">Copy</button><button class="btn ghost" id="cmColClr" aria-label="Clear collected characters">Clear</button></div>
+<script>
+(function () {
+  var VENDOR = new URL('../assets/vendor/', location.href).href, PAGE = 512;
+  var blocks = [], names = new Map(), alg = {}, marks = [], ents = {}, ready = false, list = [], page = 0, sel = null, listLabel = '';
+  var CHIPS = ['Latin-1 Supplement', 'Arrows', 'Mathematical Operators', 'Currency Symbols', 'Letterlike Symbols', 'Box Drawing', 'Geometric Shapes', 'Miscellaneous Symbols', 'Dingbats', 'Emoticons', 'Greek and Coptic', 'Cyrillic', 'General Punctuation', 'Superscripts and Subscripts', 'Number Forms', 'Enclosed Alphanumerics'];
+  function hex(cp, n) { return cp.toString(16).toUpperCase().padStart(n || 4, '0'); }
+  function say(cls, t) { $('cmMsg').className = 'msg ' + cls; $('cmMsg').textContent = t; }
+  function inR(r, cp) { for (var i = 0; i < r.length; i++) if (cp >= r[i][0] && cp <= r[i][1]) return true; return false; }
+  function blockOf(cp) { for (var i = 0; i < blocks.length; i++) if (cp >= blocks[i][0] && cp <= blocks[i][1]) return blocks[i]; return null; }
+  var JAMO_L = 'G GG N D DD R M B BB S SS  J JJ C K T P H'.split(' '), JAMO_V = 'A AE YA YAE EO E YEO YE O WA WAE OE YO U WEO WE WI YU EU YI I'.split(' '), JAMO_T = ' G GG GS N NJ NH D L LG LM LB LS LT LP LH M B BS S SS NG J C K T P H'.split(' ');
+  function nameOf(cp) {
+    if (names.has(cp)) return names.get(cp);
+    for (var k in alg) if (inR(alg[k], cp)) {
+      if (k === 'HANGUL SYLLABLE ') { var s = cp - 0xAC00; return k + JAMO_L[Math.floor(s / 588)] + JAMO_V[Math.floor(s % 588 / 28)] + JAMO_T[s % 28]; }
+      return k + hex(cp);
+    }
+    if ((cp >= 0xE000 && cp <= 0xF8FF) || cp >= 0xF0000) return 'PRIVATE USE CHARACTER';
+    return '';
+  }
+  function assigned(cp) { if (cp >= 0xD800 && cp <= 0xDFFF) return false; if (!ready) return true; return !!nameOf(cp); }
+  function glyph(cp) { var c = String.fromCodePoint(cp); if (cp < 0x20 || (cp >= 0x7F && cp <= 0x9F)) return String.fromCodePoint(cp < 0x20 ? 0x2400 + cp : 0x2421); if (inR(marks, cp)) return '◌' + c; if (/\s/.test(c) || /[\u200b-\u200f\u2060-\u2064\ufeff\u00ad]/.test(c)) return '␣'; return c; }
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function showList(cps, label) { list = cps; page = 0; listLabel = label; if (!cps.length) { sel = null; $('cmDet').hidden = true; } draw(); }
+  function draw() {
+    var pages = Math.ceil(list.length / PAGE) || 1, part = list.slice(page * PAGE, page * PAGE + PAGE);
+    $('cmGrid').innerHTML = part.map(function (cp) { return '<button type="button" role="option" data-cp="' + cp + '" title="U+' + hex(cp) + (ready ? ' ' + esc(nameOf(cp)) : '') + '"' + (sel === cp ? ' class="on" aria-selected="true"' : '') + '>' + esc(glyph(cp)) + '</button>'; }).join('');
+    $('cmPager').hidden = pages < 2;
+    $('cmPage').textContent = 'Page ' + (page + 1) + ' of ' + pages;
+    $('cmPrev').disabled = page === 0; $('cmNext').disabled = page >= pages - 1;
+    $('cmGrid').scrollTop = 0;
+    if (listLabel) say('', listLabel);
+  }
+  function showBlock(b) {
+    var cps = [];
+    if (b[0] >= 0xD800 && b[1] <= 0xDFFF) { showList([], 'Surrogates are halves of characters in UTF-16 and cannot be shown on their own.'); return; }
+    for (var cp = b[0]; cp <= b[1]; cp++) if (assigned(cp)) cps.push(cp);
+    showList(cps, b[2] + ': U+' + hex(b[0]) + ' to U+' + hex(b[1]) + ', ' + fmtNum(cps.length) + ' characters.');
+    [].forEach.call($('cmChips').children, function (c) { c.classList.toggle('on', c.textContent === b[2]); });
+  }
+  function utf8(cp) { return Array.from(new TextEncoder().encode(String.fromCodePoint(cp))).map(function (x) { return hex(x, 2); }).join(' '); }
+  function utf16(cp) { var s = String.fromCodePoint(cp); return Array.from({ length: s.length }, function (_, i) { return hex(s.charCodeAt(i)); }).join(' '); }
+  function select(cp) {
+    sel = cp;
+    [].forEach.call($('cmGrid').querySelectorAll('.on'), function (b) { b.classList.remove('on'); b.removeAttribute('aria-selected'); });
+    var btn = $('cmGrid').querySelector('[data-cp="' + cp + '"]'); if (btn) { btn.classList.add('on'); btn.setAttribute('aria-selected', 'true'); }
+    var c = String.fromCodePoint(cp), b = blockOf(cp), named = Object.keys(ents).filter(function (k) { return ents[k] === c; });
+    $('cmDet').hidden = false;
+    $('cmBig').textContent = glyph(cp);
+    $('cmName').textContent = nameOf(cp) || (ready ? 'Unassigned code point' : 'U+' + hex(cp));
+    $('cmSub').textContent = 'U+' + hex(cp) + (b ? ' · ' + b[2] : '');
+    var s16 = c.length > 1 ? '\\u' + hex(c.charCodeAt(0)) + '\\u' + hex(c.charCodeAt(1)) : '\\u' + hex(cp);
+    var rows = [['Character', c], ['Code point', 'U+' + hex(cp)], ['Decimal', String(cp)], ['HTML', '&#' + cp + ';'], ['HTML hex', '&#x' + hex(cp) + ';']];
+    if (named.length) rows.push(['HTML name', named.slice(0, 3).map(function (n) { return '&' + n + ';'; }).join(' ')]);
+    rows.push(['CSS', '\\' + hex(cp)], ['JavaScript', s16], ['JS / Python', cp > 0xFFFF ? '\\u{' + hex(cp) + '}  \\U' + hex(cp, 8) : '\\u' + hex(cp)], ['UTF-8', utf8(cp)], ['UTF-16', utf16(cp)], ['URL', encodeURIComponent(c)]);
+    $('cmCodes').innerHTML = rows.map(function (r, i) { return '<span>' + r[0] + '</span><code>' + esc(r[1]) + '</code><button type="button" data-i="' + i + '">Copy</button>'; }).join('') + '<span></span><span></span><button type="button" data-add="1">Add</button>';
+    $('cmCodes').rows = rows;
+  }
+  $('cmCodes').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b || sel == null) return;
+    if (b.dataset.add) { $('cmCol').value += String.fromCodePoint(sel); b.textContent = 'Added'; setTimeout(function () { b.textContent = 'Add'; }, 900); return; }
+    var r = $('cmCodes').rows[+b.dataset.i]; copyText(r[0] === 'HTML name' ? r[1].split(' ')[0] : r[1], b);
+  });
+  $('cmGrid').addEventListener('click', function (e) { var b = e.target.closest('button[data-cp]'); if (b) select(+b.dataset.cp); });
+  $('cmGrid').addEventListener('dblclick', function (e) { var b = e.target.closest('button[data-cp]'); if (b) $('cmCol').value += String.fromCodePoint(+b.dataset.cp); });
+  $('cmPrev').addEventListener('click', function () { if (page > 0) { page--; draw(); } });
+  $('cmNext').addEventListener('click', function () { if ((page + 1) * PAGE < list.length) { page++; draw(); } });
+  $('cmBlock').addEventListener('change', function () { var b = blocks[+$('cmBlock').value]; if (b) { $('cmQ').value = ''; showBlock(b); } });
+  $('cmChips').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; var i = blocks.findIndex(function (x) { return x[2] === b.textContent; }); if (i !== -1) { $('cmBlock').value = i; $('cmQ').value = ''; showBlock(blocks[i]); } });
+  $('cmColCp').addEventListener('click', function () { if ($('cmCol').value) copyText($('cmCol').value, $('cmColCp')); });
+  $('cmColClr').addEventListener('click', function () { $('cmCol').value = ''; });
+
+  // Search: a code (U+20AC, 0x20AC, &#8364; or &euro;), pasted characters, or words of the name.
+  function search() {
+    var q = $('cmQ').value.trim();
+    if (!q) { var b = blocks[+$('cmBlock').value]; if (b) showBlock(b); return; }
+    var m = /^(?:u\+|0x|\\u\{?|&#x|#x?|\\x)?([0-9a-f]{2,6})\}?;?$/i.exec(q), dec = /^&#(\d{1,7});?$/.exec(q), ent = /^&([a-z][a-z0-9]{1,31});?$/i.exec(q);
+    var cps = [];
+    if (dec) cps = [+dec[1]];
+    else if (ent && ents[ent[1]]) cps = Array.from(ents[ent[1]]).map(function (c) { return c.codePointAt(0); });
+    else if (m && (/^(u\+|0x|\\u|&#x|#|\\x)/i.test(q) || /^[0-9a-f]{4,6}$/i.test(q) && /\d/.test(q))) cps = [parseInt(m[1], 16)];
+    if (cps.length && cps.some(function (cp) { return cp > 0x10FFFF; })) return showList([], 'Unicode code points go from U+0000 to U+10FFFF, so this one does not exist.');
+    if (cps.length === 1 && cps[0] >= 0xD800 && cps[0] <= 0xDFFF) return showList([], 'U+' + hex(cps[0]) + ' is a surrogate: half of a character in UTF-16, not a character on its own.');
+    if (cps.length) { showList(cps, cps.length === 1 ? 'Code point U+' + hex(cps[0]) + '.' : ''); select(cps[0]); return; }
+    if (!ready) return say('', 'Loading character names…');
+    var words = q.toUpperCase().split(/[\s,]+/).filter(Boolean), out = [];
+    // pasted characters (not plain ASCII words): show each one
+    if (/[^\x00-\x7F]/.test(q)) { var seen = {}; Array.from(q.replace(/\s/g, '')).forEach(function (c) { var cp = c.codePointAt(0); if (!seen[cp]) { seen[cp] = 1; out.push(cp); } }); showList(out, out.length + ' character' + (out.length === 1 ? '' : 's') + ' from your text.'); if (out.length === 1) select(out[0]); return; }
+    names.forEach(function (n, cp) { for (var i = 0; i < words.length; i++) if (n.indexOf(words[i]) === -1) return; out.push(cp); });
+    // whole-word matches first (HEART before HEARTS)
+    var re = new RegExp('\\b' + words[0].replace(/[^A-Z0-9]/g, '') + '\\b');
+    out.sort(function (a, b) { var na = names.get(a), nb = names.get(b); return (re.test(nb) - re.test(na)) || (na.length - nb.length) || a - b; });
+    if (!out.length) return showList([], 'No character names contain “' + q + '”. Try one English word such as arrow, star or check.');
+    showList(out, fmtNum(out.length) + ' characters match “' + q + '”.');
+  }
+  var timer; $('cmQ').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(search, 160); });
+
+  // Load names (Unicode 15.1, about 140 KB) and HTML entity names.
+  function gz(url) {
+    return fetch(url).then(function (r) { if (!r.ok) throw new Error('net'); if (typeof DecompressionStream === 'undefined') throw new Error('old'); return new Response(r.body.pipeThrough(new DecompressionStream('gzip'))).json(); });
+  }
+  say('', 'Loading the Unicode character list…');
+  Promise.all([gz(VENDOR + 'unicode/ucd-15.1.json.gz'), fetch(VENDOR + 'entities/html-entities.json').then(function (r) { return r.ok ? r.json() : { entities: {} }; }).catch(function () { return { entities: {} }; })]).then(function (r) {
+    var d = r[0]; blocks = d.blocks; alg = d.alg; marks = d.marks; ents = r[1].entities || {};
+    var cp = 0; d.names.split('\n').forEach(function (line) { var i = line.indexOf(';'); cp += i ? parseInt(line.slice(0, i), 16) : 1; names.set(cp, line.slice(i + 1)); });
+    ready = true;
+    $('cmBlock').innerHTML = blocks.map(function (b, i) { return '<option value="' + i + '">' + esc(b[2]) + '</option>'; }).join('');
+    $('cmChips').innerHTML = CHIPS.filter(function (c) { return blocks.some(function (b) { return b[2] === c; }); }).map(function (c) { return '<button type="button">' + esc(c) + '</button>'; }).join('');
+    var start = 1; try { var saved = JSON.parse(localStorage.getItem('gtn-charmap-block') || 'null'); if (typeof saved === 'number' && blocks[saved]) start = saved; } catch (e) {}
+    $('cmBlock').value = start;
+    if ($('cmQ').value.trim()) search(); else showBlock(blocks[start]);
+  }).catch(function (e) {
+    say('bad', e && e.message === 'old' ? 'Your browser is too old to unpack the character list. Please update it.' : 'The character list could not be downloaded. Check your connection and reload the page.');
+    blocks = [[0x20, 0x7E, 'Basic Latin'], [0xA0, 0xFF, 'Latin-1 Supplement'], [0x2190, 0x21FF, 'Arrows'], [0x2200, 0x22FF, 'Mathematical Operators']];
+    $('cmBlock').innerHTML = blocks.map(function (b, i) { return '<option value="' + i + '">' + b[2] + '</option>'; }).join('');
+    showBlock(blocks[1]);
+  });
+  $('cmBlock').addEventListener('change', function () { try { localStorage.setItem('gtn-charmap-block', JSON.stringify(+$('cmBlock').value)); } catch (e) {} });
+})();
+</script>

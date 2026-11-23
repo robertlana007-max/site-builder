@@ -1,0 +1,25 @@
+// Search aliases for the site finder. Generated data; one entry per tool slug.
+// Language: si
+module.exports = {
+"image-compressor":["ඡායාරූප ප්‍රමාණය අඩු කරන්න","පින්තූරය කුඩා කරන්න"],
+"image-resizer":["ඡායාරූප ප්‍රමාණය වෙනස් කරන්න"],
+"qr-code-generator":["qr කේතය සාදන්න"],
+"word-counter":["වචන ගණන"],
+"age-calculator":["වයස ගණනය","වයස කැල්කියුලේටරය"],
+"percentage-calculator":["ප්‍රතිශතය ගණනය"],
+"merge-pdf":["pdf එකතු කරන්න","pdf ඒකාබද්ධ කිරීම"],
+"compress-pdf":["pdf ප්‍රමාණය අඩු කරන්න"],
+"jpg-to-pdf":["ඡායාරූප pdf බවට","jpg pdf බවට"],
+"countdown-timer":["ටයිමරය"],
+"image-to-text":["පින්තූරයෙන් පෙළ"],
+"video-to-mp3":["වීඩියෝ mp3 බවට"],
+"scientific-calculator":["ගණක යන්ත්‍රය","කැල්කියුලේටරය"],
+"currency-converter":["මුදල් පරිවර්තකය","ඩොලර් අගය"],
+"background-remover":["පසුබිම ඉවත් කරන්න"],
+"video-compressor":["වීඩියෝ ප්‍රමාණය අඩු කරන්න"],
+"video-trimmer":["වීඩියෝ කපන්න"],
+"pdf-to-word":["pdf word බවට"],
+"resume-maker":["cv සාදන්න","ජීව දත්ත පත්‍රිකාව"],
+"online-keyboard":["සිංහල යතුරුපුවරුව","sinhala typing","singlish"],
+"offline-translator":["පරිවර්තනය","පරිවර්තකය","sinhala translation"]
+};

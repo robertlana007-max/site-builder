@@ -1,1 +1,1 @@
-window.ALIAS_LANGS=[];
+window.ALIAS_LANGS=["am","ar","az","bg","bn","cs","da","de","el","es","fa","fi","fr","gu","ha","hi","hr","hu","id","it","ja","kk","km","kn","ko","lo","ml","mr","ms","my","ne","nl","no","pa","pl","ps","pt","ro","ru","si","sk","so","sr","sv","sw","ta","te","th","tl","tr","uk","ur","uz","vi","yo","zh","zu"];

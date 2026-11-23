@@ -198,7 +198,7 @@
     });
   }
   var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, md = navigator.mediaDevices;
-  var SR = 44100, buf = null, name = 'voice', busy = false, ticket = 0, actx = null, src = null, dlUrl = null, cache = { key: '', buf: null };
+  var SR = 44100, buf = null, name = 'voice', busy = false, ticket = 0, actx = null, src = null, dlUrl = null, cache = { key: '', p: null };
   var FX = [
     ['none', '🎙️', 'Normal'], ['up', '⬆️', 'Pitch up'], ['down', '⬇️', 'Pitch down'], ['chipmunk', '🐿️', 'Chipmunk'], ['deep', '🐻', 'Deep voice'],
     ['robot', '🤖', 'Robot'], ['echo', '🏔️', 'Echo'], ['reverb', '⛪', 'Reverb (hall)'], ['phone', '📞', 'Telephone']
@@ -232,7 +232,7 @@
   }
   function ready(b, label, size) {
     if (!(b.duration > 0.2)) throw new Error('short');
-    buf = b; cache = { key: '', buf: null };
+    buf = b; cache = { key: '', p: null };
     var el = $('info'); el.textContent = ''; var nb = document.createElement('b'); nb.textContent = label; el.appendChild(nb);
     el.appendChild(document.createTextNode((size ? ' · ' + fmtBytes(size) : '') + ' · ' + clock(b.duration)));
     $('work').hidden = false; $('go').disabled = false; amtUi(); changed();
@@ -315,11 +315,12 @@
   // Apply the chosen effect. Resolves with an AudioBuffer.
   function render(onPct) {
     var key = fx + ':' + $('amt').value;
-    if (cache.key === key && cache.buf) return Promise.resolve(cache.buf);
+    if (cache.key === key && cache.p) return cache.p; // already made, or being made right now
+    
     var chs = []; for (var c = 0; c < Math.min(2, buf.numberOfChannels); c++) chs.push(buf.getChannelData(c));
     var st = semis();
     var step1 = st ? dspRun(chs, SR, 1, st, false, function (p) { onPct(p * 0.7); }) : Promise.resolve(chs.map(function (x) { return x; }));
-    return step1.then(function (data) {
+    var prom = step1.then(function (data) {
       onPct(0.75);
       var a = amt(), tail = fx === 'echo' ? 1 + a * 3 : fx === 'reverb' ? 1 + a * 3 : 0.1, len = data[0].length + Math.round(tail * SR);
       var ctx = new OAC(2, len, SR), b = ctx.createBuffer(data.length, data[0].length, SR);
@@ -354,12 +355,15 @@
       // trim silence left at the end and keep the level safe
       var peak = 0, last = 0, n = out.length;
       for (var c2 = 0; c2 < out.numberOfChannels; c2++) { var d = out.getChannelData(c2); for (var i2 = 0; i2 < n; i2++) { var v = d[i2] < 0 ? -d[i2] : d[i2]; if (v > peak) peak = v; if (v > 0.0005 && i2 > last) last = i2; } }
-      var keep = Math.max(Math.min(n, buf.length), Math.min(n, last + Math.round(0.05 * SR))), g = peak > 0.98 ? 0.98 / peak : 1;
-      var fin = new AudioBuffer({ length: keep, numberOfChannels: out.numberOfChannels, sampleRate: SR });
+      var keep = Math.max(Math.min(n, buf.length), Math.min(n, last + Math.round(0.05 * SR))), g = peak > 0.89 ? 0.89 / peak : 1; // a little headroom, so MP3 does not clip
+      var fin = new OAC(1, 1, SR).createBuffer(out.numberOfChannels, keep, SR);
       for (c2 = 0; c2 < out.numberOfChannels; c2++) { var o2 = fin.getChannelData(c2), s2 = out.getChannelData(c2); for (i2 = 0; i2 < keep; i2++) o2[i2] = s2[i2] * g; }
-      cache = { key: key, buf: fin }; onPct(1);
+      onPct(1);
       return fin;
     });
+    cache = { key: key, p: prom };
+    prom.catch(function () { if (cache.p === prom) cache = { key: '', p: null }; });
+    return prom;
   }
 
   // ---------- listening ----------
@@ -377,8 +381,7 @@
     if (!buf || busy) return;
     var mine = ++playTicket, label = FX.filter(function (f) { return f[0] === fx; })[0][2];
     if (cache.key !== fx + ':' + $('amt').value) say('', 'Applying "' + label + '"…');
-    busy = true;
-    render(function () {}).then(function (b) { busy = false; if (mine === playTicket) playBuf(b, $('hear'), 'Playing with "' + label + '".'); }, function () { busy = false; say('bad', 'The effect could not be applied. Your device may be low on memory.'); });
+    render(function () {}).then(function (b) { if (mine === playTicket && !busy) playBuf(b, $('hear'), 'Playing with "' + label + '".'); }, function () { if (mine === playTicket) say('bad', 'The effect could not be applied. Your device may be low on memory.'); });
   }
   $('hear').addEventListener('click', function () { if (src && $('hear').textContent.indexOf('Stop') >= 0) return stop(); play(); });
   $('orig').addEventListener('click', function () { if (!buf) return; if (src && $('orig').textContent.indexOf('Stop') >= 0) return stop(); playBuf(buf, $('orig'), 'Playing the original sound.'); });
