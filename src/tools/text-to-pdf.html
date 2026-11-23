@@ -1,0 +1,177 @@
+<style>
+.tp-drop { padding: 18px 16px; }
+#tpText { min-height: 260px; }
+.tp-count { font-size: 14px; color: var(--muted); margin: 6px 0 14px; }
+</style>
+<div class="drop tp-drop" id="drop" tabindex="0" role="button"><b>Open a .txt file</b>or type or paste text in the box below</div>
+<input type="file" id="file" accept=".txt,.text,.md,.csv,.log,.json,.xml,.html,.htm,.ini,.srt,.vtt,.yaml,.yml,text/plain" hidden>
+<label for="tpText">Your text</label>
+<textarea id="tpText" class="plain" data-nomemo spellcheck="false" placeholder="Type or paste any text here. Every language works, including right-to-left languages such as Arabic and Hebrew."></textarea>
+<p class="tp-count" id="tpCount">0 characters</p>
+<div class="fields">
+  <div><label for="tpTitle">Title (optional, printed on top of page 1)</label><input type="text" id="tpTitle" data-nomemo autocomplete="off"></div>
+  <div><label for="tpPaper">Paper size</label><select id="tpPaper"><option value="a4">A4 (210 × 297 mm)</option><option value="letter">Letter (8.5 × 11 in)</option><option value="legal">Legal (8.5 × 14 in)</option><option value="a5">A5 (148 × 210 mm)</option><option value="a3">A3 (297 × 420 mm)</option></select></div>
+  <div><label for="tpOrient">Orientation</label><select id="tpOrient"><option value="p">Portrait</option><option value="l">Landscape</option></select></div>
+  <div><label for="tpFont">Font</label><select id="tpFont"><option value="sans">Sans serif (clean)</option><option value="serif">Serif (book style)</option><option value="mono">Monospace (code, tables)</option></select></div>
+  <div><label for="tpSize">Font size (pt)</label><input type="number" id="tpSize" min="6" max="48" step="0.5" value="11"></div>
+  <div><label for="tpLine">Line spacing</label><select id="tpLine"><option value="1.15">Single</option><option value="1.4" selected>Comfortable</option><option value="1.7">One and a half</option><option value="2.3">Double</option></select></div>
+  <div><label for="tpMargin">Margins</label><select id="tpMargin"><option value="12.7">Narrow (12.7 mm / 0.5 in)</option><option value="20" selected>Normal (20 mm / 0.8 in)</option><option value="25.4">Wide (25.4 mm / 1 in)</option><option value="38.1">Extra wide (38 mm / 1.5 in)</option></select></div>
+  <div><label for="tpNum">Page numbers</label><select id="tpNum"><option value="none">None</option><option value="c" selected>Bottom centre: 1, 2, 3</option><option value="cof">Bottom centre: Page 1 of 9</option><option value="r">Bottom corner: 1, 2, 3</option></select></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Create PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a><button class="btn ghost" id="tpClear" type="button">Clear</button></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script src="../assets/pdf-text.js"></script>
+<script>
+(function () {
+  var name = 'text', busy = false, MAXB = 30 * 1024 * 1024;
+  var PAPER = { a4: [595.28, 841.89], letter: [612, 792], legal: [612, 1008], a5: [419.53, 595.28], a3: [841.89, 1190.55] };
+  // Letter paper is the norm in the USA, Canada, Mexico, the Philippines and a few nearby countries; A4 everywhere else.
+  var reg = ''; try { reg = (new Intl.Locale(navigator.language || 'en')).maximize().region || ''; } catch (e) { reg = ((navigator.language || '').split('-')[1] || '').toUpperCase(); }
+  var startPaper = /^(US|CA|MX|PH|CL|CO|VE|GT|PR|CR|PA|DO|SV|NI|HN|BZ)$/.test(reg) ? 'letter' : 'a4';
+  $('tpPaper').value = startPaper; // a remembered choice is restored over this
+
+  var t = $('tpText');
+  function count() {
+    var n = t.value.length, lines = n ? t.value.split('\n').length : 0;
+    $('tpCount').textContent = fmtNum(n, 0) + (n === 1 ? ' character' : ' characters') + ' · ' + fmtNum(lines, 0) + (lines === 1 ? ' line' : ' lines');
+    $('go').disabled = busy || !t.value.trim(); $('dl').hidden = true;
+  }
+  t.addEventListener('input', count); count();
+  $('tpClear').addEventListener('click', function () { t.value = ''; name = 'text'; count(); PT.say('', ''); $('drop').querySelector('b').textContent = 'Open a .txt file'; t.focus(); });
+
+  // Read a text file in whatever encoding it was saved in.
+  function decode(buf) {
+    var b = new Uint8Array(buf);
+    if (b[0] === 0xEF && b[1] === 0xBB && b[2] === 0xBF) return { text: new TextDecoder('utf-8').decode(b.subarray(3)), enc: 'UTF-8' };
+    if (b[0] === 0xFF && b[1] === 0xFE) return { text: new TextDecoder('utf-16le').decode(b.subarray(2)), enc: 'UTF-16' };
+    if (b[0] === 0xFE && b[1] === 0xFF) return { text: new TextDecoder('utf-16be').decode(b.subarray(2)), enc: 'UTF-16' };
+    // UTF-16 without a mark: every other byte is zero in Latin text
+    var z0 = 0, z1 = 0, m = Math.min(b.length, 4000);
+    for (var i = 0; i < m; i++) if (!b[i]) { if (i % 2) z1++; else z0++; }
+    if (m > 20 && z1 > m * .3 && z0 < m * .05) return { text: new TextDecoder('utf-16le').decode(b), enc: 'UTF-16' };
+    if (m > 20 && z0 > m * .3 && z1 < m * .05) return { text: new TextDecoder('utf-16be').decode(b), enc: 'UTF-16' };
+    try { return { text: new TextDecoder('utf-8', { fatal: true }).decode(b), enc: 'UTF-8' }; }
+    catch (e) { return { text: new TextDecoder('windows-1252').decode(b), enc: 'Windows (Western)' }; }
+  }
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the PDF is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (f.size > MAXB) return PT.say('bad', '"' + f.name + '" is larger than 30 MB. Split it into smaller files first.');
+    if (PT.isPdf(f) || /^(image|audio|video)\//.test(f.type) || /\.(docx?|xlsx?|pptx?|odt|zip|rar|7z|exe|png|jpe?g|gif|webp|mp[34])$/i.test(f.name)) return PT.say('bad', '"' + f.name + '" is not a plain text file. For Word files use the free Word to PDF tool on this site.');
+    f.arrayBuffer().then(function (buf) {
+      var r = decode(buf), bad = (r.text.slice(0, 20000).match(/[\u0000-\u0008\u000E-\u001F]/g) || []).length;
+      if (bad > 20) return PT.say('bad', '"' + f.name + '" does not look like a text file.');
+      t.value = r.text.replace(/^﻿/, ''); name = PT.base(f.name) || 'text';
+      $('drop').querySelector('b').textContent = f.name;
+      count(); PT.say('ok', 'Opened ' + f.name + ' (' + r.enc + ', ' + fmtBytes(f.size) + ').');
+    }).catch(function () { PT.say('bad', '"' + f.name + '" could not be read.'); });
+  });
+
+  var fonts = {};
+  function fontBytes(file) {
+    if (!fonts[file]) fonts[file] = fetch('../assets/vendor/fonts/' + file + '.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).catch(function (e) { fonts[file] = null; throw e; });
+    return fonts[file];
+  }
+
+  $('go').addEventListener('click', function () {
+    if (busy) return;
+    var text = t.value.replace(/\r\n?/g, '\n');
+    if (!text.trim()) { PT.say('bad', 'Type or paste some text first.'); return; }
+    var size = parseFloat($('tpSize').value);
+    if (!(size >= 6 && size <= 48)) { PT.say('bad', 'Pick a font size from 6 to 48.'); $('tpSize').focus(); return; }
+    busy = true;
+    PT.run(async function () {
+      var L = PDFLib, doc = await L.PDFDocument.create(), kind = $('tpFont').value, title = $('tpTitle').value.trim();
+      doc.registerFontkit(fontkit);
+      var R, B;
+      if (kind === 'mono') { R = await doc.embedFont(L.StandardFonts.Courier); B = await doc.embedFont(L.StandardFonts.CourierBold); }
+      else {
+        var fam = kind === 'serif' ? 'noto-serif-subset-' : 'noto-sans-subset-';
+        var fb = await Promise.all([fontBytes(fam + '400'), fontBytes(fam + '700')]).catch(function () { throw new Error('The font could not load. Check your connection and try again.'); });
+        R = await doc.embedFont(fb[0], { subset: true }); B = await doc.embedFont(fb[1], { subset: true });
+      }
+      PT.say('', 'Preparing fonts…');
+      var T = await PDFText.create(doc, { text: title + '\n' + text, onStatus: function (m) { PT.say('', m); } });
+      var dims = PAPER[$('tpPaper').value] || PAPER.a4, PW = dims[0], PH = dims[1];
+      if ($('tpOrient').value === 'l') { PW = dims[1]; PH = dims[0]; }
+      var M = +$('tpMargin').value / 25.4 * 72, numMode = $('tpNum').value, foot = numMode === 'none' ? 0 : size * 2.2;
+      var W = PW - 2 * M, lh = size * +$('tpLine').value, top = PH - M, bottom = M + foot;
+      if (W < size * 4 || top - bottom < lh * 2) throw new Error('The margins are too wide for this paper and font size. Pick smaller margins or a smaller font.');
+
+      // fast widths for letters the page font has; anything else is measured by PDFText
+      var base = new Set(R.getCharacterSet()), cw = new Map();
+      function width(s) {
+        var w = 0;
+        for (var ch of s) {
+          var cp = ch.codePointAt(0);
+          if (!base.has(cp) || (cp >= 0x0300 && cp <= 0x036F)) return T.width(s, size, R);
+          var c = cw.get(ch); if (c == null) { c = R.widthOfTextAtSize(ch, 1000); cw.set(ch, c); }
+          w += c;
+        }
+        return w * size / 1000;
+      }
+      function plain(s) { for (var ch of s) { var cp = ch.codePointAt(0); if (!base.has(cp) || (cp >= 0x0300 && cp <= 0x036F)) return false; } return true; }
+      var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+      function graphemes(s) { return seg ? Array.from(seg.segment(s), function (x) { return x.segment; }) : Array.from(s); }
+      // wrap one paragraph, keeping runs of spaces (they matter for code and tables)
+      function wrap(p) {
+        var out = [], line = '', lw = 0, toks = p.match(/\s+|\S+/g) || [''];
+        toks.forEach(function (tk) {
+          var w = width(tk);
+          if (lw + w <= W) { line += tk; lw += w; return; }
+          if (/^\s+$/.test(tk)) { out.push(line); line = ''; lw = 0; return; } // spaces at a break are dropped
+          if (line) { out.push(line.replace(/\s+$/, '')); line = ''; lw = 0; }
+          if (w <= W) { line = tk; lw = w; return; }
+          var g = graphemes(tk), part = '';
+          g.forEach(function (c) { if (part && width(part + c) > W) { out.push(part); part = ''; } part += c; });
+          line = part; lw = width(part);
+        });
+        out.push(line);
+        return out;
+      }
+      // lay out every line first, so "Page 1 of 9" knows the total
+      var pages = [[]], y = top, lines = 0;
+      function need(h) { if (y - h < bottom - .01) { pages.push([]); y = top; } }
+      if (title) {
+        var tsize = Math.min(size * 1.6, 28), tl = T.wrap(title, tsize, B, W);
+        tl.forEach(function (l) { need(tsize * 1.3); y -= tsize * 1.3; pages[0].push({ t: l, y: y + tsize * .25, size: tsize, font: B }); });
+        y -= lh * .6;
+      }
+      var paras = text.split('\n');
+      for (var i = 0; i < paras.length; i++) {
+        var parts = paras[i].split('\f'); // a form feed character starts a new page
+        for (var j = 0; j < parts.length; j++) {
+          if (j && pages[pages.length - 1].length) { pages.push([]); y = top; }
+          var p = parts[j].replace(/\t/g, '    ').replace(/[\u0000-\u0008\u000B\u000E-\u001F\u007F]/g, '').replace(/\s+$/, '');
+          if (j && !p) continue;
+          var wl = p ? wrap(p) : [''];
+          for (var k = 0; k < wl.length; k++) { need(lh); y -= lh; pages[pages.length - 1].push({ t: wl[k], y: y + (lh - size) * .5 + size * .22, size: size, font: R }); lines++; }
+        }
+        if (i % 2000 === 1999) { PT.say('', 'Laying out line ' + fmtNum(i + 1, 0) + ' of ' + fmtNum(paras.length, 0) + '…'); await new Promise(function (r) { setTimeout(r, 0); }); }
+      }
+      var total = pages.length, ink = L.rgb(.07, .07, .09), grey = L.rgb(.4, .42, .46);
+      for (var pi = 0; pi < total; pi++) {
+        var page = doc.addPage([PW, PH]);
+        pages[pi].forEach(function (l) {
+          if (!l.t) return;
+          if (l.font === R && plain(l.t)) page.drawText(l.t, { x: M, y: l.y, size: l.size, font: R, color: ink }); // quick path for plain Latin, Greek and Cyrillic lines
+          else T.draw(page, l.t, { x: M, y: l.y, size: l.size, font: l.font, color: ink, width: W, align: 'start' });
+        });
+        if (numMode !== 'none') {
+          var label = numMode === 'cof' ? 'Page ' + (pi + 1) + ' of ' + total : String(pi + 1), ns = Math.max(7, size * .8), nw = R.widthOfTextAtSize(label, ns);
+          page.drawText(label, { x: numMode === 'r' ? PW - M - nw : (PW - nw) / 2, y: M * .5 + ns * .2, size: ns, font: R, color: grey });
+        }
+        if (pi % 50 === 49) { PT.say('', 'Writing page ' + (pi + 1) + ' of ' + total + '…'); await new Promise(function (r) { setTimeout(r, 0); }); }
+      }
+      if (title) doc.setTitle(title);
+      doc.setCreator('GetToolNest Text to PDF'); doc.setProducer('GetToolNest');
+      PT.say('', 'Saving…');
+      var out = await doc.save();
+      PT.done(out, (title ? title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 80) : name) + '.pdf', 'application/pdf', 'Made ' + total + (total === 1 ? ' page' : ' pages') + ' from ' + fmtNum(lines, 0) + (lines === 1 ? ' line' : ' lines') + (T.pictures ? '. Text in scripts without a built-in font (such as Chinese or emoji) was drawn as sharp pictures' : ''));
+    }).then(function () { busy = false; $('go').disabled = !t.value.trim(); });
+  });
+})();
+</script>

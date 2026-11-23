@@ -1,0 +1,255 @@
+<style>
+.fl-info { margin: 0 0 14px; }
+.fl-info ul { margin: 6px 0 0; padding-inline-start: 20px; font-weight: 400; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Lock in form answers, comments and stamps. The file never leaves your device.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="notice fl-info" id="flInfo" hidden><p id="flInfoText"></p><ul id="flInfoList"></ul></div>
+<div class="fields">
+  <div><label for="flMode">How to flatten</label><select id="flMode"><option value="keep">Keep text sharp and searchable (recommended)</option><option value="image">Turn every page into an image (nothing can be selected or edited)</option></select></div>
+  <div id="flDpiBox" hidden><label for="flDpi">Image quality</label><select id="flDpi"><option value="100">Screen (100 dpi, small file)</option><option value="150" selected>Good (150 dpi)</option><option value="200">High (200 dpi)</option><option value="300">Print (300 dpi, large file)</option></select></div>
+</div>
+<div class="checks" id="flChecks">
+  <label><input type="checkbox" id="flForms" checked> Form fields and their answers</label>
+  <label><input type="checkbox" id="flAnnots" checked> Comments, highlights, stamps and drawings</label>
+  <label><input type="checkbox" id="flLinks" checked> Keep links clickable</label>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Flatten PDF</button><a class="btn ghost" id="dl" hidden>Download flattened PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script src="../assets/pdf-text.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, busy = false, unlocked = false;
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so they can be changed ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (b) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(b));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+
+  var N = function (s) { return PDFLib.PDFName.of(s); };
+  function sync() {
+    var img = $('flMode').value === 'image';
+    $('flDpiBox').hidden = !img; $('flChecks').hidden = img; $('dl').hidden = true;
+  }
+  $('flMode').addEventListener('change', sync);
+  ['flForms', 'flAnnots', 'flLinks'].forEach(function (id) { $(id).addEventListener('change', function () { $('dl').hidden = true; $('go').disabled = !file || busy || (!$('flForms').checked && !$('flAnnots').checked && $('flMode').value === 'keep'); }); });
+  sync();
+
+  // what is on the page: annotation types counted per kind
+  var KIND = { Text: 'sticky notes', FreeText: 'text boxes', Highlight: 'highlights', Underline: 'underlines', StrikeOut: 'strike-throughs', Squiggly: 'squiggly underlines', Ink: 'drawings', Square: 'boxes', Circle: 'circles', Line: 'lines', Polygon: 'shapes', PolyLine: 'shapes', Stamp: 'stamps', FileAttachment: 'attached files', Caret: 'insert marks', Sound: 'sounds', Redact: 'redaction marks', Watermark: 'watermarks' };
+  function survey(d) {
+    var counts = {}, links = 0, widgets = 0;
+    d.getPages().forEach(function (pg) {
+      var a = pg.node.Annots(); if (!a) return;
+      for (var i = 0; i < a.size(); i++) {
+        var o = a.lookup(i); if (!(o instanceof PDFLib.PDFDict)) continue;
+        var st = o.get(N('Subtype')), t = st ? st.decodeText() : '';
+        if (t === 'Link') links++; else if (t === 'Widget') widgets++; else if (t !== 'Popup') counts[t] = (counts[t] || 0) + 1;
+      }
+    });
+    var fields = 0; try { fields = d.getForm().getFields().length; } catch (e) { fields = 0; }
+    return { counts: counts, links: links, widgets: widgets, fields: fields };
+  }
+
+  async function openLib(b) {
+    try { unlocked = false; return await PDFLib.PDFDocument.load(b, { updateMetadata: false }); }
+    catch (e) {
+      if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + file.name + '" could not be read as a PDF.');
+      var plain = await QP(b); unlocked = true; bytes = plain;
+      return PDFLib.PDFDocument.load(plain, { updateMetadata: false });
+    }
+  }
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; $('go').disabled = true; $('flInfo').hidden = true; PT.say('', 'Opening ' + f.name + '…');
+    (async function () {
+      file = f; bytes = new Uint8Array(await f.arrayBuffer());
+      var d = await openLib(bytes), s = survey(d), parts = [];
+      if (s.fields) parts.push(s.fields + ' form ' + (s.fields === 1 ? 'field' : 'fields'));
+      Object.keys(s.counts).forEach(function (k) { var w = KIND[k] || k + ' marks', c = s.counts[k]; parts.push(c + ' ' + (c === 1 ? w.replace(/(box|stamp|note|mark|light|line|drawing|shape|circle|file|sound|through|underline)(e?s)$/, function (m, a) { return a; }).replace(/boxe$/, 'box') : w)); });
+      if (s.links) parts.push(s.links + (s.links === 1 ? ' link' : ' links'));
+      var list = $('flInfoList'); list.innerHTML = '';
+      parts.forEach(function (p) { var li = document.createElement('li'); li.textContent = p; list.appendChild(li); });
+      var has = s.fields || Object.keys(s.counts).length;
+      $('flInfoText').textContent = has ? 'This PDF has:' : 'No form fields or comments were found in this PDF.' + (s.links ? ' It only has links.' : '') + ' You can still turn its pages into images to stop copying and editing.';
+      $('flInfo').className = 'notice fl-info ' + (has ? 'ok' : ''); $('flInfo').hidden = false;
+      if (unlocked) $('flInfoText').textContent += ' (It was locked against changes; the flattened copy is unlocked.)';
+      $('drop').querySelector('b').textContent = f.name;
+      PT.say('', f.name + ' · ' + d.getPageCount() + (d.getPageCount() === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size));
+    })().catch(function (e) { file = null; PT.say('bad', e && e.message ? e.message : 'Something went wrong with this file.'); }).then(function () { busy = false; $('go').disabled = !file; });
+  });
+
+  // ---------- flatten, keeping vectors ----------
+  var noto = null;
+  function notoBytes() { if (!noto) noto = fetch('../assets/vendor/fonts/noto-sans-subset-400.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).catch(function (e) { noto = null; throw e; }); return noto; }
+  function num(o, d) { return o && o.asNumber ? o.asNumber() : d; }
+  // the normal appearance of an annotation, as a form XObject stream (or null)
+  function appearance(ctx, dict) {
+    var ap = dict.lookup(N('AP')); if (!(ap instanceof PDFLib.PDFDict)) return null;
+    var nRaw = ap.get(N('N')), nObj = ap.lookup(N('N'));
+    if (nObj instanceof PDFLib.PDFDict && !(nObj instanceof PDFLib.PDFStream)) { // one appearance per state: use the current one
+      var as = dict.get(N('AS')); if (!as) return null;
+      nRaw = nObj.get(as); nObj = nObj.lookup(as);
+    }
+    if (!(nObj instanceof PDFLib.PDFStream)) return null;
+    nObj.dict.set(N('Type'), N('XObject')); nObj.dict.set(N('Subtype'), N('Form'));
+    if (!nObj.dict.get(N('BBox'))) return null;
+    return { ref: nRaw instanceof PDFLib.PDFRef ? nRaw : ctx.register(nObj), stream: nObj };
+  }
+  function stamp(page, dict, ap) {
+    var L = PDFLib, rect = dict.lookup(N('Rect')), bb = ap.stream.dict.lookup(N('BBox')), mx = ap.stream.dict.lookup(N('Matrix'));
+    if (!(rect instanceof L.PDFArray) || !(bb instanceof L.PDFArray)) return false;
+    var r = [0, 1, 2, 3].map(function (i) { return num(rect.lookup(i), 0); }), b = [0, 1, 2, 3].map(function (i) { return num(bb.lookup(i), 0); });
+    var m = mx instanceof L.PDFArray ? [0, 1, 2, 3, 4, 5].map(function (i) { return num(mx.lookup(i), i === 0 || i === 3 ? 1 : 0); }) : [1, 0, 0, 1, 0, 0];
+    var pts = [[b[0], b[1]], [b[2], b[1]], [b[2], b[3]], [b[0], b[3]]].map(function (p) { return [m[0] * p[0] + m[2] * p[1] + m[4], m[1] * p[0] + m[3] * p[1] + m[5]]; });
+    var x0 = Math.min.apply(null, pts.map(function (p) { return p[0]; })), x1 = Math.max.apply(null, pts.map(function (p) { return p[0]; }));
+    var y0 = Math.min.apply(null, pts.map(function (p) { return p[1]; })), y1 = Math.max.apply(null, pts.map(function (p) { return p[1]; }));
+    var rx = Math.min(r[0], r[2]), ry = Math.min(r[1], r[3]), rw = Math.abs(r[2] - r[0]), rh = Math.abs(r[3] - r[1]);
+    if (x1 - x0 < 1e-6 || y1 - y0 < 1e-6 || rw < 1e-6 || rh < 1e-6) return true; // nothing visible
+    var sx = rw / (x1 - x0), sy = rh / (y1 - y0), name = page.node.newXObject('Flat', ap.ref);
+    page.pushOperators(L.pushGraphicsState(), L.concatTransformationMatrix(sx, 0, 0, sy, rx - x0 * sx, ry - y0 * sy), L.drawObject(name), L.popGraphicsState());
+    return true;
+  }
+
+  async function flattenKeep(d) {
+    var L = PDFLib, ctx = d.context, pages = d.getPages(), doForms = $('flForms').checked, doAnn = $('flAnnots').checked, keepLinks = $('flLinks').checked;
+    var stats = { fields: 0, annots: 0, pictures: 0 }, patches = [];
+    if (doForms) {
+      var form = d.getForm(), font = null, special = [];
+      try { if (form.hasXFA()) form.deleteXFA(); } catch (e) { /* none */ }
+      var fields = form.getFields();
+      if (fields.length) { d.registerFontkit(fontkit); font = await d.embedFont(await notoBytes(), { subset: true }); }
+      var g = font && font.embedder.font;
+      fields.forEach(function (f) {
+        stats.fields++;
+        var text = f instanceof L.PDFTextField || f instanceof L.PDFDropdown || f instanceof L.PDFOptionList;
+        try {
+          if (!f.needsAppearancesUpdate()) return;
+          if (!text) { f.updateAppearances(); return; }
+          var v = f instanceof L.PDFTextField ? (f.getText() || '') : (f.getSelected() || []).join(', ');
+          if (Array.from(v).every(function (c) { var cp = c.codePointAt(0); return cp < 32 || g.hasGlyphForCodePoint(cp); })) f.updateAppearances(font);
+          else special.push({ f: f, text: v });
+        } catch (e) { /* keeps the look it has */ }
+      });
+      if (special.length) {
+        var T = await PDFText.create(d, { text: special.map(function (s) { return s.text; }) });
+        special.forEach(function (s) {
+          s.f.acroField.getWidgets().forEach(function (w) {
+            var r = w.getRectangle(), pi = pages.findIndex(function (p) { var a = p.node.Annots(); if (!a) return false; for (var i = 0; i < a.size(); i++) if (a.lookup(i) === w.dict) return true; return false; });
+            if (pi < 0 || !s.text) return;
+            var size = Math.max(6, Math.min(12, r.height * .62)); while (size > 5 && T.width(s.text, size, font) > r.width - 4) size -= .5;
+            T.draw(pages[pi], s.text, { x: r.x + 2, y: r.y + (r.height - size * .7) / 2, size: size, font: font, color: L.rgb(0, 0, 0), width: r.width - 4 });
+          });
+          form.removeField(s.f);
+        });
+      }
+      form.flatten({ updateFieldAppearances: false });
+      var af = d.catalog.lookup(N('AcroForm'));
+      if (af instanceof L.PDFDict) { var fa = af.lookup(N('Fields')); if (!fa || !fa.size || !fa.size()) d.catalog.delete(N('AcroForm')); }
+    }
+    for (var pi = 0; pi < pages.length; pi++) {
+      var pg = pages[pi], a = pg.node.Annots(); if (!a) continue;
+      for (var i = a.size() - 1; i >= 0; i--) {
+        var ref = a.get(i), o = a.lookup(i);
+        if (!(o instanceof L.PDFDict)) { if (ref instanceof L.PDFRef && !ctx.lookup(ref)) a.remove(i); continue; }
+        var st = o.get(N('Subtype')), t = st ? st.decodeText() : '';
+        if (t === 'Link') { if (!keepLinks && doAnn) a.remove(i); continue; }
+        if (t === 'Widget') continue; // a form field that was kept
+        if (!doAnn) continue;
+        if (t === 'Popup') { a.remove(i); continue; }
+        var flags = num(o.lookup(N('F')), 0);
+        if (!(flags & 2) && !(flags & 32)) { // not hidden
+          var ap = appearance(ctx, o);
+          if (ap) stamp(pg, o, ap);
+          else { var rc = o.lookup(N('Rect')); if (rc instanceof L.PDFArray) patches.push({ page: pi, rect: [0, 1, 2, 3].map(function (k) { return num(rc.lookup(k), 0); }) }); }
+        }
+        stats.annots++; a.remove(i);
+      }
+      if (!a.size()) pg.node.delete(N('Annots'));
+    }
+    // marks without a stored look (some apps never save one): copy how a PDF reader draws them
+    if (patches.length) {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+      var src = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+      for (var q = 0; q < patches.length; q++) {
+        var P = patches[q], page = await src.getPage(P.page + 1), k = 3, vp = page.getViewport({ scale: k });
+        var r = vp.convertToViewportRectangle(P.rect), x = Math.floor(Math.min(r[0], r[2])), y = Math.floor(Math.min(r[1], r[3])), w = Math.ceil(Math.abs(r[2] - r[0])), h = Math.ceil(Math.abs(r[3] - r[1]));
+        if (w < 2 || h < 2 || w * h > 2e7) continue;
+        var c = document.createElement('canvas'); c.width = w; c.height = h;
+        var cx = c.getContext('2d'); cx.translate(-x, -y);
+        await page.render({ canvasContext: cx, viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE }).promise;
+        var png = await d.embedPng(new Uint8Array(await (await PT.blob(c, 'image/png')).arrayBuffer()));
+        var lo = Math.min(P.rect[0], P.rect[2]), bo = Math.min(P.rect[1], P.rect[3]);
+        pages[P.page].drawImage(png, { x: lo, y: bo, width: Math.abs(P.rect[2] - P.rect[0]), height: Math.abs(P.rect[3] - P.rect[1]) });
+        stats.pictures++;
+      }
+      src.destroy();
+    }
+    return stats;
+  }
+
+  async function flattenImage() {
+    var L = PDFLib, dpi = +$('flDpi').value, out = await L.PDFDocument.create({ updateMetadata: false });
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+    var src = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+    for (var i = 1; i <= src.numPages; i++) {
+      PT.say('', 'Drawing page ' + i + ' of ' + src.numPages + '…');
+      var page = await src.getPage(i), vp1 = page.getViewport({ scale: 1 }), k = Math.min(dpi / 72, Math.sqrt(16e6 / (vp1.width * vp1.height))), vp = page.getViewport({ scale: k });
+      var c = document.createElement('canvas'); c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: g, viewport: vp, annotationMode: pdfjsLib.AnnotationMode.ENABLE }).promise;
+      var img = await out.embedJpg(new Uint8Array(await (await PT.blob(c, 'image/jpeg', .88)).arrayBuffer()));
+      c.width = c.height = 1; page.cleanup();
+      out.addPage([vp1.width, vp1.height]).drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+    }
+    src.destroy();
+    return out;
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    PT.run(async function () {
+      var name = PT.base(file.name) + '-flattened.pdf';
+      if ($('flMode').value === 'image') {
+        var out = await flattenImage();
+        PT.say('', 'Saving…');
+        PT.done(await out.save(), name, 'application/pdf', 'Flattened ' + out.getPageCount() + (out.getPageCount() === 1 ? ' page' : ' pages') + ' into images');
+        return;
+      }
+      if (!$('flForms').checked && !$('flAnnots').checked) throw new Error('Tick at least one thing to flatten.');
+      var d = await openLib(bytes), s = await flattenKeep(d);
+      PT.say('', 'Saving…');
+      var bits = [];
+      if ($('flForms').checked) bits.push(s.fields + ' form ' + (s.fields === 1 ? 'field' : 'fields'));
+      if ($('flAnnots').checked) bits.push(s.annots + (s.annots === 1 ? ' comment or mark' : ' comments and marks'));
+      PT.done(await d.save({ updateFieldAppearances: false }), name, 'application/pdf', 'Flattened ' + bits.join(' and ') + (s.pictures ? ' (' + s.pictures + ' drawn as pictures)' : ''));
+    }).then(function () { busy = false; });
+  });
+})();
+</script>

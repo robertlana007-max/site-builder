@@ -1,0 +1,376 @@
+<style>
+.rd-find textarea { min-height: 84px; font-family: inherit; font-size: 15px; }
+.rd-find .checks { margin: 10px 0 0; }
+.rd-sheet { touch-action: none; user-select: none; -webkit-user-select: none; cursor: crosshair; }
+.rd-layer { position: absolute; inset: 0; }
+.rd-mark { position: absolute; background: rgba(0, 0, 0, .55); outline: 2px solid #e5484d; }
+.rd-mark.white { background: rgba(255, 255, 255, .7); outline-color: #e5484d; }
+.rd-mark button { position: absolute; right: -11px; top: -11px; width: 22px; height: 22px; padding: 0; border-radius: 50%; border: 2px solid #fff; background: #e5484d; color: #fff; font: 700 12px/16px system-ui, sans-serif; cursor: pointer; }
+@media (pointer: coarse) { .rd-mark button { width: 30px; height: 30px; right: -15px; top: -15px; line-height: 24px; } }
+.rd-draft { position: absolute; border: 2px dashed #e5484d; background: rgba(229, 72, 77, .15); pointer-events: none; }
+.rd-hits { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+.rd-opts { margin-top: 16px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Hide names, numbers and other private details for good. The file never leaves your device.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div id="rdWork" hidden>
+  <div class="rd-find">
+    <label for="rdTerms">Find words to hide (one word or phrase per line)</label>
+    <textarea id="rdTerms" data-nomemo spellcheck="false" placeholder="For example:&#10;John Smith&#10;4111 2222 3333 4444"></textarea>
+    <div class="checks">
+      <label><input type="checkbox" id="rdWhole" checked> Whole words only</label>
+      <label><input type="checkbox" id="rdCase"> Match capital letters</label>
+      <label><input type="checkbox" id="rdEmail" data-nomemo> All email addresses</label>
+      <label><input type="checkbox" id="rdPhone" data-nomemo> All phone numbers</label>
+      <label><input type="checkbox" id="rdNums" data-nomemo> All long numbers (cards, IDs, accounts)</label>
+    </div>
+    <div class="btns"><button class="btn ghost" id="rdFind" type="button">Find and mark</button><button class="btn ghost" id="rdUndo" type="button" disabled>Undo</button><button class="btn ghost" id="rdClear" type="button" disabled>Remove all marks</button></div>
+    <p class="rd-hits" id="rdHits"></p>
+  </div>
+  <div class="pager" style="margin-top:14px">
+    <button class="btn ghost" id="rdPrev" type="button" aria-label="Previous page">‹</button>
+    <span id="rdPageNo">Page 1 of 1</span>
+    <button class="btn ghost" id="rdNext" type="button" aria-label="Next page">›</button>
+    <span class="grow"></span>
+    <span id="rdCount">Nothing marked yet</span>
+  </div>
+  <p class="rd-hits" style="margin:0 0 8px">Drag on the page to cover any area, such as a photo, a signature or a stamp. Press ✕ on a mark to remove it.</p>
+  <div class="stage"><div class="sheet rd-sheet" id="rdSheet"><canvas id="rdCv"></canvas><div class="rd-layer" id="rdLayer"></div></div></div>
+  <div class="fields rd-opts">
+    <div><label for="rdColor">Colour of the boxes</label><select id="rdColor"><option value="black">Black</option><option value="white">White (blends into the page)</option></select></div>
+    <div><label for="rdDpi">Quality of redacted pages</label><select id="rdDpi"><option value="150">Good (150 dpi, smaller file)</option><option value="200" selected>High (200 dpi)</option><option value="300">Print (300 dpi, larger file)</option></select></div>
+  </div>
+  <div class="checks">
+    <label><input type="checkbox" id="rdKeep" checked> Keep the rest of the text on redacted pages searchable and copyable</label>
+    <label><input type="checkbox" id="rdMeta" checked> Also remove the title, author and other hidden document details</label>
+  </div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Redact PDF</button><a class="btn ghost" id="dl" hidden>Download redacted PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/fontkit.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, pdf = null, n = 0, cur = 1, marks = {}, history = [], texts = {}, busy = false, view = { scale: 1, w: 1, h: 1 }, rendering = null;
+  var cv = $('rdCv'), layer = $('rdLayer'), sheet = $('rdSheet');
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so pdf-lib can copy their pages ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (bytes) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(bytes));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+  async function openLib(bytes) {
+    try { return await PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); }
+    catch (e) {
+      if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + file.name + '" could not be read as a PDF.');
+      return PDFLib.PDFDocument.load(await QP(bytes), { updateMetadata: false });
+    }
+  }
+
+  // ---------- marks ----------
+  // Marks are stored per page in "view units": the page as the reader sees it at 100% (points, top-left origin).
+  function total() { var t = 0; for (var k in marks) t += marks[k].length; return t; }
+  function snapshot() { history.push(JSON.stringify(marks)); if (history.length > 60) history.shift(); }
+  function changed() {
+    var t = total(), pages = Object.keys(marks).filter(function (k) { return marks[k].length; }).length;
+    $('rdCount').textContent = t ? t + (t === 1 ? ' area' : ' areas') + ' marked on ' + pages + (pages === 1 ? ' page' : ' pages') : 'Nothing marked yet';
+    $('go').disabled = !t || busy; $('rdClear').disabled = !t; $('rdUndo').disabled = !history.length; $('dl').hidden = true;
+    paintMarks();
+  }
+  function paintMarks() {
+    layer.innerHTML = '';
+    var white = $('rdColor').value === 'white';
+    (marks[cur] || []).forEach(function (m, i) {
+      var d = document.createElement('div');
+      d.className = 'rd-mark' + (white ? ' white' : '');
+      d.style.left = m.x * view.scale + 'px'; d.style.top = m.y * view.scale + 'px';
+      d.style.width = Math.max(2, m.w * view.scale) + 'px'; d.style.height = Math.max(2, m.h * view.scale) + 'px';
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = '✕'; b.setAttribute('aria-label', 'Remove this mark');
+      b.addEventListener('pointerdown', function (e) { e.stopPropagation(); });
+      b.addEventListener('click', function (e) { e.stopPropagation(); snapshot(); marks[cur].splice(i, 1); changed(); });
+      d.appendChild(b); layer.appendChild(d);
+    });
+  }
+  $('rdColor').addEventListener('change', paintMarks);
+  $('rdUndo').addEventListener('click', function () { if (!history.length) return; marks = JSON.parse(history.pop()); changed(); });
+  $('rdClear').addEventListener('click', function () { snapshot(); marks = {}; changed(); $('rdHits').textContent = ''; });
+
+  // drawing a box with mouse, finger or pen
+  var draft = null;
+  function at(e) { var r = sheet.getBoundingClientRect(); return { x: Math.max(0, Math.min(r.width, e.clientX - r.left)), y: Math.max(0, Math.min(r.height, e.clientY - r.top)) }; }
+  sheet.addEventListener('pointerdown', function (e) {
+    if (!pdf || busy || e.button > 0) return;
+    e.preventDefault();
+    var p = at(e), el = document.createElement('div'); el.className = 'rd-draft'; layer.appendChild(el);
+    draft = { x0: p.x, y0: p.y, el: el, id: e.pointerId };
+    try { sheet.setPointerCapture(e.pointerId); } catch (er) { /* older browsers */ }
+  });
+  sheet.addEventListener('pointermove', function (e) {
+    if (!draft || e.pointerId !== draft.id) return;
+    var p = at(e), s = draft.el.style;
+    s.left = Math.min(p.x, draft.x0) + 'px'; s.top = Math.min(p.y, draft.y0) + 'px'; s.width = Math.abs(p.x - draft.x0) + 'px'; s.height = Math.abs(p.y - draft.y0) + 'px';
+  });
+  function endDraw(e) {
+    if (!draft || e.pointerId !== draft.id) return;
+    var p = at(e), d = draft; draft = null; d.el.remove();
+    var w = Math.abs(p.x - d.x0), h = Math.abs(p.y - d.y0);
+    if (w < 4 || h < 4) return; // a tap, not a box
+    snapshot();
+    (marks[cur] = marks[cur] || []).push({ x: Math.min(p.x, d.x0) / view.scale, y: Math.min(p.y, d.y0) / view.scale, w: w / view.scale, h: h / view.scale });
+    changed();
+  }
+  sheet.addEventListener('pointerup', endDraw);
+  sheet.addEventListener('pointercancel', function () { if (draft) { draft.el.remove(); draft = null; } });
+
+  // ---------- page view ----------
+  function show(i) {
+    cur = Math.max(1, Math.min(n, i));
+    $('rdPageNo').textContent = 'Page ' + cur + ' of ' + n;
+    $('rdPrev').disabled = cur === 1; $('rdNext').disabled = cur === n;
+    var mine = cur;
+    rendering = pdf.getPage(cur).then(function (page) {
+      var vp1 = page.getViewport({ scale: 1 }), room = Math.max(200, Math.min(900, $('rdWork').clientWidth - 2));
+      var scale = room / vp1.width, dpr = Math.min(2, window.devicePixelRatio || 1), vp = page.getViewport({ scale: scale * dpr });
+      cv.width = Math.ceil(vp.width); cv.height = Math.ceil(vp.height);
+      cv.style.width = sheet.style.width = vp1.width * scale + 'px'; cv.style.height = sheet.style.height = vp1.height * scale + 'px';
+      view = { scale: scale, w: vp1.width, h: vp1.height };
+      paintMarks();
+      return page.render({ canvasContext: cv.getContext('2d'), viewport: vp }).promise.then(function () { page.cleanup(); });
+    }).catch(function () { if (mine === cur) PT.say('bad', 'Page ' + mine + ' could not be shown.'); });
+  }
+  $('rdPrev').addEventListener('click', function () { show(cur - 1); });
+  $('rdNext').addEventListener('click', function () { show(cur + 1); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (pdf) show(cur); }, 200); });
+
+  // ---------- text positions ----------
+  var meas = document.createElement('canvas').getContext('2d');
+  // Text of page i: items with their place in view units, and where each letter starts inside the item.
+  function pageText(i) {
+    if (texts[i]) return texts[i];
+    return (texts[i] = pdf.getPage(i).then(function (page) {
+      var vp1 = page.getViewport({ scale: 1 });
+      return page.getTextContent().then(function (tc) {
+        var items = [];
+        tc.items.forEach(function (it) {
+          if (!it.str) { if (it.hasEOL && items.length) items[items.length - 1].eol = true; return; }
+          var m = pdfjsLib.Util.transform(vp1.transform, it.transform), st = tc.styles[it.fontName] || {};
+          var fh = Math.hypot(m[2], m[3]) || Math.hypot(m[0], m[1]) || 10, asc = st.ascent || .85, desc = st.descent || -.22;
+          if (asc > 1.3 || asc < .5) asc = .85; if (desc > 0 || desc < -.5) desc = -.22;
+          var flat = Math.abs(m[1]) < .01 * fh && Math.abs(m[2]) < .01 * fh && m[0] > 0;
+          var o = { str: it.str, eol: !!it.hasEOL, flat: flat, fh: fh, x: m[4], base: m[5], top: m[5] - fh * asc, bot: m[5] - fh * desc, w: it.width * Math.hypot(m[0], m[1]) / (Math.hypot(it.transform[0], it.transform[1]) || 1), m: m };
+          if (!isFinite(o.w) || o.w <= 0) o.w = it.width || fh * it.str.length * .5;
+          // where each letter starts, as a share of the item width (measured with a similar font)
+          meas.font = '100px ' + (/serif/i.test(st.fontFamily || '') && !/sans/i.test(st.fontFamily || '') ? 'serif' : /mono/i.test(st.fontFamily || '') ? 'monospace' : 'sans-serif');
+          var chars = Array.from(it.str), pos = [0], sum = 0;
+          chars.forEach(function (c) { sum += Math.max(1, meas.measureText(c).width); pos.push(sum); });
+          o.chars = chars; o.pos = pos.map(function (p) { return p / sum; });
+          if (!flat) { // a rotated item: keep its outline, letters are not split
+            var a = Math.atan2(m[1], m[0]), c0 = Math.cos(a), s0 = Math.sin(a), L = o.w, up = fh * asc, dn = -fh * desc, pts = [[0, dn], [L, dn], [L, -up], [0, -up]].map(function (q) { return [m[4] + q[0] * c0 - q[1] * s0, m[5] + q[0] * s0 + q[1] * c0]; });
+            o.bx = Math.min.apply(null, pts.map(function (q) { return q[0]; })); o.by = Math.min.apply(null, pts.map(function (q) { return q[1]; }));
+            o.bw = Math.max.apply(null, pts.map(function (q) { return q[0]; })) - o.bx; o.bh = Math.max.apply(null, pts.map(function (q) { return q[1]; })) - o.by;
+          }
+          items.push(o);
+        });
+        page.cleanup();
+        return { items: items, w: vp1.width, h: vp1.height };
+      });
+    }));
+  }
+  // one string for the whole page, with a map from each character back to its item and letter
+  function joined(t) {
+    var s = '', map = [];
+    t.items.forEach(function (o, k) {
+      o.chars.forEach(function (c, j) { s += c; for (var q = 0; q < c.length; q++) map.push([k, j]); });
+      var nx = t.items[k + 1], sep = '';
+      if (o.eol) sep = '\n';
+      else if (nx) { var gap = o.flat && nx.flat ? nx.x - (o.x + o.w) : 99, same = Math.abs(nx.base - o.base) < o.fh * .5; sep = !same ? '\n' : gap > o.fh * .12 ? ' ' : ''; }
+      if (sep && !/\s$/.test(o.str)) { s += sep; map.push(null); }
+    });
+    return { s: s, map: map };
+  }
+  function letterBox(o, a, b, pad) {
+    var x0 = o.x + o.pos[a] * o.w, x1 = o.x + o.pos[b] * o.w, ph = o.fh * .08;
+    return { x: x0 - pad, y: o.top - ph, w: x1 - x0 + 2 * pad, h: o.bot - o.top + 2 * ph };
+  }
+  function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  function patterns() {
+    var list = [], flags = 'gu' + ($('rdCase').checked ? '' : 'i'), whole = $('rdWhole').checked;
+    $('rdTerms').value.split(/\n/).map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (t) {
+      var src = escapeRe(t).replace(/\s+/g, '\\s*');
+      if (whole) src = '(?<![\\p{L}\\p{N}_])' + src + '(?![\\p{L}\\p{N}_])';
+      list.push(new RegExp(src, flags));
+    });
+    if ($('rdEmail').checked) list.push(/[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu);
+    if ($('rdPhone').checked) list.push(/(?<![\p{L}\p{N}])(?:\+\s?\d{1,3}[\s.\-]*)?(?:\(\d{1,5}\)[\s.\-]*)?\d(?:[\s.\-]?\d){6,13}(?![\p{L}\p{N}])/gu);
+    if ($('rdNums').checked) list.push(/(?<![\p{L}\p{N}])\d(?:[\s\-]?\d){7,}(?![\p{L}\p{N}])/gu);
+    return list;
+  }
+  // every match of the patterns on page text t, as boxes in view units
+  function findIn(t, list) {
+    var j = joined(t), boxes = [];
+    list.forEach(function (re) {
+      re.lastIndex = 0; var m;
+      while ((m = re.exec(j.s))) {
+        if (!m[0].length) { re.lastIndex++; continue; }
+        var runs = {}; // item -> [first letter, last letter]
+        for (var q = m.index; q < m.index + m[0].length; q++) { var r = j.map[q]; if (!r) continue; var e = runs[r[0]] || (runs[r[0]] = [r[1], r[1]]); e[0] = Math.min(e[0], r[1]); e[1] = Math.max(e[1], r[1]); }
+        Object.keys(runs).forEach(function (k) {
+          var o = t.items[k], rg = runs[k];
+          boxes.push(o.flat ? letterBox(o, rg[0], rg[1] + 1, Math.max(.6, o.fh * .06)) : { x: o.bx - 1, y: o.by - 1, w: o.bw + 2, h: o.bh + 2 });
+        });
+      }
+    });
+    return boxes;
+  }
+  $('rdFind').addEventListener('click', async function () {
+    if (!pdf || busy) return;
+    var list;
+    try { list = patterns(); } catch (e) { return PT.say('bad', 'One of the words could not be searched for. Try writing it differently.'); }
+    if (!list.length) { PT.say('bad', 'Type a word or phrase to find, or tick one of the boxes such as All email addresses.'); $('rdTerms').focus(); return; }
+    busy = true; $('rdFind').disabled = true;
+    var found = 0, pages = [], noText = 0, before = JSON.stringify(marks);
+    try {
+      for (var i = 1; i <= n; i++) {
+        if (n > 20 && i % 10 === 1) PT.say('', 'Searching page ' + i + ' of ' + n + '…');
+        var t = await pageText(i);
+        if (!t.items.length) noText++;
+        var b = findIn(t, list);
+        if (b.length) {
+          var have = marks[i] = marks[i] || [];
+          b.forEach(function (x) { if (!have.some(function (y) { return Math.abs(y.x - x.x) < .5 && Math.abs(y.y - x.y) < .5 && Math.abs(y.w - x.w) < .5; })) { have.push(x); found++; } });
+          pages.push(i);
+        }
+      }
+      if (found) history.push(before);
+      $('rdHits').textContent = found ? 'Marked ' + found + (found === 1 ? ' match' : ' matches') + ' on ' + (pages.length === 1 ? 'page ' + pages[0] : pages.length + ' pages (' + pages.slice(0, 12).join(', ') + (pages.length > 12 ? '…' : '') + ')') + '. Check each page, then press Redact PDF.'
+        : 'No matches found.' + (noText === n ? ' This PDF has no text layer (it is probably a scan), so words cannot be searched. Drag boxes over them instead.' : noText ? ' ' + noText + ' page(s) are scans without text: drag boxes over details on those pages.' : '');
+      PT.say(found ? 'ok' : '', '');
+      if (pages.length && pages.indexOf(cur) === -1) show(pages[0]);
+    } catch (e) { PT.say('bad', 'The text of this PDF could not be read.'); }
+    busy = false; $('rdFind').disabled = false; changed();
+  });
+
+  // ---------- open ----------
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; PT.say('', 'Opening ' + f.name + '…');
+    PT.render(f).then(function (doc) {
+      if (pdf) pdf.destroy();
+      file = f; pdf = doc; n = doc.numPages; marks = {}; history = []; texts = {};
+      $('rdWork').hidden = false; $('rdHits').textContent = '';
+      $('drop').querySelector('b').textContent = f.name;
+      busy = false; changed(); show(1);
+      PT.say('', f.name + ' · ' + n + (n === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size));
+    }).catch(function (e) { busy = false; PT.say('bad', e.message); });
+  });
+
+  // ---------- redact ----------
+  var fontBytes = null;
+  function overlaps(a, b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
+  $('go').addEventListener('click', function () {
+    if (!pdf || busy || !total()) return;
+    busy = true;
+    PT.run(async function () {
+      var L = PDFLib, src = await openLib(await file.arrayBuffer()), out = await L.PDFDocument.create({ updateMetadata: false });
+      var dpi = +$('rdDpi').value, white = $('rdColor').value === 'white', keep = $('rdKeep').checked, font = null, glyphs = null;
+      if (!$('rdMeta').checked) {
+        [['Title', 'setTitle'], ['Author', 'setAuthor'], ['Subject', 'setSubject'], ['Creator', 'setCreator']].forEach(function (k) { var v = src['get' + k[0]](); if (v) out[k[1]](v); });
+        var kw = src.getKeywords(); if (kw) out.setKeywords([kw]);
+      }
+      if (keep) {
+        out.registerFontkit(fontkit);
+        if (!fontBytes) fontBytes = fetch('../assets/vendor/fonts/noto-sans-subset-400.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).catch(function (e) { fontBytes = null; throw e; });
+        try { font = await out.embedFont(await fontBytes, { subset: true }); glyphs = font.embedder.font; } catch (e) { font = null; }
+      }
+      var redacted = [], plain = [], copied;
+      function live(i) { return (marks[i] || []).filter(function (m) { return m.w > 0 && m.h > 0; }); }
+      for (var i = 1; i <= n; i++) if (!live(i).length) plain.push(i - 1);
+      copied = await out.copyPages(src, plain); // in one go, so shared fonts and pictures are stored once
+      for (i = 1; i <= n; i++) {
+        var ms = live(i);
+        if (!ms.length) { out.addPage(copied[plain.indexOf(i - 1)]); continue; }
+        PT.say('', 'Redacting page ' + i + ' of ' + n + '…');
+        var page = await pdf.getPage(i), vp1 = page.getViewport({ scale: 1 }), k = Math.min(dpi / 72, Math.sqrt(16e6 / (vp1.width * vp1.height)));
+        var vp = page.getViewport({ scale: k }), c = document.createElement('canvas');
+        c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+        await page.render({ canvasContext: g, viewport: vp }).promise;
+        g.fillStyle = white ? '#fff' : '#000';
+        ms.forEach(function (m) { g.fillRect(Math.floor(m.x * k), Math.floor(m.y * k), Math.ceil(m.w * k) + 1, Math.ceil(m.h * k) + 1); });
+        var jpg = await PT.blob(c, 'image/jpeg', .9), img = await out.embedJpg(new Uint8Array(await jpg.arrayBuffer()));
+        c.width = c.height = 1; page.cleanup();
+        var np = out.addPage([vp1.width, vp1.height]);
+        np.drawImage(img, { x: 0, y: 0, width: vp1.width, height: vp1.height });
+        if (font) {
+          // An invisible text layer with only the words that are not covered, so the page can still be searched and copied.
+          var t = await pageText(i);
+          np.pushOperators(L.pushGraphicsState(), L.setTextRenderingMode(L.TextRenderingMode.Invisible));
+          t.items.forEach(function (o) {
+            if (!o.flat) {
+              if (ms.some(function (m) { return overlaps(m, { x: o.bx, y: o.by, w: o.bw, h: o.bh }); })) return;
+              var a = Math.atan2(o.m[1], o.m[0]);
+              var s = o.chars.filter(function (ch) { return glyphs.hasGlyphForCodePoint(ch.codePointAt(0)); }).join('');
+              if (s.trim()) try { np.drawText(s, { x: o.m[4], y: vp1.height - o.m[5], size: o.fh, font: font, rotate: L.degrees(-a * 180 / Math.PI) }); } catch (e) { /* skip */ }
+              return;
+            }
+            var seg = null, segs = [];
+            o.chars.forEach(function (ch, j) {
+              var hidden = ms.some(function (m) { return overlaps(m, letterBox(o, j, j + 1, 0)); }) || !glyphs.hasGlyphForCodePoint(ch.codePointAt(0));
+              if (hidden) { seg = null; return; }
+              if (!seg) { seg = { a: j, s: '' }; segs.push(seg); }
+              seg.s += ch; seg.b = j + 1;
+            });
+            segs.forEach(function (sg) {
+              if (!sg.s.trim()) return;
+              var x0 = o.x + o.pos[sg.a] * o.w, want = (o.pos[sg.b] - o.pos[sg.a]) * o.w, have = font.widthOfTextAtSize(sg.s, o.fh);
+              var hs = have > 0 ? Math.max(10, Math.min(1000, want / have * 100)) : 100;
+              np.pushOperators(L.pushGraphicsState(), L.setCharacterSqueeze(hs));
+              np.drawText(sg.s, { x: x0 * 100 / hs, y: vp1.height - o.base, size: o.fh, font: font });
+              np.pushOperators(L.popGraphicsState());
+            });
+          });
+          np.pushOperators(L.popGraphicsState());
+        }
+        redacted.push(i);
+      }
+      PT.say('', 'Saving…');
+      var bytes = await out.save();
+      // Check the result: search the new file for the same words, which must all be gone.
+      var left = 0, list = [];
+      try { list = patterns(); } catch (e) { list = []; }
+      if (list.length) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+        var chk = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+        for (var p = 1; p <= chk.numPages; p++) {
+          var tc = await (await chk.getPage(p)).getTextContent(), s = tc.items.map(function (it) { return it.str + (it.hasEOL ? '\n' : ' '); }).join('');
+          list.forEach(function (re) { re.lastIndex = 0; var mm = s.match(re); if (mm) left += mm.length; });
+        }
+        chk.destroy();
+      }
+      PT.done(bytes, PT.base(file.name) + '-redacted.pdf', 'application/pdf', 'Redacted ' + redacted.length + (redacted.length === 1 ? ' page' : ' pages') + (list.length ? (left ? '. Warning: ' + left + ' match(es) are still in the text of pages you did not mark. Check them' : '. Checked: none of the searched words are left in the file') : ''));
+      if (left) $('msg').className = 'msg bad';
+    }).then(function () { busy = false; $('go').disabled = !total(); });
+  });
+})();
+</script>
