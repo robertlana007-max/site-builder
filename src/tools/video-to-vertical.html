@@ -1,0 +1,395 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.v9-wrap { display: flex; gap: 16px; flex-wrap: wrap; align-items: flex-start; margin: 6px 0 14px; }
+.v9-prev { flex: 0 1 auto; margin: 0 auto; text-align: center; }
+.v9-prev canvas { display: block; max-width: 100%; height: auto; width: 225px; border-radius: 12px; border: 1px solid var(--line); background: #000; margin: 0 auto; }
+.v9-ctl { display: flex; gap: 8px; align-items: center; margin: 8px 0 0; }
+.v9-ctl .btn { flex: none; padding: 8px 14px; }
+.v9-ctl input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.v9-ctl span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.6em; }
+.v9-opts { flex: 1 1 300px; min-width: 0; }
+.v9-range { display: flex; align-items: center; gap: 10px; }
+.v9-range input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.v9-range output { min-width: 3.4em; text-align: end; font-variant-numeric: tabular-nums; font-weight: 600; }
+.v9-shape { display: flex; gap: 8px; margin: 0 0 14px; }
+.v9-shape button { flex: 1; font: inherit; font-weight: 600; font-size: 14px; padding: 8px 4px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.v9-shape button i { display: block; border: 2px solid currentColor; border-radius: 3px; }
+.v9-shape button[aria-pressed=true] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 1px var(--accent) inset; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a video here</b>MP4, MOV, WebM, MKV or AVI, up to 1 GB. Your video never leaves your device.</div>
+<input type="file" id="file" accept="video/*,.mkv,.mov,.avi,.m4v,.3gp,.ts,.mts,.wmv,.flv" hidden data-nomemo>
+<p class="vt-info" id="info"></p>
+<div id="editor" hidden>
+  <div class="v9-shape" id="shapes" role="group" aria-label="Shape">
+    <button type="button" data-shape="9x16" aria-pressed="true"><i style="width:18px;height:32px"></i>9:16 Reels, TikTok, Shorts</button>
+    <button type="button" data-shape="4x5" aria-pressed="false"><i style="width:24px;height:30px"></i>4:5 Instagram post</button>
+    <button type="button" data-shape="1x1" aria-pressed="false"><i style="width:28px;height:28px"></i>1:1 Square</button>
+  </div>
+  <div class="v9-wrap">
+    <div class="v9-prev">
+      <canvas id="prev" width="360" height="640" aria-label="Preview of the new video"></canvas>
+      <div class="v9-ctl"><button class="btn ghost" type="button" id="pp">▶</button><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Preview position"><span id="ptime">0:00.0</span></div>
+      <p class="vt-hint" id="noPlay" hidden style="margin:8px 0 0">Your browser cannot play this video format, so there is no preview. The settings still work.</p>
+      <video id="player" playsinline preload="auto" hidden></video>
+    </div>
+    <div class="v9-opts">
+      <div class="fields">
+        <div><label for="fill">Fill the empty space with</label><select id="fill"><option value="blur">A blurred copy of the video</option><option value="color">A plain colour</option><option value="crop">Nothing: zoom in to fill (cuts the sides)</option></select></div>
+        <div id="colorBox" hidden><label for="color">Background colour</label><input type="color" id="color" value="#000000"></div>
+        <div id="blurBox"><label for="blur">Blur strength</label><select id="blur"><option value="3">Light</option><option value="6" selected>Medium</option><option value="10">Strong</option></select></div>
+        <div><label for="zoom">Zoom</label><div class="v9-range"><input type="range" id="zoom" min="100" max="300" step="5" value="100"><output id="zoomOut">100%</output></div></div>
+        <div><label for="px">Left ↔ right</label><div class="v9-range"><input type="range" id="px" min="0" max="100" step="1" value="50"><output id="pxOut">Centre</output></div></div>
+        <div><label for="py">Up ↕ down</label><div class="v9-range"><input type="range" id="py" min="0" max="100" step="1" value="50"><output id="pyOut">Centre</output></div></div>
+        <div><label for="res">Size</label><select id="res"><option value="720">720p (faster)</option><option value="1080">1080p Full HD (slower)</option></select></div>
+        <div><label for="q">Quality</label><select id="q"><option value="20">High (bigger file)</option><option value="23" selected>Good (recommended)</option><option value="27">Smaller file</option></select></div>
+      </div>
+      <div class="checks"><label><input type="checkbox" id="mute"> Remove the sound</label></div>
+      <p class="vt-hint" id="hint"></p>
+    </div>
+  </div>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Make vertical video</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download MP4</a></div>
+<p class="msg" id="msg"></p>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var file = null, info = null, url = null, P = $('player'), cv = $('prev'), shape = '9x16', raf = 0, tiny = document.createElement('canvas');
+  var SH = { '9x16': [9, 16], '4x5': [4, 5], '1x1': [1, 1] };
+  function out() { var r = SH[shape], w = +$('res').value, h = Math.round(w * r[1] / r[0] / 2) * 2; return { W: w, H: h }; }
+  // Where the video goes in the new frame (in output pixels), and which part of the source is visible.
+  function layout(W, H) {
+    var w = info.width, h = info.height, mode = $('fill').value, z = +$('zoom').value / 100;
+    var s = (mode === 'crop' ? Math.max(W / w, H / h) : Math.min(W / w, H / h)) * z, fw = w * s, fh = h * s;
+    var x = (W - fw) * $('px').value / 100, y = (H - fh) * $('py').value / 100;
+    var ox0 = Math.max(0, x), oy0 = Math.max(0, y), ox1 = Math.min(W, x + fw), oy1 = Math.min(H, y + fh);
+    return { s: s, x: x, y: y, ox0: ox0, oy0: oy0, ox1: ox1, oy1: oy1, cx: (ox0 - x) / s, cy: (oy0 - y) / s, cw: (ox1 - ox0) / s, ch: (oy1 - oy0) / s, full: ox0 <= 0.5 && oy0 <= 0.5 && ox1 >= W - 0.5 && oy1 >= H - 0.5 };
+  }
+  function labels() {
+    $('zoomOut').textContent = $('zoom').value + '%';
+    var n = function (v) { v = +v; return v === 50 ? 'Centre' : v + '%'; };
+    $('pxOut').textContent = n($('px').value); $('pyOut').textContent = n($('py').value);
+    $('colorBox').hidden = $('fill').value !== 'color'; $('blurBox').hidden = $('fill').value !== 'blur';
+  }
+  function draw() {
+    if (!info) return;
+    var o = out(), ph = 640, pw = Math.round(ph * o.W / o.H);
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+    cv.style.width = Math.round((window.innerWidth < 520 ? 340 : 400) * pw / ph) + 'px';
+    var g = cv.getContext('2d'), k = pw / o.W, L = layout(o.W, o.H), mode = $('fill').value, ok = !P.hidden && P.readyState >= 2;
+    g.fillStyle = mode === 'color' ? $('color').value : '#000'; g.fillRect(0, 0, pw, ph);
+    if (!ok) { g.fillStyle = '#333'; g.fillRect(L.ox0 * k, L.oy0 * k, (L.ox1 - L.ox0) * k, (L.oy1 - L.oy0) * k); return; }
+    if (mode === 'blur') { // shrink then stretch: a cheap blur that works in every browser
+      var b = +$('blur').value, tw = Math.max(4, Math.round(64 / b)), th = Math.max(4, Math.round(tw * ph / pw));
+      tiny.width = tw; tiny.height = th;
+      var tg = tiny.getContext('2d'), cs = Math.max(tw / info.width, th / info.height);
+      tg.drawImage(P, (tw - info.width * cs) / 2, (th - info.height * cs) / 2, info.width * cs, info.height * cs);
+      g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(tiny, 0, 0, pw, ph);
+      g.fillStyle = 'rgba(0,0,0,.18)'; g.fillRect(0, 0, pw, ph);
+    }
+    var vw = P.videoWidth, vh = P.videoHeight, sx = vw / info.width, sy = vh / info.height; // the element may already be rotated
+    if (L.cw > 0 && L.ch > 0) g.drawImage(P, L.cx * sx, L.cy * sy, L.cw * sx, L.ch * sy, L.ox0 * k, L.oy0 * k, (L.ox1 - L.ox0) * k, (L.oy1 - L.oy0) * k);
+  }
+  function loop() { draw(); $('ptime').textContent = VT.clock(P.currentTime || 0); if (info) $('seek').value = Math.round((P.currentTime || 0) / info.duration * 1000); if (!P.paused) raf = requestAnimationFrame(loop); }
+  function hint() {
+    if (!info) return;
+    labels(); draw();
+    var o = out(), mode = $('fill').value, L = layout(o.W, o.H), lost = mode !== 'crop' || L.full ? 1 - (L.cw * L.ch) / (info.width * info.height) : 0;
+    var txt = 'New video: ' + o.W + ' × ' + o.H + ' MP4.';
+    if (lost > 0.02) txt += ' About ' + Math.round(lost * 100) + '% of the picture is cut off at the edges. Use the sliders to choose which part stays.';
+    var slow = o.W * o.H / 921600 * (mode === 'blur' ? 1.3 : 1), mins = info.duration * slow / 60;
+    txt += ' Expect roughly ' + (mins < 1 ? 'under a minute' : Math.round(mins) + ' to ' + Math.round(mins * 3) + ' minutes') + ' on a computer, longer on a phone.';
+    $('hint').textContent = txt;
+  }
+  Array.prototype.forEach.call($('shapes').children, function (b) {
+    b.addEventListener('click', function () {
+      shape = b.dataset.shape; Array.prototype.forEach.call($('shapes').children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); });
+      $('dl').hidden = true; hint();
+    });
+  });
+  ['fill', 'color', 'blur', 'zoom', 'px', 'py', 'res', 'q', 'mute'].forEach(function (id) { $(id).addEventListener('input', hint); $(id).addEventListener('change', hint); });
+  function reset() {
+    file = null; info = null; $('editor').hidden = true; cancelAnimationFrame(raf);
+    P.pause(); P.removeAttribute('src'); P.load();
+    if (url) { URL.revokeObjectURL(url); url = null; }
+  }
+  VT.pick(reset, function (f, i) {
+    file = f; info = i; url = URL.createObjectURL(f);
+    $('noPlay').hidden = true; P.hidden = false; P.muted = false; P.src = url;
+    $('mute').checked = false; $('mute').disabled = !i.audio;
+    if (i.height > i.width && shape === '9x16') VT.say('', 'This video is already upright. You can still change its shape, zoom in, or add a blurred background.');
+    $('editor').hidden = false; hint();
+  });
+  P.addEventListener('loadeddata', function () { draw(); });
+  P.addEventListener('seeked', function () { draw(); });
+  P.addEventListener('error', function () { if (P.getAttribute('src')) { P.hidden = true; $('noPlay').hidden = false; draw(); } });
+  P.addEventListener('play', function () { $('pp').textContent = '❚❚'; loop(); });
+  P.addEventListener('pause', function () { $('pp').textContent = '▶'; draw(); });
+  P.addEventListener('ended', function () { $('pp').textContent = '▶'; });
+  $('pp').addEventListener('click', function () { if (P.hidden || !info) return; if (P.paused) { var p = P.play(); if (p && p.catch) p.catch(function () {}); } else P.pause(); });
+  $('seek').addEventListener('input', function () { if (!info || P.hidden) return; P.currentTime = $('seek').value / 1000 * info.duration; $('ptime').textContent = VT.clock(P.currentTime); });
+  window.addEventListener('resize', draw);
+
+  $('go').addEventListener('click', function () {
+    if (!file) return;
+    P.pause();
+    var f = file, i = info, o = out(), W = o.W, H = o.H, L = layout(W, H), mode = $('fill').value, mute = $('mute').checked || !i.audio, q = $('q').value;
+    function ev(v) { return Math.max(2, Math.round(v / 2) * 2); }
+    var cw = Math.min(ev(L.cw), i.width - i.width % 2), ch = Math.min(ev(L.ch), i.height - i.height % 2);
+    var cx = Math.max(0, Math.min(i.width - cw, Math.round(L.cx))), cy = Math.max(0, Math.min(i.height - ch, Math.round(L.cy)));
+    var ow = Math.min(W, ev(L.ox1 - L.ox0)), oh = Math.min(H, ev(L.oy1 - L.oy0)), ox = Math.max(0, Math.min(W - ow, Math.round(L.ox0))), oy = Math.max(0, Math.min(H - oh, Math.round(L.oy0)));
+    var fg = 'crop=' + cw + ':' + ch + ':' + cx + ':' + cy + ',scale=' + ow + ':' + oh + ':flags=bicubic,setsar=1';
+    var graph;
+    if (L.full) graph = '[0:v]' + fg + ',format=yuv420p[v]';
+    else if (mode === 'color') graph = '[0:v]' + fg + ',pad=' + W + ':' + H + ':' + ox + ':' + oy + ':color=0x' + $('color').value.slice(1) + ',format=yuv420p[v]';
+    else {
+      var bw = ev(W / 8), bh = ev(H / 8), r = +$('blur').value;
+      graph = '[0:v]split=2[a][b];[a]scale=' + bw + ':' + bh + ':force_original_aspect_ratio=increase,crop=' + bw + ':' + bh + ',boxblur=' + r + ':2,scale=' + W + ':' + H + ',eq=brightness=-0.06,setsar=1[bg];' +
+        '[b]' + fg + '[fg];[bg][fg]overlay=' + ox + ':' + oy + ',format=yuv420p[v]';
+    }
+    VT.go('Making your ' + shape.replace('x', ':') + ' video', function (pct) {
+      return FF.run(f, function (inp) {
+        var a = ['-i', inp, '-filter_complex', graph, '-map', '[v]'];
+        if (!mute) a.push('-map', '0:a:0?', '-c:a', i.acodec === 'aac' ? 'copy' : 'aac', '-b:a', '160k'); else a.push('-an');
+        a.push('-c:v', 'libx264', '-preset', 'veryfast', '-crf', q, '-movflags', '+faststart');
+        return a;
+      }, 'vertical.mp4', i.duration, pct, VT.say).then(function (data) {
+        VT.done(data, VT.base(f.name) + '-' + shape.replace('x', 'x') + '.mp4', 'video/mp4');
+        return 'Your ' + W + ' × ' + H + ' video is ready (' + fmtBytes(data.length) + ')';
+      });
+    });
+  });
+})();
+</script>
