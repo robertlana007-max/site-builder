@@ -1,0 +1,199 @@
+<style>
+.icm-two { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr)); gap: 12px; margin-bottom: 14px; }
+.icm-two .drop { margin: 0; padding: 22px 12px; min-width: 0; overflow-wrap: anywhere; }
+.icm-two .drop.has { border-style: solid; border-color: var(--accent); }
+.icm-two .drop img { display: block; max-width: 100%; max-height: 120px; margin: 8px auto 0; border-radius: 6px; }
+.icm-views { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 4px 0 12px; }
+.icm-views .seg { flex-wrap: wrap; }
+.icm-stage { border: 1px solid var(--line); border-radius: 12px; overflow: hidden; line-height: 0; text-align: center;
+  background-color: #fff; background-image: linear-gradient(45deg, #e3e6ea 25%, transparent 25%, transparent 75%, #e3e6ea 75%), linear-gradient(45deg, #e3e6ea 25%, transparent 25%, transparent 75%, #e3e6ea 75%); background-size: 18px 18px; background-position: 0 0, 9px 9px; }
+.icm-stage canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.icm-stage canvas.slide { cursor: ew-resize; touch-action: pan-y; }
+.icm-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.icm-pair figure { margin: 0; min-width: 0; }
+.icm-pair figcaption { font-size: 13px; color: var(--muted); text-align: center; margin-top: 4px; }
+.icm-sub { font-size: 14px; color: var(--muted); margin: 8px 0 0; }
+</style>
+<div class="icm-two">
+  <div class="drop" id="dropA" tabindex="0" role="button"><b>Image A (original)</b><span id="nameA">Click or drop a picture</span></div>
+  <div class="drop" id="dropB" tabindex="0" role="button"><b>Image B (changed)</b><span id="nameB">Click or drop a picture</span></div>
+</div>
+<input type="file" id="fileA" accept="image/*" hidden data-nomemo>
+<input type="file" id="fileB" accept="image/*" hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 16px"><button class="btn ghost" id="swap" type="button" disabled>Swap A and B</button><button class="btn ghost" id="sample" type="button">Try with two sample pictures</button></div>
+<div class="fields">
+  <div><label for="thr">Ignore small differences: <span id="thrV">10</span>%</label><input type="range" id="thr" min="0" max="80" value="10"></div>
+  <div><label for="hl">Highlight colour</label><select id="hl"><option value="#ff1f3d">Red</option><option value="#ff00e6">Magenta</option><option value="#00c853">Green</option><option value="#ffd600">Yellow</option><option value="#2979ff">Blue</option></select></div>
+  <div><label for="fit">If the sizes differ</label><select id="fit"><option value="scale">Stretch B to the size of A</option><option value="corner">Line up the top-left corners</option></select></div>
+</div>
+<div id="work" hidden>
+  <div class="stats" style="margin:0 0 14px">
+    <div class="stat"><span>Different</span><b id="sPct">–</b></div>
+    <div class="stat"><span>Changed pixels</span><b id="sPx">–</b></div>
+    <div class="stat"><span>Compared at</span><b id="sSize">–</b></div>
+  </div>
+  <div class="icm-views"><div class="seg" role="group" aria-label="View">
+    <button type="button" data-v="diff" aria-pressed="true">Highlight</button>
+    <button type="button" data-v="slide" aria-pressed="false">Slider</button>
+    <button type="button" data-v="pair" aria-pressed="false">Side by side</button>
+    <button type="button" data-v="raw" aria-pressed="false">Difference only</button>
+  </div></div>
+  <div class="icm-stage" id="stage"><canvas id="cv" aria-label="Comparison of image A and image B"></canvas></div>
+  <div class="icm-pair" id="pair" hidden><figure><div class="icm-stage"><canvas id="cvA"></canvas></div><figcaption>A</figcaption></figure><figure><div class="icm-stage"><canvas id="cvB"></canvas></div><figcaption>B</figcaption></figure></div>
+  <p class="icm-sub" id="hint">Changed pixels are coloured; everything else is shown faded.</p>
+  <div class="btns"><button type="button" class="btn" id="save">Download this view (PNG)</button></div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  'use strict';
+  var MAX_AREA = 16000000, MAX_SIDE = 8000;
+  var imgs = { A: null, B: null }, names = { A: '', B: '' }, view = 'diff', split = 0.5, res = null, jobs = { A: 0, B: 0 };
+  var cv = $('cv'), ctx = cv.getContext('2d');
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
+  function canvas(w, h) { var c = document.createElement('canvas'); c.width = w; c.height = h; return c; }
+
+  function setup(k) {
+    var drop = $('drop' + k), input = $('file' + k);
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; if (f) take(k, f); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) {
+      var fs = e.dataTransfer.files;
+      if (fs.length > 1) { take('A', fs[0]); take('B', fs[1]); } else if (fs[0]) take(k, fs[0]);
+    });
+  }
+  function showSlot(k) {
+    var d = $('drop' + k), n = $('name' + k), old = d.querySelector('img'); if (old) old.remove();
+    d.classList.toggle('has', !!imgs[k]);
+    if (!imgs[k]) { n.textContent = 'Click or drop a picture'; return; }
+    n.textContent = names[k] + ' · ' + imgs[k].width + ' × ' + imgs[k].height + ' px';
+    var t = new Image(); t.alt = ''; t.src = imgs[k].thumb; d.appendChild(t);
+  }
+  function take(k, f) {
+    var mine = ++jobs[k];
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { say('bad', 'This is a HEIC photo, which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool.'); return; }
+    if (!/^image\//.test(f.type)) { say('bad', '"' + f.name + '" is not a picture. Please choose JPG, PNG, WebP, GIF or BMP files.'); return; }
+    say('', 'Opening ' + f.name + '…');
+    loadImage(f, function (im) {
+      if (mine !== jobs[k]) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open.'); return; }
+      var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, Math.sqrt(MAX_AREA / (w * h)), MAX_SIDE / Math.max(w, h));
+      var c = canvas(Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s)));
+      c.getContext('2d', { willReadFrequently: true }).drawImage(im, 0, 0, c.width, c.height);
+      var ts = Math.min(1, 240 / Math.max(c.width, c.height)), t = canvas(Math.max(1, Math.round(c.width * ts)), Math.max(1, Math.round(c.height * ts)));
+      t.getContext('2d').drawImage(c, 0, 0, t.width, t.height);
+      c.thumb = t.toDataURL('image/png'); c.scaled = s < 1; c.ow = w; c.oh = h;
+      imgs[k] = c; names[k] = f.name; showSlot(k); say('', '');
+      $('swap').disabled = !(imgs.A && imgs.B);
+      compare();
+    });
+  }
+  setup('A'); setup('B');
+
+  function compare() {
+    if (!imgs.A || !imgs.B) { $('work').hidden = true; if (imgs.A || imgs.B) say('', 'Now add image ' + (imgs.A ? 'B' : 'A') + '.'); return; }
+    var A = imgs.A, B = imgs.B, w = A.width, h = A.height, same = A.width === B.width && A.height === B.height;
+    var bb = canvas(w, h), bx = bb.getContext('2d', { willReadFrequently: true });
+    if (same || $('fit').value === 'scale') bx.drawImage(B, 0, 0, w, h); else bx.drawImage(B, 0, 0);
+    var da = A.getContext('2d', { willReadFrequently: true }).getImageData(0, 0, w, h), db = bx.getImageData(0, 0, w, h);
+    var a = da.data, b = db.data, n = w * h, thr = +$('thr').value / 100 * 255, mask = new Uint8Array(n), cnt = 0, mag = new Uint8ClampedArray(n);
+    var outside = !same && $('fit').value === 'corner' ? [B.width, B.height] : null;
+    for (var i = 0, p = 0; i < n; i++, p += 4) {
+      var dr = Math.abs(a[p] - b[p]), dg = Math.abs(a[p + 1] - b[p + 1]), dbl = Math.abs(a[p + 2] - b[p + 2]), dal = Math.abs(a[p + 3] - b[p + 3]);
+      var m = Math.max(dr, dg, dbl, dal);
+      if (outside && ((i % w) >= outside[0] || ((i / w) | 0) >= outside[1])) m = 255; // B does not cover this area
+      mag[i] = m;
+      if (m > thr) { mask[i] = 1; cnt++; }
+    }
+    res = { w: w, h: h, a: da, b: db, mask: mask, mag: mag, cnt: cnt, bc: bb };
+    var pct = cnt / n * 100;
+    $('sPct').textContent = (pct === 0 ? '0' : pct < 0.01 ? '< 0.01' : pct >= 99.995 && cnt < n ? '99.99' : pct.toFixed(2)) + '%';
+    $('sPx').textContent = fmtNum(cnt); $('sSize').textContent = w + ' × ' + h;
+    var notes = [];
+    if (!same) notes.push('The images are different sizes (' + A.ow + ' × ' + A.oh + ' and ' + B.ow + ' × ' + B.oh + ' px), so B was ' + ($('fit').value === 'scale' ? 'stretched to the size of A' : 'lined up at the top-left corner') + '.');
+    if (A.scaled || B.scaled) notes.push('A very large picture was scaled down to compare it.');
+    notes.unshift(cnt === 0 ? 'No differences found' + (thr > 0 ? ' above the ' + $('thr').value + '% threshold.' : '. The images are identical.') : 'Found ' + fmtNum(cnt) + ' changed pixels.');
+    say(cnt === 0 ? 'ok' : '', notes.join(' '));
+    $('work').hidden = false; draw();
+  }
+  function hexRgb(hx) { var n = parseInt(hx.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  function diffCanvas(raw) {
+    var w = res.w, h = res.h, c = canvas(w, h), x = c.getContext('2d'), o = x.createImageData(w, h), d = o.data, a = res.a.data, hl = hexRgb($('hl').value);
+    for (var i = 0, p = 0; i < w * h; i++, p += 4) {
+      if (raw) { var m = res.mag[i]; d[p] = d[p + 1] = d[p + 2] = res.mask[i] ? 255 - m : 255; if (res.mask[i]) { d[p] = 255 - m * (1 - hl[0] / 255); d[p + 1] = 255 - m * (1 - hl[1] / 255); d[p + 2] = 255 - m * (1 - hl[2] / 255); } d[p + 3] = 255; continue; }
+      if (res.mask[i]) { d[p] = hl[0]; d[p + 1] = hl[1]; d[p + 2] = hl[2]; d[p + 3] = 255; }
+      else { var g = 0.299 * a[p] + 0.587 * a[p + 1] + 0.114 * a[p + 2], al = a[p + 3] / 255; g = g * al + 255 * (1 - al); g = 255 - (255 - g) * 0.3; d[p] = d[p + 1] = d[p + 2] = g; d[p + 3] = 255; }
+    }
+    x.putImageData(o, 0, 0);
+    return c;
+  }
+  var raf = 0;
+  function draw() {
+    if (!res) return;
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(function () {
+      raf = 0;
+      var w = res.w, h = res.h;
+      $('stage').hidden = view === 'pair'; $('pair').hidden = view !== 'pair';
+      cv.classList.toggle('slide', view === 'slide');
+      $('hint').textContent = { diff: 'Changed pixels are coloured; everything else is shown faded.', slide: 'Drag across the picture to wipe between A (left) and B (right).', pair: 'A on the left, B on the right.', raw: 'White means identical. The stronger the colour, the bigger the change.' }[view];
+      if (view === 'pair') {
+        [['cvA', imgs.A], ['cvB', res.bc]].forEach(function (q) { var c = $(q[0]); c.width = w; c.height = h; c.style.width = '100%'; c.getContext('2d').drawImage(q[1], 0, 0); });
+        return;
+      }
+      cv.width = w; cv.height = h;
+      if (view === 'diff' || view === 'raw') { ctx.drawImage(diffCanvas(view === 'raw'), 0, 0); return; }
+      var sx = Math.round(split * w);
+      ctx.clearRect(0, 0, w, h); ctx.drawImage(res.bc, 0, 0);
+      ctx.save(); ctx.beginPath(); ctx.rect(0, 0, sx, h); ctx.clip(); ctx.clearRect(0, 0, sx, h); ctx.drawImage(imgs.A, 0, 0); ctx.restore();
+      var lw = Math.max(2, Math.round(w / 300)); ctx.fillStyle = '#fff'; ctx.fillRect(sx - lw / 2, 0, lw, h);
+      var r = Math.max(10, Math.round(Math.min(w, h) / 25)); ctx.beginPath(); ctx.arc(sx, h / 2, r, 0, 7); ctx.fill();
+      ctx.fillStyle = '#111'; ctx.font = '700 ' + Math.round(r * 0.9) + 'px system-ui,sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText('↔', sx, h / 2);
+    });
+  }
+  function slideTo(e) { var b = cv.getBoundingClientRect(); split = Math.max(0, Math.min(1, (e.clientX - b.left) / b.width)); draw(); }
+  var drag = false;
+  cv.addEventListener('pointerdown', function (e) { if (view !== 'slide') return; drag = true; try { cv.setPointerCapture(e.pointerId); } catch (er) {} slideTo(e); });
+  cv.addEventListener('pointermove', function (e) { if (drag) slideTo(e); });
+  cv.addEventListener('pointerup', function () { drag = false; }); cv.addEventListener('pointercancel', function () { drag = false; });
+  Array.prototype.forEach.call(document.querySelectorAll('[data-v]'), function (b) {
+    b.addEventListener('click', function () {
+      view = b.getAttribute('data-v');
+      Array.prototype.forEach.call(document.querySelectorAll('[data-v]'), function (o) { o.setAttribute('aria-pressed', String(o === b)); });
+      draw();
+    });
+  });
+  $('thr').addEventListener('input', function () { $('thrV').textContent = $('thr').value; compare(); });
+  $('hl').addEventListener('change', draw);
+  $('fit').addEventListener('change', compare);
+  $('swap').addEventListener('click', function () {
+    var t = imgs.A; imgs.A = imgs.B; imgs.B = t; t = names.A; names.A = names.B; names.B = t; showSlot('A'); showSlot('B'); compare();
+  });
+  $('sample').addEventListener('click', function () {
+    function scene(changed) {
+      var c = canvas(480, 320), x = c.getContext('2d');
+      x.fillStyle = '#eef3f8'; x.fillRect(0, 0, 480, 320); x.fillStyle = '#2b6cb0'; x.fillRect(30, 30, 180, 120);
+      x.fillStyle = '#f6ad55'; x.beginPath(); x.arc(340, 100, 60, 0, 7); x.fill();
+      x.fillStyle = '#2d3748'; x.font = '700 34px system-ui,sans-serif'; x.fillText(changed ? 'Price: 19.99' : 'Price: 18.99', 40, 230);
+      x.fillStyle = changed ? '#38a169' : '#e53e3e'; x.fillRect(320, 200, 120, 80);
+      if (changed) { x.fillStyle = '#805ad5'; x.beginPath(); x.moveTo(60, 290); x.lineTo(100, 250); x.lineTo(140, 290); x.fill(); }
+      return c;
+    }
+    ['A', 'B'].forEach(function (k, i) { scene(i === 1).toBlob(function (b) { take(k, new File([b], 'sample-' + k.toLowerCase() + '.png', { type: 'image/png' })); }); });
+  });
+  $('save').addEventListener('click', function () {
+    if (!res) return;
+    var c = view === 'pair' ? (function () { var w = res.w, h = res.h, g = Math.max(8, Math.round(w / 50)), o = canvas(w * 2 + g, h), x = o.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, o.width, h); x.drawImage(imgs.A, 0, 0); x.drawImage(res.bc, w + g, 0); return o; })() : cv;
+    c.toBlob(function (b) {
+      if (!b) { say('bad', 'Your browser could not save the picture.'); return; }
+      var a = document.createElement('a'), u = URL.createObjectURL(b);
+      a.href = u; a.download = (names.A.replace(/\.[^.]+$/, '') || 'image') + '-compare-' + view + '.png'; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+      say('ok', 'Saved ' + a.download + ' (' + fmtBytes(b.size) + ').');
+    }, 'image/png');
+  });
+})();
+</script>

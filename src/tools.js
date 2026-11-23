@@ -3873,5 +3873,151 @@ module.exports = [
         ['Does the slider work on phones?', 'Yes. It works with a finger, a mouse and the keyboard arrow keys.']
       ],
       icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 2v20"/><path d="M9 10l-2 2 2 2M15 10l2 2-2 2"/>'
+  },
+  {
+      slug: 'sticker-maker', cat: 'Image tools', name: 'Sticker Maker',
+      title: 'Sticker Maker - Photo to WhatsApp & Telegram Stickers, Free',
+      desc: 'Turn photos into 512 × 512 stickers: the subject is cut out, given a white outline, shadow and text. WebP under 100 KB for WhatsApp, PNG for Telegram. Private.',
+      card: 'Turn photos into chat stickers with an outline.',
+      intro: 'Make your own chat stickers from photos of friends, pets or anything else. An AI cut-out removes the background on your device, then adds a white sticker outline, a soft shadow and optional text. Stickers are saved at 512 × 512 pixels, as WebP files under 100 KB for WhatsApp or as PNG for Telegram, one at a time or all together in a ZIP.',
+      steps: ['Drop one photo or up to 30. The subject of each one is cut out automatically.', 'Choose the outline width and colour, the shadow and the edge softness.', 'Tap a sticker to add text such as "LOL" or "Thank you!", in a font and colour you like.', 'Pick WhatsApp or Telegram and download the selected sticker or all of them as a ZIP.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. The cut-out AI is downloaded to your browser once and runs on your device. Your photos never leave it.'],
+        ['How do I add the stickers to WhatsApp?', 'WhatsApp only takes stickers through a sticker-pack app or its built-in sticker creator. Save the WebP files to your phone, then import them with a sticker-pack app of your choice (most need at least 3 stickers and a 96 × 96 tray icon, which this tool also makes).'],
+        ['How do I add them to Telegram?', 'Send the PNG or WebP files to Telegram\'s official sticker bot (@Stickers) and follow its steps to create a new pack.'],
+        ['Why is my sticker not under 100 KB?', 'The tool lowers the WebP quality until the file fits. Very detailed photos may still be larger; the message tells you, and a smaller outline or simpler photo helps.'],
+        ['Why did I get a PNG instead of WebP?', 'Safari on iPhone and Mac cannot create WebP files. Open the page in Chrome, Edge or Firefox to make WebP stickers.'],
+        ['Can I use a logo or drawing?', 'Yes. Choose "Whole picture" to skip the AI cut-out. See-through PNGs keep their shape and still get the outline.']
+      ],
+      icon: '<path d="M20 12V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h6z"/><path d="M12 20a8 8 0 0 0 8-8h-5a3 3 0 0 0-3 3z"/><circle cx="9" cy="10" r="1"/><path d="M8 14.5c1 .8 2 .8 3 .3"/>'
+  },
+  {
+      slug: 'text-behind-image', cat: 'Image tools', name: 'Text Behind Image',
+      title: 'Text Behind Image - Put Text Behind a Person or Object, Free',
+      desc: 'Place big text behind the main subject of a photo, the popular poster look. AI cut-out on your device, fonts, colour, rotation, shadow. Save PNG or JPG.',
+      card: 'Place text behind the person in a photo.',
+      intro: 'Create the eye-catching "text behind the subject" effect used on posters, thumbnails and social posts. The tool finds the main subject of your photo with an on-device AI, puts your text on the background and lays the cut-out subject back on top, so the words look like they sit behind the person or object. Pick a font, size, colour, rotation and shadow, drag the text into place and save at full resolution.',
+      steps: ['Drop a photo with a clear main subject, such as a person, pet, car or building.', 'Type your text and choose the font, size, colour, opacity and letter spacing.', 'Drag the text on the picture, or use the position and rotation sliders. Add a shadow or outline if you like.', 'Download a full-size PNG or JPG.'],
+      faq: [
+        ['Is my photo uploaded?', 'No. The AI model is downloaded to your browser once and the whole effect is made on your device.'],
+        ['Why is part of the text hidden?', 'That is the effect: the subject covers the text where they overlap. Move the text up or make it bigger so enough of it shows above or around the subject.'],
+        ['The subject was not found properly. What can I do?', 'Switch to Best quality, which handles busy backgrounds, hair and thin parts much better. Photos with one clear subject against a simple background work best.'],
+        ['What size is the saved picture?', 'The same size as your photo, up to 16 megapixels. Bigger photos are scaled down to that size so they work on phones.'],
+        ['Can I use my own fonts?', 'The tool includes seven fonts, from bold poster letters to elegant script, that work in every browser without installing anything.']
+      ],
+      icon: '<path d="M3 6V4h11v2M8.5 4v12"/><circle cx="16" cy="12" r="3"/><path d="M11 21c.6-3 2.6-5 5-5s4.4 2 5 5"/>'
+  },
+  {
+      slug: 'device-mockup', cat: 'Image tools', name: 'Device Mockup Generator',
+      title: 'Device Mockup Generator - Screenshot in Phone or Laptop Frame',
+      desc: 'Put a screenshot inside a phone, tablet, laptop, monitor, watch or browser frame. Gradient background, shadow and angle. Download PNG. Free and private.',
+      card: 'Show screenshots inside phone and laptop frames.',
+      intro: 'Present your app, website or design inside a clean, generic device frame. Drop a screenshot and choose a phone, tablet, laptop, desktop monitor, smartwatch or browser window, then pick a device colour, background, shadow and angle. The frames are simple, brand-free drawings, so the mockups suit any portfolio, store listing, slide or social post.',
+      steps: ['Drop, paste or pick a screenshot. A matching device is chosen for you.', 'Choose the device, orientation, colour and how the screenshot fits the screen.', 'Set the background colour or gradient, the angle, the shadow and the space around.', 'Pick the picture shape and width, then download PNG or JPG.'],
+      faq: [
+        ['Is my screenshot uploaded?', 'No. The mockup is drawn in your browser and your screenshot never leaves your device.'],
+        ['Do the frames show any brand?', 'No. All devices are simple generic drawings made by this tool, without logos or trademarked designs, so you can use them freely.'],
+        ['My screenshot is cut off. Why?', 'Phones, tablets and laptops have a fixed screen shape, so the screenshot fills it and the extra part is cut. Choose "Show the whole screenshot" to see all of it with bars, or use the Browser frame, which adapts to any shape.'],
+        ['Can I get a see-through background?', 'Yes. Set Background to Transparent and download PNG.'],
+        ['What size is the picture?', 'Choose 1080, 1600, 2400 or 3600 pixels wide, with a shape that fits the device or square, 4:5, 16:9 or 9:16 for social media.']
+      ],
+      icon: '<rect x="2" y="4" width="14" height="10" rx="1.5"/><path d="M1 17h16"/><rect x="17" y="8" width="5" height="11" rx="1.2"/>'
+  },
+  {
+      slug: 'pixel-art-maker', cat: 'Image tools', name: 'Pixel Art Maker',
+      title: 'Pixel Art Maker - Draw Pixel Art and Animated GIFs Online',
+      desc: 'Draw pixel art on an 8 to 128 pixel grid with palettes, fill and mirror. Turn a photo into pixels, animate frames and export PNG or GIF. Free, no sign-up.',
+      card: 'Draw pixel art and sprites, export PNG or GIF.',
+      intro: 'Draw retro pixel art, game sprites, icons and emoji right in your browser. Pick a grid from 8 × 8 to 128 × 128, choose colours from ready-made palettes, and use the pencil, eraser, fill bucket, colour picker and mirror drawing. Turn any photo into pixel art, add animation frames, and export a crisp PNG at up to 32× size or an animated GIF. Your drawing is kept in your browser between visits.',
+      steps: ['Choose the grid width and height and a colour palette.', 'Draw with the pencil, fill areas, and turn on mirror drawing for symmetric sprites. Undo and redo any step.', 'Optionally import a picture to pixelate it, or add frames for an animation.', 'Pick the export size and download a PNG, a sprite sheet or an animated GIF.'],
+      faq: [
+        ['Will I lose my drawing if I close the page?', 'No. It is saved in this browser automatically and comes back when you return. It is not uploaded anywhere, so it stays on this device only.'],
+        ['How do I make an animated GIF?', 'Press New frame or Duplicate to add frames, draw each step, set the speed, then press Download GIF. Turn on "Show previous frame faintly" to line things up.'],
+        ['Why does the PNG look blurry somewhere else?', 'Some apps smooth small images when they enlarge them. Export at 16× or 32× so the pixels stay sharp everywhere.'],
+        ['Are see-through pixels supported?', 'Yes. Erased pixels are transparent in both PNG and GIF.'],
+        ['Can I turn a photo into pixel art?', 'Yes. Press Import picture. The photo is shrunk to your grid; tick "use only the colours in the palette" for a retro look.']
+      ],
+      icon: '<path d="M4 4h4v4H4zM8 8h4v4H8zM12 4h4v4h-4zM16 8h4v4h-4zM4 16h4v4H4zM12 12h4v4h-4zM16 16h4v4h-4z"/>'
+  },
+  {
+      slug: 'image-to-ascii', cat: 'Image tools', name: 'Image to ASCII Art',
+      title: 'Image to ASCII Art Converter - Text Art from Photos, Free',
+      desc: 'Turn any picture into ASCII text art. Choose the width, character set, invert and colour HTML output. Copy the text or download TXT, PNG or HTML. Private.',
+      card: 'Turn pictures into ASCII text art.',
+      intro: 'Convert photos, logos and drawings into ASCII art made of letters and symbols. Choose how many characters wide it should be, pick a character set from simple to detailed, adjust brightness and contrast, and invert it for dark backgrounds. Copy the result into a chat, code comment or README, or download it as plain text, a PNG picture or a coloured HTML page.',
+      steps: ['Drop, paste or pick a picture, or try the sample.', 'Set the width in characters and choose a character set.', 'Adjust brightness and contrast, and tick Invert for light text on a dark background.', 'Copy the text, or download it as TXT, PNG or colour HTML.'],
+      faq: [
+        ['Why does my ASCII art look squashed when I paste it?', 'ASCII art needs a monospaced font, where every character is the same width. Paste it into a code block, a text editor or a chat that supports monospace.'],
+        ['What width should I use?', 'About 60 to 80 characters fits chats and code comments. 120 to 200 shows much more detail for PNG or HTML.'],
+        ['What does Invert do?', 'Normally dark parts of the picture use dense characters, which suits dark text on a light page. Invert swaps this for light text on a dark background, such as a terminal.'],
+        ['Is my picture uploaded?', 'No. The conversion happens entirely in your browser.'],
+        ['Can I get colours?', 'Yes. Choose Output: Colour (HTML). Each character keeps the colour of that part of the picture, and you can download it as an HTML page or a PNG.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h2M11 8h6M7 12h6M15 12h2M7 16h3M12 16h5"/>'
+  },
+  {
+      slug: 'image-compare', cat: 'Image tools', name: 'Image Compare',
+      title: 'Image Compare - Find Differences Between Two Images Online',
+      desc: 'Compare two images and see every difference highlighted, with a slider, side by side view and percentage of changed pixels. Ignore small changes. Private.',
+      card: 'Spot the differences between two images.',
+      intro: 'Find exactly what changed between two versions of a picture, design or screenshot. The tool compares the images pixel by pixel, colours every changed pixel, and tells you what percentage of the picture is different. Switch between a highlight view, a wipe slider, side by side and a difference map, and use the threshold to ignore tiny changes such as compression noise.',
+      steps: ['Drop the original picture on A and the changed one on B (or both at once).', 'Read the percentage and number of changed pixels.', 'Use the threshold to ignore small differences, and pick a highlight colour.', 'Switch views to inspect the changes, then download the view you need.'],
+      faq: [
+        ['Are my images uploaded?', 'No. Both images are compared in your browser and never leave your device.'],
+        ['What does "Ignore small differences" mean?', 'A pixel only counts as changed if a colour channel differs by more than this percentage. 0% counts every tiny change; around 10% hides JPG compression noise; higher values show only big changes.'],
+        ['Can I compare images of different sizes?', 'Yes. Image B can be stretched to the size of A, or lined up at the top-left corner. Areas that B does not cover count as different.'],
+        ['Is this good for visual testing of websites?', 'Yes. Compare screenshots before and after a change to catch unexpected layout or colour changes.'],
+        ['How big can the images be?', 'Up to about 16 megapixels each. Larger images are scaled down before comparing.']
+      ],
+      icon: '<rect x="2" y="5" width="9" height="14" rx="1.5"/><rect x="13" y="5" width="9" height="14" rx="1.5"/><path d="M16 10l3 3M19 10l-3 3"/>'
+  },
+  {
+      slug: 'image-border', cat: 'Image tools', name: 'Add Border to Image',
+      title: 'Add Border to Image - Frames, Polaroid & Instagram Square Fit',
+      desc: 'Add a border, frame or padding to photos: colours, gradients, rounded corners, shadow, instant-photo style with caption, or fit square for Instagram. Batch.',
+      card: 'Add borders, frames and padding to photos.',
+      intro: 'Give your photos a clean border or a frame in seconds. Choose a quick style such as a simple white border, a thin black frame, an instant-photo (Polaroid-style) card with a handwritten caption, a gallery mat, or fit a photo into a square for Instagram without cropping. Fine-tune the border width, colour or gradient, rounded corners, shadow and canvas shape, and process many photos at once.',
+      steps: ['Drop one photo or many. The same border is used for all of them.', 'Pick a quick style, or set the border width, fill, frame line, corners and shadow yourself.', 'Choose a canvas shape such as square 1:1 or 4:5 for Instagram, and add a caption if you like.', 'Download the photo, or all photos together in a ZIP.'],
+      faq: [
+        ['Is anything uploaded?', 'No. The borders are added in your browser, so your photos stay on your device.'],
+        ['How do I post a whole photo on Instagram without cropping?', 'Choose the "Fit square for Instagram" style (or Canvas shape: Square or Portrait 4:5). Padding is added around the photo so nothing is cut off, and it is saved 1080 pixels wide.'],
+        ['Why are my rounded corners white?', 'JPG cannot store see-through areas. Choose PNG to keep the corners transparent.'],
+        ['How is the border width measured?', 'As a percentage of the shorter side of the photo, so the border looks the same on big and small photos.'],
+        ['Can I add a border to many photos at once?', 'Yes. Drop up to 100 photos and use Download all (ZIP).']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1"/><rect x="7" y="7" width="10" height="10"/>'
+  },
+  {
+      slug: 'photo-filters', cat: 'Image tools', name: 'Photo Filters',
+      title: 'Photo Filters Online - Vintage, Sepia, B&W, Duotone & More',
+      desc: 'Apply photo filters online: black and white, sepia, vintage, warm, cool, invert, duotone and more, with intensity, brightness and contrast. Batch, private.',
+      card: 'Apply vintage, B&W, sepia and other filters.',
+      intro: 'Give your photos a new mood with one tap. Choose from 13 filters, including black and white, sepia, vintage, warm, cool, faded, vivid, noir, dramatic, invert and duotone in your own colours, and set how strong each one is. Fine-tune brightness, contrast and saturation, press and hold to compare with the original, and apply the same look to many photos at once.',
+      steps: ['Drop one or more photos, or try the sample.', 'Tap a filter. Each button shows a small preview of your photo.', 'Set the intensity and adjust brightness, contrast and saturation. Press and hold the picture to see the original.', 'Choose JPG, PNG or WebP and download the photo, or all photos as a ZIP.'],
+      faq: [
+        ['Are my photos uploaded?', 'No. Filters are applied in your browser and your photos stay on your device.'],
+        ['What does intensity do?', 'It blends the filter with your original photo. 100% is the full effect, 50% is half way, 0% is the original.'],
+        ['How do I make a duotone?', 'Choose Duotone, then pick a colour for the shadows and one for the highlights. Dark parts take the first colour and light parts the second.'],
+        ['Does it keep the full resolution?', 'Yes, up to 24 megapixels. Bigger photos are scaled down so they work on phones.'],
+        ['Can I apply one filter to many photos?', 'Yes. Drop up to 100 photos; the chosen filter and settings are used for all of them in Download all (ZIP).']
+      ],
+      icon: '<circle cx="9" cy="9" r="6"/><circle cx="15" cy="9" r="6"/><circle cx="12" cy="15" r="6"/>'
+  },
+  {
+      slug: 'color-contrast-checker', cat: 'Developer tools', name: 'Colour Contrast Checker',
+      title: 'Color Contrast Checker - WCAG 2.2 AA & AAA Contrast Ratio',
+      desc: 'Check the contrast ratio of text and background colours against WCAG 2.2 AA and AAA, with a live preview, nearest passing colour and colour-blind view.',
+      card: 'Check text colour contrast for WCAG AA/AAA.',
+      intro: 'Make sure your text is easy to read for everyone. Enter a text colour and a background colour as hex, rgb(), hsl() or a colour name, and see the WCAG 2.2 contrast ratio with pass or fail for AA and AAA, for normal text, large text and icons. A live preview shows real text sizes, the tool suggests the nearest lighter or darker colour that passes, and a colour-blindness preview shows how the pair looks to people with red, green or blue colour blindness.',
+      steps: ['Pick or type the text colour and the background colour.', 'Read the contrast ratio and the pass or fail results for AA and AAA.', 'Choose a target level and press Use on a suggested colour to fix a failing pair.', 'Check the colour-blind previews, then copy the CSS.'],
+      faq: [
+        ['What contrast ratio do I need?', 'WCAG AA needs at least 4.5:1 for normal text and 3:1 for large text and for icons, borders and form controls. AAA needs 7:1 for normal text and 4.5:1 for large text.'],
+        ['What counts as large text?', 'At least 24 px (18 pt) regular, or at least 18.67 px (14 pt) bold.'],
+        ['How is the ratio calculated?', 'With the WCAG formula (L1 + 0.05) / (L2 + 0.05), where L1 and L2 are the relative luminance of the lighter and darker colour. For example #777777 on white is 4.48:1, just below AA.'],
+        ['Why does 4.499 not round up to pass?', 'WCAG does not allow rounding up. The tool shows two decimals but never shows a value that crosses a pass mark when the real ratio is below it.'],
+        ['Does it handle see-through colours?', 'Yes. A text colour with transparency (for example #ff000080) is blended with the background first, which is what people actually see.'],
+        ['How do the suggestions work?', 'The tool keeps the hue and saturation and finds the closest lighter or darker shade of the text or background colour that reaches your chosen level.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor"/>'
   }
 ];
