@@ -220,5 +220,21 @@ module.exports = {
 "face-blur":["yüz bulanıklaştırma","yuz bulaniklastir"],
 "photo-colorizer":["siyah beyaz fotoğrafı renklendirme"],
 "color-blindness-simulator":["renk körlüğü simülatörü"],
-"before-after-slider":["öncesi sonrası","fotograf karsilastirma"]
+"before-after-slider":["öncesi sonrası","fotograf karsilastirma"],
+"retirement-calculator":["emeklilik hesaplama"],
+"net-worth-calculator":["net varlık hesaplama"],
+"debt-payoff-calculator":["borç ödeme planı"],
+"rent-vs-buy-calculator":["kira mı ev almak mı"],
+"overtime-calculator":["fazla mesai hesaplama"],
+"hourly-salary-converter":["saatlik ücret yıllık maaş"],
+"macro-calculator":["makro hesaplama"],
+"running-pace-calculator":["koşu temposu hesaplama"],
+"one-rep-max-calculator":["1rm hesaplama"],
+"heart-rate-zones-calculator":["nabız bölgeleri"],
+"period-ovulation-calculator":["regl hesaplama","yumurtlama hesaplama"],
+"paint-calculator":["boya hesaplama"],
+"tile-calculator":["fayans hesaplama"],
+"pet-age-calculator":["köpek yaşı hesaplama"],
+"zodiac-sign-calculator":["burç hesaplama","burcum ne"],
+"cooking-converter":["su bardağı gram"]
 };

@@ -4627,5 +4627,181 @@ module.exports = [
     ]
   ],
       icon: '<path d="M4 11h16l-1.5 8a2 2 0 0 1-2 1.7h-9A2 2 0 0 1 5.5 19z"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 4V2"/>'
+  },
+  {
+      slug: 'redact-pdf', cat: 'PDF tools', name: 'Redact PDF',
+      title: 'Redact PDF - Black Out Text & Remove It for Good, Free',
+      desc: 'Black out names, numbers, emails and any area of a PDF. The hidden text is truly removed, not just covered. Free, private, works in your browser.',
+      card: 'Black out private text so it is really gone.',
+      intro: 'Hide private details in a PDF for good. Search for words or draw boxes, and the text and pictures under them are permanently removed, not just covered with a black shape.',
+      steps: ['Open your PDF.', 'Type the words to hide and press Find and mark, or drag boxes over any area on the page.', 'Check every page, then press Redact PDF.', 'Download the redacted copy and share that one.'],
+      faq: [
+        ['Is the hidden text really gone?', 'Yes. Every page with a mark is rebuilt as a picture with the boxes burned in, so the words under a box no longer exist in the file. The tool then searches the new file to check that none of the words you searched for are left.'],
+        ['Can people still search and copy the rest of the page?', 'Yes, if "Keep the rest of the text searchable" is ticked. An invisible copy of the text that is not under a box is added, so search and copy still work for everything except the redacted words.'],
+        ['Does it work on scanned PDFs?', 'Drawing boxes works on any page. Word search needs real text, so for scans drag boxes over the details instead.'],
+        ['Are my files uploaded?', 'No. The PDF is opened and redacted inside your browser, and it never leaves your device.'],
+        ['Does it remove hidden details too?', 'By default the title, author and other document details are removed as well. Pages without marks are copied unchanged.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><rect x="8" y="11" width="8" height="3" fill="currentColor"/><path d="M8 17h5"/>'
+  },
+  {
+      slug: 'fill-pdf-form', cat: 'PDF tools', name: 'Fill PDF Form',
+      title: 'Fill PDF Form Online - Type in Any PDF, Free & Private',
+      desc: 'Fill in PDF forms in your browser: text boxes, tick boxes, choices and lists. No form fields? Type, tick or date anywhere on the page. Optional flatten.',
+      card: 'Fill in PDF forms or type anywhere on a PDF.',
+      intro: 'Fill in a PDF form without printing it. The tool finds every fillable field, or lets you type, tick and add the date anywhere on PDFs that have no fields.',
+      steps: ['Open the PDF form.', 'Fill in the fields in the list, or tap a blue box on the page to jump to it.', 'Use + Text, + ✓ or + Date to write anywhere else on the page.', 'Tick Flatten if the answers should not be changed, then save and download.'],
+      faq: [
+        ['What kinds of fields can I fill?', 'Text boxes (one line or many), tick boxes, radio buttons, drop-down lists and option lists. Signature fields are left as they are; use Sign PDF for those.'],
+        ['The PDF has no fillable fields. Can I still fill it?', 'Yes. Press + Text and tap the page where your answer goes, then type. You can also add ticks, crosses and the date, move them with the ⠿ handle and delete them with ✕.'],
+        ['What does Flatten do?', 'It makes your answers part of the page, so they show the same in every PDF reader and can no longer be edited as form fields.'],
+        ['Can I type in Arabic, Hindi or Chinese?', 'Yes. Answers in any language are kept. If the form’s own font cannot show your script, tick Flatten to have the text drawn with a font that can, so it looks right everywhere.'],
+        ['Is my form uploaded?', 'No. The form is filled inside your browser and never leaves your device.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><rect x="8" y="11" width="8" height="3" rx=".5"/><path d="M8 17l1.5 1.5L12 16"/>'
+  },
+  {
+      slug: 'compare-pdf', cat: 'PDF tools', name: 'Compare PDF',
+      title: 'Compare PDF Files - Find Differences in Text & Layout',
+      desc: 'Compare two PDFs page by page: see added and removed words, and an overlay or side-by-side view that highlights what changed. Free and private.',
+      card: 'Spot every change between two PDF versions.',
+      intro: 'Compare two versions of a PDF and see exactly what changed. Words that were removed or added are highlighted on each page, and a visual view shows changes in pictures and layout.',
+      steps: ['Choose the first (older) PDF and the second (newer) PDF.', 'Press Compare PDFs.', 'Click a red page number to see its changes.', 'Switch between Text changes, Overlay and Side by side.'],
+      faq: [
+        ['What counts as a change?', 'Every word that is in one PDF but not in the other, page by page. The Overlay and Side by side views also show changes in pictures, lines and layout that text cannot show.'],
+        ['Can it compare scanned PDFs?', 'Scans have no text, so the word list stays empty, but Overlay and Side by side still compare them as pictures.'],
+        ['What if one PDF has more pages?', 'Extra pages are shown with a dashed border and listed as only in the first or only in the second PDF.'],
+        ['Can I ignore small differences?', 'Yes. Tick Ignore capital letters or Ignore punctuation to hide changes that only affect those.'],
+        ['Are my files uploaded?', 'No. Both PDFs are read and compared inside your browser.']
+      ],
+      icon: '<rect x="3" y="4" width="8" height="16" rx="1.5"/><rect x="13" y="4" width="8" height="16" rx="1.5"/><path d="M6 9h2M6 13h2M16 9h2M16 13h2"/>'
+  },
+  {
+      slug: 'pdf-booklet', cat: 'PDF tools', name: 'PDF Booklet & N-up',
+      title: 'PDF Booklet Maker & N-up - 2, 4, 6, 9 Pages per Sheet',
+      desc: 'Print a PDF as a folded booklet, or put 2, 4, 6, 9 or 16 pages on one sheet. Pick A4 or Letter, right-to-left order, margins and borders. Free.',
+      card: 'Make a folded booklet or print many pages per sheet.',
+      intro: 'Turn any PDF into a booklet you can print double-sided and fold in the middle, or save paper by putting several pages on each sheet.',
+      steps: ['Open your PDF.', 'Choose Booklet, or how many pages go on each sheet side.', 'Pick the sheet size, reading direction and margins.', 'Make the PDF, download it and print it at actual size.'],
+      faq: [
+        ['How do I print the booklet?', 'Print double-sided and choose "flip on short edge", at actual size (100%). Fold the stack in half and staple along the fold.'],
+        ['Why are there blank pages?', 'A booklet needs a multiple of 4 pages, so blank pages are added at the end when needed.'],
+        ['What are sections?', 'Thick booklets fold badly. Splitting into sections of a few sheets lets you fold each one separately and stack them, like a real book.'],
+        ['Does it work for right-to-left books?', 'Yes. Choose Right to left for Arabic, Hebrew, Urdu or Japanese books, and the pages are ordered for binding on the right.'],
+        ['Is my PDF uploaded?', 'No. The new PDF is made in your browser.']
+      ],
+      icon: '<path d="M12 6v14M12 6c-2-1.5-5-2-8-1.5V19c3-.5 6 0 8 1.5M12 6c2-1.5 5-2 8-1.5V19c-3-.5-6 0-8 1.5"/>'
+  },
+  {
+      slug: 'pdf-page-resize', cat: 'PDF tools', name: 'Resize PDF Pages',
+      title: 'Resize PDF Pages - Change to A4, Letter, A3 or Custom Size',
+      desc: 'Change the page size of a PDF to A4, Letter, Legal, A3, A5 or any custom size. Fit, fill or keep the content, add margins. Free, no upload.',
+      card: 'Change PDF pages to A4, Letter or any size.',
+      intro: 'Change the paper size of a PDF, for example from Letter to A4 for printing. Content is scaled to fit, or to fill the page, and stays sharp.',
+      steps: ['Open your PDF.', 'Pick the new paper size and orientation.', 'Choose Fit, Fill or Keep size, and add a margin if you like.', 'Press Resize pages and download the new PDF.'],
+      faq: [
+        ['Does resizing make the PDF blurry?', 'No. The page content is scaled as vector graphics, so text and lines stay sharp at any size.'],
+        ['What is the difference between Fit and Fill?', 'Fit shows the whole page and may leave white edges. Fill covers the whole paper and cuts off what sticks out.'],
+        ['Can I resize only some pages?', 'Yes. Type the pages in "Pages to change", for example 1-3, 7. Other pages stay as they are.'],
+        ['Do links and form fields still work?', 'Yes. Links, comments and form fields are moved and scaled with the page content.'],
+        ['Is my file uploaded?', 'No. The PDF is changed inside your browser.']
+      ],
+      icon: '<rect x="3" y="3" width="13" height="17" rx="1.5"/><path d="M19 8v13H8M14 14l7 7M21 16v5h-5"/>'
+  },
+  {
+      slug: 'text-to-pdf', cat: 'PDF tools', name: 'Text to PDF',
+      title: 'Text to PDF Converter - TXT to PDF in Any Language, Free',
+      desc: 'Turn plain text or a .txt file into a clean PDF. Choose paper, font, size, margins and page numbers. Works with every language, including Arabic and Hindi.',
+      card: 'Turn plain text or .txt files into a neat PDF.',
+      intro: 'Paste text or open a .txt file and get a tidy PDF with the font, size, margins and page numbers you choose. Every language works, including right-to-left scripts.',
+      steps: ['Paste your text, or open a .txt file.', 'Choose the paper, font, size and margins.', 'Pick page numbers and add a title if you like.', 'Press Create PDF and download it.'],
+      faq: [
+        ['Which languages are supported?', 'All of them. Latin, Greek and Cyrillic use the main font; Arabic, Urdu, Persian, Hebrew, Hindi, Bengali, Tamil and Thai get their own fonts; Chinese, Japanese, Korean and emoji are drawn as sharp pictures.'],
+        ['Are long lines wrapped?', 'Yes. Lines are wrapped at word boundaries to fit the page, and very long words are split.'],
+        ['Can I keep columns and code lined up?', 'Choose the Monospace font. Spaces and tabs are kept, so columns stay aligned.'],
+        ['Can I start a new page on purpose?', 'Yes. A form feed character (common in old .txt reports) starts a new page.'],
+        ['Is my text uploaded?', 'No. The PDF is made in your browser.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 12h6M9 15h6M9 18h4"/>'
+  },
+  {
+      slug: 'flatten-pdf', cat: 'PDF tools', name: 'Flatten PDF',
+      title: 'Flatten PDF Online - Lock Form Fields & Comments, Free',
+      desc: 'Flatten a PDF so form answers, comments, highlights and stamps become part of the page and can no longer be edited. Or turn pages into images.',
+      card: 'Lock form answers and comments into the page.',
+      intro: 'Flatten a PDF so filled-in form fields, comments, highlights and stamps become a fixed part of the page. They look the same in every PDF reader and can no longer be changed.',
+      steps: ['Open your PDF.', 'Choose what to flatten: form fields, comments and marks, or both.', 'Or choose to turn every page into an image.', 'Press Flatten PDF and download it.'],
+      faq: [
+        ['What does flattening do?', 'It draws form answers and annotations into the page content and removes the editable fields and comments, so the document looks the same everywhere and cannot be edited as a form.'],
+        ['Will my text stay selectable?', 'Yes, in the recommended mode. Only the "turn every page into an image" mode removes selectable text.'],
+        ['Are links kept?', 'Yes, by default links stay clickable. Untick "Keep links clickable" to remove them too.'],
+        ['Can it flatten locked PDFs?', 'PDFs that open without a password but block editing are unlocked automatically. Files that need a password must be unlocked first.'],
+        ['Is my file uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<path d="M12 3l9 5-9 5-9-5z"/><path d="M3 13l9 5 9-5M3 17.5l9 5 9-5"/>'
+  },
+  {
+      slug: 'pdf-metadata-editor', cat: 'PDF tools', name: 'PDF Metadata Editor',
+      title: 'PDF Metadata Editor - Edit or Remove Title, Author & Dates',
+      desc: 'See and change the hidden details of a PDF: title, author, subject, keywords, app names and dates. Or remove all metadata at once. Free, no upload.',
+      card: 'Edit or remove the hidden details of a PDF.',
+      intro: 'Every PDF stores hidden details such as the title, the author’s name, the app that made it and when it was created. See them, change them, or remove them all before you share the file.',
+      steps: ['Open your PDF.', 'Change the title, author, keywords, dates or other details.', 'Press Save changes, or Remove all metadata to wipe them.', 'Download the PDF.'],
+      faq: [
+        ['What is PDF metadata?', 'Information stored inside the file, separate from the pages: title, author, subject, keywords, the app that created it, and creation and change dates. Readers show it in Document Properties, and search engines use the title.'],
+        ['Why remove metadata?', 'It can reveal your name, your company, the software you use and when you worked on the file. Removing it protects your privacy when sharing.'],
+        ['Does it also change XMP metadata?', 'Yes. If the PDF has an XMP block, it is updated to match your changes, and Remove all metadata deletes it.'],
+        ['Will the pages change?', 'No. Only the hidden details change; the content of the pages stays exactly the same.'],
+        ['Is my file uploaded?', 'No. The PDF is read and saved in your browser.']
+      ],
+      icon: '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><circle cx="12" cy="11" r=".6" fill="currentColor"/><path d="M12 14v4"/>'
+  },
+  {
+      slug: 'meeting-planner', cat: 'Time tools', name: 'Meeting Planner',
+      title: 'Meeting Planner - Find the Best Time Across Time Zones',
+      desc: 'Plan meetings across time zones: see working hours for every city side by side, find hours that suit everyone, and copy the invite or save a calendar file.',
+      card: 'Find a meeting time that works in every time zone.',
+      intro: 'Pick the cities of everyone in the meeting and see their hours side by side. Green hours are working hours, so the best time for everyone stands out. Then copy the invite.',
+      steps: ['Add the cities or time zones of everyone in the meeting.', 'Pick the date and adjust working hours or weekends if needed.', 'Click an hour in the grid, ideally one marked ✓.', 'Copy the invite text or download a calendar file.'],
+      faq: [
+        ['How does it find the best time?', 'For each hour of the day it checks every city’s working hours and weekend. Hours where everyone is working get a ✓, and the best hours are listed above the details.'],
+        ['Does it handle daylight saving time?', 'Yes. Times come from your browser’s time zone database, so clock changes on the chosen date are included.'],
+        ['What about countries with a Friday weekend?', 'Weekends are set by country, for example Friday and Saturday in Saudi Arabia, and you can change any city’s weekend and working hours.'],
+        ['Can I add it to my calendar?', 'Yes. Download the .ics file and open it with Google Calendar, Outlook or Apple Calendar.'],
+        ['Is my list saved?', 'Yes, your cities and hours are saved in this browser on this device.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/><path d="M16 16l2 2 3-3"/>'
+  },
+  {
+      slug: 'world-clock', cat: 'Time tools', name: 'World Clock',
+      title: 'World Clock - Live Time in Cities Around the World',
+      desc: 'See the live time in many cities at once, with day or night, sunrise and sunset, and the difference from your time. Add or remove cities; saved on your device.',
+      card: 'Live clocks for cities around the world.',
+      intro: 'Keep an eye on the time in all the places that matter to you. Each clock shows the local time, date, day or night with sunrise and sunset, and how far ahead or behind you it is.',
+      steps: ['Look at your own time at the top and the starting clocks below.', 'Search for a city or time zone and click it to add a clock.', 'Remove or reorder clocks, or sort them from west to east.', 'Your list is saved and comes back next time.'],
+      faq: [
+        ['Is the time accurate?', 'The clocks use your device’s clock and your browser’s time zone data, which includes daylight saving rules. If your device clock is right, the world times are right.'],
+        ['How is day or night worked out?', 'For cities in the list, sunrise and sunset are calculated from the city’s position for today. For time zones added by name, 6:00 to 18:00 counts as day.'],
+        ['Are my cities saved?', 'Yes, in this browser on this device. Nothing is sent anywhere.'],
+        ['Can I use a 12-hour clock?', 'Yes. Choose 12-hour or 24-hour, and turn seconds and clock faces on or off.'],
+        ['Does it work offline?', 'Yes. Once the page has loaded, the clocks keep running without a connection.']
+      ],
+      icon: '<circle cx="12" cy="12" r="9"/><path d="M3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.6 3.5 5.6 3.5 9s-1 6.4-3.5 9c-2.5-2.6-3.5-5.6-3.5-9s1-6.4 3.5-9z"/>'
+  },
+  {
+      slug: 'week-number', cat: 'Time tools', name: 'Week Number',
+      title: 'Week Number Today - ISO Week of Any Date & Year Table',
+      desc: 'Find the week number of any date in the ISO system and in Sunday-start and Saturday-start systems. See week dates, weeks in a year and a full year table.',
+      card: 'Week number of any date, in every system.',
+      intro: 'Find out which week of the year a date falls in. The ISO week used in most of the world is shown, along with Sunday-start and Saturday-start weeks, the dates of the week, and a table for the whole year.',
+      steps: ['Pick a date, or press Today.', 'Read the week number and the dates of that week.', 'Compare with the other week systems in the table.', 'Use the year table, or find the dates of any week number.'],
+      faq: [
+        ['What is an ISO week number?', 'The ISO 8601 standard: weeks start on Monday and week 1 is the week with the year’s first Thursday. It is used across Europe, much of Asia and in business software.'],
+        ['Why does 1 January sometimes belong to week 52 or 53?', 'In the ISO system the first days of January can belong to the last week of the previous year, and late December can belong to week 1 of the next year.'],
+        ['How do US week numbers differ?', 'In the US and some other countries weeks start on Sunday and week 1 is the week that contains 1 January, so the numbers can differ from ISO by one.'],
+        ['How many weeks does a year have?', 'An ISO year has 52 or 53 weeks. A year has 53 when it starts on a Thursday, or on a Wednesday in a leap year.'],
+        ['Can I download the weeks of a year?', 'Yes. Copy the year table or download it as a CSV file for a spreadsheet.']
+      ],
+      icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M10 14h4v4"/>'
   }
 ];

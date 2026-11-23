@@ -15,6 +15,8 @@
 .v9-ctl input { flex: 1; min-width: 0; accent-color: var(--accent); }
 .v9-ctl span { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 4.6em; }
 .v9-opts { flex: 1 1 300px; min-width: 0; }
+.v9-prev { position: relative; }
+.v9-vid { position: absolute; left: 0; top: 0; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
 .v9-range { display: flex; align-items: center; gap: 10px; }
 .v9-range input { flex: 1; min-width: 0; accent-color: var(--accent); }
 .v9-range output { min-width: 3.4em; text-align: end; font-variant-numeric: tabular-nums; font-weight: 600; }
@@ -37,7 +39,7 @@
       <canvas id="prev" width="360" height="640" aria-label="Preview of the new video"></canvas>
       <div class="v9-ctl"><button class="btn ghost" type="button" id="pp">▶</button><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Preview position"><span id="ptime">0:00.0</span></div>
       <p class="vt-hint" id="noPlay" hidden style="margin:8px 0 0">Your browser cannot play this video format, so there is no preview. The settings still work.</p>
-      <video id="player" playsinline preload="auto" hidden></video>
+      <video id="player" class="v9-vid" playsinline preload="auto" aria-hidden="true"></video>
     </div>
     <div class="v9-opts">
       <div class="fields">
@@ -286,7 +288,7 @@ var VT = (function () {
   return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
 })();
 (function () {
-  var file = null, info = null, url = null, P = $('player'), cv = $('prev'), shape = '9x16', raf = 0, tiny = document.createElement('canvas');
+  var file = null, info = null, url = null, bad = false, P = $('player'), cv = $('prev'), shape = '9x16', raf = 0, tiny = document.createElement('canvas');
   var SH = { '9x16': [9, 16], '4x5': [4, 5], '1x1': [1, 1] };
   function out() { var r = SH[shape], w = +$('res').value, h = Math.round(w * r[1] / r[0] / 2) * 2; return { W: w, H: h }; }
   // Where the video goes in the new frame (in output pixels), and which part of the source is visible.
@@ -308,7 +310,7 @@ var VT = (function () {
     var o = out(), ph = 640, pw = Math.round(ph * o.W / o.H);
     if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
     cv.style.width = Math.round((window.innerWidth < 520 ? 340 : 400) * pw / ph) + 'px';
-    var g = cv.getContext('2d'), k = pw / o.W, L = layout(o.W, o.H), mode = $('fill').value, ok = !P.hidden && P.readyState >= 2;
+    var g = cv.getContext('2d'), k = pw / o.W, L = layout(o.W, o.H), mode = $('fill').value, ok = !bad && P.readyState >= 2;
     g.fillStyle = mode === 'color' ? $('color').value : '#000'; g.fillRect(0, 0, pw, ph);
     if (!ok) { g.fillStyle = '#333'; g.fillRect(L.ox0 * k, L.oy0 * k, (L.ox1 - L.ox0) * k, (L.oy1 - L.oy0) * k); return; }
     if (mode === 'blur') { // shrink then stretch: a cheap blur that works in every browser
@@ -347,19 +349,19 @@ var VT = (function () {
   }
   VT.pick(reset, function (f, i) {
     file = f; info = i; url = URL.createObjectURL(f);
-    $('noPlay').hidden = true; P.hidden = false; P.muted = false; P.src = url;
+    $('noPlay').hidden = true; bad = false; P.src = url;
     $('mute').checked = false; $('mute').disabled = !i.audio;
     if (i.height > i.width && shape === '9x16') VT.say('', 'This video is already upright. You can still change its shape, zoom in, or add a blurred background.');
     $('editor').hidden = false; hint();
   });
   P.addEventListener('loadeddata', function () { draw(); });
   P.addEventListener('seeked', function () { draw(); });
-  P.addEventListener('error', function () { if (P.getAttribute('src')) { P.hidden = true; $('noPlay').hidden = false; draw(); } });
+  P.addEventListener('error', function () { if (P.getAttribute('src')) { bad = true; $('noPlay').hidden = false; draw(); } });
   P.addEventListener('play', function () { $('pp').textContent = '❚❚'; loop(); });
   P.addEventListener('pause', function () { $('pp').textContent = '▶'; draw(); });
   P.addEventListener('ended', function () { $('pp').textContent = '▶'; });
-  $('pp').addEventListener('click', function () { if (P.hidden || !info) return; if (P.paused) { var p = P.play(); if (p && p.catch) p.catch(function () {}); } else P.pause(); });
-  $('seek').addEventListener('input', function () { if (!info || P.hidden) return; P.currentTime = $('seek').value / 1000 * info.duration; $('ptime').textContent = VT.clock(P.currentTime); });
+  $('pp').addEventListener('click', function () { if (bad || !info) return; if (P.paused) { var p = P.play(); if (p && p.catch) p.catch(function () {}); } else P.pause(); });
+  $('seek').addEventListener('input', function () { if (!info || bad) return; P.currentTime = $('seek').value / 1000 * info.duration; $('ptime').textContent = VT.clock(P.currentTime); });
   window.addEventListener('resize', draw);
 
   $('go').addEventListener('click', function () {

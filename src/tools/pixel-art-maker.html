@@ -12,7 +12,7 @@
 .pam-frames { display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 8px; margin: 0 0 6px; }
 .pam-frames button { flex: none; width: 52px; height: 52px; padding: 2px; border: 2px solid var(--line); border-radius: 8px; cursor: pointer; background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 8px 8px; position: relative; }
 .pam-frames button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
-.pam-frames canvas { width: 100%; height: 100%; image-rendering: pixelated; display: block; }
+.pam-frames canvas { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; display: block; }
 .pam-frames span { position: absolute; right: 2px; bottom: 1px; font: 700 10px/1 system-ui, sans-serif; color: #111; background: rgba(255,255,255,.8); border-radius: 3px; padding: 1px 2px; }
 .pam-h { font-size: 15px; margin: 14px 0 8px; }
 .pam-sub { font-size: 13.5px; color: var(--muted); margin: 0 0 10px; }
@@ -89,19 +89,37 @@
   function blank() { return new Uint32Array(W * H); }
 
   // ---------- storage (per browser, so a reload keeps the drawing) ----------
-  var saveT;
+  // Saved compactly: each frame as runs of hex colours ("ff0000*12", "" = see-through), and a repeated frame as the number of the earlier copy.
+  var saveT, storeFull = false;
+  function enc(f) {
+    var out = [], i = 0, n = f.length;
+    while (i < n) { var v = f[i], k = i + 1; while (k < n && f[k] === v) k++; out.push((v >>> 24 ? (v & 0xffffff).toString(16) : '') + (k - i > 1 ? '*' + (k - i) : '')); i = k; }
+    return out.join(',');
+  }
+  function dec(str, len) {
+    var u = new Uint32Array(len), o = 0;
+    str.split(',').forEach(function (t) { var p = t.split('*'), v = p[0] ? (0xff000000 | parseInt(p[0], 16)) >>> 0 : 0, n = Math.max(1, +p[1] || 1); for (var q = 0; q < n && o < len; q++) u[o++] = v; });
+    return u;
+  }
   function persist() {
     clearTimeout(saveT);
     saveT = setTimeout(function () {
-      try { localStorage.setItem(KEY, JSON.stringify({ w: W, h: H, fi: fi, color: color, frames: frames.map(function (f) { return Array.prototype.slice.call(f); }) })); } catch (e) {}
+      var seen = {}, list = frames.map(function (f, i) { var e = enc(f); if (seen[e] != null) return seen[e]; seen[e] = i; return e; });
+      try { localStorage.setItem(KEY, JSON.stringify({ v: 2, w: W, h: H, fi: fi, color: color, frames: list })); storeFull = false; }
+      catch (e) { if (!storeFull) say('bad', 'This drawing is now too big to keep in this browser, so it would be lost on reload. Download it (PNG, GIF or sprite sheet) to keep it.'); storeFull = true; }
     }, 300);
   }
   function restore() {
     try {
-      var s = JSON.parse(localStorage.getItem(KEY) || 'null');
-      if (!s || !s.frames || !s.frames.length || [8, 16, 24, 32, 48, 64, 96, 128].indexOf(s.w) < 0 || [8, 16, 24, 32, 48, 64, 96, 128].indexOf(s.h) < 0) return false;
-      W = s.w; H = s.h; frames = s.frames.slice(0, 64).map(function (a) { var u = new Uint32Array(W * H); for (var i = 0; i < u.length && i < a.length; i++) u[i] = a[i] >>> 0; return u; });
-      fi = Math.min(frames.length - 1, Math.max(0, s.fi | 0)); if (/^#[0-9a-f]{6}$/.test(s.color)) color = s.color;
+      var s = JSON.parse(localStorage.getItem(KEY) || 'null'), SZ = [8, 16, 24, 32, 48, 64, 96, 128];
+      if (!s || !s.frames || !s.frames.length || SZ.indexOf(s.w) < 0 || SZ.indexOf(s.h) < 0) return false;
+      W = s.w; H = s.h; var n = W * H, out = [];
+      s.frames.slice(0, 64).forEach(function (a) {
+        if (typeof a === 'number') { out.push(out[a] ? out[a].slice() : new Uint32Array(n)); return; }
+        if (typeof a === 'string') { out.push(dec(a, n)); return; }
+        var u = new Uint32Array(n); for (var i = 0; i < u.length && i < a.length; i++) u[i] = a[i] >>> 0; out.push(u); // older saves: plain number lists
+      });
+      frames = out; fi = Math.min(frames.length - 1, Math.max(0, s.fi | 0)); if (/^#[0-9a-f]{6}$/.test(s.color)) color = s.color;
       return true;
     } catch (e) { return false; }
   }
@@ -178,7 +196,7 @@
 
   // ---------- palette and tools ----------
   function setColor(c) { color = c; $('picker').value = c; palette(); persist(); }
-  function use(c) { recent = [c].concat(recent.filter(function (r) { return r !== c; })).slice(0, 8); }
+  function use(c) { var had = recent.indexOf(c) >= 0 || (PALS[$('palSet').value] || []).indexOf(c) >= 0; recent = [c].concat(recent.filter(function (r) { return r !== c; })).slice(0, 8); if (!had) palette(); }
   function palette() {
     var box = $('pal'), list = PALS[$('palSet').value] || PALS.basic; box.innerHTML = '';
     var pk = document.createElement('input'); pk.type = 'color'; pk.id = 'picker'; pk.value = color; pk.setAttribute('aria-label', 'Any colour'); pk.setAttribute('data-nomemo', '');

@@ -153,7 +153,7 @@
       if (i >= list.length) {
         thumbs(); swatches(); draw();
         if (!items.length) { say('bad', 'Could not read ' + (list.length > 1 ? 'those files' : '"' + list[0].name + '"') + '. They may be damaged or in a format your browser cannot open.'); return; }
-        say('', items.length + ' photo' + (items.length > 1 ? 's' : '') + ' ready. Pick a filter.' + (skipped ? ' ' + skipped + ' file(s) were skipped.' : '') + (items.some(function (q) { return q.scaled; }) ? ' Very large photos were scaled down to ' + MAX_SIDE + ' px.' : ''));
+        say('', items.length + ' photo' + (items.length > 1 ? 's' : '') + ' ready. Pick a filter.' + (skipped ? ' ' + skipped + (skipped > 1 ? ' files were' : ' file was') + ' skipped.' : '') + (items.some(function (q) { return q.scaled; }) ? ' Very large photos were scaled down (to ' + items.filter(function (q) { return q.scaled; }).map(function (q) { return q.img.width + ' × ' + q.img.height; })[0] + ' px for the first one) so your device can handle them.' : '') + (items.some(function (q) { return q.alpha; }) && $('fmt').value === 'image/jpeg' ? ' Your picture has see-through parts: choose PNG or WebP below to keep them (JPG makes them white).' : ''));
         return;
       }
       loadImage(list[i], function (im) {
@@ -162,7 +162,8 @@
           var w = im.naturalWidth, h = im.naturalHeight, s = Math.min(1, MAX_SIDE / Math.max(w, h), Math.sqrt(MAX_AREA / (w * h)));
           var c = canvas(Math.max(1, Math.round(w * s)), Math.max(1, Math.round(h * s))); c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
           var t = canvas(60, 60), k = Math.max(60 / w, 60 / h); t.getContext('2d').drawImage(im, (60 - w * k) / 2, (60 - h * k) / 2, w * k, h * k);
-          items.push({ img: c, name: list[i].name.replace(/\.[^.]+$/, '') || 'photo', thumb: t.toDataURL(), scaled: s < 1, alpha: /png|webp|gif/i.test(list[i].type) });
+          var alpha = false; if (/png|webp|gif/i.test(list[i].type)) { var tc = canvas(64, 64), tx = tc.getContext('2d', { willReadFrequently: true }); tx.drawImage(im, 0, 0, 64, 64); var ad = tx.getImageData(0, 0, 64, 64).data; for (var q = 3; q < ad.length; q += 4) if (ad[q] < 250) { alpha = true; break; } }
+          items.push({ img: c, name: list[i].name.replace(/\.[^.]+$/, '') || 'photo', thumb: t.toDataURL(), scaled: s < 1, alpha: alpha });
         } else skipped++;
         next(i + 1);
       });
@@ -179,7 +180,9 @@
   });
 
   // ---------- save ----------
-  function ext() { return { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[$('fmt').value]; }
+  // name the file after what the browser really made (Safari cannot make WebP and gives PNG instead)
+  function ext(b) { return { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp' }[(b && b.type) || $('fmt').value] || 'png'; }
+  function noWebp(b) { return $('fmt').value === 'image/webp' && b.type !== 'image/webp' ? ' Your browser cannot make WebP, so it was saved as PNG.' : ''; }
   function encode(it) {
     var type = $('fmt').value, c = filtered(it.img, it.img.width, it.img.height, filter, opts());
     if (type === 'image/jpeg') { var j = canvas(c.width, c.height), jx = j.getContext('2d'); jx.fillStyle = '#fff'; jx.fillRect(0, 0, j.width, j.height); jx.drawImage(c, 0, 0); c = j; }
@@ -190,7 +193,7 @@
   $('go').addEventListener('click', function () {
     var it = items[cur], btn = $('go'); if (!it) return; btn.disabled = true; say('', 'Saving…');
     setTimeout(function () {
-      encode(it).then(function (b) { var n = it.name + '-' + label() + '.' + ext(); saveBlob(b, n); say('ok', 'Saved ' + n + ' (' + fmtBytes(b.size) + ').'); if (window.burst) burst(btn); })
+      encode(it).then(function (b) { var n = it.name + '-' + label() + '.' + ext(b); saveBlob(b, n); say('ok', 'Saved ' + n + ' (' + fmtBytes(b.size) + ').' + noWebp(b)); if (window.burst) burst(btn); })
         .catch(function () { say('bad', 'Your browser could not save this photo (it may be out of memory). Try JPG or a smaller photo.'); }).then(function () { btn.disabled = false; });
     }, 20);
   });
@@ -200,9 +203,9 @@
       if (i >= items.length) { var z = PT.zip(files); saveBlob(z, 'filtered-photos.zip'); say('ok', 'Saved ' + files.length + ' photos in filtered-photos.zip (' + fmtBytes(z.size) + ').'); btn.disabled = false; return; }
       say('', 'Filtering photo ' + (i + 1) + ' of ' + items.length + '…');
       setTimeout(function () {
-        encode(items[i]).then(function (b) { return b.arrayBuffer(); }).then(function (a) {
+        encode(items[i]).then(function (b) { return b.arrayBuffer().then(function (a) { return [a, ext(b)]; }); }).then(function (r) {
           var n = items[i].name + '-' + label(), k = n; for (var j = 2; used[k]; j++) k = n + '-' + j; used[k] = 1;
-          files.push({ name: k + '.' + ext(), data: new Uint8Array(a) }); next(i + 1);
+          files.push({ name: k + '.' + r[1], data: new Uint8Array(r[0]) }); next(i + 1);
         }).catch(function () { say('bad', 'Ran out of memory on photo ' + (i + 1) + '. Try fewer or smaller photos.'); btn.disabled = false; });
       }, 10);
     })(0);

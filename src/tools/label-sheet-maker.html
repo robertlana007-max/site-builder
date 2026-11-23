@@ -1,0 +1,449 @@
+<style>
+.lbm fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.lbm legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.lbm textarea { min-height: 170px; font-family: inherit; font-size: 15px; }
+.lbm .lbm-hint { display: block; font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.lbm .lbm-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.lbm .lbm-row { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.lbm .lbm-row button { font: inherit; font-size: 14px; font-weight: 600; min-height: 44px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; cursor: pointer; padding: 4px 6px; }
+.lbm .lbm-row button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.lbm input[type=file] { max-width: 100%; margin-bottom: 12px; }
+.lbm .lbm-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.lbm .lbm-prev canvas { width: 100%; max-width: 460px; height: auto; display: block; margin: 0 auto; background: #fff; box-shadow: 0 2px 10px rgba(0,0,0,.18); }
+.lbm .lbm-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.lbm .lbm-nav .btn { min-height: 38px; padding: 4px 12px; }
+</style>
+<div class="lbm" id="lbm">
+<fieldset><legend>Label sheet</legend>
+  <div class="fields">
+    <div><label for="lbSheet">Sheet layout</label><select id="lbSheet"></select></div>
+  </div>
+  <span class="lbm-hint" id="lbSheetInfo"></span>
+  <div id="lbCustom" hidden>
+    <div class="fields">
+      <div><label for="lbCPage">Paper</label><select id="lbCPage"><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+      <div><label for="lbCUnit">Units</label><select id="lbCUnit"><option value="mm">mm</option><option value="in">inches</option></select></div>
+      <div><label for="lbCCols">Labels across</label><input type="number" id="lbCCols" min="1" max="10" value="3" inputmode="numeric"></div>
+      <div><label for="lbCRows">Labels down</label><input type="number" id="lbCRows" min="1" max="30" value="7" inputmode="numeric"></div>
+    </div>
+    <div class="fields">
+      <div><label for="lbCW">Label width</label><input type="number" id="lbCW" step="0.01" value="63.5" inputmode="decimal"></div>
+      <div><label for="lbCH">Label height</label><input type="number" id="lbCH" step="0.01" value="38.1" inputmode="decimal"></div>
+      <div><label for="lbCTop">Top margin</label><input type="number" id="lbCTop" step="0.01" value="15.15" inputmode="decimal"></div>
+      <div><label for="lbCLeft">Left margin</label><input type="number" id="lbCLeft" step="0.01" value="7.2" inputmode="decimal"></div>
+      <div><label for="lbCHP">Across pitch (label + gap)</label><input type="number" id="lbCHP" step="0.01" value="66" inputmode="decimal"></div>
+      <div><label for="lbCVP">Down pitch (label + gap)</label><input type="number" id="lbCVP" step="0.01" value="38.1" inputmode="decimal"></div>
+    </div>
+    <span class="lbm-hint">Measure your sheet, or copy the numbers from its box. Pitch is the distance from the left (or top) edge of one label to the next.</span>
+  </div>
+</fieldset>
+<fieldset><legend>What goes on the labels?</legend>
+  <div class="lbm-row" id="lbMode" role="group" aria-label="Label text">
+    <button type="button" data-m="list">A list of labels</button><button type="button" data-m="same">Same on every label</button><button type="button" data-m="csv">From a spreadsheet (CSV)</button>
+  </div>
+  <div id="lbListBox">
+    <label for="lbText" id="lbTextLab">Labels: leave an empty line between labels</label>
+    <textarea id="lbText" data-nomemo maxlength="400000" placeholder="Maria Garcia&#10;12 Rose Street&#10;Springfield 12345&#10;&#10;Kenji Tanaka&#10;4-2 Sakura Avenue&#10;Osaka 530-0001"></textarea>
+  </div>
+  <div id="lbCsvBox" hidden>
+    <label for="lbCsv">Spreadsheet saved as CSV (first row = column names)</label>
+    <input type="file" id="lbCsv" data-nomemo accept=".csv,.txt,text/csv,text/plain">
+    <label for="lbTpl">Label layout: use {column name} for each column</label>
+    <textarea id="lbTpl" data-nomemo maxlength="2000" style="min-height:100px" placeholder="{Name}&#10;{Address}&#10;{City} {Postcode}"></textarea>
+    <span class="lbm-hint" id="lbCsvInfo">Choose a CSV file. In Excel or Google Sheets use File, Save as or Download, CSV.</span>
+  </div>
+  <div class="fields">
+    <div id="lbCopiesBox"><label for="lbCopies" id="lbCopiesLab">Copies of each label</label><input type="number" id="lbCopies" min="1" max="1000" value="1" inputmode="numeric"></div>
+    <div><label for="lbStart">Start at label number</label><input type="number" id="lbStart" min="1" value="1" inputmode="numeric"></div>
+  </div>
+  <span class="lbm-hint">Start at a later label to use up a sheet that is partly used. Labels are counted across, then down.</span>
+</fieldset>
+<fieldset><legend>Text</legend>
+  <div class="fields">
+    <div><label for="lbSize">Largest text size</label><select id="lbSize"><option value="8">8 pt</option><option value="10">10 pt</option><option value="12" selected>12 pt</option><option value="14">14 pt</option><option value="18">18 pt</option><option value="24">24 pt</option><option value="36">36 pt</option></select></div>
+    <div><label for="lbAlign">Alignment</label><select id="lbAlign"><option value="left">Left</option><option value="center">Centre</option></select></div>
+    <div><label for="lbPad">Space inside each label</label><select id="lbPad"><option value="1.5">Small</option><option value="3" selected>Normal</option><option value="5">Large</option></select></div>
+  </div>
+  <label class="lbm-check"><input type="checkbox" id="lbBold" checked>First line in bold</label>
+  <label class="lbm-check"><input type="checkbox" id="lbLines">Print label outlines (for a test on plain paper)</label>
+  <div class="fields">
+    <div><label for="lbDX">Move everything right (mm)</label><input type="number" id="lbDX" step="0.5" value="0" inputmode="decimal"></div>
+    <div><label for="lbDY">Move everything down (mm)</label><input type="number" id="lbDY" step="0.5" value="0" inputmode="decimal"></div>
+  </div>
+  <span class="lbm-hint">If a test print is a little off, move the text here. Use minus numbers to move left or up.</span>
+</fieldset>
+<div class="lbm-prev"><div class="lbm-nav"><button type="button" class="btn ghost" id="lbPrevP" aria-label="Previous sheet">‹</button><span id="lbWho">Sheet 1</span><button type="button" class="btn ghost" id="lbNextP" aria-label="Next sheet">›</button></div><canvas id="lbCanvas" width="595" height="842" aria-label="Label sheet preview"></canvas></div>
+<div class="btns">
+  <button type="button" class="btn" id="lbPdf">Download PDF</button>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @GD-START (shared drawing helper)
+  // ---------- tiny drawing engine: the same list of shapes is drawn on a canvas (preview, PNG) and into a PDF ----------
+  var GD = (function () {
+    var FONTS = {
+      sans: ['GD Noto Sans', 'noto-sans-subset-400.ttf', 400, 1], sansb: ['GD Noto Sans', 'noto-sans-subset-700.ttf', 700, 1],
+      serif: ['GD Noto Serif', 'noto-serif-subset-400.ttf', 400, 1], serifb: ['GD Noto Serif', 'noto-serif-subset-700.ttf', 700, 1],
+      script: ['GD Great Vibes', 'great-vibes-latin-400-normal.woff2', 400], hand: ['GD Dancing Script', 'dancing-script-latin-400-normal.woff2', 400],
+      display: ['GD Anton', 'anton-latin-400-normal.woff2', 400], caveat: ['GD Caveat', 'caveat-latin-400-normal.woff2', 400]
+    };
+    var bufs = {}, prom = {}, mc = document.createElement('canvas').getContext('2d');
+    function load(k) {
+      if (!prom[k]) prom[k] = fetch('../assets/vendor/fonts/' + FONTS[k][1]).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) {
+        bufs[k] = b; return new FontFace(FONTS[k][0], b.slice(0), { weight: String(FONTS[k][2]) }).load().then(function (f) { document.fonts.add(f); });
+      }).catch(function (e) { prom[k] = null; throw e; });
+      return prom[k];
+    }
+    function loadAll(keys) { return Promise.all(keys.map(load)); }
+    function css(k, s) { var F = FONTS[k] || FONTS.sans; return F[2] + ' ' + s + 'px "' + F[0] + '", sans-serif'; }
+    function chars(t) { return Array.from(String(t)); }
+    function width(t, k, s, ls) { mc.font = css(k, s); return mc.measureText(String(t)).width + (ls || 0) * Math.max(0, chars(t).length - 1); }
+    function fit(t, k, s, maxW, min, ls) { min = min || 3; while (s > min && width(t, k, s, ls) > maxW) s = Math.max(min, s * 0.96); return s; }
+    function wrap(t, k, s, maxW) {
+      var out = [];
+      String(t == null ? '' : t).replace(/\r\n?/g, '\n').split('\n').forEach(function (para) {
+        var cur = '';
+        para.split(/ +/).forEach(function (w) {
+          var trial = cur ? cur + ' ' + w : w;
+          if (width(trial, k, s) <= maxW) { cur = trial; return; }
+          if (cur) out.push(cur);
+          cur = '';
+          while (w && width(w, k, s) > maxW) { var c = chars(w), n = c.length; while (n > 1 && width(c.slice(0, n).join(''), k, s) > maxW) n--; out.push(c.slice(0, n).join('')); w = c.slice(n).join(''); }
+          cur = w;
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function startX(o) { var w = width(o.t, o.font, o.s, o.ls); return o.align === 'center' ? o.x - w / 2 : o.align === 'right' ? o.x - w : o.x; }
+    function rgb(h) { h = String(h || '#000').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+    function rrPath(x, y, w, h, r) { r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); return 'M' + (x + r) + ' ' + y + 'H' + (x + w - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w) + ' ' + (y + r) : '') + 'V' + (y + h - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w - r) + ' ' + (y + h) : '') + 'H' + (x + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + x + ' ' + (y + h - r) : '') + 'V' + (y + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y : '') + 'Z'; }
+    // draw an image into a w x h canvas: cover/contain, optional round clip
+    function raster(o, scale) {
+      var img = o.img, W = Math.max(1, Math.round(o.w * scale)), H = Math.max(1, Math.round(o.h * scale)), c = document.createElement('canvas');
+      c.width = W; c.height = H; var g = c.getContext('2d');
+      if (o.clip) { g.beginPath(); if (o.clip === 'circle') g.ellipse(W / 2, H / 2, W / 2, H / 2, 0, 0, Math.PI * 2); else g.roundRect ? g.roundRect(0, 0, W, H, o.clip * scale) : g.rect(0, 0, W, H); g.clip(); }
+      var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = o.fit === 'contain' ? Math.min(W / iw, H / ih) : Math.max(W / iw, H / ih);
+      g.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+      return c;
+    }
+    function drawCanvas(ops, ctx, scale) {
+      ops.forEach(function (o) {
+        ctx.save(); ctx.globalAlpha = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'circle' || o.k === 'path') {
+          var p;
+          if (o.k === 'rect') p = new Path2D(rrPath(o.x * scale, o.y * scale, o.w * scale, o.h * scale, (o.r || 0) * scale));
+          else if (o.k === 'circle') { p = new Path2D(); p.arc(o.x * scale, o.y * scale, o.r * scale, 0, Math.PI * 2); }
+          else { ctx.translate(o.x * scale, o.y * scale); ctx.scale(o.sc * scale, o.sc * scale); if (o.rot) ctx.rotate(o.rot); p = new Path2D(o.d); }
+          var u = o.k === 'path' ? o.sc * scale : 1;
+          if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(p); }
+          if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale / u; ctx.stroke(p); }
+        } else if (o.k === 'line') {
+          ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale; if (o.dash) ctx.setLineDash(o.dash.map(function (d) { return d * scale; }));
+          ctx.beginPath(); ctx.moveTo(o.x1 * scale, o.y1 * scale); ctx.lineTo(o.x2 * scale, o.y2 * scale); ctx.stroke();
+        } else if (o.k === 'text') {
+          ctx.font = css(o.font, o.s * scale); ctx.fillStyle = o.fill; ctx.textBaseline = 'alphabetic';
+          var x = startX(o);
+          if (o.ls) chars(o.t).forEach(function (ch) { ctx.fillText(ch, x * scale, o.y * scale); x += width(ch, o.font, o.s) + o.ls; });
+          else ctx.fillText(o.t, x * scale, o.y * scale);
+        } else if (o.k === 'img' && o.img) {
+          ctx.drawImage(raster(o, scale), o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+        }
+        ctx.restore();
+      });
+    }
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
+    async function drawPdf(env, page, ops, ox, oy) {
+      var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
+      function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
+      async function font(k) {
+        if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
+        return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      }
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i], op = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'path') {
+          var d = o.k === 'rect' ? rrPath(o.x + ox, o.y + oy, o.w, o.h, o.r) : o.d, sc = o.k === 'path' ? o.sc : 1;
+          var opt = { x: o.k === 'path' ? o.x + ox : 0, y: H - (o.k === 'path' ? o.y + oy : 0), scale: sc, opacity: op, borderOpacity: op };
+          if (o.rot) opt.rotate = P.degrees(-o.rot * 180 / Math.PI);
+          if (o.fill) opt.color = col(o.fill);
+          if (o.stroke) { opt.borderColor = col(o.stroke); opt.borderWidth = (o.lw || 1) / sc; } else opt.borderWidth = 0;
+          page.drawSvgPath(d, opt);
+        } else if (o.k === 'circle') {
+          var c = { x: o.x + ox, y: H - o.y - oy, size: o.r, opacity: op, borderOpacity: op };
+          if (o.fill) c.color = col(o.fill); if (o.stroke) { c.borderColor = col(o.stroke); c.borderWidth = o.lw || 1; }
+          page.drawCircle(c);
+        } else if (o.k === 'line') {
+          page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
+        } else if (o.k === 'text') {
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!t.trim()) continue;
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
+        } else if (o.k === 'img' && o.img) {
+          env.imgs = env.imgs || new Map();
+          var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
+          if (!em) {
+            var cv = raster(o, Math.min(300 / 72, 2400 / Math.max(o.w, o.h))), png = o.clip || o.alpha;
+            var url = png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92), bytes = await fetch(url).then(function (r) { return r.arrayBuffer(); });
+            em = png ? await env.doc.embedPng(bytes) : await env.doc.embedJpg(bytes); env.imgs.set(key, em);
+          }
+          page.drawImage(em, { x: o.x + ox, y: H - o.y - oy - o.h, width: o.w, height: o.h, opacity: op });
+        }
+      }
+    }
+    var libs = null;
+    function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
+      await pdfLibs();
+      var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
+      doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
+    }
+    function readImage(file, maxSide, cb) {
+      if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
+      if (file.size > 25 * 1048576) return cb(null, 'That picture is over 25 MB. Choose a smaller one.');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 600, h = img.naturalHeight || 600, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var png = /png|gif|svg|webp/.test(file.type), out = new Image(); out.onload = function () { cb(out); }; out.onerror = function () { cb(null, 'That picture could not be opened.'); };
+        out.src = png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9); out.alpha = png;
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); cb(null, '"' + file.name + '" could not be opened. HEIC photos need converting to JPG first.'); };
+      img.src = url;
+    }
+    function download(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); return u; }
+    return { FONTS: FONTS, load: load, loadAll: loadAll, width: width, fit: fit, wrap: wrap, drawCanvas: drawCanvas, drawPdf: drawPdf, newPdf: newPdf, readImage: readImage, download: download, rgb: rgb };
+  })();
+  // @GD-END
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var MM = 72 / 25.4, IN = 72;
+  // [name, paper, unit, cols, rows, width, height, top, left, across pitch, down pitch]
+  var SHEETS = {
+    a4_21: ['A4: 21 labels, 3 × 7 (63.5 × 38.1 mm)', 'a4', 'mm', 3, 7, 63.5, 38.1, 15.15, 7.2, 66, 38.1],
+    a4_14: ['A4: 14 labels, 2 × 7 (99.1 × 38.1 mm)', 'a4', 'mm', 2, 7, 99.1, 38.1, 15.15, 4.65, 101.6, 38.1],
+    a4_24: ['A4: 24 labels, 3 × 8 (63.5 × 33.9 mm)', 'a4', 'mm', 3, 8, 63.5, 33.9, 12.9, 7.2, 66, 33.9],
+    a4_8: ['A4: 8 labels, 2 × 4 (99.1 × 67.7 mm)', 'a4', 'mm', 2, 4, 99.1, 67.7, 13, 4.65, 101.6, 67.7],
+    a4_30: ['A4: 30 labels, 3 × 10 (70 × 29.7 mm, no gaps)', 'a4', 'mm', 3, 10, 70, 29.7, 0, 0, 70, 29.7],
+    a4_65: ['A4: 65 labels, 5 × 13 (38.1 × 21.2 mm)', 'a4', 'mm', 5, 13, 38.1, 21.2, 10.7, 4.75, 40.6, 21.2],
+    lt_30: ['Letter: 30 labels, 3 × 10 (2⅝ × 1 in)', 'letter', 'in', 3, 10, 2.625, 1, 0.5, 0.1875, 2.75, 1],
+    lt_20: ['Letter: 20 labels, 2 × 10 (4 × 1 in)', 'letter', 'in', 2, 10, 4, 1, 0.5, 0.15625, 4.1875, 1],
+    lt_14: ['Letter: 14 labels, 2 × 7 (4 × 1⅓ in)', 'letter', 'in', 2, 7, 4, 1.3333, 0.8333, 0.15625, 4.1875, 1.3333],
+    lt_10: ['Letter: 10 labels, 2 × 5 (4 × 2 in)', 'letter', 'in', 2, 5, 4, 2, 0.5, 0.15625, 4.1875, 2],
+    lt_80: ['Letter: 80 labels, 4 × 20 (1¾ × ½ in)', 'letter', 'in', 4, 20, 1.75, 0.5, 0.5, 0.28125, 2.0625, 0.5],
+    custom: ['Custom size…']
+  };
+  var mode = 'list', page = 0, rowsCsv = null, heads = [], ready = false, busy = false;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  Object.keys(SHEETS).forEach(function (k) { var o = document.createElement('option'); o.value = k; o.textContent = SHEETS[k][0]; $('lbSheet').appendChild(o); });
+  $('lbSheet').value = UT.letter() ? 'lt_30' : 'a4_21'; $('lbCPage').value = UT.letter() ? 'letter' : 'a4';
+  function num(id) { var v = parseFloat(String($(id).value).replace(',', '.')); return isFinite(v) ? v : NaN; }
+  // the sheet in points
+  function sheet() {
+    var k = $('lbSheet').value, s = SHEETS[k], u, c;
+    if (k === 'custom') { u = $('lbCUnit').value === 'in' ? IN : MM; c = { paper: $('lbCPage').value, cols: num('lbCCols'), rows: num('lbCRows'), w: num('lbCW') * u, h: num('lbCH') * u, top: num('lbCTop') * u, left: num('lbCLeft') * u, hp: num('lbCHP') * u, vp: num('lbCVP') * u }; }
+    else { u = s[2] === 'in' ? IN : MM; c = { paper: s[1], cols: s[3], rows: s[4], w: s[5] * u, h: s[6] * u, top: s[7] * u, left: s[8] * u, hp: s[9] * u, vp: s[10] * u }; }
+    var P = c.paper === 'letter' ? [612, 792] : [595.28, 841.89]; c.W = P[0]; c.H = P[1]; c.per = c.cols * c.rows;
+    return c;
+  }
+  function checkSheet(c) {
+    if (!(c.cols >= 1 && c.cols <= 10 && c.rows >= 1 && c.rows <= 30 && c.cols === Math.floor(c.cols) && c.rows === Math.floor(c.rows))) return 'Choose 1 to 10 labels across and 1 to 30 down.';
+    if (!(c.w > 5 && c.h > 5 && c.top >= 0 && c.left >= 0 && c.hp > 0 && c.vp > 0)) return 'Fill in every size with a number. Label sizes must be bigger than 2 mm.';
+    if (c.hp < c.w - 0.01 || c.vp < c.h - 0.01) return 'The pitch must be at least the label size, or labels would overlap.';
+    if (c.left + (c.cols - 1) * c.hp + c.w > c.W + 0.5 || c.top + (c.rows - 1) * c.vp + c.h > c.H + 0.5) return 'These labels do not fit on the paper. Check the sizes and margins.';
+    return '';
+  }
+  function info() {
+    var k = $('lbSheet').value; $('lbCustom').hidden = k !== 'custom';
+    var c = sheet(); $('lbSheetInfo').textContent = k === 'custom' ? '' : c.per + ' labels per sheet. Check that the size printed on your pack matches.';
+  }
+  // ---------- CSV ----------
+  function parseCSV(t) {
+    t = t.replace(/^﻿/, '');
+    var first = t.split(/\r?\n/)[0] || '', sep = [',', ';', '\t'].map(function (s) { return [s, first.split(s).length]; }).sort(function (a, b) { return b[1] - a[1]; })[0][0];
+    var rows = [], row = [], f = '', q = false;
+    for (var i = 0; i < t.length; i++) {
+      var ch = t[i];
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; }
+      else if (ch === '"') q = true;
+      else if (ch === sep) { row.push(f); f = ''; }
+      else if (ch === '\n' || ch === '\r') { if (ch === '\r' && t[i + 1] === '\n') i++; row.push(f); rows.push(row); row = []; f = ''; }
+      else f += ch;
+    }
+    if (f || row.length) { row.push(f); rows.push(row); }
+    return rows.filter(function (r) { return r.some(function (x) { return x.trim(); }); });
+  }
+  $('lbCsv').addEventListener('change', function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    if (f.size > 20 * 1048576) { this.value = ''; return say('bad', 'That file is over 20 MB. Choose a smaller CSV file.'); }
+    if (/\.(xlsx?|ods|numbers|pdf|docx?)$/i.test(f.name)) { this.value = ''; return say('bad', '"' + f.name + '" is not a CSV file. Save your spreadsheet as CSV first (File, Save as, CSV).'); }
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 2000))) return say('bad', '"' + f.name + '" does not look like a text CSV file.');
+      var rows = parseCSV(t);
+      if (rows.length < 2) return say('bad', 'The file needs a first row with column names and at least one row of data.');
+      heads = rows[0].map(function (h, i) { return h.trim() || 'Column ' + (i + 1); }); rowsCsv = rows.slice(1);
+      if (!$('lbTpl').value.trim()) $('lbTpl').value = heads.map(function (h) { return '{' + h + '}'; }).join('\n');
+      $('lbCsvInfo').textContent = rowsCsv.length + ' rows found. Columns: ' + heads.join(', ') + '.';
+      say('ok', 'CSV loaded.'); page = 0; paint();
+    }, function () { say('bad', 'That file could not be read.'); });
+  });
+  // ---------- labels ----------
+  var unknown = {};
+  function labels() {
+    unknown = {};
+    var out = [], copies = Math.floor(num('lbCopies')) || 1;
+    if (mode === 'same') { var t = $('lbText').value.trim(); if (t) for (var i = 0; i < copies; i++) out.push(t); return out; }
+    var base = [];
+    if (mode === 'csv') {
+      if (!rowsCsv) return [];
+      var tpl = $('lbTpl').value, idx = {}; heads.forEach(function (h, i) { idx[h.toLocaleLowerCase()] = i; });
+      rowsCsv.forEach(function (r) {
+        var txt = tpl.replace(/\{([^{}]+)\}/g, function (m, k) { var i = idx[k.trim().toLocaleLowerCase()]; if (i == null) { unknown[k.trim()] = 1; return m; } return (r[i] || '').trim(); });
+        txt = txt.split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean).join('\n');
+        if (txt) base.push(txt);
+      });
+    } else base = $('lbText').value.replace(/\r\n?/g, '\n').split(/\n\s*\n/).map(function (b) { return b.split('\n').map(function (l) { return l.trim(); }).filter(Boolean).join('\n'); }).filter(Boolean);
+    base.forEach(function (b) { for (var i = 0; i < copies; i++) out.push(b); });
+    return out;
+  }
+  function fitLabel(text, w, h, max, bold) {
+    var lines = text.split('\n');
+    for (var s = max; s >= 4; s -= 0.25) {
+      var out = [], lh = s * 1.2;
+      lines.forEach(function (l, i) { var f = bold && i === 0 ? 'sansb' : 'sans'; GD.wrap(l, f, s, w).forEach(function (x, j) { out.push([x, f]); }); });
+      if (out.length * lh <= h + 0.01 && out.every(function (x) { return GD.width(x[0], x[1], s) <= w + 0.01; })) return { lines: out, s: s, lh: lh };
+    }
+    var o2 = []; lines.forEach(function (l, i) { var f = bold && i === 0 ? 'sansb' : 'sans'; GD.wrap(l, f, 4, w).forEach(function (x) { o2.push([x, f]); }); });
+    return { lines: o2.slice(0, Math.max(1, Math.floor(h / 4.8))), s: 4, lh: 4.8, cut: true };
+  }
+  function pages() {
+    var c = sheet(), err = checkSheet(c); if (err) return { err: err };
+    var L = labels(), start = Math.max(1, Math.floor(num('lbStart')) || 1);
+    if (start > c.per) return { err: 'This sheet has ' + c.per + ' labels, so start at a number from 1 to ' + c.per + '.' };
+    if (!L.length) return { err: mode === 'csv' ? (rowsCsv ? 'The label layout gives empty labels. Use the column names in curly brackets, like {' + (heads[0] || 'Name') + '}.' : 'Choose a CSV file first.') : 'Type the text for your labels.' };
+    if (L.length > 20000) return { err: 'That makes ' + L.length + ' labels. Please make 20,000 or fewer at once.' };
+    var dx = (num('lbDX') || 0) * MM, dy = (num('lbDY') || 0) * MM, pad = +$('lbPad').value * MM, max = +$('lbSize').value, bold = $('lbBold').checked, al = $('lbAlign').value, outl = $('lbLines').checked;
+    var out = [], slot = start - 1, cut = 0, ops = null;
+    L.forEach(function (t, n) {
+      if (!ops || slot >= c.per) { if (ops) slot = 0; ops = [{ k: 'rect', x: 0, y: 0, w: c.W, h: c.H, fill: '#ffffff' }]; out.push({ ops: ops, W: c.W, H: c.H, first: n }); drawOutlines(ops, c, outl); }
+      var col = slot % c.cols, row = Math.floor(slot / c.cols), x = c.left + col * c.hp + dx, y = c.top + row * c.vp + dy;
+      var f = fitLabel(t, c.w - 2 * pad, c.h - 2 * pad, max, bold); if (f.cut) cut++;
+      var th = f.lines.length * f.lh, ty = y + (c.h - th) / 2 + f.s * 0.93;
+      f.lines.forEach(function (ln, i) { ops.push({ k: 'text', t: ln[0], x: al === 'center' ? x + c.w / 2 : UT.rtl(ln[0]) ? x + c.w - pad : x + pad, y: ty + i * f.lh, font: ln[1], s: f.s, fill: '#111111', align: al === 'center' ? 'center' : UT.rtl(ln[0]) ? 'right' : 'left' }); });
+      slot++;
+    });
+    return { pages: out, count: L.length, cut: cut, sheet: c };
+  }
+  // light outlines show on screen; on paper only when asked
+  function drawOutlines(ops, c, print) {
+    for (var r = 0; r < c.rows; r++) for (var k = 0; k < c.cols; k++) ops.push({ k: 'rect', x: c.left + k * c.hp, y: c.top + r * c.vp, w: c.w, h: c.h, r: Math.min(c.w, c.h) * 0.06, stroke: print ? '#9ca3af' : '#d1d5db', lw: print ? 0.5 : 0.4, screen: !print });
+  }
+  function paint() {
+    if (!ready) return;
+    info();
+    var r = pages(), cv = $('lbCanvas'), sc = 1.6, c = sheet();
+    if (r.err) {
+      cv.width = Math.round(c.W * sc); cv.height = Math.round(c.H * sc);
+      var o = [{ k: 'rect', x: 0, y: 0, w: c.W, h: c.H, fill: '#ffffff' }]; if (!checkSheet(c)) drawOutlines(o, c, false);
+      GD.drawCanvas(o, cv.getContext('2d'), sc); $('lbWho').textContent = 'Sheet 1'; say(/Type the text|Choose a CSV/.test(r.err) ? '' : 'bad', r.err); return null;
+    }
+    page = Math.max(0, Math.min(page, r.pages.length - 1));
+    var pg = r.pages[page]; cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
+    GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+    $('lbWho').textContent = 'Sheet ' + (page + 1) + ' of ' + r.pages.length;
+    $('lbPrevP').disabled = page === 0; $('lbNextP').disabled = page >= r.pages.length - 1;
+    var unk = mode === 'csv' ? Object.keys(unknown) : [];
+    if (unk.length) say('bad', 'There is no column called {' + unk.join('}, {') + '}. The columns are: ' + heads.join(', ') + '.'); else
+    say(r.cut ? 'bad' : '', r.count + ' label' + (r.count > 1 ? 's' : '') + ' on ' + r.pages.length + ' sheet' + (r.pages.length > 1 ? 's' : '') + '.' + (r.cut ? ' ' + r.cut + ' label' + (r.cut > 1 ? 's have' : ' has') + ' too much text, so some is cut off.' : ''));
+    $('lbCanvas')._labels = r;
+    return r;
+  }
+  function setMode(m) {
+    mode = m; [].forEach.call($('lbMode').children, function (b) { b.setAttribute('aria-pressed', b.dataset.m === m); });
+    $('lbListBox').hidden = m === 'csv'; $('lbCsvBox').hidden = m !== 'csv';
+    $('lbTextLab').textContent = m === 'same' ? 'Text for every label' : 'Labels: leave an empty line between labels';
+    $('lbCopiesLab').textContent = m === 'same' ? 'How many labels' : 'Copies of each label';
+    if (m === 'same' && +$('lbCopies').value === 1) $('lbCopies').value = sheet().per;
+    page = 0; paint();
+  }
+  [].forEach.call($('lbMode').children, function (b) { b.addEventListener('click', function () { setMode(b.dataset.m); }); });
+  var tm = null; function later() { clearTimeout(tm); tm = setTimeout(paint, 180); }
+  ['lbText', 'lbTpl', 'lbCopies', 'lbStart', 'lbDX', 'lbDY', 'lbCCols', 'lbCRows', 'lbCW', 'lbCH', 'lbCTop', 'lbCLeft', 'lbCHP', 'lbCVP'].forEach(function (id) { $(id).addEventListener('input', later); });
+  ['lbSheet', 'lbSize', 'lbAlign', 'lbPad', 'lbBold', 'lbLines', 'lbCPage', 'lbCUnit'].forEach(function (id) { $(id).addEventListener('change', function () { page = 0; paint(); }); });
+  $('lbPrevP').addEventListener('click', function () { page--; paint(); });
+  $('lbNextP').addEventListener('click', function () { page++; paint(); });
+  $('lbPdf').addEventListener('click', async function () {
+    if (busy || !ready) return;
+    var r = paint(); if (!r) return;
+    busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
+    try {
+      var env = await GD.newPdf('Labels', 'GetToolNest Label Sheet Maker', function (t) { say('', t); });
+      for (var i = 0; i < r.pages.length; i++) {
+        await GD.drawPdf(env, env.doc.addPage([r.pages[i].W, r.pages[i].H]), r.pages[i].ops.filter(function (o) { return !o.screen; }));
+        if (i % 20 === 19) { say('', 'Making the PDF… sheet ' + (i + 1) + ' of ' + r.pages.length); await new Promise(function (res) { setTimeout(res, 0); }); }
+      }
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), 'labels.pdf');
+      say('ok', 'PDF saved: ' + r.count + ' label' + (r.count > 1 ? 's' : '') + ' on ' + r.pages.length + ' sheet' + (r.pages.length > 1 ? 's' : '') + '. Print at 100% ("Actual size"), not "Fit to page". Try one sheet on plain paper first.');
+    } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false;
+  });
+  setMode('list');
+  GD.loadAll(['sans', 'sansb']).then(function () { ready = true; paint(); }, function () { ready = true; paint(); });
+})();
+</script>

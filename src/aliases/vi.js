@@ -227,5 +227,21 @@ module.exports = {
 "face-blur":["làm mờ khuôn mặt","che mat"],
 "photo-colorizer":["tô màu ảnh đen trắng","phuc hoi anh cu"],
 "color-blindness-simulator":["mù màu"],
-"before-after-slider":["trước và sau"]
+"before-after-slider":["trước và sau"],
+"retirement-calculator":["tính tiền hưu trí"],
+"net-worth-calculator":["tính tài sản ròng"],
+"debt-payoff-calculator":["tính trả nợ"],
+"rent-vs-buy-calculator":["thuê hay mua nhà"],
+"overtime-calculator":["tính lương làm thêm giờ"],
+"hourly-salary-converter":["đổi lương theo giờ"],
+"macro-calculator":["tính macro"],
+"running-pace-calculator":["tính pace chạy bộ"],
+"one-rep-max-calculator":["tính 1rm"],
+"heart-rate-zones-calculator":["vùng nhịp tim"],
+"period-ovulation-calculator":["tính ngày rụng trứng","tinh chu ky kinh nguyet"],
+"paint-calculator":["tính lượng sơn"],
+"tile-calculator":["tính số gạch"],
+"pet-age-calculator":["tuổi chó quy đổi"],
+"zodiac-sign-calculator":["cung hoàng đạo","con giáp"],
+"cooking-converter":["đổi cốc sang gram"]
 };

@@ -201,5 +201,21 @@ module.exports = {
 "face-blur":["মুখ ব্লার"],
 "photo-colorizer":["সাদাকালো ছবি রঙিন"],
 "color-blindness-simulator":["বর্ণান্ধতা"],
-"before-after-slider":["আগে ও পরে"]
+"before-after-slider":["আগে ও পরে"],
+"retirement-calculator":["অবসর ক্যালকুলেটর"],
+"net-worth-calculator":["নিট সম্পদ"],
+"debt-payoff-calculator":["ঋণ পরিশোধ ক্যালকুলেটর"],
+"rent-vs-buy-calculator":["ভাড়া না কেনা"],
+"overtime-calculator":["ওভারটাইম ক্যালকুলেটর"],
+"hourly-salary-converter":["ঘণ্টা প্রতি বেতন"],
+"macro-calculator":["ম্যাক্রো ক্যালকুলেটর"],
+"running-pace-calculator":["দৌড়ের গতি"],
+"one-rep-max-calculator":["ওয়ান রেপ ম্যাক্স"],
+"heart-rate-zones-calculator":["হৃদস্পন্দন জোন"],
+"period-ovulation-calculator":["মাসিক ক্যালকুলেটর"],
+"paint-calculator":["রং ক্যালকুলেটর"],
+"tile-calculator":["টাইলস ক্যালকুলেটর"],
+"pet-age-calculator":["কুকুরের বয়স"],
+"zodiac-sign-calculator":["আমার রাশি"],
+"cooking-converter":["কাপ থেকে গ্রাম"]
 };

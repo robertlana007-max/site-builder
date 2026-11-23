@@ -207,5 +207,21 @@ module.exports = {
 "face-blur":["sfocare volto","oscurare viso"],
 "photo-colorizer":["colorizar foto","colorare foto","colorare foto in bianco e nero"],
 "color-blindness-simulator":["simulatore daltonismo"],
-"before-after-slider":["prima e dopo","confrontare immagini"]
+"before-after-slider":["prima e dopo","confrontare immagini"],
+"retirement-calculator":["calcolo pensione"],
+"net-worth-calculator":["patrimonio neto","patrimonio netto"],
+"debt-payoff-calculator":["calcolo estinzione debiti"],
+"rent-vs-buy-calculator":["affittare o comprare"],
+"overtime-calculator":["calcolo straordinari"],
+"hourly-salary-converter":["stipendio orario annuale"],
+"macro-calculator":["calcolo macro"],
+"running-pace-calculator":["calcolo passo corsa"],
+"one-rep-max-calculator":["calcolo massimale","kalkulator 1rm"],
+"heart-rate-zones-calculator":["zone di frequenza cardiaca"],
+"period-ovulation-calculator":["calcolo ovulazione","giorni fertili"],
+"paint-calculator":["quanto de tinta","calcolo pittura","quanta vernice"],
+"tile-calculator":["calcolo piastrelle"],
+"pet-age-calculator":["katzenalter","età del cane in anni umani"],
+"zodiac-sign-calculator":["segno zodiacale"],
+"cooking-converter":["tazze in grammi"]
 };

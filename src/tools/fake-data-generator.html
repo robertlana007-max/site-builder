@@ -1,0 +1,200 @@
+<style>
+.fdg-fields { display: flex; flex-direction: column; gap: 8px; margin: 8px 0 10px; }
+.fdg-row { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 8px; align-items: center; }
+.fdg-row input, .fdg-row select { min-width: 0; }
+.fdg-row button { height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 18px; }
+.fdg-row button:hover { color: var(--bad); border-color: var(--bad); }
+.fdg-prev { overflow-x: auto; margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.fdg-prev table { border-collapse: collapse; font-size: 13.5px; min-width: 100%; }
+.fdg-prev th, .fdg-prev td { border-bottom: 1px solid var(--line); padding: 6px 9px; text-align: left; white-space: nowrap; }
+.fdg-prev th { background: var(--surface); position: sticky; top: 0; }
+</style>
+<div class="fields">
+  <div><label for="fdLoc">Country / language</label>
+    <select id="fdLoc">
+      <option value="en-US">English (United States)</option>
+      <option value="en-GB">English (United Kingdom)</option>
+      <option value="en-IN">English (India)</option>
+      <option value="es-ES">Español (España)</option>
+      <option value="es-MX">Español (México)</option>
+      <option value="fr-FR">Français (France)</option>
+      <option value="de-DE">Deutsch (Deutschland)</option>
+      <option value="it-IT">Italiano (Italia)</option>
+      <option value="pt-BR">Português (Brasil)</option>
+      <option value="nl-NL">Nederlands (Nederland)</option>
+      <option value="tr-TR">Türkçe (Türkiye)</option>
+      <option value="id-ID">Bahasa Indonesia (Indonesia)</option>
+      <option value="ru-RU">Русский (Россия)</option>
+      <option value="ar-EG">العربية (مصر)</option>
+      <option value="ja-JP">日本語 (日本)</option>
+      <option value="zh-CN">中文 (中国)</option>
+      <option value="mix">Mixed (all of the above)</option>
+    </select></div>
+  <div><label for="fdRows">Rows (1 to 10,000)</label><input type="number" id="fdRows" min="1" max="10000" value="100" inputmode="numeric"></div>
+  <div><label for="fdFmt">Format</label><select id="fdFmt"><option value="csv">CSV</option><option value="json">JSON</option><option value="jsonl">JSON Lines</option><option value="sql">SQL INSERT</option></select></div>
+  <div><label for="fdTable">SQL table name</label><input type="text" id="fdTable" value="people" maxlength="64" spellcheck="false"></div>
+  <div><label for="fdSeed">Seed (optional, repeatable data)</label><input type="text" id="fdSeed" placeholder="e.g. 42" maxlength="40" spellcheck="false"></div>
+</div>
+<label>Columns</label>
+<div class="fdg-fields" id="fdFields"></div>
+<div class="btns" style="margin-top:0">
+  <button class="btn ghost" id="fdAdd">+ Add column</button>
+  <button class="btn ghost" id="fdReset">Default columns</button>
+</div>
+<div class="btns">
+  <button class="btn" id="fdGo">Generate</button>
+  <button class="btn ghost" id="fdCp">Copy</button>
+  <button class="btn ghost" id="fdDl">Download</button>
+</div>
+<p class="msg" id="fdMsg"></p>
+<div class="fdg-prev" id="fdPrev" hidden></div>
+<label for="fdOut" style="margin-top:14px">Result</label>
+<textarea id="fdOut" data-nomemo readonly style="min-height:200px;font-family:var(--mono);font-size:13px;white-space:pre" spellcheck="false"></textarea>
+<script>
+(function () {
+  // ---- built-in word lists: common first names, surnames and places (made-up people; no real persons) ----
+  // "native:latin" gives a Latin spelling for email addresses and usernames.
+  function L(s) { return s.split(',').map(function (x) { var p = x.split(':'); return { n: p[0].trim(), l: (p[1] || p[0]).trim() }; }); }
+  var D = {
+    'en-US': { m: 'James,John,Robert,Michael,William,David,Richard,Joseph,Thomas,Daniel,Matthew,Anthony,Mark,Steven,Andrew,Joshua,Kevin,Brian,Ryan,Ethan', f: 'Mary,Patricia,Jennifer,Linda,Elizabeth,Barbara,Susan,Jessica,Sarah,Karen,Emily,Ashley,Olivia,Emma,Sophia,Ava,Grace,Chloe,Hannah,Megan', s: 'Smith,Johnson,Williams,Brown,Jones,Garcia,Miller,Davis,Rodriguez,Martinez,Wilson,Anderson,Taylor,Thomas,Moore,Jackson,Martin,Lee,Thompson,White,Harris,Clark,Lewis,Walker,Hall,Young,Allen,King,Wright,Scott', c: 'New York,Los Angeles,Chicago,Houston,Phoenix,Philadelphia,San Antonio,San Diego,Dallas,Austin,Seattle,Denver,Boston,Portland,Atlanta,Miami,Nashville,Detroit,Minneapolis,Columbus', st: 'Main Street,Oak Avenue,Maple Street,Cedar Lane,Pine Street,Elm Street,Washington Avenue,Lake Road,Hill Street,Park Avenue,Second Street,Sunset Boulevard,River Road,Church Street,Highland Avenue', addr: '{n} {st}', pc: '#####', ph: '(###) 555-01##', country: 'United States', co: 'Inc.,LLC,Corp.,Group', cc: 'US' },
+    'en-GB': { m: 'Oliver,George,Harry,Jack,Jacob,Noah,Charlie,Muhammad,Thomas,Oscar,William,James,Leo,Alfie,Henry,Arthur,Freddie,Archie,Theo,Isaac', f: 'Olivia,Amelia,Isla,Ava,Emily,Sophia,Grace,Mia,Poppy,Ella,Lily,Evie,Isabella,Freya,Ivy,Florence,Willow,Rosie,Sienna,Phoebe', s: 'Smith,Jones,Taylor,Brown,Williams,Wilson,Johnson,Davies,Robinson,Wright,Thompson,Evans,Walker,White,Roberts,Green,Hall,Wood,Jackson,Clarke,Patel,Khan,Hughes,Edwards,Turner,Hill,Moore,Cooper,Ward,Morris', c: 'London,Manchester,Birmingham,Leeds,Glasgow,Liverpool,Bristol,Sheffield,Edinburgh,Cardiff,Leicester,Nottingham,Newcastle upon Tyne,Brighton,Belfast,Oxford,Cambridge,York', st: 'High Street,Station Road,Church Lane,Victoria Road,Park Road,Green Lane,Manor Road,Mill Lane,Queens Road,The Crescent,Kings Road,London Road', addr: '{n} {st}', pc: 'AA# #AA', ph: '07700 900###', country: 'United Kingdom', co: 'Ltd,PLC,Group,& Co', cc: 'GB' },
+    'en-IN': { m: 'Aarav,Vihaan,Arjun,Sai,Reyansh,Ayaan,Krishna,Ishaan,Rohan,Rahul,Aditya,Vivaan,Kabir,Ansh,Dhruv', f: 'Aadhya,Ananya,Diya,Saanvi,Pari,Anika,Priya,Neha,Pooja,Kavya,Isha,Riya,Meera,Tara,Nisha', s: 'Sharma,Verma,Gupta,Singh,Kumar,Patel,Reddy,Nair,Iyer,Das,Mehta,Joshi,Rao,Chopra,Khan,Bose,Menon,Pillai,Desai,Kapoor', c: 'Mumbai,Delhi,Bengaluru,Hyderabad,Chennai,Kolkata,Pune,Ahmedabad,Jaipur,Lucknow,Kochi,Indore,Chandigarh,Bhopal', st: 'MG Road,Station Road,Gandhi Nagar,Nehru Street,Park Street,Civil Lines,Church Road,Lake View Road,Temple Street,Market Road', addr: '{n}, {st}', pc: '######', ph: '+91 9#### #####', country: 'India', co: 'Pvt Ltd,Ltd,Technologies,Enterprises', cc: 'IN' },
+    'es-ES': { m: 'Antonio,Manuel,José,Francisco,David,Juan,Javier,Daniel,Carlos,Alejandro,Pablo,Sergio,Jorge,Álvaro,Hugo,Mario,Diego,Adrián,Marcos,Iván', f: 'María,Carmen,Ana,Laura,Isabel,Lucía,Marta,Elena,Sofía,Paula,Cristina,Sara,Julia,Irene,Alba,Nuria,Raquel,Silvia,Andrea,Claudia', s: 'García,Rodríguez,González,Fernández,López,Martínez,Sánchez,Pérez,Gómez,Martín,Jiménez,Ruiz,Hernández,Díaz,Moreno,Muñoz,Álvarez,Romero,Navarro,Torres', two: true, c: 'Madrid,Barcelona,Valencia,Sevilla,Zaragoza,Málaga,Murcia,Palma,Bilbao,Alicante,Córdoba,Valladolid,Vigo,Gijón,Granada', st: 'Calle Mayor,Calle Real,Avenida de la Constitución,Calle del Sol,Plaza de España,Calle Nueva,Avenida de Andalucía,Calle San Juan,Calle de Alcalá,Paseo del Prado', addr: '{st}, {n}', pc: '#####', ph: '+34 6## ### ###', country: 'España', co: 'S.L.,S.A.,y Asociados', cc: 'ES' },
+    'es-MX': { m: 'Santiago,Mateo,Sebastián,Leonardo,Diego,Emiliano,Daniel,Miguel,José,Luis,Juan,Carlos,Alejandro,Ángel,Gael', f: 'Ximena,Valentina,Regina,Camila,Renata,Fernanda,María,Sofía,Guadalupe,Daniela,Andrea,Mariana,Paola,Natalia,Lucía', s: 'Hernández,García,Martínez,López,González,Pérez,Rodríguez,Sánchez,Ramírez,Cruz,Flores,Gómez,Morales,Vázquez,Reyes,Jiménez,Torres,Díaz,Gutiérrez,Ruiz', two: true, c: 'Ciudad de México,Guadalajara,Monterrey,Puebla,Tijuana,León,Querétaro,Mérida,Cancún,Oaxaca,Morelia,Toluca,Veracruz,Chihuahua', st: 'Av. Reforma,Calle Hidalgo,Av. Juárez,Calle Morelos,Av. Insurgentes,Calle Zaragoza,Calle 5 de Mayo,Av. Revolución', addr: '{st} {n}', pc: '#####', ph: '+52 55 #### ####', country: 'México', co: 'S.A. de C.V.,S. de R.L.,Grupo', cc: 'MX' },
+    'fr-FR': { m: 'Gabriel,Léo,Raphaël,Louis,Lucas,Jules,Adam,Arthur,Hugo,Nathan,Paul,Thomas,Maël,Noah,Victor', f: 'Jade,Louise,Emma,Alice,Chloé,Lina,Léa,Rose,Anna,Inès,Camille,Manon,Juliette,Zoé,Clara', s: 'Martin,Bernard,Dubois,Thomas,Robert,Richard,Petit,Durand,Leroy,Moreau,Simon,Laurent,Lefebvre,Michel,Garcia,David,Bertrand,Roux,Vincent,Fournier', c: 'Paris,Marseille,Lyon,Toulouse,Nice,Nantes,Strasbourg,Montpellier,Bordeaux,Lille,Rennes,Reims,Toulon,Grenoble,Dijon', st: 'rue de la Paix,rue Victor Hugo,avenue Jean Jaurès,rue Pasteur,boulevard Voltaire,place de la République,rue de la Gare,rue des Lilas,rue du Moulin,avenue des Champs', addr: '{n} {st}', pc: '#####', ph: '+33 6 ## ## ## ##', country: 'France', co: 'SARL,SAS,et Fils,Groupe', cc: 'FR' },
+    'de-DE': { m: 'Noah,Ben,Paul,Leon,Finn,Elias,Felix,Lukas,Jonas,Maximilian,Luca,Henry,Emil,Theo,Anton', f: 'Emilia,Mia,Sophia,Hannah,Emma,Lina,Mila,Marie,Lea,Clara,Anna,Lena,Ella,Leni,Frieda', s: 'Müller,Schmidt,Schneider,Fischer,Weber,Meyer,Wagner,Becker,Schulz,Hoffmann,Schäfer,Koch,Bauer,Richter,Klein,Wolf,Schröder,Neumann,Schwarz,Zimmermann', c: 'Berlin,Hamburg,München,Köln,Frankfurt am Main,Stuttgart,Düsseldorf,Leipzig,Dortmund,Essen,Bremen,Dresden,Hannover,Nürnberg', st: 'Hauptstraße,Schulstraße,Gartenstraße,Bahnhofstraße,Dorfstraße,Bergstraße,Lindenstraße,Kirchstraße,Waldstraße,Ringstraße', addr: '{st} {n}', pc: '#####', ph: '+49 15# #######', country: 'Deutschland', co: 'GmbH,AG,KG,& Co. KG', cc: 'DE' },
+    'it-IT': { m: 'Leonardo,Francesco,Alessandro,Lorenzo,Mattia,Andrea,Gabriele,Tommaso,Riccardo,Edoardo,Matteo,Giuseppe,Marco,Luca,Davide', f: 'Sofia,Giulia,Aurora,Alice,Ginevra,Emma,Giorgia,Beatrice,Greta,Martina,Chiara,Anna,Sara,Francesca,Elena', s: 'Rossi,Russo,Ferrari,Esposito,Bianchi,Romano,Colombo,Ricci,Marino,Greco,Bruno,Gallo,Conti,De Luca,Mancini,Costa,Giordano,Rizzo,Lombardi,Moretti', c: 'Roma,Milano,Napoli,Torino,Palermo,Genova,Bologna,Firenze,Bari,Catania,Venezia,Verona,Padova,Trieste', st: 'Via Roma,Via Garibaldi,Via Mazzini,Corso Italia,Via Dante,Piazza del Popolo,Via Verdi,Via Marconi,Via Cavour,Viale Europa', addr: '{st} {n}', pc: '#####', ph: '+39 3## ### ####', country: 'Italia', co: 'S.r.l.,S.p.A.,& Figli', cc: 'IT' },
+    'pt-BR': { m: 'Miguel,Arthur,Gael,Heitor,Theo,Davi,Gabriel,Bernardo,Samuel,João,Pedro,Lucas,Rafael,Matheus,Gustavo', f: 'Helena,Alice,Laura,Maria,Valentina,Heloísa,Cecília,Júlia,Manuela,Sophia,Beatriz,Isabela,Larissa,Camila,Ana', s: 'Silva,Santos,Oliveira,Souza,Rodrigues,Ferreira,Alves,Pereira,Lima,Gomes,Costa,Ribeiro,Martins,Carvalho,Almeida,Lopes,Soares,Fernandes,Vieira,Barbosa', c: 'São Paulo,Rio de Janeiro,Brasília,Salvador,Fortaleza,Belo Horizonte,Manaus,Curitiba,Recife,Porto Alegre,Belém,Goiânia,Campinas,Florianópolis', st: 'Rua das Flores,Avenida Brasil,Rua São João,Avenida Paulista,Rua XV de Novembro,Rua Sete de Setembro,Rua da Paz,Avenida Atlântica', addr: '{st}, {n}', pc: '#####-###', ph: '+55 11 9####-####', country: 'Brasil', co: 'Ltda.,S.A.,ME', cc: 'BR' },
+    'nl-NL': { m: 'Noah,Liam,Luca,Lucas,Sem,Finn,Daan,Levi,Milan,Bram,Jesse,Thijs,Ruben,Lars,Jayden', f: 'Emma,Julia,Mila,Tess,Sophie,Zoë,Sara,Nora,Yara,Eva,Anna,Lotte,Fleur,Sanne,Isa', s: 'de Jong,Jansen,de Vries,van den Berg,van Dijk,Bakker,Janssen,Visser,Smit,Meijer,de Boer,Mulder,de Groot,Bos,Vos,Peters,Hendriks,van Leeuwen,Dekker,Brouwer', c: 'Amsterdam,Rotterdam,Den Haag,Utrecht,Eindhoven,Groningen,Tilburg,Almere,Breda,Nijmegen,Haarlem,Arnhem,Leiden,Maastricht', st: 'Kerkstraat,Schoolstraat,Molenweg,Dorpsstraat,Stationsweg,Julianastraat,Beatrixlaan,Nieuwstraat,Markt,Kastanjelaan', addr: '{st} {n}', pc: '#### AA', ph: '+31 6 ########', country: 'Nederland', co: 'B.V.,N.V.,& Zn.', cc: 'NL' },
+    'tr-TR': { m: 'Yusuf,Eymen,Ömer:omer,Mustafa,Ahmet,Mehmet,Ali,Emir,Kerem,Can,Burak,Emre,Murat,Hakan,Oğuz:oguz', f: 'Zeynep,Elif,Defne,Asel,Azra,Eylül:eylul,Ecrin,Nehir,Ayşe:ayse,Fatma,Merve,Esra,Büşra:busra,Selin,Deniz', s: 'Yılmaz:yilmaz,Kaya,Demir,Şahin:sahin,Çelik:celik,Yıldız:yildiz,Yıldırım:yildirim,Öztürk:ozturk,Aydın:aydin,Özdemir:ozdemir,Arslan,Doğan:dogan,Kılıç:kilic,Aslan,Çetin:cetin', c: 'İstanbul,Ankara,İzmir,Bursa,Antalya,Konya,Adana,Gaziantep,Kayseri,Eskişehir,Trabzon,Samsun', st: 'Atatürk Caddesi,Cumhuriyet Caddesi,İstiklal Caddesi,Gül Sokak,Lale Sokak,Bahçe Sokak,Okul Sokak,Çiçek Sokak', addr: '{st} No: {n}', pc: '#####', ph: '+90 5## ### ## ##', country: 'Türkiye', co: 'A.Ş.,Ltd. Şti.,Holding', cc: 'TR' },
+    'id-ID': { m: 'Muhammad,Ahmad,Budi,Agus,Dedi,Rizky,Andi,Fajar,Hendra,Arif,Bayu,Dimas,Eko,Galih,Yoga', f: 'Siti,Nur,Dewi,Sri,Putri,Ayu,Rina,Wulan,Indah,Fitri,Anisa,Lestari,Maya,Ratna,Yuni', s: 'Santoso,Wijaya,Saputra,Pratama,Hidayat,Kurniawan,Setiawan,Nugroho,Susanto,Gunawan,Halim,Lestari,Wibowo,Siregar,Nasution', c: 'Jakarta,Surabaya,Bandung,Medan,Semarang,Makassar,Palembang,Yogyakarta,Denpasar,Malang,Bogor,Balikpapan', st: 'Jl. Sudirman,Jl. Merdeka,Jl. Diponegoro,Jl. Gatot Subroto,Jl. Ahmad Yani,Jl. Pahlawan,Jl. Thamrin,Jl. Gajah Mada', addr: '{st} No. {n}', pc: '#####', ph: '+62 812-####-####', country: 'Indonesia', co: 'PT,CV', coFirst: true, cc: 'ID' },
+    'ru-RU': { m: 'Александр:aleksandr,Михаил:mikhail,Максим:maksim,Артём:artem,Иван:ivan,Дмитрий:dmitry,Даниил:daniil,Кирилл:kirill,Андрей:andrey,Егор:egor', f: 'Анна:anna,Мария:maria,София:sofia,Алиса:alisa,Виктория:viktoria,Полина:polina,Елизавета:elizaveta,Анастасия:anastasia,Дарья:darya,Екатерина:ekaterina', s: 'Иванов:ivanov,Смирнов:smirnov,Кузнецов:kuznetsov,Попов:popov,Васильев:vasilyev,Петров:petrov,Соколов:sokolov,Михайлов:mikhaylov,Новиков:novikov,Фёдоров:fedorov,Морозов:morozov,Волков:volkov', femSuffix: 'а', c: 'Москва,Санкт-Петербург,Новосибирск,Екатеринбург,Казань,Нижний Новгород,Самара,Омск,Ростов-на-Дону,Уфа,Красноярск,Пермь', st: 'ул. Ленина,ул. Мира,ул. Советская,ул. Садовая,ул. Гагарина,пр. Победы,ул. Лесная,ул. Школьная', addr: '{st}, д. {n}', pc: '######', ph: '+7 9## ###-##-##', country: 'Россия', co: 'ООО,АО', coFirst: true, cc: 'RU' },
+    'ar-EG': { m: 'محمد:mohamed,أحمد:ahmed,علي:ali,عمر:omar,يوسف:youssef,خالد:khaled,حسن:hassan,مصطفى:mostafa,كريم:karim,طارق:tarek', f: 'فاطمة:fatma,مريم:mariam,نور:nour,سارة:sara,ليلى:laila,هدى:hoda,ياسمين:yasmine,منى:mona,ريم:reem,سلمى:salma', s: 'السيد:elsayed,حسن:hassan,محمود:mahmoud,إبراهيم:ibrahim,عبد الله:abdallah,مصطفى:mostafa,علي:ali,عثمان:osman,سليمان:soliman,فؤاد:fouad', c: 'القاهرة,الإسكندرية,الجيزة,المنصورة,أسوان,الأقصر,طنطا,بورسعيد,السويس,الزقازيق', st: 'شارع التحرير,شارع الهرم,شارع النصر,شارع الجمهورية,شارع النيل,شارع السلام', addr: '{n} {st}', pc: '#####', ph: '+20 10 #### ####', country: 'مصر', co: 'ش.م.م,وشركاه', cc: 'EG' },
+    'ja-JP': { m: '翔:sho,蓮:ren,陽翔:haruto,湊:minato,大翔:hiroto,悠真:yuma,樹:itsuki,健太:kenta,拓海:takumi,大輝:daiki', f: '陽葵:himari,凛:rin,結菜:yuna,葵:aoi,芽依:mei,紬:tsumugi,さくら:sakura,美咲:misaki,花子:hanako,優奈:yuna', s: '佐藤:sato,鈴木:suzuki,高橋:takahashi,田中:tanaka,伊藤:ito,渡辺:watanabe,山本:yamamoto,中村:nakamura,小林:kobayashi,加藤:kato', familyFirst: true, noSpace: true, c: '東京都新宿区,大阪府大阪市,神奈川県横浜市,愛知県名古屋市,北海道札幌市,福岡県福岡市,京都府京都市,兵庫県神戸市', st: '中央,本町,栄町,緑町,旭町,幸町', addr: '{st}{n}-{n2}-{n3}', pc: '###-####', ph: '090-####-####', country: '日本', co: '株式会社', coFirst: true, cc: 'JP' },
+    'zh-CN': { m: '伟:wei,磊:lei,洋:yang,勇:yong,军:jun,杰:jie,涛:tao,明:ming,超:chao,强:qiang,浩然:haoran,子轩:zixuan', f: '芳:fang,娜:na,敏:min,静:jing,丽:li,秀英:xiuying,婷:ting,雪:xue,欣怡:xinyi,梓涵:zihan', s: '王:wang,李:li,张:zhang,刘:liu,陈:chen,杨:yang,赵:zhao,黄:huang,周:zhou,吴:wu,徐:xu,孙:sun', familyFirst: true, noSpace: true, c: '北京市,上海市,广州市,深圳市,成都市,杭州市,武汉市,西安市,南京市,重庆市', st: '人民路,中山路,解放路,建设路,和平路,长江路,新华街', addr: '{st}{n}号', pc: '######', ph: '+86 13# #### ####', country: '中国', co: '有限公司,科技有限公司', cc: 'CN' }
+  };
+  Object.keys(D).forEach(function (k) { var d = D[k]; ['m', 'f', 's', 'c', 'st'].forEach(function (x) { d[x] = L(d[x]); }); d.co = d.co.split(','); });
+  var JOBS = 'Accountant,Architect,Data Analyst,Designer,Developer,Engineer,Nurse,Teacher,Project Manager,Sales Manager,Marketing Specialist,Product Manager,Consultant,Pharmacist,Chef,Electrician,Lawyer,Photographer,Translator,Customer Support Agent,HR Manager,Researcher,Mechanic,Journalist,Logistics Coordinator'.split(',');
+  var WORDS = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore et dolore magna aliqua enim ad minim veniam quis nostrud exercitation ullamco laboris nisi aliquip ex ea commodo consequat'.split(' ');
+  var TYPES = [
+    ['id', 'Row number'], ['uuid', 'UUID'], ['first', 'First name'], ['last', 'Last name'], ['full', 'Full name'], ['gender', 'Gender'], ['email', 'Email (example.com)'], ['username', 'Username'], ['password', 'Password'], ['phone', 'Phone'],
+    ['street', 'Street address'], ['city', 'City'], ['postcode', 'Postcode'], ['country', 'Country'], ['ccode', 'Country code'], ['address', 'Full address'], ['company', 'Company'], ['job', 'Job title'],
+    ['dob', 'Date of birth'], ['age', 'Age'], ['date', 'Date (last 2 years)'], ['datetime', 'Date and time (ISO)'], ['int', 'Number 1–1000'], ['price', 'Price 0.99–999.99'], ['bool', 'True / false'],
+    ['ip', 'IPv4 (documentation range)'], ['ipv6', 'IPv6 (documentation range)'], ['url', 'URL (example.com)'], ['color', 'Hex colour'], ['lat', 'Latitude'], ['lng', 'Longitude'], ['sentence', 'Sentence (lorem ipsum)']
+  ];
+  var DEFAULT = [['id', 'id'], ['first', 'first_name'], ['last', 'last_name'], ['email', 'email'], ['phone', 'phone'], ['city', 'city'], ['country', 'country'], ['dob', 'birth_date']];
+
+  // ---- random numbers: crypto by default, a seeded generator when a seed is given ----
+  var rnd;
+  function seeded(str) { var h = 1779033703 ^ str.length; for (var i = 0; i < str.length; i++) { h = Math.imul(h ^ str.charCodeAt(i), 3432918353); h = h << 13 | h >>> 19; } var a = h >>> 0; return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+  function cryptoRnd() { var buf = new Uint32Array(1024), i = 1024; return function () { if (i >= 1024) { crypto.getRandomValues(buf); i = 0; } return buf[i++] / 4294967296; }; }
+  function int(a, b) { return a + Math.floor(rnd() * (b - a + 1)); }
+  function pick(a) { return a[Math.floor(rnd() * a.length)]; }
+  function pattern(p) { return p.replace(/[#A]/g, function (c) { return c === '#' ? String(int(0, 9)) : String.fromCharCode(65 + int(0, 25)); }); }
+  function pad(n) { return n < 10 ? '0' + n : String(n); }
+  function iso(d) { return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()); }
+  function ascii(s) { return s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').replace(/ß/g, 'ss').replace(/ø/g, 'o').replace(/ı/g, 'i').toLowerCase().replace(/[^a-z0-9]+/g, ''); }
+
+  // One made-up person per row, so name, email and username match each other.
+  function person(loc) {
+    var d = D[loc], fem = rnd() < 0.5, first = pick(fem ? d.f : d.m), s1 = pick(d.s), last = { n: s1.n, l: s1.l };
+    if (d.two) { var s2 = pick(d.s); if (s2.n !== s1.n) last = { n: s1.n + ' ' + s2.n, l: s1.l }; }
+    if (d.femSuffix && fem) last = { n: last.n + d.femSuffix, l: last.l + 'a' };
+    var full = d.familyFirst ? last.n + (d.noSpace ? '' : ' ') + first.n : first.n + ' ' + last.n;
+    var fl = ascii(first.l), ll = ascii(last.l), sep = pick(['.', '_', '', '.']);
+    var user = pick([fl + sep + ll, fl.charAt(0) + ll, fl + ll.charAt(0), ll + sep + fl]) + (rnd() < 0.6 ? int(1, 99) : '');
+    var city = pick(d.c), n = int(1, 199);
+    var street = d.addr.replace('{st}', pick(d.st).n).replace('{n}', n).replace('{n2}', int(1, 30)).replace('{n3}', int(1, 20));
+    var pc = pattern(d.pc);
+    var addrFull = loc === 'ja-JP' ? '〒' + pc + ' ' + city.n + street : loc === 'zh-CN' ? city.n + street + ' ' + pc : loc === 'en-US' ? street + ', ' + city.n + ' ' + pc : loc === 'en-GB' || loc === 'en-IN' ? street + ', ' + city.n + ' ' + pc : street + ', ' + pc + ' ' + city.n;
+    var co = d.coFirst ? (loc === 'ja-JP' || loc === 'zh-CN' ? (loc === 'ja-JP' ? d.co[0] + pick(d.s).n + pick(['商事', '工業', '電機', '物産']) : pick(d.s).n + pick(['华', '鑫', '腾', '盛']) + pick(['科技', '贸易', '实业']) + pick(d.co)) : pick(d.co) + ' ' + pick(d.s).n + ' ' + pick(['Mandiri', 'Sejahtera', 'Group', 'Trading'])) : pick(d.s).n + ' ' + pick(d.co);
+    if (loc === 'ru-RU') co = pick(d.co) + ' «' + pick(['Север', 'Альфа', 'Восток', 'Прогресс', 'Вектор']) + '»';
+    if (loc === 'ar-EG') co = pick(['شركة النيل', 'شركة الأمل', 'شركة المستقبل', 'شركة الهرم']) + ' ' + pick(d.co);
+    return { first: first.n, last: last.n, full: full, gender: fem ? 'female' : 'male', email: user.replace(/\d+$/, '') + (rnd() < 0.5 ? int(1, 99) : '') + '@' + pick(['example.com', 'example.org', 'example.net']), username: user, phone: pattern(d.ph), street: street, city: city.n, postcode: pc, country: d.country, ccode: d.cc, address: addrFull, company: co, slug: fl };
+  }
+  // the same birth date for a row's date of birth and age columns
+  function dob(p, now) { if (!p._dob) p._dob = new Date(now - (18 * 365.25 + rnd() * 62 * 365.25) * 864e5); return p._dob; }
+  var COLNAME = { id: 'id', uuid: 'uuid', first: 'first_name', last: 'last_name', full: 'full_name', gender: 'gender', email: 'email', username: 'username', password: 'password', phone: 'phone', street: 'street', city: 'city', postcode: 'postcode', country: 'country', ccode: 'country_code', address: 'address', company: 'company', job: 'job_title', dob: 'birth_date', age: 'age', date: 'date', datetime: 'created_at', int: 'number', price: 'price', bool: 'active', ip: 'ip_address', ipv6: 'ipv6_address', url: 'url', color: 'color', lat: 'latitude', lng: 'longitude', sentence: 'note' };
+  function value(type, p, i, now) {
+    switch (type) {
+      case 'id': return i + 1;
+      case 'uuid': var h = []; for (var k = 0; k < 16; k++) h.push(int(0, 255)); h[6] = (h[6] & 15) | 64; h[8] = (h[8] & 63) | 128; var x = h.map(function (b) { return (b < 16 ? '0' : '') + b.toString(16); }).join(''); return x.slice(0, 8) + '-' + x.slice(8, 12) + '-' + x.slice(12, 16) + '-' + x.slice(16, 20) + '-' + x.slice(20);
+      case 'password': var cs = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%&*?', pw = ''; for (var j = 0; j < 14; j++) pw += cs.charAt(int(0, cs.length - 1)); return pw;
+      case 'dob': return iso(dob(p, now));
+      case 'age': return Math.floor((now - dob(p, now)) / (365.25 * 864e5));
+      case 'date': return iso(new Date(now - rnd() * 730 * 864e5));
+      case 'datetime': return new Date(now - rnd() * 730 * 864e5).toISOString().replace(/\.\d+Z$/, 'Z');
+      case 'int': return int(1, 1000);
+      case 'price': return +(int(99, 99999) / 100).toFixed(2);
+      case 'bool': return rnd() < 0.5;
+      case 'ip': return pick(['192.0.2.', '198.51.100.', '203.0.113.']) + int(1, 254);
+      case 'ipv6': return '2001:db8:' + [int(0, 65535), int(0, 65535), int(0, 65535), int(0, 65535)].map(function (v) { return v.toString(16); }).join(':') + '::' + int(1, 65535).toString(16);
+      case 'url': return 'https://www.' + pick(['example.com', 'example.org', 'example.net']) + '/' + pick(['blog', 'shop', 'news', 'products', 'about', 'docs']) + '/' + (p.slug || 'page') + '-' + int(1, 999);
+      case 'color': return '#' + ('00000' + int(0, 0xFFFFFF).toString(16)).slice(-6);
+      case 'lat': return +(rnd() * 180 - 90).toFixed(6);
+      case 'lng': return +(rnd() * 360 - 180).toFixed(6);
+      case 'job': return pick(JOBS);
+      case 'sentence': var n = int(5, 12), w = []; for (var q = 0; q < n; q++) w.push(pick(WORDS)); var s = w.join(' '); return s.charAt(0).toUpperCase() + s.slice(1) + '.';
+      default: return p[type];
+    }
+  }
+
+  // ---- column editor ----
+  function addRow(type, name) {
+    var row = document.createElement('div'); row.className = 'fdg-row';
+    row.innerHTML = '<select aria-label="Data type">' + TYPES.map(function (t) { return '<option value="' + t[0] + '"' + (t[0] === type ? ' selected' : '') + '>' + t[1] + '</option>'; }).join('') + '</select><input type="text" aria-label="Column name" maxlength="64" spellcheck="false"><button type="button" aria-label="Remove column" title="Remove column">×</button>';
+    row.querySelector('input').value = name;
+    row.querySelector('select').addEventListener('change', function () { var inp = row.querySelector('input'); if (!inp.dataset.touched) inp.value = COLNAME[this.value] || this.value; save(); });
+    row.querySelector('input').addEventListener('input', function () { this.dataset.touched = 1; save(); });
+    row.querySelector('button').addEventListener('click', function () { if ($('fdFields').children.length > 1) { row.remove(); save(); } else say('', 'Keep at least one column.'); });
+    $('fdFields').appendChild(row);
+  }
+  function cols() { return [].map.call($('fdFields').children, function (r) { return [r.querySelector('select').value, r.querySelector('input').value.trim() || r.querySelector('select').value]; }); }
+  function save() { try { localStorage.setItem('gtn-fake-cols', JSON.stringify(cols())); } catch (e) {} }
+  function load() { var c = null; try { c = JSON.parse(localStorage.getItem('gtn-fake-cols')); } catch (e) {} if (!Array.isArray(c) || !c.length) c = DEFAULT; $('fdFields').innerHTML = ''; c.forEach(function (x) { if (Array.isArray(x) && TYPES.some(function (t) { return t[0] === x[0]; })) addRow(x[0], String(x[1])); }); if (!$('fdFields').children.length) DEFAULT.forEach(function (x) { addRow(x[0], x[1]); }); }
+
+  // ---- output ----
+  function csvCell(v) { var s = String(v); return /[",\n\r]/.test(s) || /^\s|\s$/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+  function sqlId(s) { return '"' + String(s).replace(/"/g, '""') + '"'; }
+  function sqlVal(v) { return typeof v === 'number' ? String(v) : typeof v === 'boolean' ? (v ? 'TRUE' : 'FALSE') : "'" + String(v).replace(/'/g, "''") + "'"; }
+  var last = '', ext = 'csv';
+  function say(cls, t) { $('fdMsg').className = 'msg ' + cls; $('fdMsg').textContent = t; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function generate() {
+    var n = Math.floor(+$('fdRows').value);
+    if (!(n >= 1)) return say('bad', 'Enter how many rows you need (1 to 10,000).');
+    if (n > 10000) { n = 10000; $('fdRows').value = 10000; }
+    var c = cols(), names = c.map(function (x) { return x[1]; }), seed = $('fdSeed').value.trim();
+    var dup = names.filter(function (x, i) { return names.indexOf(x) !== i; });
+    if (dup.length) return say('bad', 'Two columns are both called “' + dup[0] + '”. Give each column its own name.');
+    rnd = seed ? seeded(seed) : cryptoRnd();
+    var now = seed ? Date.UTC(2026, 0, 1) : Date.now(), loc = $('fdLoc').value, locs = Object.keys(D), rows = [];
+    for (var i = 0; i < n; i++) { var p = person(loc === 'mix' ? pick(locs) : loc), r = []; for (var j = 0; j < c.length; j++) r.push(value(c[j][0], p, i, now)); rows.push(r); }
+    var fmt = $('fdFmt').value, out;
+    if (fmt === 'csv') { out = '\ufeff' + names.map(csvCell).join(',') + '\r\n' + rows.map(function (r) { return r.map(csvCell).join(','); }).join('\r\n') + '\r\n'; ext = 'csv'; }
+    else if (fmt === 'json' || fmt === 'jsonl') {
+      var objs = rows.map(function (r) { var o = {}; names.forEach(function (k, j) { o[k] = r[j]; }); return o; });
+      out = fmt === 'json' ? JSON.stringify(objs, null, 2) + '\n' : objs.map(function (o) { return JSON.stringify(o); }).join('\n') + '\n'; ext = fmt === 'json' ? 'json' : 'jsonl';
+    } else {
+      var t = $('fdTable').value.trim() || 'people', head = 'INSERT INTO ' + sqlId(t) + ' (' + names.map(sqlId).join(', ') + ') VALUES\n', parts = [];
+      for (var b = 0; b < rows.length; b += 500) parts.push(head + rows.slice(b, b + 500).map(function (r) { return '  (' + r.map(sqlVal).join(', ') + ')'; }).join(',\n') + ';');
+      out = parts.join('\n\n') + '\n'; ext = 'sql';
+    }
+    last = out;
+    $('fdOut').value = out.length > 2000000 ? out.slice(0, 2000000).replace(/^\ufeff/, '') + '\n… (preview cut here; Copy and Download include everything)' : out.replace(/^\ufeff/, '');
+    $('fdPrev').hidden = false;
+    $('fdPrev').innerHTML = '<table><thead><tr>' + names.map(function (x) { return '<th>' + esc(x) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.slice(0, 8).map(function (r) { return '<tr>' + r.map(function (v) { return '<td>' + esc(v) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table>';
+    say('ok', 'Generated ' + fmtNum(n) + ' row' + (n === 1 ? '' : 's') + ' (' + fmtBytes(new Blob([out]).size) + '). All people are made up; emails use the reserved example.com domains' + (seed ? '; the same seed gives the same data.' : '.'));
+  }
+  $('fdAdd').addEventListener('click', function () { if ($('fdFields').children.length >= 40) return say('', 'That is the maximum of 40 columns.'); var used = cols().map(function (c) { return c[0]; }), next = TYPES.filter(function (t) { return used.indexOf(t[0]) === -1; })[0] || TYPES[0]; addRow(next[0], COLNAME[next[0]]); save(); });
+  $('fdReset').addEventListener('click', function () { $('fdFields').innerHTML = ''; DEFAULT.forEach(function (x) { addRow(x[0], x[1]); }); save(); });
+  $('fdGo').addEventListener('click', generate);
+  $('fdCp').addEventListener('click', function () { if (!last) return say('', 'Press Generate first.'); copyText(last.replace(/^\ufeff/, ''), $('fdCp')); });
+  $('fdDl').addEventListener('click', function () {
+    if (!last) return say('', 'Press Generate first.');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([last], { type: { csv: 'text/csv', json: 'application/json', jsonl: 'application/x-ndjson', sql: 'application/sql' }[ext] + ';charset=utf-8' })); a.download = 'fake-data.' + ext;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  load();
+})();
+</script>

@@ -241,5 +241,21 @@ module.exports = {
 "face-blur":["人脸打码","面部模糊","顔ぼかし","顔モザイク"],
 "photo-colorizer":["黑白照片上色","老照片上色","白黒写真カラー化"],
 "color-blindness-simulator":["色盲模拟","色覚シミュレーション"],
-"before-after-slider":["前后对比","ビフォーアフター"]
+"before-after-slider":["前后对比","ビフォーアフター"],
+"retirement-calculator":["退休计算器","养老金计算","老後資金計算"],
+"net-worth-calculator":["净资产计算器","純資産計算"],
+"debt-payoff-calculator":["还债计算器","借金返済計算"],
+"rent-vs-buy-calculator":["租房还是买房","賃貸か購入か"],
+"overtime-calculator":["加班费计算器","残業代計算"],
+"hourly-salary-converter":["时薪换算年薪","時給 年収 換算"],
+"macro-calculator":["宏量营养素计算","pfc計算"],
+"running-pace-calculator":["跑步配速计算器","ペース計算"],
+"one-rep-max-calculator":["最大重量计算","1rm計算"],
+"heart-rate-zones-calculator":["心率区间计算","心拍ゾーン計算"],
+"period-ovulation-calculator":["排卵期计算器","月经周期计算","排卵日計算","生理日計算"],
+"paint-calculator":["油漆计算器","ペンキ計算"],
+"tile-calculator":["瓷砖计算器","タイル計算"],
+"pet-age-calculator":["狗狗年龄换算","猫の年齢 人間"],
+"zodiac-sign-calculator":["星座查询","生肖查询","星座 診断","干支"],
+"cooking-converter":["杯换算克","計量カップ グラム 換算"]
 };
