@@ -1,0 +1,28 @@
+// Search aliases for the site finder. Generated data; one entry per tool slug.
+// Language: ps
+module.exports = {
+"image-compressor":["د انځور حجم کمول","عکس کوچنی کول"],
+"image-resizer":["د انځور اندازه بدلول"],
+"qr-code-generator":["qr کوډ جوړول"],
+"password-generator":["پټنوم جوړونکی"],
+"word-counter":["د کلمو شمېرنه"],
+"age-calculator":["د عمر محاسبه","عمر حسابول"],
+"percentage-calculator":["سلنه محاسبه"],
+"merge-pdf":["pdf یوځای کول","د pdf فایلونه یوځای کړئ"],
+"compress-pdf":["pdf کوچنی کول","د pdf حجم کمول"],
+"jpg-to-pdf":["انځور pdf ته","عکس په pdf بدلول"],
+"countdown-timer":["ټایمر"],
+"image-to-text":["له انځور څخه متن"],
+"voice-recorder":["غږ ثبتول"],
+"video-to-mp3":["ویډیو mp3 ته"],
+"scientific-calculator":["محاسبه ماشین","کیلکولیټر"],
+"currency-converter":["د اسعارو بدلون","د ډالر نرخ","افغانۍ ډالر"],
+"alarm-clock":["الارم ساعت"],
+"background-remover":["شالید لرې کول","د عکس شالید لرې کړئ"],
+"video-compressor":["ویډیو کوچنۍ کول","د ویډیو حجم کمول"],
+"video-trimmer":["ویډیو پرې کول"],
+"pdf-to-word":["pdf ورډ ته بدلول"],
+"resume-maker":["سي وي جوړول","خپل سوانح"],
+"online-keyboard":["پښتو کیبورډ","پښتو ټایپ"],
+"offline-translator":["ژباړونکی","ژباړه","ژباړه وکړئ"]
+};

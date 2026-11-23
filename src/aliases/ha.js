@@ -1,0 +1,21 @@
+// Search aliases for the site finder. Generated data; one entry per tool slug.
+// Language: ha
+module.exports = {
+"image-compressor":["rage girman hoto","matse hoto"],
+"image-resizer":["canza girman hoto"],
+"qr-code-generator":["kirkiri qr code"],
+"age-calculator":["lissafin shekaru"],
+"percentage-calculator":["lissafin kashi"],
+"merge-pdf":["hada pdf","haɗa pdf","hada fayilolin pdf"],
+"compress-pdf":["rage girman pdf"],
+"jpg-to-pdf":["mayar da hoto pdf","hoto zuwa pdf"],
+"scientific-calculator":["na'urar lissafi","kalkuleta"],
+"currency-converter":["canjin kudi","farashin dala","naira zuwa dala"],
+"background-remover":["cire bango","cire bayan hoto"],
+"video-compressor":["rage girman bidiyo"],
+"video-trimmer":["yanke bidiyo"],
+"pdf-to-word":["mayar da pdf word"],
+"savings-circle-calculator":["adashe","asusu"],
+"resume-maker":["rubuta cv"],
+"offline-translator":["fassara","mai fassara","fassarar turanci zuwa hausa"]
+};

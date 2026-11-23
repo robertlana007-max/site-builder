@@ -1,0 +1,25 @@
+// Search aliases for the site finder. Generated data; one entry per tool slug.
+// Language: my
+module.exports = {
+"image-compressor":["ဓာတ်ပုံဆိုဒ်လျှော့","ပုံချုံ့"],
+"image-resizer":["ပုံအရွယ်အစားပြောင်း"],
+"qr-code-generator":["qr code ဖန်တီး"],
+"word-counter":["စကားလုံးရေတွက်"],
+"age-calculator":["အသက်တွက်"],
+"percentage-calculator":["ရာခိုင်နှုန်းတွက်"],
+"merge-pdf":["pdf ပေါင်းရန်","pdf ဖိုင်ပေါင်း"],
+"compress-pdf":["pdf ဆိုဒ်လျှော့","pdf ချုံ့"],
+"jpg-to-pdf":["ဓာတ်ပုံကို pdf ပြောင်း","jpg မှ pdf"],
+"countdown-timer":["အချိန်တိုင်း"],
+"image-to-text":["ပုံမှစာသား"],
+"video-to-mp3":["ဗီဒီယိုမှ mp3"],
+"scientific-calculator":["ဂဏန်းတွက်စက်"],
+"currency-converter":["ငွေလဲနှုန်း","ဒေါ်လာဈေး"],
+"background-remover":["နောက်ခံဖျက်","background ဖျက်"],
+"video-compressor":["ဗီဒီယိုချုံ့","ဗီဒီယိုဆိုဒ်လျှော့"],
+"video-trimmer":["ဗီဒီယိုဖြတ်"],
+"pdf-to-word":["pdf မှ word ပြောင်း"],
+"resume-maker":["cv ရေး","ကိုယ်ရေးအကျဉ်း"],
+"online-keyboard":["မြန်မာကီးဘုတ်","zawgyi unicode","myanmar typing"],
+"offline-translator":["ဘာသာပြန်","ဘာသာပြန်စက်","myanmar translation"]
+};

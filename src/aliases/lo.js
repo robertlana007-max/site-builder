@@ -1,0 +1,17 @@
+// Search aliases for the site finder. Generated data; one entry per tool slug.
+// Language: lo
+module.exports = {
+"image-compressor":["ຫຼຸດຂະໜາດຮູບ","ບີບອັດຮູບ"],
+"image-resizer":["ປັບຂະໜາດຮູບ"],
+"qr-code-generator":["ສ້າງ qr code"],
+"age-calculator":["ຄິດໄລ່ອາຍຸ"],
+"merge-pdf":["ລວມ pdf","ລວມໄຟລ໌ pdf"],
+"compress-pdf":["ຫຼຸດຂະໜາດ pdf","ບີບອັດ pdf"],
+"jpg-to-pdf":["ປ່ຽນຮູບເປັນ pdf"],
+"scientific-calculator":["ເຄື່ອງຄິດເລກ"],
+"currency-converter":["ອັດຕາແລກປ່ຽນ","ແລກເງິນກີບ"],
+"background-remover":["ລົບພື້ນຫຼັງ"],
+"video-compressor":["ຫຼຸດຂະໜາດວິດີໂອ"],
+"online-keyboard":["ແປ້ນພິມລາວ","lao typing"],
+"offline-translator":["ແປພາສາ","ແປ","lao translation"]
+};
