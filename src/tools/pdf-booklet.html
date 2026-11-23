@@ -1,0 +1,190 @@
+<style>
+.bk-prev { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+.bk-prev figure { margin: 0; text-align: center; font-size: 12px; color: var(--muted); }
+.bk-prev canvas { display: block; border: 1px solid var(--line); background: #fff; max-width: 100%; height: auto; }
+.bk-tip { font-size: 14px; margin: 10px 0 0; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>Print several pages on one sheet, or as a folded booklet. Nothing is uploaded.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div class="fields">
+  <div><label for="bkMode">Layout</label><select id="bkMode">
+    <option value="booklet">Booklet (fold in half, 4 pages per sheet)</option>
+    <option value="2">2 pages per sheet side</option><option value="4">4 pages per sheet side</option>
+    <option value="6">6 pages per sheet side</option><option value="9">9 pages per sheet side</option><option value="16">16 pages per sheet side</option></select></div>
+  <div><label for="bkPaper">Sheet size</label><select id="bkPaper"><option value="a4">A4</option><option value="letter">Letter</option><option value="a3">A3</option><option value="legal">Legal</option><option value="tabloid">Tabloid (11 × 17 in)</option><option value="same">Same as the PDF’s first page</option></select></div>
+  <div><label for="bkDir">Reading direction</label><select id="bkDir"><option value="ltr">Left to right</option><option value="rtl">Right to left (Arabic, Hebrew, Urdu, Japanese books)</option></select></div>
+  <div id="bkSigBox"><label for="bkSig">Sheets per folded section</label><select id="bkSig"><option value="0">All sheets in one booklet</option><option value="2">2 sheets (8 pages)</option><option value="3">3 sheets (12 pages)</option><option value="4">4 sheets (16 pages)</option><option value="5">5 sheets (20 pages)</option><option value="8">8 sheets (32 pages)</option><option value="10">10 sheets (40 pages)</option></select></div>
+  <div id="bkFlowBox" hidden><label for="bkFlow">Page order</label><select id="bkFlow"><option value="rows">Across, then down</option><option value="cols">Down, then across</option></select></div>
+  <div><label for="bkMargin">Outer margin (mm)</label><input type="number" id="bkMargin" min="0" max="50" step="1" value="5"></div>
+  <div><label for="bkGap">Space between pages (mm)</label><input type="number" id="bkGap" min="0" max="50" step="1" value="4"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="bkBorder"> Draw a thin line around each page</label></div>
+<div class="btns"><button class="btn" id="go" disabled>Make PDF</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<p class="bk-tip" id="bkTip" hidden></p>
+<div class="bk-prev" id="bkPrev"></div>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, busy = false, count = 0;
+  var MM = 72 / 25.4, PAPER = { a4: [595.28, 841.89], letter: [612, 792], a3: [841.89, 1190.55], legal: [612, 1008], tabloid: [792, 1224] };
+  var reg = ''; try { reg = (new Intl.Locale(navigator.language || 'en')).maximize().region || ''; } catch (e) { reg = ((navigator.language || '').split('-')[1] || '').toUpperCase(); }
+  $('bkPaper').value = /^(US|CA|MX|PH|CL|CO|VE|GT|PR|CR|PA|DO|SV|NI|HN|BZ)$/.test(reg) ? 'letter' : 'a4'; // a remembered choice is restored over this
+  if (/^(ar|he|fa|ur|yi|ps|sd|ckb|dv)\b/i.test(navigator.language || '')) $('bkDir').value = 'rtl';
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so their pages can be copied ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (b) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(b));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+  async function openLib() {
+    try { return await PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); }
+    catch (e) {
+      if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + file.name + '" could not be read as a PDF.');
+      bytes = await QP(bytes);
+      return PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+    }
+  }
+
+  function sync() {
+    var b = $('bkMode').value === 'booklet';
+    $('bkSigBox').hidden = !b; $('bkFlowBox').hidden = b; $('dl').hidden = true; $('bkTip').hidden = true; $('bkPrev').innerHTML = '';
+  }
+  ['bkMode', 'bkPaper', 'bkDir', 'bkSig', 'bkFlow', 'bkMargin', 'bkGap', 'bkBorder'].forEach(function (id) { $(id).addEventListener('change', sync); });
+  $('bkMode').addEventListener('change', sync); sync();
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; $('go').disabled = true; PT.say('', 'Opening ' + f.name + '…'); sync();
+    (async function () {
+      file = f; bytes = new Uint8Array(await f.arrayBuffer());
+      var d = await openLib(); count = d.getPageCount();
+      $('drop').querySelector('b').textContent = f.name;
+      PT.say('', f.name + ' · ' + count + (count === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size));
+    })().catch(function (e) { file = null; PT.say('bad', e && e.message ? e.message : 'Something went wrong with this file.'); }).then(function () { busy = false; $('go').disabled = !file; });
+  });
+
+  // booklet order: for each sheet, [front left, front right, back left, back right] (null = blank page)
+  function bookletOrder(n, perSection, rtl) {
+    var out = [], start = 0;
+    while (start < n) {
+      var left = n - start, P = perSection ? Math.min(perSection * 4, Math.ceil(left / 4) * 4) : Math.ceil(left / 4) * 4;
+      for (var s = 0; s < P / 4; s++) {
+        var f = [P - 1 - 2 * s, 2 * s], b = [2 * s + 1, P - 2 - 2 * s];
+        if (rtl) { f.reverse(); b.reverse(); }
+        out.push(f.map(function (i) { return start + i < n && i < left ? start + i : null; }));
+        out.push(b.map(function (i) { return start + i < n && i < left ? start + i : null; }));
+      }
+      start += P;
+    }
+    return out;
+  }
+
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    busy = true;
+    PT.run(async function () {
+      var L = PDFLib, src = await openLib(), pages = src.getPages(), n = pages.length, mode = $('bkMode').value, rtl = $('bkDir').value === 'rtl';
+      var margin = Math.max(0, parseFloat($('bkMargin').value) || 0) * MM, gap = Math.max(0, parseFloat($('bkGap').value) || 0) * MM;
+      // what each page looks like to a reader (size and turn)
+      var info = pages.map(function (p) { var b = p.getCropBox(), r = ((Math.round((p.getRotation().angle || 0) / 90) * 90) % 360 + 360) % 360, side = r % 180 !== 0; return { box: b, r: r, w: side ? b.height : b.width, h: side ? b.width : b.height }; });
+      var paper = $('bkPaper').value === 'same' ? [Math.min(info[0].w, info[0].h), Math.max(info[0].w, info[0].h)] : PAPER[$('bkPaper').value];
+      var sheets, cols, rows, SW, SH;
+      if (mode === 'booklet') {
+        sheets = bookletOrder(n, +$('bkSig').value, rtl);
+        cols = 2; rows = 1;
+        // the sheet is turned sideways so two pages fit side by side; if the pages are wide, two go one above the other instead
+        if (info[0].w > info[0].h * 1.15) { cols = 1; rows = 2; SW = paper[0]; SH = paper[1]; } else { SW = paper[1]; SH = paper[0]; }
+        // stacked pages fold along the middle line: the front has the last page on top and the cover below; the back side
+        // (printed flipping on the long edge) keeps top and bottom, so its order is the other way round
+        if (cols === 1) sheets = bookletOrder(n, +$('bkSig').value, false).map(function (sh, k) { return k % 2 ? sh.slice().reverse() : sh; });
+      } else {
+        var k = +mode, pairs = { 2: [[1, 2], [2, 1]], 4: [[2, 2]], 6: [[2, 3], [3, 2]], 9: [[3, 3]], 16: [[4, 4]] }[k], best = null;
+        [[paper[0], paper[1]], [paper[1], paper[0]]].forEach(function (sz) {
+          pairs.forEach(function (pr) {
+            var cw = (sz[0] - 2 * margin - (pr[0] - 1) * gap) / pr[0], ch = (sz[1] - 2 * margin - (pr[1] - 1) * gap) / pr[1];
+            var s = Math.min(cw / info[0].w, ch / info[0].h);
+            if (cw > 0 && ch > 0 && (!best || s > best.s + 1e-6)) best = { s: s, sz: sz, c: pr[0], r: pr[1] };
+          });
+        });
+        if (!best) throw new Error('The margins and spaces are too big for this sheet. Make them smaller.');
+        SW = best.sz[0]; SH = best.sz[1]; cols = best.c; rows = best.r; sheets = [];
+        for (var i = 0; i < n; i += k) { var g = []; for (var j = 0; j < k; j++) g.push(i + j < n ? i + j : null); sheets.push(g); }
+      }
+      var cw = (SW - 2 * margin - (cols - 1) * gap) / cols, ch = (SH - 2 * margin - (rows - 1) * gap) / rows;
+      if (cw < 20 || ch < 20) throw new Error('The margins and spaces are too big for this sheet. Make them smaller.');
+      var out = await L.PDFDocument.create(), used = {};
+      sheets.forEach(function (sh) { sh.forEach(function (i) { if (i != null) used[i] = 1; }); });
+      var list = Object.keys(used).map(Number).sort(function (a, b) { return a - b; });
+      var emb = {}, CH = 40;
+      for (var q = 0; q < list.length; q += CH) {
+        PT.say('', 'Reading pages ' + (q + 1) + '–' + Math.min(list.length, q + CH) + ' of ' + list.length + '…');
+        var part = list.slice(q, q + CH), e = await out.embedPages(part.map(function (i) { return pages[i]; }), part.map(function (i) { var b = info[i].box; return { left: b.x, bottom: b.y, right: b.x + b.width, top: b.y + b.height }; }));
+        part.forEach(function (i, z) { emb[i] = e[z]; });
+      }
+      var line = L.rgb(.6, .62, .66), flow = $('bkFlow').value;
+      sheets.forEach(function (sh, si) {
+        var page = out.addPage([SW, SH]);
+        sh.forEach(function (i, slot) {
+          var c, r;
+          if (mode === 'booklet') { c = slot % cols; r = Math.floor(slot / cols); }
+          else if (flow === 'cols') { r = slot % rows; c = Math.floor(slot / rows); }
+          else { c = slot % cols; r = Math.floor(slot / cols); }
+          if (rtl && mode !== 'booklet') c = cols - 1 - c;
+          var X = margin + c * (cw + gap), Y = SH - margin - (r + 1) * ch - r * gap;
+          if (i == null) return;
+          var p = info[i], s = Math.min(cw / p.w, ch / p.h), w = p.w * s, h = p.h * s, x = X + (cw - w) / 2, y = Y + (ch - h) / 2;
+          if (mode === 'booklet' && cols === 2) x = slot % 2 === 0 ? X + cw - w : X; // pages sit against the fold
+          var ew = p.box.width * s, eh = p.box.height * s, o;
+          if (p.r === 90) o = { x: x, y: y + h, rotate: L.degrees(-90) };
+          else if (p.r === 180) o = { x: x + w, y: y + h, rotate: L.degrees(180) };
+          else if (p.r === 270) o = { x: x + w, y: y, rotate: L.degrees(90) };
+          else o = { x: x, y: y };
+          page.drawPage(emb[i], Object.assign(o, { width: ew, height: eh }));
+          if ($('bkBorder').checked) page.drawRectangle({ x: x, y: y, width: w, height: h, borderColor: line, borderWidth: .5 });
+        });
+        if (mode === 'booklet' && $('bkBorder').checked) { // fold line
+          if (cols === 2) page.drawLine({ start: { x: SW / 2, y: margin / 2 }, end: { x: SW / 2, y: SH - margin / 2 }, thickness: .3, color: line, dashArray: [3, 3] });
+          else page.drawLine({ start: { x: margin / 2, y: SH / 2 }, end: { x: SW - margin / 2, y: SH / 2 }, thickness: .3, color: line, dashArray: [3, 3] });
+        }
+      });
+      PT.say('', 'Saving…');
+      var bytesOut = await out.save(), sides = out.getPageCount();
+      PT.done(bytesOut, PT.base(file.name) + (mode === 'booklet' ? '-booklet.pdf' : '-' + mode + '-up.pdf'), 'application/pdf', mode === 'booklet' ? 'Booklet ready: ' + sides / 2 + (sides / 2 === 1 ? ' sheet' : ' sheets') + ' of paper (' + sides + ' sides)' : n + ' pages on ' + sides + (sides === 1 ? ' sheet side' : ' sheet sides'));
+      var tip = $('bkTip'); tip.hidden = false;
+      tip.textContent = mode === 'booklet' ? (cols === 2 ? 'To print: choose double-sided printing and “flip on short edge”, at actual size (100%). Fold the printed stack in half' : 'To print: choose double-sided printing and “flip on long edge”, at actual size (100%). Fold the printed stack in half across the middle') + (+$('bkSig').value ? ', one section at a time, then stack the sections in order and staple or sew them.' : ', then staple along the fold.')
+        : 'Print at actual size (100%), or choose “fit to page” if your printer uses a different paper size.';
+      // small preview of the first sides
+      pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+      var pv = await pdfjsLib.getDocument({ data: bytesOut.slice() }).promise, box = $('bkPrev'); box.innerHTML = '';
+      for (var v = 1; v <= Math.min(4, pv.numPages); v++) {
+        var r2 = await PT.pageCanvas(pv, v, 150 / Math.max(SW, SH)), fig = document.createElement('figure'), cap = document.createElement('figcaption');
+        cap.textContent = mode === 'booklet' ? 'Sheet ' + Math.ceil(v / 2) + (v % 2 ? ', front' : ', back') : 'Side ' + v;
+        fig.appendChild(r2.canvas); fig.appendChild(cap); box.appendChild(fig);
+      }
+      pv.destroy();
+    }).then(function () { busy = false; });
+  });
+})();
+</script>

@@ -17,7 +17,7 @@ async function check(b, w) {
   const ctx = await b.newContext({ viewport: { width: w, height: 860 } });
   const p = await ctx.newPage();
   let errs = [];
-  p.on('console', m => { if (m.type() === 'error') errs.push(m.text()); });
+  p.on('console', m => { if (m.type() === 'error' && !/ERR_TUNNEL|ERR_NAME|ERR_PROXY|ERR_CONNECTION/.test(m.text())) errs.push(m.text()); });
   p.on('pageerror', e => errs.push(String(e)));
   for (const s of pages) {
     errs = [];
@@ -109,7 +109,7 @@ async function e2e(b) {
   // spin the wheel
   await go('spin-the-wheel');
   await p.click('#spin');
-  await p.waitForFunction(() => document.getElementById('res').innerText.trim().length > 0, null, { timeout: 15000 }).catch(() => {});
+  await p.waitForFunction(() => { const t = document.getElementById('res').innerText.trim(); return t.length > 0 && !/Spinning/.test(t); }, null, { timeout: 20000 }).catch(() => {});
   const res = (await p.locator('#res').innerText()).trim();
   console.log('spin result:', res.slice(0, 60));
   if (!res) fail('spin-the-wheel: no result');

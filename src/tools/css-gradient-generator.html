@@ -1,0 +1,150 @@
+<style>
+.gg-prev { height: 240px; border-radius: 14px; border: 1px solid var(--line); margin-bottom: 16px; }
+.gg-bar { position: relative; height: 34px; border-radius: 8px; border: 1px solid var(--line); margin: 8px 12px 30px; cursor: copy; touch-action: none; background-image: linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%), linear-gradient(45deg, #ccc 25%, transparent 25%, transparent 75%, #ccc 75%); background-size: 12px 12px; background-position: 0 0, 6px 6px; }
+.gg-bar > div { position: absolute; inset: 0; border-radius: 7px; }
+.gg-h { position: absolute; top: 100%; width: 22px; height: 26px; margin-left: -11px; margin-top: 3px; border: 0; padding: 0; background: none; cursor: grab; touch-action: none; }
+.gg-h::before { content: ""; position: absolute; left: 5px; top: -6px; border: 6px solid transparent; border-bottom-color: var(--ink); }
+.gg-h i { display: block; width: 22px; height: 20px; border-radius: 5px; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--muted); }
+.gg-h.on i { box-shadow: 0 0 0 2px var(--accent); }
+.gg-stops { display: grid; gap: 8px; margin-bottom: 14px; }
+.gg-row { display: grid; grid-template-columns: 52px minmax(0, 1fr) 90px 44px; gap: 8px; align-items: center; padding: 6px; border: 1px solid var(--line); border-radius: 10px; }
+.gg-row.on { border-color: var(--accent); background: var(--accent-soft); }
+.gg-row input[type=color] { width: 52px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); padding: 2px; cursor: pointer; }
+.gg-row input[type=number] { min-height: 40px; }
+.gg-row button { min-height: 40px; padding: 4px; justify-content: center; }
+.gg-row label { margin: 0; font-size: 12px; color: var(--muted); font-weight: 500; }
+.gg-pre { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+.gg-pre button { width: 46px; height: 46px; border-radius: 10px; border: 1px solid var(--line); cursor: pointer; }
+.gg-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0 0; }
+</style>
+<div class="gg-prev" id="prev" role="img" aria-label="Gradient preview"></div>
+<div class="fields">
+  <div><label for="gtype">Type</label><select id="gtype"><option value="linear">Linear</option><option value="radial">Radial</option><option value="conic">Conic</option></select></div>
+  <div data-for="linear conic"><label for="ang">Angle: <span id="angV">90</span>°</label><input type="range" id="ang" min="0" max="360" value="90"></div>
+  <div data-for="radial"><label for="shape">Shape</label><select id="shape"><option value="circle">Circle</option><option value="ellipse">Ellipse</option></select></div>
+  <div data-for="radial conic"><label for="px">Center X: <span id="pxV">50</span>%</label><input type="range" id="px" min="0" max="100" value="50"></div>
+  <div data-for="radial conic"><label for="py">Center Y: <span id="pyV">50</span>%</label><input type="range" id="py" min="0" max="100" value="50"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="rep">Repeating gradient</label></div>
+<label>Color stops <span style="font-weight:400;color:var(--muted)">(click the bar to add, drag a marker to move)</span></label>
+<div class="gg-bar" id="bar" title="Click to add a color stop"><div id="barFill"></div></div>
+<div class="gg-stops" id="stops"></div>
+<div class="btns" style="margin:0 0 16px"><button class="btn ghost" id="add" type="button">Add color</button><button class="btn ghost" id="rev" type="button">Reverse</button><button class="btn ghost" id="rnd" type="button">Random</button></div>
+<label>Presets</label>
+<div class="gg-pre" id="pre"></div>
+<label>CSS code</label>
+<pre class="gg-code" id="code"></pre>
+<div class="btns"><button class="btn" id="cp" type="button">Copy CSS</button><button class="btn ghost" id="cpv" type="button">Copy gradient only</button></div>
+<script>
+(function () {
+  var stops = [{ c: '#4f46e5', a: 1, p: 0 }, { c: '#ec4899', a: 1, p: 100 }], sel = 0;
+  var PRESETS = [
+    ['linear', 135, [['#667eea', 0], ['#764ba2', 100]]], ['linear', 90, [['#ff9a9e', 0], ['#fecfef', 100]]], ['linear', 45, [['#f093fb', 0], ['#f5576c', 100]]],
+    ['linear', 120, [['#84fab0', 0], ['#8fd3f4', 100]]], ['linear', 90, [['#fa709a', 0], ['#fee140', 100]]], ['radial', 0, [['#fdfbfb', 0], ['#a1c4fd', 100]]],
+    ['linear', 180, [['#0f2027', 0], ['#203a43', 50], ['#2c5364', 100]]], ['conic', 0, [['#ff0000', 0], ['#ffff00', 17], ['#00ff00', 33], ['#00ffff', 50], ['#0000ff', 67], ['#ff00ff', 83], ['#ff0000', 100]]],
+    ['linear', 90, [['#00c6ff', 0], ['#0072ff', 100]]], ['linear', 160, [['#f6d365', 0], ['#fda085', 100]]]
+  ];
+  function rgba(s) { var n = parseInt(s.c.slice(1), 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255; return s.a >= 1 ? s.c : 'rgba(' + r + ', ' + g + ', ' + b + ', ' + (+s.a.toFixed(2)) + ')'; }
+  function sorted() { return stops.slice().sort(function (a, b) { return a.p - b.p; }); }
+  function list() { return sorted().map(function (s) { return rgba(s) + ' ' + Math.round(s.p * 10) / 10 + '%'; }).join(', '); }
+  function value() {
+    var t = $('gtype').value, rep = $('rep').checked ? 'repeating-' : '', pos = $('px').value + '% ' + $('py').value + '%';
+    if (t === 'linear') return rep + 'linear-gradient(' + $('ang').value + 'deg, ' + list() + ')';
+    if (t === 'radial') return rep + 'radial-gradient(' + $('shape').value + ' at ' + pos + ', ' + list() + ')';
+    return rep + 'conic-gradient(from ' + $('ang').value + 'deg at ' + pos + ', ' + list() + ')';
+  }
+  function css() { var v = value(); return 'background: ' + rgba(sorted()[0]) + ';\nbackground-image: ' + v + ';'; }
+  function paint() {
+    var t = $('gtype').value;
+    document.querySelectorAll('[data-for]').forEach(function (el) { el.hidden = el.getAttribute('data-for').split(' ').indexOf(t) < 0; });
+    $('angV').textContent = $('ang').value; $('pxV').textContent = $('px').value; $('pyV').textContent = $('py').value;
+    $('prev').style.backgroundImage = value();
+    $('barFill').style.backgroundImage = 'linear-gradient(90deg, ' + list() + ')';
+    $('code').textContent = css();
+  }
+  function render() {
+    if (sel >= stops.length) sel = stops.length - 1;
+    var bar = $('bar');
+    bar.querySelectorAll('.gg-h').forEach(function (h) { h.remove(); });
+    stops.forEach(function (s, i) {
+      var h = document.createElement('button'); h.type = 'button'; h.className = 'gg-h' + (i === sel ? ' on' : ''); h.style.left = s.p + '%';
+      h.setAttribute('aria-label', 'Color stop ' + (i + 1) + ' at ' + Math.round(s.p) + '%'); h.dataset.i = i;
+      h.innerHTML = '<i style="background:' + rgba(s) + '"></i>'; bar.appendChild(h);
+    });
+    $('stops').innerHTML = '';
+    stops.forEach(function (s, i) {
+      var row = document.createElement('div'); row.className = 'gg-row' + (i === sel ? ' on' : '');
+      row.innerHTML = '<input type="color" data-nomemo aria-label="Color ' + (i + 1) + '" value="' + s.c + '">' +
+        '<div><label>Opacity ' + Math.round(s.a * 100) + '%</label><input type="range" data-nomemo min="0" max="100" value="' + Math.round(s.a * 100) + '" aria-label="Opacity ' + (i + 1) + '"></div>' +
+        '<div><label>Position %</label><input type="number" data-nomemo min="0" max="100" step="1" value="' + Math.round(s.p * 10) / 10 + '" aria-label="Position ' + (i + 1) + '"></div>' +
+        '<button type="button" class="btn ghost" aria-label="Remove color ' + (i + 1) + '" title="Remove"' + (stops.length <= 2 ? ' disabled' : '') + '>✕</button>';
+      var ins = row.querySelectorAll('input');
+      ins[0].addEventListener('input', function () { s.c = ins[0].value; sel = i; sync(); });
+      ins[1].addEventListener('input', function () { s.a = ins[1].value / 100; row.querySelector('label').textContent = 'Opacity ' + ins[1].value + '%'; sel = i; sync(); });
+      ins[2].addEventListener('input', function () { var v = parseFloat(ins[2].value); if (isFinite(v)) { s.p = Math.max(0, Math.min(100, v)); sel = i; sync(); } });
+      row.querySelector('button').addEventListener('click', function () { if (stops.length > 2) { stops.splice(i, 1); render(); } });
+      row.addEventListener('focusin', function () { if (sel !== i) { sel = i; mark(); } });
+      $('stops').appendChild(row);
+    });
+    paint();
+  }
+  function mark() { document.querySelectorAll('.gg-row').forEach(function (r, i) { r.classList.toggle('on', i === sel); }); document.querySelectorAll('.gg-h').forEach(function (h, i) { h.classList.toggle('on', i === sel); }); }
+  function sync() { // update markers without rebuilding the inputs being edited
+    document.querySelectorAll('.gg-h').forEach(function (h, i) { var s = stops[i]; h.style.left = s.p + '%'; h.querySelector('i').style.background = rgba(s); });
+    mark(); paint();
+  }
+  function colorAt(p) { // interpolate the colour at position p, for new stops
+    var s = sorted(), a = s[0], b = s[s.length - 1];
+    for (var i = 0; i < s.length - 1; i++) if (p >= s[i].p && p <= s[i + 1].p) { a = s[i]; b = s[i + 1]; break; }
+    var t = b.p === a.p ? 0 : Math.max(0, Math.min(1, (p - a.p) / (b.p - a.p)));
+    var ca = parseInt(a.c.slice(1), 16), cb = parseInt(b.c.slice(1), 16), out = 0;
+    [16, 8, 0].forEach(function (sh) { var x = Math.round(((ca >> sh) & 255) * (1 - t) + ((cb >> sh) & 255) * t); out |= x << sh; });
+    return { c: '#' + out.toString(16).padStart(6, '0'), a: +(a.a * (1 - t) + b.a * t).toFixed(2), p: p };
+  }
+  // drag markers / click the bar to add
+  var drag = null;
+  $('bar').addEventListener('pointerdown', function (e) {
+    var r = $('bar').getBoundingClientRect(), p = Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100));
+    var h = e.target.closest('.gg-h');
+    if (h) { sel = +h.dataset.i; drag = { i: sel, id: e.pointerId }; h.setPointerCapture(e.pointerId); mark(); e.preventDefault(); return; }
+    if (stops.length >= 16) return;
+    stops.push(colorAt(Math.round(p))); sel = stops.length - 1; render();
+  });
+  $('bar').addEventListener('pointermove', function (e) {
+    if (!drag || e.pointerId !== drag.id) return;
+    var r = $('bar').getBoundingClientRect(), p = Math.round(Math.max(0, Math.min(100, (e.clientX - r.left) / r.width * 100)));
+    stops[drag.i].p = p; var n = document.querySelectorAll('.gg-row input[type=number]')[drag.i]; if (n) n.value = p; sync();
+  });
+  ['pointerup', 'pointercancel'].forEach(function (ev) { $('bar').addEventListener(ev, function () { drag = null; }); });
+  $('bar').addEventListener('keydown', function (e) {
+    var h = e.target.closest('.gg-h'); if (!h) return;
+    var i = +h.dataset.i, d = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0; if (!d) return;
+    e.preventDefault(); stops[i].p = Math.max(0, Math.min(100, stops[i].p + d * (e.shiftKey ? 10 : 1))); sel = i; render(); var hs = document.querySelectorAll('.gg-h'); if (hs[i]) hs[i].focus();
+  });
+  $('add').addEventListener('click', function () {
+    if (stops.length >= 16) return;
+    var s = sorted(), gap = 0, at = 50;
+    for (var i = 0; i < s.length - 1; i++) if (s[i + 1].p - s[i].p > gap) { gap = s[i + 1].p - s[i].p; at = (s[i].p + s[i + 1].p) / 2; }
+    stops.push(colorAt(Math.round(at))); sel = stops.length - 1; render();
+  });
+  $('rev').addEventListener('click', function () { stops.forEach(function (s) { s.p = 100 - s.p; }); render(); });
+  $('rnd').addEventListener('click', function () {
+    var n = 2 + Math.floor(Math.random() * 2), h = Math.random() * 360;
+    stops = []; for (var i = 0; i < n; i++) { var hue = (h + i * (40 + Math.random() * 60)) % 360, c = hsl(hue, 70 + Math.random() * 25, 50 + Math.random() * 15); stops.push({ c: c, a: 1, p: Math.round(i / (n - 1) * 100) }); }
+    $('ang').value = Math.round(Math.random() * 36) * 10; sel = 0; render();
+  });
+  function hsl(h, s, l) { s /= 100; l /= 100; var k = function (n) { return (n + h / 30) % 12; }, a = s * Math.min(l, 1 - l), f = function (n) { return Math.round(255 * (l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)))); }; return '#' + [f(0), f(8), f(4)].map(function (x) { return x.toString(16).padStart(2, '0'); }).join(''); }
+  PRESETS.forEach(function (pr) {
+    var b = document.createElement('button'); b.type = 'button';
+    var l = pr[2].map(function (s) { return s[0] + ' ' + s[1] + '%'; }).join(', ');
+    b.style.backgroundImage = pr[0] === 'linear' ? 'linear-gradient(' + pr[1] + 'deg, ' + l + ')' : pr[0] === 'radial' ? 'radial-gradient(circle, ' + l + ')' : 'conic-gradient(' + l + ')';
+    b.setAttribute('aria-label', 'Preset gradient');
+    b.addEventListener('click', function () { $('gtype').value = pr[0]; $('ang').value = pr[1]; $('px').value = 50; $('py').value = 50; stops = pr[2].map(function (s) { return { c: s[0], a: 1, p: s[1] }; }); sel = 0; render(); });
+    $('pre').appendChild(b);
+  });
+  ['gtype', 'ang', 'shape', 'px', 'py', 'rep'].forEach(function (id) { $(id).addEventListener('input', paint); $(id).addEventListener('change', paint); });
+  $('cp').addEventListener('click', function () { copyText(css(), $('cp')); });
+  $('cpv').addEventListener('click', function () { copyText(value(), $('cpv')); });
+  render();
+})();
+</script>
