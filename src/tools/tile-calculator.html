@@ -1,0 +1,121 @@
+<style>
+.tlc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.tlc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.tlc legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.tlc .tlc-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+@media (max-width: 480px) { .tlc .stats { grid-template-columns: 1fr 1fr; } .tlc .stat { padding: 10px 12px; } }
+</style>
+<div class="tlc" id="tlc">
+<div class="fields">
+  <div><label for="tlcUnit">Units</label><select id="tlcUnit"><option value="m">Metric (m, cm, mm)</option><option value="i">Imperial (ft, in)</option></select></div>
+  <div><label for="tlcWhat">Surface</label><select id="tlcWhat"><option value="floor">Floor</option><option value="wall">Wall</option></select></div>
+</div>
+<fieldset>
+  <legend>Area to tile</legend>
+  <div class="fields">
+    <div><label for="tlcA" id="tlcAL">Length (m)</label><input type="number" id="tlcA" min="0" step="any" inputmode="decimal" value="4"></div>
+    <div><label for="tlcB" id="tlcBL">Width (m)</label><input type="number" id="tlcB" min="0" step="any" inputmode="decimal" value="3"></div>
+    <div><label for="tlcSkip" id="tlcSkipL">Area to leave out (m²)</label><input type="number" id="tlcSkip" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  </div>
+  <span class="tlc-hint" id="tlcSkipHint">For example a bath, a kitchen island, a door or a window.</span>
+</fieldset>
+<fieldset>
+  <legend>Tiles</legend>
+  <div class="fields">
+    <div><label for="tlcTL" id="tlcTLL">Tile length (cm)</label><input type="number" id="tlcTL" min="0" step="any" inputmode="decimal" value="60"></div>
+    <div><label for="tlcTW" id="tlcTWL">Tile width (cm)</label><input type="number" id="tlcTW" min="0" step="any" inputmode="decimal" value="30"></div>
+    <div><label for="tlcGap" id="tlcGapL">Grout gap (mm)</label><input type="number" id="tlcGap" min="0" step="any" inputmode="decimal" value="3"></div>
+  </div>
+  <div class="fields">
+    <div><label for="tlcWaste">Extra for cuts and breakage (%)</label><select id="tlcWaste"><option value="5">5% – large simple room</option><option value="10" selected>10% – most rooms</option><option value="15">15% – diagonal or herringbone</option><option value="20">20% – many corners or cuts</option><option value="0">None</option></select></div>
+    <div><label for="tlcBox">Tiles per box (optional)</label><input type="number" id="tlcBox" min="0" step="1" inputmode="numeric" placeholder="e.g. 8"></div>
+    <div><label for="tlcPrice">Price per box (optional)</label><input type="number" id="tlcPrice" min="0" step="any" inputmode="decimal" placeholder="0"></div>
+  </div>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Area to tile</span><b id="tlcArea">–</b></div>
+  <div class="stat"><span>Tiles needed (no extra)</span><b id="tlcRaw">–</b></div>
+  <div class="stat"><span>Tiles to buy (with extra)</span><b id="tlcBuy">–</b></div>
+  <div class="stat"><span>Boxes</span><b id="tlcBoxes">–</b></div>
+  <div class="stat"><span>Estimated cost</span><b id="tlcCost">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="btns"><button type="button" class="btn ghost" id="tlcCopy">Copy shopping list</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  var last = null;
+  function labels() {
+    var imp = $('tlcUnit').value === 'i', wall = $('tlcWhat').value === 'wall', u = imp ? 'ft' : 'm';
+    $('tlcAL').textContent = (wall ? 'Wall width (' : 'Length (') + u + ')'; $('tlcBL').textContent = (wall ? 'Wall height (' : 'Width (') + u + ')';
+    $('tlcSkipL').textContent = 'Area to leave out (' + u + '²)';
+    $('tlcSkipHint').textContent = wall ? 'For example a door, a window or a cabinet.' : 'For example a bath, a kitchen island or a fixed cupboard.';
+    $('tlcTLL').textContent = 'Tile length (' + (imp ? 'in' : 'cm') + ')'; $('tlcTWL').textContent = 'Tile width (' + (imp ? 'in' : 'cm') + ')';
+    $('tlcGapL').textContent = 'Grout gap (' + (imp ? 'in' : 'mm') + ')';
+  }
+  function calc() {
+    labels();
+    var imp = $('tlcUnit').value === 'i', u2 = imp ? 'ft²' : 'm²';
+    var A = num('tlcA'), B = num('tlcB'), skip = num('tlcSkip') || 0, tl = num('tlcTL'), tw = num('tlcTW'), gap = num('tlcGap') || 0, waste = +$('tlcWaste').value, per = num('tlcBox'), price = num('tlcPrice') || 0;
+    var fail = function (t) { ['tlcArea', 'tlcRaw', 'tlcBuy', 'tlcBoxes', 'tlcCost'].forEach(function (i) { $(i).textContent = '–'; }); last = null; say('bad', t); };
+    if (!(A > 0) || !(B > 0)) return fail('Enter both measurements of the area.');
+    if (A * B > (imp ? 1e6 : 1e5)) return fail('That area is very large. Check the units (' + (imp ? 'feet' : 'meters') + ').');
+    if (!(tl > 0) || !(tw > 0)) return fail('Enter the tile length and width.');
+    if (skip < 0 || gap < 0 || price < 0 || per < 0) return fail('Numbers cannot be negative.');
+    if (gap > (imp ? 1 : 25)) return fail('That grout gap is very wide. Most gaps are ' + (imp ? '1/16 to 3/8 in (0.0625 to 0.375).' : '2 to 10 mm.'));
+    var area = A * B - skip;
+    if (area <= 0) return fail('The area to leave out is as big as the whole area.');
+    // tile plus one grout gap, in the same unit as the area
+    var cell = imp ? ((tl + gap) / 12) * ((tw + gap) / 12) : ((tl / 100 + gap / 1000) * (tw / 100 + gap / 1000));
+    var raw = area / cell, rawN = Math.ceil(raw - 1e-9), buy = Math.ceil(raw * (1 + waste / 100) - 1e-9);
+    if (buy > 1e7) return fail('That would need over 10 million tiles. Check the tile size units (' + (imp ? 'inches' : 'centimeters') + ').');
+    var boxes = per > 0 ? Math.ceil(buy / Math.floor(per)) : null;
+    $('tlcArea').textContent = nfx(area, 2) + ' ' + u2;
+    $('tlcRaw').textContent = fmtNum(rawN, 0); $('tlcBuy').textContent = fmtNum(buy, 0);
+    $('tlcBoxes').textContent = boxes == null ? 'Add tiles per box' : fmtNum(boxes, 0) + (boxes === 1 ? ' box' : ' boxes');
+    $('tlcCost').textContent = boxes != null && price ? fmtNum(boxes * price, 2) : '–';
+    var tileArea = imp ? tl * tw / 144 : tl * tw / 10000;
+    var notes = ['One tile covers ' + nfx(tileArea, 4) + ' ' + u2 + ' (' + nfx(cell, 4) + ' ' + u2 + ' with the grout gap), so ' + nfx(area, 2) + ' ' + u2 + ' needs ' + nfx(raw, 1) + ' tiles' + (waste ? ', plus ' + waste + '% extra = ' + fmtNum(buy, 0) + '.' : '.')];
+    if (boxes != null) notes.push(fmtNum(boxes, 0) + ' boxes hold ' + fmtNum(boxes * Math.floor(per), 0) + ' tiles (' + fmtNum(boxes * Math.floor(per) - buy, 0) + ' spare).');
+    notes.push('Buy all boxes from the same batch so the color matches.');
+    say('ok', notes.join(' '));
+    last = { area: area, u2: u2, buy: buy, boxes: boxes, raw: rawN };
+  }
+  var prev = imperialDefault() ? 'i' : 'm';
+  if (prev === 'i') { $('tlcUnit').value = 'i'; $('tlcA').value = 12; $('tlcB').value = 10; $('tlcTL').value = 24; $('tlcTW').value = 12; $('tlcGap').value = 0.125; }
+  $('tlcUnit').addEventListener('change', function () {
+    var now = $('tlcUnit').value; if (now === prev) return;
+    var toI = now === 'i', f = function (id, k, d) { var v = num(id); if (v > 0) $(id).value = round(toI ? v / k : v * k, d); };
+    f('tlcA', 0.3048, 2); f('tlcB', 0.3048, 2); f('tlcSkip', 0.09290304, 2); f('tlcTL', 2.54, 2); f('tlcTW', 2.54, 2); f('tlcGap', 25.4, 3);
+    prev = now; calc();
+  });
+  $('tlcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Area: ' + nfx(last.area, 2) + ' ' + last.u2 + '\nTiles to buy: ' + last.buy + ' (' + last.raw + ' without extra)' + (last.boxes != null ? '\nBoxes: ' + last.boxes : ''), this);
+  });
+  $('tlc').addEventListener('input', calc);
+  $('tlc').addEventListener('change', calc);
+  calc();
+})();
+</script>

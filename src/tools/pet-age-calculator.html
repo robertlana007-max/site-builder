@@ -1,0 +1,122 @@
+<style>
+.pac .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.pac h3 { margin: 18px 0 8px; }
+.pac table.sched td, .pac table.sched th { white-space: nowrap; }
+.pac table.sched td:last-child { white-space: normal; min-width: 160px; }
+.pac tr.on td { font-weight: 700; color: var(--accent); }
+.pac .pac-pet { margin: 0 0 14px; }
+@media (max-width: 480px) { .pac .stats { grid-template-columns: 1fr 1fr; } .pac .stat { padding: 10px 12px; } }
+</style>
+<div class="pac" id="pac">
+<div class="pac-pet"><div class="seg" role="group" aria-label="Pet"><button type="button" data-v="dog" aria-pressed="true">Dog</button><button type="button" data-v="cat" aria-pressed="false">Cat</button></div></div>
+<select id="pacPet" hidden aria-hidden="true" tabindex="-1"><option value="dog">Dog</option><option value="cat">Cat</option></select>
+<div class="fields">
+  <div><label for="pacY">Age (years)</label><input type="number" id="pacY" min="0" max="40" step="1" inputmode="numeric" value="5"></div>
+  <div><label for="pacM">and months</label><input type="number" id="pacM" min="0" max="11" step="1" inputmode="numeric" value="0"></div>
+  <div id="pacSizeBox"><label for="pacSize">Dog size (adult weight)</label><select id="pacSize"><option value="s">Small – up to 9 kg (20 lb)</option><option value="m" selected>Medium – 9.5 to 23 kg (21 to 50 lb)</option><option value="l">Large – over 23 kg (50 lb)</option></select></div>
+</div>
+<div class="stats">
+  <div class="stat"><span id="pacMainL">In human years (vet chart)</span><b id="pacMain">–</b></div>
+  <div class="stat" id="pacEpiBox"><span>Epigenetic formula</span><b id="pacEpi">–</b></div>
+  <div class="stat"><span>Old "× 7" rule</span><b id="pac7">–</b></div>
+  <div class="stat"><span>Life stage</span><b id="pacStage">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Why the numbers differ</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Method</th><th>Result</th><th>What it is</th></tr></thead><tbody id="pacWhy"></tbody></table></div>
+<h3 id="pacChartH">Vet chart</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Pet age</th><th>Human years</th><th>Life stage</th></tr></thead><tbody id="pacChart"></tbody></table></div>
+<p class="msg">Human-year numbers are a rough way to picture your pet's stage of life, not a medical measure. Breed, health and care matter a lot. Your vet can tell you more about your pet.</p>
+<div class="btns"><button type="button" class="btn ghost" id="pacCopy">Copy result</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // Dog chart by size, ages 1-16 (as published by the American Veterinary Medical Association).
+  var DOG = { s: [15, 24, 28, 32, 36, 40, 44, 48, 52, 56, 60, 64, 68, 72, 76, 80], m: [15, 24, 28, 32, 36, 42, 47, 51, 56, 60, 65, 69, 74, 78, 83, 87], l: [15, 24, 28, 32, 36, 45, 50, 55, 61, 66, 72, 77, 82, 88, 93, 99] };
+  var SENIOR = { s: 11, m: 10, l: 8 };
+  // Cat chart (International Cat Care / AAHA-AAFP style): [cat age in years, human years]
+  var CAT = [[0, 0], [1 / 12, 1], [3 / 12, 4], [4 / 12, 6], [6 / 12, 10], [7 / 12, 12], [1, 15], [1.5, 21], [2, 24]];
+  var last = null;
+  function lerp(pts, x) {
+    for (var i = 1; i < pts.length; i++) if (x <= pts[i][0]) { var a = pts[i - 1], b = pts[i]; return a[1] + (b[1] - a[1]) * (x - a[0]) / (b[0] - a[0]); }
+    return null;
+  }
+  function dogYears(age, size) {
+    var t = DOG[size], pts = [[0, 0]].concat(t.map(function (v, i) { return [i + 1, v]; }));
+    var v = lerp(pts, age);
+    if (v == null) v = t[15] + (t[15] - t[14]) * (age - 16); // past 16: keep the last yearly step
+    return v;
+  }
+  function catYears(age) { var v = lerp(CAT, age); return v == null ? 24 + 4 * (age - 2) : v; }
+  function epi(age) { return 16 * Math.log(age) + 31; } // Wang et al. 2020, UC San Diego (Labrador retrievers)
+  function stage(pet, age, size) {
+    if (pet === 'cat') return age < 1 ? 'Kitten' : age < 7 ? 'Young adult' : age < 11 ? 'Mature adult' : 'Senior';
+    return age < 0.75 ? 'Puppy' : age < 3.5 ? 'Young adult' : age < SENIOR[size] ? 'Mature adult' : 'Senior';
+  }
+  function pet() { return $('pacPet').value === 'cat' ? 'cat' : 'dog'; }
+  function setPet(v) {
+    $('pacPet').value = v; $('pacSizeBox').hidden = v !== 'dog'; $('pacEpiBox').hidden = v !== 'dog';
+    document.querySelectorAll('.pac .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); });
+  }
+  function yrs(v) { return nfx(v, 0) + ' years'; }
+  function calc() {
+    var p = pet(), y = num('pacY'), m = num('pacM'), size = $('pacSize').value;
+    if (isNaN(y)) y = 0; if (isNaN(m)) m = 0;
+    var fail = function (t) { ['pacMain', 'pacEpi', 'pac7', 'pacStage'].forEach(function (i) { $(i).textContent = '–'; }); $('pacWhy').innerHTML = ''; last = null; say('bad', t); };
+    if (y < 0 || m < 0 || Math.floor(y) !== y || Math.floor(m) !== m) return fail('Enter whole years and months, 0 or more.');
+    if (m > 11) return fail('Months must be from 0 to 11. Put full years in the years box.');
+    var age = y + m / 12;
+    if (age <= 0) return fail('Enter your pet\'s age.');
+    if (age > (p === 'cat' ? 38 : 30)) return fail('That is older than any ' + p + ' on record. Check the age.');
+    var main = p === 'cat' ? catYears(age) : dogYears(age, size), seven = age * 7, st = stage(p, age, size);
+    $('pacMainL').textContent = 'In human years (vet chart)';
+    $('pacMain').textContent = yrs(main); $('pac7').textContent = yrs(seven); $('pacStage').textContent = st;
+    var e = p === 'dog' && age >= 1 ? epi(age) : null;
+    $('pacEpi').textContent = p !== 'dog' ? '–' : e == null ? 'From age 1' : yrs(e);
+    var why = [['Vet chart', yrs(main), p === 'dog' ? 'Dogs grow up fast: the first year equals about 15 human years and the second about 9 more. After that, small dogs age about 4 years per year and large dogs up to 6, because big breeds have shorter lives.' : 'Cats reach adulthood fast: about 15 human years at age 1 and 24 at age 2. After that each cat year counts as about 4 human years.']];
+    if (p === 'dog') why.push(['Epigenetic formula: 16 × ln(age) + 31', e == null ? 'Not for puppies under 1' : yrs(e), 'From a 2020 study that compared DNA changes in Labrador retrievers with people. It ages young dogs very fast (a 1-year-old is 31) and then slows down. It was based on one breed.']);
+    why.push(['Age × 7', yrs(seven), 'An old rule of thumb. It is too low for young pets and ignores size, so vets no longer use it.']);
+    $('pacWhy').innerHTML = why.map(function (w) { return '<tr><td>' + w[0] + '</td><td>' + w[1] + '</td><td>' + w[2] + '</td></tr>'; }).join('');
+    // chart rows
+    var rows = [], ages = p === 'cat' ? [[1 / 12, '1 month'], [3 / 12, '3 months'], [6 / 12, '6 months'], [1, '1 year'], [2, '2 years']].concat([3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 18, 20, 22, 25].map(function (a) { return [a, a + ' years']; }))
+      : [[0.5, '6 months']].concat([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(function (a) { return [a, a + (a === 1 ? ' year' : ' years')]; }));
+    var nearest = ages.reduce(function (b, a) { return Math.abs(a[0] - age) < Math.abs(b[0] - age) ? a : b; }, ages[0]);
+    $('pacChartH').textContent = p === 'cat' ? 'Cat age chart' : 'Dog age chart (' + $('pacSize').selectedOptions[0].textContent.split(' – ')[0].toLowerCase() + ' dogs)';
+    $('pacChart').innerHTML = ages.map(function (a) { var v = p === 'cat' ? catYears(a[0]) : dogYears(a[0], size); return '<tr' + (a === nearest ? ' class="on"' : '') + '><td>' + a[1] + '</td><td>' + nfx(v, 0) + '</td><td>' + stage(p, a[0], size) + '</td></tr>'; }).join('');
+    var name = p === 'cat' ? 'cat' : 'dog';
+    say('ok', 'Your ' + [y ? y + '-year' : '', m ? m + '-month' : ''].filter(Boolean).join(', ') + '-old ' + name + ' is about ' + yrs(main) + ' old in human terms (' + st.toLowerCase() + ').' + (p === 'dog' && st === 'Senior' ? ' Vets often suggest check-ups twice a year for senior dogs.' : p === 'cat' && st === 'Senior' ? ' Vets often suggest check-ups twice a year for senior cats.' : ''));
+    last = { p: p, age: age, main: main, e: e, st: st };
+  }
+  document.querySelectorAll('.pac .seg button').forEach(function (b) { b.addEventListener('click', function () { setPet(b.dataset.v); $('pacPet').dispatchEvent(new Event('change', { bubbles: true })); }); });
+  $('pacPet').addEventListener('change', function () { setPet(pet()); calc(); });
+  $('pacCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Enter your pet\'s age first.');
+    copyText('My ' + last.p + ' (' + nfx(last.age, 2) + ' years) is about ' + yrs(last.main) + ' in human years (' + last.st + ')' + (last.e != null ? '\nEpigenetic formula: ' + yrs(last.e) : ''), this);
+  });
+  $('pac').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  $('pacSize').addEventListener('change', calc);
+  setPet('dog');
+  calc();
+})();
+</script>

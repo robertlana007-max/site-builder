@@ -1,0 +1,100 @@
+<style>
+.orm .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.orm h3 { margin: 18px 0 8px; }
+.orm table.sched td, .orm table.sched th { white-space: nowrap; }
+.orm tr.orm-avg td { font-weight: 700; }
+@media (max-width: 480px) { .orm .stats { grid-template-columns: 1fr 1fr; } .orm .stat { padding: 10px 12px; } }
+</style>
+<div class="orm" id="orm">
+<div class="fields">
+  <div><label for="ormUnit">Weight unit</label><select id="ormUnit"><option value="kg">Kilograms (kg)</option><option value="lb">Pounds (lb)</option></select></div>
+  <div><label for="ormW">Weight lifted</label><input type="number" id="ormW" min="0" step="any" inputmode="decimal" value="100"></div>
+  <div><label for="ormR">Reps done (1–20)</label><input type="number" id="ormR" min="1" max="20" step="1" inputmode="numeric" value="5"></div>
+  <div><label for="ormRound">Round weights to</label><select id="ormRound"><option value="0">No rounding</option><option value="1">1</option><option value="2.5" selected>2.5</option><option value="5">5</option></select></div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Estimated one-rep max (average)</span><b id="ormAvg">–</b></div>
+  <div class="stat"><span>Epley</span><b id="ormEp">–</b></div>
+  <div class="stat"><span>Brzycki</span><b id="ormBr">–</b></div>
+  <div class="stat"><span>Range of formulas</span><b id="ormRange">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Training weights</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>% of 1RM</th><th>Weight</th><th>About how many reps</th></tr></thead><tbody id="ormPct"></tbody></table></div>
+<h3>All formulas</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Formula</th><th>Equation</th><th>1RM</th></tr></thead><tbody id="ormAll"></tbody></table></div>
+<p class="msg">Estimates are most accurate for sets of 10 reps or fewer, done to near failure with good form. Always warm up and use a spotter for heavy lifts.</p>
+<div class="btns"><button type="button" class="btn ghost" id="ormCopy">Copy results</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // w = weight lifted, r = reps. Each returns the estimated one-rep max.
+  var F = [
+    ['Epley', 'w × (1 + r ÷ 30)', function (w, r) { return w * (1 + r / 30); }],
+    ['Brzycki', 'w × 36 ÷ (37 − r)', function (w, r) { return w * 36 / (37 - r); }],
+    ['Lombardi', 'w × r^0.10', function (w, r) { return w * Math.pow(r, 0.1); }],
+    ['Lander', '100 × w ÷ (101.3 − 2.67123 × r)', function (w, r) { return 100 * w / (101.3 - 2.67123 * r); }],
+    ['Mayhew et al.', '100 × w ÷ (52.2 + 41.9 × e^(−0.055 × r))', function (w, r) { return 100 * w / (52.2 + 41.9 * Math.exp(-0.055 * r)); }],
+    ["O'Conner et al.", 'w × (1 + 0.025 × r)', function (w, r) { return w * (1 + 0.025 * r); }],
+    ['Wathan', '100 × w ÷ (48.8 + 53.8 × e^(−0.075 × r))', function (w, r) { return 100 * w / (48.8 + 53.8 * Math.exp(-0.075 * r)); }]
+  ];
+  // Common strength-training guide: share of 1RM and the reps most people can do with it.
+  var PCT = [[100, '1'], [95, '2'], [93, '3'], [90, '4'], [87, '5'], [85, '6'], [83, '7'], [80, '8'], [77, '9'], [75, '10'], [70, '11–12'], [67, '12–15'], [65, '15'], [60, '17–20'], [55, '20+'], [50, '20+']];
+  var last = null;
+  if (imperialDefault()) { $('ormUnit').value = 'lb'; $('ormW').value = 225; $('ormRound').value = '5'; }
+  function rnd(v) { var s = +$('ormRound').value; return s ? Math.round(v / s) * s : v; }
+  function calc() {
+    var w = num('ormW'), r = num('ormR'), u = ' ' + $('ormUnit').value;
+    var fail = function (t) { ['ormAvg', 'ormEp', 'ormBr', 'ormRange'].forEach(function (i) { $(i).textContent = '–'; }); $('ormPct').innerHTML = $('ormAll').innerHTML = ''; last = null; say('bad', t); };
+    if (!(w > 0)) return fail('Enter the weight you lifted.');
+    if (w > 2000) return fail('That weight is beyond any human lift. Check the number and the unit.');
+    if (!(r >= 1) || Math.floor(r) !== r) return fail('Enter the number of reps as a whole number from 1 to 20.');
+    if (r > 20) return fail('Use a set of 20 reps or fewer. Above that, one-rep max estimates are not reliable.');
+    // One rep is already your max.
+    var vals = F.map(function (f) { return r === 1 ? w : f[2](w, r); });
+    var avg = vals.reduce(function (s, v) { return s + v; }, 0) / vals.length, lo = Math.min.apply(null, vals), hi = Math.max.apply(null, vals);
+    $('ormAvg').textContent = nfx(avg, 1) + u; $('ormEp').textContent = nfx(vals[0], 1) + u; $('ormBr').textContent = nfx(vals[1], 1) + u;
+    $('ormRange').textContent = nfx(lo, 1) + '–' + nfx(hi, 1) + u;
+    $('ormPct').innerHTML = PCT.map(function (p) { return '<tr><td>' + p[0] + '%</td><td>' + nfx(rnd(avg * p[0] / 100), 1) + u + '</td><td>' + p[1] + '</td></tr>'; }).join('');
+    $('ormAll').innerHTML = F.map(function (f, i) { return '<tr><td>' + f[0] + '</td><td>' + f[1] + '</td><td>' + nfx(vals[i], 1) + u + '</td></tr>'; }).join('') +
+      '<tr class="orm-avg"><td>Average</td><td></td><td>' + nfx(avg, 1) + u + '</td></tr>';
+    var other = $('ormUnit').value === 'kg' ? nfx(avg / 0.45359237, 1) + ' lb' : nfx(avg * 0.45359237, 1) + ' kg';
+    say(r > 10 ? 'bad' : 'ok', r === 1 ? 'You did 1 rep, so that weight is your one-rep max.' : r > 10 ? 'With more than 10 reps the formulas disagree more. Treat the result as a rough guide (' + other + ').' : 'Your estimated max is about ' + nfx(avg, 1) + u + ' (' + other + ').');
+    last = { avg: avg, w: w, r: r, u: u };
+  }
+  var prevU = $('ormUnit').value;
+  $('ormUnit').addEventListener('change', function () {
+    var u = $('ormUnit').value, w = num('ormW'); if (u === prevU) return;
+    if (w > 0) $('ormW').value = round(u === 'lb' ? w / 0.45359237 : w * 0.45359237, 1);
+    prevU = u; calc();
+  });
+  $('ormCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Lifted ' + last.w + last.u + ' for ' + last.r + ' reps\nEstimated one-rep max: ' + nfx(last.avg, 1) + last.u + '\n' + PCT.slice(0, 10).map(function (p) { return p[0] + '%: ' + nfx(rnd(last.avg * p[0] / 100), 1) + last.u; }).join('\n'), this);
+  });
+  $('orm').addEventListener('input', calc);
+  $('ormRound').addEventListener('change', calc);
+  calc();
+})();
+</script>

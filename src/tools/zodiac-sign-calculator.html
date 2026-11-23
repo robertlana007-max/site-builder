@@ -1,0 +1,142 @@
+<style>
+.zsc .zsc-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; margin-top: 16px; }
+.zsc .zsc-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; background: var(--bg); }
+.zsc .zsc-card h3 { margin: 0 0 2px; font-size: 14px; color: var(--muted); font-weight: 600; }
+.zsc .zsc-big { display: flex; align-items: center; gap: 12px; margin: 4px 0 8px; }
+.zsc .zsc-big i { font-style: normal; font-size: 40px; line-height: 1; }
+.zsc .zsc-big b { font-size: 26px; letter-spacing: -.02em; }
+.zsc .zsc-big small { display: block; color: var(--muted); font-size: 14px; }
+.zsc .zsc-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0 10px; }
+.zsc .zsc-tags span { font-size: 13px; border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; background: var(--surface, transparent); }
+.zsc .zsc-card p { margin: 6px 0 0; font-size: 15px; }
+.zsc h3.zsc-h { margin: 18px 0 8px; }
+.zsc table.sched td, .zsc table.sched th { white-space: nowrap; }
+</style>
+<div class="zsc" id="zsc">
+<div class="fields">
+  <div><label for="zscDate">Date of birth</label><input type="date" id="zscDate" min="1800-01-01" max="2200-12-31" data-nomemo></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="zsc-cards" id="zscCards" hidden>
+  <div class="zsc-card"><h3>Western zodiac (sun sign)</h3><div class="zsc-big"><i id="zscWSym" aria-hidden="true"></i><div><b id="zscW">–</b><small id="zscWDates"></small></div></div><div class="zsc-tags" id="zscWTags"></div><p id="zscWText"></p></div>
+  <div class="zsc-card"><h3>Chinese zodiac</h3><div class="zsc-big"><i id="zscCSym" aria-hidden="true"></i><div><b id="zscC">–</b><small id="zscCDates"></small></div></div><div class="zsc-tags" id="zscCTags"></div><p id="zscCText"></p></div>
+</div>
+<h3 class="zsc-h">All 12 Western signs</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Sign</th><th>Dates</th><th>Element</th></tr></thead><tbody id="zscAll"></tbody></table></div>
+<p class="msg">Just for fun. Sign dates can shift by a day depending on the year, so people born on the first or last day of a sign are said to be "on the cusp". The Chinese zodiac year starts at Lunar New Year (late January to mid-February), not on 1 January.</p>
+<div class="btns"><button type="button" class="btn ghost" id="zscCopy">Copy my signs</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // [name, symbol, start month, start day, element, quality, fun description]
+  var W = [
+    ['Capricorn', '♑', 12, 22, 'Earth', 'Cardinal', 'Patient, ambitious and practical. Capricorns like a plan, keep their promises and quietly climb toward big goals.'],
+    ['Aquarius', '♒', 1, 20, 'Air', 'Fixed', 'Original, curious and independent. Aquarians love new ideas, causes that help people, and doing things their own way.'],
+    ['Pisces', '♓', 2, 19, 'Water', 'Mutable', 'Imaginative, kind and intuitive. Pisceans are dreamers and creative souls who feel what others feel.'],
+    ['Aries', '♈', 3, 21, 'Fire', 'Cardinal', 'Bold, energetic and direct. Aries loves a challenge, starts things first and brings plenty of courage.'],
+    ['Taurus', '♉', 4, 20, 'Earth', 'Fixed', 'Steady, loyal and fond of comfort. Taurus enjoys good food, calm surroundings and things built to last.'],
+    ['Gemini', '♊', 5, 21, 'Air', 'Mutable', 'Chatty, quick and adaptable. Geminis are curious about everything and great at keeping a conversation going.'],
+    ['Cancer', '♋', 6, 21, 'Water', 'Cardinal', 'Caring, protective and loyal. Cancers make home feel like home and look after the people they love.'],
+    ['Leo', '♌', 7, 23, 'Fire', 'Fixed', 'Warm, generous and confident. Leos light up a room, enjoy the spotlight and cheer on their friends.'],
+    ['Virgo', '♍', 8, 23, 'Earth', 'Mutable', 'Thoughtful, helpful and detail-minded. Virgos notice what others miss and like to get things just right.'],
+    ['Libra', '♎', 9, 23, 'Air', 'Cardinal', 'Fair, friendly and diplomatic. Libras love balance, good company and beautiful things.'],
+    ['Scorpio', '♏', 10, 23, 'Water', 'Fixed', 'Intense, determined and loyal. Scorpios are deep thinkers who never do anything halfway.'],
+    ['Sagittarius', '♐', 11, 22, 'Fire', 'Mutable', 'Adventurous, cheerful and honest. Sagittarians love travel, big questions and a good laugh.']];
+  // Chinese zodiac animals, in order from the Rat (2020, 2008, 1996 ...)
+  var C = [
+    ['Rat', '🐀', 'Clever, quick-witted and resourceful. Rats spot chances others miss and are good with plans and money.'],
+    ['Ox', '🐂', 'Hard-working, dependable and calm. The Ox gets things done steadily and is someone you can count on.'],
+    ['Tiger', '🐅', 'Brave, confident and lively. Tigers love a challenge and are natural leaders.'],
+    ['Rabbit', '🐇', 'Gentle, elegant and kind. Rabbits are good listeners and prefer peace and harmony.'],
+    ['Dragon', '🐉', 'Energetic, ambitious and charismatic. Dragons dream big and inspire the people around them.'],
+    ['Snake', '🐍', 'Wise, calm and thoughtful. Snakes think before they act and have great intuition.'],
+    ['Horse', '🐎', 'Free-spirited, active and cheerful. Horses love movement, travel and being with friends.'],
+    ['Goat', '🐐', 'Creative, gentle and caring. Goats (also called Sheep) have an artistic side and a big heart.'],
+    ['Monkey', '🐒', 'Playful, smart and inventive. Monkeys solve problems in clever ways and keep things fun.'],
+    ['Rooster', '🐓', 'Observant, hard-working and honest. Roosters are organised, confident and proud of their work.'],
+    ['Dog', '🐕', 'Loyal, honest and fair. Dogs stand up for others and make true friends.'],
+    ['Pig', '🐖', 'Generous, warm and easy-going. Pigs enjoy life, share freely and see the best in people.']];
+  var ELEM = ['Metal', 'Metal', 'Water', 'Water', 'Wood', 'Wood', 'Fire', 'Fire', 'Earth', 'Earth'];
+  var ELEM_TXT = { Metal: 'Metal adds determination and strong will.', Water: 'Water adds calm, wisdom and flexibility.', Wood: 'Wood adds kindness, growth and generosity.', Fire: 'Fire adds passion, energy and warmth.', Earth: 'Earth adds patience, balance and reliability.' };
+  var MON = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  var last = null, DAY = 864e5;
+  function md(m, d) { return MON[m - 1].slice(0, 3) + ' ' + d; }
+  function western(m, d) {
+    var k = m * 100 + d, idx = 0;
+    for (var i = 1; i < W.length; i++) if (k >= W[i][2] * 100 + W[i][3]) idx = i;
+    if (k >= 1222) idx = 0;
+    return idx;
+  }
+  function endOf(i) { var n = W[(i + 1) % 12], t = new Date(Date.UTC(2001, n[2] - 1, n[3]) - DAY); return md(t.getUTCMonth() + 1, t.getUTCDate()); }
+  // Lunar year that a date belongs to, from the browser's built-in Chinese calendar.
+  var CF = null;
+  try { CF = new Intl.DateTimeFormat('en-u-ca-chinese', { year: 'numeric', month: 'numeric', day: 'numeric', timeZone: 'UTC' }); } catch (e) { CF = null; }
+  function lunarYear(t) {
+    if (!CF || !CF.formatToParts) return null;
+    try { var p = CF.formatToParts(new Date(t)).filter(function (x) { return x.type === 'relatedYear'; })[0]; return p ? +p.value : null; } catch (e) { return null; }
+  }
+  // Lunar New Year (first day of lunar year y) by searching late Jan to late Feb.
+  function newYear(y) {
+    var lo = Date.UTC(y, 0, 19), hi = Date.UTC(y, 1, 22);
+    if (lunarYear(lo) !== y - 1 || lunarYear(hi) !== y) return null;
+    while (hi - lo > DAY) { var mid = lo + Math.floor((hi - lo) / DAY / 2) * DAY; if (lunarYear(mid) === y) hi = mid; else lo = mid; }
+    return hi;
+  }
+  function fmtD(t) { try { return new Date(t).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return new Date(t).toISOString().slice(0, 10); } }
+  $('zscAll').innerHTML = [3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map(function (i) { var w = W[i]; return '<tr><td>' + w[1] + ' ' + w[0] + '</td><td>' + md(w[2], w[3]) + ' – ' + endOf(i) + '</td><td>' + w[4] + '</td></tr>'; }).join('');
+  function calc() {
+    var s = $('zscDate').value, mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s);
+    if (!mm) { $('zscCards').hidden = true; last = null; return say('', s ? 'Enter a full date of birth.' : 'Pick your date of birth to see your Western and Chinese zodiac signs.'); }
+    var y = +mm[1], m = +mm[2], d = +mm[3], t = Date.UTC(y, m - 1, d);
+    if (y < 1800 || y > 2200) { $('zscCards').hidden = true; last = null; return say('bad', 'Enter a year between 1800 and 2200.'); }
+    var wi = western(m, d), w = W[wi];
+    $('zscWSym').textContent = w[1]; $('zscW').textContent = w[0]; $('zscWDates').textContent = md(w[2], w[3]) + ' – ' + endOf(wi);
+    $('zscWTags').innerHTML = ['Element: ' + w[4], 'Quality: ' + w[5]].map(function (x) { return '<span>' + x + '</span>'; }).join('');
+    var cusp = '', startT = Date.UTC(y, w[2] - 1, w[3]), nxt = W[(wi + 1) % 12], endT = Date.UTC(y + (wi === 0 && m === 12 ? 1 : 0), nxt[2] - 1, nxt[3]) - DAY;
+    if (t === startT || t === startT + DAY) cusp = ' Born at the very start of ' + w[0] + ', close to the cusp with ' + W[(wi + 11) % 12][0] + '.';
+    else if (t === endT || t === endT - DAY) cusp = ' Born at the very end of ' + w[0] + ', close to the cusp with ' + nxt[0] + '.';
+    $('zscWText').textContent = w[6] + cusp;
+    // Chinese zodiac
+    var ly = lunarYear(t), approx = false;
+    if (ly == null) { approx = true; ly = (m === 1 || (m === 2 && d < 4)) ? y - 1 : y; }
+    var ci = ((ly - 4) % 12 + 12) % 12, c = C[ci], el = ELEM[((ly % 10) + 10) % 10], yin = ly % 2 ? 'Yin' : 'Yang';
+    $('zscCSym').textContent = c[1]; $('zscC').textContent = el + ' ' + c[0];
+    var ny = approx ? null : newYear(ly), ny2 = approx ? null : newYear(ly + 1);
+    $('zscCDates').textContent = ny && ny2 ? 'Year of the ' + c[0] + ': ' + fmtD(ny) + ' – ' + fmtD(ny2 - DAY) : 'Lunar year ' + ly;
+    $('zscCTags').innerHTML = ['Animal: ' + c[0], 'Element: ' + el, yin].map(function (x) { return '<span>' + x + '</span>'; }).join('');
+    $('zscCText').textContent = c[2] + ' ' + ELEM_TXT[el] + (m <= 2 && ly !== y ? ' Because you were born before Lunar New Year, your sign comes from the previous year (' + ly + ').' : '');
+    $('zscCards').hidden = false;
+    var wd; try { wd = new Date(t).toLocaleDateString(undefined, { weekday: 'long', timeZone: 'UTC' }); } catch (e) { wd = ''; }
+    say('ok', 'You are a ' + w[0] + ' ' + w[1] + ' and a ' + el + ' ' + c[0] + ' ' + c[1] + '.' + (wd ? ' You were born on a ' + wd + '.' : '') + (approx ? ' Your browser has no Chinese calendar, so the Chinese sign near Lunar New Year is approximate.' : ''));
+    last = { w: w, c: c, el: el, yin: yin };
+  }
+  $('zscCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Pick your date of birth first.');
+    copyText('Western zodiac: ' + last.w[1] + ' ' + last.w[0] + ' (' + last.w[4] + ')\nChinese zodiac: ' + last.c[1] + ' ' + last.el + ' ' + last.c[0] + ' (' + last.yin + ')', this);
+  });
+  $('zscDate').addEventListener('input', calc);
+  $('zscDate').addEventListener('change', calc);
+  calc();
+})();
+</script>

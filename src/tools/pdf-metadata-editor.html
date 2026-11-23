@@ -1,0 +1,250 @@
+<style>
+.md-facts { margin: 0 0 16px; }
+.md-facts .stat b { font-size: 17px; }
+.md-custom { display: grid; gap: 8px; margin: 6px 0 4px; }
+.md-crow { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr) auto; gap: 8px; align-items: center; }
+.md-crow button { font: inherit; width: 40px; height: 40px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.md-crow button:hover { border-color: var(--bad); color: var(--bad); }
+.md-note { font-size: 13px; color: var(--muted); margin: 4px 0 0; }
+.md-wide { grid-column: 1 / -1; }
+@media (max-width: 560px) { .md-crow { grid-template-columns: minmax(0, 1fr) auto; } .md-crow input:nth-child(2) { grid-column: 1; grid-row: 2; } .md-crow button { grid-row: 1 / span 2; grid-column: 2; } }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a PDF here</b>See and change its hidden details. The file never leaves your device.</div>
+<input type="file" id="file" accept="application/pdf,.pdf" hidden>
+<div id="mdWork" hidden>
+  <div class="stats md-facts" id="mdFacts"></div>
+  <div class="fields">
+    <div class="md-wide"><label for="mdTitle">Title</label><input type="text" id="mdTitle" data-nomemo autocomplete="off"></div>
+    <div><label for="mdAuthor">Author</label><input type="text" id="mdAuthor" data-nomemo autocomplete="off"></div>
+    <div><label for="mdSubject">Subject</label><input type="text" id="mdSubject" data-nomemo autocomplete="off"></div>
+    <div class="md-wide"><label for="mdKeywords">Keywords</label><input type="text" id="mdKeywords" data-nomemo autocomplete="off" placeholder="For example: report, 2026, sales"></div>
+    <div><label for="mdCreator">Made with (app)</label><input type="text" id="mdCreator" data-nomemo autocomplete="off"></div>
+    <div><label for="mdProducer">PDF producer</label><input type="text" id="mdProducer" data-nomemo autocomplete="off"></div>
+    <div><label for="mdCreated">Created</label><input type="datetime-local" id="mdCreated" step="1" data-nomemo></div>
+    <div><label for="mdModified">Last changed</label><input type="datetime-local" id="mdModified" step="1" data-nomemo></div>
+    <div><label for="mdLang">Language code</label><input type="text" id="mdLang" data-nomemo autocomplete="off" placeholder="For example: en, fr-CA, ar, zh-Hans" maxlength="35"></div>
+  </div>
+  <p class="md-note" id="mdTz"></p>
+  <div class="checks" style="margin-top:10px">
+    <label><input type="checkbox" id="mdShowTitle" data-nomemo> Show the title, not the file name, at the top of PDF readers</label>
+    <label><input type="checkbox" id="mdNow" data-nomemo> Set “Last changed” to now when saving</label>
+  </div>
+  <label style="margin-top:6px">Other properties</label>
+  <div class="md-custom" id="mdCustom"></div>
+  <div class="btns" style="margin-top:6px"><button class="btn ghost" type="button" id="mdAdd">+ Add property</button></div>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Save changes</button><button class="btn ghost" id="mdStrip" type="button" disabled>Remove all metadata</button><a class="btn ghost" id="dl" hidden>Download PDF</a></div>
+<p class="msg" id="msg"></p>
+<script src="../assets/vendor/pdf-lib.min.js"></script>
+<script src="../assets/pdf-tools.js"></script>
+<script>
+(function () {
+  var file = null, bytes = null, busy = false, unlocked = false, xmpFound = false;
+  var N = function (s) { return PDFLib.PDFName.of(s); };
+  var MAIN = { Title: 'mdTitle', Author: 'mdAuthor', Subject: 'mdSubject', Keywords: 'mdKeywords', Creator: 'mdCreator', Producer: 'mdProducer' };
+  var KNOWN = ['Title', 'Author', 'Subject', 'Keywords', 'Creator', 'Producer', 'CreationDate', 'ModDate', 'Trapped'];
+
+  // ---------- owner-locked PDFs: decrypted with qpdf (WebAssembly) so their details can be changed ----------
+  var QP = (function () {
+    var wasm = null, sink = null, hooked = false;
+    function hook() { if (hooked) return; hooked = true; ['log', 'error', 'warn'].forEach(function (k) { var o = console[k]; console[k] = function () { if (sink) sink(Array.prototype.join.call(arguments, ' ')); else o.apply(console, arguments); }; }); }
+    function load() {
+      hook();
+      return (typeof window.Module === 'function' ? Promise.resolve() : new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/qpdf/qpdf.js'; s.onload = res; s.onerror = rej; document.head.appendChild(s); }))
+        .then(function () { return wasm || fetch('../assets/vendor/qpdf/qpdf.wasm').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).then(function (b) { return (wasm = b); }); })
+        .then(function (bin) { return window.Module({ wasmBinary: bin, noInitialRun: true }); })
+        .catch(function () { throw new Error('The PDF engine could not load. Check your connection and reload the page.'); });
+    }
+    return function (b) {
+      return load().then(function (m) {
+        m.FS.writeFile('/in.pdf', new Uint8Array(b));
+        var log = [], code; sink = function (t) { log.push(t); };
+        try { code = m.callMain(['--decrypt', '--password=', '/in.pdf', '/out.pdf']); } catch (e) { code = typeof e === 'number' ? e : (e && e.status) || 2; }
+        sink = null;
+        if (code === 2) throw new Error(/password/i.test(log.join(' ')) ? 'This PDF needs a password to open. Remove it first with the free Unlock PDF tool on this site, then try again.' : 'This PDF could not be read. It may be damaged.');
+        return m.FS.readFile('/out.pdf');
+      });
+    };
+  })();
+  async function openLib() {
+    try { return await PDFLib.PDFDocument.load(bytes, { updateMetadata: false }); }
+    catch (e) {
+      if (!/encrypt/i.test(String(e && e.message))) throw new Error('"' + file.name + '" could not be read as a PDF.');
+      bytes = await QP(bytes); unlocked = true;
+      return PDFLib.PDFDocument.load(bytes, { updateMetadata: false });
+    }
+  }
+
+  // ---------- reading ----------
+  function text(o) { try { return o && o.decodeText ? o.decodeText() : o instanceof PDFLib.PDFName ? o.decodeText() : o != null ? String(o) : ''; } catch (e) { return ''; } }
+  function pad(n) { return String(n).padStart(2, '0'); }
+  function toLocal(d) { return d && !isNaN(d) ? d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) : ''; }
+  // PDF date: D:YYYYMMDDHHmmSSOHH'mm'
+  function parseDate(s) {
+    var m = /^(?:D:)?(\d{4})(\d{2})?(\d{2})?(\d{2})?(\d{2})?(\d{2})?\s*([Zz+\-])?\s*(\d{2})?'?(\d{2})?'?/.exec(String(s || '').trim());
+    if (!m) return null;
+    var y = +m[1], mo = +(m[2] || 1) - 1, d = +(m[3] || 1), h = +(m[4] || 0), mi = +(m[5] || 0), se = +(m[6] || 0);
+    if (!m[7]) return new Date(y, mo, d, h, mi, se); // no zone given: read as local time
+    var off = m[7] === 'Z' || m[7] === 'z' ? 0 : (m[7] === '-' ? -1 : 1) * ((+m[8] || 0) * 60 + (+m[9] || 0));
+    return new Date(Date.UTC(y, mo, d, h, mi, se) - off * 60000);
+  }
+  function pdfDate(d) {
+    var o = -d.getTimezoneOffset(), s = o >= 0 ? '+' : '-', a = Math.abs(o);
+    return 'D:' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + s + pad(Math.floor(a / 60)) + "'" + pad(a % 60) + "'";
+  }
+  function isoDate(d) {
+    var o = -d.getTimezoneOffset(), s = o >= 0 ? '+' : '-', a = Math.abs(o);
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes()) + ':' + pad(d.getSeconds()) + s + pad(Math.floor(a / 60)) + ':' + pad(a % 60);
+  }
+  function addCustom(k, v) {
+    var row = document.createElement('div'); row.className = 'md-crow';
+    var a = document.createElement('input'); a.type = 'text'; a.value = k || ''; a.placeholder = 'Name, e.g. Company'; a.setAttribute('aria-label', 'Property name'); a.dataset.nomemo = ''; a.maxLength = 60;
+    var b = document.createElement('input'); b.type = 'text'; b.value = v || ''; b.placeholder = 'Value'; b.setAttribute('aria-label', 'Property value'); b.dataset.nomemo = '';
+    var x = document.createElement('button'); x.type = 'button'; x.textContent = '✕'; x.setAttribute('aria-label', 'Remove this property');
+    x.addEventListener('click', function () { row.remove(); $('dl').hidden = true; });
+    [a, b].forEach(function (el) { el.addEventListener('input', function () { $('dl').hidden = true; }); });
+    row.appendChild(a); row.appendChild(b); row.appendChild(x); $('mdCustom').appendChild(row);
+    return a;
+  }
+  $('mdAdd').addEventListener('click', function () { addCustom('', '').focus(); });
+  Array.prototype.forEach.call(document.querySelectorAll('#mdWork input'), function (el) { el.addEventListener('input', function () { $('dl').hidden = true; }); el.addEventListener('change', function () { $('dl').hidden = true; }); });
+
+  function fact(label, value) { var d = document.createElement('div'); d.className = 'stat'; var s = document.createElement('span'); s.textContent = label; var b = document.createElement('b'); b.textContent = value; d.appendChild(s); d.appendChild(b); $('mdFacts').appendChild(d); }
+  function sizeName(w, h) {
+    var a = Math.min(w, h), b = Math.max(w, h), list = [['A4', 595.28, 841.89], ['Letter', 612, 792], ['Legal', 612, 1008], ['A3', 841.89, 1190.55], ['A5', 419.53, 595.28], ['Tabloid', 792, 1224], ['B5', 498.9, 708.66]];
+    for (var i = 0; i < list.length; i++) if (Math.abs(a - list[i][1]) < 3 && Math.abs(b - list[i][2]) < 3) return list[i][0] + (w > h ? ' landscape' : '');
+    return Math.round(w / 72 * 25.4) + ' × ' + Math.round(h / 72 * 25.4) + ' mm';
+  }
+
+  PT.drop(false, function (f) {
+    if (busy) return PT.say('bad', 'Please wait until the current job is finished.');
+    if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
+    if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    busy = true; PT.say('', 'Opening ' + f.name + '…');
+    (async function () {
+      file = f; bytes = new Uint8Array(await f.arrayBuffer()); unlocked = false;
+      var d = await openLib(), info = d.getInfoDict(), cat = d.catalog;
+      Object.keys(MAIN).forEach(function (k) { $(MAIN[k]).value = text(info.lookup(N(k))); });
+      $('mdCreated').value = toLocal(parseDate(text(info.lookup(N('CreationDate')))));
+      $('mdModified').value = toLocal(parseDate(text(info.lookup(N('ModDate')))));
+      $('mdLang').value = text(cat.lookup(N('Lang')));
+      var vpref = cat.lookup(N('ViewerPreferences')), ddt = vpref instanceof PDFLib.PDFDict ? vpref.lookup(N('DisplayDocTitle')) : null;
+      $('mdShowTitle').checked = !!(ddt && ddt.asBoolean && ddt.asBoolean());
+      $('mdNow').checked = false;
+      $('mdCustom').innerHTML = '';
+      info.entries().forEach(function (e) { var k = e[0].decodeText(); if (KNOWN.indexOf(k) === -1) { var v = info.lookup(e[0]); addCustom(k, text(v)); } });
+      xmpFound = !!cat.get(N('Metadata'));
+      $('mdFacts').innerHTML = '';
+      var p0 = d.getPage(0), sz = p0.getSize(), rot = (p0.getRotation().angle || 0) % 180 !== 0;
+      fact('Pages', fmtNum(d.getPageCount(), 0)); fact('File size', fmtBytes(f.size));
+      fact('Page size', sizeName(rot ? sz.height : sz.width, rot ? sz.width : sz.height));
+      var head = new TextDecoder('latin1').decode(bytes.subarray(0, 20)), ver = (/%PDF-(\d\.\d)/.exec(head) || [])[1] || '?';
+      var cv = cat.lookup(N('Version')); if (cv) ver = text(cv).replace(/^\//, '');
+      fact('PDF version', ver);
+      fact('XMP metadata', xmpFound ? 'Yes' : 'No');
+      $('mdTz').textContent = 'Dates are shown in your time zone (' + (Intl.DateTimeFormat().resolvedOptions().timeZone || 'local time') + ').' + (unlocked ? ' This PDF was locked against changes; the saved copy is unlocked.' : '');
+      $('mdWork').hidden = false; $('drop').querySelector('b').textContent = f.name;
+      $('go').disabled = false; $('mdStrip').disabled = false; $('dl').hidden = true;
+      PT.say('', f.name + ' · ' + fmtBytes(f.size));
+    })().catch(function (e) { file = null; $('mdWork').hidden = true; $('go').disabled = true; $('mdStrip').disabled = true; PT.say('bad', e && e.message ? e.message : 'Something went wrong with this file.'); }).then(function () { busy = false; });
+  });
+
+  // ---------- XMP (the newer copy of the same details, which many apps read first) ----------
+  var NS = { x: 'adobe:ns:meta/', rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#', dc: 'http://purl.org/dc/elements/1.1/', pdf: 'http://ns.adobe.com/pdf/1.3/', xmp: 'http://ns.adobe.com/xap/1.0/' };
+  function streamText(s) {
+    var L = PDFLib, raw = s instanceof L.PDFRawStream ? (s.dict.get(N('Filter')) ? L.decodePDFRawStream(s).decode() : s.contents) : s.getContents();
+    return new TextDecoder('utf-8').decode(raw);
+  }
+  function freshXmp() {
+    return '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?><x:xmpmeta xmlns:x="adobe:ns:meta/"><rdf:RDF xmlns:rdf="' + NS.rdf + '"><rdf:Description rdf:about=""/></rdf:RDF></x:xmpmeta><?xpacket end="w"?>';
+  }
+  function updateXmp(d, v) {
+    var L = PDFLib, cat = d.catalog, s = cat.lookup(N('Metadata')), xml = '';
+    if (!(s instanceof L.PDFStream)) return;
+    try { xml = streamText(s); } catch (e) { xml = ''; }
+    var doc = new DOMParser().parseFromString(xml.replace(/^﻿/, ''), 'application/xml');
+    if (!xml || doc.getElementsByTagName('parsererror').length || !doc.getElementsByTagNameNS(NS.rdf, 'RDF').length) doc = new DOMParser().parseFromString(freshXmp(), 'application/xml');
+    var rdf = doc.getElementsByTagNameNS(NS.rdf, 'RDF')[0], descs = Array.prototype.slice.call(rdf.getElementsByTagNameNS(NS.rdf, 'Description'));
+    if (!descs.length) { var dd = doc.createElementNS(NS.rdf, 'rdf:Description'); dd.setAttributeNS(NS.rdf, 'rdf:about', ''); rdf.appendChild(dd); descs = [dd]; }
+    // shape: 'alt' (language alternatives), 'seq' (ordered list), 'text'
+    function put(ns, prefix, name, value, shape) {
+      descs.forEach(function (de) {
+        if (de.hasAttributeNS(ns, name)) de.removeAttributeNS(ns, name);
+        Array.prototype.slice.call(de.childNodes).forEach(function (c) { if (c.nodeType === 1 && c.namespaceURI === ns && c.localName === name) de.removeChild(c); });
+      });
+      if (!value) return;
+      var el = doc.createElementNS(ns, prefix + ':' + name);
+      if (shape === 'text') el.textContent = value;
+      else {
+        var box = doc.createElementNS(NS.rdf, shape === 'alt' ? 'rdf:Alt' : 'rdf:Seq'), li = doc.createElementNS(NS.rdf, 'rdf:li');
+        if (shape === 'alt') li.setAttributeNS('http://www.w3.org/XML/1998/namespace', 'xml:lang', 'x-default');
+        li.textContent = value; box.appendChild(li); el.appendChild(box);
+      }
+      descs[0].appendChild(el);
+    }
+    put(NS.dc, 'dc', 'title', v.Title, 'alt');
+    put(NS.dc, 'dc', 'creator', v.Author, 'seq');
+    put(NS.dc, 'dc', 'description', v.Subject, 'alt');
+    put(NS.pdf, 'pdf', 'Keywords', v.Keywords, 'text');
+    put(NS.pdf, 'pdf', 'Producer', v.Producer, 'text');
+    put(NS.xmp, 'xmp', 'CreatorTool', v.Creator, 'text');
+    put(NS.xmp, 'xmp', 'CreateDate', v.created ? isoDate(v.created) : '', 'text');
+    put(NS.xmp, 'xmp', 'ModifyDate', v.modified ? isoDate(v.modified) : '', 'text');
+    put(NS.xmp, 'xmp', 'MetadataDate', isoDate(new Date()), 'text');
+    var out = new XMLSerializer().serializeToString(doc);
+    var st = d.context.stream(new TextEncoder().encode(out), { Type: 'Metadata', Subtype: 'XML' });
+    cat.set(N('Metadata'), d.context.register(st));
+  }
+
+  // ---------- saving ----------
+  function readDate(id) { var v = $(id).value; if (!v) return null; var d = new Date(v); return isNaN(d) ? 'bad' : d; }
+  function save(strip) {
+    if (!file || busy) return;
+    busy = true; $('mdStrip').disabled = true;
+    PT.run(async function () {
+      var L = PDFLib, d = await openLib(), info = d.getInfoDict(), cat = d.catalog;
+      if (strip) {
+        d.context.trailerInfo.Info = undefined;
+        cat.delete(N('Metadata')); cat.delete(N('PieceInfo'));
+        d.getPages().forEach(function (p) { p.node.delete(N('Metadata')); p.node.delete(N('PieceInfo')); });
+        var out = await d.save({ updateFieldAppearances: false });
+        Object.keys(MAIN).forEach(function (k) { $(MAIN[k]).value = ''; });
+        ['mdCreated', 'mdModified'].forEach(function (id) { $(id).value = ''; }); $('mdCustom').innerHTML = '';
+        PT.done(out, PT.base(file.name) + '-clean.pdf', 'application/pdf', 'Removed title, author, dates, app names and XMP metadata');
+        return;
+      }
+      var created = readDate('mdCreated'), modified = $('mdNow').checked ? new Date() : readDate('mdModified');
+      if (created === 'bad' || modified === 'bad') throw new Error('One of the dates is not valid. Pick it again or clear it.');
+      if (modified && $('mdNow').checked) $('mdModified').value = toLocal(modified);
+      var lang = $('mdLang').value.trim();
+      if (lang && !/^[A-Za-z]{2,8}(-[A-Za-z0-9]{1,8})*$/.test(lang)) throw new Error('"' + lang + '" is not a language code. Use a short code such as en, fr-CA or ar, or leave it empty.');
+      var v = { created: created, modified: modified };
+      Object.keys(MAIN).forEach(function (k) {
+        var val = $(MAIN[k]).value.replace(/[\u0000-\u001F]/g, ' ').trim(); v[k] = val;
+        if (val) info.set(N(k), L.PDFHexString.fromText(val)); else info.delete(N(k));
+      });
+      if (created) info.set(N('CreationDate'), L.PDFString.of(pdfDate(created))); else info.delete(N('CreationDate'));
+      if (modified) info.set(N('ModDate'), L.PDFString.of(pdfDate(modified))); else info.delete(N('ModDate'));
+      // other properties: replace them with what is in the list now
+      info.entries().forEach(function (e) { if (KNOWN.indexOf(e[0].decodeText()) === -1) info.delete(e[0]); });
+      var bad = null;
+      Array.prototype.forEach.call($('mdCustom').children, function (row) {
+        var k = row.children[0].value.trim(), val = row.children[1].value.trim();
+        if (!k && !val) return;
+        if (!/^[A-Za-z0-9_.\-]+$/.test(k) || KNOWN.indexOf(k) !== -1) { bad = k; return; }
+        info.set(N(k), L.PDFHexString.fromText(val));
+      });
+      if (bad != null) throw new Error(bad ? 'The property name "' + bad + '" cannot be used. Use English letters, digits, dots, dashes or underscores, and not a name from the boxes above.' : 'A property has a value but no name. Give it a name or remove it.');
+      if (lang) cat.set(N('Lang'), L.PDFHexString.fromText(lang)); else cat.delete(N('Lang'));
+      var vp = cat.lookup(N('ViewerPreferences'));
+      if ($('mdShowTitle').checked) { if (!(vp instanceof L.PDFDict)) { vp = d.context.obj({}); cat.set(N('ViewerPreferences'), vp); } vp.set(N('DisplayDocTitle'), L.PDFBool.True); }
+      else if (vp instanceof L.PDFDict) vp.delete(N('DisplayDocTitle'));
+      updateXmp(d, v);
+      var out2 = await d.save({ updateFieldAppearances: false });
+      PT.done(out2, file.name.replace(/\.pdf$/i, '') + '.pdf', 'application/pdf', 'Saved the new details');
+    }).then(function () { busy = false; $('mdStrip').disabled = !file; });
+  }
+  $('go').addEventListener('click', function () { save(false); });
+  $('mdStrip').addEventListener('click', function () { save(true); });
+})();
+</script>

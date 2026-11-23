@@ -1,0 +1,148 @@
+<style>
+.rpc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.rpc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.rpc fieldset[disabled] { opacity: .55; }
+.rpc legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.rpc .rpc-mode { margin: 0 0 14px; }
+.rpc .rpc-hms { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.rpc .rpc-hms label { font-size: 13px; color: var(--muted); }
+.rpc .rpc-ms { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.rpc .rpc-ms label { font-size: 13px; color: var(--muted); }
+.rpc h3 { margin: 18px 0 8px; }
+.rpc table.sched td, .rpc table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .rpc .stats { grid-template-columns: 1fr 1fr; } .rpc .stat { padding: 10px 12px; } }
+</style>
+<div class="rpc" id="rpc">
+<div class="rpc-mode"><div class="seg" role="group" aria-label="What do you want to find?"><button type="button" data-v="pace" aria-pressed="true">Find pace</button><button type="button" data-v="time" aria-pressed="false">Find time</button><button type="button" data-v="dist" aria-pressed="false">Find distance</button></div></div>
+<select id="rpcMode" hidden aria-hidden="true" tabindex="-1"><option value="pace">pace</option><option value="time">time</option><option value="dist">distance</option></select>
+<fieldset id="rpcDistF">
+  <legend>Distance</legend>
+  <div class="fields">
+    <div><label for="rpcRace">Race</label><select id="rpcRace"><option value="">Custom distance</option><option value="1.609344">1 mile</option><option value="5">5K</option><option value="10">10K</option><option value="15">15K</option><option value="21.0975">Half marathon</option><option value="42.195">Marathon</option></select></div>
+    <div><label for="rpcDU">Unit</label><select id="rpcDU"><option value="km">Kilometers</option><option value="mi">Miles</option><option value="m">Meters</option></select></div>
+    <div><label for="rpcDist">Distance</label><input type="number" id="rpcDist" min="0" step="any" inputmode="decimal" value="10"></div>
+  </div>
+</fieldset>
+<fieldset id="rpcTimeF">
+  <legend>Time</legend>
+  <div class="rpc-hms" style="margin-bottom:14px">
+    <div><label for="rpcH">Hours</label><input type="number" id="rpcH" min="0" step="1" inputmode="numeric" value="0"></div>
+    <div><label for="rpcM">Minutes</label><input type="number" id="rpcM" min="0" step="1" inputmode="numeric" value="55"></div>
+    <div><label for="rpcS">Seconds</label><input type="number" id="rpcS" min="0" step="any" inputmode="decimal" value="0"></div>
+  </div>
+</fieldset>
+<fieldset id="rpcPaceF" disabled>
+  <legend>Pace</legend>
+  <div class="fields">
+    <div class="rpc-ms">
+      <div><label for="rpcPM">Minutes</label><input type="number" id="rpcPM" min="0" step="1" inputmode="numeric" value="5"></div>
+      <div><label for="rpcPS">Seconds</label><input type="number" id="rpcPS" min="0" step="any" inputmode="decimal" value="30"></div>
+    </div>
+    <div><label for="rpcPU">Per</label><select id="rpcPU"><option value="km">Kilometer</option><option value="mi">Mile</option></select></div>
+  </div>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Pace per km</span><b id="rpcPk">–</b></div>
+  <div class="stat"><span>Pace per mile</span><b id="rpcPmi">–</b></div>
+  <div class="stat"><span>Speed</span><b id="rpcSpd">–</b></div>
+  <div class="stat"><span>Finish time</span><b id="rpcTime">–</b></div>
+  <div class="stat"><span>Distance</span><b id="rpcDOut">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>Race time predictions</h3>
+<p class="msg" style="margin-top:0">Based on your result, using Riegel's formula: time₂ = time₁ × (distance₂ ÷ distance₁)<sup>1.06</sup>. Best for distances not too far from the one you ran, and only if you train for the longer race.</p>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Race</th><th>Predicted time</th><th>Pace /km</th><th>Pace /mi</th></tr></thead><tbody id="rpcPred"></tbody></table></div>
+<h3 id="rpcSplitH">Even splits</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th id="rpcSplitU">Km</th><th>Split time</th><th>Total time</th></tr></thead><tbody id="rpcSplits"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="rpcCopy">Copy summary</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  var MI = 1.609344, last = null;
+  var RACES = [['1 mile', MI], ['5K', 5], ['10K', 10], ['15K', 15], ['Half marathon', 21.0975], ['Marathon', 42.195]];
+  if (imperialDefault()) { $('rpcDU').value = 'mi'; $('rpcPU').value = 'mi'; $('rpcDist').value = 6.2; $('rpcPM').value = 8; $('rpcPS').value = 50; }
+  // seconds -> "1:02:05" or "5:30"
+  function hms(t) {
+    if (!isFinite(t)) return '–';
+    var s = Math.round(t), h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    return (h ? h + ':' + String(m).padStart(2, '0') : m) + ':' + String(x).padStart(2, '0');
+  }
+  function mode() { return $('rpcMode').value || 'pace'; }
+  function setMode(v) {
+    $('rpcMode').value = v;
+    document.querySelectorAll('.rpc .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); });
+    $('rpcDistF').disabled = v === 'dist'; $('rpcTimeF').disabled = v === 'time'; $('rpcPaceF').disabled = v === 'pace';
+  }
+  function toKm(d, u) { return u === 'mi' ? d * MI : u === 'm' ? d / 1000 : d; }
+  function fail(t) { ['rpcPk', 'rpcPmi', 'rpcSpd', 'rpcTime', 'rpcDOut'].forEach(function (i) { $(i).textContent = '–'; }); $('rpcPred').innerHTML = ''; $('rpcSplits').innerHTML = ''; last = null; say('bad', t); }
+  function calc() {
+    var m = mode(), km, sec, paceKm;
+    var d = num('rpcDist'), du = $('rpcDU').value;
+    var h = num('rpcH') || 0, mi = num('rpcM') || 0, s = num('rpcS') || 0;
+    var pm = num('rpcPM') || 0, ps = num('rpcPS') || 0, pu = $('rpcPU').value;
+    if (m !== 'dist') { if (!(d > 0)) return fail('Enter a distance above 0.'); if (toKm(d, du) > 10000) return fail('That distance is too long. Enter up to 10,000 km.'); }
+    if (m !== 'time') { if (h < 0 || mi < 0 || s < 0) return fail('Time cannot be negative.'); if (!(h * 3600 + mi * 60 + s > 0)) return fail('Enter a time above 0.'); }
+    if (m !== 'pace') { if (pm < 0 || ps < 0) return fail('Pace cannot be negative.'); if (!(pm * 60 + ps > 0)) return fail('Enter a pace above 0.'); }
+    if (m === 'pace') { km = toKm(d, du); sec = h * 3600 + mi * 60 + s; paceKm = sec / km; }
+    else if (m === 'time') { km = toKm(d, du); paceKm = (pm * 60 + ps) / (pu === 'mi' ? MI : 1); sec = paceKm * km; }
+    else { sec = h * 3600 + mi * 60 + s; paceKm = (pm * 60 + ps) / (pu === 'mi' ? MI : 1); km = sec / paceKm; }
+    if (sec > 3600 * 24 * 60) return fail('That time is longer than 60 days. Check the numbers.');
+    var kmh = km / (sec / 3600);
+    $('rpcPk').textContent = hms(paceKm) + ' /km'; $('rpcPmi').textContent = hms(paceKm * MI) + ' /mi';
+    $('rpcSpd').textContent = nfx(kmh, 2) + ' km/h · ' + nfx(kmh / MI, 2) + ' mph';
+    $('rpcTime').textContent = hms(sec);
+    $('rpcDOut').textContent = nfx(km, 2) + ' km · ' + nfx(km / MI, 2) + ' mi';
+    var note = '';
+    if (paceKm < 150) note = 'That is faster than the world record pace for most distances (about 2:30 per km). Check the numbers.';
+    else if (kmh < 3) note = 'That is slower than a typical walking speed.';
+    say(note ? 'bad' : 'ok', note || (m === 'pace' ? 'Your average pace is ' + hms(paceKm) + ' per km (' + hms(paceKm * MI) + ' per mile).' : m === 'time' ? 'At this pace you finish in ' + hms(sec) + '.' : 'In ' + hms(sec) + ' at this pace you cover ' + nfx(km, 2) + ' km (' + nfx(km / MI, 2) + ' mi).'));
+    $('rpcPred').innerHTML = RACES.map(function (r) { var t = sec * Math.pow(r[1] / km, 1.06); return '<tr><td>' + r[0] + '</td><td>' + hms(t) + '</td><td>' + hms(t / r[1]) + '</td><td>' + hms(t / r[1] * MI) + '</td></tr>'; }).join('');
+    // splits in the pace unit
+    var perMi = (m === 'pace' ? $('rpcDU').value === 'mi' : pu === 'mi'), unitKm = perMi ? MI : 1, n = km / unitKm, rows = [], full = Math.floor(n + 1e-9);
+    $('rpcSplitU').textContent = perMi ? 'Mile' : 'Km';
+    if (full > 200) $('rpcSplitH').textContent = 'Even splits (first 200)'; else $('rpcSplitH').textContent = 'Even splits';
+    for (var i = 1; i <= Math.min(full, 200); i++) rows.push('<tr><td>' + i + '</td><td>' + hms(paceKm * unitKm) + '</td><td>' + hms(paceKm * unitKm * i) + '</td></tr>');
+    if (full <= 200 && n - full > 0.005) rows.push('<tr><td>' + nfx(n, 2) + '</td><td>' + hms(paceKm * unitKm * (n - full)) + '</td><td>' + hms(sec) + '</td></tr>');
+    $('rpcSplits').innerHTML = rows.join('');
+    last = { km: km, sec: sec, paceKm: paceKm };
+  }
+  document.querySelectorAll('.rpc .seg button').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.v); $('rpcMode').dispatchEvent(new Event('change', { bubbles: true })); calc(); }); });
+  $('rpcMode').addEventListener('change', function () { setMode(mode()); calc(); });
+  $('rpcRace').addEventListener('change', function () {
+    var v = +$('rpcRace').value; if (!v) return;
+    var u = $('rpcDU').value; $('rpcDist').value = round(u === 'mi' ? v / MI : u === 'm' ? v * 1000 : v, 4); calc();
+  });
+  $('rpcDist').addEventListener('input', function () { var v = +$('rpcRace').value; if (v && Math.abs(toKm(num('rpcDist'), $('rpcDU').value) - v) > 1e-3) $('rpcRace').value = ''; });
+  var prevDU = $('rpcDU').value;
+  $('rpcDU').addEventListener('change', function () { var d = num('rpcDist'); if (d > 0) $('rpcDist').value = round(toKm(d, prevDU) / toKm(1, $('rpcDU').value), 4); prevDU = $('rpcDU').value; calc(); });
+  $('rpcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Distance: ' + nfx(last.km, 2) + ' km (' + nfx(last.km / MI, 2) + ' mi)\nTime: ' + hms(last.sec) + '\nPace: ' + hms(last.paceKm) + ' /km, ' + hms(last.paceKm * MI) + ' /mi', this);
+  });
+  $('rpc').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  $('rpcPU').addEventListener('change', calc);
+  setMode('pace');
+  calc();
+})();
+</script>
