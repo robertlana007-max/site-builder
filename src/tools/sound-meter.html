@@ -141,7 +141,7 @@
     stream = null; srcNode = null;
     $('start').textContent = 'Start microphone';
   }
-  $('start').addEventListener('click', function () { if (stream) { stop(); say('', 'Stopped. Your readings stay on screen until you start again or reset.'); } else { if (!hist.length) resetStats(); start(); } });
+  $('start').addEventListener('click', function () { if (stream) { stop(); say('', 'Stopped. Your readings stay on screen until you start again or reset.'); } else { resetStats(); start(); } });
   function resetStats() { minV = Infinity; maxV = -Infinity; sumE = 0; sumN = 0; hist = []; log = []; t0 = lastT = performance.now(); level = null; warmup = 0; show(); }
   $('reset').addEventListener('click', function () { resetStats(); say('', 'Readings reset.'); });
 
@@ -150,6 +150,7 @@
     if (!an) return;
     an.getFloatTimeDomainData(buf);
     var ms = 0; for (var i = 0; i < buf.length; i++) ms += buf[i] * buf[i]; ms /= buf.length;
+    if (ms === 0) { lastT = performance.now(); return; } // no samples yet (the microphone is still starting, or it is muted)
     var now = performance.now(), dt = (now - lastT) / 1000; lastT = now;
     var tau = $('speed').value === 'slow' ? 1 : 0.125;
     level = level == null ? ms : level + (ms - level) * (1 - Math.exp(-dt / tau));
@@ -210,7 +211,7 @@
     g.stroke();
   }
   function draw() { show(); graph(); if (stream) raf = requestAnimationFrame(draw); }
-  ['show', 'weight', 'speed'].forEach(function (id) { $(id).addEventListener('change', function () { if (id !== 'show') { level = null; warmup = 0; } draw(); }); });
+  ['show', 'weight', 'speed'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'weight') resetStats(); else if (id === 'speed') { level = null; warmup = 0; } draw(); }); });
   $('offset').addEventListener('input', function () { draw(); });
   $('mic').addEventListener('change', function () { if (stream) { stop(); start(); } });
   $('cal').addEventListener('click', function () {

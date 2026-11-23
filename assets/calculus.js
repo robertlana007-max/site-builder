@@ -504,7 +504,7 @@
   }
   function Hexp(e) { // exponents are printed small and inline
     if (isN(e)) return numTxt(e).replace('-', '−');
-    return esc(T(e)).replace(/(\d)\*(?=[A-Za-z(])/g, '$1').replace(/\*/g, '·').replace(/-/g, '−').replace(/pi/g, 'π');
+    return esc(T(e)).replace(/(\d)\*(?=[A-Za-z(])/g, '$1').replace(/\*/g, '·').replace(/-/g, '−').replace(/pi/g, 'π').replace(/\^(\w+|\([^()]*\))/g, '<sup>$1</sup>');
   }
   function isNegTerm(t) { return (isN(t) && val(t) < 0) || (t.t === '*' && isN(t.a[0]) && val(t.a[0]) < 0); }
   function negTerm(t) { if (isN(t)) return neg(t); var a = t.a.slice(); a[0] = neg(a[0]); if (isOne(a[0])) a.shift(); return a.length === 1 ? a[0] : mul(a); }
