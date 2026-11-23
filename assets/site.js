@@ -199,21 +199,114 @@
   // ---------- finder: instant tool search, used by the hero box and the Ctrl K palette ----------
   function finder(input, box, onPick) {
     var sel = 0, links = [];
-    function rank(t, words) {
-      var name = t[1].toLowerCase(), hay = name + ' ' + t[2].toLowerCase() + ' ' + t[4].toLowerCase() + ' ' + t[0], score = 0;
-      for (var i = 0; i < words.length; i++) {
-        if (hay.indexOf(words[i]) === -1) return 0;
-        score += name.indexOf(words[i]) === 0 ? 4 : name.indexOf(words[i]) !== -1 ? 2 : 1;
+    // Forgiving search: typos, other names (aliases from src/aliases.js) and other languages.
+    function norm(s) { return String(s || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[_\-–—/.,:;!?()"'’]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function dist(a, b, max) { // Damerau-Levenshtein with early exit
+      var la = a.length, lb = b.length; if (Math.abs(la - lb) > max) return max + 1;
+      var prev2 = null, prev = [], cur, i, j;
+      for (j = 0; j <= lb; j++) prev[j] = j;
+      for (i = 1; i <= la; i++) {
+        cur = [i]; var best = i;
+        for (j = 1; j <= lb; j++) {
+          var c = a[i - 1] === b[j - 1] ? 0 : 1;
+          cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + c);
+          if (prev2 && i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) cur[j] = Math.min(cur[j], prev2[j - 2] + 1);
+          if (cur[j] < best) best = cur[j];
+        }
+        if (best > max) return max + 1;
+        prev2 = prev; prev = cur;
       }
-      return score;
+      return prev[lb];
+    }
+    var STOP = {}; ('i im me my mine we our you your a an the to of for in on at by with from into onto and or but is are was be can could would should will do does did how what which where why want wants need needs like please help some any this that these those it its online free tool tools app website site way easy quick quickly best simple just get let') .split(' ').forEach(function (w) { STOP[w] = 1; });
+    // Everyday task words → words used in tool names (more come from src/aliases when they load).
+    var SYN = {
+      smaller: ['compress', 'reduce'], small: ['compress'], shrink: ['compress', 'reduce'], reduce: ['compress'], lighter: ['compress'], kb: ['compress'], mb: ['compress'], size: ['resize', 'compress'],
+      bigger: ['resize', 'upscale'], larger: ['resize', 'upscale'], enlarge: ['upscale', 'resize'], sharper: ['upscale'], clear: ['upscale'], blurry: ['upscale'],
+      join: ['merge'], combine: ['merge'], together: ['merge'], attach: ['merge'], add: ['merge'], one: ['merge'],
+      cut: ['trim', 'split', 'crop', 'cutter'], separate: ['split'], divide: ['split'], break: ['split'], extract: ['split', 'extract'],
+      picture: ['image', 'photo'], pictures: ['image'], photo: ['image'], photos: ['image'], pic: ['image'], pics: ['image'], img: ['image'], selfie: ['image', 'photo'], jpeg: ['jpg'],
+      words: ['text', 'word'], writing: ['text'], letters: ['text'], typed: ['text'],
+      sound: ['audio', 'mp3'], song: ['audio', 'mp3'], music: ['audio', 'mp3'], voice: ['audio', 'voice'],
+      film: ['video'], clip: ['video'], movie: ['video'], reel: ['video', 'vertical'],
+      change: ['convert', 'converter'], turn: ['convert', 'converter'], transform: ['convert'], save: ['convert', 'download'],
+      money: ['calculator', 'currency'], cost: ['calculator'], price: ['calculator'], interest: ['loan', 'interest'], tax: ['tax'],
+      delete: ['remove'], erase: ['remove'], rid: ['remove'], background: ['background'], bg: ['background'],
+      sign: ['signature', 'sign'], lock: ['protect'], password: ['protect', 'unlock', 'password'], open: ['unlock'], scan: ['scanner', 'ocr'], read: ['ocr', 'reader'],
+      make: ['maker', 'generator', 'creator'], create: ['maker', 'generator'], build: ['maker', 'builder'], cv: ['resume'],
+      count: ['counter'], timer: ['timer', 'countdown'], weight: ['bmi', 'weight'], fat: ['body fat', 'bmi']
+    };
+    function synOf(w) { var x = (window.TOOL_SYNONYMS && window.TOOL_SYNONYMS[w]) || []; return (SYN[w] || []).concat(x); }
+    var index = null, aliasState = 0;
+    // Alias files (other names, typos, task phrases, other languages) load only when someone searches:
+    // English core first, then the visitor's browser languages, the language of the script they type in,
+    // and, if nothing matches, the remaining Latin-alphabet languages.
+    var loaded = {}, pending = 0;
+    function loadFile(name) {
+      if (loaded[name]) return; loaded[name] = 1; pending++;
+      var s = document.createElement('script'); s.src = REL + 'assets/aliases/' + name + '.js'; s.async = true;
+      s.onload = s.onerror = function () { pending--; index = null; if (!pending && (document.activeElement === input || input.value)) render(); };
+      document.head.appendChild(s);
+    }
+    var SCRIPTS = [[/[؀-ۿݐ-ݿ]/, ['ar', 'fa', 'ur', 'ps']], [/[ऀ-ॿ]/, ['hi', 'mr', 'ne']], [/[ঀ-৿]/, ['bn']], [/[਀-੿]/, ['pa']], [/[઀-૿]/, ['gu']], [/[஀-௿]/, ['ta']], [/[ఀ-౿]/, ['te']], [/[ಀ-೿]/, ['kn']], [/[ഀ-ൿ]/, ['ml']], [/[඀-෿]/, ['si']], [/[က-႟]/, ['my']], [/[฀-๿]/, ['th']], [/[ក-៿]/, ['km']], [/[຀-໿]/, ['lo']], [/[぀-ヿ]/, ['ja']], [/[一-鿿]/, ['zh', 'ja']], [/[가-힯ᄀ-ᇿ]/, ['ko']], [/[Ѐ-ӿ]/, ['ru', 'uk', 'bg', 'sr', 'kk', 'uz']], [/[Ͱ-Ͽ]/, ['el']], [/[ሀ-፿]/, ['am']]];
+    var LATIN = 'es pt fr de it nl pl ro cs sk hu sv da no fi tr az uz id ms tl vi sw ha yo so zu hr hi ur'.split(' ');
+    function loadAliases(q, needMore) {
+      loadFile('core'); loadFile('list');
+      (navigator.languages || [navigator.language || '']).forEach(function (l) { l = String(l).toLowerCase().split('-')[0]; if (l && l !== 'en') loadFile(l === 'nb' || l === 'nn' ? 'no' : l === 'fil' ? 'tl' : l); });
+      for (var i = 0; i < SCRIPTS.length; i++) if (SCRIPTS[i][0].test(q)) SCRIPTS[i][1].forEach(loadFile);
+      if (needMore && /[a-z]/.test(q)) LATIN.forEach(loadFile);
+    }
+    function build() {
+      var AL = window.TOOL_ALIASES || {};
+      index = (window.TOOLS || []).map(function (t) {
+        if (AL[t[0]] && !t[5]) t = t.concat([AL[t[0]]]);
+        var name = norm(t[1]), extra = norm(t[2] + ' ' + t[4] + ' ' + t[0]), alias = norm(t[5] || '');
+        var toks = {}; (name + ' ' + extra + ' ' + alias).split(' ').forEach(function (w) { if (w) toks[w] = 1; });
+        return { t: t, name: name, nameToks: name.split(' '), all: name + ' ' + extra + ' ' + alias, flat: (name + '|' + alias.split('|').join('|')).replace(/ /g, ''), aliasList: (t[5] || '').split('|').map(norm), toks: Object.keys(toks) };
+      });
+    }
+    function wordScore(e, w) {
+      var wide = /[^\x00-\x7f]/.test(w), best = 0, i, tk;
+      for (i = 0; i < e.nameToks.length; i++) { tk = e.nameToks[i]; if (tk === w) return 6; if (tk.indexOf(w) === 0 && (w.length > 1 || wide)) best = Math.max(best, 5); }
+      if (e.all.indexOf(w) !== -1 && (w.length > 2 || wide)) best = Math.max(best, e.name.indexOf(w) !== -1 ? 4 : 3);
+      if (!best && w.length >= 5 && e.flat.indexOf(w) !== -1) best = 3; // words typed together, e.g. "mergepdf"
+      if (best || w.length < 4) return best;
+      var max = w.length >= 6 ? 2 : 1;
+      for (i = 0; i < e.toks.length; i++) {
+        tk = e.toks[i]; if (tk.length < 3) continue;
+        if (dist(w, tk, max) <= max) { best = Math.max(best, e.nameToks.indexOf(tk) !== -1 ? 2.5 : 2); }
+        else if (tk.length > w.length && dist(w, tk.slice(0, w.length), max) <= max) best = Math.max(best, 1.5); // typo while still typing
+        if (best >= 2.5) break;
+      }
+      return best;
+    }
+    function rank(e, words, q, loose) {
+      var score = 0, miss = 0;
+      for (var i = 0; i < words.length; i++) {
+        var s = wordScore(e, words[i]), alts = synOf(words[i]);
+        for (var j = 0; j < alts.length && s < 4; j++) s = Math.max(s, wordScore(e, alts[j]) * 0.85);
+        if (!s) miss++; score += s;
+      }
+      if (!score) return 0;
+      if (!loose && miss > (words.length >= 3 ? Math.floor(words.length / 2) : 0)) return 0;
+      if (e.name === q) score += 20; else if (e.name.indexOf(q) === 0) score += 8; else if (e.name.indexOf(q) !== -1) score += 5;
+      for (var k = 0; k < e.aliasList.length; k++) if (e.aliasList[k] && (e.aliasList[k] === q || e.aliasList[k].indexOf(q) === 0)) { score += e.aliasList[k] === q ? 12 : 4; break; }
+      return score - miss * 2;
     }
     function mark() { links.forEach(function (a, i) { a.classList.toggle('sel', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); }); }
     function render() {
-      var q = input.value.trim().toLowerCase(), words = q.split(/\s+/).filter(Boolean), list;
+      var q = norm(input.value), all = q.split(' ').filter(Boolean), list, close = false;
+      // People often describe the job ("how do i make my photo smaller"): drop filler words, keep the meaning.
+      var words = all.filter(function (w) { return !STOP[w]; }); if (!words.length) words = all;
+      if (words.length >= 3) { var core = words.filter(function (w) { return !/^(make|makes|making|made|create|change|turn)$/.test(w); }); if (core.length >= 2) words = core; }
+      loadAliases(q, false);
+      if (!index) build();
+      function find(loose) { return index.map(function (e) { return [rank(e, words, q, loose), e.t]; }).filter(function (x) { return x[0] > 0; })
+        .sort(function (a, b) { return b[0] - a[0]; }).slice(0, 8).map(function (x) { return x[1]; }); }
       if (!q) list = input.dataset.empty === 'all' ? (window.TOOLS || []).slice(0, 8) : [];
-      else list = (window.TOOLS || []).map(function (t) { return [rank(t, words), t]; }).filter(function (x) { return x[0]; })
-        .sort(function (a, b) { return b[0] - a[0]; }).slice(0, 8).map(function (x) { return x[1]; });
+      else { list = find(false); if (!list.length) { loadAliases(q, true); list = find(true).slice(0, 5); close = list.length > 0; } }
       box.innerHTML = ''; links = []; sel = 0;
+      if (close) { var h = document.createElement('p'); h.className = 'f-none'; h.textContent = 'No exact match for "' + input.value.trim() + '". Closest tools:'; box.appendChild(h); }
       list.forEach(function (t) {
         var a = document.createElement('a'), dot = document.createElement('i'), cat = document.createElement('small');
         a.className = 'f-item'; a.href = REL + t[0] + '/'; a.style.setProperty('--c', t[3]);

@@ -285,6 +285,23 @@ const bySlug = s => { const t = tools.find(t => t.slug === s); if (!t) throw new
 
 // Search index used by the finder, the palette and the "My tools" lists.
 write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [t.slug, t.name, t.cat, COLOR[t.cat], t.card])) + ';\n');
+// Search aliases (other names, common typos, other languages), loaded only when someone uses the search box.
+{
+  // src/aliases/core.js = English names, typos, task phrases (+ __synonyms); src/aliases/<lang>.js = one file per language.
+  // Each is published as assets/aliases/<name>.js and loaded by the search box only when needed.
+  const dir = path.join(ROOT, 'src', 'aliases'), slugs = new Set(tools.map(t => t.slug));
+  const pack = (AL) => { const out = {}; for (const s of Object.keys(AL || {})) { if (!slugs.has(s) || !Array.isArray(AL[s]) || !AL[s].length) continue; out[s] = AL[s].map(x => String(x).replace(/\|/g, ' ')).join('|'); } return out; };
+  const langs = [];
+  if (fs.existsSync(dir)) {
+    for (const f of fs.readdirSync(dir).filter(f => /^[a-z]{2,3}(-[a-z]+)?\.js$|^core\.js$/.test(f))) {
+      let AL = {}; try { AL = require(path.join(dir, f)); } catch (e) { console.warn('aliases: skipped ' + f + ': ' + e.message); continue; }
+      const name = f.replace(/\.js$/, ''), syn = name === 'core' && AL.__synonyms ? AL.__synonyms : null;
+      write('assets/aliases/' + name + '.js', 'window.TOOL_ALIASES=window.TOOL_ALIASES||{};(function(a,s){for(var k in a)window.TOOL_ALIASES[k]=(window.TOOL_ALIASES[k]?window.TOOL_ALIASES[k]+"|":"")+a[k];' + (syn ? 'window.TOOL_SYNONYMS=s;' : '') + '})(' + JSON.stringify(pack(AL)) + ',' + JSON.stringify(syn || 0) + ');\n');
+      if (name !== 'core') langs.push(name);
+    }
+  }
+  write('assets/aliases/list.js', 'window.ALIAS_LANGS=' + JSON.stringify(langs.sort()) + ';\n');
+}
 
 // ---------- home ----------
 const keepLine = cfg.firebase
@@ -327,7 +344,8 @@ write('index.html', layout({
   <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
   <h1>Use any tool you need, <span class="hl">completely free</span></h1>
   <p class="sub">Scroll down and pick whatever you need. All ${tools.length} tools for PDFs, pictures, money, text and code are free for everyone: zero ads, unlimited use, no sign-up and nothing to install.</p>
-  <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search for a tool, for example “pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
+  <p class="find-tip"><span aria-hidden="true">🔎</span> We have a lot of tools, so the one you need might take a little while to find. The quickest way is to search for it: type its name, or simply describe what you want to do in your own words and your own language, like “make my photo smaller” or “join two PDF files”. Don’t worry about spelling mistakes, we will still find it for you.</p>
+  <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search in any language, e.g. “merge pdf” or “unir pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
   <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Zero ads</li><li>${icon('check')}Unlimited use</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
   ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>You are not a customer here, you are family.</b> And for us, family is everything. Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
