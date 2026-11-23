@@ -1,0 +1,421 @@
+<style>
+.cwm fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.cwm legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.cwm textarea { min-height: 190px; font-family: inherit; font-size: 15px; }
+.cwm .cwm-hint { display: block; font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.cwm .cwm-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.cwm .cwm-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-top: 4px; }
+.cwm .cwm-prev canvas { width: 100%; max-width: 560px; height: auto; display: block; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.cwm .cwm-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.cwm .cwm-bar .btn { min-height: 38px; padding: 4px 12px; }
+.cwm .cwm-nav { display: flex; gap: 6px; align-items: center; }
+</style>
+<div class="cwm" id="cwm">
+<fieldset><legend>Words and clues</legend>
+  <div class="fields"><div><label for="cwTitle">Puzzle title</label><input type="text" id="cwTitle" data-nomemo maxlength="70" placeholder="e.g. Science Week Crossword"></div></div>
+  <label for="cwWords">One per line: the answer, then a dash or colon, then the clue</label>
+  <textarea id="cwWords" data-nomemo maxlength="20000" placeholder="planet - Earth is one of these&#10;oxygen - Gas we breathe in&#10;gravity - Force that pulls things down&#10;atom - Tiny building block of matter&#10;magnet - Attracts iron and steel"></textarea>
+  <span class="cwm-hint" id="cwCount">Answers can be in any language. Spaces in an answer are removed in the grid.</span>
+</fieldset>
+<fieldset><legend>Options</legend>
+  <div class="fields">
+    <div><label for="cwPaper">Paper</label><select id="cwPaper" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+    <div><label for="cwCase">Answer letters</label><select id="cwCase"><option value="upper">CAPITALS</option><option value="asis">As typed</option></select></div>
+  </div>
+  <label class="cwm-check"><input type="checkbox" id="cwLen" checked>Show the number of letters after each clue, like (6)</label>
+  <label class="cwm-check"><input type="checkbox" id="cwName" checked>Add Name and Date lines</label>
+</fieldset>
+<div class="btns" style="margin:0 0 14px">
+  <button type="button" class="btn" id="cwMake">Make crossword</button>
+  <button type="button" class="btn ghost" id="cwAgain">Try another layout</button>
+</div>
+<div class="cwm-prev" id="cwPrevBox" hidden>
+  <div class="cwm-bar"><span id="cwInfo"></span><span class="cwm-nav"><button type="button" class="btn ghost" id="cwPrevP" aria-label="Previous page">‹</button><span id="cwPage">1/1</span><button type="button" class="btn ghost" id="cwNextP" aria-label="Next page">›</button></span><button type="button" class="btn ghost" id="cwKey" aria-pressed="false">Show answers</button></div>
+  <canvas id="cwCanvas" width="595" height="842" aria-label="Crossword preview"></canvas>
+</div>
+<div class="btns">
+  <button type="button" class="btn" id="cwPdf" disabled>Download PDF with answer key</button>
+  <button type="button" class="btn ghost" id="cwPng" disabled>Save this page as PNG</button>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @GD-START (shared drawing helper)
+  // ---------- tiny drawing engine: the same list of shapes is drawn on a canvas (preview, PNG) and into a PDF ----------
+  var GD = (function () {
+    var FONTS = {
+      sans: ['GD Noto Sans', 'noto-sans-subset-400.ttf', 400, 1], sansb: ['GD Noto Sans', 'noto-sans-subset-700.ttf', 700, 1],
+      serif: ['GD Noto Serif', 'noto-serif-subset-400.ttf', 400, 1], serifb: ['GD Noto Serif', 'noto-serif-subset-700.ttf', 700, 1],
+      script: ['GD Great Vibes', 'great-vibes-latin-400-normal.woff2', 400], hand: ['GD Dancing Script', 'dancing-script-latin-400-normal.woff2', 400],
+      display: ['GD Anton', 'anton-latin-400-normal.woff2', 400], caveat: ['GD Caveat', 'caveat-latin-400-normal.woff2', 400]
+    };
+    var bufs = {}, prom = {}, mc = document.createElement('canvas').getContext('2d');
+    function load(k) {
+      if (!prom[k]) prom[k] = fetch('../assets/vendor/fonts/' + FONTS[k][1]).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) {
+        bufs[k] = b; return new FontFace(FONTS[k][0], b.slice(0), { weight: String(FONTS[k][2]) }).load().then(function (f) { document.fonts.add(f); });
+      }).catch(function (e) { prom[k] = null; throw e; });
+      return prom[k];
+    }
+    function loadAll(keys) { return Promise.all(keys.map(load)); }
+    function css(k, s) { var F = FONTS[k] || FONTS.sans; return F[2] + ' ' + s + 'px "' + F[0] + '", sans-serif'; }
+    function chars(t) { return Array.from(String(t)); }
+    function width(t, k, s, ls) { mc.font = css(k, s); return mc.measureText(String(t)).width + (ls || 0) * Math.max(0, chars(t).length - 1); }
+    function fit(t, k, s, maxW, min, ls) { min = min || 3; while (s > min && width(t, k, s, ls) > maxW) s = Math.max(min, s * 0.96); return s; }
+    function wrap(t, k, s, maxW) {
+      var out = [];
+      String(t == null ? '' : t).replace(/\r\n?/g, '\n').split('\n').forEach(function (para) {
+        var cur = '';
+        para.split(/ +/).forEach(function (w) {
+          var trial = cur ? cur + ' ' + w : w;
+          if (width(trial, k, s) <= maxW) { cur = trial; return; }
+          if (cur) out.push(cur);
+          cur = '';
+          while (w && width(w, k, s) > maxW) { var c = chars(w), n = c.length; while (n > 1 && width(c.slice(0, n).join(''), k, s) > maxW) n--; out.push(c.slice(0, n).join('')); w = c.slice(n).join(''); }
+          cur = w;
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function startX(o) { var w = width(o.t, o.font, o.s, o.ls); return o.align === 'center' ? o.x - w / 2 : o.align === 'right' ? o.x - w : o.x; }
+    function rgb(h) { h = String(h || '#000').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+    function rrPath(x, y, w, h, r) { r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); return 'M' + (x + r) + ' ' + y + 'H' + (x + w - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w) + ' ' + (y + r) : '') + 'V' + (y + h - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w - r) + ' ' + (y + h) : '') + 'H' + (x + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + x + ' ' + (y + h - r) : '') + 'V' + (y + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y : '') + 'Z'; }
+    // draw an image into a w x h canvas: cover/contain, optional round clip
+    function raster(o, scale) {
+      var img = o.img, W = Math.max(1, Math.round(o.w * scale)), H = Math.max(1, Math.round(o.h * scale)), c = document.createElement('canvas');
+      c.width = W; c.height = H; var g = c.getContext('2d');
+      if (o.clip) { g.beginPath(); if (o.clip === 'circle') g.ellipse(W / 2, H / 2, W / 2, H / 2, 0, 0, Math.PI * 2); else g.roundRect ? g.roundRect(0, 0, W, H, o.clip * scale) : g.rect(0, 0, W, H); g.clip(); }
+      var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = o.fit === 'contain' ? Math.min(W / iw, H / ih) : Math.max(W / iw, H / ih);
+      g.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+      return c;
+    }
+    function drawCanvas(ops, ctx, scale) {
+      ops.forEach(function (o) {
+        ctx.save(); ctx.globalAlpha = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'circle' || o.k === 'path') {
+          var p;
+          if (o.k === 'rect') p = new Path2D(rrPath(o.x * scale, o.y * scale, o.w * scale, o.h * scale, (o.r || 0) * scale));
+          else if (o.k === 'circle') { p = new Path2D(); p.arc(o.x * scale, o.y * scale, o.r * scale, 0, Math.PI * 2); }
+          else { ctx.translate(o.x * scale, o.y * scale); ctx.scale(o.sc * scale, o.sc * scale); if (o.rot) ctx.rotate(o.rot); p = new Path2D(o.d); }
+          var u = o.k === 'path' ? o.sc * scale : 1;
+          if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(p); }
+          if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale / u; ctx.stroke(p); }
+        } else if (o.k === 'line') {
+          ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale; if (o.dash) ctx.setLineDash(o.dash.map(function (d) { return d * scale; }));
+          ctx.beginPath(); ctx.moveTo(o.x1 * scale, o.y1 * scale); ctx.lineTo(o.x2 * scale, o.y2 * scale); ctx.stroke();
+        } else if (o.k === 'text') {
+          ctx.font = css(o.font, o.s * scale); ctx.fillStyle = o.fill; ctx.textBaseline = 'alphabetic';
+          var x = startX(o);
+          if (o.ls) chars(o.t).forEach(function (ch) { ctx.fillText(ch, x * scale, o.y * scale); x += width(ch, o.font, o.s) + o.ls; });
+          else ctx.fillText(o.t, x * scale, o.y * scale);
+        } else if (o.k === 'img' && o.img) {
+          ctx.drawImage(raster(o, scale), o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+        }
+        ctx.restore();
+      });
+    }
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
+    async function drawPdf(env, page, ops, ox, oy) {
+      var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
+      function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
+      async function font(k) {
+        if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
+        return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      }
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i], op = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'path') {
+          var d = o.k === 'rect' ? rrPath(o.x + ox, o.y + oy, o.w, o.h, o.r) : o.d, sc = o.k === 'path' ? o.sc : 1;
+          var opt = { x: o.k === 'path' ? o.x + ox : 0, y: H - (o.k === 'path' ? o.y + oy : 0), scale: sc, opacity: op, borderOpacity: op };
+          if (o.rot) opt.rotate = P.degrees(-o.rot * 180 / Math.PI);
+          if (o.fill) opt.color = col(o.fill);
+          if (o.stroke) { opt.borderColor = col(o.stroke); opt.borderWidth = (o.lw || 1) / sc; } else opt.borderWidth = 0;
+          page.drawSvgPath(d, opt);
+        } else if (o.k === 'circle') {
+          var c = { x: o.x + ox, y: H - o.y - oy, size: o.r, opacity: op, borderOpacity: op };
+          if (o.fill) c.color = col(o.fill); if (o.stroke) { c.borderColor = col(o.stroke); c.borderWidth = o.lw || 1; }
+          page.drawCircle(c);
+        } else if (o.k === 'line') {
+          page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
+        } else if (o.k === 'text') {
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!t.trim()) continue;
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
+        } else if (o.k === 'img' && o.img) {
+          env.imgs = env.imgs || new Map();
+          var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
+          if (!em) {
+            var cv = raster(o, Math.min(300 / 72, 2400 / Math.max(o.w, o.h))), png = o.clip || o.alpha;
+            var url = png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92), bytes = await fetch(url).then(function (r) { return r.arrayBuffer(); });
+            em = png ? await env.doc.embedPng(bytes) : await env.doc.embedJpg(bytes); env.imgs.set(key, em);
+          }
+          page.drawImage(em, { x: o.x + ox, y: H - o.y - oy - o.h, width: o.w, height: o.h, opacity: op });
+        }
+      }
+    }
+    var libs = null;
+    function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
+      await pdfLibs();
+      var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
+      doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
+    }
+    function readImage(file, maxSide, cb) {
+      if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
+      if (file.size > 25 * 1048576) return cb(null, 'That picture is over 25 MB. Choose a smaller one.');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 600, h = img.naturalHeight || 600, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var png = /png|gif|svg|webp/.test(file.type), out = new Image(); out.onload = function () { cb(out); }; out.onerror = function () { cb(null, 'That picture could not be opened.'); };
+        out.src = png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9); out.alpha = png;
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); cb(null, '"' + file.name + '" could not be opened. HEIC photos need converting to JPG first.'); };
+      img.src = url;
+    }
+    function download(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); return u; }
+    return { FONTS: FONTS, load: load, loadAll: loadAll, width: width, fit: fit, wrap: wrap, drawCanvas: drawCanvas, drawPdf: drawPdf, newPdf: newPdf, readImage: readImage, download: download, rgb: rgb };
+  })();
+  // @GD-END
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var cur = null, showKey = false, ready = false, busy = false, pageNo = 0;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  $('cwPaper').value = UT.letter() ? 'letter' : 'a4';
+
+  function readList() {
+    var out = [], bad = [], seen = {};
+    $('cwWords').value.split(/\r?\n/).forEach(function (line, i) {
+      line = line.trim(); if (!line) return;
+      var m = /^(.+?)\s*(?:\s[-–—]\s|[:：|=\t]|\s[-–—]$)\s*(.*)$/.exec(line) || /^(.+?)\s*[-–—]\s*(.+)$/.exec(line);
+      var ans = (m ? m[1] : line).trim(), clue = m ? m[2].trim() : '';
+      var g = UT.graphemes(($('cwCase').value === 'upper' ? ans.toLocaleUpperCase() : ans).normalize('NFC').replace(/[\s\-‐'’.·_]/g, '')).filter(function (x) { return /[\p{L}\p{N}]/u.test(x); });
+      if (g.length < 2) { bad.push('line ' + (i + 1) + ' (answer needs 2+ letters)'); return; }
+      if (g.length > 25) { bad.push('line ' + (i + 1) + ' (answer over 25 letters)'); return; }
+      var key = g.join('').toLocaleLowerCase(); if (seen[key]) { bad.push('line ' + (i + 1) + ' (repeated answer)'); return; }
+      seen[key] = 1;
+      out.push({ ans: ans, g: g, clue: clue || '(no clue given)', noClue: !clue, len: ans.split(/[\s-]+/).filter(Boolean).map(function (p) { return UT.graphemes(p).filter(function (x) { return /[\p{L}\p{N}]/u.test(x); }).length; }).join(',') });
+    });
+    return { list: out, bad: bad };
+  }
+
+  // ---------- layout: place words so they cross, never touching side by side ----------
+  function attempt(words, order, wild) {
+    var cells = new Map(), placed = [];
+    function at(x, y) { return cells.get(x + ',' + y); }
+    function fits(w, x, y, dx, dy) {
+      var L = w.g.length, cross = 0;
+      if (at(x - dx, y - dy) || at(x + dx * L, y + dy * L)) return -1;
+      for (var i = 0; i < L; i++) {
+        var cx = x + dx * i, cy = y + dy * i, c = at(cx, cy);
+        if (c) { if (c.ch !== w.g[i] || c[dx ? 'a' : 'd']) return -1; cross++; }
+        else if (at(cx + dy, cy + dx) || at(cx - dy, cy - dx)) return -1;
+      }
+      return cross;
+    }
+    function put(w, x, y, dx, dy) {
+      for (var i = 0; i < w.g.length; i++) { var k = (x + dx * i) + ',' + (y + dy * i), c = cells.get(k) || { ch: w.g[i] }; c[dx ? 'a' : 'd'] = 1; cells.set(k, c); }
+      placed.push({ w: w, x: x, y: y, dx: dx, dy: dy });
+    }
+    var first = order[0]; put(first, 0, 0, 1, 0);
+    var left = order.slice(1), progress = true;
+    while (left.length && progress) {
+      progress = false;
+      for (var j = 0; j < left.length; j++) {
+        var w = left[j], best = [], bestScore = -1;
+        placed.forEach(function (p) {
+          for (var a = 0; a < p.w.g.length; a++) for (var b = 0; b < w.g.length; b++) {
+            if (p.w.g[a] !== w.g[b]) continue;
+            var dx = p.dx ? 0 : 1, dy = p.dx ? 1 : 0, x = p.x + p.dx * a - dx * b, y = p.y + p.dy * a - dy * b, c = fits(w, x, y, dx, dy);
+            if (c < 1) continue;
+            var sc = c * (wild ? 2 : 10) + UT.rnd(wild ? 12 : 8);
+            if (sc > bestScore) { bestScore = sc; best = [x, y, dx, dy]; }
+          }
+        });
+        if (bestScore >= 0) { put(w, best[0], best[1], best[2], best[3]); left.splice(j, 1); j--; progress = true; }
+      }
+    }
+    var minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity, crosses = 0;
+    cells.forEach(function (c, k) { var p = k.split(','), x = +p[0], y = +p[1]; minX = Math.min(minX, x); minY = Math.min(minY, y); maxX = Math.max(maxX, x); maxY = Math.max(maxY, y); if (c.a && c.d) crosses++; });
+    var w = maxX - minX + 1, h = maxY - minY + 1;
+    return { placed: placed, left: left, minX: minX, minY: minY, w: w, h: h, crosses: crosses, score: placed.length * 1000 + crosses * 20 - Math.max(w, h) * 6 - w * h * 0.2 };
+  }
+  function layout(words) {
+    var best = null, t0 = performance.now(), n = 0;
+    var byLen = words.slice().sort(function (a, b) { return b.g.length - a.g.length; });
+    while (n < 3 || (performance.now() - t0 < 700 && n < 400)) {
+      var order = n === 0 ? byLen : UT.shuffle(byLen.slice(0, 3)).concat(UT.shuffle(byLen.slice(3)));
+      if (n > 0 && UT.rnd(2)) order = byLen.slice().sort(function (a, b) { return (b.g.length - a.g.length) + (UT.rnd(5) - 2); });
+      if (n > 20 && best && best.left.length && UT.rnd(2)) order = UT.shuffle(byLen.slice());
+      var r = attempt(words, order, n > 20 && UT.rnd(3) === 0); n++;
+      if (!best || r.score > best.score) best = r;
+      if (!best.left.length && n > 60 && performance.now() - t0 > 350) break;
+    }
+    return finish(best, words);
+  }
+  function finish(r, words) {
+    var rtl = words.some(function (w) { return UT.rtl(w.ans); });
+    var grid = {}, starts = {}, W = r.w, H = r.h;
+    r.placed.forEach(function (p) {
+      p.x -= r.minX; p.y -= r.minY;
+      if (rtl) { p.x = W - 1 - p.x; p.dx = -p.dx; }
+      for (var i = 0; i < p.w.g.length; i++) grid[(p.x + p.dx * i) + ',' + (p.y + p.dy * i)] = p.w.g[i];
+      starts[p.x + ',' + p.y] = 1;
+    });
+    // numbers in reading order (right to left for Arabic, Hebrew…)
+    var num = {}, k = 0;
+    for (var y = 0; y < H; y++) for (var i = 0; i < W; i++) { var x = rtl ? W - 1 - i : i; if (starts[x + ',' + y]) num[x + ',' + y] = ++k; }
+    r.placed.forEach(function (p) { p.n = num[p.x + ',' + p.y]; });
+    var across = r.placed.filter(function (p) { return p.dy === 0; }).sort(function (a, b) { return a.n - b.n; }), down = r.placed.filter(function (p) { return p.dx === 0; }).sort(function (a, b) { return a.n - b.n; });
+    return { w: W, h: H, grid: grid, num: num, across: across, down: down, left: r.left, rtl: rtl, crosses: r.crosses };
+  }
+
+  // ---------- pages ----------
+  function pageSize() { return $('cwPaper').value === 'letter' ? [612, 792] : [595.28, 841.89]; }
+  function pages(r, title, key) {
+    var P = pageSize(), W = P[0], H = P[1], M = 40, out = [], ops = [], y = M, font = 'sans';
+    function newPage() { ops = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }]; out.push(ops); y = M; }
+    newPage();
+    var t = (title || 'Crossword') + (key ? ' (answers)' : ''), ts = GD.fit(t, 'sansb', 22, W - 2 * M, 12);
+    ops.push({ k: 'text', t: t, x: W / 2, y: y + ts, font: 'sansb', s: ts, fill: '#111827', align: 'center' }); y += ts + 14;
+    if ($('cwName').checked && !key) {
+      y += 10;
+      ops.push({ k: 'text', t: 'Name', x: M, y: y, font: 'sans', s: 11, fill: '#374151' }, { k: 'line', x1: M + 34, y1: y + 2, x2: W * 0.62, y2: y + 2, stroke: '#9ca3af', lw: 0.8 });
+      ops.push({ k: 'text', t: 'Date', x: W * 0.66, y: y, font: 'sans', s: 11, fill: '#374151' }, { k: 'line', x1: W * 0.66 + 30, y1: y + 2, x2: W - M, y2: y + 2, stroke: '#9ca3af', lw: 0.8 });
+      y += 16;
+    }
+    y += 6;
+    var maxH = (H - y - M) * 0.62, cell = Math.min(30, (W - 2 * M) / r.w, maxH / r.h), gx = (W - cell * r.w) / 2, gy = y;
+    Object.keys(r.grid).forEach(function (k) {
+      var p = k.split(','), x = gx + +p[0] * cell, yy = gy + +p[1] * cell;
+      ops.push({ k: 'rect', x: x, y: yy, w: cell, h: cell, fill: '#ffffff', stroke: '#111827', lw: 0.9 });
+      if (r.num[k]) ops.push({ k: 'text', t: String(r.num[k]), x: r.rtl ? x + cell - 2 : x + 2, y: yy + Math.max(5, cell * 0.3), font: 'sans', s: Math.max(4.5, cell * 0.28), fill: '#111827', align: r.rtl ? 'right' : 'left' });
+      if (key) { var fs = cell * 0.55; ops.push({ k: 'text', t: r.grid[k], x: x + cell / 2, y: yy + cell * 0.62 + fs * 0.3, font: 'sansb', s: fs, fill: '#1d4ed8', align: 'center' }); }
+    });
+    y = gy + cell * r.h + 22;
+    // clues flow down the left column, then the right column, then onto the next page
+    var colW = (W - 2 * M - 24) / 2, cs = 10.5, lh = 14, top = y, col = 0;
+    function clueText(p) { return p.w.clue + ($('cwLen').checked ? ' (' + p.w.len + ')' : '') + (key ? ' = ' + p.w.ans : ''); }
+    function cx() { return M + col * (colW + 24); }
+    function room(h) { if (y + h <= H - M) return; if (col === 0) { col = 1; y = top; } else { newPage(); top = M; col = 0; } }
+    function block(head, list) {
+      room(lh * 3);
+      ops.push({ k: 'text', t: head, x: cx(), y: y + 12, font: 'sansb', s: 13, fill: '#111827' }); y += 22;
+      list.forEach(function (p) {
+        var lines = GD.wrap(clueText(p), font, cs, colW - 22);
+        room(lines.length * lh);
+        ops.push({ k: 'text', t: String(p.n), x: cx(), y: y + cs, font: 'sansb', s: cs, fill: '#111827' });
+        lines.forEach(function (ln, i) { ops.push({ k: 'text', t: ln, x: cx() + 22, y: y + cs + i * lh, font: font, s: cs, fill: '#1f2937' }); });
+        y += lines.length * lh + 3;
+      });
+      y += 10;
+    }
+    block('Across', r.across);
+    if (col === 0 && r.across.length && r.down.length) { col = 1; y = top; }
+    block('Down', r.down);
+    return out.map(function (o) { return { ops: o, W: W, H: H }; });
+  }
+  function allPages() { return cur ? pages(cur, $('cwTitle').value.trim(), showKey) : []; }
+  function paint() {
+    if (!cur || !ready) return;
+    var ps = allPages(); pageNo = Math.max(0, Math.min(pageNo, ps.length - 1));
+    var pg = ps[pageNo], cv = $('cwCanvas'), sc = 2;
+    cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
+    GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+    $('cwPage').textContent = (pageNo + 1) + '/' + ps.length;
+  }
+  function make() {
+    if (!ready) return say('', 'Loading fonts…');
+    var rl = readList(), list = rl.list;
+    $('cwCount').textContent = list.length + ' answers' + (rl.bad.length ? '. Skipped: ' + rl.bad.slice(0, 4).join('; ') + (rl.bad.length > 4 ? '…' : '') : '') + '.';
+    if (list.length < 2) { cur = null; $('cwPrevBox').hidden = true; $('cwPdf').disabled = $('cwPng').disabled = true; return say('bad', 'Add at least 2 answers with clues, one per line, like: planet - Earth is one of these'); }
+    if (list.length > 60) return say('bad', 'Please use 60 answers or fewer. You have ' + list.length + '.');
+    var r = layout(list);
+    cur = r; pageNo = 0;
+    $('cwCanvas')._puzzle = r;
+    $('cwPrevBox').hidden = false; $('cwPdf').disabled = $('cwPng').disabled = false;
+    $('cwInfo').textContent = r.w + ' × ' + r.h + ' squares, ' + (r.across.length + r.down.length) + ' answers';
+    var miss = r.left.map(function (w) { return w.ans; }), noClue = list.filter(function (w) { return w.noClue; }).length;
+    if (miss.length) say('bad', 'These answers could not be joined to the others and were left out: ' + miss.join(', ') + '. They may share no letters with the rest. Press "Try another layout", or add words that share letters with them.');
+    else say('ok', 'Crossword ready with all ' + list.length + ' answers.' + (noClue ? ' ' + noClue + ' answer' + (noClue > 1 ? 's have' : ' has') + ' no clue yet.' : ''));
+    paint();
+  }
+  $('cwMake').addEventListener('click', make);
+  $('cwAgain').addEventListener('click', make);
+  $('cwCase').addEventListener('change', function () { if (cur) make(); });
+  ['cwPaper', 'cwLen', 'cwName'].forEach(function (id) { $(id).addEventListener('change', paint); });
+  $('cwTitle').addEventListener('input', paint);
+  $('cwPrevP').addEventListener('click', function () { pageNo--; paint(); });
+  $('cwNextP').addEventListener('click', function () { pageNo++; paint(); });
+  $('cwKey').addEventListener('click', function () { showKey = !showKey; this.setAttribute('aria-pressed', showKey); this.textContent = showKey ? 'Hide answers' : 'Show answers'; paint(); });
+  $('cwPng').addEventListener('click', function () { if (cur) $('cwCanvas').toBlob(function (b) { GD.download(b, 'crossword' + (showKey ? '-answers' : '') + '.png'); say('ok', 'PNG saved.'); }, 'image/png'); });
+  $('cwPdf').addEventListener('click', async function () {
+    if (!cur || busy) return;
+    busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
+    try {
+      var title = $('cwTitle').value.trim(), env = await GD.newPdf(title || 'Crossword', 'GetToolNest Crossword Maker', function (t) { say('', t); });
+      var ps = pages(cur, title, false).concat(pages(cur, title, true));
+      for (var i = 0; i < ps.length; i++) await GD.drawPdf(env, env.doc.addPage([ps[i].W, ps[i].H]), ps[i].ops);
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), (title || 'crossword').replace(/[\\/:*?"<>|]+/g, '').slice(0, 60) + '.pdf');
+      say('ok', 'PDF saved with the puzzle and the answer key (' + ps.length + ' pages).');
+    } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false;
+  });
+  GD.loadAll(['sans', 'sansb']).then(function () { ready = true; if ($('cwWords').value.trim()) make(); }, function () { say('bad', 'The fonts could not load. Check your connection and reload.'); });
+})();
+</script>

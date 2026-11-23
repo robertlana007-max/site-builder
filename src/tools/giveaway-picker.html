@@ -1,0 +1,150 @@
+<style>
+.gvp textarea { min-height: 200px; font-family: inherit; font-size: 15px; }
+.gvp .gvp-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.gvp .gvp-stage { border: 1px solid var(--line); border-radius: 14px; padding: 18px 14px; margin-top: 16px; text-align: center; background: var(--bg); }
+.gvp .gvp-roll { font-size: clamp(26px, 7vw, 44px); font-weight: 800; min-height: 1.3em; line-height: 1.3; color: var(--accent); word-break: break-word; }
+.gvp .gvp-roll.spin { color: var(--muted); }
+.gvp ol { text-align: left; margin: 14px auto 0; padding-left: 28px; max-width: 520px; }
+.gvp ol li { padding: 6px 0; border-bottom: 1px solid var(--line); word-break: break-word; }
+.gvp ol li b { font-size: 17px; }
+.gvp ol li small { display: block; color: var(--muted); font-size: 13px; }
+.gvp .gvp-sub { font-size: 14px; color: var(--muted); margin-top: 12px; }
+.gvp details { margin-top: 14px; }
+.gvp details summary { cursor: pointer; font-weight: 600; }
+</style>
+<div class="gvp" id="gvp">
+<label for="gvList">Entries: paste names or comments, one per line</label>
+<textarea id="gvList" data-nomemo maxlength="2000000" placeholder="@maria_g Love this! Count me in 🎉&#10;@kenji.t I hope I win&#10;Amara Okafor&#10;@maria_g tagging @friend"></textarea>
+<div class="stats">
+  <div class="stat"><span>Lines</span><b id="gvLines">0</b></div>
+  <div class="stat"><span>Valid entries</span><b id="gvValid">0</b></div>
+  <div class="stat"><span>Duplicates removed</span><b id="gvDup">0</b></div>
+</div>
+<div class="fields">
+  <div><label for="gvMode">Who is each line?</label><select id="gvMode"><option value="line">The whole line is one entry</option><option value="at">The first @username in the line</option><option value="first">The first word of the line</option></select></div>
+  <div><label for="gvWin">Number of winners</label><input type="number" id="gvWin" min="1" max="500" value="1" inputmode="numeric"></div>
+  <div><label for="gvBackup">Backup winners</label><input type="number" id="gvBackup" min="0" max="50" value="0" inputmode="numeric"></div>
+</div>
+<div class="fields">
+  <div><label for="gvMust">Only lines that contain (optional)</label><input type="text" id="gvMust" data-nomemo maxlength="80" placeholder="e.g. #giveaway or a tagged friend's @"></div>
+  <div><label for="gvSkip">Leave out these names (optional, comma separated)</label><input type="text" id="gvSkip" data-nomemo maxlength="2000" placeholder="e.g. @myshop, @staff_member"></div>
+</div>
+<label class="gvp-check"><input type="checkbox" id="gvDedupe" checked>One entry per person (remove duplicates, ignoring capital letters)</label>
+<label class="gvp-check"><input type="checkbox" id="gvAnim" checked>Show the draw animation</label>
+<div class="btns"><button type="button" class="btn big" id="gvPick">Pick winners</button><button type="button" class="btn ghost" id="gvAgain" hidden>Draw again without these winners</button></div>
+<div class="gvp-stage" id="gvStage" hidden>
+  <div class="gvp-roll" id="gvRoll" aria-live="polite"></div>
+  <ol id="gvOut"></ol>
+  <div class="gvp-sub" id="gvMeta"></div>
+  <div class="btns" style="justify-content:center"><button type="button" class="btn ghost" id="gvCopy">Copy results</button></div>
+</div>
+<details id="gvHistBox" hidden><summary>Earlier draws in this visit</summary><ol id="gvHist"></ol></details>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var excluded = {}, last = null, rolling = false, draws = 0;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function nameOf(line) {
+    var mode = $('gvMode').value;
+    if (mode === 'at') { var m = /@[\p{L}\p{N}_.]+/u.exec(line); return m ? m[0].replace(/\.+$/, '') : null; }
+    if (mode === 'first') { var w = line.trim().split(/\s+/)[0]; return w ? w.replace(/[:,;]+$/, '') : null; }
+    return line.trim().replace(/\s+/g, ' ');
+  }
+  function key(n) { return n.toLocaleLowerCase().normalize('NFKC'); }
+  function entries() {
+    var raw = $('gvList').value.split(/\r?\n/), must = $('gvMust').value.trim().toLocaleLowerCase(), skip = {}, seen = {}, out = [], dup = 0, lines = 0, noName = 0;
+    $('gvSkip').value.split(/[,\n]+/).forEach(function (s) { s = s.trim(); if (s) skip[key(s)] = 1; });
+    raw.forEach(function (line) {
+      if (!line.trim()) return; lines++;
+      if (must && line.toLocaleLowerCase().indexOf(must) < 0) return;
+      var n = nameOf(line); if (!n) { noName++; return; }
+      var k = key(n);
+      if (skip[k] || excluded[k]) return;
+      if ($('gvDedupe').checked && seen[k]) { dup++; return; }
+      seen[k] = 1; out.push({ name: n, line: line.trim(), k: k });
+    });
+    return { list: out, dup: dup, lines: lines, noName: noName };
+  }
+  function count() { var e = entries(); $('gvLines').textContent = fmtNum(e.lines); $('gvValid').textContent = fmtNum(e.list.length); $('gvDup').textContent = fmtNum(e.dup); return e; }
+  var tm = null; function later() { clearTimeout(tm); tm = setTimeout(count, 150); }
+  ['gvList', 'gvMust', 'gvSkip'].forEach(function (id) { $(id).addEventListener('input', later); });
+  ['gvMode', 'gvDedupe'].forEach(function (id) { $(id).addEventListener('change', count); });
+  // fair draw: each entry has the same chance, using the browser's secure random numbers
+  function draw(list, n) { var a = list.slice(); for (var i = 0; i < n; i++) { var j = i + UT.rnd(a.length - i), t = a[i]; a[i] = a[j]; a[j] = t; } return a.slice(0, n); }
+  function pick() {
+    if (rolling) return;
+    var e = count(), w = +$('gvWin').value, b = +$('gvBackup').value || 0;
+    if (!e.lines) return say('bad', 'Paste the entries first, one per line.');
+    if (!e.list.length) return say('bad', e.noName && $('gvMode').value === 'at' ? 'No @usernames were found. Choose "The whole line is one entry" instead.' : 'No entries are left after the filters. Check "Only lines that contain" and "Leave out".');
+    if (!(w >= 1 && w <= 500 && w === Math.floor(w))) return say('bad', 'Choose between 1 and 500 winners.');
+    if (!(b >= 0 && b <= 50 && b === Math.floor(b))) return say('bad', 'Choose between 0 and 50 backup winners.');
+    if (w > e.list.length) return say('bad', 'You asked for ' + w + ' winners but there are only ' + e.list.length + ' entries.');
+    var total = Math.min(e.list.length, w + b), res = draw(e.list, total), anim = $('gvAnim').checked && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    last = { winners: res.slice(0, w), backups: res.slice(w), pool: e.list.length, at: new Date(), dup: e.dup, again: Object.keys(excluded).length > 0 };
+    $('gvStage').hidden = false; $('gvOut').innerHTML = ''; $('gvMeta').textContent = ''; say('', '');
+    if (!anim) return show();
+    rolling = true; $('gvPick').disabled = true; $('gvRoll').classList.add('spin');
+    var t0 = performance.now(), dur = 2200;
+    (function step() {
+      var p = (performance.now() - t0) / dur;
+      if (p >= 1) { rolling = false; $('gvPick').disabled = false; $('gvRoll').classList.remove('spin'); return show(); }
+      $('gvRoll').textContent = e.list[UT.rnd(e.list.length)].name;
+      setTimeout(step, 40 + p * p * 220);
+    })();
+  }
+  function show() {
+    var L = last, out = $('gvOut');
+    $('gvRoll').textContent = L.winners.length === 1 ? '🎉 ' + L.winners[0].name : '🎉 ' + L.winners.length + ' winners';
+    function li(x, label) { var el = document.createElement('li'); var b = document.createElement('b'); b.textContent = x.name + (label ? ' (' + label + ')' : ''); el.appendChild(b); if (x.line !== x.name) { var s = document.createElement('small'); s.textContent = x.line.length > 160 ? x.line.slice(0, 157) + '…' : x.line; el.appendChild(s); } out.appendChild(el); }
+    L.winners.forEach(function (x) { li(x); });
+    L.backups.forEach(function (x, i) { li(x, 'backup ' + (i + 1)); });
+    $('gvMeta').textContent = (L.again ? 'Earlier winners were left out. ' : '') + 'Drawn from ' + fmtNum(L.pool) + ' entries' + (L.dup ? ' (' + fmtNum(L.dup) + ' duplicates removed)' : '') + ' on ' + L.at.toLocaleString() + '. Every entry had the same chance.';
+    $('gvAgain').hidden = false;
+    draws++;
+    var h = document.createElement('li'); h.textContent = L.at.toLocaleTimeString() + ': ' + L.winners.map(function (x) { return x.name; }).join(', ') + (L.backups.length ? ' | backups: ' + L.backups.map(function (x) { return x.name; }).join(', ') : '');
+    $('gvHist').insertBefore(h, $('gvHist').firstChild); while ($('gvHist').children.length > 30) $('gvHist').lastChild.remove(); $('gvHistBox').hidden = draws < 2;
+    if (window.burst) try { burst($('gvRoll')); } catch (e) {}
+    $('gvOut')._last = L;
+  }
+  $('gvPick').addEventListener('click', pick);
+  $('gvAgain').addEventListener('click', function () { if (!last || rolling) return; last.winners.concat(last.backups).forEach(function (x) { excluded[x.k] = 1; }); count(); pick(); });
+  $('gvList').addEventListener('input', function () { excluded = {}; });
+  $('gvCopy').addEventListener('click', function () {
+    if (!last) return;
+    var t = 'Winners:\n' + last.winners.map(function (x, i) { return (i + 1) + '. ' + x.name; }).join('\n') + (last.backups.length ? '\nBackups:\n' + last.backups.map(function (x, i) { return (i + 1) + '. ' + x.name; }).join('\n') : '') + '\nDrawn from ' + last.pool + ' entries on ' + last.at.toLocaleString();
+    copyText(t, this);
+  });
+})();
+</script>

@@ -1,0 +1,396 @@
+<style>
+.ppg fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.ppg legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.ppg .ppg-types { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin-bottom: 14px; }
+.ppg .ppg-types button { font: inherit; font-size: 14px; font-weight: 600; min-height: 48px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; cursor: pointer; padding: 4px 6px; }
+.ppg .ppg-types button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.ppg .ppg-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+.ppg .ppg-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.ppg .ppg-sw { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.ppg .ppg-sw button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.ppg .ppg-sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.ppg input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--field); }
+.ppg .ppg-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.ppg .ppg-prev canvas { width: 100%; max-width: 480px; height: auto; display: block; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.ppg .ppg-prev.land canvas { max-width: 680px; }
+</style>
+<div class="ppg" id="ppg">
+<fieldset><legend>Type of paper</legend>
+  <div class="ppg-types" id="ppType" role="group" aria-label="Type of paper"></div>
+  <div class="fields">
+    <div><label for="ppUnit">Units</label><select id="ppUnit"><option value="mm">Millimetres (mm)</option><option value="in">Inches (in)</option></select></div>
+    <div><label for="ppGap" id="ppGapLab">Line spacing</label><input type="number" id="ppGap" data-nomemo min="1" max="60" step="0.1" inputmode="decimal"></div>
+    <div id="ppMajorBox"><label for="ppMajor">Bold line every</label><select id="ppMajor"><option value="0">Never</option><option value="2">2 squares</option><option value="4">4 squares</option><option value="5" selected>5 squares</option><option value="10">10 squares</option></select></div>
+    <div id="ppIsoBox" hidden><label for="ppIso">Draw as</label><select id="ppIso"><option value="lines">Lines</option><option value="dots">Dots</option></select></div>
+  </div>
+  <span class="ppg-hint" id="ppGapHint"></span>
+</fieldset>
+<fieldset><legend>Page</legend>
+  <div class="fields">
+    <div><label for="ppPaper">Paper size</label><select id="ppPaper" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option><option value="legal">US Legal</option><option value="a5">A5</option><option value="a3">A3</option></select></div>
+    <div><label for="ppOrient">Orientation</label><select id="ppOrient"><option value="port">Portrait</option><option value="land">Landscape</option></select></div>
+    <div><label for="ppMargin">Margin around the page</label><select id="ppMargin"><option value="0">None (to the edge)</option><option value="5">Small (5 mm)</option><option value="10" selected>Normal (10 mm)</option><option value="15">Wide (15 mm)</option><option value="20">Extra wide (20 mm)</option></select></div>
+    <div><label for="ppPages">Number of pages</label><input type="number" id="ppPages" min="1" max="200" step="1" value="1" inputmode="numeric"></div>
+  </div>
+</fieldset>
+<fieldset><legend>Look</legend>
+  <div class="ppg-sw" id="ppSw"><input type="color" id="ppColor" value="#9ca3af" aria-label="Custom line colour"></div>
+  <div class="fields">
+    <div><label for="ppWeight">Line thickness</label><select id="ppWeight"><option value="0.35">Fine</option><option value="0.6" selected>Normal</option><option value="1">Bold</option></select></div>
+  </div>
+  <label class="ppg-check" id="ppMarginLineBox"><input type="checkbox" id="ppMarginLine" checked>Red margin line on the left</label>
+  <label class="ppg-check"><input type="checkbox" id="ppHeader">Name and Date at the top</label>
+  <div class="fields"><div><label for="ppTitle">Title at the top (optional)</label><input type="text" id="ppTitle" data-nomemo maxlength="80" placeholder="e.g. Science notes"></div></div>
+</fieldset>
+<div class="ppg-prev" id="ppPrevBox"><canvas id="ppCanvas" width="595" height="842" aria-label="Paper preview"></canvas></div>
+<div class="btns">
+  <button type="button" class="btn" id="ppPdf">Download PDF</button>
+  <button type="button" class="btn ghost" id="ppPng">Save as PNG</button>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @GD-START (shared drawing helper)
+  // ---------- tiny drawing engine: the same list of shapes is drawn on a canvas (preview, PNG) and into a PDF ----------
+  var GD = (function () {
+    var FONTS = {
+      sans: ['GD Noto Sans', 'noto-sans-subset-400.ttf', 400, 1], sansb: ['GD Noto Sans', 'noto-sans-subset-700.ttf', 700, 1],
+      serif: ['GD Noto Serif', 'noto-serif-subset-400.ttf', 400, 1], serifb: ['GD Noto Serif', 'noto-serif-subset-700.ttf', 700, 1],
+      script: ['GD Great Vibes', 'great-vibes-latin-400-normal.woff2', 400], hand: ['GD Dancing Script', 'dancing-script-latin-400-normal.woff2', 400],
+      display: ['GD Anton', 'anton-latin-400-normal.woff2', 400], caveat: ['GD Caveat', 'caveat-latin-400-normal.woff2', 400]
+    };
+    var bufs = {}, prom = {}, mc = document.createElement('canvas').getContext('2d');
+    function load(k) {
+      if (!prom[k]) prom[k] = fetch('../assets/vendor/fonts/' + FONTS[k][1]).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) {
+        bufs[k] = b; return new FontFace(FONTS[k][0], b.slice(0), { weight: String(FONTS[k][2]) }).load().then(function (f) { document.fonts.add(f); });
+      }).catch(function (e) { prom[k] = null; throw e; });
+      return prom[k];
+    }
+    function loadAll(keys) { return Promise.all(keys.map(load)); }
+    function css(k, s) { var F = FONTS[k] || FONTS.sans; return F[2] + ' ' + s + 'px "' + F[0] + '", sans-serif'; }
+    function chars(t) { return Array.from(String(t)); }
+    function width(t, k, s, ls) { mc.font = css(k, s); return mc.measureText(String(t)).width + (ls || 0) * Math.max(0, chars(t).length - 1); }
+    function fit(t, k, s, maxW, min, ls) { min = min || 3; while (s > min && width(t, k, s, ls) > maxW) s = Math.max(min, s * 0.96); return s; }
+    function wrap(t, k, s, maxW) {
+      var out = [];
+      String(t == null ? '' : t).replace(/\r\n?/g, '\n').split('\n').forEach(function (para) {
+        var cur = '';
+        para.split(/ +/).forEach(function (w) {
+          var trial = cur ? cur + ' ' + w : w;
+          if (width(trial, k, s) <= maxW) { cur = trial; return; }
+          if (cur) out.push(cur);
+          cur = '';
+          while (w && width(w, k, s) > maxW) { var c = chars(w), n = c.length; while (n > 1 && width(c.slice(0, n).join(''), k, s) > maxW) n--; out.push(c.slice(0, n).join('')); w = c.slice(n).join(''); }
+          cur = w;
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function startX(o) { var w = width(o.t, o.font, o.s, o.ls); return o.align === 'center' ? o.x - w / 2 : o.align === 'right' ? o.x - w : o.x; }
+    function rgb(h) { h = String(h || '#000').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+    function rrPath(x, y, w, h, r) { r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); return 'M' + (x + r) + ' ' + y + 'H' + (x + w - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w) + ' ' + (y + r) : '') + 'V' + (y + h - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w - r) + ' ' + (y + h) : '') + 'H' + (x + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + x + ' ' + (y + h - r) : '') + 'V' + (y + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y : '') + 'Z'; }
+    // draw an image into a w x h canvas: cover/contain, optional round clip
+    function raster(o, scale) {
+      var img = o.img, W = Math.max(1, Math.round(o.w * scale)), H = Math.max(1, Math.round(o.h * scale)), c = document.createElement('canvas');
+      c.width = W; c.height = H; var g = c.getContext('2d');
+      if (o.clip) { g.beginPath(); if (o.clip === 'circle') g.ellipse(W / 2, H / 2, W / 2, H / 2, 0, 0, Math.PI * 2); else g.roundRect ? g.roundRect(0, 0, W, H, o.clip * scale) : g.rect(0, 0, W, H); g.clip(); }
+      var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = o.fit === 'contain' ? Math.min(W / iw, H / ih) : Math.max(W / iw, H / ih);
+      g.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+      return c;
+    }
+    function drawCanvas(ops, ctx, scale) {
+      ops.forEach(function (o) {
+        ctx.save(); ctx.globalAlpha = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'circle' || o.k === 'path') {
+          var p;
+          if (o.k === 'rect') p = new Path2D(rrPath(o.x * scale, o.y * scale, o.w * scale, o.h * scale, (o.r || 0) * scale));
+          else if (o.k === 'circle') { p = new Path2D(); p.arc(o.x * scale, o.y * scale, o.r * scale, 0, Math.PI * 2); }
+          else { ctx.translate(o.x * scale, o.y * scale); ctx.scale(o.sc * scale, o.sc * scale); if (o.rot) ctx.rotate(o.rot); p = new Path2D(o.d); }
+          var u = o.k === 'path' ? o.sc * scale : 1;
+          if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(p); }
+          if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale / u; ctx.stroke(p); }
+        } else if (o.k === 'line') {
+          ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale; if (o.dash) ctx.setLineDash(o.dash.map(function (d) { return d * scale; }));
+          ctx.beginPath(); ctx.moveTo(o.x1 * scale, o.y1 * scale); ctx.lineTo(o.x2 * scale, o.y2 * scale); ctx.stroke();
+        } else if (o.k === 'text') {
+          ctx.font = css(o.font, o.s * scale); ctx.fillStyle = o.fill; ctx.textBaseline = 'alphabetic';
+          var x = startX(o);
+          if (o.ls) chars(o.t).forEach(function (ch) { ctx.fillText(ch, x * scale, o.y * scale); x += width(ch, o.font, o.s) + o.ls; });
+          else ctx.fillText(o.t, x * scale, o.y * scale);
+        } else if (o.k === 'img' && o.img) {
+          ctx.drawImage(raster(o, scale), o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+        }
+        ctx.restore();
+      });
+    }
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
+    async function drawPdf(env, page, ops, ox, oy) {
+      var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
+      function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
+      async function font(k) {
+        if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
+        return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      }
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i], op = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'path') {
+          var d = o.k === 'rect' ? rrPath(o.x + ox, o.y + oy, o.w, o.h, o.r) : o.d, sc = o.k === 'path' ? o.sc : 1;
+          var opt = { x: o.k === 'path' ? o.x + ox : 0, y: H - (o.k === 'path' ? o.y + oy : 0), scale: sc, opacity: op, borderOpacity: op };
+          if (o.rot) opt.rotate = P.degrees(-o.rot * 180 / Math.PI);
+          if (o.fill) opt.color = col(o.fill);
+          if (o.stroke) { opt.borderColor = col(o.stroke); opt.borderWidth = (o.lw || 1) / sc; } else opt.borderWidth = 0;
+          page.drawSvgPath(d, opt);
+        } else if (o.k === 'circle') {
+          var c = { x: o.x + ox, y: H - o.y - oy, size: o.r, opacity: op, borderOpacity: op };
+          if (o.fill) c.color = col(o.fill); if (o.stroke) { c.borderColor = col(o.stroke); c.borderWidth = o.lw || 1; }
+          page.drawCircle(c);
+        } else if (o.k === 'line') {
+          page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
+        } else if (o.k === 'text') {
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!t.trim()) continue;
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
+        } else if (o.k === 'img' && o.img) {
+          env.imgs = env.imgs || new Map();
+          var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
+          if (!em) {
+            var cv = raster(o, Math.min(300 / 72, 2400 / Math.max(o.w, o.h))), png = o.clip || o.alpha;
+            var url = png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92), bytes = await fetch(url).then(function (r) { return r.arrayBuffer(); });
+            em = png ? await env.doc.embedPng(bytes) : await env.doc.embedJpg(bytes); env.imgs.set(key, em);
+          }
+          page.drawImage(em, { x: o.x + ox, y: H - o.y - oy - o.h, width: o.w, height: o.h, opacity: op });
+        }
+      }
+    }
+    var libs = null;
+    function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
+      await pdfLibs();
+      var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
+      doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
+    }
+    function readImage(file, maxSide, cb) {
+      if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
+      if (file.size > 25 * 1048576) return cb(null, 'That picture is over 25 MB. Choose a smaller one.');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 600, h = img.naturalHeight || 600, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var png = /png|gif|svg|webp/.test(file.type), out = new Image(); out.onload = function () { cb(out); }; out.onerror = function () { cb(null, 'That picture could not be opened.'); };
+        out.src = png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9); out.alpha = png;
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); cb(null, '"' + file.name + '" could not be opened. HEIC photos need converting to JPG first.'); };
+      img.src = url;
+    }
+    function download(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); return u; }
+    return { FONTS: FONTS, load: load, loadAll: loadAll, width: width, fit: fit, wrap: wrap, drawCanvas: drawCanvas, drawPdf: drawPdf, newPdf: newPdf, readImage: readImage, download: download, rgb: rgb };
+  })();
+  // @GD-END
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var MM = 72 / 25.4;
+  // default spacing for each type, in mm and in inches
+  var TYPES = {
+    lined: ['Lined', 'Line spacing', 8, 0.3125, 'Wide rule is about 8.7 mm (11/32 in), college rule about 7.1 mm (9/32 in), narrow rule about 6.4 mm (1/4 in).'],
+    graph: ['Graph (grid)', 'Square size', 5, 0.25, 'Common sizes are 5 mm and 1/4 in. Use 1 mm for engineering paper or 10 mm for big squares.'],
+    dot: ['Dot grid', 'Dot spacing', 5, 0.2, '5 mm is the usual spacing for bullet journals.'],
+    iso: ['Isometric', 'Triangle size', 5, 0.25, 'Used for 3D drawings, game maps and design sketches.'],
+    music: ['Music staff', 'Staff line gap', 2, 0.08, 'The gap between the 5 lines of each staff. 2 mm makes an 8 mm staff, like most printed music.'],
+    hand: ['Handwriting', 'Writing line height', 15, 0.625, 'The height from the top line to the baseline. Use 18 to 25 mm for young children.'],
+    cornell: ['Cornell notes', 'Line spacing', 7.1, 0.28125, 'A cue column on the left and a summary box at the bottom, for study notes.']
+  };
+  var COLORS = ['#9ca3af', '#93c5fd', '#2563eb', '#86efac', '#fca5a5', '#111827'];
+  var type = 'lined', color = COLORS[0], busy = false, ready = false;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  Object.keys(TYPES).forEach(function (k) { var b = document.createElement('button'); b.type = 'button'; b.textContent = TYPES[k][0]; b.dataset.k = k; b.setAttribute('aria-pressed', k === type); b.addEventListener('click', function () { setType(k, true); }); $('ppType').appendChild(b); });
+  COLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.dataset.c = c; b.setAttribute('aria-label', 'Line colour ' + c); b.setAttribute('aria-pressed', c === color); b.addEventListener('click', function () { setColor(c); }); $('ppSw').insertBefore(b, $('ppColor')); });
+  function setColor(c) { color = c; [].forEach.call($('ppSw').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.c === c); }); paint(); }
+  function unit() { return $('ppUnit').value; }
+  function setType(k, resetGap) {
+    type = k;
+    [].forEach.call($('ppType').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.k === k); });
+    $('ppGapLab').textContent = TYPES[k][1] + ' (' + unit() + ')';
+    $('ppGapHint').textContent = TYPES[k][4];
+    if (resetGap) $('ppGap').value = unit() === 'mm' ? TYPES[k][2] : TYPES[k][3];
+    $('ppMajorBox').hidden = k !== 'graph';
+    $('ppIsoBox').hidden = k !== 'iso';
+    $('ppMarginLineBox').hidden = k !== 'lined';
+    paint();
+  }
+  $('ppPaper').value = UT.letter() ? 'letter' : 'a4';
+  if (UT.letter()) $('ppUnit').value = 'in';
+
+  function pageSize() { var p = { a4: [595.28, 841.89], letter: [612, 792], legal: [612, 1008], a5: [419.53, 595.28], a3: [841.89, 1190.55] }[$('ppPaper').value]; return $('ppOrient').value === 'land' ? [p[1], p[0]] : p; }
+  function gapPt() { var v = parseFloat(String($('ppGap').value).replace(',', '.')); if (!isFinite(v) || v <= 0) return null; return unit() === 'mm' ? v * MM : v * 72; }
+  // the part of an endless line (through px,py with direction dx,dy) that lies inside the box
+  function clip(px, py, dx, dy, b) {
+    var t0 = -1e9, t1 = 1e9;
+    [[dx, b.x - px, b.x + b.w - px], [dy, b.y - py, b.y + b.h - py]].forEach(function (a) {
+      if (Math.abs(a[0]) < 1e-9) { if (a[1] > 0 || a[2] < 0) { t0 = 1; t1 = 0; } return; }
+      var u = a[1] / a[0], v = a[2] / a[0]; if (u > v) { var s = u; u = v; v = s; } t0 = Math.max(t0, u); t1 = Math.min(t1, v);
+    });
+    return t1 > t0 ? [px + dx * t0, py + dy * t0, px + dx * t1, py + dy * t1] : null;
+  }
+  function pageOps() {
+    var P = pageSize(), W = P[0], H = P[1], g = gapPt(), lw = +$('ppWeight').value, m = +$('ppMargin').value * MM, ops = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }];
+    var top = m, title = $('ppTitle').value.trim();
+    if (title || $('ppHeader').checked) top = Math.max(m, 12 * MM);
+    if (title) { var ts = GD.fit(title, 'sansb', 16, W - 2 * Math.max(m, 24), 8); ops.push({ k: 'text', t: title, x: Math.max(m, 24), y: top + ts * 0.2, font: 'sansb', s: ts, fill: '#374151' }); top += ts + 8; }
+    if ($('ppHeader').checked) {
+      var hx = Math.max(m, 24), hy = top + 12;
+      ops.push({ k: 'text', t: 'Name', x: hx, y: hy, font: 'sans', s: 10, fill: '#4b5563' }, { k: 'line', x1: hx + 32, y1: hy + 2, x2: W * 0.6, y2: hy + 2, stroke: '#9ca3af', lw: 0.7 });
+      ops.push({ k: 'text', t: 'Date', x: W * 0.64, y: hy, font: 'sans', s: 10, fill: '#4b5563' }, { k: 'line', x1: W * 0.64 + 28, y1: hy + 2, x2: W - hx, y2: hy + 2, stroke: '#9ca3af', lw: 0.7 });
+      top = hy + 14;
+    }
+    var box = { x: m, y: top, w: W - 2 * m, h: H - top - m };
+    function line(x1, y1, x2, y2, o) { ops.push({ k: 'line', x1: x1, y1: y1, x2: x2, y2: y2, stroke: (o && o.c) || color, lw: (o && o.w) || lw, dash: o && o.dash }); }
+    if (type === 'lined' || type === 'cornell') {
+      var y0 = box.y + (type === 'cornell' ? g * 1.5 : g), bottom = type === 'cornell' ? box.y + box.h - Math.min(2 * 72, box.h * 0.22) : box.y + box.h;
+      if (type === 'cornell') {
+        var cueX = box.x + Math.min(2.5 * 72, box.w * 0.3);
+        line(box.x, bottom, box.x + box.w, bottom, { w: lw * 2.2 });
+        line(cueX, box.y, cueX, bottom, { w: lw * 2.2 });
+        ops.push({ k: 'text', t: 'Cues', x: box.x + 6, y: box.y + 11, font: 'sansb', s: 9, fill: '#9ca3af' }, { k: 'text', t: 'Notes', x: cueX + 6, y: box.y + 11, font: 'sansb', s: 9, fill: '#9ca3af' }, { k: 'text', t: 'Summary', x: box.x + 6, y: bottom + 13, font: 'sansb', s: 9, fill: '#9ca3af' });
+        for (var yc = y0; yc <= bottom - g * 0.5; yc += g) line(cueX, yc, box.x + box.w, yc);
+      } else {
+        for (var y = y0; y <= bottom + 0.01; y += g) line(box.x, y, box.x + box.w, y);
+        if ($('ppMarginLine').checked) { var mx = box.x + Math.min(box.w * 0.15, 25 * MM); line(mx, box.y, mx, box.y + box.h, { c: '#ef4444', w: Math.max(0.5, lw) }); }
+      }
+    } else if (type === 'graph') {
+      var major = +$('ppMajor').value, nx = Math.floor(box.w / g + 1e-6), ny = Math.floor(box.h / g + 1e-6), gx = box.x + (box.w - nx * g) / 2, gy = box.y + (box.h - ny * g) / 2;
+      for (var i = 0; i <= nx; i++) { var mj = major && i % major === 0; line(gx + i * g, gy, gx + i * g, gy + ny * g, { w: mj ? lw * 2 : lw, c: mj ? color : undefined }); }
+      for (var j = 0; j <= ny; j++) { var mj2 = major && j % major === 0; line(gx, gy + j * g, gx + nx * g, gy + j * g, { w: mj2 ? lw * 2 : lw }); }
+    } else if (type === 'dot') {
+      var dx = Math.floor(box.w / g + 1e-6), dy = Math.floor(box.h / g + 1e-6), ox = box.x + (box.w - dx * g) / 2, oy = box.y + (box.h - dy * g) / 2, r = Math.max(0.45, lw * 0.95);
+      for (var a = 0; a <= dx; a++) for (var b = 0; b <= dy; b++) ops.push({ k: 'circle', x: ox + a * g, y: oy + b * g, r: r, fill: color });
+    } else if (type === 'iso') {
+      var hstep = g * Math.sqrt(3) / 2, cols = Math.floor(box.w / hstep + 1e-6), ix = box.x + (box.w - cols * hstep) / 2;
+      if ($('ppIso').value === 'dots') {
+        for (var c = 0; c <= cols; c++) for (var yy = box.y + (c % 2 ? g / 2 : 0); yy <= box.y + box.h + 0.01; yy += g) ops.push({ k: 'circle', x: ix + c * hstep, y: yy, r: Math.max(0.45, lw * 0.95), fill: color });
+      } else {
+        var ib = { x: ix, y: box.y, w: cols * hstep, h: box.h };
+        for (var c2 = 0; c2 <= cols; c2++) line(ix + c2 * hstep, box.y, ix + c2 * hstep, box.y + box.h);
+        var s30 = Math.tan(Math.PI / 6), span = ib.h + ib.w * s30;
+        for (var k = -Math.ceil(ib.w * s30 / g) - 1; k * g <= span + g; k++) {
+          var p1 = clip(ix, box.y + k * g, 1, s30, ib), p2 = clip(ix, box.y + ib.h - k * g, 1, -s30, ib);
+          if (p1) line(p1[0], p1[1], p1[2], p1[3]);
+          if (p2) line(p2[0], p2[1], p2[2], p2[3]);
+        }
+      }
+    } else if (type === 'music') {
+      var staff = g * 4, between = Math.max(staff * 1.2, 9 * MM), n = Math.floor((box.h + between) / (staff + between) + 1e-6), sy = box.y + (box.h - (n * staff + (n - 1) * between)) / 2;
+      for (var s = 0; s < n; s++) for (var l = 0; l < 5; l++) line(box.x, sy + s * (staff + between) + l * g, box.x + box.w, sy + s * (staff + between) + l * g, { w: Math.max(lw, 0.5) });
+    } else if (type === 'hand') {
+      var row = g, step = g * 1.5, nr = Math.floor((box.h - row * 0.5) / step + 1e-6) + (box.h >= row ? 1 : 0), hy0 = box.y + 4;
+      for (var q = 0; q < nr; q++) {
+        var ty = hy0 + q * step; if (ty + row > box.y + box.h + 0.01) break;
+        line(box.x, ty, box.x + box.w, ty, { c: '#60a5fa' });
+        line(box.x, ty + row / 2, box.x + box.w, ty + row / 2, { c: '#93c5fd', dash: [3, 3] });
+        line(box.x, ty + row, box.x + box.w, ty + row, { c: '#ef4444', w: lw * 1.4 });
+        if (ty + row * 1.5 <= box.y + box.h + 0.01) line(box.x, ty + row * 1.5, box.x + box.w, ty + row * 1.5, { c: '#d1d5db', dash: [1, 3] });
+      }
+    }
+    return { ops: ops, W: W, H: H };
+  }
+  function check() {
+    var g = gapPt(), P = pageSize(), n = +$('ppPages').value;
+    if (!g) { say('bad', 'Type a spacing bigger than 0, for example ' + (unit() === 'mm' ? TYPES[type][2] + ' mm.' : TYPES[type][3] + ' in.')); return false; }
+    if (g < 1 * MM) { say('bad', 'The spacing must be at least 1 mm (0.04 in), or the lines would print as solid grey.'); return false; }
+    if (g > Math.min(P[0], P[1]) / 3) { say('bad', 'That spacing is too big for this paper. Try a smaller number.'); return false; }
+    if (!(n >= 1 && n <= 200 && n === Math.floor(n))) { say('bad', 'Choose between 1 and 200 pages.'); return false; }
+    return true;
+  }
+  function paint() {
+    if (!ready) return;
+    $('ppGapLab').textContent = TYPES[type][1] + ' (' + unit() + ')';
+    if (!check()) return;
+    say('', '');
+    var pg = pageOps(), cv = $('ppCanvas'), sc = 1.5;
+    cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
+    $('ppPrevBox').classList.toggle('land', pg.W > pg.H);
+    GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+  }
+  var tm = null;
+  $('ppGap').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(paint, 200); });
+  $('ppUnit').addEventListener('change', function () { var v = parseFloat($('ppGap').value); if (isFinite(v)) $('ppGap').value = unit() === 'in' ? +(v / 25.4).toFixed(3) : +(v * 25.4).toFixed(2); paint(); });
+  ['ppMajor', 'ppIso', 'ppPaper', 'ppOrient', 'ppMargin', 'ppWeight', 'ppMarginLine', 'ppHeader', 'ppPages'].forEach(function (id) { $(id).addEventListener('change', paint); });
+  $('ppTitle').addEventListener('input', paint);
+  $('ppColor').addEventListener('input', function () { setColor(this.value); });
+  $('ppPng').addEventListener('click', function () { if (!check()) return; paint(); $('ppCanvas').toBlob(function (b) { GD.download(b, type + '-paper.png'); say('ok', 'PNG saved.'); }, 'image/png'); });
+  $('ppPdf').addEventListener('click', async function () {
+    if (busy || !check()) return;
+    busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
+    try {
+      var pg = pageOps(), n = +$('ppPages').value;
+      // draw the page once, then place that same drawing on every page so the file stays small
+      var one = await GD.newPdf('Paper', 'GetToolNest', null);
+      await GD.drawPdf(one, one.doc.addPage([pg.W, pg.H]), pg.ops);
+      var env = await GD.newPdf(TYPES[type][0] + ' paper', 'GetToolNest Paper Generator', null);
+      var emb = (await env.doc.embedPdf(await one.doc.save()))[0];
+      for (var i = 0; i < n; i++) env.doc.addPage([pg.W, pg.H]).drawPage(emb, { x: 0, y: 0, width: pg.W, height: pg.H });
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), type + '-paper-' + $('ppPaper').value + '.pdf');
+      say('ok', 'PDF saved: ' + n + ' page' + (n > 1 ? 's' : '') + ', ' + fmtBytes(bytes.length) + '. Print at 100% ("Actual size") so the spacing stays exact.');
+    } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false;
+  });
+  $('ppGap').value = unit() === 'mm' ? TYPES.lined[2] : TYPES.lined[3];
+  setType('lined', false);
+  GD.loadAll(['sans', 'sansb']).then(function () { ready = true; paint(); }, function () { ready = true; paint(); });
+})();
+</script>

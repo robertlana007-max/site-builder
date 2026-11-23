@@ -5032,5 +5032,245 @@ module.exports = [
       ['How many variables can I use?', 'Up to 12, which gives 4,096 rows.']
     ],
     icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M13 13l2 2 3-4"/>'
+  },
+  {
+      slug: 'word-search-maker', cat: 'Study tools', name: 'Word Search Maker',
+      title: 'Word Search Maker - Printable Puzzles with Answer Key',
+      desc: 'Make printable word search puzzles from your own word list, in any language. Choose difficulty and grid size, and get a PDF with the answer key.',
+      card: 'Make printable word searches with answers.',
+      intro: 'Type your words and get a word search puzzle in seconds. Choose easy, medium or hard, pick a grid size or let it size itself, and download a PDF with the puzzle and a separate answer key. Words in any language work, including Arabic, Hindi, Russian and Chinese.',
+      steps: ['Type a title and your words, one per line or separated by commas.', 'Choose the difficulty, grid size and letter style.', 'Press Make puzzle, then New layout until you like it.', 'Download the PDF with the puzzle and the answer key, or save a PNG.'],
+      faq: [
+        ['Can I use words in other languages?', 'Yes. The empty squares are filled with letters from the same alphabet as your words, so the puzzle looks natural in Spanish, Russian, Greek, Arabic, Hindi and more. Arabic and Hebrew words read right to left.'],
+        ['What do the difficulty levels mean?', 'Easy hides words across and down only. Medium adds diagonals. Hard also hides words backwards, in all eight directions.'],
+        ['Can I make different versions for a class?', 'Yes. Choose how many versions you want. Each one has the same words in a different layout, and each gets its own answer page.'],
+        ['How many words can I use?', 'Up to 80 words, each with 2 to 30 letters. Spaces and hyphens inside a word are removed in the grid but stay in the word list.'],
+        ['Is the answer key included?', 'Yes. The PDF has the puzzle pages first and the answer pages after them, with every word circled.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h2M11 8h2M15 8h2M7 12h2M15 12h2M7 16h2M11 16h2"/><rect x="9.5" y="10.5" width="9" height="3" rx="1.5" transform="rotate(45 14 12)"/>'
+  },
+  {
+      slug: 'crossword-maker', cat: 'Study tools', name: 'Crossword Maker',
+      title: 'Crossword Puzzle Maker - Free Printable with Answer Key',
+      desc: 'Make a crossword from your own words and clues. The grid is laid out and numbered for you. Download a printable PDF with Across, Down and the answers.',
+      card: 'Turn words and clues into a printable crossword.',
+      intro: 'Type each answer with its clue and the Crossword Maker builds the grid for you: it finds where the words cross, numbers the squares and writes the Across and Down clues. Download a PDF with the puzzle and a separate answer key. Answers can be in any language.',
+      steps: ['Type one answer and clue per line, like: planet - Earth is one of these.', 'Press Make crossword. Press Try another layout to get a different grid.', 'Press Show answers to check it.', 'Download the PDF with the puzzle and the answer key.'],
+      faq: [
+        ['How do I write the clues?', 'One per line: the answer, then a dash, colon or tab, then the clue. For example "oxygen - Gas we breathe in" or "atom: Tiny building block of matter".'],
+        ['Why was a word left out?', 'Every word must cross another word. A word that shares no letters with the others, or whose crossings are all blocked, is left out and listed. Try another layout or add words that share letters.'],
+        ['Can answers have two words?', 'Yes. The space is removed in the grid and the clue shows the word lengths, like (5,6).'],
+        ['Does it work in other languages?', 'Yes. Answers and clues can be in any language. Arabic and Hebrew crosswords read right to left.'],
+        ['How many words can I use?', 'From 2 to 60 answers, each up to 25 letters. 10 to 25 words make the nicest puzzles.']
+      ],
+      icon: '<rect x="3" y="3" width="6" height="6"/><rect x="9" y="3" width="6" height="6"/><rect x="15" y="3" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/><rect x="9" y="15" width="6" height="6"/><path d="M4.5 4.5h1"/>'
+  },
+  {
+      slug: 'sudoku-generator', cat: 'Study tools', name: 'Sudoku Generator',
+      title: 'Sudoku Generator - Play, Print and Solve Sudoku Free',
+      desc: 'Make new sudoku puzzles with exactly one solution at easy, medium, hard or expert level. Play online, print PDF puzzle books with answers, or solve any sudoku.',
+      card: 'Make, play, print and solve sudoku.',
+      intro: 'Generate fresh sudoku puzzles that always have exactly one solution, graded easy, medium, hard or expert by the solving methods they need. Play right here with notes, hints and mistake checks, print up to 100 puzzles with answers as a PDF, or type in a puzzle from a book and solve it.',
+      steps: ['Choose the difficulty.', 'Play: tap a square and a number; use notes, check and hints.', 'Print: choose how many puzzles and how many per page, then make the PDF with answers.', 'Solve: type or paste a puzzle and press Solve.'],
+      faq: [
+        ['Does every puzzle have one solution?', 'Yes. Each puzzle is checked by a solver, and a number is only removed if the puzzle still has exactly one solution.'],
+        ['How is difficulty decided?', 'Easy and medium puzzles can be solved by finding the only place or the only number for a square. Hard puzzles need techniques like pairs and pointing. Expert puzzles need even more advanced logic.'],
+        ['Is my game saved?', 'Yes. Your current game, notes and time are saved on this device, so you can close the page and continue later.'],
+        ['Can it solve a puzzle from a newspaper?', 'Yes. Open Solve, type the numbers on the board or paste 81 digits with 0 for empty squares. It also tells you if the puzzle has no solution or more than one.'],
+        ['Can I print a puzzle book?', 'Yes. Print up to 100 puzzles, 1 to 6 per page, with the answers at the end.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M5.5 6.5h1M17 12h1.5M11.5 18h1"/>'
+  },
+  {
+      slug: 'maze-generator', cat: 'Study tools', name: 'Maze Generator',
+      title: 'Maze Generator - Printable Square and Circle Mazes',
+      desc: 'Make printable mazes in rectangle or circle shapes, from easy to expert. Every maze has one solution. Download a PDF with many mazes and the answers.',
+      card: 'Printable square and round mazes with answers.',
+      intro: 'Create a new maze with one click: a rectangle or a round maze, easy to expert, with long winding paths or many short dead ends. Show the solution on screen, save a PNG, or print up to 50 different mazes in one PDF with the solutions at the end.',
+      steps: ['Choose Rectangle or Circle and a difficulty.', 'Pick the path style, or choose your own size.', 'Press New maze until you like it, and Show solution to check.', 'Set how many mazes to print and download the PDF.'],
+      faq: [
+        ['Can every maze be solved?', 'Yes. Every maze is a "perfect" maze: there is exactly one path between any two points, so there is always one route from start to finish.'],
+        ['What do the path styles mean?', 'Long winding paths make long corridors that twist around. Many short dead ends make lots of side branches, which feels harder near the start.'],
+        ['How big can a maze be?', 'Rectangles up to 100 × 100 squares and circles up to 50 rings.'],
+        ['Where are the start and finish?', 'Green marks the start and red marks the finish. Rectangle mazes go from top to bottom; circle mazes go from the outside to the centre.'],
+        ['Are the solutions included?', 'Yes, on pages at the end of the PDF, unless you turn them off.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h6v6M15 3v6h-3M21 15h-6v6M9 21v-3"/>'
+  },
+  {
+      slug: 'quote-image-maker', cat: 'Social media tools', name: 'Quote Image Maker',
+      title: 'Quote Image Maker - Quote Pictures for Instagram and Stories',
+      desc: 'Turn a quote into a shareable image. Pick a background, font and size for posts, stories or link previews, add the author and your handle, and download.',
+      card: 'Turn a quote into a shareable image.',
+      intro: 'Type a quote and its author and get a stylish picture ready to post. Choose a gradient, your own colour or a photo as the background, pick a font and size for square posts, portrait posts, stories or landscape posts, add your name or handle, and download a PNG or JPG.',
+      steps: ['Type the quote and the author.', 'Choose the size for where you will post it.', 'Pick a background, font and alignment, or press Surprise me.', 'Download the PNG or JPG, or copy it.'],
+      faq: [
+        ['Which sizes are there?', 'Square post 1080 × 1080, portrait post 1080 × 1350, story or reel 1080 × 1920, landscape post 1600 × 900 and link preview 1200 × 628.'],
+        ['Can I use my own photo?', 'Yes. Add a photo and use the slider to darken it so the text stays easy to read.'],
+        ['Does it work in other languages?', 'Yes. Arabic and Hebrew quotes are written right to left, and Chinese, Japanese, Hindi and other scripts use your device\'s fonts.'],
+        ['What if my quote is long?', 'The text shrinks to fit. If it is still too long, you will see a warning; choose the Story size for long quotes.'],
+        ['Can I share it straight away?', 'Press Copy image and paste it into your post or chat, or download it first.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10c0-1.5 1-2.5 2.5-2.5M8 10v3h3v-3H8zM13 10c0-1.5 1-2.5 2.5-2.5M13 10v3h3v-3h-3z"/><path d="M8 17h8"/>'
+  },
+  {
+      slug: 'printable-calendar', cat: 'Generators', name: 'Printable Calendar',
+      title: 'Printable Calendar Maker - Monthly or Yearly PDF, Any Year',
+      desc: 'Make a printable monthly or yearly calendar for any year in your language. Week starts on your local day. Add your own holidays and birthdays. Free PDF.',
+      card: 'Monthly or yearly calendars to print, any language.',
+      intro: 'Make a calendar for any year from 1600 to 2600. Choose one month per page or the whole year on one page, the language for month and day names, and whether the week starts on Monday, Sunday or Saturday. Add your own holidays, birthdays and events, pick a style and colour, and download a PDF.',
+      steps: ['Choose one month per page or the whole year, then the year and months.', 'Pick the language and the first day of the week.', 'Add your own holidays, birthdays and events (optional).', 'Choose a style, colour and paper, then download the PDF.'],
+      faq: [
+        ['Which holidays are included?', 'None are added for you, because holidays differ by country, region and faith. Type the ones you want, such as "12-25 Holiday" for every year or "2026-03-20 School trip" for one date.'],
+        ['Which day does the week start on?', 'By default the day used in your region, for example Monday in most of Europe, Sunday in the USA and Saturday in some Middle Eastern countries. You can change it.'],
+        ['Can I make it in my language?', 'Yes. Month and day names come in more than 25 languages, including Arabic, Hindi, Chinese, Japanese and Russian, and Arabic calendars run right to left.'],
+        ['Can I print week numbers?', 'Yes. Turn on week numbers to show ISO week numbers next to each week.'],
+        ['Which paper sizes work?', 'A4 and US Letter, in landscape or portrait.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>'
+  },
+  {
+      slug: 'paper-generator', cat: 'Generators', name: 'Paper Generator',
+      title: 'Printable Paper - Lined, Graph, Dot, Isometric, Music',
+      desc: 'Print lined, graph, dot grid, isometric, music staff, handwriting or Cornell notes paper. Set exact spacing in mm or inches. Free PDF in A4 or Letter.',
+      card: 'Lined, graph, dot and music paper to print.',
+      intro: 'Make your own printable paper with exact spacing. Choose lined, graph, dot grid, isometric, music staff, handwriting practice or Cornell notes, set the spacing in millimetres or inches, and download a vector PDF of up to 200 pages that prints sharp on any printer.',
+      steps: ['Choose the type of paper.', 'Set the spacing in mm or inches, and the colour and thickness of the lines.', 'Choose the paper size, margins and number of pages.', 'Download the PDF and print it at 100% (actual size).'],
+      faq: [
+        ['Will the spacing be exact?', 'Yes, as long as you print at 100% or "Actual size". With "Fit to page" the printer shrinks the page a little.'],
+        ['What spacing is college rule?', 'About 7.1 mm (9/32 in). Wide rule is about 8.7 mm (11/32 in) and narrow rule about 6.4 mm (1/4 in).'],
+        ['Can I make engineering graph paper?', 'Yes. Choose Graph, set the square size to 1 mm, and add a bold line every 10 squares.'],
+        ['What is handwriting paper?', 'Rows with a top line, a dashed middle line and a baseline, with space for letters that go below the line. It is used to learn to write.'],
+        ['Which paper sizes are there?', 'A4, US Letter, US Legal, A5 and A3, in portrait or landscape.']
+      ],
+      icon: '<path d="M6 3h12v18H6z"/><path d="M6 8h12M6 12h12M6 16h12M9 3v18"/>'
+  },
+  {
+      slug: 'signature-generator', cat: 'Generators', name: 'Signature Generator',
+      title: 'Signature Generator - Handwritten Signature PNG, Free',
+      desc: 'Type your name to see it in 10 handwritten signature styles, or draw your own. Download a transparent PNG or SVG for documents and emails.',
+      card: 'Make a handwritten-style signature image.',
+      intro: 'Type your name and see it written in ten handwriting styles, from elegant script to casual pen. Choose ink colour, slant and an underline flourish, then download a transparent PNG or a sharp SVG. Prefer your real signature? Draw it with a finger, stylus or mouse.',
+      steps: ['Type your name, or switch to Draw it and sign in the box.', 'Pick a style, ink colour and slant.', 'Choose an image size.', 'Download the transparent PNG or SVG and add it to your document.'],
+      faq: [
+        ['Is a typed signature legally valid?', 'In many places an electronic signature can be valid when the signer intends to sign, but rules differ by country and document. For contracts and official forms, check what the receiver accepts.'],
+        ['Is the background transparent?', 'Yes. The PNG has a transparent background, so it sits nicely on any document or email.'],
+        ['Can I use letters with accents?', 'Yes, the styles include common accented Latin letters such as é, ñ, ü and ç. For other alphabets, use Draw it.'],
+        ['Is my signature saved anywhere?', 'No. It is made in your browser and is not uploaded or stored.'],
+        ['How do I add it to a PDF?', 'Download the PNG, then use our Sign PDF tool or your PDF app to place the picture.']
+      ],
+      icon: '<path d="M3 17c3-1 4-9 6-9s-1 9 2 9 3-5 5-5 1 4 3 4 2-1 2-1"/><path d="M3 21h18"/>'
+  },
+  {
+      slug: 'logo-maker', cat: 'Generators', name: 'Logo Maker',
+      title: 'Free Logo Maker - Simple Text and Icon Logos, PNG and SVG',
+      desc: 'Make a simple logo from your name, an icon and a shape. Pick fonts and colours, then download a transparent PNG or a sharp SVG. No sign-up, no watermark.',
+      card: 'Make a simple text and icon logo.',
+      intro: 'Type your business or project name, pick one of 30 simple icons or your initials, choose a shape, layout, font and colours, and download your logo as a transparent PNG or an SVG that stays sharp at any size. Text is turned into shapes, so the SVG looks the same on every computer.',
+      steps: ['Type your name and an optional tagline.', 'Pick an icon or your initials, a shape and a layout.', 'Choose a font and a colour set, or your own colours.', 'Download the PNG or SVG.'],
+      faq: [
+        ['Can I use the logo for my business?', 'Yes. The icons were drawn for this tool and the fonts are open-licence fonts that allow commercial use. Check that your logo is not too close to a trademark someone else already uses.'],
+        ['What is the difference between PNG and SVG?', 'PNG is a picture for websites, documents and social media. SVG is a vector file that stays sharp at any size, for printing, signs and designers.'],
+        ['Is the background transparent?', 'Yes, unless you choose White, Light tint or Dark as the background.'],
+        ['Can I write my name in another alphabet?', 'Yes. Latin, Greek and Cyrillic letters become shapes. Other alphabets, such as Arabic or Chinese, are written with your device\'s font.'],
+        ['Can I make a square profile picture?', 'Yes. Choose "Square (profile picture)" before downloading.']
+      ],
+      icon: '<circle cx="8" cy="12" r="5"/><path d="M6 12l2-2 2 2-2 2z"/><path d="M15 10h6M15 14h4"/>'
+  },
+  {
+      slug: 'poster-maker', cat: 'Generators', name: 'Poster Maker',
+      title: 'Poster and Flyer Maker - Free Printable PDF and PNG',
+      desc: 'Make posters and flyers for events, sales, notices, parties and classes. Add text and a photo, pick colours, then download a PDF to print or a PNG to share.',
+      card: 'Make posters and flyers to print or share.',
+      intro: 'Choose a template for an event, sale, notice, party, class or photo poster, type your headline and details, add a picture and pick colours. Download a PDF for printing on A4, US Letter or A3, or a PNG sized for social media posts and stories.',
+      steps: ['Pick a template. Sample text is filled in for you.', 'Write your headline, details and contact line, and add a photo if you like.', 'Choose colours, a headline font and the size.', 'Download a PDF to print or a PNG to share.'],
+      faq: [
+        ['Which sizes can I make?', 'A4, US Letter and A3 paper, plus square (1080 × 1080), portrait (1080 × 1350), story (1080 × 1920) and wide (1920 × 1080) for social media and screens.'],
+        ['Can I add my own photo?', 'Yes. Add a JPG, PNG or WebP picture. The Photo template uses it as the full background with your text on top.'],
+        ['Will long text fit?', 'Text shrinks to fit its space. If it still does not fit you see a warning, so you can shorten it or choose a bigger size.'],
+        ['Can I write in my language?', 'Yes, including Arabic, Hindi, Chinese, Russian and accented letters. The PDF keeps the text correct.'],
+        ['Is there a watermark?', 'No. It is free, with no watermark and no sign-up.']
+      ],
+      icon: '<rect x="5" y="2" width="14" height="20" rx="1"/><path d="M8 6h8M8 9h6"/><circle cx="12" cy="15" r="3"/>'
+  },
+  {
+      slug: 'bingo-card-generator', cat: 'Generators', name: 'Bingo Card Generator',
+      title: 'Bingo Card Generator - Printable 75, 90-Ball and Word Cards',
+      desc: 'Make unique printable bingo cards: 75-ball, 90-ball tickets or your own words. Up to 500 cards in one PDF, plus a caller\'s sheet and an on-screen caller.',
+      card: 'Print unique bingo cards with a caller sheet.',
+      intro: 'Make as many different bingo cards as you need, up to 500 in one PDF. Choose classic 75-ball cards, 90-ball tickets, or cards with your own words for classrooms, parties and baby showers. Every card is unique and numbered, a caller\'s sheet is included, and a fair on-screen caller is built in.',
+      steps: ['Choose 75-ball, 90-ball or your own words.', 'Type a title and how many cards you need.', 'Press Make cards to see the first page.', 'Download the PDF and use the caller on screen or the printed sheet.'],
+      faq: [
+        ['Are all cards different?', 'Yes. No two cards are the same. With a short word list, some cards may share the same words in a different order, and you are told when that happens.'],
+        ['How do 75-ball cards work?', 'Each card is 5 × 5 under B I N G O. B has 1 to 15, I 16 to 30, N 31 to 45, G 46 to 60 and O 61 to 75, with a free square in the middle.'],
+        ['How do 90-ball tickets work?', 'Each ticket has 3 rows and 9 columns. Every row has 5 numbers, column 1 has 1 to 9, column 2 has 10 to 19 and so on up to 90.'],
+        ['How many words do I need?', 'At least as many as squares on a card: 24 for 5 × 5 with a free square, 16 for 4 × 4, 8 for 3 × 3 with a free square. More words make cards more different.'],
+        ['Is the caller fair?', 'Yes. It uses your browser\'s secure random numbers, never repeats a call, and every number or word has the same chance.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><circle cx="12" cy="12" r="1.5"/>'
+  },
+  {
+      slug: 'giveaway-picker', cat: 'Generators', name: 'Giveaway Picker',
+      title: 'Giveaway Picker - Random Comment Winner, Fair and Free',
+      desc: 'Pick random giveaway winners from pasted names or comments. Removes duplicates, filters by keyword, picks backups, and uses secure random numbers.',
+      card: 'Pick fair random winners from names or comments.',
+      intro: 'Paste the names or comments from your giveaway, one per line, and pick winners fairly. The tool can take the @username from each comment, keep one entry per person, only count comments with a keyword or hashtag, leave out your own account, and pick backup winners. Winners are drawn with your browser\'s secure random numbers.',
+      steps: ['Paste entries, one per line (names or copied comments).', 'Choose how to read each line and set any filters.', 'Choose the number of winners and backups.', 'Press Pick winners, then copy the results.'],
+      faq: [
+        ['Is the draw really random and fair?', 'Yes. It uses crypto.getRandomValues, the browser\'s secure random number generator, without bias, so every valid entry has exactly the same chance.'],
+        ['Can it remove duplicate entries?', 'Yes. With "One entry per person" on, each name or @username counts once, ignoring capital letters, so commenting many times does not raise someone\'s chance.'],
+        ['How do I get the comments?', 'Copy them from the app or website and paste them here, or paste a list exported from a comment tool. Each comment should be on its own line.'],
+        ['Can I pick backup winners?', 'Yes. Backups are drawn in order in case a winner does not reply.'],
+        ['Is my list uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<path d="M8 3h8v6a4 4 0 0 1-8 0z"/><path d="M8 5H5a3 3 0 0 0 3.5 4.5M16 5h3a3 3 0 0 1-3.5 4.5M12 13v4M8 21h8M10 17h4l1 4H9z"/>'
+  },
+  {
+      slug: 'secret-santa-generator', cat: 'Generators', name: 'Secret Santa Generator',
+      title: 'Secret Santa Generator - Draw Names with Private Links',
+      desc: 'Draw names for a gift exchange. Set who cannot draw whom, add a budget and date, then send everyone a private link or print folded slips. No sign-up.',
+      card: 'Draw names for a gift exchange, no sign-up.',
+      intro: 'Type the names of everyone in your gift exchange, add pairs who should not draw each other, and press Draw names. Nobody gets themselves. Each person gets a private link that shows only who they are giving to, with the budget, date and your message, or you can print slips to fold and hand out. The organiser can take part too.',
+      steps: ['Type the names, one per line.', 'Add pairs who should not draw each other, and the budget, date and message.', 'Press Draw names.', 'Send each person their private link, or print the slips.'],
+      faq: [
+        ['How do the private links work?', 'Each link holds only that person\'s own result, scrambled inside the link, so the page can show it without any server or account. Send each person only their own link.'],
+        ['Can the organiser take part?', 'Yes. The organiser sees only the list of names and links, not who got whom, unless they choose to show all pairs.'],
+        ['Can I stop couples drawing each other?', 'Yes. Add one pair per line, like "Anna, Ben". By default it works both ways.'],
+        ['Is the draw fair?', 'Yes. Names are shuffled with secure random numbers until every rule is met, so every allowed result is equally likely.'],
+        ['What if I draw again?', 'A new draw changes everyone\'s result, so links you already sent become out of date. Your last draw is kept on this device.']
+      ],
+      icon: '<rect x="3" y="9" width="18" height="12" rx="1"/><path d="M3 13h18M12 9v12"/><path d="M12 9c-1.5-4-6-4-5-1 .6 1.4 5 1 5 1zM12 9c1.5-4 6-4 5-1-.6 1.4-5 1-5 1z"/>'
+  },
+  {
+      slug: 'habit-tracker', cat: 'Generators', name: 'Habit Tracker',
+      title: 'Habit Tracker - Free Online and Printable Monthly Tracker',
+      desc: 'Track daily habits on your phone or computer with streaks and monthly progress, and print a monthly habit tracker PDF. No account needed.',
+      card: 'Track daily habits and print a monthly sheet.',
+      intro: 'Add the habits you want to build, such as drinking water, reading or walking, and tick a box each day you do them. See your current streak, best streak and monthly completion. Your ticks are saved on this device, and you can print a monthly tracker sheet, blank or with your ticks.',
+      steps: ['Add a habit and press Add.', 'Tick the box for each day you keep the habit.', 'Watch your streaks and monthly completion grow.', 'Download a printable PDF for the month.'],
+      faq: [
+        ['Where are my ticks saved?', 'In this browser on this device. Nothing is uploaded. Use "Back up my data" to keep a copy.'],
+        ['How is a streak counted?', 'It counts the days in a row you ticked, up to today. If today is not ticked yet, the streak counts up to yesterday, so it does not break before the day is over.'],
+        ['How many habits can I track?', 'Up to 20.'],
+        ['Can I print a blank tracker?', 'Yes. The PDF lists your habits with empty boxes, plus extra empty rows to write in more habits by hand.'],
+        ['Can I go back to past months?', 'Yes. Use the arrows or pick a month to see and change earlier months.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18"/><path d="M7 13l1.5 1.5L11 12M7 17l1.5 1.5L11 16M14 13h3M14 17h3"/>'
+  },
+  {
+      slug: 'label-sheet-maker', cat: 'Generators', name: 'Label Sheet Maker',
+      title: 'Label Maker - Print Address Labels on A4 and Letter Sheets',
+      desc: 'Print address and name labels on common A4 and US Letter label sheets, or a custom size. Type labels or import a CSV. Exact PDF, start at any label.',
+      card: 'Print address labels from a list or CSV.',
+      intro: 'Make printable label sheets for addresses, names, jars and parcels. Pick a common A4 or US Letter layout or enter your own measurements, type your labels or import a spreadsheet saved as CSV, and download a PDF with every label in exactly the right place. Start at any label to use up part-used sheets.',
+      steps: ['Choose your label sheet layout, or enter a custom size.', 'Type your labels, use the same text on all, or import a CSV.', 'Set the text size, alignment and start position.', 'Download the PDF and print at 100% (actual size).'],
+      faq: [
+        ['Which label sheets work?', 'Common layouts such as A4 21 per sheet (63.5 × 38.1 mm), 14, 24, 8, 30 and 65 per sheet, and US Letter 30 per sheet (2⅝ × 1 in), 20, 14, 10 and 80 per sheet. For others, choose Custom size and type the measurements from the box.'],
+        ['How do I print addresses from a spreadsheet?', 'Save the spreadsheet as CSV, choose "From a spreadsheet (CSV)" and pick the file. Then write the layout using column names in curly brackets, like {Name} and {City}.'],
+        ['Can I use a sheet that is partly used?', 'Yes. Set "Start at label number" to the first empty label. Labels are counted across, then down.'],
+        ['My print is a little off. What can I do?', 'Print at 100% ("Actual size"), not "Fit to page". If it is still off, move everything right or down by a millimetre or two and print a test on plain paper.'],
+        ['Can I write in other languages?', 'Yes, any language, including Arabic and Hebrew right to left.']
+      ],
+      icon: '<rect x="3" y="2" width="18" height="20" rx="1"/><rect x="5" y="5" width="6" height="3" rx="1"/><rect x="13" y="5" width="6" height="3" rx="1"/><rect x="5" y="10.5" width="6" height="3" rx="1"/><rect x="13" y="10.5" width="6" height="3" rx="1"/><rect x="5" y="16" width="6" height="3" rx="1"/><rect x="13" y="16" width="6" height="3" rx="1"/>'
   }
 ];

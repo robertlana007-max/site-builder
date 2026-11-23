@@ -1,0 +1,247 @@
+<style>
+.sgn .sgn-tabs { display: flex; gap: 8px; margin-bottom: 14px; }
+.sgn .sgn-tabs .btn { flex: 1; justify-content: center; }
+.sgn .sgn-sw { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.sgn .sgn-sw button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.sgn .sgn-sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.sgn input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--field); }
+.sgn .sgn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; margin: 4px 0 14px; }
+.sgn .sgn-grid button { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 6px; cursor: pointer; display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-height: 96px; }
+.sgn .sgn-grid button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }
+.sgn .sgn-grid canvas { width: 100%; height: 70px; display: block; }
+.sgn .sgn-grid small { font-size: 12px; color: #6b7280; text-align: left; }
+.sgn .sgn-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.sgn .sgn-hint { display: block; font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.sgn .sgn-big { border: 1px solid var(--line); border-radius: 12px; padding: 10px; background-color: #fff; background-image: linear-gradient(45deg, #f1f5f9 25%, transparent 25%), linear-gradient(-45deg, #f1f5f9 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f1f5f9 75%), linear-gradient(-45deg, transparent 75%, #f1f5f9 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; }
+.sgn .sgn-big canvas { max-width: 100%; height: auto; display: block; margin: 0 auto; }
+.sgn .sgn-pad { position: relative; border: 1px dashed var(--line); border-radius: 12px; background: #fff; touch-action: none; }
+.sgn .sgn-pad canvas { width: 100%; height: 220px; display: block; cursor: crosshair; touch-action: none; }
+.sgn .sgn-pad .sgn-base { position: absolute; left: 8%; right: 8%; bottom: 52px; border-top: 1px solid #cbd5e1; pointer-events: none; }
+.sgn .sgn-pad .sgn-x { position: absolute; left: 8%; bottom: 56px; color: #94a3b8; font-size: 18px; pointer-events: none; }
+</style>
+<div class="sgn" id="sgn">
+<div class="sgn-tabs" role="group" aria-label="How to make the signature">
+  <button type="button" class="btn ghost" id="sgTabType" aria-pressed="true">Type it</button>
+  <button type="button" class="btn ghost" id="sgTabDraw" aria-pressed="false">Draw it</button>
+</div>
+<div id="sgTypeBox">
+  <div class="fields">
+    <div><label for="sgName">Your name</label><input type="text" id="sgName" data-nomemo maxlength="40" placeholder="e.g. Maria Garcia" autocomplete="name"></div>
+    <div><label for="sgSize">Image size</label><select id="sgSize"><option value="90">Small (for email)</option><option value="180" selected>Medium</option><option value="360">Large (for print)</option></select></div>
+    <div><label for="sgSlant">Slant</label><select id="sgSlant"><option value="0">Upright</option><option value="8" selected>A little</option><option value="16">More</option></select></div>
+  </div>
+  <div class="sgn-sw" id="sgSw"><input type="color" id="sgColor" value="#1e3a8a" aria-label="Custom ink colour"></div>
+  <label class="sgn-check"><input type="checkbox" id="sgLine">Add a flourish under the name</label>
+  <span class="sgn-hint" id="sgFontNote">Pick a style. The handwriting fonts cover Latin letters (English, Spanish, French, German and more). For other alphabets, use Draw it.</span>
+  <div class="sgn-grid" id="sgGrid" role="group" aria-label="Signature styles"></div>
+  <div class="sgn-big"><canvas id="sgBig" width="600" height="180" aria-label="Chosen signature"></canvas></div>
+  <div class="btns">
+    <button type="button" class="btn" id="sgPng" disabled>Download PNG (transparent)</button>
+    <button type="button" class="btn ghost" id="sgSvg" disabled>Download SVG</button>
+    <button type="button" class="btn ghost" id="sgCopy" disabled>Copy image</button>
+  </div>
+</div>
+<div id="sgDrawBox" hidden>
+  <div class="fields">
+    <div><label for="sgPen">Pen thickness</label><select id="sgPen"><option value="2">Thin</option><option value="3.2" selected>Medium</option><option value="5">Thick</option></select></div>
+  </div>
+  <div class="sgn-sw" id="sgSw2"><input type="color" id="sgColor2" value="#1e3a8a" aria-label="Custom ink colour"></div>
+  <div class="sgn-pad"><span class="sgn-x">×</span><span class="sgn-base"></span><canvas id="sgPad" aria-label="Draw your signature here with a finger, pen or mouse"></canvas></div>
+  <span class="sgn-hint">Sign above the line with your finger, a stylus or the mouse.</span>
+  <div class="btns">
+    <button type="button" class="btn" id="sgDrawPng" disabled>Download PNG (transparent)</button>
+    <button type="button" class="btn ghost" id="sgUndo" disabled>Undo</button>
+    <button type="button" class="btn ghost" id="sgClear" disabled>Clear</button>
+  </div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  var FONTS = [
+    ['Great Vibes', 'great-vibes'], ['Allura', 'allura'], ['Alex Brush', 'alex-brush'], ['Sacramento', 'sacramento'], ['Mr Dafoe', 'mr-dafoe'],
+    ['Herr Von Muellerhoff', 'herr-von-muellerhoff'], ['Homemade Apple', 'homemade-apple'], ['Satisfy', 'satisfy'], ['Dancing Script', 'dancing-script'], ['Caveat', 'caveat']
+  ];
+  var INKS = ['#1e3a8a', '#111827', '#1d4ed8', '#0f766e', '#7f1d1d'];
+  var ink = INKS[0], ink2 = INKS[0], pick = 0, loaded = {}, bufs = {};
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function fam(i) { return 'SG ' + FONTS[i][0]; }
+  function loadFont(i) {
+    if (!loaded[i]) loaded[i] = fetch('../assets/vendor/fonts/' + FONTS[i][1] + '-latin-400-normal.woff2').then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); })
+      .then(function (b) { bufs[i] = b; return new FontFace(fam(i), b.slice(0)).load(); }).then(function (f) { document.fonts.add(f); }).catch(function (e) { loaded[i] = null; throw e; });
+    return loaded[i];
+  }
+  function swatches(box, input, get, set) {
+    INKS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.dataset.c = c; b.setAttribute('aria-label', 'Ink ' + c); b.addEventListener('click', function () { set(c); mark(); }); box.insertBefore(b, input); });
+    input.addEventListener('input', function () { set(input.value); mark(); });
+    function mark() { [].forEach.call(box.querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.dataset.c === get()); }); }
+    mark();
+  }
+  // ---------- typed signature ----------
+  function name() { return $('sgName').value.trim().replace(/\s+/g, ' '); }
+  // draw the name in a font; returns a tightly cropped transparent canvas
+  function render(i, txt, h, color, slant, flourish) {
+    var fs = h * 0.62, c = document.createElement('canvas'), g = c.getContext('2d');
+    g.font = fs + 'px "' + fam(i) + '", cursive';
+    var w = g.measureText(txt).width, pad = fs * 0.6, sk = Math.tan(slant * Math.PI / 180);
+    c.width = Math.ceil(w + pad * 2 + fs * sk + (flourish ? fs * 0.4 : 0)); c.height = Math.ceil(fs * 2.1);
+    g = c.getContext('2d'); g.font = fs + 'px "' + fam(i) + '", cursive'; g.fillStyle = color; g.strokeStyle = color; g.textBaseline = 'alphabetic';
+    var base = fs * 1.25;
+    g.setTransform(1, 0, -sk, 1, sk * base, 0);
+    g.fillText(txt, pad, base);
+    if (flourish) {
+      g.lineWidth = Math.max(1.2, fs * 0.035); g.lineCap = 'round';
+      g.beginPath(); g.moveTo(pad * 0.7, base + fs * 0.28);
+      g.bezierCurveTo(pad + w * 0.35, base + fs * 0.12, pad + w * 0.7, base + fs * 0.42, pad + w + fs * 0.35, base + fs * 0.08); g.stroke();
+    }
+    return trim(c, Math.round(h * 0.08));
+  }
+  function trim(c, margin) {
+    var g = c.getContext('2d'), d = g.getImageData(0, 0, c.width, c.height).data, x0 = c.width, y0 = c.height, x1 = -1, y1 = -1;
+    for (var y = 0; y < c.height; y++) for (var x = 0; x < c.width; x++) if (d[(y * c.width + x) * 4 + 3] > 8) { if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; }
+    if (x1 < 0) return null;
+    var o = document.createElement('canvas'); o.width = x1 - x0 + 1 + margin * 2; o.height = y1 - y0 + 1 + margin * 2;
+    o.getContext('2d').drawImage(c, x0, y0, x1 - x0 + 1, y1 - y0 + 1, margin, margin, x1 - x0 + 1, y1 - y0 + 1);
+    return o;
+  }
+  function latinOnly(t) { return /^[\p{Script=Latin}\p{M}\p{N}\s.,'’&\-()]*$/u.test(t); }
+  function gallery() {
+    var t = name() || 'Your Name';
+    $('sgFontNote').style.color = latinOnly(t) ? '' : 'var(--bad)';
+    [].forEach.call($('sgGrid').querySelectorAll('button'), function (b, i) {
+      var cv = b.querySelector('canvas'), r = render(i, t, 120, ink, +$('sgSlant').value, $('sgLine').checked);
+      var W = cv.width = cv.clientWidth * 2 || 440, H = cv.height = 140, g = cv.getContext('2d'); g.clearRect(0, 0, W, H);
+      if (r) { var k = Math.min((W - 10) / r.width, (H - 6) / r.height); g.drawImage(r, (W - r.width * k) / 2, (H - r.height * k) / 2, r.width * k, r.height * k); }
+      b.setAttribute('aria-pressed', i === pick);
+    });
+    big();
+  }
+  var cur = null;
+  function big() {
+    var t = name();
+    $('sgPng').disabled = $('sgSvg').disabled = $('sgCopy').disabled = !t;
+    var cv = $('sgBig'), g = cv.getContext('2d');
+    if (!t) { cur = null; cv.width = 600; cv.height = 120; g.clearRect(0, 0, 600, 120); g.font = '16px sans-serif'; g.fillStyle = '#94a3b8'; g.textAlign = 'center'; g.fillText('Type your name above', 300, 66); return; }
+    cur = render(pick, t, +$('sgSize').value, ink, +$('sgSlant').value, $('sgLine').checked);
+    if (!cur) return;
+    cv.width = cur.width; cv.height = cur.height; cv.getContext('2d').drawImage(cur, 0, 0);
+  }
+  function fileName(ext) { return 'signature-' + (name() || 'drawn').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 30) + '.' + ext; }
+  function save(blob, n) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = n; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); }
+  $('sgPng').addEventListener('click', function () { if (!cur) return; cur.toBlob(function (b) { save(b, fileName('png')); say('ok', 'Saved a ' + cur.width + ' × ' + cur.height + ' PNG with a transparent background.'); }, 'image/png'); });
+  $('sgCopy').addEventListener('click', function () {
+    if (!cur) return;
+    if (!navigator.clipboard || !window.ClipboardItem) return say('bad', 'This browser cannot copy pictures. Use Download PNG instead.');
+    cur.toBlob(function (b) { navigator.clipboard.write([new ClipboardItem({ 'image/png': b })]).then(function () { say('ok', 'Copied. Paste it into your document or email.'); }, function () { say('bad', 'Copying was blocked. Use Download PNG instead.'); }); }, 'image/png');
+  });
+  var fk = null;
+  function fontkitLib() { if (window.fontkit) return Promise.resolve(); if (!fk) fk = new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/fontkit.min.js'; s.onload = res; s.onerror = function () { fk = null; rej(new Error('load')); }; document.head.appendChild(s); }); return fk; }
+  $('sgSvg').addEventListener('click', async function () {
+    var t = name(); if (!t) return;
+    try {
+      await fontkitLib(); await loadFont(pick);
+      var f = fontkit.create(new Uint8Array(bufs[pick])), missing = Array.from(t).some(function (ch) { return !/\s/.test(ch) && !f.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      if (missing) return say('bad', 'This style has no shapes for some letters of your name, so it cannot be saved as SVG. Save it as PNG, or draw it.');
+      var fs = 100, run = f.layout(t), k = fs / f.unitsPerEm, x = 0, d = '';
+      run.glyphs.forEach(function (gl, i) { d += gl.path.scale(k, -k).translate(x, 0).toSVG(); x += run.positions[i].xAdvance * k; });
+      var sk = Math.tan(+$('sgSlant').value * Math.PI / 180), w = x, top = f.ascent * k, bot = -f.descent * k, extra = $('sgLine').checked;
+      var fl = extra ? '<path d="M' + (-fs * 0.1) + ' ' + (fs * 0.28) + 'C' + (w * 0.35) + ' ' + (fs * 0.12) + ' ' + (w * 0.7) + ' ' + (fs * 0.42) + ' ' + (w + fs * 0.35) + ' ' + (fs * 0.08) + '" fill="none" stroke="' + ink + '" stroke-width="' + (fs * 0.035) + '" stroke-linecap="round"/>' : '';
+      var minX = -fs * 0.2 - sk * bot, W = w + fs * 0.6 + sk * top + (extra ? fs * 0.4 : 0), Hh = top + bot + fs * 0.2;
+      var svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="' + minX.toFixed(1) + ' ' + (-top - fs * 0.1).toFixed(1) + ' ' + W.toFixed(1) + ' ' + Hh.toFixed(1) + '" width="' + Math.round(W) + '" height="' + Math.round(Hh) + '"><g transform="matrix(1 0 ' + (-sk).toFixed(4) + ' 1 0 0)"><path d="' + d + '" fill="' + ink + '"/>' + fl + '</g></svg>';
+      save(new Blob([svg], { type: 'image/svg+xml' }), fileName('svg'));
+      say('ok', 'SVG saved. It scales to any size without getting blurry.');
+    } catch (e) { say('bad', 'The SVG could not be made. Try Download PNG.'); }
+  });
+  FONTS.forEach(function (f, i) {
+    var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', f[0] + ' style'); b.setAttribute('aria-pressed', i === 0);
+    b.innerHTML = '<canvas width="440" height="140"></canvas><small>' + UT.esc(f[0]) + '</small>';
+    b.addEventListener('click', function () { pick = i; gallery(); });
+    $('sgGrid').appendChild(b);
+  });
+  swatches($('sgSw'), $('sgColor'), function () { return ink; }, function (c) { ink = c; gallery(); });
+  var tm = null;
+  $('sgName').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(gallery, 120); say('', ''); });
+  ['sgSize', 'sgSlant', 'sgLine'].forEach(function (id) { $(id).addEventListener('change', gallery); });
+  Promise.all(FONTS.map(function (f, i) { return loadFont(i).catch(function () { return null; }); })).then(function (r) {
+    if (r.every(function (x) { return x === null; })) say('bad', 'The handwriting fonts could not load. Check your connection and reload.');
+    gallery();
+  });
+  window.addEventListener('resize', function () { clearTimeout(tm); tm = setTimeout(gallery, 200); });
+
+  // ---------- drawn signature ----------
+  var pad = $('sgPad'), strokes = [], drawing = null, dpr = Math.min(3, window.devicePixelRatio || 1);
+  function size() { var r = pad.getBoundingClientRect(); if (!r.width) return; pad.width = Math.round(r.width * dpr); pad.height = Math.round(r.height * dpr); redraw(); }
+  function pos(e) { var r = pad.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height, e.pressure && e.pointerType === 'pen' ? e.pressure : 0.5, e.timeStamp]; }
+  function drawStroke(g, s, W, H, scale) {
+    var p = s.pts, base = s.w * scale;
+    g.strokeStyle = g.fillStyle = s.c; g.lineCap = g.lineJoin = 'round';
+    if (p.length === 1) { g.beginPath(); g.arc(p[0][0] * W, p[0][1] * H, base / 2, 0, Math.PI * 2); g.fill(); return; }
+    for (var i = 1; i < p.length; i++) {
+      // faster movement makes a thinner line, like real ink
+      var a = p[i - 1], b = p[i], dist = Math.hypot((b[0] - a[0]) * W, (b[1] - a[1]) * H) / scale, dt = Math.max(1, b[3] - a[3]), v = dist / dt;
+      g.lineWidth = base * Math.max(0.45, Math.min(1.25, 1.15 - v * 0.18)) * (0.6 + b[2] * 0.8);
+      g.beginPath();
+      if (i > 1) { var z = p[i - 2]; g.moveTo((z[0] + a[0]) / 2 * W, (z[1] + a[1]) / 2 * H); g.quadraticCurveTo(a[0] * W, a[1] * H, (a[0] + b[0]) / 2 * W, (a[1] + b[1]) / 2 * H); }
+      else { g.moveTo(a[0] * W, a[1] * H); g.lineTo((a[0] + b[0]) / 2 * W, (a[1] + b[1]) / 2 * H); }
+      g.stroke();
+    }
+    var l = p[p.length - 1], m = p[p.length - 2]; g.beginPath(); g.moveTo((m[0] + l[0]) / 2 * W, (m[1] + l[1]) / 2 * H); g.lineTo(l[0] * W, l[1] * H); g.stroke();
+  }
+  function redraw() { var g = pad.getContext('2d'); g.clearRect(0, 0, pad.width, pad.height); strokes.forEach(function (s) { drawStroke(g, s, pad.width, pad.height, dpr); }); var has = strokes.length > 0; $('sgDrawPng').disabled = $('sgUndo').disabled = $('sgClear').disabled = !has; }
+  pad.addEventListener('pointerdown', function (e) { e.preventDefault(); pad.setPointerCapture(e.pointerId); drawing = { c: ink2, w: +$('sgPen').value, pts: [pos(e)] }; strokes.push(drawing); redraw(); });
+  pad.addEventListener('pointermove', function (e) { if (!drawing) return; e.preventDefault(); var ev = e.getCoalescedEvents ? e.getCoalescedEvents() : [e]; (ev.length ? ev : [e]).forEach(function (x) { drawing.pts.push(pos(x)); }); redraw(); });
+  function end() { drawing = null; }
+  pad.addEventListener('pointerup', end); pad.addEventListener('pointercancel', end); pad.addEventListener('lostpointercapture', end);
+  $('sgUndo').addEventListener('click', function () { strokes.pop(); redraw(); });
+  $('sgClear').addEventListener('click', function () { strokes = []; redraw(); say('', ''); });
+  swatches($('sgSw2'), $('sgColor2'), function () { return ink2; }, function (c) { ink2 = c; });
+  $('sgDrawPng').addEventListener('click', function () {
+    if (!strokes.length) return;
+    // redraw at a higher resolution so the picture is sharp in documents
+    var k = Math.max(2, 1400 / pad.clientWidth), c = document.createElement('canvas'); c.width = Math.round(pad.clientWidth * k); c.height = Math.round(pad.clientHeight * k);
+    var g = c.getContext('2d'); strokes.forEach(function (s) { drawStroke(g, s, c.width, c.height, k); });
+    var t = trim(c, Math.round(10 * k / 2));
+    if (!t) return say('bad', 'The drawing is empty. Sign in the box first.');
+    t.toBlob(function (b) { save(b, 'signature-drawn.png'); say('ok', 'Saved a ' + t.width + ' × ' + t.height + ' PNG with a transparent background.'); }, 'image/png');
+  });
+  function tab(draw) {
+    $('sgTabType').setAttribute('aria-pressed', !draw); $('sgTabDraw').setAttribute('aria-pressed', draw);
+    $('sgTypeBox').hidden = draw; $('sgDrawBox').hidden = !draw; say('', '');
+    if (draw) size(); else gallery();
+  }
+  $('sgTabType').addEventListener('click', function () { tab(false); });
+  $('sgTabDraw').addEventListener('click', function () { tab(true); });
+  window.addEventListener('resize', function () { if (!$('sgDrawBox').hidden) size(); });
+})();
+</script>
