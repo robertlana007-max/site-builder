@@ -1,0 +1,134 @@
+<style>
+.xmf-err { font-family: var(--mono); font-size: 13px; white-space: pre; overflow-x: auto; background: var(--bg); border: 1px solid var(--bad); border-radius: 10px; padding: 10px 12px; margin-top: 10px; }
+</style>
+<label for="xfIn">XML</label>
+<textarea id="xfIn" data-nomemo style="min-height:260px;font-family:var(--mono);font-size:13.5px" spellcheck="false" placeholder='<?xml version="1.0"?><catalog><book id="1"><title>XML Basics</title></book></catalog>'></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="xfInd">Indent</label><select id="xfInd"><option value="2">2 spaces</option><option value="4">4 spaces</option><option value="t">Tab</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="xfCom">Remove comments</label>
+  <label><input type="checkbox" id="xfSelf">Write empty elements as &lt;tag/&gt;</label>
+  <label><input type="checkbox" id="xfAttr">Put each attribute on its own line (long tags)</label>
+</div>
+<div class="btns">
+  <button class="btn" id="xfFmt">Format</button>
+  <button class="btn" id="xfMin">Minify</button>
+  <button class="btn ghost" id="xfVal">Validate only</button>
+  <button class="btn ghost" id="xfCp">Copy</button>
+  <button class="btn ghost" id="xfDl">Download</button>
+  <label class="btn ghost" style="cursor:pointer">Open file<input type="file" id="xfFile" accept=".xml,.svg,.xsd,.xsl,.xslt,.rss,.atom,.kml,.gpx,.plist,.config,.csproj,.xaml,.txt,text/xml,application/xml" hidden></label>
+  <button class="btn ghost" id="xfClr">Clear</button>
+</div>
+<p class="msg" id="xfMsg"></p>
+<div class="xmf-err" id="xfErr" hidden></div>
+<script>
+(function () {
+  var fileName = 'formatted.xml';
+  function say(cls, t) { $('xfMsg').className = 'msg ' + cls; $('xfMsg').textContent = t; }
+  // Check the XML with the browser's own parser and pull out the line and column of the first error.
+  function check(t) {
+    var doc = new DOMParser().parseFromString(t, 'application/xml'), pe = doc.getElementsByTagName('parsererror')[0];
+    if (!pe) return null;
+    var txt = pe.textContent || 'Not well-formed XML', m = /line (\d+) at column (\d+)/i.exec(txt) || /Line Number (\d+), Column (\d+)/i.exec(txt) || /(\d+):(\d+)/.exec(txt);
+    var msg = txt.replace(/^This page contains the following errors:/, '').replace(/Below is a rendering of the page up to the first error\.?/, '').replace(/^XML Parsing Error:\s*/, '').split(/\n|Location:/)[0].trim();
+    msg = msg.replace(/^error on line \d+ at column \d+:\s*/i, '');
+    return { line: m ? +m[1] : 0, col: m ? +m[2] : 0, msg: msg || 'Not well-formed XML' };
+  }
+  function showErr(t, e) {
+    say('bad', 'Invalid XML' + (e.line ? ' at line ' + e.line + ', column ' + e.col : '') + ': ' + e.msg);
+    if (!e.line) { $('xfErr').hidden = true; return; }
+    var lines = t.split('\n'), from = Math.max(0, e.line - 3), to = Math.min(lines.length, e.line + 1), out = '', w = String(to).length;
+    for (var i = from; i < to; i++) {
+      var l = lines[i].length > 200 ? (e.line === i + 1 && e.col > 150 ? '…' + lines[i].slice(e.col - 100, e.col + 80) : lines[i].slice(0, 200) + '…') : lines[i];
+      out += String(i + 1).padStart(w) + ' | ' + l + '\n';
+      if (i + 1 === e.line) { var c = lines[i].length > 200 && e.col > 150 ? 101 : e.col; out += ' '.repeat(w) + ' | ' + ' '.repeat(Math.max(0, c - 1)) + '^\n'; }
+    }
+    $('xfErr').textContent = out; $('xfErr').hidden = false;
+  }
+  // Split XML into its pieces, keeping each piece exactly as written.
+  var TOK = /<\?[\s\S]*?\?>|<!--[\s\S]*?-->|<!\[CDATA\[[\s\S]*?\]\]>|<!DOCTYPE(?:[^\[>]|\[[\s\S]*?\])*>|<\/[^>]+>|<(?:"[^"]*"|'[^']*'|[^'">])*>|[^<]+/gi;
+  function tokens(t) { return t.match(TOK) || []; }
+  function matchClose(toks) {
+    var stack = [], close = new Int32Array(toks.length).fill(-1), mixed = [];
+    for (var i = 0; i < toks.length; i++) {
+      var k = toks[i];
+      if (k.charAt(0) !== '<') { if (/\S/.test(k) && stack.length) mixed[stack[stack.length - 1]] = true; continue; }
+      if (/^<[!?]/.test(k)) continue;
+      if (k.charAt(1) === '/') { var o = stack.pop(); if (o != null && mixed[o]) close[o] = i; continue; }
+      if (!/\/\s*>$/.test(k)) stack.push(i);
+    }
+    return close;
+  }
+  function format(t, minify) {
+    var unit = $('xfInd').value === 't' ? '\t' : ' '.repeat(+$('xfInd').value), out = [], depth = 0, toks = tokens(t), noCom = $('xfCom').checked, self = $('xfSelf').checked, attrLines = $('xfAttr').checked;
+    var pad = function (d) { return minify ? '' : unit.repeat(d); };
+    // Elements holding text or CDATA next to other content ("mixed content") are copied exactly as written,
+    // because adding or removing spaces there would change the text.
+    var close = matchClose(toks);
+    for (var i = 0; i < toks.length; i++) {
+      var k = toks[i];
+      if (close[i] > i + 2) { out.push({ d: depth, s: toks.slice(i, close[i] + 1).join('') }); i = close[i]; continue; }
+      if (k.charAt(0) !== '<') { // text
+        var tx = k.trim();
+        if (!tx) continue;
+        out.push({ d: depth, s: tx, text: true }); continue;
+      }
+      if (k.indexOf('<!--') === 0) { if (!noCom) out.push({ d: depth, s: k }); continue; }
+      if (k.indexOf('</') === 0) {
+        depth = Math.max(0, depth - 1);
+        var prev = out[out.length - 1], prev2 = out[out.length - 2];
+        // <a></a> or <a>text</a> stay on one line
+        if (prev && prev.open && prev.d === depth) { if (self) { prev.s = prev.s.replace(/\s*>$/, '/>'); prev.open = false; } else prev.s += k; prev.open = false; continue; }
+        if (prev && prev.text && prev2 && prev2.open && prev2.d === depth && !/\n/.test(prev.s)) { prev2.s += prev.s + k; prev2.open = false; out.pop(); continue; }
+        out.push({ d: depth, s: k }); continue;
+      }
+      if (/^<!\[CDATA\[/.test(k)) { out.push({ d: depth, s: k, text: true }); continue; }
+      if (/^<[!?]/.test(k)) { out.push({ d: depth, s: k }); continue; }
+      var isSelf = /\/\s*>$/.test(k), tag = k;
+      if (attrLines && !minify && k.length > 80) {
+        var parts = k.match(/^<[^\s/>]+|[^\s=]+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)|\/?>$/g);
+        if (parts && parts.length > 3) tag = parts[0] + '\n' + parts.slice(1, -1).map(function (a) { return pad(depth + 1) + a; }).join('\n') + parts[parts.length - 1];
+      }
+      if (minify) tag = tag.replace(/\s+(\/?>)$/, '$1').replace(/\s{2,}(?=(?:[^"']|"[^"]*"|'[^']*')*$)/g, ' ');
+      out.push({ d: depth, s: tag, open: !isSelf });
+      if (!isSelf) depth++;
+    }
+    if (minify) return out.map(function (o) { return o.s; }).join('');
+    return out.map(function (o) { return pad(o.d) + o.s; }).join('\n') + '\n';
+  }
+  function run(mode) {
+    var t = $('xfIn').value.replace(/^\ufeff/, '');
+    $('xfErr').hidden = true;
+    if (!t.trim()) return say('', 'Paste some XML first, or open a file.');
+    var e = check(t);
+    if (e) return showErr(t, e);
+    if (mode === 'check') return say('ok', 'Valid, well-formed XML (' + fmtNum(t.length) + ' characters).');
+    var r = format(t, mode === 'min');
+    // safety net: the result must still parse (skipped for very large files to save time)
+    var e2 = r.length < 600000 ? check(r) : null;
+    if (e2) return say('bad', 'Sorry, this XML could not be ' + (mode === 'min' ? 'minified' : 'formatted') + ' safely. It is valid, and was left unchanged.');
+    $('xfIn').value = r;
+    say('ok', 'Valid XML. ' + (mode === 'min' ? 'Minified to ' + fmtNum(r.length) + ' characters (from ' + fmtNum(t.length) + ').' : 'Formatted.'));
+  }
+  function later(mode) { if ($('xfIn').value.length > 300000) { say('', 'Working on a large file…'); setTimeout(function () { run(mode); }, 30); } else run(mode); }
+  $('xfFmt').addEventListener('click', function () { later('fmt'); });
+  $('xfMin').addEventListener('click', function () { later('min'); });
+  $('xfVal').addEventListener('click', function () { later('check'); });
+  $('xfCp').addEventListener('click', function () { if ($('xfIn').value) copyText($('xfIn').value, $('xfCp')); });
+  $('xfDl').addEventListener('click', function () {
+    if (!$('xfIn').value) return say('', 'Paste some XML first, or open a file.');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('xfIn').value], { type: 'application/xml;charset=utf-8' })); a.download = fileName;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('xfFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    if (f.size > 30 * 1048576) return say('bad', 'This file is larger than 30 MB, which is too big to edit in the browser.');
+    f.text().then(function (t) {
+      if (/\u0000/.test(t.slice(0, 4000))) return say('bad', 'This is not a text file. Choose an XML file.');
+      $('xfIn').value = t; fileName = f.name.replace(/(\.[^.]+)?$/, '-formatted$1') || 'formatted.xml'; later('check');
+    }, function () { say('bad', 'The file could not be read.'); });
+  });
+  $('xfClr').addEventListener('click', function () { $('xfIn').value = ''; $('xfErr').hidden = true; say('', ''); $('xfIn').focus(); });
+})();
+</script>

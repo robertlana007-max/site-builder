@@ -1,0 +1,107 @@
+<style>
+.tlx-samples { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+.tlx-samples button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); border-radius: 999px; padding: 4px 11px; cursor: pointer; }
+.tlx-samples button:hover { border-color: var(--accent); color: var(--accent); }
+.tlx-notes { margin: 10px 0 0; padding-left: 20px; font-size: 14px; color: var(--muted); }
+.tlx-notes li { margin: 3px 0; }
+</style>
+<label for="tlIn">Text in any script</label>
+<textarea id="tlIn" data-nomemo style="min-height:160px" spellcheck="false" placeholder="Paste text in Cyrillic, Greek, Arabic, Hebrew, Hindi, Thai, Korean, Japanese kana, Chinese..."></textarea>
+<div class="tlx-samples" id="tlSamples" aria-label="Examples">
+  <button type="button" data-s="Москва — столица России. Добро пожаловать!" data-o="cyr=ru">Russian</button>
+  <button type="button" data-s="Київ — столиця України. Щасливої дороги!" data-o="cyr=uk">Ukrainian</button>
+  <button type="button" data-s="Καλημέρα από την Αθήνα και τη Θεσσαλονίκη!">Greek</button>
+  <button type="button" data-s="مُحَمَّد يَسْكُنُ فِي القَاهِرَة">Arabic</button>
+  <button type="button" data-s="שָׁלוֹם עֲלֵיכֶם, ירושלים">Hebrew</button>
+  <button type="button" data-s="नमस्ते, भारत में आपका स्वागत है।">Hindi</button>
+  <button type="button" data-s="สวัสดีครับ ขอบคุณมาก กรุงเทพ">Thai</button>
+  <button type="button" data-s="안녕하세요. 서울에 오신 것을 환영합니다.">Korean</button>
+  <button type="button" data-s="ありがとう ございます。トウキョウ と オオサカ、コーヒー">Japanese kana</button>
+  <button type="button" data-s="你好，世界！欢迎来到北京。">Chinese</button>
+</div>
+<div class="fields" id="tlOpts">
+  <div data-for="Cyrillic"><label for="tlCyr">Cyrillic language</label>
+    <select id="tlCyr"><option value="ru">Russian</option><option value="uk">Ukrainian</option><option value="be">Belarusian</option><option value="bg">Bulgarian</option><option value="sr">Serbian</option><option value="mk">Macedonian</option></select></div>
+  <div data-for="Cyrillic"><label for="tlCyrS">Cyrillic system</label>
+    <select id="tlCyrS"><option value="simple">Simple / national (readable)</option><option value="icao">Passport (ICAO 9303)</option><option value="alalc">ALA-LC (libraries)</option><option value="iso9">ISO 9 (one letter = one letter)</option></select></div>
+  <div data-for="Greek"><label for="tlGr">Greek system</label>
+    <select id="tlGr"><option value="elot">ELOT 743 / UN (transcription)</option><option value="iso">ISO 843 (transliteration, keeps accents)</option></select></div>
+  <div data-for="Arabic"><label for="tlAr">Arabic, Persian, Urdu</label>
+    <select id="tlAr"><option value="alalc">ALA-LC style (ḥ, ṣ, ʿ)</option><option value="simple">Simple ASCII</option></select></div>
+  <div data-for="Hebrew"><label for="tlHe">Hebrew</label>
+    <select id="tlHe"><option value="academic">Academic (ḥ, ʾ, ʿ)</option><option value="simple">Simple (ch, no ʾ ʿ)</option></select></div>
+  <div data-for="Devanagari"><label for="tlDev">Devanagari</label>
+    <select id="tlDev"><option value="iast">IAST (Sanskrit)</option><option value="iso">ISO 15919</option><option value="hindi">Simple Hindi (ASCII)</option></select></div>
+  <div data-for="Japanese kana"><label for="tlJa">Japanese kana</label>
+    <select id="tlJa"><option value="hepburn">Hepburn</option><option value="kunrei">Kunrei-shiki (ISO 3602)</option></select></div>
+  <div data-for="Japanese kana"><label for="tlJaL">Japanese long vowels</label>
+    <select id="tlJaL"><option value="macron">Macrons (Tōkyō)</option><option value="double">As written (Toukyou)</option><option value="plain">Plain (Tokyo)</option></select></div>
+  <div data-for="Chinese"><label for="tlZh">Chinese pinyin tones</label>
+    <select id="tlZh"><option value="marks">Tone marks (nǐ hǎo)</option><option value="num">Tone numbers (ni3 hao3)</option><option value="none">No tones (ni hao)</option></select></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="tlAscii">Plain ASCII output (remove all accents and marks)</label></div>
+<label for="tlOut">Latin letters</label>
+<textarea id="tlOut" data-nomemo readonly style="min-height:160px" spellcheck="false" placeholder="The romanized text appears here as you type."></textarea>
+<div class="btns">
+  <button class="btn" id="tlCp">Copy result</button>
+  <button class="btn ghost" id="tlDl">Download .txt</button>
+  <button class="btn ghost" id="tlClr">Clear</button>
+</div>
+<p class="msg" id="tlMsg"></p>
+<ul class="tlx-notes" id="tlNotes"></ul>
+<script src="../assets/translit.js"></script>
+<script>
+(function () {
+  var VENDOR = new URL('../assets/vendor/', location.href).href, timer = null, zhState = '';
+  var NOTES = {
+    'Arabic': 'Arabic, Persian and Urdu are usually written without short vowels, so only the letters that are written appear (كتاب → ktāb). Text with vowel marks (ك\u0650ت\u064eاب) gives the full reading (kitāb).',
+    'Hebrew': 'Hebrew without vowel points is read with common guesses (ו as o/u, י as i). Pointed text (with niqqud) is more exact.',
+    'Thai': 'Thai is romanized with the Royal Thai General System (RTGS) by rule. Thai spelling does not always show vowels or syllable breaks, so some words may differ from the official spelling. Tones are not shown, as in RTGS.',
+    'Japanese kana': 'Only hiragana and katakana are converted. Kanji need a dictionary to know their reading, so they are kept as they are.',
+    'Chinese': 'Chinese uses Hanyu Pinyin. Characters with several readings are chosen from the words around them, which is right in most but not all cases.',
+    'Korean': 'Korean uses the Revised Romanization with the main sound-change rules (liaison and nasal assimilation). Names often have their own traditional spelling.',
+    'Devanagari': 'Devanagari (Hindi, Marathi, Nepali, Sanskrit) keeps the inherent “a” in IAST and ISO 15919; Simple Hindi drops it at the end of words, as it is pronounced.',
+    'Cyrillic': 'Pick the language: the same letter can be written differently (г is g in Russian but h in Ukrainian and Belarusian).'
+  };
+  function opts() {
+    return { cyr: $('tlCyr').value, cyrScheme: $('tlCyrS').value, greek: $('tlGr').value, arabic: $('tlAr').value, hebrew: $('tlHe').value, indic: $('tlDev').value, ja: $('tlJa').value, jaLong: $('tlJaL').value, zh: $('tlZh').value, ascii: $('tlAscii').checked };
+  }
+  function say(cls, t) { $('tlMsg').className = 'msg ' + cls; $('tlMsg').textContent = t; }
+  function run() {
+    var t = $('tlIn').value, found = t ? Translit.scripts(t).filter(function (f) { return f !== 'Latin with accents'; }) : [];
+    [].forEach.call($('tlOpts').children, function (d) { d.hidden = !!t && found.indexOf(d.dataset.for) === -1; });
+    $('tlOpts').hidden = !!t && ![].some.call($('tlOpts').children, function (d) { return !d.hidden; });
+    if (!t) { $('tlOut').value = ''; say('', ''); $('tlNotes').innerHTML = ''; return; }
+    var needZh = found.indexOf('Chinese') !== -1 && !Translit.hasKana(t);
+    if (needZh && !Translit.chineseReady()) {
+      if (zhState !== 'loading') {
+        zhState = 'loading';
+        say('', 'Loading Chinese pronunciation data (about 330 KB, only once)…');
+        Translit.loadChinese(VENDOR).then(function () { zhState = ''; run(); }, function () { zhState = 'failed'; say('bad', 'The Chinese pronunciation data could not be downloaded. Check your connection and type again to retry.'); });
+      }
+      if (zhState === 'failed') zhState = '';
+    }
+    $('tlOut').value = Translit.convert(t, opts());
+    var shown = found.filter(function (f) { return f !== 'Chinese' || needZh || Translit.hasKana(t); });
+    if (zhState !== 'loading' && zhState !== 'failed') say(found.length ? 'ok' : '', found.length ? 'Converted: ' + shown.join(', ') + '.' : 'No non-Latin script found. The text is already in Latin letters' + ($('tlAscii').checked ? '; accents were removed.' : '. Tick Plain ASCII to remove accents.'));
+    $('tlNotes').innerHTML = '';
+    found.forEach(function (f) { if (NOTES[f]) { var li = document.createElement('li'); li.textContent = NOTES[f]; $('tlNotes').appendChild(li); } });
+  }
+  function later() { clearTimeout(timer); timer = setTimeout(run, $('tlIn').value.length > 200000 ? 400 : 60); }
+  $('tlIn').addEventListener('input', later);
+  [].forEach.call(document.querySelectorAll('#tlOpts select, #tlAscii'), function (el) { el.addEventListener('change', run); });
+  $('tlSamples').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    if (b.dataset.o) { var kv = b.dataset.o.split('='); $('tlCyr').value = kv[1]; }
+    $('tlIn').value = b.dataset.s; run();
+  });
+  $('tlCp').addEventListener('click', function () { if (!$('tlOut').value) return say('', 'Type or paste some text first.'); copyText($('tlOut').value, $('tlCp')); });
+  $('tlDl').addEventListener('click', function () {
+    if (!$('tlOut').value) return say('', 'Type or paste some text first.');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('tlOut').value], { type: 'text/plain;charset=utf-8' })); a.download = 'transliteration.txt';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('tlClr').addEventListener('click', function () { $('tlIn').value = ''; run(); $('tlIn').focus(); });
+  run();
+})();
+</script>

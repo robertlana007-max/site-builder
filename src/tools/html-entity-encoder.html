@@ -1,0 +1,98 @@
+<label for="heIn">Text or HTML</label>
+<textarea id="heIn" data-nomemo style="min-height:170px" spellcheck="false" placeholder="Café &lt;b&gt;bold&lt;/b&gt; &amp; “quotes” — or paste &amp;eacute; &amp;#169; to decode"></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="heWhat">Characters to encode</label>
+    <select id="heWhat"><option value="html">Only &lt; &gt; &amp; " ' (safe for HTML)</option><option value="nonascii">Those plus every non-ASCII character</option><option value="all">Every character</option></select></div>
+  <div><label for="heFmt">Write them as</label>
+    <select id="heFmt"><option value="named">Names where possible (&amp;eacute;)</option><option value="dec">Decimal numbers (&amp;#233;)</option><option value="hex">Hex numbers (&amp;#xE9;)</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="heQuotes" checked>Encode quotes " and '</label>
+  <label><input type="checkbox" id="heNbsp" checked>Show non-breaking spaces as &amp;nbsp;</label>
+  <label><input type="checkbox" id="heLines">Turn line breaks into &lt;br&gt;</label>
+</div>
+<div class="btns">
+  <button class="btn" id="heEnc">Encode</button>
+  <button class="btn" id="heDec">Decode</button>
+  <button class="btn ghost" id="heCp">Copy result</button>
+  <button class="btn ghost" id="heUse">Use result as input</button>
+  <button class="btn ghost" id="heClr">Clear</button>
+</div>
+<label for="heOut" style="margin-top:14px">Result</label>
+<textarea id="heOut" data-nomemo readonly style="min-height:170px" spellcheck="false"></textarea>
+<p class="msg" id="heMsg"></p>
+<script>
+(function () {
+  // A few common names work at once; the full list of 2,125 HTML5 names loads in the background.
+  var ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: '\u00a0', copy: '©', reg: '®', trade: '™', euro: '€', hellip: '…', mdash: '—', ndash: '–' };
+  var LEGACY = { amp: 1, lt: 1, gt: 1, quot: 1, nbsp: 1, copy: 1, reg: 1 }, NAME = null, fullLoaded = false;
+  fetch(new URL('../assets/vendor/entities/html-entities.json', location.href)).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (d) {
+    ENT = d.entities; LEGACY = {}; d.legacy.forEach(function (n) { LEGACY[n] = 1; }); NAME = null; fullLoaded = true;
+  }).catch(function () {});
+  // Choose one name per character: the classic HTML 4 name if there is one, else the shortest lowercase name.
+  function names() {
+    if (NAME) return NAME;
+    NAME = {};
+    Object.keys(ENT).forEach(function (n) {
+      var v = ENT[n], cur = NAME[v];
+      var score = function (x) { return (LEGACY[x] ? 0 : 100) + (x === x.toLowerCase() ? 0 : 50) + x.length; };
+      if (!cur || score(n) < score(cur)) NAME[v] = n;
+    });
+    NAME["'"] = null; // &apos; is not in HTML 4; use &#39;
+    return NAME;
+  }
+  function say(cls, t) { $('heMsg').className = 'msg ' + cls; $('heMsg').textContent = t; }
+  function encode(t) {
+    var what = $('heWhat').value, fmt = $('heFmt').value, q = $('heQuotes').checked, nb = $('heNbsp').checked, N = names(), n = 0;
+    function one(ch) {
+      var cp = ch.codePointAt(0);
+      if (!q && (ch === '"' || ch === "'")) return ch;
+      if (cp === 0xA0 && !nb && what === 'html') return ch;
+      n++;
+      if (cp === 0xA0 && nb) return '&nbsp;';
+      if (fmt === 'named' && N[ch]) return '&' + N[ch] + ';';
+      return fmt === 'hex' ? '&#x' + cp.toString(16).toUpperCase() + ';' : '&#' + cp + ';';
+    }
+    var re = what === 'html' ? /[&<>"'\u00A0]/g : what === 'nonascii' ? /[&<>"'\u007F-\u{10FFFF}]/gu : /[^\r\n]/gu;
+    var out = t.replace(re, one);
+    if ($('heLines').checked) out = out.replace(/\r?\n/g, '<br>\n');
+    return { s: out, n: n };
+  }
+  // Numbers 128-159 mean Windows-1252 characters in HTML (&#150; is –), as browsers do.
+  var W1252 = { 128: 8364, 130: 8218, 131: 402, 132: 8222, 133: 8230, 134: 8224, 135: 8225, 136: 710, 137: 8240, 138: 352, 139: 8249, 140: 338, 142: 381, 145: 8216, 146: 8217, 147: 8220, 148: 8221, 149: 8226, 150: 8211, 151: 8212, 152: 732, 153: 8482, 154: 353, 155: 8250, 156: 339, 158: 382, 159: 376 };
+  function decode(t) {
+    var n = 0, unknown = {}, bad = 0;
+    var out = t.replace(/&(?:#([0-9]{1,8});?|#[xX]([0-9a-fA-F]{1,7});?|([A-Za-z][A-Za-z0-9]{0,31});?)/g, function (m, d, h, name) {
+      if (d || h) {
+        var cp = d ? parseInt(d, 10) : parseInt(h, 16);
+        if (W1252[cp]) cp = W1252[cp];
+        if (cp === 0 || cp > 0x10FFFF || (cp >= 0xD800 && cp <= 0xDFFF)) { bad++; n++; return '�'; }
+        n++; return String.fromCodePoint(cp);
+      }
+      var semi = m.charAt(m.length - 1) === ';';
+      if (semi && ENT.hasOwnProperty(name)) { n++; return ENT[name]; }
+      // old names may appear without ; (like &copy 2026); longest match first
+      for (var L = name.length; L > 1; L--) { var p = name.slice(0, L); if (LEGACY[p] && ENT[p]) { n++; return ENT[p] + name.slice(L) + (semi ? ';' : ''); } }
+      if (semi) unknown[name] = 1;
+      return m;
+    });
+    return { s: out, n: n, unknown: Object.keys(unknown), bad: bad };
+  }
+  $('heEnc').addEventListener('click', function () {
+    var t = $('heIn').value; if (!t) return say('', 'Type or paste some text first.');
+    var r = encode(t); $('heOut').value = r.s;
+    say('ok', r.n ? 'Encoded ' + fmtNum(r.n) + ' character' + (r.n === 1 ? '' : 's') + '.' : 'Nothing needed encoding with these settings; the text is unchanged.');
+  });
+  $('heDec').addEventListener('click', function () {
+    var t = $('heIn').value; if (!t) return say('', 'Type or paste some text first.');
+    var r = decode(t); $('heOut').value = r.s;
+    var msg = r.n ? 'Decoded ' + fmtNum(r.n) + ' entit' + (r.n === 1 ? 'y' : 'ies') + '.' : 'No entities were found to decode.';
+    if (r.bad) msg += ' ' + r.bad + ' invalid number' + (r.bad === 1 ? ' was' : 's were') + ' replaced with �.';
+    if (r.unknown.length) msg += ' Unknown names left as they are: ' + r.unknown.slice(0, 8).map(function (x) { return '&' + x + ';'; }).join(' ') + (r.unknown.length > 8 ? ' …' : '') + (fullLoaded ? '' : ' (the full list of names is still loading; try again in a moment)') + '.';
+    say(r.unknown.length || r.bad ? 'bad' : 'ok', msg);
+  });
+  $('heCp').addEventListener('click', function () { if ($('heOut').value) copyText($('heOut').value, $('heCp')); else say('', 'Encode or decode something first.'); });
+  $('heUse').addEventListener('click', function () { if (!$('heOut').value) return say('', 'Encode or decode something first.'); $('heIn').value = $('heOut').value; $('heOut').value = ''; say('', 'The result is now the input.'); });
+  $('heClr').addEventListener('click', function () { $('heIn').value = ''; $('heOut').value = ''; say('', ''); $('heIn').focus(); });
+})();
+</script>

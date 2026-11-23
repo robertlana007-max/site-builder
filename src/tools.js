@@ -5272,5 +5272,189 @@ module.exports = [
         ['Can I write in other languages?', 'Yes, any language, including Arabic and Hebrew right to left.']
       ],
       icon: '<rect x="3" y="2" width="18" height="20" rx="1"/><rect x="5" y="5" width="6" height="3" rx="1"/><rect x="13" y="5" width="6" height="3" rx="1"/><rect x="5" y="10.5" width="6" height="3" rx="1"/><rect x="13" y="10.5" width="6" height="3" rx="1"/><rect x="5" y="16" width="6" height="3" rx="1"/><rect x="13" y="16" width="6" height="3" rx="1"/>'
+  },
+  {
+    slug: 'spell-checker', cat: 'Text tools', name: 'Spell Checker',
+    title: 'Spell Checker - Check Spelling in 12 Languages Online',
+    desc: 'Check spelling in English, Spanish, French, German, Portuguese, Italian, Dutch, Russian, Turkish and Indonesian. Mistakes underlined, suggestions shown.',
+    card: 'Find spelling mistakes in 12 languages.',
+    intro: 'Paste your text and every word the dictionary does not know is underlined. Click it for suggestions, fix it in one click, ignore it, or add it to your own dictionary. It uses Hunspell, the spell checker inside LibreOffice and Firefox, running entirely in your browser.',
+    steps: ['Choose the language of your text.', 'Type or paste your text, then press Check spelling (it also checks as you type).', 'Click an underlined word to see suggestions and pick the right one.', 'Ignore words that are fine, or add names and terms to your dictionary, then copy the corrected text.'],
+    faq: [
+      ['Which languages are supported?', 'English (US and UK), Spanish, French, German, Portuguese (Brazil and Portugal), Italian, Dutch, Russian, Turkish and Indonesian. Each dictionary downloads only when you first use it.'],
+      ['Is my text uploaded?', 'No. The dictionary is downloaded to your browser and the checking happens on your device. Your text is never sent anywhere.'],
+      ['Does it check grammar?', 'No. It finds words that are not in the dictionary. Real words used wrongly, such as their instead of there, are not flagged.'],
+      ['Where are the words I add saved?', 'In this browser only. They are accepted in every language and you can remove them under My dictionary.'],
+      ['Why is a correct word underlined?', 'Names, brands, new words and technical terms are often missing from dictionaries. Ignore the word or add it to your dictionary.']
+    ],
+    icon: '<path d="M3 15l3-9 3 9M4.2 12h3.6"/><path d="M12 6v9h2.5a2.2 2.2 0 0 0 0-4.5H12M12 10.5h2a2.2 2.2 0 0 0 0-4.5h-2"/><path d="M14 19l2 2 5-5"/>'
+  },
+  {
+    slug: 'url-slug-generator', cat: 'Text tools', name: 'URL Slug Generator',
+    title: 'URL Slug Generator - Turn Titles into Clean URLs, Any Language',
+    desc: 'Turn any title into a clean, SEO-friendly URL slug. Transliterates Cyrillic, Greek, Arabic, Chinese and more. Separators, max length and bulk mode.',
+    card: 'Make clean URL slugs from titles in any language.',
+    intro: 'Type a page title and get a short, readable web address part such as 10-tips-for-cafe-owners. Accents are removed and other alphabets are turned into Latin letters, so titles in Russian, Greek, Arabic, Hindi, Chinese and many more languages work too. Paste many titles to make many slugs at once.',
+    steps: ['Type or paste a title. For many slugs, put one title on each line.', 'Pick a separator and a maximum length, and choose options like lowercase or removing short words.', 'Check the slug, or the full address preview if you entered your site address.', 'Copy the slug, or copy and download all of them as CSV.'],
+    faq: [
+      ['What is a URL slug?', 'The readable part of a web address that names a page, such as how-to-bake-bread in example.com/blog/how-to-bake-bread.'],
+      ['Can I keep letters in my own language?', 'Yes. Tick Keep non-Latin letters to make a Unicode slug such as привет-мир. Most modern sites support them, but they appear encoded (%D0%BF…) when copied.'],
+      ['How are other alphabets converted?', 'Cyrillic, Greek, Arabic, Hebrew, Devanagari, Thai, Korean, Japanese kana and Chinese (pinyin) are turned into Latin letters with common romanization rules.'],
+      ['Why were Japanese kanji left out?', 'Kanji can be read in several ways and need a dictionary. Write those words in kana or Latin letters to include them.'],
+      ['Does it keep repeated slugs apart?', 'Yes. In bulk mode, repeated slugs get -2, -3 and so on, unless you turn that off.']
+    ],
+    icon: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'
+  },
+  {
+    slug: 'markdown-table-generator', cat: 'Text tools', name: 'Markdown Table Generator',
+    title: 'Markdown Table Generator - Paste from Excel, Get Markdown/HTML',
+    desc: 'Build Markdown and HTML tables in an editable grid. Paste from Excel, Google Sheets or CSV, set column alignment and copy neatly aligned output.',
+    card: 'Build Markdown tables from a grid or Excel.',
+    intro: 'Type into a spreadsheet-like grid, or paste cells straight from Excel, Google Sheets, LibreOffice or a CSV file, and get a tidy Markdown table for GitHub, README files, docs and forums. Set the alignment of each column and switch to HTML with one click.',
+    steps: ['Type in the grid, or paste cells copied from a spreadsheet into any cell.', 'Add or remove rows and columns, and choose the alignment of each column.', 'Pick Markdown or HTML output and check the preview.', 'Copy the table or download it as a .md or .html file.'],
+    faq: [
+      ['Can I paste from Excel or Google Sheets?', 'Yes. Copy the cells and paste them into any cell of the grid; they fill the grid from that cell. You can also paste CSV, semicolon-separated data or an existing Markdown table under Import.'],
+      ['Does it handle pipes and line breaks in cells?', 'Yes. A | in a cell is written as \\| so it does not break the table, and line breaks become <br>.'],
+      ['What does Line up columns do?', 'It pads cells with spaces so the columns line up in plain text, which is easier to read and edit. Chinese, Japanese and Korean characters count as two columns wide.'],
+      ['Is there a size limit?', 'You can import up to 100 columns and thousands of rows. The editor shows the first 500 rows, and the output always contains all of them.']
+    ],
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>'
+  },
+  {
+    slug: 'invisible-character', cat: 'Text tools', name: 'Invisible Character',
+    title: 'Invisible Character - Copy Blank Text & Remove Hidden Characters',
+    desc: 'Copy invisible characters like Hangul Filler and zero-width space for blank names and messages, or find and remove hidden characters from any text.',
+    card: 'Copy blank characters or remove hidden ones.',
+    intro: 'Copy a blank character for an empty name, message or bio with one click, and learn what each one is for. Or paste any text to reveal hidden characters, such as zero-width spaces, byte order marks, direction marks and special spaces, and remove them safely while keeping the joiners that emoji and some languages need.',
+    steps: ['To copy, choose how many you need and press Copy on a character.', 'Paste it where you need it: a game name, a message or a social profile.', 'To clean text, paste it into Text to check; hidden characters are marked in red and orange.', 'Press Remove hidden characters, then copy the cleaned text.'],
+    faq: [
+      ['Which invisible character works for blank names?', 'Hangul Filler (U+3164) and Braille Pattern Blank (U+2800) work in most apps and games. Apps can change their rules, so if one is removed, try another.'],
+      ['Why does my text have hidden characters?', 'They come along when copying from web pages, PDFs, chat apps and word processors. They can break passwords, code, search and spreadsheets without being visible.'],
+      ['Will cleaning break emoji or other languages?', 'No. By default, joiners inside emoji like 👨‍👩‍👧 and in Persian, Arabic and Indic words are kept. You can change that with the options.'],
+      ['Is my text sent anywhere?', 'No. Everything happens in your browser.']
+    ],
+    icon: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'
+  },
+  {
+    slug: 'transliteration', cat: 'Text tools', name: 'Transliteration Tool',
+    title: 'Transliteration Tool - Cyrillic, Greek, Arabic, Hindi to Latin',
+    desc: 'Convert Cyrillic, Greek, Arabic, Hebrew, Devanagari, Thai, Korean, Japanese kana and Chinese into Latin letters with standard systems like ISO 9 and Hepburn.',
+    card: 'Convert other alphabets into Latin letters.',
+    intro: 'Paste text in another writing system and read it in Latin letters straight away. Choose the romanization system you need, such as ISO 9, ALA-LC or passport style for Cyrillic, ELOT 743 for Greek, IAST for Sanskrit and Hindi, Hepburn for Japanese and pinyin for Chinese. Mixed text works too: each script is detected and converted.',
+    steps: ['Paste or type your text, or try one of the examples.', 'The scripts in your text are detected and converted as you type.', 'Pick the system you need for each script, and tick Plain ASCII if you want no accents.', 'Copy the result or download it as a text file.'],
+    faq: [
+      ['Which scripts are supported?', 'Cyrillic (Russian, Ukrainian, Belarusian, Bulgarian, Serbian, Macedonian), Greek, Arabic, Persian and Urdu, Hebrew, Devanagari, Thai, Korean Hangul, Japanese hiragana and katakana, Chinese, Georgian and Armenian.'],
+      ['Why are some Arabic or Hebrew vowels missing?', 'These scripts usually do not write short vowels, so only the written letters can be converted. Text with vowel marks gives a full reading.'],
+      ['Can it read Japanese kanji?', 'No. Kanji have several readings that depend on the word, so they are kept unchanged. Hiragana and katakana are converted.'],
+      ['Is it the same as translation?', 'No. Transliteration changes the letters, not the language: Москва becomes Moskva, not a translated word.'],
+      ['Which system should I use for a passport name?', 'For Russian and Ukrainian, choose Passport (ICAO 9303) for the system used in machine-readable passports. Always check with the official document.']
+    ],
+    icon: '<path d="M3 5h8M7 3v2M5 5c0 4 3 7 6 8M9 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/>'
+  },
+  {
+    slug: 'bionic-reading', cat: 'Text tools', name: 'Bionic Reading Converter',
+    title: 'Bionic Reading Converter - Bold the Start of Every Word',
+    desc: 'Make text easier to skim by bolding the first part of each word. Adjust the bold amount, then copy formatted text or HTML for email, Docs or Word.',
+    card: 'Bold the start of words for faster reading.',
+    intro: 'Paste any text and the first letters of every word turn bold, guiding your eyes along the line. Many readers find it easier to stay focused, especially on screens. Adjust how much of each word is bold, fade the rest, then copy it with formatting into an email, Google Docs or Word.',
+    steps: ['Paste or type your text.', 'Move the slider to choose how much of each word is bold.', 'Optionally fade the rest of each word, skip short words or bold numbers.', 'Copy the formatted text, copy the HTML, or download an HTML page.'],
+    faq: [
+      ['Does bionic reading really make reading faster?', 'Studies have not shown a clear speed gain for everyone, but many people, including some with ADHD or dyslexia, say it helps them stay focused. Try it and see what works for you.'],
+      ['Which languages work?', 'Any language written with letters: Latin, Cyrillic, Greek, Arabic, Hebrew, Indic scripts and Thai. Chinese, Japanese and Korean characters are left unchanged.'],
+      ['Will the bold text paste into Word or Google Docs?', 'Yes. Copy formatted text puts rich text on the clipboard, so the bold parts are kept when you paste.'],
+      ['Is my text uploaded?', 'No. It is converted in your browser.']
+    ],
+    icon: '<path d="M3 4h5.5a3.5 3.5 0 0 1 0 7H3zM3 11h6.5a3.5 3.5 0 0 1 0 7H3z"/><path d="M15 7h6M15 12h6M15 17h4"/>'
+  },
+  {
+    slug: 'character-map', cat: 'Text tools', name: 'Character Map',
+    title: 'Character Map - Browse Unicode, Search Symbols, Copy Codes',
+    desc: 'Browse all Unicode blocks, search symbols by name, and copy any character with its code point, HTML entity, CSS, JavaScript and UTF-8 codes.',
+    card: 'Find any Unicode symbol and copy its codes.',
+    intro: 'Find any character among the 150,000 in Unicode 15.1: arrows, maths, currency, emoji, accented letters and every alphabet. Search by name such as arrow or euro, by code such as U+20AC, or browse by block. Click a character to see and copy its code point, HTML entity, CSS and JavaScript escapes and UTF-8 bytes.',
+    steps: ['Search by name (in English), paste a character, type a code like U+00E9, or pick a block.', 'Click a character to see its name and codes.', 'Copy the character or any of its codes with one click.', 'Press Add (or double-click) to collect several characters, then copy them together.'],
+    faq: [
+      ['What can I search for?', 'Words from the official Unicode name (heart, arrow, check), a code point like U+2713 or 2713, an HTML entity like &check; or &#10003;, or characters you paste.'],
+      ['Why do some characters show as empty boxes?', 'Your device has no font with that character. The character is still correct and will show on devices that have a suitable font.'],
+      ['What is the difference between the HTML codes?', 'Named entities like &eacute; are easy to read; numeric ones like &#233; or &#xE9; work for every character.'],
+      ['Which Unicode version is used?', 'Unicode 15.1 names and blocks.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16h2.5v-1.2A4 4 0 1 1 13.5 14.8V16H16"/>'
+  },
+  {
+    slug: 'xml-formatter', cat: 'Developer tools', name: 'XML Formatter',
+    title: 'XML Formatter - Format, Minify and Validate XML Online',
+    desc: 'Format or minify XML and check it is well-formed, with the exact line and column of any error. Keeps comments, CDATA and mixed content intact.',
+    card: 'Beautify, minify and validate XML.',
+    intro: 'Paste XML or open a file to pretty-print it with clean indentation, shrink it to one line, or simply check that it is well-formed. Errors show the line and column with the code around them. Comments, CDATA, the XML declaration and text mixed with tags are kept exactly as written.',
+    steps: ['Paste XML or open an .xml, .svg, .rss or other XML file.', 'Choose the indent and options such as removing comments.', 'Press Format, Minify or Validate only.', 'Copy the result or download the file.'],
+    faq: [
+      ['How are errors shown?', 'The browser\'s own XML parser checks your document. The first error is shown with its line, column and the lines around it, with a marker under the problem.'],
+      ['Will formatting change my data?', 'No. Only whitespace between tags changes. Text that sits next to tags, such as a paragraph with bold words, is kept exactly as written.'],
+      ['Can it handle large files?', 'Yes, files of several megabytes format in a few seconds, depending on your device.'],
+      ['Is my XML uploaded?', 'No. Everything runs in your browser.']
+    ],
+    icon: '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/>'
+  },
+  {
+    slug: 'html-entity-encoder', cat: 'Developer tools', name: 'HTML Entity Encoder / Decoder',
+    title: 'HTML Entity Encoder & Decoder - Named and Numeric Entities',
+    desc: 'Encode text to HTML entities or decode entities back to text. Supports all 2,125 named HTML5 entities, decimal and hex codes, and old no-semicolon forms.',
+    card: 'Encode and decode HTML entities.',
+    intro: 'Make text safe to put into HTML by encoding < > & and quotes, or encode every non-ASCII character too. Decoding turns &eacute;, &#233; and &#xE9; back into é, using the full list of HTML5 entity names and the same rules as browsers.',
+    steps: ['Paste text or HTML.', 'For encoding, choose which characters to encode and whether to use names or numbers.', 'Press Encode or Decode.', 'Copy the result, or use it as the new input to keep working.'],
+    faq: [
+      ['Which characters must be encoded in HTML?', 'The ampersand &, less-than < and greater-than >, plus double and single quotes inside attribute values. Encoding just those is enough for UTF-8 pages.'],
+      ['Named or numeric entities?', 'Named entities like &copy; are easier to read. Numeric ones like &#169; work for every character, including emoji.'],
+      ['Why does &#150; become a dash?', 'HTML treats numbers 128 to 159 as Windows-1252 characters, so &#150; is an en dash. The decoder does the same as browsers.'],
+      ['What happens to unknown names?', 'They are left as they are and listed in the message, so you can fix typos.']
+    ],
+    icon: '<path d="M7 8l-4 4 4 4M17 8l4 4-4 4"/><path d="M9.5 12h.01M12 12h.01M14.5 12h.01"/>'
+  },
+  {
+    slug: 'json-to-typescript', cat: 'Developer tools', name: 'JSON to TypeScript',
+    title: 'JSON to TypeScript - Generate Interfaces, Types or JSON Schema',
+    desc: 'Turn JSON into TypeScript interfaces or types, or a JSON Schema. Nested objects get their own names, and keys missing in some items become optional.',
+    card: 'Generate TypeScript interfaces from JSON.',
+    intro: 'Paste a JSON sample, such as an API response, and get ready-to-use TypeScript interfaces or type aliases. Every object in an array is merged, so fields that appear only sometimes are marked optional and mixed values become union types. You can also produce a JSON Schema (draft 2020-12).',
+    steps: ['Paste your JSON or try the example.', 'Choose interfaces, types or JSON Schema, and name the root type.', 'Pick options such as export, readonly or making every property optional.', 'Copy the code or download it as a .ts or .schema.json file.'],
+    faq: [
+      ['How are optional properties detected?', 'When an array holds several objects, a key that is missing from some of them is marked optional with ?.'],
+      ['What about null values?', 'A key that is always null is typed null; if it also has other values the type becomes a union like string | null.'],
+      ['How are nested types named?', 'From their key in PascalCase. Array items get a singular name, so orders becomes Order. Identical shapes share one type.'],
+      ['Is my JSON uploaded?', 'No. It is converted in your browser.']
+    ],
+    icon: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M12 8h8M16 8v10"/>'
+  },
+  {
+    slug: 'fake-data-generator', cat: 'Developer tools', name: 'Fake Data Generator',
+    title: 'Fake Data Generator - Test Data as CSV, JSON or SQL, 16 Locales',
+    desc: 'Generate up to 10,000 rows of made-up names, emails, phones, addresses, dates and UUIDs for 16 countries. Download as CSV, JSON or SQL INSERT.',
+    card: 'Make realistic test data as CSV, JSON or SQL.',
+    intro: 'Create realistic but completely made-up test data for apps, databases and spreadsheets. Pick your columns, choose a country for local names, addresses and phone formats, and download CSV, JSON, JSON Lines or SQL INSERT statements. Emails use the reserved example.com domains, and a seed lets you get the same data again.',
+    steps: ['Choose a country or language, or Mixed for all of them.', 'Set up your columns: pick a data type and a column name for each.', 'Enter how many rows you need, choose the format and press Generate.', 'Check the preview, then copy or download the file.'],
+    faq: [
+      ['Are these real people?', 'No. Names, addresses and companies are random combinations of common words, and emails use example.com, example.org and example.net, which are reserved and never belong to anyone.'],
+      ['Are the phone numbers real?', 'They follow each country\'s format. United States numbers use the fictional 555-01xx range and United Kingdom numbers the Ofcom drama range. Elsewhere they are random and could match a real number, so never call or text them.'],
+      ['What is the seed for?', 'With the same seed and settings you get exactly the same data again, which helps with repeatable tests.'],
+      ['How many rows can I make?', 'Up to 10,000 per batch, made in your browser in about a second.']
+    ],
+    icon: '<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0"/><path d="M15 7h6M15 12h6M15 17h6"/>'
+  },
+  {
+    slug: 'robots-txt-generator', cat: 'Developer tools', name: 'Robots.txt Generator',
+    title: 'Robots.txt Generator and Sitemap.xml Generator - Free',
+    desc: 'Build a robots.txt with rules per crawler, block AI training bots, add sitemap lines and test any URL. Also turns a list of URLs into a sitemap.xml.',
+    card: 'Make robots.txt and sitemap.xml files.',
+    intro: 'Create a correct robots.txt without remembering the syntax: start from a preset, add Allow and Disallow rules for all crawlers or specific ones, block AI training crawlers with one tick and add your sitemap. Test any page path to see if it is allowed. Below, paste your page addresses to get a ready sitemap.xml.',
+    steps: ['Choose a preset, then edit the rules for each crawler.', 'Tick Block AI training crawlers if you want, and add your sitemap address.', 'Test a page path, then copy or download robots.txt and upload it to your site root.', 'For a sitemap, paste your page URLs, choose the options and press Make sitemap.'],
+    faq: [
+      ['Where do I put robots.txt?', 'At the root of your domain, so it opens at https://your-site/robots.txt. It only applies to that host.'],
+      ['Does robots.txt hide pages from Google?', 'It stops crawling, not indexing. A blocked page can still appear in results if other sites link to it. Use a noindex tag to keep a page out of search.'],
+      ['How are Allow and Disallow decided?', 'Like Google: the most specific (longest) matching rule wins, and Allow wins a tie. The tester uses the same rule, including * and $.'],
+      ['How many URLs can a sitemap have?', 'Up to 50,000 addresses and 50 MB. For bigger sites, split them into several sitemaps.'],
+      ['Do all AI crawlers obey robots.txt?', 'The major ones listed say they do, but robots.txt is a request, not a lock.']
+    ],
+    icon: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6M2 13v2M22 13v2"/><circle cx="12" cy="3" r="1"/>'
   }
 ];

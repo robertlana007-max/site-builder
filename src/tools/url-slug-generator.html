@@ -1,0 +1,123 @@
+<style>
+.slg-one { display: flex; gap: 8px; align-items: stretch; margin-top: 12px; }
+.slg-one .out { flex: 1; min-width: 0; margin-top: 0; font-size: 16px; }
+.slg-url { font-size: 14px; color: var(--muted); margin-top: 6px; overflow-wrap: anywhere; font-family: var(--mono); }
+</style>
+<label for="slIn">Title or text (one per line for many slugs)</label>
+<textarea id="slIn" data-nomemo style="min-height:140px" spellcheck="false" placeholder="10 Tips for Café Owners: Crème Brûlée & More!"></textarea>
+<div class="fields">
+  <div><label for="slSep">Separator</label>
+    <select id="slSep"><option value="-">Hyphen ( - )</option><option value="_">Underscore ( _ )</option><option value=".">Dot ( . )</option><option value="">None</option></select></div>
+  <div><label for="slMax">Maximum length</label><input type="number" id="slMax" min="0" max="2000" step="1" value="80" inputmode="numeric"></div>
+  <div><label for="slAmp">Write &amp; as</label><input type="text" id="slAmp" value="and" maxlength="20" spellcheck="false"></div>
+  <div><label for="slCyr">Cyrillic as</label>
+    <select id="slCyr"><option value="auto">Automatic</option><option value="ru">Russian</option><option value="uk">Ukrainian</option><option value="be">Belarusian</option><option value="bg">Bulgarian</option><option value="sr">Serbian</option><option value="mk">Macedonian</option></select></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="slLow" checked>Lowercase</label>
+  <label><input type="checkbox" id="slWord" checked>Cut at a whole word</label>
+  <label><input type="checkbox" id="slStop">Remove short common words (a, the, of, de, la, der…)</label>
+  <label><input type="checkbox" id="slDe">German style (ä → ae, ö → oe, ü → ue)</label>
+  <label><input type="checkbox" id="slUni">Keep non-Latin letters (Unicode slug)</label>
+  <label><input type="checkbox" id="slUniq" checked>Make repeated slugs unique (-2, -3)</label>
+</div>
+<div class="fields" style="grid-template-columns:1fr">
+  <div><label for="slBase">Preview with address (optional)</label><input type="text" id="slBase" placeholder="https://example.com/blog/" spellcheck="false" inputmode="url"></div>
+</div>
+<div id="slSingle">
+  <label>Slug</label>
+  <div class="slg-one"><div class="out" id="slOut"></div><button class="btn" id="slCp1">Copy</button></div>
+  <div class="slg-url" id="slUrl"></div>
+</div>
+<div id="slMulti" hidden>
+  <label for="slOuts">Slugs (<span id="slCount">0</span>)</label>
+  <textarea id="slOuts" data-nomemo readonly style="min-height:140px" spellcheck="false"></textarea>
+  <div class="btns">
+    <button class="btn" id="slCpAll">Copy all</button>
+    <button class="btn ghost" id="slCsv">Download CSV</button>
+  </div>
+</div>
+<p class="msg" id="slMsg"></p>
+<script src="../assets/translit.js"></script>
+<script>
+(function () {
+  var VENDOR = new URL('../assets/vendor/', location.href).href, timer = null, zhLoading = false, last = [];
+  // Very common short words in English, Spanish, French, German, Portuguese, Italian and Dutch.
+  var STOP = {};
+  ('a an the and or of to in on at for with by from as is are be into ' +
+   'el la los las un una unos unas y o de del al en con por para que es ' +
+   'le les une des et ou du au aux dans sur pour par avec est ' +
+   'der die das den dem des ein eine einer und oder von zu im am mit auf fur für ist ' +
+   'os as um uma e do da dos das no na nos nas em com por para ' +
+   'il lo gli i uno e di da del della dei nel con su per ' +
+   'het een en van op te met voor aan').split(' ').forEach(function (w) { STOP[w] = 1; });
+
+  function say(cls, t) { $('slMsg').className = 'msg ' + cls; $('slMsg').textContent = t; }
+  function cyrFor(t) {
+    var c = $('slCyr').value;
+    if (c !== 'auto') return c;
+    if (/[їєґ]/i.test(t)) return 'uk';
+    if (/[ў]/i.test(t)) return 'be';
+    if (/[ђћџљњ]/i.test(t)) return 'sr';
+    if (/[ѓќѕ]/i.test(t)) return 'mk';
+    if (/[і]/i.test(t)) return /[ыэё]/i.test(t) ? 'be' : 'uk';
+    return 'ru';
+  }
+  function slugify(line) {
+    var sep = $('slSep').value, max = Math.max(0, Math.floor(+$('slMax').value || 0)), amp = $('slAmp').value.trim();
+    var s = line.replace(/&(amp;)?/g, amp ? ' ' + amp + ' ' : ' ');
+    if ($('slUni').checked) {
+      if ($('slDe').checked) s = s.replace(/[äöüÄÖÜ]/g, function (c) { return { ä: 'ae', ö: 'oe', ü: 'ue', Ä: 'Ae', Ö: 'Oe', Ü: 'Ue' }[c]; });
+      s = s.normalize('NFC');
+    } else {
+      s = Translit.convert(s, { cyr: cyrFor(line), cyrScheme: 'simple', greek: 'elot', arabic: 'simple', hebrew: 'simple', indic: 'hindi', ja: 'hepburn', jaLong: 'plain', zh: 'none', ascii: true, german: $('slDe').checked });
+    }
+    s = s.replace(/(\p{L})['’`´ʹʺ](\p{L})/gu, '$1$2'); // don't -> dont, l'homme -> lhomme
+    if ($('slLow').checked) s = s.toLocaleLowerCase();
+    var letters = $('slUni').checked ? /[^\p{L}\p{M}\p{N}]+/gu : /[^A-Za-z0-9]+/g;
+    var words = s.split(letters).filter(Boolean);
+    if ($('slStop').checked) { var kept = words.filter(function (w) { return !STOP[w.toLowerCase()]; }); if (kept.length) words = kept; }
+    var out = words.join(sep);
+    if (max && out.length > max) {
+      var cut = out.slice(0, max);
+      if ($('slWord').checked && sep && out.charAt(max) !== sep) { var at = cut.lastIndexOf(sep); if (at > 0) cut = cut.slice(0, at); }
+      out = cut.replace(new RegExp('[' + (sep ? sep.replace(/[.\-_]/g, '\\$&') : '') + ']+$'), '');
+    }
+    return out;
+  }
+  function run() {
+    var t = $('slIn').value, lines = t.split(/\r?\n/), multi = lines.filter(function (l) { return l.trim(); }).length > 1;
+    if (Translit.hasHan(t) && !Translit.hasKana(t) && !Translit.chineseReady() && !$('slUni').checked && !zhLoading) {
+      zhLoading = true; say('', 'Loading Chinese pronunciation data (about 330 KB, only once)…');
+      Translit.loadChinese(VENDOR).then(function () { zhLoading = false; run(); }, function () { zhLoading = false; say('bad', 'The Chinese pronunciation data could not be downloaded, so Chinese characters were left out. Check your connection and edit the text to retry.'); });
+    }
+    var seen = {}, rows = [], empties = 0;
+    lines.forEach(function (l) {
+      if (!l.trim()) return;
+      var s = slugify(l);
+      if (!s) { empties++; rows.push([l, '']); return; }
+      if ($('slUniq').checked) { var base = s, n = 1; while (seen[s]) s = base + ($('slSep').value || '-') + (++n); }
+      seen[s] = 1; rows.push([l, s]);
+    });
+    last = rows;
+    $('slSingle').hidden = multi; $('slMulti').hidden = !multi;
+    if (multi) { $('slOuts').value = rows.map(function (r) { return r[1]; }).join('\n'); $('slCount').textContent = fmtNum(rows.length); }
+    else { var one = rows[0] ? rows[0][1] : ''; $('slOut').textContent = one; var b = $('slBase').value.trim(); $('slUrl').textContent = one && b ? b + (/[\/#=]$/.test(b) ? '' : '/') + one : ''; }
+    if (zhLoading) return;
+    if (!t.trim()) say('', '');
+    else if (empties) say('bad', (multi ? empties + ' line' + (empties === 1 ? ' has' : 's have') : 'This text has') + ' no letters or numbers that can go in a web address' + (Translit.hasKana(t) && Translit.hasHan(t) ? ' (kanji cannot be converted; write the reading in kana or Latin letters)' : '') + '.');
+    else say('ok', (multi ? fmtNum(rows.length) + ' slugs made.' : 'Slug ready: ' + rows[0][1].length + ' characters.') + (Translit.hasKana(t) && Translit.hasHan(t) && !$('slUni').checked ? ' Note: Japanese kanji cannot be read without a dictionary and were left out; write them in kana or Latin letters to include them.' : ''));
+  }
+  $('slIn').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, $('slIn').value.length > 100000 ? 300 : 40); });
+  [].forEach.call(document.querySelectorAll('.card select, .card input'), function (el) { if (el.id !== 'slIn') el.addEventListener(el.type === 'text' || el.type === 'number' ? 'input' : 'change', run); });
+  $('slCp1').addEventListener('click', function () { if ($('slOut').textContent) copyText($('slOut').textContent, $('slCp1')); else say('', 'Type a title first.'); });
+  $('slCpAll').addEventListener('click', function () { copyText($('slOuts').value, $('slCpAll')); });
+  $('slCsv').addEventListener('click', function () {
+    var q = function (v) { return /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; };
+    var csv = '\ufeffTitle,Slug\r\n' + last.map(function (r) { return q(r[0]) + ',' + q(r[1]); }).join('\r\n');
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' })); a.download = 'slugs.csv';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  run();
+})();
+</script>

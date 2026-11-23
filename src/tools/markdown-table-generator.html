@@ -1,0 +1,193 @@
+<style>
+.mdt-wrap { overflow: auto; max-height: 460px; border: 1px solid var(--line); border-radius: 10px; margin: 10px 0 6px; background: var(--bg); }
+.mdt-grid { border-collapse: collapse; min-width: 100%; }
+.mdt-grid td, .mdt-grid th { border: 1px solid var(--line); padding: 0; min-width: 110px; }
+.mdt-grid th { background: var(--surface); position: sticky; top: 0; z-index: 1; padding: 3px; }
+.mdt-grid th select { width: 100%; min-height: 30px; font-size: 13px; padding: 2px 4px; }
+.mdt-grid td input { width: 100%; min-width: 110px; border: 0; border-radius: 0; background: transparent; padding: 8px 9px; font: inherit; font-size: 15px; color: var(--ink); min-height: 38px; box-shadow: none; }
+.mdt-grid td input:focus { outline: 2px solid var(--accent); outline-offset: -2px; background: var(--surface); }
+.mdt-grid tr.hd td input { font-weight: 700; }
+.mdt-grid .rn { min-width: 34px; width: 34px; text-align: center; font-size: 12px; color: var(--muted); background: var(--surface); }
+.mdt-tabs { display: inline-flex; margin: 14px 0 6px; }
+.mdt-out { font-family: var(--mono); font-size: 13.5px; min-height: 160px; white-space: pre; overflow-wrap: normal; overflow-x: auto; }
+.mdt-prev { overflow-x: auto; margin-top: 10px; }
+.mdt-prev table { border-collapse: collapse; font-size: 14px; }
+.mdt-prev th, .mdt-prev td { border: 1px solid var(--line); padding: 6px 10px; }
+.mdt-prev th { background: var(--surface); }
+</style>
+<div class="btns" style="margin-top:0">
+  <button class="btn ghost" id="mtAddR">+ Row</button>
+  <button class="btn ghost" id="mtAddC">+ Column</button>
+  <button class="btn ghost" id="mtDelR">− Row</button>
+  <button class="btn ghost" id="mtDelC">− Column</button>
+  <button class="btn ghost" id="mtTr">Swap rows and columns</button>
+  <button class="btn ghost" id="mtClr">Clear</button>
+</div>
+<div class="checks" style="margin-top:12px">
+  <label><input type="checkbox" id="mtHead" checked>First row is the header</label>
+  <label><input type="checkbox" id="mtPretty" checked>Line up columns (pretty)</label>
+</div>
+<div class="mdt-wrap" id="mtWrap"><table class="mdt-grid" id="mtGrid"></table></div>
+<p class="msg" id="mtInfo" style="margin-top:4px">Tip: paste cells copied from Excel, Google Sheets or LibreOffice straight into any cell.</p>
+<details style="margin-top:12px">
+  <summary>Import from Excel, CSV or an existing Markdown table</summary>
+  <label for="mtPaste" style="margin-top:10px">Paste data</label>
+  <textarea id="mtPaste" data-nomemo style="min-height:110px" spellcheck="false" placeholder="Name	Age	City&#10;Ana	31	Lisbon&#10;Kenji	28	Osaka"></textarea>
+  <div class="btns"><button class="btn" id="mtImp">Import</button><label class="btn ghost" style="cursor:pointer">Open CSV / TSV file<input type="file" id="mtFile" accept=".csv,.tsv,.txt,.md,text/csv,text/plain" hidden></label></div>
+</details>
+<div class="seg mdt-tabs" role="group" aria-label="Output format">
+  <button type="button" id="mtMd" aria-pressed="true">Markdown</button>
+  <button type="button" id="mtHtml" aria-pressed="false">HTML</button>
+</div>
+<textarea id="mtOut" data-nomemo class="mdt-out" readonly spellcheck="false" aria-label="Generated table"></textarea>
+<div class="btns">
+  <button class="btn" id="mtCp">Copy</button>
+  <button class="btn ghost" id="mtDl">Download</button>
+</div>
+<p class="msg" id="mtMsg"></p>
+<details style="margin-top:8px"><summary>Preview</summary><div class="mdt-prev" id="mtPrev"></div></details>
+<script>
+(function () {
+  var data = [['Name', 'Age', 'City'], ['Ana', '31', 'Lisbon'], ['Kenji', '28', 'Osaka'], ['', '', '']], align = ['', '', ''], fmt = 'md', SHOW = 500, MAXC = 100;
+  function say(cls, t) { $('mtMsg').className = 'msg ' + cls; $('mtMsg').textContent = t; }
+  function cols() { return data.reduce(function (m, r) { return Math.max(m, r.length); }, 0) || 1; }
+  function norm() { var n = cols(); data.forEach(function (r) { while (r.length < n) r.push(''); }); while (align.length < n) align.push(''); align.length = n; }
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  function draw() {
+    norm();
+    var n = cols(), h = '<thead><tr><th class="rn"></th>';
+    for (var c = 0; c < n; c++) h += '<th><select data-a="' + c + '" aria-label="Alignment of column ' + (c + 1) + '"><option value="">Align: none</option><option value="l"' + (align[c] === 'l' ? ' selected' : '') + '>Left</option><option value="c"' + (align[c] === 'c' ? ' selected' : '') + '>Center</option><option value="r"' + (align[c] === 'r' ? ' selected' : '') + '>Right</option></select></th>';
+    h += '</tr></thead><tbody>';
+    data.slice(0, SHOW).forEach(function (r, ri) {
+      h += '<tr' + (ri === 0 && $('mtHead').checked ? ' class="hd"' : '') + '><td class="rn">' + (ri + 1) + '</td>';
+      for (var c = 0; c < n; c++) h += '<td><input data-r="' + ri + '" data-c="' + c + '" value="' + esc(r[c]) + '" aria-label="Row ' + (ri + 1) + ', column ' + (c + 1) + '"></td>';
+      h += '</tr>';
+    });
+    $('mtGrid').innerHTML = h + '</tbody>';
+    $('mtInfo').textContent = data.length > SHOW ? 'The editor shows the first ' + fmtNum(SHOW) + ' of ' + fmtNum(data.length) + ' rows; the output below has all of them.' : 'Tip: paste cells copied from Excel, Google Sheets or LibreOffice straight into any cell.';
+    out();
+  }
+  // How wide text looks in a monospace font: CJK and most emoji take two columns.
+  var WIDE = /[ᄀ-ᅟ⺀-〾ぁ-㏿㐀-䶿一-鿿ꀀ-꓏가-힣豈-﫿︰-﹏＀-｠￠-￦]|[\u{1F300}-\u{1FAFF}\u{20000}-\u{3FFFD}]/u;
+  function width(s) { var w = 0; for (var ch of s) { if (/\p{M}|\u200d|\ufe0f/u.test(ch)) continue; w += WIDE.test(ch) ? 2 : 1; } return w; }
+  function pad(s, w, a) { var d = w - width(s); if (d <= 0) return s; if (a === 'r') return ' '.repeat(d) + s; if (a === 'c') { var l = Math.floor(d / 2); return ' '.repeat(l) + s + ' '.repeat(d - l); } return s + ' '.repeat(d); }
+  function mdCell(s) { return String(s).replace(/\\/g, '\\\\').replace(/\|/g, '\\|').replace(/\r?\n/g, '<br>').trim(); }
+  function markdown() {
+    var n = cols(), head = $('mtHead').checked, rows = data.filter(function (r, i) { return i === 0 || r.some(function (x) { return String(x).trim(); }); });
+    var body = rows.map(function (r) { return r.map(mdCell); });
+    if (!head) body.unshift(new Array(n).fill(''));
+    var pretty = $('mtPretty').checked, w = [];
+    for (var c = 0; c < n; c++) w[c] = pretty ? Math.max(3, body.reduce(function (m, r) { return Math.max(m, width(r[c] || '')); }, 0)) : 3;
+    var line = function (r) { return '| ' + r.map(function (x, c) { return pretty ? pad(x, w[c], align[c]) : x; }).join(' | ') + ' |'; };
+    var sep = '|' + w.map(function (x, c) { var a = align[c], dash = pretty ? x : 3; return ' ' + (a === 'l' || a === 'c' ? ':' : '') + '-'.repeat(Math.max(1, dash - (a === 'c' ? 2 : a ? 1 : 0))) + (a === 'r' || a === 'c' ? ':' : '') + ' '; }).join('|') + '|';
+    return [line(body[0]), sep].concat(body.slice(1).map(line)).join('\n');
+  }
+  function html() {
+    var n = cols(), head = $('mtHead').checked, rows = data.filter(function (r, i) { return (i === 0 && head) || r.some(function (x) { return String(x).trim(); }); });
+    var st = function (c) { return align[c] ? ' style="text-align:' + { l: 'left', c: 'center', r: 'right' }[align[c]] + '"' : ''; };
+    var cell = function (t, x, c) { return '<' + t + st(c) + '>' + esc(x).replace(/\r?\n/g, '<br>') + '</' + t + '>'; };
+    var o = '<table>\n';
+    if (head) o += '  <thead>\n    <tr>' + rows[0].map(function (x, c) { return cell('th', x, c); }).join('') + '</tr>\n  </thead>\n';
+    o += '  <tbody>\n' + rows.slice(head ? 1 : 0).map(function (r) { return '    <tr>' + r.map(function (x, c) { return cell('td', x, c); }).join('') + '</tr>'; }).join('\n') + '\n  </tbody>\n</table>';
+    return o;
+  }
+  function out() {
+    var empty = !data.some(function (r) { return r.some(function (x) { return String(x).trim(); }); });
+    $('mtOut').value = empty ? '' : fmt === 'md' ? markdown() : html();
+    $('mtPrev').innerHTML = empty ? '' : html();
+    say('', empty ? 'Type in the grid, or import data, to build a table.' : fmtNum(data.length) + ' rows × ' + cols() + ' columns.');
+  }
+
+  // ---- reading pasted data: TSV (spreadsheets), CSV with quotes, semicolons, or a Markdown table ----
+  function parseDelim(t, d) {
+    var rows = [], row = [], f = '', q = false, i = 0;
+    for (; i < t.length; i++) {
+      var ch = t[i];
+      if (q) { if (ch === '"') { if (t[i + 1] === '"') { f += '"'; i++; } else q = false; } else f += ch; continue; }
+      if (ch === '"' && f === '') { q = true; continue; }
+      if (ch === d) { row.push(f); f = ''; continue; }
+      if (ch === '\r') continue;
+      if (ch === '\n') { row.push(f); rows.push(row); row = []; f = ''; continue; }
+      f += ch;
+    }
+    if (f !== '' || row.length) { row.push(f); rows.push(row); }
+    return rows;
+  }
+  function parseMd(t) {
+    var lines = t.split(/\r?\n/).filter(function (l) { return l.trim(); }), al = null, rows = [];
+    lines.forEach(function (l) {
+      var s = l.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, ''), cells = s.split(/(?<!\\)\|/).map(function (x) { return x.trim().replace(/\\\|/g, '|').replace(/<br\s*\/?>/gi, '\n'); });
+      if (cells.every(function (x) { return /^:?-{1,}:?$/.test(x); })) { al = cells.map(function (x) { return /^:.*:$/.test(x) ? 'c' : /:$/.test(x) ? 'r' : /^:/.test(x) ? 'l' : ''; }); return; }
+      rows.push(cells);
+    });
+    return { rows: rows, align: al };
+  }
+  function parse(t) {
+    t = t.replace(/^\ufeff/, '');
+    if (!t.trim()) return null;
+    var lines = t.split(/\r?\n/).filter(function (l) { return l.trim(); });
+    if (lines.length > 1 && /^\s*\|/.test(lines[0]) && /^\s*\|?\s*:?-+:?\s*(\|\s*:?-+:?\s*)*\|?\s*$/.test(lines[1])) return parseMd(t);
+    if (/\t/.test(t)) return { rows: parseDelim(t, '\t') };
+    var best = ',', score = -1;
+    [',', ';', '|'].forEach(function (d) { var counts = lines.slice(0, 20).map(function (l) { return parseDelim(l, d)[0].length; }); var ok = counts[0] > 1 && counts.every(function (c) { return c === counts[0]; }) ? counts[0] * 10 : Math.max.apply(null, counts); if (ok > score) { score = ok; best = d; } });
+    return { rows: parseDelim(t, best) };
+  }
+  function load(p, at) {
+    if (!p || !p.rows.length) return say('bad', 'There is nothing to import. Paste rows of cells separated by tabs, commas or semicolons.');
+    var rows = p.rows, wide = rows.reduce(function (m, r) { return Math.max(m, r.length); }, 0), cut = false;
+    if (wide > MAXC) { rows = rows.map(function (r) { return r.slice(0, MAXC); }); cut = true; }
+    if (at) { // paste into the grid from a cell
+      rows.forEach(function (r, i) { var y = at.r + i; while (data.length <= y) data.push([]); r.forEach(function (x, j) { var cx = at.c + j; if (cx < MAXC) { while (data[y].length < cx) data[y].push(''); data[y][cx] = x; } }); });
+    } else { data = rows.map(function (r) { return r.slice(); }); align = p.align ? p.align.slice() : []; }
+    draw();
+    say(cut ? 'bad' : 'ok', 'Imported ' + fmtNum(rows.length) + ' rows.' + (cut ? ' Only the first ' + MAXC + ' columns were kept.' : ''));
+  }
+
+  $('mtGrid').addEventListener('input', function (e) {
+    var el = e.target;
+    if (el.dataset.a != null) { align[+el.dataset.a] = el.value; return out(); }
+    if (el.dataset.r == null) return;
+    data[+el.dataset.r][+el.dataset.c] = el.value; out();
+  });
+  $('mtGrid').addEventListener('change', function (e) { if (e.target.dataset.a != null) { align[+e.target.dataset.a] = e.target.value; out(); } });
+  $('mtGrid').addEventListener('paste', function (e) {
+    var el = e.target; if (el.dataset.r == null) return;
+    var t = (e.clipboardData || window.clipboardData).getData('text');
+    if (!/[\t\n]/.test(t.replace(/\r?\n$/, ''))) return; // a single value pastes normally
+    e.preventDefault(); load(parse(t), { r: +el.dataset.r, c: +el.dataset.c });
+  });
+  $('mtGrid').addEventListener('keydown', function (e) {
+    var el = e.target; if (el.dataset.r == null) return;
+    var r = +el.dataset.r, c = +el.dataset.c, go = null;
+    if (e.key === 'Enter') { e.preventDefault(); if (r === data.length - 1 && r < SHOW - 1) { data.push(new Array(cols()).fill('')); draw(); } go = [r + (e.shiftKey ? -1 : 1), c]; }
+    else if (e.key === 'ArrowDown' && !e.altKey) go = [r + 1, c];
+    else if (e.key === 'ArrowUp' && !e.altKey) go = [r - 1, c];
+    if (go) { var t = $('mtGrid').querySelector('input[data-r="' + go[0] + '"][data-c="' + go[1] + '"]'); if (t) { e.preventDefault(); t.focus(); t.select(); } }
+  });
+  $('mtAddR').addEventListener('click', function () { data.push(new Array(cols()).fill('')); draw(); var last = $('mtGrid').querySelector('input[data-r="' + (Math.min(data.length, SHOW) - 1) + '"]'); if (last) last.focus(); });
+  $('mtAddC').addEventListener('click', function () { if (cols() >= MAXC) return say('bad', 'A table can have up to ' + MAXC + ' columns here.'); data.forEach(function (r) { r.push(''); }); align.push(''); draw(); });
+  $('mtDelR').addEventListener('click', function () { if (data.length > 1) { data.pop(); draw(); } else say('', 'The table needs at least one row.'); });
+  $('mtDelC').addEventListener('click', function () { if (cols() > 1) { data.forEach(function (r) { r.length = cols() - 1; }); align.pop(); data.forEach(function (r) { r.length = align.length; }); draw(); } else say('', 'The table needs at least one column.'); });
+  $('mtTr').addEventListener('click', function () { norm(); var n = cols(); if (data.length > MAXC) return say('bad', 'Too many rows to turn into columns (the limit is ' + MAXC + ' columns).'); var t = []; for (var c = 0; c < n; c++) t.push(data.map(function (r) { return r[c]; })); data = t; align = []; draw(); });
+  $('mtClr').addEventListener('click', function () { data = [['', '', ''], ['', '', ''], ['', '', '']]; align = ['', '', '']; draw(); });
+  $('mtHead').addEventListener('change', draw);
+  $('mtPretty').addEventListener('change', out);
+  $('mtImp').addEventListener('click', function () { load(parse($('mtPaste').value)); });
+  $('mtFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    if (f.size > 20 * 1048576) return say('bad', 'This file is larger than 20 MB. Please use a smaller file.');
+    f.text().then(function (t) { if (/\u0000/.test(t.slice(0, 2000))) return say('bad', 'This does not look like a text file. Save the spreadsheet as CSV first.'); $('mtPaste').value = t.length < 200000 ? t : ''; load(parse(t)); }, function () { say('bad', 'The file could not be read.'); });
+  });
+  function setFmt(f) { fmt = f; $('mtMd').setAttribute('aria-pressed', f === 'md'); $('mtHtml').setAttribute('aria-pressed', f === 'html'); out(); }
+  $('mtMd').addEventListener('click', function () { setFmt('md'); });
+  $('mtHtml').addEventListener('click', function () { setFmt('html'); });
+  $('mtCp').addEventListener('click', function () { if ($('mtOut').value) copyText($('mtOut').value, $('mtCp')); });
+  $('mtDl').addEventListener('click', function () {
+    if (!$('mtOut').value) return;
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([$('mtOut').value + '\n'], { type: fmt === 'md' ? 'text/markdown;charset=utf-8' : 'text/html;charset=utf-8' })); a.download = fmt === 'md' ? 'table.md' : 'table.html';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  draw();
+})();
+</script>

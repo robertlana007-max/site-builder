@@ -1,0 +1,158 @@
+<style>
+.icx-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; margin: 10px 0 6px; }
+.icx-item { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 6px; }
+.icx-item b { font-size: 15px; }
+.icx-item code { font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+.icx-item p { margin: 0; font-size: 13.5px; color: var(--muted); line-height: 1.45; }
+.icx-item .btn { min-height: 38px; padding: 6px 12px; align-self: flex-start; }
+.icx-view { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; margin-top: 12px; max-height: 320px; overflow: auto; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 15px; min-height: 50px; }
+.icx-mk { display: inline-block; font: 600 10.5px/1.3 var(--mono); color: #fff; background: var(--bad); border-radius: 4px; padding: 0 4px; margin: 0 1px; vertical-align: middle; white-space: nowrap; }
+.icx-mk.sp { background: #b45309; } .icx-mk.kp { background: var(--muted); }
+.icx-found { width: 100%; border-collapse: collapse; font-size: 14px; margin-top: 10px; }
+.icx-found th, .icx-found td { border-bottom: 1px solid var(--line); padding: 6px 8px; text-align: left; }
+.icx-found td:first-child { font-family: var(--mono); white-space: nowrap; }
+h2.icx-h { font-size: 19px; margin: 6px 0 4px; }
+</style>
+<h2 class="icx-h">Copy an invisible character</h2>
+<div class="fields" style="margin-bottom:4px">
+  <div><label for="icN">How many to copy</label><input type="number" id="icN" min="1" max="10000" value="1" inputmode="numeric"></div>
+</div>
+<div class="icx-list" id="icList"></div>
+<p class="msg" id="icCopied"></p>
+
+<h2 class="icx-h" style="margin-top:26px">Find and remove hidden characters</h2>
+<label for="icIn">Text to check</label>
+<textarea id="icIn" data-nomemo style="min-height:160px" spellcheck="false" placeholder="Paste text that behaves strangely: a password that will not match, code that will not run, a name that looks the same but is not..."></textarea>
+<div class="checks" style="margin-top:12px">
+  <label><input type="checkbox" id="icSp" checked>Turn special spaces into normal spaces</label>
+  <label><input type="checkbox" id="icEmoji" checked>Keep joiners inside emoji (👨‍👩‍👧)</label>
+  <label><input type="checkbox" id="icScript" checked>Keep joiners inside Persian, Arabic and Indic words</label>
+  <label><input type="checkbox" id="icShy">Keep soft hyphens</label>
+</div>
+<div class="btns">
+  <button class="btn" id="icClean">Remove hidden characters</button>
+  <button class="btn ghost" id="icCp">Copy cleaned text</button>
+  <button class="btn ghost" id="icEx">Try an example</button>
+  <button class="btn ghost" id="icClr">Clear</button>
+</div>
+<p class="msg" id="icMsg"></p>
+<div class="stats">
+  <div class="stat"><span>Hidden characters</span><b id="icCount">0</b></div>
+  <div class="stat"><span>Special spaces</span><b id="icSpaces">0</b></div>
+  <div class="stat"><span>Kinds</span><b id="icKinds">0</b></div>
+</div>
+<div class="icx-view" id="icView" aria-label="Text with hidden characters shown"></div>
+<div class="scroll-x"><table class="icx-found" id="icFound" hidden><thead><tr><th>Code</th><th>Name</th><th>Count</th></tr></thead><tbody></tbody></table></div>
+<script>
+(function () {
+  var CHARS = [
+    [0x3164, 'Hangul Filler', 'Shows as an empty but real character. Popular for blank names in games and apps that refuse an empty name or plain spaces.'],
+    [0x2800, 'Braille Pattern Blank', 'An empty braille cell. Many apps keep it where they trim normal spaces, so it is used for blank messages and spacing in bios.'],
+    [0x200B, 'Zero Width Space', 'Takes no room. Lets long words or URLs break across lines, or splits a word so it is not turned into a link or mention.'],
+    [0x200C, 'Zero Width Non-Joiner', 'Stops letters joining. Needed in Persian, Kurdish and some Indic words; also separates ligatures like ff.'],
+    [0x200D, 'Zero Width Joiner', 'Joins characters. Builds emoji sequences such as 👨\u200d👩\u200d👧 and controls letter shapes in Arabic and Indic scripts.'],
+    [0x2060, 'Word Joiner', 'Invisible and prevents a line break at that spot, like a zero-width no-break space.'],
+    [0x00A0, 'No-Break Space', 'Looks like a space but keeps two words on one line, such as 10 km or Mr. Lee. Common in French before ! ? : ;'],
+    [0x202F, 'Narrow No-Break Space', 'A thin space that does not break, used in French punctuation and as a thousands separator (1 000 000).'],
+    [0x2007, 'Figure Space', 'As wide as a digit, so columns of numbers line up.'],
+    [0x2009, 'Thin Space', 'A narrow space used around dashes and in numbers and units.'],
+    [0x200A, 'Hair Space', 'The thinnest space, for fine typography.'],
+    [0x2002, 'En Space', 'Half an em wide.'],
+    [0x2003, 'Em Space', 'As wide as the font size; used for indents.'],
+    [0x3000, 'Ideographic Space', 'A full-width space used in Chinese, Japanese and Korean text.'],
+    [0x00AD, 'Soft Hyphen', 'Invisible unless the word is split at the end of a line, where a hyphen appears.'],
+    [0xFEFF, 'Zero Width No-Break Space (BOM)', 'Marks the start of a text file (byte order mark). Inside text it often causes bugs.'],
+    [0x115F, 'Hangul Choseong Filler', 'Another blank Hangul filler that some apps accept for empty names.'],
+    [0x034F, 'Combining Grapheme Joiner', 'An invisible mark that attaches to the letter before it; used to keep letters apart when sorting.']
+  ];
+  // Names for what the checker can find (others show their code).
+  var NAMES = { 0x09: 'Tab', 0x0B: 'Vertical tab', 0x0C: 'Form feed', 0x1C: 'File separator', 0x7F: 'Delete', 0x85: 'Next line', 0x1680: 'Ogham space', 0x2000: 'En quad', 0x2001: 'Em quad', 0x2004: 'Three-per-em space', 0x2005: 'Four-per-em space', 0x2006: 'Six-per-em space', 0x2008: 'Punctuation space', 0x200E: 'Left-to-right mark', 0x200F: 'Right-to-left mark', 0x2028: 'Line separator', 0x2029: 'Paragraph separator', 0x202A: 'Left-to-right embedding', 0x202B: 'Right-to-left embedding', 0x202C: 'Pop directional formatting', 0x202D: 'Left-to-right override', 0x202E: 'Right-to-left override', 0x205F: 'Medium mathematical space', 0x2061: 'Function application', 0x2062: 'Invisible times', 0x2063: 'Invisible separator', 0x2064: 'Invisible plus', 0x2066: 'Left-to-right isolate', 0x2067: 'Right-to-left isolate', 0x2068: 'First strong isolate', 0x2069: 'Pop directional isolate', 0x061C: 'Arabic letter mark', 0x180E: 'Mongolian vowel separator', 0x1160: 'Hangul Jungseong Filler', 0xFFA0: 'Halfwidth Hangul Filler', 0x17B4: 'Khmer vowel inherent AQ', 0x17B5: 'Khmer vowel inherent AA', 0xFFFC: 'Object replacement character' };
+  CHARS.forEach(function (c) { NAMES[c[0]] = c[1]; });
+  function hex(cp) { return 'U+' + cp.toString(16).toUpperCase().padStart(4, '0'); }
+  function nameOf(cp) { if (NAMES[cp]) return NAMES[cp]; if (cp >= 0xFE00 && cp <= 0xFE0F) return 'Variation selector ' + (cp - 0xFE00 + 1); if (cp >= 0xE0100 && cp <= 0xE01EF) return 'Variation selector ' + (cp - 0xE0100 + 17); if (cp >= 0xE0000 && cp <= 0xE007F) return 'Tag character' + (cp >= 0xE0020 && cp <= 0xE007E ? ' “' + String.fromCharCode(cp - 0xE0000) + '”' : ''); if (cp < 0x20 || (cp >= 0x7F && cp <= 0x9F)) return 'Control character'; return 'Invisible character'; }
+
+  // ---- copy list ----
+  $('icList').innerHTML = CHARS.map(function (c, i) {
+    return '<div class="icx-item"><b>' + c[1] + '</b><code>' + hex(c[0]) + ' · HTML &amp;#' + c[0] + ';</code><p>' + c[2] + '</p><button class="btn ghost" type="button" data-i="' + i + '">Copy</button></div>';
+  }).join('');
+  $('icList').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-i]'); if (!b) return;
+    var c = CHARS[+b.dataset.i], n = Math.min(10000, Math.max(1, Math.floor(+$('icN').value || 1)));
+    copyText(String.fromCodePoint(c[0]).repeat(n), b);
+    $('icCopied').className = 'msg ok';
+    $('icCopied').textContent = 'Copied ' + (n > 1 ? fmtNum(n) + ' × ' : '') + c[1] + ' (' + hex(c[0]) + '). Paste it where you need it. Some apps remove certain blank characters; if one does not work, try another.';
+  });
+
+  // ---- checker ----
+  var SPACE = /[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/;
+  var HIDDEN = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F\u00ad\u034f\u061cᅟᅠ\u17b4\u17b5\u180b-\u180f\u200b-\u200f\u2028-\u202e\u2060-\u206f⠀ㅤ\ufe00-\ufe0f\ufeffﾠ\ufff9-￼]|[\u{E0000}-\u{E007F}\u{E0100}-\u{E01EF}\u{1D159}\u{1D173}-\u{1D17A}]/u;
+  var EMOJI = /\p{Extended_Pictographic}|\p{Emoji_Modifier}|[\u{1F1E6}-\u{1F1FF}]/u;
+  var JOINSCRIPT = /[\u0600-ۿݐ-ݿ\u0900-෿ﭐ-﷿ﹰ-\ufeff]/u;
+  // Should this hidden character stay because it does a job? (emoji sequences, Persian/Indic joiners)
+  function keep(arr, i, cp) {
+    var prev = arr[i - 1] || '', next = arr[i + 1] || '';
+    if ($('icEmoji').checked) {
+      if (cp === 0x200D && EMOJI.test(prev) && (EMOJI.test(next) || /[♀♂⚕⚖✈❤]/.test(next))) return true;
+      if (cp === 0x200D && /[\ufe0f\u{1F3FB}-\u{1F3FF}]/u.test(prev) && EMOJI.test(next)) return true;
+      if (cp === 0xFE0F || cp === 0xFE0E) return EMOJI.test(prev) || /[#*0-9©®‼-㊙]/u.test(prev);
+      if (cp >= 0xE0020 && cp <= 0xE007F) { for (var k = i - 1; k >= 0 && k > i - 10; k--) if (arr[k].codePointAt(0) === 0x1F3F4) return true; } // flags like 🏴\ue0067\ue0062\ue0073\ue0063\ue0074\ue007f
+    }
+    if ($('icScript').checked && (cp === 0x200C || cp === 0x200D) && JOINSCRIPT.test(prev) && JOINSCRIPT.test(next)) return true;
+    if ($('icShy').checked && cp === 0xAD) return true;
+    return false;
+  }
+  function esc(s) { return s.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function short(cp) { var n = nameOf(cp); return { 0x200B: 'ZWSP', 0x200C: 'ZWNJ', 0x200D: 'ZWJ', 0x2060: 'WJ', 0xFEFF: 'BOM', 0x00A0: 'NBSP', 0x202F: 'NNBSP', 0x00AD: 'SHY', 0x200E: 'LRM', 0x200F: 'RLM', 0x202E: 'RLO', 0x202D: 'LRO', 0x3164: 'HF', 0x2800: 'BRAILLE', 0x3000: 'IDSP' }[cp] || hex(cp); }
+  var scanned = null;
+  function scan() {
+    var t = $('icIn').value, arr = Array.from(t), found = {}, hidden = 0, spaces = 0, html = '', LIMIT = 100000;
+    for (var i = 0; i < arr.length; i++) {
+      var ch = arr[i], cp = ch.codePointAt(0), isSp = SPACE.test(ch), isH = !isSp && HIDDEN.test(ch);
+      if (!isSp && !isH) { if (i < LIMIT) html += esc(ch); continue; }
+      var kp = isH && keep(arr, i, cp);
+      if (!kp) { if (isSp) spaces++; else hidden++; }
+      var f = found[cp] || (found[cp] = { n: 0, kept: 0 }); f.n++; if (kp) f.kept++;
+      if (i < LIMIT) html += '<span class="icx-mk' + (isSp ? ' sp' : '') + (kp ? ' kp' : '') + '" title="' + hex(cp) + ' ' + esc(nameOf(cp)) + (kp ? ' (kept)' : '') + '">' + short(cp) + '</span>' + (cp === 0x2028 || cp === 0x2029 ? '\n' : '');
+    }
+    if (arr.length > LIMIT) html += '\n… (showing the first ' + fmtNum(LIMIT) + ' characters)';
+    $('icView').innerHTML = html;
+    $('icCount').textContent = fmtNum(hidden); $('icSpaces').textContent = fmtNum(spaces);
+    var keys = Object.keys(found).map(Number).sort(function (a, b) { return found[b].n - found[a].n; });
+    $('icKinds').textContent = keys.length;
+    $('icFound').hidden = !keys.length;
+    $('icFound').tBodies[0].innerHTML = keys.map(function (cp) { var f = found[cp]; return '<tr><td>' + hex(cp) + '</td><td>' + esc(nameOf(cp)) + (f.kept ? ' <small>(' + f.kept + ' kept, part of emoji or words)</small>' : '') + '</td><td>' + fmtNum(f.n) + '</td></tr>'; }).join('');
+    scanned = { hidden: hidden, spaces: spaces };
+    if (!t) say('', '');
+    else if (!hidden && !spaces) say('ok', keys.length ? 'Only characters that are needed (emoji or word joiners) were found.' : 'No hidden characters found. This text is clean.');
+    else say('bad', 'Found ' + fmtNum(hidden) + ' hidden character' + (hidden === 1 ? '' : 's') + (spaces ? ' and ' + fmtNum(spaces) + ' special space' + (spaces === 1 ? '' : 's') : '') + '. They are marked in red and orange below. Press Remove hidden characters to clean the text.');
+  }
+  function clean(t) {
+    var arr = Array.from(t), out = '';
+    for (var i = 0; i < arr.length; i++) {
+      var ch = arr[i], cp = ch.codePointAt(0);
+      if (SPACE.test(ch)) { out += $('icSp').checked ? ' ' : ch; continue; }
+      if (cp === 0x2028 || cp === 0x2029) { out += '\n'; continue; }
+      if (HIDDEN.test(ch) && !keep(arr, i, cp)) continue;
+      out += ch;
+    }
+    return out;
+  }
+  function say(cls, t) { $('icMsg').className = 'msg ' + cls; $('icMsg').textContent = t; }
+  var timer;
+  $('icIn').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(scan, $('icIn').value.length > 200000 ? 300 : 50); });
+  ['icSp', 'icEmoji', 'icScript', 'icShy'].forEach(function (id) { $(id).addEventListener('change', scan); });
+  $('icClean').addEventListener('click', function () {
+    var t = $('icIn').value; if (!t) return say('', 'Paste some text first.');
+    var before = scanned || { hidden: 0, spaces: 0 }, c = clean(t);
+    $('icIn').value = c; scan();
+    say('ok', c === t ? 'Nothing to remove. The text is clean.' : 'Done: removed ' + fmtNum(before.hidden) + ' hidden character' + (before.hidden === 1 ? '' : 's') + (before.spaces && $('icSp').checked ? ' and replaced ' + fmtNum(before.spaces) + ' special space' + (before.spaces === 1 ? '' : 's') : '') + '. Copy the cleaned text below.');
+  });
+  $('icCp').addEventListener('click', function () { if ($('icIn').value) copyText($('icIn').value, $('icCp')); else say('', 'Paste some text first.'); });
+  $('icEx').addEventListener('click', function () {
+    $('icIn').value = 'pass\u200bword\ufeff and 10\u00a0km, call\u202f+1\u2060555. Family: 👨\u200d👩\u200d👧 ok. Persian: می\u200cخواهم. Hidden\u00ad hyphen, filler [ㅤ], tab\u0009end, RTL\u202etxt.';
+    scan();
+  });
+  $('icClr').addEventListener('click', function () { $('icIn').value = ''; scan(); $('icIn').focus(); });
+  scan();
+})();
+</script>

@@ -1,0 +1,106 @@
+<style>
+.brx-out { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-top: 12px; min-height: 90px; max-height: 520px; overflow: auto; line-height: 1.7; overflow-wrap: anywhere; }
+.brx-out p { margin: 0 0 .9em; }
+.brx-out b { font-weight: 700; }
+.brx-out.dim span.r { opacity: .72; }
+.brx-out:empty::before { content: attr(data-empty); color: var(--muted); }
+.brx-range { display: flex; align-items: center; gap: 10px; }
+.brx-range input { flex: 1; }
+.brx-range output { min-width: 44px; font-weight: 700; text-align: right; }
+</style>
+<label for="brIn">Your text</label>
+<textarea id="brIn" data-nomemo style="min-height:170px" placeholder="Paste an article, email or study notes here..."></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="brPct">Bold part of each word</label><div class="brx-range"><input type="range" id="brPct" min="10" max="90" step="5" value="45"><output id="brPctV">45%</output></div></div>
+  <div><label for="brMin">Skip words shorter than</label><select id="brMin"><option value="1">No skipping</option><option value="2">2 letters</option><option value="3">3 letters</option><option value="4">4 letters</option></select></div>
+  <div><label for="brSize">Preview text size</label><div class="brx-range"><input type="range" id="brSize" min="13" max="28" step="1" value="18"><output id="brSizeV">18</output></div></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="brDim">Fade the rest of each word</label>
+  <label><input type="checkbox" id="brNum">Also bold numbers</label>
+</div>
+<div class="brx-out" id="brOut" data-empty="Your text appears here with the start of each word in bold." dir="auto"></div>
+<div class="btns">
+  <button class="btn" id="brCp">Copy formatted text</button>
+  <button class="btn ghost" id="brHtml">Copy HTML code</button>
+  <button class="btn ghost" id="brDl">Download .html</button>
+  <button class="btn ghost" id="brEx">Try an example</button>
+  <button class="btn ghost" id="brClr">Clear</button>
+</div>
+<p class="msg" id="brMsg"></p>
+<script>
+(function () {
+  var wordSeg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'word' }) : null;
+  var graphSeg = window.Intl && Intl.Segmenter ? new Intl.Segmenter(undefined, { granularity: 'grapheme' }) : null;
+  var NOSPACE = /[぀-ヿ㐀-䶿一-鿿豈-﫿가-힣]/; // Chinese, Japanese and Korean blocks are not split into bold parts
+  var EXAMPLE = 'Bionic reading guides your eyes through text by making the first letters of each word bold. Your brain fills in the rest of the word, so many people find they can read faster and stay focused for longer.\n\nIt works in many languages: La lectura biónica funciona en español. Le français aussi. Auch auf Deutsch. Также по-русски.';
+  function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function graphemes(w) { if (!graphSeg || /^[\x20-\x7e]*$/.test(w)) return Array.from(w); var a = []; for (var g of graphSeg.segment(w)) a.push(g.segment); return a; }
+  function words(line) {
+    if (wordSeg) { var a = []; for (var s of wordSeg.segment(line)) a.push({ t: s.segment, w: !!s.isWordLike }); return a; }
+    return line.split(/([\p{L}\p{M}\p{N}'’]+)/u).filter(Boolean).map(function (t) { return { t: t, w: /[\p{L}\p{N}]/u.test(t) }; });
+  }
+  function boldWord(w) {
+    var pct = +$('brPct').value / 100, min = +$('brMin').value;
+    if (NOSPACE.test(w) || (!$('brNum').checked && !/\p{L}/u.test(w))) return esc(w);
+    var g = graphemes(w);
+    if (g.length < min) return esc(w);
+    var n = Math.max(1, Math.min(g.length, Math.round(g.length * pct)));
+    var head = g.slice(0, n).join(''), rest = g.slice(n).join('');
+    return '<b>' + esc(head) + '</b>' + (rest ? '<span class="r">' + esc(rest) + '</span>' : '');
+  }
+  function build(text) {
+    return text.replace(/\r\n?/g, '\n').split(/\n{2,}/).map(function (para) {
+      return '<p>' + para.split('\n').map(function (line) {
+        return words(line).map(function (x) {
+          if (!x.w) return esc(x.t);
+          // hyphenated words count as parts (well-known -> each part)
+          return x.t.split(/([-‐])/).map(function (p) { return /^[-‐]$/.test(p) || !p ? esc(p) : boldWord(p); }).join('');
+        }).join('');
+      }).join('<br>') + '</p>';
+    }).join('');
+  }
+  var html = '';
+  function say(cls, t) { $('brMsg').className = 'msg ' + cls; $('brMsg').textContent = t; }
+  function run() {
+    $('brPctV').textContent = $('brPct').value + '%'; $('brSizeV').textContent = $('brSize').value;
+    $('brOut').style.fontSize = $('brSize').value + 'px';
+    $('brOut').classList.toggle('dim', $('brDim').checked);
+    var t = $('brIn').value;
+    html = t.trim() ? build(t) : '';
+    $('brOut').innerHTML = html;
+    if (t.trim() && NOSPACE.test(t)) say('', 'Chinese, Japanese and Korean characters are left as they are: bionic reading works on words made of letters.'); else say('', '');
+  }
+  // the copied version carries inline styles, so the bold and fading survive in email, Word or Google Docs
+  function portable() { var dim = $('brDim').checked; return html.replace(/<span class="r">/g, dim ? '<span style="opacity:.72">' : '<span>'); }
+  var timer;
+  $('brIn').addEventListener('input', function () { clearTimeout(timer); timer = setTimeout(run, $('brIn').value.length > 100000 ? 250 : 30); });
+  ['brPct', 'brMin', 'brSize', 'brDim', 'brNum'].forEach(function (id) { $(id).addEventListener('input', run); $(id).addEventListener('change', run); });
+  $('brCp').addEventListener('click', function () {
+    if (!html) return say('', 'Type or paste some text first.');
+    var plain = $('brOut').innerText, rich = '<div>' + portable() + '</div>', btn = $('brCp');
+    function fallback() {
+      var r = document.createRange(); r.selectNodeContents($('brOut'));
+      var s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      var ok = false; try { ok = document.execCommand('copy'); } catch (e) {}
+      s.removeAllRanges();
+      say(ok ? 'ok' : 'bad', ok ? 'Copied with formatting. Paste into an email, Word or Google Docs.' : 'Your browser blocked copying. Select the text above and copy it yourself.');
+    }
+    if (navigator.clipboard && window.ClipboardItem) {
+      navigator.clipboard.write([new ClipboardItem({ 'text/html': new Blob([rich], { type: 'text/html' }), 'text/plain': new Blob([plain], { type: 'text/plain' }) })]).then(function () {
+        say('ok', 'Copied with formatting. Paste into an email, Word or Google Docs.'); var o = btn.textContent; btn.textContent = 'Copied'; setTimeout(function () { btn.textContent = o; }, 1500);
+      }, fallback);
+    } else fallback();
+  });
+  $('brHtml').addEventListener('click', function () { if (!html) return say('', 'Type or paste some text first.'); copyText(portable(), $('brHtml')); });
+  $('brDl').addEventListener('click', function () {
+    if (!html) return say('', 'Type or paste some text first.');
+    var doc = '<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Bionic reading</title><style>body{font:' + $('brSize').value + 'px/1.7 Georgia,serif;max-width:720px;margin:40px auto;padding:0 18px;color:#1f2328}b{font-weight:700}</style></head><body dir="auto">\n' + portable() + '\n</body></html>\n';
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([doc], { type: 'text/html;charset=utf-8' })); a.download = 'bionic-reading.html';
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  });
+  $('brEx').addEventListener('click', function () { $('brIn').value = EXAMPLE; run(); });
+  $('brClr').addEventListener('click', function () { $('brIn').value = ''; run(); $('brIn').focus(); });
+  run();
+})();
+</script>

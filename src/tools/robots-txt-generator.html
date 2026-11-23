@@ -1,0 +1,196 @@
+<style>
+.rbt-group { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 10px; background: var(--bg); }
+.rbt-ghead { display: grid; grid-template-columns: 1fr 1fr 44px; gap: 8px; align-items: end; margin-bottom: 8px; }
+.rbt-rule { display: grid; grid-template-columns: 130px 1fr 44px; gap: 8px; margin-top: 6px; }
+.rbt-rule input, .rbt-rule select, .rbt-ghead input, .rbt-ghead select { min-width: 0; }
+.rbt-x { height: 44px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); cursor: pointer; font-size: 18px; }
+.rbt-x:hover { color: var(--bad); border-color: var(--bad); }
+.rbt-add { font: inherit; font-size: 14px; border: 0; background: none; color: var(--accent); cursor: pointer; padding: 8px 0 0; }
+h2.rbt-h { font-size: 20px; margin: 4px 0 8px; }
+@media (max-width: 520px) { .rbt-rule { grid-template-columns: 105px 1fr 44px; } .rbt-ghead { grid-template-columns: 1fr 44px; } .rbt-ghead .rbt-custom { grid-column: 1 / 2; } }
+</style>
+<h2 class="rbt-h">robots.txt</h2>
+<div class="fields">
+  <div><label for="rbPreset">Start from</label><select id="rbPreset" data-nomemo><option value="">Choose a preset…</option><option value="allow">Allow all crawlers everywhere</option><option value="block">Block all crawlers everywhere</option><option value="common">Typical website (block admin, cart, search)</option><option value="wp">WordPress</option></select></div>
+  <div><label for="rbDelay">Crawl-delay (seconds, optional)</label><input type="number" id="rbDelay" min="0" max="60" step="1" placeholder="none" inputmode="numeric"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="rbAI">Block AI training crawlers (GPTBot, Google-Extended, CCBot, ClaudeBot and others)</label>
+</div>
+<div id="rbGroups"></div>
+<button type="button" class="btn ghost" id="rbAddG">+ Add rules for another crawler</button>
+<label for="rbSitemaps" style="margin-top:16px">Sitemap URLs (one per line)</label>
+<textarea id="rbSitemaps" data-nomemo style="min-height:70px" spellcheck="false" placeholder="https://www.example.com/sitemap.xml"></textarea>
+<label for="rbOut" style="margin-top:14px">Your robots.txt</label>
+<textarea id="rbOut" data-nomemo readonly style="min-height:200px;font-family:var(--mono);font-size:13.5px" spellcheck="false"></textarea>
+<div class="btns">
+  <button class="btn" id="rbCp">Copy</button>
+  <button class="btn ghost" id="rbDl">Download robots.txt</button>
+</div>
+<p class="msg" id="rbMsg"></p>
+<div class="fields" style="margin-top:14px">
+  <div><label for="rbTestPath">Test a page path</label><input type="text" id="rbTestPath" data-nomemo placeholder="/admin/settings?id=2" spellcheck="false"></div>
+  <div><label for="rbTestBot">As crawler</label><input type="text" id="rbTestBot" value="Googlebot" spellcheck="false"></div>
+</div>
+<p class="msg" id="rbTest"></p>
+
+<h2 class="rbt-h" style="margin-top:30px">sitemap.xml</h2>
+<label for="smIn">Page URLs (one per line)</label>
+<textarea id="smIn" data-nomemo style="min-height:150px" spellcheck="false" placeholder="https://www.example.com/&#10;https://www.example.com/about&#10;https://www.example.com/blog/first-post"></textarea>
+<div class="fields" style="margin-top:14px">
+  <div><label for="smMod">Last modified</label><select id="smMod"><option value="today">Today</option><option value="none">Leave out</option><option value="date">Pick a date</option></select></div>
+  <div><label for="smDate">Date</label><input type="date" id="smDate"></div>
+  <div><label for="smFreq">Change frequency</label><select id="smFreq"><option value="">Leave out</option><option>always</option><option>hourly</option><option>daily</option><option selected>weekly</option><option>monthly</option><option>yearly</option><option>never</option></select></div>
+  <div><label for="smPri">Priority</label><select id="smPri"><option value="">Leave out</option><option value="auto">By page depth (1.0, 0.8, 0.6…)</option><option value="0.5">0.5 for all</option></select></div>
+</div>
+<div class="btns">
+  <button class="btn" id="smGo">Make sitemap</button>
+  <button class="btn ghost" id="smCp">Copy</button>
+  <button class="btn ghost" id="smDl">Download sitemap.xml</button>
+</div>
+<p class="msg" id="smMsg"></p>
+<textarea id="smOut" data-nomemo readonly style="min-height:180px;font-family:var(--mono);font-size:13px" spellcheck="false" aria-label="Generated sitemap"></textarea>
+<script>
+(function () {
+  var BOTS = ['*', 'Googlebot', 'Googlebot-Image', 'Bingbot', 'Applebot', 'DuckDuckBot', 'YandexBot', 'Baiduspider', 'Slurp', 'facebookexternalhit', 'Twitterbot', 'AhrefsBot', 'SemrushBot', 'MJ12bot', 'GPTBot', 'ChatGPT-User', 'Google-Extended', 'CCBot', 'ClaudeBot', 'anthropic-ai', 'PerplexityBot', 'Bytespider', 'Amazonbot', 'Applebot-Extended', 'Meta-ExternalAgent', 'custom'];
+  var AI = ['GPTBot', 'Google-Extended', 'CCBot', 'ClaudeBot', 'anthropic-ai', 'PerplexityBot', 'Bytespider', 'Applebot-Extended', 'Meta-ExternalAgent', 'Amazonbot'];
+  var groups = [];
+  function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function say(id, cls, t) { $(id).className = 'msg ' + cls; $(id).textContent = t; }
+  function preset(p) {
+    if (p === 'allow') groups = [{ ua: '*', rules: [['Disallow', '']] }];
+    if (p === 'block') groups = [{ ua: '*', rules: [['Disallow', '/']] }];
+    if (p === 'common') groups = [{ ua: '*', rules: [['Disallow', '/admin/'], ['Disallow', '/cart/'], ['Disallow', '/checkout/'], ['Disallow', '/account/'], ['Disallow', '/search'], ['Disallow', '/*?sort='], ['Allow', '/']] }];
+    if (p === 'wp') groups = [{ ua: '*', rules: [['Disallow', '/wp-admin/'], ['Allow', '/wp-admin/admin-ajax.php'], ['Disallow', '/?s='], ['Disallow', '/search/']] }];
+  }
+  function draw() {
+    $('rbGroups').innerHTML = groups.map(function (g, gi) {
+      var known = BOTS.indexOf(g.ua) !== -1 && g.ua !== 'custom';
+      return '<div class="rbt-group" data-g="' + gi + '"><div class="rbt-ghead"><div><label>Crawler (User-agent)</label><select data-k="bot" aria-label="Crawler">' + BOTS.map(function (b) { return '<option value="' + b + '"' + ((known ? b === g.ua : b === 'custom') ? ' selected' : '') + '>' + (b === '*' ? 'All crawlers (*)' : b === 'custom' ? 'Other (type a name)…' : b) + '</option>'; }).join('') + '</select></div>' +
+        '<div class="rbt-custom"' + (known ? ' hidden' : '') + '><label>Name</label><input data-k="ua" value="' + esc(known ? '' : g.ua) + '" placeholder="MyBot" spellcheck="false" aria-label="Crawler name"></div>' +
+        '<button type="button" class="rbt-x" data-k="delg" aria-label="Remove this crawler" title="Remove">×</button></div>' +
+        g.rules.map(function (r, ri) { return '<div class="rbt-rule" data-r="' + ri + '"><select data-k="type" aria-label="Rule"><option' + (r[0] === 'Disallow' ? ' selected' : '') + '>Disallow</option><option' + (r[0] === 'Allow' ? ' selected' : '') + '>Allow</option></select><input data-k="path" value="' + esc(r[1]) + '" placeholder="/private/  (empty = allow all)" spellcheck="false" aria-label="Path"><button type="button" class="rbt-x" data-k="delr" aria-label="Remove rule" title="Remove">×</button></div>'; }).join('') +
+        '<button type="button" class="rbt-add" data-k="addr">+ Add a rule</button></div>';
+    }).join('');
+    build();
+  }
+  function build() {
+    var lines = [], warn = [], delay = $('rbDelay').value.trim();
+    groups.forEach(function (g) {
+      var ua = (g.ua || '').trim();
+      if (!ua) { warn.push('A crawler has no name.'); return; }
+      lines.push('User-agent: ' + ua);
+      g.rules.forEach(function (r) {
+        var path = r[1].trim();
+        if (path && !/^[\/*]/.test(path)) { if (/^https?:\/\//i.test(path)) { try { var u = new URL(path); path = u.pathname + u.search; } catch (e) {} } else path = '/' + path; warn.push('Paths should start with /. “' + r[1].trim() + '” was written as “' + path + '”.'); }
+        path = path.replace(/\s/g, '%20');
+        lines.push(r[0] + ': ' + path);
+      });
+      if (!g.rules.length) lines.push('Disallow:');
+      if (delay && +delay > 0) lines.push('Crawl-delay: ' + Math.round(+delay));
+      lines.push('');
+    });
+    if ($('rbAI').checked) AI.forEach(function (b) { if (!groups.some(function (g) { return g.ua.toLowerCase() === b.toLowerCase(); })) lines.push('User-agent: ' + b, 'Disallow: /', ''); });
+    var sms = $('rbSitemaps').value.split(/\s*\n\s*/).map(function (x) { return x.trim(); }).filter(Boolean);
+    sms.forEach(function (s) { if (!/^https?:\/\/[^\s/]+\.[^\s/]+/i.test(s)) warn.push('A sitemap must be a full address starting with https:// (“' + s + '”).'); else lines.push('Sitemap: ' + s); });
+    if (!groups.length && !$('rbAI').checked) lines.unshift('User-agent: *', 'Disallow:', '');
+    var out = lines.join('\n').replace(/\n{3,}/g, '\n\n').trim() + '\n';
+    try { localStorage.setItem('gtn-robots', JSON.stringify({ groups: groups, sitemaps: $('rbSitemaps').value })); } catch (e) {}
+    $('rbOut').value = out;
+    if (warn.length) say('rbMsg', 'bad', warn.slice(0, 3).join(' '));
+    else say('rbMsg', 'ok', 'Ready. Upload it as robots.txt at the root of your site (https://your-site/robots.txt).' + (delay ? ' Note: Google ignores Crawl-delay; Bing and Yandex use it.' : ''));
+    test();
+  }
+  // ---- test a path the way Google does: the most specific (longest) matching rule wins; Allow wins a tie ----
+  function parse(txt) {
+    var gs = [], cur = null, lastUA = false;
+    txt.split(/\r?\n/).forEach(function (line) {
+      var m = /^\s*([A-Za-z-]+)\s*:\s*(.*?)\s*(#.*)?$/.exec(line); if (!m) return;
+      var k = m[1].toLowerCase(), v = m[2];
+      if (k === 'user-agent') { if (!lastUA || !cur) { cur = { ua: [], rules: [] }; gs.push(cur); } cur.ua.push(v.toLowerCase()); lastUA = true; return; }
+      lastUA = false;
+      if ((k === 'allow' || k === 'disallow') && cur) cur.rules.push([k, v]);
+    });
+    return gs;
+  }
+  function toRe(p) { var end = /\$$/.test(p); p = p.replace(/\$$/, ''); return new RegExp('^' + p.split('*').map(function (s) { return s.replace(/[.+?^${}()|[\]\\]/g, '\\$&'); }).join('.*') + (end ? '$' : '')); }
+  function test() {
+    var path = $('rbTestPath').value.trim(), bot = ($('rbTestBot').value.trim() || '*').toLowerCase();
+    if (!path) { $('rbTest').textContent = ''; return; }
+    if (/^https?:\/\//i.test(path)) { try { var u = new URL(path); path = u.pathname + u.search; } catch (e) {} }
+    if (path.charAt(0) !== '/') path = '/' + path;
+    var gs = parse($('rbOut').value), mine = gs.filter(function (g) { return g.ua.some(function (u) { return u !== '*' && bot.indexOf(u) === 0 || u === bot; }); });
+    var used = mine.length ? mine : gs.filter(function (g) { return g.ua.indexOf('*') !== -1; });
+    var best = null;
+    used.forEach(function (g) { g.rules.forEach(function (r) { if (!r[1]) return; if (toRe(r[1]).test(path) && (!best || r[1].length > best[1].length || (r[1].length === best[1].length && r[0] === 'allow'))) best = r; }); });
+    var allowed = !best || best[0] === 'allow';
+    say('rbTest', allowed ? 'ok' : 'bad', (allowed ? 'Allowed' : 'Blocked') + ' for ' + $('rbTestBot').value.trim() + (best ? ' by the rule “' + (best[0] === 'allow' ? 'Allow' : 'Disallow') + ': ' + best[1] + '”' : mine.length || used.length ? ' (no rule matches this path)' : ' (no rules for this crawler)') + '.');
+  }
+  $('rbGroups').addEventListener('input', function (e) {
+    var el = e.target, gEl = el.closest('[data-g]'); if (!gEl) return;
+    var g = groups[+gEl.dataset.g], rEl = el.closest('[data-r]');
+    if (el.dataset.k === 'ua') g.ua = el.value;
+    if (el.dataset.k === 'path') g.rules[+rEl.dataset.r][1] = el.value;
+    if (el.dataset.k === 'type') g.rules[+rEl.dataset.r][0] = el.value;
+    if (el.dataset.k === 'bot') { if (el.value === 'custom') { g.ua = ''; draw(); gEl = $('rbGroups').querySelector('[data-g="' + groups.indexOf(g) + '"] input[data-k="ua"]'); if (gEl) gEl.focus(); return; } g.ua = el.value; }
+    build();
+  });
+  $('rbGroups').addEventListener('click', function (e) {
+    var b = e.target.closest('button'); if (!b) return;
+    var gi = +b.closest('[data-g]').dataset.g;
+    if (b.dataset.k === 'delg') groups.splice(gi, 1);
+    if (b.dataset.k === 'delr') groups[gi].rules.splice(+b.closest('[data-r]').dataset.r, 1);
+    if (b.dataset.k === 'addr') groups[gi].rules.push(['Disallow', '']);
+    draw();
+    if (b.dataset.k === 'addr') { var ins = $('rbGroups').querySelectorAll('[data-g="' + gi + '"] input[data-k="path"]'); if (ins.length) ins[ins.length - 1].focus(); }
+  });
+  $('rbAddG').addEventListener('click', function () { groups.push({ ua: 'Googlebot', rules: [['Disallow', '']] }); draw(); });
+  $('rbPreset').addEventListener('change', function () { if (this.value) { preset(this.value); draw(); } });
+  ['rbDelay', 'rbAI', 'rbSitemaps'].forEach(function (id) { $(id).addEventListener('input', build); $(id).addEventListener('change', build); });
+  ['rbTestPath', 'rbTestBot'].forEach(function (id) { $(id).addEventListener('input', test); });
+  $('rbCp').addEventListener('click', function () { copyText($('rbOut').value, $('rbCp')); });
+  function download(text, name, type) { var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000); }
+  $('rbDl').addEventListener('click', function () { download($('rbOut').value, 'robots.txt', 'text/plain;charset=utf-8'); });
+
+  // ---- sitemap.xml ----
+  function xmlEsc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&apos;'); }
+  function today() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function sitemap() {
+    var raw = $('smIn').value.split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean), bad = [], seen = {}, urls = [], hosts = {};
+    if (!raw.length) { $('smOut').value = ''; return say('smMsg', '', 'Paste your page addresses first, one per line.'); }
+    raw.forEach(function (x) {
+      var u; try { u = new URL(/^[a-z][a-z0-9+.-]*:/i.test(x) ? x : 'https://' + x); } catch (e) { bad.push(x); return; }
+      if (!/^https?:$/.test(u.protocol) || !/\./.test(u.hostname)) { bad.push(x); return; }
+      u.hash = '';
+      var h = u.href; if (seen[h]) return; seen[h] = 1; hosts[u.host] = 1; urls.push(u);
+    });
+    if (!urls.length) { $('smOut').value = ''; return say('smMsg', 'bad', 'None of these look like web addresses. Use full addresses such as https://www.example.com/page.'); }
+    var MAX = 50000, cut = urls.length > MAX; if (cut) urls = urls.slice(0, MAX);
+    var mod = $('smMod').value === 'today' ? today() : $('smMod').value === 'date' ? $('smDate').value : '', freq = $('smFreq').value, pri = $('smPri').value;
+    var out = '<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n' + urls.map(function (u) {
+      var depth = u.pathname.split('/').filter(Boolean).length, p = pri === 'auto' ? Math.max(0.1, 1 - depth * 0.2).toFixed(1) : pri;
+      return '  <url>\n    <loc>' + xmlEsc(u.href) + '</loc>\n' + (mod ? '    <lastmod>' + mod + '</lastmod>\n' : '') + (freq ? '    <changefreq>' + freq + '</changefreq>\n' : '') + (p ? '    <priority>' + p + '</priority>\n' : '') + '  </url>';
+    }).join('\n') + '\n</urlset>\n';
+    $('smOut').value = out;
+    var notes = [];
+    if (bad.length) notes.push(bad.length + ' line' + (bad.length === 1 ? ' was' : 's were') + ' skipped because ' + (bad.length === 1 ? 'it is' : 'they are') + ' not web addresses (' + bad.slice(0, 3).join(', ') + (bad.length > 3 ? ', …' : '') + ').');
+    if (raw.length - bad.length > urls.length && !cut) notes.push('Duplicates were removed.');
+    if (Object.keys(hosts).length > 1) notes.push('Warning: the addresses use ' + Object.keys(hosts).length + ' different domains; a sitemap should list pages of one site only.');
+    if (cut) notes.push('A sitemap can hold at most 50,000 addresses, so only the first 50,000 were used. Split the rest into another sitemap.');
+    if ($('smMod').value === 'date' && !mod) notes.push('Pick a date, or choose Leave out.');
+    say('smMsg', notes.length ? 'bad' : 'ok', 'Sitemap with ' + fmtNum(urls.length) + ' address' + (urls.length === 1 ? '' : 'es') + ' ready. ' + notes.join(' '));
+    if (!$('rbSitemaps').value.trim()) { $('rbSitemaps').value = urls[0].origin + '/sitemap.xml'; build(); }
+  }
+  $('smGo').addEventListener('click', sitemap);
+  ['smMod', 'smDate', 'smFreq', 'smPri'].forEach(function (id) { $(id).addEventListener('change', function () { $('smDate').disabled = $('smMod').value !== 'date'; if ($('smOut').value) sitemap(); }); });
+  $('smDate').disabled = $('smMod').value !== 'date';
+  $('smCp').addEventListener('click', function () { if ($('smOut').value) copyText($('smOut').value, $('smCp')); else say('smMsg', '', 'Make the sitemap first.'); });
+  $('smDl').addEventListener('click', function () { if ($('smOut').value) download($('smOut').value, 'sitemap.xml', 'application/xml;charset=utf-8'); else say('smMsg', '', 'Make the sitemap first.'); });
+
+  // your rules come back when you return (kept only in this browser)
+  var saved = null; try { saved = JSON.parse(localStorage.getItem('gtn-robots')); } catch (e) {}
+  if (saved && Array.isArray(saved.groups) && saved.groups.every(function (g) { return g && typeof g.ua === 'string' && Array.isArray(g.rules); })) { groups = saved.groups; if (typeof saved.sitemaps === 'string') $('rbSitemaps').value = saved.sitemaps; }
+  else preset('common');
+  draw();
+})();
+</script>
