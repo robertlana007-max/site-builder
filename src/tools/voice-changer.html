@@ -1,0 +1,408 @@
+<style>
+.vc-src { display: flex; gap: 10px; flex-wrap: wrap; margin: 0 0 12px; }
+.vc-src > * { flex: 1 1 220px; }
+.vc-rec { display: flex; flex-direction: column; justify-content: center; align-items: stretch; gap: 6px; border: 2px dashed var(--line); border-radius: 14px; padding: 14px; text-align: center; }
+.vc-rec .btn { min-height: 52px; }
+.vc-time { font-variant-numeric: tabular-nums; font-weight: 700; font-size: 20px; min-height: 1.3em; }
+.vc-lvl { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; }
+.vc-lvl i { display: block; height: 100%; width: 0; background: var(--accent); }
+.vc-src .drop { margin: 0; display: flex; flex-direction: column; justify-content: center; }
+.vc-name { margin: 0 0 12px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vc-name b { color: var(--ink); }
+.vc-fx { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; margin: 0 0 14px; }
+.vc-fx button { font: inherit; font-weight: 600; min-height: 64px; padding: 8px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface, var(--bg)); color: var(--ink); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.vc-fx button span { font-size: 22px; line-height: 1; }
+.vc-fx button[aria-pressed=true] { border-color: var(--accent); background: var(--accent-soft, var(--bg)); box-shadow: 0 0 0 1px var(--accent) inset; }
+.vc-amt { display: flex; align-items: center; gap: 10px; }
+.vc-amt input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.vc-amt output { min-width: 6.5em; text-align: end; font-variant-numeric: tabular-nums; font-weight: 600; }
+.vc-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; }
+.vc-row .btn { flex: 1 1 160px; }
+.vc-audio { display: block; width: 100%; margin: 0 0 14px; }
+</style>
+<div class="vc-src">
+  <div class="vc-rec">
+    <button class="btn" type="button" id="rec">● Record your voice</button>
+    <div class="vc-time" id="recTime" aria-live="off"></div>
+    <div class="vc-lvl" aria-hidden="true"><i id="recLvl"></i></div>
+  </div>
+  <div class="drop" id="drop" tabindex="0" role="button"><b>Or open an audio file</b>MP3, M4A, WAV, OGG, voice notes or videos. Nothing is uploaded.</div>
+</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.mov,.webm,.mkv,.3gp,.amr" hidden data-nomemo>
+<p class="vc-name" id="info"></p>
+<div id="work" hidden>
+  <div class="vc-fx" id="fx" role="group" aria-label="Voice effect"></div>
+  <div class="fields">
+    <div id="amtBox"><label for="amt" id="amtLbl">Amount</label><div class="vc-amt"><input type="range" id="amt" min="0" max="100" value="50"><output id="amtOut" for="amt"></output></div></div>
+    <div><label for="fmt">Save as</label><select id="fmt"><option value="mp3">MP3 (small, plays everywhere)</option><option value="wav">WAV (best quality)</option></select></div>
+  </div>
+  <div class="vc-row">
+    <button class="btn ghost" type="button" id="hear">▶ Listen</button>
+    <button class="btn ghost" type="button" id="orig">▶ Original</button>
+  </div>
+</div>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Save MP3</button><a class="btn ghost" id="dl" hidden>Download</a></div>
+<p class="msg" id="msg"></p>
+<audio class="vc-audio" id="result" controls hidden></audio>
+<script src="../assets/vendor/lamejs/lamejs.min.js"></script>
+<script>
+(function () {
+  // ---------- MP3 and WAV encoding (the same code as the Voice Recorder tool) ----------
+  // A resumable job: each step() encodes about 1.5 seconds of sound, so it can run in a worker or in small slices.
+  function mp3Job(ch, rate, kbps) {
+    var enc = new lamejs.Mp3Encoder(ch.length, rate, kbps), n = ch[0].length, pos = 0, parts = [];
+    var L = new Int16Array(1152 * 64), R = ch.length > 1 ? new Int16Array(L.length) : null;
+    function toInt(src, dst, from, len) { for (var i = 0; i < len; i++) { var s = src[from + i]; s = s < -1 ? -1 : s > 1 ? 1 : s; dst[i] = s < 0 ? s * 32768 : s * 32767; } }
+    function keep(b) { if (b.length) parts.push(new Uint8Array(b.buffer, b.byteOffset, b.length).slice()); }
+    return {
+      step: function () {
+        var len = Math.min(L.length, n - pos);
+        if (len > 0) {
+          toInt(ch[0], L, pos, len); if (R) toInt(ch[1], R, pos, len);
+          keep(R ? enc.encodeBuffer(L.subarray(0, len), R.subarray(0, len)) : enc.encodeBuffer(L.subarray(0, len)));
+          pos += len;
+        }
+        if (pos >= n) { keep(enc.flush()); return true; }
+        return false;
+      },
+      progress: function () { return n ? pos / n : 1; },
+      parts: parts
+    };
+  }
+  function encodeMp3(ch, rate, kbps, onProgress) {
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(parts) { if (done) return; done = true; resolve(new Blob(parts, { type: 'audio/mpeg' })); }
+      function inPage() { // slower fallback when workers are not available: small slices keep the page responsive
+        if (!window.lamejs) return reject(new Error('The MP3 encoder could not load. Reload the page and try again.'));
+        var job; try { job = mp3Job(ch, rate, kbps); } catch (e) { return reject(e); }
+        (function tick() {
+          try { var t = Date.now(); while (Date.now() - t < 40) if (job.step()) return finish(job.parts); } catch (e) { return reject(e); }
+          onProgress(job.progress()); setTimeout(tick, 0);
+        })();
+      }
+      var w, url;
+      try {
+        var lib = new URL('../assets/vendor/lamejs/lamejs.min.js', location.href).href;
+        url = URL.createObjectURL(new Blob(['importScripts(' + JSON.stringify(lib) + ');var mp3Job=' + mp3Job.toString() +
+          ';onmessage=function(e){var d=e.data,j=mp3Job(d.ch,d.rate,d.kbps),t=0;while(!j.step()){var now=Date.now();if(now-t>150){t=now;postMessage({p:j.progress()});}}postMessage({parts:j.parts});close();};'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.parts) { URL.revokeObjectURL(url); finish(e.data.parts); } else onProgress(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      var copy = ch.map(function (c) { return c.slice(); }); // own copies, handed over without a second copy
+      w.postMessage({ ch: copy, rate: rate, kbps: kbps }, copy.map(function (c) { return c.buffer; }));
+    });
+  }
+  function wavBlob(ch, rate) {
+    var c = ch.length, n = ch[0].length, dv = new DataView(new ArrayBuffer(44 + n * c * 2)), o = 44;
+    function str(at, s) { for (var i = 0; i < s.length; i++) dv.setUint8(at + i, s.charCodeAt(i)); }
+    str(0, 'RIFF'); dv.setUint32(4, 36 + n * c * 2, true); str(8, 'WAVE'); str(12, 'fmt ');
+    dv.setUint32(16, 16, true); dv.setUint16(20, 1, true); dv.setUint16(22, c, true); dv.setUint32(24, rate, true);
+    dv.setUint32(28, rate * c * 2, true); dv.setUint16(32, c * 2, true); dv.setUint16(34, 16, true); str(36, 'data'); dv.setUint32(40, n * c * 2, true);
+    for (var i = 0; i < n; i++) for (var k = 0; k < c; k++) { var s = Math.max(-1, Math.min(1, ch[k][i])); dv.setInt16(o, s < 0 ? s * 32768 : s * 32767, true); o += 2; }
+    return new Blob([dv.buffer], { type: 'audio/wav' });
+  }
+  // ---------- speed and pitch (WSOLA time stretching + band-limited resampling) ----------
+  // stretch: make the sound `factor` times longer without changing its pitch. chs: array of Float32Array (all channels
+  // use the same splice points, so stereo stays stereo). prog(p) reports 0..1.
+  function dspStretch(chs, factor, sr, prog) {
+    var n = chs[0].length, N = Math.round(sr * 0.046) & ~1, Hs = N / 2, Ha = Hs / factor, D = Math.round(sr * 0.014);
+    var outLen = Math.ceil(n * factor), out = chs.map(function () { return new Float32Array(outLen + N); });
+    var win = new Float32Array(N), i, c;
+    for (i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N); // periodic Hann: halves add up to exactly 1
+    // a mono guide signal, decimated by 4 for the coarse search
+    var q = 4, gl = Math.ceil(n / q) + 1, g = new Float32Array(gl);
+    for (i = 0; i < n; i++) { var s = 0; for (c = 0; c < chs.length; c++) s += chs[c][i]; g[(i / q) | 0] += s; }
+    var mono = chs[0];
+    if (chs.length > 1) { mono = new Float32Array(n); for (c = 0; c < chs.length; c++) for (i = 0; i < n; i++) mono[i] += chs[c][i]; }
+    var prev = 0, frames = Math.ceil(outLen / Hs) + 1, L = N / 2, Lq = (L / q) | 0;
+    for (var k = 0; k < frames; k++) {
+      var nominal = Math.round(k * Ha), pos = nominal;
+      if (k > 0) {
+        var want = prev + Hs; // where the previous frame would naturally continue
+        if (nominal - D < 0) pos = Math.max(0, nominal); else {
+          var lo = nominal - D, hi = nominal + D, best = -Infinity, bp = nominal, wq = (want / q) | 0;
+          for (var p = lo; p <= hi; p += q) { // coarse search on the decimated guide
+            var pq = (p / q) | 0, cc = 0, e = 1e-9;
+            for (var j = 0; j < Lq; j++) { var a = g[pq + j] || 0, b = g[wq + j] || 0; cc += a * b; e += a * a; }
+            cc /= Math.sqrt(e); if (cc > best) { best = cc; bp = p; }
+          }
+          best = -Infinity; var fineBest = bp;
+          for (p = bp - q + 1; p <= bp + q - 1; p++) { // fine search at full rate (every 2nd sample)
+            if (p < 0) continue;
+            var cc2 = 0, e2 = 1e-9;
+            var jm = Math.min(L, n - p, n - want);
+            for (j = 0; j < jm; j += 2) { var a2 = mono[p + j], b2 = mono[want + j]; cc2 += a2 * b2; e2 += a2 * a2; }
+            cc2 /= Math.sqrt(e2); if (cc2 > best) { best = cc2; fineBest = p; }
+          }
+          pos = fineBest;
+        }
+      }
+      var o = k * Hs;
+      if (o >= outLen + N) break;
+      for (c = 0; c < chs.length; c++) {
+        var src = chs[c], dst = out[c];
+        for (j = 0; j < N; j++) { var si = pos + j; if (si < n && o + j < dst.length) dst[o + j] += src[si] * win[j]; }
+      }
+      prev = pos;
+      if (prog && (k & 255) === 0) prog(k / frames);
+    }
+    return out.map(function (d) { return d.subarray(0, outLen); });
+  }
+  // resample: read the sound `ratio` times faster (ratio 2 = half as long and an octave higher), with a windowed-sinc filter.
+  function dspResample(x, ratio, prog) {
+    var n = Math.max(1, Math.floor(x.length / ratio)), y = new Float32Array(n), fc = Math.min(1, 1 / ratio), A = 8, half = Math.ceil(A / fc), R = 256;
+    var tab = new Float32Array(A * R + 2); // the Lanczos kernel, looked up instead of computed for every tap
+    for (var k = 0; k < tab.length; k++) { var d0 = k / R; tab[k] = d0 === 0 ? 1 : d0 >= A ? 0 : Math.sin(Math.PI * d0) / (Math.PI * d0) * Math.sin(Math.PI * d0 / A) / (Math.PI * d0 / A); }
+    var last = x.length - 1;
+    for (var i = 0; i < n; i++) {
+      var t = i * ratio, c = Math.floor(t), s = 0, ws = 0, j0 = c - half + 1, j1 = c + half;
+      for (var j = j0; j <= j1; j++) {
+        var d = (t - j) * fc; if (d < 0) d = -d;
+        if (d >= A) continue;
+        var f = d * R, fi = f | 0, w = tab[fi] + (tab[fi + 1] - tab[fi]) * (f - fi);
+        ws += w; if (j >= 0 && j <= last) s += x[j] * w;
+      }
+      y[i] = ws ? s / ws : 0;
+      if (prog && (i & 65535) === 0) prog(i / n);
+    }
+    return y;
+  }
+  // speed: 2 = twice as fast; semis: pitch change in semitones; vinyl: change both together like a record player.
+  function dspSpeedPitch(chs, sr, speed, semis, vinyl, prog) {
+    prog = prog || function () {};
+    var p = Math.pow(2, semis / 12);
+    if (vinyl) { var r = speed; return chs.map(function (c, k) { return dspResample(c, r, function (v) { prog((k + v) / chs.length); }); }); }
+    if (Math.abs(p - 1) < 1e-4 && Math.abs(speed - 1) < 1e-4) return chs.map(function (c) { return c.slice(); });
+    var f = p / speed, st = Math.abs(f - 1) < 1e-4 ? chs.map(function (c) { return c.slice(); }) : dspStretch(chs, f, sr, function (v) { prog(v * (Math.abs(p - 1) < 1e-4 ? 1 : 0.7)); });
+    if (Math.abs(p - 1) < 1e-4) return st;
+    return st.map(function (c, k) { return dspResample(c, p, function (v) { prog(0.7 + 0.3 * (k + v) / st.length); }); });
+  }
+  // Run dspSpeedPitch in a background worker (falls back to the page). Resolves with an array of Float32Array.
+  function dspRun(chs, sr, speed, semis, vinyl, prog) {
+    return new Promise(function (resolve, reject) {
+      function inPage() { setTimeout(function () { try { resolve(dspSpeedPitch(chs, sr, speed, semis, vinyl, prog)); } catch (e) { reject(e); } }, 20); }
+      var w, url;
+      try {
+        url = URL.createObjectURL(new Blob(['(function(){' + dspStretch.toString() + dspResample.toString() + dspSpeedPitch.toString() +
+          'onmessage=function(e){var d=e.data,t=0;var r=dspSpeedPitch(d.chs,d.sr,d.speed,d.semis,d.vinyl,function(p){var n=Date.now();if(n-t>150){t=n;postMessage({p:p});}});postMessage({out:r},r.map(function(c){return c.buffer;}));close();};})();'], { type: 'text/javascript' }));
+        w = new Worker(url);
+      } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { if (e.data.out) { URL.revokeObjectURL(url); resolve(e.data.out); } else if (prog) prog(e.data.p); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      w.postMessage({ chs: chs.map(function (c) { return c.slice(); }), sr: sr, speed: speed, semis: semis, vinyl: vinyl });
+    });
+  }
+  var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext, md = navigator.mediaDevices;
+  var SR = 44100, buf = null, name = 'voice', busy = false, ticket = 0, actx = null, src = null, dlUrl = null, cache = { key: '', buf: null };
+  var FX = [
+    ['none', '🎙️', 'Normal'], ['up', '⬆️', 'Pitch up'], ['down', '⬇️', 'Pitch down'], ['chipmunk', '🐿️', 'Chipmunk'], ['deep', '🐻', 'Deep voice'],
+    ['robot', '🤖', 'Robot'], ['echo', '🏔️', 'Echo'], ['reverb', '⛪', 'Reverb (hall)'], ['phone', '📞', 'Telephone']
+  ];
+  var fx = 'chipmunk';
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function clock(s) { s = Math.max(0, s); var m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('fill').style.width = Math.round(p * 100) + '%'; }
+  FX.forEach(function (f) {
+    var b = document.createElement('button'); b.type = 'button'; b.dataset.fx = f[0]; b.setAttribute('aria-pressed', f[0] === fx ? 'true' : 'false');
+    var i = document.createElement('span'); i.textContent = f[1]; i.setAttribute('aria-hidden', 'true'); b.appendChild(i); b.appendChild(document.createTextNode(f[2]));
+    b.addEventListener('click', function () { fx = f[0]; Array.prototype.forEach.call($('fx').children, function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); amtUi(); changed(); if (buf) play(); });
+    $('fx').appendChild(b);
+  });
+  function amt() { return +$('amt').value / 100; }
+  function semis() { var a = amt(); return fx === 'up' ? 1 + Math.round(a * 11) : fx === 'down' ? -(1 + Math.round(a * 11)) : fx === 'chipmunk' ? 5 + Math.round(a * 7) : fx === 'deep' ? -(3 + Math.round(a * 6)) : 0; }
+  function amtUi() {
+    var p = /up|down|chipmunk|deep/.test(fx), s = semis();
+    $('amtBox').hidden = fx === 'none';
+    $('amtLbl').textContent = p ? 'How much higher or lower' : fx === 'phone' ? 'Crackle' : 'Strength';
+    $('amtOut').textContent = p ? (s > 0 ? '+' : '−') + Math.abs(s) + ' semitones' : Math.round(amt() * 100) + '%';
+  }
+  $('amt').addEventListener('input', function () { amtUi(); changed(); });
+  $('amt').addEventListener('change', function () { if (buf) play(); });
+  $('fmt').addEventListener('change', function () { changed(); });
+  function changed() { $('dl').hidden = true; $('go').textContent = 'Save ' + $('fmt').value.toUpperCase(); stop(); }
+
+  // ---------- getting the sound ----------
+  function decode(data) {
+    return new Promise(function (res, rej) { var p = new OAC(2, 1, SR).decodeAudioData(data, res, rej); if (p && p.catch) p.catch(rej); });
+  }
+  function ready(b, label, size) {
+    if (!(b.duration > 0.2)) throw new Error('short');
+    buf = b; cache = { key: '', buf: null };
+    var el = $('info'); el.textContent = ''; var nb = document.createElement('b'); nb.textContent = label; el.appendChild(nb);
+    el.appendChild(document.createTextNode((size ? ' · ' + fmtBytes(size) : '') + ' · ' + clock(b.duration)));
+    $('work').hidden = false; $('go').disabled = false; amtUi(); changed();
+    say('', 'Tap an effect to hear it, then save.' + (b.duration > 600 ? ' This is a long recording, so effects take a little longer.' : ''));
+  }
+  function readFail(e, label) {
+    if (e && e.message === 'short') return say('bad', 'The sound is too short (under 0.2 seconds). Record or choose something longer.');
+    if (e instanceof RangeError || e && e.name === 'NotReadableError') return say('bad', 'Your device ran out of memory reading this file. Try a shorter file.');
+    say('bad', 'The sound in "' + label + '" could not be read. The file may be damaged, have no sound, or use a format this browser cannot decode. Try an MP3 or WAV.');
+  }
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy || recorder) { say('bad', 'Please wait until the current job or recording is finished.'); return; }
+    if (!/^(audio|video)\//.test(f.type) && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm|mkv|3gp|amr|aif|aiff)$/i.test(f.name)) return say('bad', '"' + f.name + '" is not an audio file. Choose a recording such as MP3, M4A or WAV.');
+    if (!f.size) return say('bad', '"' + f.name + '" is empty.');
+    if (f.size > 500 * 1048576) return say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 500 MB are too big for this tool. Cut it shorter first.');
+    if (!OAC) return say('bad', 'This browser is too old to change audio. Try a current Chrome, Edge, Firefox or Safari.');
+    stop(); var mine = ++ticket; busy = true; say('', 'Reading "' + f.name + '"…');
+    f.arrayBuffer().then(decode).then(function (b) {
+      busy = false; if (mine !== ticket) return;
+      name = f.name.replace(/\.[^.]+$/, '') || 'voice'; ready(b, f.name, f.size);
+    }).catch(function (e) { busy = false; if (mine === ticket) readFail(e, f.name); });
+  });
+
+  // ---------- recording ----------
+  var recorder = null, recStream = null, recT0 = 0, recTimer = 0, recAn = null, recCtx = null, chunks = [], MAXREC = 600;
+  function micWhy(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError' || n === 'PermissionDeniedError') return 'Microphone access was blocked. Click the lock or microphone icon next to the web address, allow the microphone, then press Record again. On a phone, also check that your browser may use the microphone in the phone settings. You can also open an audio file instead.';
+    if (n === 'NotFoundError' || n === 'DevicesNotFoundError') return 'No microphone was found. Plug one in, or open an audio file instead.';
+    if (n === 'NotReadableError' || n === 'TrackStartError' || n === 'AbortError') return 'The microphone is busy or could not start. Close other apps or tabs that use it, then try again.';
+    return 'The microphone could not start. You can open an audio file instead.';
+  }
+  var canRec = window.isSecureContext && md && md.getUserMedia && window.MediaRecorder;
+  if (!canRec) { $('rec').disabled = true; $('recTime').textContent = window.isSecureContext ? 'Recording is not supported in this browser. Open a file instead.' : 'Recording needs a secure (https) page.'; $('recTime').style.fontSize = '14px'; }
+  function recStop() {
+    if (!recorder) return;
+    try { if (recorder.state !== 'inactive') recorder.stop(); } catch (e) {}
+  }
+  $('rec').addEventListener('click', function () {
+    if (recorder) return recStop();
+    if (busy) return say('bad', 'Please wait until the current job is finished.');
+    stop(); $('rec').disabled = true; say('', 'Starting the microphone… If your browser asks, choose Allow.');
+    md.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } }).then(function (s) {
+      recStream = s; chunks = [];
+      var types = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/webm', 'audio/ogg;codecs=opus'], type = '';
+      for (var i = 0; i < types.length; i++) if (MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(types[i])) { type = types[i]; break; }
+      recorder = type ? new MediaRecorder(s, { mimeType: type }) : new MediaRecorder(s);
+      recorder.ondataavailable = function (e) { if (e.data && e.data.size) chunks.push(e.data); };
+      recorder.onstop = function () {
+        clearInterval(recTimer); s.getTracks().forEach(function (t) { t.stop(); });
+        if (recCtx) { try { recCtx.close(); } catch (e) {} recCtx = null; }
+        var dur = (performance.now() - recT0) / 1000, blob = new Blob(chunks, { type: recorder.mimeType || type || 'audio/webm' });
+        recorder = null; $('rec').textContent = '● Record again'; $('recLvl').style.width = '0';
+        if (!blob.size || dur < 0.3) { $('recTime').textContent = ''; return say('bad', 'Nothing was recorded. Press Record and speak for at least a second.'); }
+        $('recTime').textContent = 'Recorded ' + clock(dur);
+        busy = true; var mine = ++ticket;
+        blob.arrayBuffer().then(decode).then(function (b) { busy = false; if (mine !== ticket) return; name = 'my-voice'; ready(b, 'Your recording', 0); play(); },
+          function (e) { busy = false; if (mine === ticket) readFail(e, 'your recording'); });
+      };
+      recorder.start(1000); recT0 = performance.now();
+      $('rec').disabled = false; $('rec').textContent = '■ Stop recording';
+      say('', 'Recording… Speak now. Press Stop when you are done (up to 10 minutes).');
+      try { recCtx = new AC(); recAn = recCtx.createAnalyser(); recAn.fftSize = 1024; recCtx.createMediaStreamSource(s).connect(recAn); } catch (e) { recAn = null; }
+      var data = new Float32Array(1024);
+      recTimer = setInterval(function () {
+        var t = (performance.now() - recT0) / 1000; $('recTime').textContent = clock(t);
+        if (recAn) { recAn.getFloatTimeDomainData(data); var pk = 0; for (var i = 0; i < data.length; i++) pk = Math.max(pk, Math.abs(data[i])); $('recLvl').style.width = Math.min(100, pk * 140) + '%'; }
+        if (t >= MAXREC) { recStop(); }
+      }, 100);
+    }).catch(function (e) { $('rec').disabled = false; recorder = null; say('bad', micWhy(e)); });
+  });
+
+  // ---------- effects ----------
+  function impulse(ctx, secs, decay) {
+    var n = Math.round(ctx.sampleRate * secs), ir = ctx.createBuffer(2, n, ctx.sampleRate);
+    for (var c = 0; c < 2; c++) { var d = ir.getChannelData(c); for (var i = 0; i < n; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / n, decay); }
+    return ir;
+  }
+  // Apply the chosen effect. Resolves with an AudioBuffer.
+  function render(onPct) {
+    var key = fx + ':' + $('amt').value;
+    if (cache.key === key && cache.buf) return Promise.resolve(cache.buf);
+    var chs = []; for (var c = 0; c < Math.min(2, buf.numberOfChannels); c++) chs.push(buf.getChannelData(c));
+    var st = semis();
+    var step1 = st ? dspRun(chs, SR, 1, st, false, function (p) { onPct(p * 0.7); }) : Promise.resolve(chs.map(function (x) { return x; }));
+    return step1.then(function (data) {
+      onPct(0.75);
+      var a = amt(), tail = fx === 'echo' ? 1 + a * 3 : fx === 'reverb' ? 1 + a * 3 : 0.1, len = data[0].length + Math.round(tail * SR);
+      var ctx = new OAC(2, len, SR), b = ctx.createBuffer(data.length, data[0].length, SR);
+      data.forEach(function (d, k) { b.getChannelData(k).set(d); });
+      var s = ctx.createBufferSource(); s.buffer = b;
+      var outG = ctx.createGain(); outG.connect(ctx.destination);
+      if (fx === 'robot') {
+        // ring modulation with a low hum, plus a short metallic resonance
+        var ring = ctx.createGain(), osc = ctx.createOscillator(); ring.gain.value = 0; osc.frequency.value = 30 + a * 60; osc.connect(ring.gain); osc.start();
+        var dly = ctx.createDelay(0.05), fb = ctx.createGain(); dly.delayTime.value = 0.008; fb.gain.value = 0.35 + a * 0.3;
+        s.connect(ring); ring.connect(dly); dly.connect(fb); fb.connect(dly); dly.connect(outG); ring.connect(outG);
+        var dry = ctx.createGain(); dry.gain.value = 0.25 * (1 - a); s.connect(dry); dry.connect(outG);
+      } else if (fx === 'echo') {
+        var d2 = ctx.createDelay(2), f2 = ctx.createGain(), w2 = ctx.createGain(); d2.delayTime.value = 0.22 + a * 0.28; f2.gain.value = 0.3 + a * 0.35; w2.gain.value = 0.7;
+        s.connect(outG); s.connect(d2); d2.connect(f2); f2.connect(d2); d2.connect(w2); w2.connect(outG);
+      } else if (fx === 'reverb') {
+        var conv = ctx.createConvolver(), wet = ctx.createGain(), dry2 = ctx.createGain();
+        conv.buffer = impulse(ctx, 1.2 + a * 2.8, 2.5); wet.gain.value = 0.25 + a * 0.5; dry2.gain.value = 1 - a * 0.4;
+        s.connect(dry2); dry2.connect(outG); s.connect(conv); conv.connect(wet); wet.connect(outG);
+      } else if (fx === 'phone') {
+        var hp = ctx.createBiquadFilter(), lp = ctx.createBiquadFilter(), pk = ctx.createBiquadFilter(), sh = ctx.createWaveShaper(), mono = ctx.createGain();
+        hp.type = 'highpass'; hp.frequency.value = 400; hp.Q.value = 0.9; lp.type = 'lowpass'; lp.frequency.value = 3200; lp.Q.value = 0.9;
+        pk.type = 'peaking'; pk.frequency.value = 1800; pk.gain.value = 6; pk.Q.value = 1;
+        var curve = new Float32Array(1024), k = 1 + a * 12; for (var i = 0; i < 1024; i++) { var x = i / 511.5 - 1; curve[i] = Math.tanh(k * x) / Math.tanh(k); }
+        sh.curve = curve; mono.channelCount = 1; mono.channelCountMode = 'explicit'; mono.channelInterpretation = 'speakers';
+        s.connect(mono); mono.connect(hp); hp.connect(lp); lp.connect(pk); pk.connect(sh); sh.connect(outG); outG.gain.value = 0.8;
+      } else s.connect(outG);
+      s.start();
+      var p = ctx.startRendering();
+      return p && p.then ? p : new Promise(function (r) { ctx.oncomplete = function (e) { r(e.renderedBuffer); }; });
+    }).then(function (out) {
+      // trim silence left at the end and keep the level safe
+      var peak = 0, last = 0, n = out.length;
+      for (var c2 = 0; c2 < out.numberOfChannels; c2++) { var d = out.getChannelData(c2); for (var i2 = 0; i2 < n; i2++) { var v = d[i2] < 0 ? -d[i2] : d[i2]; if (v > peak) peak = v; if (v > 0.0005 && i2 > last) last = i2; } }
+      var keep = Math.max(Math.min(n, buf.length), Math.min(n, last + Math.round(0.05 * SR))), g = peak > 0.98 ? 0.98 / peak : 1;
+      var fin = new AudioBuffer({ length: keep, numberOfChannels: out.numberOfChannels, sampleRate: SR });
+      for (c2 = 0; c2 < out.numberOfChannels; c2++) { var o2 = fin.getChannelData(c2), s2 = out.getChannelData(c2); for (i2 = 0; i2 < keep; i2++) o2[i2] = s2[i2] * g; }
+      cache = { key: key, buf: fin }; onPct(1);
+      return fin;
+    });
+  }
+
+  // ---------- listening ----------
+  function stop() { if (src) { try { src.onended = null; src.stop(); } catch (e) {} src = null; } $('hear').textContent = '▶ Listen'; $('orig').textContent = '▶ Original'; }
+  function playBuf(b, btn, label) {
+    if (!AC) return say('bad', 'This browser cannot play sound here. You can still save the file.');
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    stop(); src = actx.createBufferSource(); src.buffer = b; src.connect(actx.destination); src.start();
+    src.onended = function () { src = null; stop(); };
+    btn.textContent = '■ Stop'; say('', label);
+  }
+  var playTicket = 0;
+  function play() {
+    if (!buf || busy) return;
+    var mine = ++playTicket, label = FX.filter(function (f) { return f[0] === fx; })[0][2];
+    if (cache.key !== fx + ':' + $('amt').value) say('', 'Applying "' + label + '"…');
+    busy = true;
+    render(function () {}).then(function (b) { busy = false; if (mine === playTicket) playBuf(b, $('hear'), 'Playing with "' + label + '".'); }, function () { busy = false; say('bad', 'The effect could not be applied. Your device may be low on memory.'); });
+  }
+  $('hear').addEventListener('click', function () { if (src && $('hear').textContent.indexOf('Stop') >= 0) return stop(); play(); });
+  $('orig').addEventListener('click', function () { if (!buf) return; if (src && $('orig').textContent.indexOf('Stop') >= 0) return stop(); playBuf(buf, $('orig'), 'Playing the original sound.'); });
+
+  // ---------- saving ----------
+  $('go').addEventListener('click', function () {
+    if (!buf || busy) return;
+    stop(); busy = true; $('go').disabled = true; $('dl').hidden = true; $('result').hidden = true; bar(0);
+    var fmt = $('fmt').value, label = FX.filter(function (f) { return f[0] === fx; })[0][2];
+    say('', 'Applying "' + label + '"…');
+    render(function (p) { bar(p * 0.6); }).then(function (b) {
+      var chs = []; for (var c = 0; c < b.numberOfChannels; c++) chs.push(b.getChannelData(c));
+      if (fmt === 'wav') return wavBlob(chs, SR);
+      say('', 'Saving as MP3…');
+      return encodeMp3(chs, SR, 160, function (p) { bar(0.6 + p * 0.4); });
+    }).then(function (blob) {
+      if (dlUrl) URL.revokeObjectURL(dlUrl);
+      dlUrl = URL.createObjectURL(blob);
+      $('dl').href = dlUrl; $('dl').download = name + '-' + fx + '.' + fmt; $('dl').textContent = 'Download ' + fmt.toUpperCase(); $('dl').hidden = false;
+      $('result').src = dlUrl; $('result').hidden = false; bar(1);
+      say('ok', 'Your "' + label + '" voice is ready (' + fmtBytes(blob.size) + ').');
+    }).catch(function (e) { bar(null); say('bad', e instanceof RangeError ? 'Your device ran out of memory. Try a shorter recording.' : 'Something went wrong while saving. Please try again.'); })
+      .then(function () { busy = false; $('go').disabled = !buf; });
+  });
+  amtUi();
+})();
+</script>

@@ -1,0 +1,284 @@
+<style>
+.cp-two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cp-two .drop { margin-bottom: 0; padding: 22px 12px; overflow-wrap: anywhere; }
+.cp-two .drop small { display: block; margin-top: 4px; font-size: 13px; }
+.cp-tag { display: inline-block; font-size: 12px; font-weight: 700; padding: 1px 8px; border-radius: 999px; margin-bottom: 6px; }
+.cp-a { background: #fde2e2; color: #b42318; } .cp-b { background: #dbeafe; color: #1d4ed8; }
+@media (max-width: 560px) { .cp-two { grid-template-columns: 1fr; } }
+.cp-res { margin-top: 16px; }
+.cp-pages { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+.cp-pages button { font: inherit; font-size: 13px; min-width: 40px; height: 34px; padding: 0 8px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.cp-pages button.chg { border-color: #e5484d; color: #b42318; font-weight: 700; }
+.cp-pages button.only { border-style: dashed; }
+.cp-pages button[aria-current="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.cp-modes { margin: 4px 0 12px; }
+.cp-text { border: 1px solid var(--line); border-radius: 10px; background: var(--bg); padding: 12px 14px; line-height: 1.7; font-size: 15px; white-space: pre-wrap; overflow-wrap: anywhere; max-height: 70vh; overflow: auto; }
+.cp-text del { background: #fde2e2; color: #b42318; text-decoration: line-through; border-radius: 3px; padding: 0 2px; }
+.cp-text ins { background: #dcfce7; color: #166534; text-decoration: none; border-radius: 3px; padding: 0 2px; }
+[data-theme="dark"] .cp-text del { background: #4c1d1d; color: #fecaca; } [data-theme="dark"] .cp-text ins { background: #14391f; color: #bbf7d0; }
+.cp-legend { font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+.cp-legend i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 4px; }
+.cp-vis { display: grid; gap: 10px; }
+.cp-vis.two { grid-template-columns: 1fr 1fr; }
+.cp-vis figure { margin: 0; }
+.cp-vis figcaption { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.cp-vis canvas { display: block; width: 100%; height: auto; border: 1px solid var(--line); background: #fff; }
+</style>
+<div class="cp-two">
+  <div class="drop" id="cpDropA" tabindex="0" role="button"><span class="cp-tag cp-a">First (old)</span><b id="cpNameA">Choose the first PDF</b><small id="cpInfoA">Click or drop it here</small></div>
+  <div class="drop" id="cpDropB" tabindex="0" role="button"><span class="cp-tag cp-b">Second (new)</span><b id="cpNameB">Choose the second PDF</b><small id="cpInfoB">Click or drop it here</small></div>
+</div>
+<input type="file" id="cpFileA" accept="application/pdf,.pdf" hidden>
+<input type="file" id="cpFileB" accept="application/pdf,.pdf" hidden>
+<div class="checks" style="margin-top:14px">
+  <label><input type="checkbox" id="cpCase"> Ignore capital letters</label>
+  <label><input type="checkbox" id="cpPunct"> Ignore punctuation</label>
+</div>
+<div class="btns"><button class="btn" id="go" disabled>Compare PDFs</button><button class="btn ghost" id="cpSwap" type="button" disabled>Swap first and second</button></div>
+<p class="msg" id="msg"></p>
+<div class="cp-res" id="cpRes" hidden>
+  <div class="stats" id="cpStats"></div>
+  <div class="cp-pages" id="cpPages" role="group" aria-label="Pages"></div>
+  <div class="seg cp-modes" role="group" aria-label="How to show the differences">
+    <button type="button" id="cpMText" aria-pressed="true">Text changes</button>
+    <button type="button" id="cpMOver" aria-pressed="false">Overlay</button>
+    <button type="button" id="cpMSide" aria-pressed="false">Side by side</button>
+  </div>
+  <div id="cpView"></div>
+</div>
+<script src="../assets/vendor/pdf.min.js"></script>
+<script>
+(function () {
+  var files = { A: null, B: null }, docs = { A: null, B: null }, texts = { A: [], B: [] }, result = [], cur = 0, mode = 'text', busy = false, job = 0;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+
+  function pick(which, f) {
+    if (busy) return say('bad', 'Please wait until the comparison is finished.');
+    if (!f) return;
+    if (!f.size) return say('bad', '"' + f.name + '" is empty.');
+    if (!(f.type === 'application/pdf' || /\.pdf$/i.test(f.name))) return say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
+    say('', 'Opening ' + f.name + '…');
+    f.arrayBuffer().then(function (b) { return pdfjsLib.getDocument({ data: b }).promise; }).then(function (d) {
+      if (docs[which]) docs[which].destroy();
+      files[which] = f; docs[which] = d; texts[which] = [];
+      $('cpName' + which).textContent = f.name; $('cpInfo' + which).textContent = d.numPages + (d.numPages === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(f.size);
+      $('cpRes').hidden = true; refresh();
+      say('', files.A && files.B ? 'Press Compare PDFs.' : 'Now choose the ' + (files.A ? 'second' : 'first') + ' PDF.');
+    }).catch(function (e) { say('bad', e && e.name === 'PasswordException' ? '"' + f.name + '" is password protected. Remove the password first with the free Unlock PDF tool on this site.' : '"' + f.name + '" could not be read as a PDF.'); });
+  }
+  ['A', 'B'].forEach(function (w) {
+    var drop = $('cpDrop' + w), input = $('cpFile' + w);
+    drop.addEventListener('click', function () { input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+    input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; pick(w, f); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) {
+      var l = e.dataTransfer.files;
+      if (l.length >= 2) { pick('A', l[0]); pick('B', l[1]); } else pick(w, l[0]);
+    });
+  });
+  function refresh() { $('go').disabled = busy || !(docs.A && docs.B); $('cpSwap').disabled = busy || !(docs.A || docs.B); }
+  $('cpSwap').addEventListener('click', function () {
+    var f = files.A; files.A = files.B; files.B = f; var d = docs.A; docs.A = docs.B; docs.B = d; var t = texts.A; texts.A = texts.B; texts.B = t;
+    ['A', 'B'].forEach(function (w) { $('cpName' + w).textContent = files[w] ? files[w].name : 'Choose the ' + (w === 'A' ? 'first' : 'second') + ' PDF'; $('cpInfo' + w).textContent = docs[w] ? docs[w].numPages + (docs[w].numPages === 1 ? ' page' : ' pages') + ' · ' + fmtBytes(files[w].size) : 'Click or drop it here'; });
+    if (!$('cpRes').hidden) $('go').click();
+  });
+  ['cpCase', 'cpPunct'].forEach(function (id) { $(id).addEventListener('change', function () { if (!$('cpRes').hidden && !busy) $('go').click(); }); });
+
+  // ---------- text ----------
+  function pageWords(d, i) {
+    return d.getPage(i).then(function (page) {
+      return page.getTextContent().then(function (tc) {
+        var s = '', last = null;
+        tc.items.forEach(function (it) {
+          if (!('str' in it)) return;
+          if (last && !/\s$/.test(s)) { var same = Math.abs(it.transform[5] - last.transform[5]) < Math.abs(last.transform[3] || 10) * .5, gap = it.transform[4] - (last.transform[4] + last.width); s += !same ? '\n' : gap > Math.abs(last.transform[0] || 10) * .15 ? ' ' : ''; }
+          s += it.str; if (it.hasEOL) s += '\n'; last = it;
+        });
+        page.cleanup();
+        return s.match(/\S+|\n/g) || [];
+      });
+    });
+  }
+  function norm(w) {
+    if ($('cpCase').checked) w = w.toLocaleLowerCase();
+    if ($('cpPunct').checked) w = w.replace(/[\p{P}\p{S}]/gu, '');
+    return w;
+  }
+  // Myers' diff on two word lists. Returns [{ t: '=', '-', '+', w }] or null when the texts are too different.
+  function diff(a, b) {
+    var A = a.map(norm), B = b.map(norm), n = A.length, m = B.length, max = n + m, off = max + 1, v = new Int32Array(2 * max + 3), trace = [], limit = Math.min(max, 4000);
+    var pre = 0; while (pre < n && pre < m && A[pre] === B[pre]) pre++;
+    if (pre === n && pre === m) return a.map(function (w) { return { t: '=', w: w }; });
+    for (var D = 0; D <= limit; D++) {
+      trace.push(v.slice());
+      for (var k = -D; k <= D; k += 2) {
+        var x = (k === -D || (k !== D && v[off + k - 1] < v[off + k + 1])) ? v[off + k + 1] : v[off + k - 1] + 1, y = x - k;
+        while (x < n && y < m && A[x] === B[y]) { x++; y++; }
+        v[off + k] = x;
+        if (x >= n && y >= m) { // walk back
+          var out = [], cx = n, cy = m;
+          for (var d = D; d > 0; d--) {
+            var pv = trace[d], kk = cx - cy, down = kk === -d || (kk !== d && pv[off + kk - 1] < pv[off + kk + 1]), pk = down ? kk + 1 : kk - 1, px = pv[off + pk], py = px - pk;
+            while (cx > px && cy > py) { out.push({ t: '=', w: a[cx - 1] }); cx--; cy--; }
+            if (down) out.push({ t: '+', w: b[cy - 1] }); else out.push({ t: '-', w: a[cx - 1] });
+            cx = px; cy = py;
+          }
+          while (cx > 0 && cy > 0) { out.push({ t: '=', w: a[cx - 1] }); cx--; cy--; }
+          return out.reverse();
+        }
+      }
+      if (trace.length * v.length > 6e7) break; // too much memory: give up
+    }
+    return null;
+  }
+
+  $('go').addEventListener('click', async function () {
+    if (busy || !docs.A || !docs.B) return;
+    busy = true; refresh(); var me = ++job;
+    try {
+      var na = docs.A.numPages, nb = docs.B.numPages, n = Math.max(na, nb);
+      result = [];
+      var tot = { pages: 0, add: 0, del: 0 };
+      for (var i = 1; i <= n; i++) {
+        if (n > 10 && i % 5 === 1) say('', 'Reading page ' + i + ' of ' + n + '…');
+        var a = i <= na ? (texts.A[i] || (texts.A[i] = await pageWords(docs.A, i))) : null, b = i <= nb ? (texts.B[i] || (texts.B[i] = await pageWords(docs.B, i))) : null;
+        var r = { i: i, inA: !!a, inB: !!b }, ops = diff(a || [], b || []);
+        if (!ops) ops = (a || []).map(function (w) { return { t: '-', w: w }; }).concat((b || []).map(function (w) { return { t: '+', w: w }; }));
+        r.ops = ops; r.add = 0; r.del = 0;
+        ops.forEach(function (o) { if (o.w === '\n') return; if (o.t === '+') r.add++; else if (o.t === '-') r.del++; });
+        r.changed = r.add + r.del > 0 || !a || !b;
+        r.empty = (!a || !a.length) && (!b || !b.length);
+        if (r.changed) tot.pages++; tot.add += r.add; tot.del += r.del;
+        result.push(r);
+      }
+      if (me !== job) return;
+      var st = $('cpStats'); st.innerHTML = '';
+      [['Pages (first / second)', na + ' / ' + nb], ['Pages with changes', tot.pages], ['Words removed', fmtNum(tot.del, 0)], ['Words added', fmtNum(tot.add, 0)]].forEach(function (x) {
+        var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<span></span><b></b>'; d.firstChild.textContent = x[0]; d.lastChild.textContent = x[1]; st.appendChild(d);
+      });
+      var noText = result.every(function (r) { return r.empty; });
+      say(tot.pages ? '' : 'ok', noText ? 'These PDFs have no text (they may be scans), so only the pictures can be compared: use Overlay or Side by side.' : tot.pages ? 'Found text changes on ' + tot.pages + (tot.pages === 1 ? ' page' : ' pages') + '. Pages marked in red have changes.' : 'The text of both PDFs is the same. Use Overlay to check pictures and layout.');
+      var first = result.findIndex(function (r) { return r.changed; });
+      $('cpRes').hidden = false; drawPages(); show(first < 0 ? 0 : first, noText && mode === 'text' ? 'over' : null);
+    } catch (e) { say('bad', 'These PDFs could not be compared. One of them may be damaged.'); }
+    busy = false; refresh();
+  });
+
+  function drawPages() {
+    var box = $('cpPages'); box.innerHTML = '';
+    result.forEach(function (r, k) {
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = r.i;
+      if (r.changed) b.className = 'chg'; if (!r.inA || !r.inB) b.className += ' only';
+      b.title = !r.inA ? 'Only in the second PDF' : !r.inB ? 'Only in the first PDF' : r.changed ? r.del + ' removed, ' + r.add + ' added' : 'No text changes';
+      b.setAttribute('aria-label', 'Page ' + r.i + ': ' + b.title);
+      b.addEventListener('click', function () { show(k); });
+      box.appendChild(b);
+    });
+  }
+  function setMode(m) { mode = m; [['cpMText', 'text'], ['cpMOver', 'over'], ['cpMSide', 'side']].forEach(function (x) { $(x[0]).setAttribute('aria-pressed', String(mode === x[1])); }); }
+  $('cpMText').addEventListener('click', function () { setMode('text'); show(cur); });
+  $('cpMOver').addEventListener('click', function () { setMode('over'); show(cur); });
+  $('cpMSide').addEventListener('click', function () { setMode('side'); show(cur); });
+
+  var vjob = 0;
+  function show(k, m) {
+    if (m) setMode(m);
+    cur = k; var r = result[k], view = $('cpView'), me = ++vjob;
+    Array.prototype.forEach.call($('cpPages').children, function (b, z) { b.setAttribute('aria-current', String(z === k)); });
+    view.innerHTML = '';
+    if (!r) return;
+    if (mode === 'text') {
+      var lg = document.createElement('p'); lg.className = 'cp-legend';
+      lg.innerHTML = '<i style="background:#fde2e2;border:1px solid #b42318"></i>Removed (only in the first) &nbsp; <i style="background:#dcfce7;border:1px solid #166534"></i>Added (only in the second)';
+      view.appendChild(lg);
+      var box = document.createElement('div'); box.className = 'cp-text'; box.setAttribute('translate', 'no');
+      if (!r.inA) box.appendChild(document.createTextNode('This page is only in the second PDF.\n\n'));
+      if (!r.inB) box.appendChild(document.createTextNode('This page is only in the first PDF.\n\n'));
+      if (r.empty) box.appendChild(document.createTextNode('No text on this page. Use Overlay or Side by side to compare it as a picture.'));
+      var run = null;
+      r.ops.forEach(function (o, z) {
+        var tag = o.t === '+' ? 'ins' : o.t === '-' ? 'del' : null;
+        if (o.w === '\n') { if (o.t !== '+' || !r.inA) { run = null; box.appendChild(document.createTextNode('\n')); } return; }
+        if (!tag) { run = null; box.appendChild(document.createTextNode(o.w + ' ')); return; }
+        if (!run || run.tagName.toLowerCase() !== tag) { run = document.createElement(tag); box.appendChild(run); }
+        run.textContent += (run.textContent ? ' ' : '') + o.w;
+        var nx = r.ops[z + 1]; if (!nx || nx.t !== o.t || nx.w === '\n') { box.appendChild(document.createTextNode(' ')); }
+      });
+      view.appendChild(box);
+      return;
+    }
+    var note = document.createElement('p'); note.className = 'cp-legend'; note.textContent = 'Drawing page ' + r.i + '…'; view.appendChild(note);
+    var w = Math.min(1400, Math.max(300, view.clientWidth * Math.min(2, window.devicePixelRatio || 1)));
+    Promise.all([r.inA ? render(docs.A, r.i, w) : null, r.inB ? render(docs.B, r.i, w) : null]).then(function (c) {
+      if (me !== vjob) return;
+      view.innerHTML = '';
+      var a = c[0], b = c[1], W = Math.max(a ? a.width : 0, b ? b.width : 0), H = Math.max(a ? a.height : 0, b ? b.height : 0);
+      var ga = grab(a, W, H), gb = grab(b, W, H), da = ga.getImageData(0, 0, W, H), db = gb.getImageData(0, 0, W, H), A = da.data, B = db.data;
+      var mask = new Uint8Array(W * H), diffN = 0;
+      for (var p = 0, q = 0; p < A.length; p += 4, q++) {
+        var la = A[p] * .3 + A[p + 1] * .59 + A[p + 2] * .11, lb = B[p] * .3 + B[p + 1] * .59 + B[p + 2] * .11;
+        if (Math.abs(la - lb) > 48 || Math.abs(A[p] - B[p]) + Math.abs(A[p + 1] - B[p + 1]) + Math.abs(A[p + 2] - B[p + 2]) > 120) { mask[q] = la < lb ? 1 : 2; diffN++; }
+      }
+      var pct = diffN / (W * H) * 100, lg2 = document.createElement('p'); lg2.className = 'cp-legend';
+      var head = (!r.inA ? 'Only in the second PDF. ' : !r.inB ? 'Only in the first PDF. ' : '') + (diffN ? (pct < .01 ? 'Less than 0.01' : pct.toFixed(2)) + '% of the page looks different.' : 'The two pages look the same.');
+      if (mode === 'over') {
+        lg2.innerHTML = '<i style="background:#e5484d"></i>Only in the first &nbsp; <i style="background:#2563eb"></i>Only in the second &nbsp; <i style="background:#bbb"></i>Same';
+        lg2.insertBefore(document.createTextNode(head + ' '), lg2.firstChild);
+        var out = document.createElement('canvas'); out.width = W; out.height = H;
+        var go = out.getContext('2d'), od = go.createImageData(W, H), O = od.data;
+        for (p = 0, q = 0; p < O.length; p += 4, q++) {
+          if (mask[q] === 1) { O[p] = 229; O[p + 1] = 72; O[p + 2] = 77; }
+          else if (mask[q] === 2) { O[p] = 37; O[p + 1] = 99; O[p + 2] = 235; }
+          else { var l = (A[p] * .3 + A[p + 1] * .59 + A[p + 2] * .11) * .35 + 255 * .65; O[p] = O[p + 1] = O[p + 2] = l; }
+          O[p + 3] = 255;
+        }
+        go.putImageData(od, 0, 0);
+        view.appendChild(lg2);
+        var wrap = document.createElement('div'); wrap.className = 'cp-vis'; var fig = document.createElement('figure'); fig.appendChild(out); wrap.appendChild(fig); view.appendChild(wrap);
+      } else {
+        lg2.textContent = head + (diffN ? ' Changed areas have red boxes.' : '');
+        view.appendChild(lg2);
+        var boxes = regions(mask, W, H), wrap2 = document.createElement('div'); wrap2.className = 'cp-vis two';
+        [[ga, 'First: ' + files.A.name, a], [gb, 'Second: ' + files.B.name, b]].forEach(function (x) {
+          var cv = x[0].canvas, fg = document.createElement('figure'), cap = document.createElement('figcaption');
+          cap.textContent = x[1];
+          if (!x[2]) { x[0].fillStyle = '#f3f4f6'; x[0].fillRect(0, 0, W, H); x[0].fillStyle = '#6b7280'; x[0].font = Math.round(W / 22) + 'px sans-serif'; x[0].fillText('No page ' + r.i, W * .1, H * .2); }
+          else { x[0].strokeStyle = '#e5484d'; x[0].lineWidth = Math.max(2, W / 300); boxes.forEach(function (bx) { x[0].strokeRect(bx[0], bx[1], bx[2], bx[3]); }); }
+          fg.appendChild(cap); fg.appendChild(cv); wrap2.appendChild(fg);
+        });
+        view.appendChild(wrap2);
+      }
+    }).catch(function () { if (me === vjob) view.textContent = 'Page ' + r.i + ' could not be drawn.'; });
+  }
+  function render(d, i, w) {
+    return d.getPage(i).then(function (page) {
+      var vp1 = page.getViewport({ scale: 1 }), vp = page.getViewport({ scale: w / vp1.width }), c = document.createElement('canvas');
+      c.width = Math.ceil(vp.width); c.height = Math.ceil(vp.height);
+      var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height);
+      return page.render({ canvasContext: g, viewport: vp }).promise.then(function () { page.cleanup(); return c; });
+    });
+  }
+  function grab(c, W, H) { var o = document.createElement('canvas'); o.width = W; o.height = H; var g = o.getContext('2d', { willReadFrequently: true }); g.fillStyle = '#fff'; g.fillRect(0, 0, W, H); if (c) g.drawImage(c, 0, 0); return g; }
+  // group changed pixels into boxes on a coarse grid
+  function regions(mask, W, H) {
+    var S = Math.max(8, Math.round(W / 90)), gw = Math.ceil(W / S), gh = Math.ceil(H / S), cell = new Uint8Array(gw * gh), x, y;
+    for (y = 0; y < H; y++) for (x = 0; x < W; x++) if (mask[y * W + x]) cell[Math.floor(y / S) * gw + Math.floor(x / S)]++;
+    var seen = new Uint8Array(gw * gh), out = [];
+    for (var c0 = 0; c0 < cell.length; c0++) {
+      if (cell[c0] < 2 || seen[c0]) continue;
+      var stack = [c0], x0 = 1e9, y0 = 1e9, x1 = -1, y1 = -1; seen[c0] = 1;
+      while (stack.length) {
+        var c = stack.pop(), cx = c % gw, cy = (c - cx) / gw;
+        x0 = Math.min(x0, cx); x1 = Math.max(x1, cx); y0 = Math.min(y0, cy); y1 = Math.max(y1, cy);
+        for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var nx = cx + dx, ny = cy + dy, nc = ny * gw + nx; if (nx >= 0 && ny >= 0 && nx < gw && ny < gh && !seen[nc] && cell[nc] >= 2) { seen[nc] = 1; stack.push(nc); } }
+      }
+      out.push([x0 * S - 3, y0 * S - 3, (x1 - x0 + 1) * S + 6, (y1 - y0 + 1) * S + 6]);
+    }
+    return out;
+  }
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (!$('cpRes').hidden && mode !== 'text') show(cur); }, 300); });
+})();
+</script>

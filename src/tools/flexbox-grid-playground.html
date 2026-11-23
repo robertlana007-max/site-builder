@@ -1,0 +1,118 @@
+<style>
+.fg-tabs { display: inline-flex; padding: 3px; gap: 3px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; margin-bottom: 14px; }
+.fg-tabs button { font: 700 14px/1 inherit; font-family: inherit; height: 38px; padding: 0 18px; border: 0; border-radius: 8px; background: none; color: var(--muted); cursor: pointer; }
+.fg-tabs button[aria-selected="true"] { background: var(--accent); color: var(--on-accent); }
+.fg-stage { border: 2px dashed var(--line); border-radius: 12px; padding: 10px; min-height: 260px; background: var(--bg); overflow: auto; resize: both; margin-bottom: 6px; max-width: 100%; }
+.fg-item { background: hsl(var(--h) 75% 60%); color: #fff; font: 700 15px/1 system-ui, sans-serif; border-radius: 8px; padding: 14px; min-width: 40px; min-height: 40px; display: flex; align-items: center; justify-content: center; cursor: pointer; border: 3px solid transparent; text-shadow: 0 1px 2px rgba(0, 0, 0, .3); }
+.fg-item.on { border-color: var(--ink); }
+.fg-item small { display: block; font-weight: 500; font-size: 11px; opacity: .9; margin-top: 3px; }
+.fg-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 14px; margin-bottom: 12px; }
+.fg-fields label { font-size: 13px; margin-bottom: 4px; font-family: var(--mono); }
+.fg-fields select, .fg-fields input { min-height: 40px; padding: 6px 10px; }
+.fg-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
+.fg-box h3 { margin: 0 0 10px !important; font-size: 15px; }
+.fg-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; max-height: 360px; overflow: auto; }
+</style>
+<div class="fg-tabs" role="tablist"><button type="button" role="tab" id="tFlex" aria-selected="true">Flexbox</button><button type="button" role="tab" id="tGrid" aria-selected="false">Grid</button></div>
+<div class="fg-stage" id="stage" aria-label="Live preview"></div>
+<p class="msg" style="margin:0 0 12px;font-size:13px">Click a box to change its own settings. Drag the corner of the dashed area to resize it.</p>
+<div class="btns" style="margin:0 0 14px"><button class="btn ghost" id="addI" type="button">Add box</button><button class="btn ghost" id="delI" type="button">Remove box</button><button class="btn ghost" id="resetI" type="button">Reset</button></div>
+<div class="fg-box"><h3>Container</h3><div class="fg-fields" id="cont"></div></div>
+<div class="fg-box"><h3 id="itemH">Selected box</h3><div class="fg-fields" id="item"></div></div>
+<label>CSS code</label>
+<pre class="fg-code" id="code"></pre>
+<div class="btns"><button class="btn" id="cp" type="button">Copy CSS</button><button class="btn ghost" id="cpH" type="button">Copy HTML</button></div>
+<script>
+(function () {
+  var FLEX = [
+    ['flex-direction', ['row', 'row-reverse', 'column', 'column-reverse']], ['flex-wrap', ['nowrap', 'wrap', 'wrap-reverse']],
+    ['justify-content', ['flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'space-evenly']], ['align-items', ['stretch', 'flex-start', 'center', 'flex-end', 'baseline']],
+    ['align-content', ['normal', 'flex-start', 'center', 'flex-end', 'space-between', 'space-around', 'stretch']], ['gap', 'text', '10px']
+  ];
+  var GRID = [
+    ['grid-template-columns', 'text', 'repeat(3, 1fr)', ['repeat(3, 1fr)', '1fr 2fr', '200px 1fr', 'repeat(auto-fill, minmax(100px, 1fr))', '1fr 1fr 1fr 1fr']], ['grid-template-rows', 'text', 'auto', ['auto', '100px 100px', 'repeat(2, 1fr)', '80px auto 80px']],
+    ['gap', 'text', '10px'], ['justify-items', ['stretch', 'start', 'center', 'end']], ['align-items', ['stretch', 'start', 'center', 'end']],
+    ['justify-content', ['normal', 'start', 'center', 'end', 'space-between', 'space-around', 'space-evenly']], ['align-content', ['normal', 'start', 'center', 'end', 'space-between', 'space-around']], ['grid-auto-flow', ['row', 'column', 'row dense', 'column dense']]
+  ];
+  var FITEM = [['flex-grow', 'number', '0'], ['flex-shrink', 'number', '1'], ['flex-basis', 'text', 'auto'], ['align-self', ['auto', 'flex-start', 'center', 'flex-end', 'stretch', 'baseline']], ['order', 'number', '0']];
+  var GITEM = [['grid-column', 'text', 'auto', ['auto', 'span 2', 'span 3', '1 / -1', '2 / 4']], ['grid-row', 'text', 'auto', ['auto', 'span 2', '1 / 3']], ['justify-self', ['auto', 'start', 'center', 'end', 'stretch']], ['align-self', ['auto', 'start', 'center', 'end', 'stretch']]];
+  var mode = 'flex', st, sel = 0;
+  function fresh() {
+    var s = { flex: {}, grid: {}, items: [] };
+    FLEX.forEach(function (p) { s.flex[p[0]] = p[1] === 'text' ? p[2] : p[1][0]; });
+    GRID.forEach(function (p) { s.grid[p[0]] = p[1] === 'text' ? p[2] : p[1][0]; });
+    for (var i = 0; i < 5; i++) s.items.push(newItem());
+    return s;
+  }
+  function newItem() { var o = { f: {}, g: {} }; FITEM.forEach(function (p) { o.f[p[0]] = Array.isArray(p[1]) ? p[1][0] : p[2]; }); GITEM.forEach(function (p) { o.g[p[0]] = Array.isArray(p[1]) ? p[1][0] : p[2]; }); return o; }
+  st = fresh();
+  function field(p, val, onset, idp) {
+    var d = document.createElement('div'), id = idp + p[0], html = '<label for="' + id + '">' + p[0] + '</label>';
+    if (Array.isArray(p[1])) html += '<select id="' + id + '" data-nomemo>' + p[1].map(function (o) { return '<option' + (o === val ? ' selected' : '') + '>' + o + '</option>'; }).join('') + '</select>';
+    else html += '<input id="' + id + '" data-nomemo type="' + (p[1] === 'number' ? 'number' : 'text') + '" value="' + String(val).replace(/"/g, '&quot;') + '"' + (p[1] === 'number' ? ' step="1"' : ' spellcheck="false" autocomplete="off" autocapitalize="off"') + (p[3] ? ' list="' + id + 'L"' : '') + '>' + (p[3] ? '<datalist id="' + id + 'L">' + p[3].map(function (o) { return '<option value="' + o + '">'; }).join('') + '</datalist>' : '');
+    d.innerHTML = html;
+    var el = d.querySelector('select,input');
+    el.addEventListener('input', function () { onset(el.value); });
+    el.addEventListener('change', function () { onset(el.value); });
+    return d;
+  }
+  function controls() {
+    var c = $('cont'); c.innerHTML = '';
+    var props = mode === 'flex' ? FLEX : GRID, obj = mode === 'flex' ? st.flex : st.grid;
+    props.forEach(function (p) { c.appendChild(field(p, obj[p[0]], function (v) { obj[p[0]] = v; paint(); }, 'c-')); });
+    itemControls();
+  }
+  function itemControls() {
+    var c = $('item'); c.innerHTML = '';
+    if (!st.items.length) { $('itemH').textContent = 'Selected box'; c.innerHTML = '<p class="msg" style="margin:0">Add a box to edit it.</p>'; return; }
+    if (sel >= st.items.length) sel = st.items.length - 1;
+    $('itemH').textContent = 'Box ' + (sel + 1);
+    var it = st.items[sel], props = mode === 'flex' ? FITEM : GITEM, obj = mode === 'flex' ? it.f : it.g;
+    props.forEach(function (p) { c.appendChild(field(p, obj[p[0]], function (v) { obj[p[0]] = v; paint(); }, 'i-')); });
+  }
+  function safe(v) { return String(v).replace(/[;{}<>]/g, ''); }
+  function itemCss(it) {
+    var props = mode === 'flex' ? FITEM : GITEM, obj = mode === 'flex' ? it.f : it.g, out = [];
+    props.forEach(function (p) { var def = Array.isArray(p[1]) ? p[1][0] : p[2]; if (String(obj[p[0]]).trim() !== def && String(obj[p[0]]).trim() !== '') out.push([p[0], safe(obj[p[0]]).trim()]); });
+    return out;
+  }
+  function paint() {
+    var stg = $('stage'), obj = mode === 'flex' ? st.flex : st.grid, props = mode === 'flex' ? FLEX : GRID;
+    var keepW = stg.style.width, keepH = stg.style.height;
+    stg.removeAttribute('style'); stg.style.width = keepW; stg.style.height = keepH; stg.style.display = mode;
+    props.forEach(function (p) { stg.style.setProperty(p[0], safe(obj[p[0]])); });
+    stg.innerHTML = '';
+    st.items.forEach(function (it, i) {
+      var d = document.createElement('div'); d.className = 'fg-item' + (i === sel ? ' on' : ''); d.style.setProperty('--h', (i * 47 + 200) % 360);
+      d.tabIndex = 0; d.setAttribute('role', 'button'); d.setAttribute('aria-label', 'Box ' + (i + 1));
+      var ic = itemCss(it); ic.forEach(function (x) { d.style.setProperty(x[0], x[1]); });
+      if (mode === 'flex' && /column/.test(st.flex['flex-direction'])) d.style.minWidth = '60px';
+      d.innerHTML = '<div style="text-align:center">' + (i + 1) + (ic.length ? '<small>' + ic.map(function (x) { return x[1]; }).join(' · ').replace(/</g, '&lt;') + '</small>' : '') + '</div>';
+      if (i % 3 === 1) d.style.paddingTop = d.style.paddingBottom = '22px'; // uneven heights make alignment visible
+      d.addEventListener('click', function () { sel = i; itemControls(); markSel(); });
+      d.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); sel = i; itemControls(); markSel(); } });
+      stg.appendChild(d);
+    });
+    $('code').textContent = css();
+    $('delI').disabled = !st.items.length; $('addI').disabled = st.items.length >= 24;
+  }
+  function markSel() { $('stage').querySelectorAll('.fg-item').forEach(function (d, i) { d.classList.toggle('on', i === sel); }); }
+  function css() {
+    var obj = mode === 'flex' ? st.flex : st.grid, props = mode === 'flex' ? FLEX : GRID;
+    var lines = ['.container {', '  display: ' + mode + ';'];
+    props.forEach(function (p) { var def = p[1] === 'text' ? '' : p[1][0], v = safe(obj[p[0]]).trim(); if (v && (p[1] === 'text' || v !== def)) lines.push('  ' + p[0] + ': ' + v + ';'); });
+    lines.push('}');
+    st.items.forEach(function (it, i) { var ic = itemCss(it); if (ic.length) { lines.push('', '.item:nth-child(' + (i + 1) + ') {'); ic.forEach(function (x) { lines.push('  ' + x[0] + ': ' + x[1] + ';'); }); lines.push('}'); } });
+    return lines.join('\n');
+  }
+  function setMode(m) { mode = m; $('tFlex').setAttribute('aria-selected', m === 'flex'); $('tGrid').setAttribute('aria-selected', m === 'grid'); controls(); paint(); }
+  $('tFlex').addEventListener('click', function () { setMode('flex'); });
+  $('tGrid').addEventListener('click', function () { setMode('grid'); });
+  $('addI').addEventListener('click', function () { if (st.items.length >= 24) return; st.items.push(newItem()); sel = st.items.length - 1; itemControls(); paint(); });
+  $('delI').addEventListener('click', function () { if (!st.items.length) return; st.items.splice(sel, 1); sel = Math.max(0, sel - 1); itemControls(); paint(); });
+  $('resetI').addEventListener('click', function () { st = fresh(); sel = 0; $('stage').style.width = ''; $('stage').style.height = ''; controls(); paint(); });
+  $('cp').addEventListener('click', function () { copyText(css(), $('cp')); });
+  $('cpH').addEventListener('click', function () { copyText('<div class="container">\n' + st.items.map(function (_, i) { return '  <div class="item">' + (i + 1) + '</div>'; }).join('\n') + '\n</div>', $('cpH')); });
+  setMode('flex');
+})();
+</script>

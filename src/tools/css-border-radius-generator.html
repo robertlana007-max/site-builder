@@ -1,0 +1,94 @@
+<style>
+.br-stage { display: grid; place-items: center; min-height: 300px; border-radius: 14px; border: 1px solid var(--line); background: var(--bg); margin-bottom: 16px; padding: 16px; overflow: hidden; }
+.br-box { background: linear-gradient(135deg, #6366f1, #ec4899); max-width: 100%; transition: border-radius .05s; }
+.br-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 18px; margin-bottom: 14px; }
+.br-c { border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; }
+.br-c b { display: block; font-size: 14px; margin-bottom: 4px; }
+.br-c label { font-weight: 500; font-size: 13px; color: var(--muted); margin: 6px 0 2px; }
+.br-c .v { display: flex; gap: 8px; align-items: center; }
+.br-c .v input[type=number] { width: 84px; min-height: 36px; flex: none; padding: 4px 8px; }
+.br-pre { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 16px; }
+.br-pre button { font: 500 13px/1 inherit; font-family: inherit; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; padding: 10px 12px; cursor: pointer; }
+.br-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 12px 0 0; }
+@media (max-width: 560px) { .br-grid { grid-template-columns: minmax(0, 1fr); } }
+</style>
+<div class="br-stage"><div class="br-box" id="box"></div></div>
+<div class="fields">
+  <div><label for="unit">Unit</label><select id="unit"><option value="px">Pixels (px)</option><option value="%">Percent (%)</option></select></div>
+  <div><label for="bw">Box width: <span id="bwV">260</span>px</label><input type="range" id="bw" min="60" max="400" value="260"></div>
+  <div><label for="bh">Box height: <span id="bhV">200</span>px</label><input type="range" id="bh" min="60" max="300" value="200"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="link" checked>Same value for all corners</label><label><input type="checkbox" id="ell">Elliptical corners (separate horizontal and vertical radius)</label></div>
+<div class="br-grid" id="corners"></div>
+<label>Presets</label>
+<div class="br-pre" id="pre"></div>
+<label>CSS code</label>
+<pre class="br-code" id="code"></pre>
+<div class="btns"><button class="btn" id="cp" type="button">Copy CSS</button><button class="btn ghost" id="reset" type="button">Reset</button></div>
+<script>
+(function () {
+  var NAMES = [['tl', 'Top left'], ['tr', 'Top right'], ['br', 'Bottom right'], ['bl', 'Bottom left']];
+  var V = { tl: [24, 24], tr: [24, 24], br: [24, 24], bl: [24, 24] };
+  var PRE = {
+    'Rounded': ['px', false, { tl: [16, 16], tr: [16, 16], br: [16, 16], bl: [16, 16] }],
+    'Circle / oval': ['%', false, { tl: [50, 50], tr: [50, 50], br: [50, 50], bl: [50, 50] }],
+    'Pill': ['px', false, { tl: [999, 999], tr: [999, 999], br: [999, 999], bl: [999, 999] }],
+    'Leaf': ['%', false, { tl: [0, 0], tr: [70, 70], br: [0, 0], bl: [70, 70] }],
+    'Speech bubble': ['px', false, { tl: [24, 24], tr: [24, 24], br: [24, 24], bl: [0, 0] }],
+    'Blob': ['%', true, { tl: [30, 30], tr: [70, 30], br: [70, 70], bl: [30, 70] }],
+    'Egg': ['%', true, { tl: [50, 60], tr: [50, 60], br: [50, 40], bl: [50, 40] }],
+    'Drop': ['%', false, { tl: [0, 0], tr: [50, 50], br: [50, 50], bl: [50, 50] }]
+  };
+  function max() { return $('unit').value === '%' ? 100 : 400; }
+  function build() {
+    var ell = $('ell').checked, m = max();
+    $('corners').innerHTML = NAMES.map(function (n) {
+      var h = '<div class="br-c"><b>' + n[1] + '</b>' +
+        '<label for="' + n[0] + 'h">' + (ell ? 'Horizontal' : 'Radius') + '</label><div class="v"><input type="range" data-nomemo id="' + n[0] + 'h" min="0" max="' + m + '" value="' + Math.min(m, V[n[0]][0]) + '"><input type="number" data-nomemo min="0" step="1" aria-label="' + n[1] + ' radius value" value="' + V[n[0]][0] + '"></div>';
+      if (ell) h += '<label for="' + n[0] + 'v">Vertical</label><div class="v"><input type="range" data-nomemo id="' + n[0] + 'v" min="0" max="' + m + '" value="' + Math.min(m, V[n[0]][1]) + '"><input type="number" data-nomemo min="0" step="1" aria-label="' + n[1] + ' vertical radius value" value="' + V[n[0]][1] + '"></div>';
+      return h + '</div>';
+    }).join('');
+    $('corners').querySelectorAll('.v').forEach(function (row) {
+      var r = row.children[0], num = row.children[1], key = r.id.slice(0, 2), axis = r.id[2] === 'h' ? 0 : 1;
+      function set(v, from) {
+        v = Math.max(0, Math.round(+v)); if (!isFinite(v)) return;
+        var targets = $('link').checked ? ['tl', 'tr', 'br', 'bl'] : [key];
+        targets.forEach(function (k) { V[k][axis] = v; if (!$('ell').checked) V[k][1] = v; });
+        if ($('link').checked || from) $('corners').querySelectorAll('.v').forEach(function (rw) { var a = rw.children[0].id[2] === 'h' ? 0 : 1, kk = rw.children[0].id.slice(0, 2); if (rw !== row || from !== 'range') rw.children[0].value = Math.min(max(), V[kk][a]); if (rw !== row || from !== 'num') rw.children[1].value = V[kk][a]; });
+        paint();
+      }
+      r.addEventListener('input', function () { set(r.value, 'range'); });
+      num.addEventListener('input', function () { if (num.value !== '') set(num.value, 'num'); });
+    });
+    paint();
+  }
+  function short(a) { // collapse 4 values the way CSS does
+    if (a[3] === a[1]) { a = a.slice(0, 3); if (a[2] === a[0]) { a = a.slice(0, 2); if (a[1] === a[0]) a = a.slice(0, 1); } }
+    return a.join(' ');
+  }
+  function value() {
+    var u = $('unit').value, f = function (x) { return x === 0 ? '0' : x + u; };
+    var h = ['tl', 'tr', 'br', 'bl'].map(function (k) { return f(V[k][0]); }), v = ['tl', 'tr', 'br', 'bl'].map(function (k) { return f($('ell').checked ? V[k][1] : V[k][0]); });
+    var hs = short(h), vs = short(v);
+    return hs === vs ? hs : hs + ' / ' + vs;
+  }
+  function paint() {
+    var b = $('box');
+    b.style.width = $('bw').value + 'px'; b.style.height = $('bh').value + 'px'; $('bwV').textContent = $('bw').value; $('bhV').textContent = $('bh').value;
+    b.style.borderRadius = value();
+    $('code').textContent = 'border-radius: ' + value() + ';';
+  }
+  $('unit').addEventListener('change', function () { ['tl', 'tr', 'br', 'bl'].forEach(function (k) { V[k] = V[k].map(function (x) { return Math.min(x, max()); }); }); build(); });
+  $('ell').addEventListener('change', function () { if (!$('ell').checked) ['tl', 'tr', 'br', 'bl'].forEach(function (k) { V[k][1] = V[k][0]; }); build(); });
+  $('link').addEventListener('change', function () { if ($('link').checked) { var t = V.tl.slice(); ['tr', 'br', 'bl'].forEach(function (k) { V[k] = t.slice(); }); build(); } });
+  ['bw', 'bh'].forEach(function (id) { $(id).addEventListener('input', paint); });
+  Object.keys(PRE).forEach(function (k) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = k;
+    b.addEventListener('click', function () { var p = PRE[k]; $('unit').value = p[0]; $('ell').checked = p[1]; $('link').checked = false; Object.keys(p[2]).forEach(function (c) { V[c] = p[2][c].slice(); }); build(); });
+    $('pre').appendChild(b);
+  });
+  $('reset').addEventListener('click', function () { $('unit').value = 'px'; $('ell').checked = false; $('link').checked = true; ['tl', 'tr', 'br', 'bl'].forEach(function (k) { V[k] = [24, 24]; }); build(); });
+  $('cp').addEventListener('click', function () { copyText('border-radius: ' + value() + ';', $('cp')); });
+  build();
+})();
+</script>
