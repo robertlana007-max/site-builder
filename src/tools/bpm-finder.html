@@ -1,0 +1,332 @@
+<style>
+.bf-name { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.bf-name b { color: var(--ink); }
+.bf-res { text-align: center; border: 1px solid var(--line); border-radius: 14px; padding: 18px 12px 14px; margin: 0 0 16px; background: var(--bg); }
+.bf-big { font-size: clamp(52px, 15vw, 88px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.bf-big small { font-size: 18px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-inline-start: 6px; }
+.bf-conf { display: inline-block; margin: 10px 0 4px; padding: 4px 12px; border-radius: 99px; font-size: 14px; font-weight: 700; background: var(--line); }
+.bf-conf.hi { background: #dcfce7; color: #166534; }
+.bf-conf.mid { background: #fef3c7; color: #92400e; }
+.bf-conf.lo { background: #fee2e2; color: #991b1b; }
+.bf-alt { font-size: 14px; color: var(--muted); margin: 6px 0 0; }
+.bf-alt button { font: inherit; font-weight: 600; color: var(--accent); background: none; border: 0; padding: 2px 4px; cursor: pointer; text-decoration: underline; }
+.bf-row { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 16px; }
+.bf-row .btn { flex: 1 1 160px; }
+.bf-beat { width: 18px; height: 18px; border-radius: 50%; display: inline-block; vertical-align: middle; background: var(--line); margin-inline-end: 8px; transition: background .05s; }
+.bf-beat.on { background: var(--accent); }
+.bf-tap { border-top: 1px solid var(--line); margin-top: 18px; padding-top: 16px; }
+.bf-tap h3 { margin: 0 0 6px; font-size: 18px; }
+.bf-tapbtn { width: 100%; min-height: 96px; font-size: 22px; touch-action: manipulation; user-select: none; -webkit-user-select: none; }
+.bf-tapshow { text-align: center; margin: 12px 0 4px; font-size: 15px; color: var(--muted); }
+.bf-tapshow b { display: block; font-size: 44px; color: var(--ink); font-variant-numeric: tabular-nums; line-height: 1.1; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a song here</b>MP3, M4A, WAV, OGG, FLAC, or a video with music. Nothing is uploaded.</div>
+<input type="file" id="file" accept="audio/*,video/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.mov,.webm,.mkv" hidden data-nomemo>
+<p class="bf-name" id="info"></p>
+<div class="meter" id="bar" hidden><i id="fill"></i></div>
+<div id="out" hidden>
+  <div class="bf-res" aria-live="polite">
+    <div class="bf-big"><span id="bpm">–</span><small>BPM</small></div>
+    <div><span class="bf-conf" id="conf"></span></div>
+    <p class="bf-alt" id="alt"></p>
+  </div>
+  <div class="bf-row">
+    <button class="btn" type="button" id="hear"><span class="bf-beat" id="beat"></span>Play with a click on each beat</button>
+    <button class="btn ghost" type="button" id="copy">Copy BPM</button>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Tempo (exact)</span><b id="exact">–</b></div>
+    <div class="stat"><span>Beat length</span><b id="ms">–</b></div>
+    <div class="stat"><span>Song length</span><b id="len">–</b></div>
+    <div class="stat"><span>Beats in the song</span><b id="beats">–</b></div>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<div class="bf-tap">
+  <h3>Tap tempo</h3>
+  <p class="bf-alt" style="margin:0 0 10px">Tap along to any song you hear: click the button, tap it on your phone, or press the T key or space bar on each beat.</p>
+  <button class="btn ghost bf-tapbtn" type="button" id="tap">Tap here on every beat</button>
+  <div class="bf-tapshow" aria-live="polite"><b id="tapBpm">–</b><span id="tapInfo">Tap at least 4 times</span></div>
+  <div class="btns"><button class="btn ghost" type="button" id="tapReset">Reset taps</button></div>
+</div>
+<script>
+(function () {
+  // ---------- tempo detection: spectral-flux onset strength + autocorrelation ----------
+  // x: mono samples, sr: sample rate. Returns { bpm, conf, alts } or null when no beat is found.
+  function fft(re, im) { // in place, radix 2
+    var n = re.length, i, j = 0, k, m, t;
+    for (i = 1; i < n; i++) { m = n >> 1; while (j & m) { j ^= m; m >>= 1; } j |= m; if (i < j) { t = re[i]; re[i] = re[j]; re[j] = t; t = im[i]; im[i] = im[j]; im[j] = t; } }
+    for (var len = 2; len <= n; len <<= 1) {
+      var ang = -2 * Math.PI / len, wr = Math.cos(ang), wi = Math.sin(ang), half = len >> 1;
+      for (i = 0; i < n; i += len) {
+        var cr = 1, ci = 0;
+        for (k = 0; k < half; k++) {
+          var a = i + k, b = a + half, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr;
+          re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi;
+          t = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = t;
+        }
+      }
+    }
+  }
+  function onsets(x, sr) {
+    var N = 1024, hop = Math.round(sr / 86), win = new Float32Array(N), re = new Float32Array(N), im = new Float32Array(N);
+    for (var i = 0; i < N; i++) win[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / N);
+    // energy in six bands (low to high), so a kick drum counts as much as a bright hi-hat
+    var edges = [30, 150, 400, 1000, 2500, 5000, 10000].map(function (f) { return Math.max(1, Math.min(N / 2, Math.round(f / sr * N))); }), B = edges.length - 1;
+    var frames = Math.max(0, Math.floor((x.length - N) / hop) + 1), env = new Float32Array(frames), prev = new Float32Array(B);
+    for (var f = 0; f < frames; f++) {
+      var o = f * hop;
+      for (i = 0; i < N; i++) { re[i] = x[o + i] * win[i]; im[i] = 0; }
+      fft(re, im);
+      var s = 0;
+      for (var b = 0; b < B; b++) {
+        var p = 0; for (i = edges[b]; i < edges[b + 1]; i++) p += re[i] * re[i] + im[i] * im[i];
+        var m = Math.log(1 + 1000 * p / Math.max(1, edges[b + 1] - edges[b])), d = m - prev[b];
+        if (d > 0 && f) s += d; prev[b] = m;
+      }
+      env[f] = s;
+    }
+    // remove the slowly changing part, keep the peaks
+    var w = 16, out = new Float32Array(frames), acc = 0, q = [];
+    for (f = 0; f < frames; f++) {
+      var lo = Math.max(0, f - w), hi = Math.min(frames - 1, f + w);
+      if (f === 0) { acc = 0; for (i = 0; i <= hi; i++) acc += env[i]; }
+      else { if (f + w < frames) acc += env[f + w]; if (f - w - 1 >= 0) acc -= env[f - w - 1]; }
+      var v = env[f] - acc / (hi - lo + 1); out[f] = v > 0 ? v : 0;
+    }
+    return { env: out, fps: sr / hop, delay: N / 2 / sr };
+  }
+  // Score every tempo from lo to hi BPM by how well an evenly spaced beat grid lines up with the onsets
+  // (in windows of about 12 seconds, so a small tempo error does not drift), then fine-tune it with the
+  // autocorrelation many beats away. Returns { bpm, conf (0-1), score } or null.
+  function tempo(env, fps, lo, hi) {
+    var n = env.length, W = Math.min(n, Math.round(12 * fps)), i, k;
+    if (n < fps * 4) return null;
+    var em = new Float32Array(n); // each frame's largest neighbour, so a beat may be one frame early or late
+    for (i = 0; i < n; i++) em[i] = Math.max(env[i], i ? env[i - 1] : 0, i < n - 1 ? env[i + 1] : 0);
+    var grid = []; for (var b = lo; b <= hi + 1e-9; b += 0.5) grid.push(b);
+    var total = new Float64Array(grid.length), weight = 0, votes = [];
+    for (var ws = 0; ws + W <= n; ws += Math.max(1, Math.round(W / 2))) {
+      var e2 = 0; for (i = ws; i < ws + W; i++) e2 += env[i] * env[i];
+      if (!(e2 > 1e-9)) continue;
+      var norm = Math.sqrt(e2), bestG = -1, bestS = -1, ws_w = norm;
+      for (var g = 0; g < grid.length; g++) {
+        var P = 60 * fps / grid[g], top = 0;
+        for (var ph = 0; ph < P; ph += 1) {
+          var s = 0, c = 0;
+          for (var t = ws + ph; t < ws + W; t += P) { s += em[Math.round(t) < n ? Math.round(t) : n - 1]; c++; }
+          s /= Math.sqrt(c); if (s > top) top = s;
+        }
+        top /= norm; total[g] += top * ws_w;
+        if (top > bestS) { bestS = top; bestG = g; }
+      }
+      weight += ws_w; votes.push(grid[bestG]);
+      if (ws + W === n) break;
+    }
+    if (!weight) return null;
+    var best = 0, sc = [];
+    for (g = 0; g < grid.length; g++) {
+      var prior = Math.exp(-0.5 * Math.pow(Math.log(grid[g] / 120) / Math.LN2, 2)); // gentle preference for common tempos
+      sc[g] = total[g] / weight * (0.75 + 0.25 * prior);
+      if (sc[g] > sc[best]) best = g;
+    }
+    var bpm = grid[best];
+    // autocorrelation of the onset curve
+    var maxLag = Math.min(n - 2, Math.ceil(60 * fps / bpm * 16) + 6), A = new Float32Array(maxLag + 2), mean = 0;
+    for (i = 0; i < n; i++) mean += env[i]; mean /= n;
+    var e = new Float32Array(n); for (i = 0; i < n; i++) e[i] = env[i] - mean;
+    for (var L = 0; L <= maxLag + 1; L++) { var s2 = 0; for (i = 0; i + L < n; i++) s2 += e[i] * e[i + L]; A[L] = s2 / (n - L); }
+    var Pq = 60 * fps / bpm;
+    for (k = 1; k <= 16; k++) { // walk out beat by beat, each time using the better period
+      var c0 = Math.round(k * Pq), b0 = c0;
+      if (c0 + 3 > maxLag) break;
+      for (var l = c0 - 2; l <= c0 + 2; l++) if (l > 0 && A[l] > A[b0]) b0 = l;
+      var y0 = A[b0 - 1], y1 = A[b0], y2 = A[b0 + 1], den = y0 - 2 * y1 + y2, d = den < 0 ? 0.5 * (y0 - y2) / den : 0;
+      if (Math.abs(d) > 1 || y1 <= 0) continue;
+      var est = (b0 + d) / k;
+      if (Math.abs(est - Pq) / Pq < 0.02) Pq = est;
+    }
+    var fine = 60 * fps / Pq;
+    if (Math.abs(fine - bpm) > 1) fine = bpm;
+    // Half the speed scores almost as well? If every other beat is clearly stronger (kick and snare
+    // against hi-hats), the beats we found are in-between notes and the real beat is half as fast.
+    var half = Math.round((bpm / 2 - lo) * 2), halved = false;
+    if (bpm / 2 >= 70 && half >= 0 && sc[half] >= 0.85 * sc[best]) {
+      var P2 = 60 * fps / fine, topPh = 0, topS = -1, ev = 0, od = 0;
+      for (var ph2 = 0; ph2 < P2; ph2++) { var s3 = 0; for (var t2 = ph2; t2 < n; t2 += P2) s3 += em[Math.round(t2) < n ? Math.round(t2) : n - 1]; if (s3 > topS) { topS = s3; topPh = ph2; } }
+      for (k = 0, t2 = topPh; t2 < n; t2 += P2, k++) { var v2 = em[Math.round(t2) < n ? Math.round(t2) : n - 1]; if (k % 2) od += v2; else ev += v2; }
+      if (Math.max(ev, od) > 1.4 * Math.min(ev, od)) { fine /= 2; bpm /= 2; best = half; halved = true; }
+    }
+    // confidence: how clearly the winner stands out, and how many windows agree with it
+    var sorted = sc.slice().sort(function (a, b2) { return a - b2; }), med = sorted[sorted.length >> 1];
+    var contrast = Math.max(0, (sc[best] - med) / sc[best]);
+    function related(a, b2) { var r = a / b2; return [1, 2, 0.5, 1.5, 2 / 3, 3, 1 / 3].some(function (m) { return Math.abs(r / m - 1) < 0.03; }); }
+    var agree = votes.filter(function (v) { return Math.abs(v / bpm - 1) < 0.03; }).length / votes.length;
+    var agreeLoose = votes.filter(function (v) { return related(v, bpm); }).length / votes.length;
+    if (halved) agree = agreeLoose;
+    var conf = Math.max(0, Math.min(1, (0.25 * agree + 0.75 * agreeLoose) * Math.min(1, contrast * 2.2)));
+    // where the beats fall: the grid offset that lines up best with the onsets
+    var Pf = 60 * fps / fine, phase = 0, top2 = -1;
+    for (var ph3 = 0; ph3 < Pf; ph3 += 0.25) { var s4 = 0; for (var t3 = ph3; t3 < n; t3 += Pf) s4 += env[Math.round(t3) < n ? Math.round(t3) : n - 1]; if (s4 > top2) { top2 = s4; phase = ph3; } }
+    return { bpm: fine, conf: conf, contrast: contrast, agree: agree, first: phase / fps };
+  }
+  function say(cls, t) { $('msg').className = 'msg ' + (cls || ''); $('msg').textContent = t || ''; }
+  function clock(s) { s = Math.round(Math.max(0, s)); return Math.floor(s / 60) + ':' + (s % 60 < 10 ? '0' : '') + s % 60; }
+  function round1(v) { return Math.round(v * 10) / 10; }
+  function show(v) { var r = Math.round(v); return Math.abs(v - r) < 0.15 ? String(r) : fmtNum(round1(v), 1); }
+  var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var file = null, buf = null, res = null, busy = false, ticket = 0, actx = null, src = null, clickT = null, raf = 0, chosen = 0;
+
+  // The analysis runs in a background worker so the page stays responsive; the page runs it itself if workers are blocked.
+  var SRC = '(function(){' + fft.toString() + onsets.toString() + tempo.toString() + 'onmessage=function(e){var o=onsets(e.data.x,e.data.sr);postMessage({o:{fps:o.fps,delay:o.delay},r:tempo(o.env,o.fps,55,215)});};})();';
+  function analyse(x, sr) {
+    return new Promise(function (resolve, reject) {
+      function inPage() { setTimeout(function () { try { var o = onsets(x, sr); resolve({ o: o, r: tempo(o.env, o.fps, 55, 215) }); } catch (e) { reject(e); } }, 30); }
+      var w, url;
+      try { url = URL.createObjectURL(new Blob([SRC], { type: 'text/javascript' })); w = new Worker(url); } catch (e) { w = null; }
+      if (!w) return inPage();
+      w.onmessage = function (e) { w.terminate(); URL.revokeObjectURL(url); resolve(e.data); };
+      w.onerror = function (e) { e.preventDefault(); w.terminate(); URL.revokeObjectURL(url); inPage(); };
+      w.postMessage({ x: x, sr: sr });
+    });
+  }
+  function decode(f) {
+    return f.arrayBuffer().then(function (data) {
+      if (!OAC) throw new Error('old');
+      return new Promise(function (res2, rej) { var p = new OAC(1, 1, 22050).decodeAudioData(data, res2, rej); if (p && p.catch) p.catch(rej); });
+    });
+  }
+  function mono(b) {
+    var n = b.length, x = new Float32Array(n), c = b.numberOfChannels;
+    for (var k = 0; k < c; k++) { var d = b.getChannelData(k); for (var i = 0; i < n; i++) x[i] += d[i] / c; }
+    return x;
+  }
+  function setBpm(v) {
+    chosen = v;
+    $('bpm').textContent = show(v);
+    $('exact').textContent = fmtNum(v, 2) + ' BPM';
+    $('ms').textContent = Math.round(60000 / v) + ' ms';
+    $('beats').textContent = buf ? fmtNum(Math.round(buf.duration / 60 * v), 0) : '–';
+    var alt = $('alt'); alt.textContent = '';
+    var opts = [[v / 2, 'half time'], [v * 2, 'double time']].filter(function (o) { return o[0] >= 30 && o[0] <= 300; });
+    if (!opts.length) return;
+    alt.appendChild(document.createTextNode('Some people count this song as '));
+    opts.forEach(function (o, i) {
+      if (i) alt.appendChild(document.createTextNode(' or '));
+      var b = document.createElement('button'); b.type = 'button'; b.textContent = show(o[0]) + ' BPM (' + o[1] + ')';
+      b.addEventListener('click', function () { stopHear(); setBpm(o[0]); say('', 'Showing ' + show(o[0]) + ' BPM. Press "Play with a click" to check it by ear.'); });
+      alt.appendChild(b);
+    });
+    alt.appendChild(document.createTextNode('.'));
+  }
+  function reset() {
+    stopHear(); buf = null; res = null;
+    $('out').hidden = true; $('info').textContent = ''; $('bar').hidden = true;
+  }
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { say('bad', 'Please wait until the current song has been analysed.'); return; }
+    reset(); file = f;
+    if (!/^(audio|video)\//.test(f.type) && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|m4v|mov|webm|mkv|3gp|wma|aif|aiff)$/i.test(f.name)) return say('bad', '"' + f.name + '" is not an audio file. Choose a song such as MP3, M4A, WAV or FLAC.');
+    if (!f.size) return say('bad', '"' + f.name + '" is empty.');
+    if (f.size > 500 * 1048576) return say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 500 MB are too big to analyse in a browser. Cut out a part of the song first.');
+    if (!OAC) return say('bad', 'This browser is too old to read audio. Try a current Chrome, Edge, Firefox or Safari.');
+    var mine = ++ticket; busy = true;
+    $('bar').hidden = false; $('fill').style.width = '20%';
+    say('', 'Reading "' + f.name + '"…');
+    var t0 = Date.now();
+    decode(f).then(function (b) {
+      if (mine !== ticket) return;
+      if (!(b.duration >= 5)) throw new Error('short');
+      buf = b; $('fill').style.width = '55%';
+      var el = $('info'); el.textContent = ''; var nb = document.createElement('b'); nb.textContent = f.name; el.appendChild(nb);
+      el.appendChild(document.createTextNode(' · ' + fmtBytes(f.size) + ' · ' + clock(b.duration)));
+      say('', 'Listening for the beat…');
+      return analyse(mono(b), b.sampleRate).then(function (d) {
+        if (mine !== ticket) return;
+        busy = false; $('bar').hidden = true;
+        if (!d.r) { say('bad', 'No steady beat was found in this file. It may be speech, silence, or music without a regular rhythm. Try Tap tempo below.'); return; }
+        res = d.r; res.first += d.o.delay;
+        $('len').textContent = clock(b.duration);
+        var c = Math.round(res.conf * 100), lvl = c >= 70 ? 'hi' : c >= 40 ? 'mid' : 'lo';
+        $('conf').className = 'bf-conf ' + lvl;
+        $('conf').textContent = (lvl === 'hi' ? 'High' : lvl === 'mid' ? 'Medium' : 'Low') + ' confidence · ' + c + '%';
+        setBpm(res.bpm);
+        $('out').hidden = false;
+        say(lvl === 'lo' ? 'bad' : 'ok', (lvl === 'lo' ? 'The beat is not very clear in this song, so the tempo may be wrong. Check it by ear with the click, or use Tap tempo. ' : 'Done in ' + Math.max(1, Math.round((Date.now() - t0) / 1000)) + ' s. ') + 'Press "Play with a click" to hear if it matches.');
+      });
+    }).catch(function (e) {
+      if (mine !== ticket) return;
+      busy = false; $('bar').hidden = true; buf = null;
+      if (e && e.message === 'short') return say('bad', 'This file is too short. A song needs at least 5 seconds of sound to find its tempo.');
+      if (e && e.message === 'old') return say('bad', 'This browser is too old to read audio. Try a current Chrome, Edge, Firefox or Safari.');
+      if (e instanceof RangeError || e && e.name === 'NotReadableError') return say('bad', 'Your device ran out of memory reading this file. Try a shorter file.');
+      say('bad', 'The sound in "' + f.name + '" could not be read. The file may be damaged, have no sound, or use a format this browser cannot decode. Try an MP3 or WAV.');
+    });
+  });
+
+  // ---------- listen with a click ----------
+  function stopHear() {
+    if (src) { try { src.onended = null; src.stop(); } catch (e) {} src = null; }
+    clearInterval(clickT); clickT = null; cancelAnimationFrame(raf);
+    $('beat').classList.remove('on');
+    $('hear').lastChild.textContent = 'Play with a click on each beat';
+  }
+  $('hear').addEventListener('click', function () {
+    if (!buf || !res) return;
+    if (src) return stopHear();
+    if (!AC) return say('bad', 'This browser cannot play sound here.');
+    if (!actx) actx = new AC();
+    if (actx.resume) actx.resume();
+    var t0 = actx.currentTime + 0.1, P = 60 / chosen, first = res.first % P, next = 0;
+    src = actx.createBufferSource(); src.buffer = buf; src.connect(actx.destination); src.start(t0);
+    src.onended = function () { src = null; stopHear(); };
+    // schedule clicks a little ahead of time
+    function sched() {
+      if (!src) return;
+      var now = actx.currentTime - t0;
+      while (first + next * P < now + 0.3) {
+        var at = first + next * P;
+        if (at >= now - 0.01) {
+          var o = actx.createOscillator(), g = actx.createGain(), when = t0 + at;
+          o.frequency.value = next % 4 ? 1500 : 2200; o.connect(g); g.connect(actx.destination);
+          g.gain.setValueAtTime(0.0001, when); g.gain.exponentialRampToValueAtTime(0.5, when + 0.002); g.gain.exponentialRampToValueAtTime(0.0001, when + 0.05);
+          o.start(when); o.stop(when + 0.06);
+        }
+        next++;
+      }
+    }
+    sched(); clickT = setInterval(sched, 100);
+    (function blink() {
+      if (!src) return;
+      var t = actx.currentTime - t0 - first, ph = ((t % P) + P) % P;
+      $('beat').classList.toggle('on', t >= 0 && ph < 0.1);
+      raf = requestAnimationFrame(blink);
+    })();
+    $('hear').lastChild.textContent = 'Stop';
+  });
+  $('copy').addEventListener('click', function () { if (chosen) copyText(show(chosen), $('copy')); });
+
+  // ---------- tap tempo ----------
+  var taps = [];
+  function tap() {
+    var now = performance.now();
+    if (taps.length && now - taps[taps.length - 1] > 2500) taps = []; // a long pause starts again
+    taps.push(now); if (taps.length > 16) taps.shift();
+    var n = taps.length;
+    if (n < 2) { $('tapBpm').textContent = '–'; $('tapInfo').textContent = 'Keep tapping…'; return; }
+    var v = 60000 * (n - 1) / (taps[n - 1] - taps[0]);
+    $('tapBpm').textContent = fmtNum(Math.round(v), 0);
+    $('tapInfo').textContent = n < 4 ? 'Keep tapping… (' + n + ' taps)' : 'Average of the last ' + n + ' taps · ' + fmtNum(round1(v), 1) + ' BPM';
+  }
+  $('tap').addEventListener('pointerdown', function (e) { e.preventDefault(); tap(); });
+  $('tap').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); tap(); } });
+  $('tapReset').addEventListener('click', function () { taps = []; $('tapBpm').textContent = '–'; $('tapInfo').textContent = 'Tap at least 4 times'; });
+  document.addEventListener('keydown', function (e) {
+    if (e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target, typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+    if (typing) return;
+    if (e.key === 't' || e.key === 'T' || (e.key === ' ' && (t === document.body || t === $('tap')))) { e.preventDefault(); tap(); }
+  });
+})();
+</script>

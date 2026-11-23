@@ -1,0 +1,194 @@
+<style>
+.otc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.otc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.otc legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.otc .otc-mode { margin: 0 0 14px; }
+.otc .otc-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.otc .otc-days label { font-size: 13px; text-align: center; }
+.otc .otc-days input { padding: 9px 4px; text-align: center; }
+@media (max-width: 520px) { .otc .otc-days { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
+.otc .otc-hint { display: block; font-size: 13px; color: var(--muted); margin: -6px 0 12px; }
+.otc table.sched td, .otc table.sched th { white-space: nowrap; }
+@media (max-width: 480px) { .otc .stats { grid-template-columns: 1fr 1fr; } .otc .stat { padding: 10px 12px; } }
+</style>
+<div class="otc" id="otc">
+<div class="fields">
+  <div><label for="otcCur">Currency</label><select id="otcCur" data-cur></select></div>
+  <div hidden><label for="otcSym">Your currency symbol</label><input type="text" id="otcSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+  <div><label for="otcRate">Normal hourly pay</label><input type="number" id="otcRate" min="0" step="any" inputmode="decimal" value="20"></div>
+</div>
+<div class="otc-mode"><div class="seg" role="group" aria-label="How to enter hours"><button type="button" data-v="tot" aria-pressed="true">Weekly totals</button><button type="button" data-v="day" aria-pressed="false">Day by day</button></div></div>
+<select id="otcMode" hidden aria-hidden="true" tabindex="-1"><option value="tot">Weekly totals</option><option value="day">Day by day</option></select>
+<fieldset id="otcTot">
+  <legend>Hours this week</legend>
+  <div class="fields">
+    <div><label for="otcReg">Regular hours</label><input type="number" id="otcReg" min="0" step="any" inputmode="decimal" value="40"></div>
+    <div><label for="otcH1">Overtime hours</label><input type="number" id="otcH1" min="0" step="any" inputmode="decimal" value="5"></div>
+    <div><label for="otcM1">Overtime rate (× pay)</label><input type="number" id="otcM1" min="1" step="any" inputmode="decimal" value="1.5"></div>
+  </div>
+  <div class="fields">
+    <div><label for="otcH2">Double-time hours</label><input type="number" id="otcH2" min="0" step="any" inputmode="decimal" value="0"></div>
+    <div><label for="otcM2">Double-time rate (× pay)</label><input type="number" id="otcM2" min="1" step="any" inputmode="decimal" value="2"></div>
+  </div>
+</fieldset>
+<fieldset id="otcDay" hidden>
+  <legend>Hours worked each day</legend>
+  <div class="otc-days" id="otcDays"></div>
+  <div class="fields">
+    <div><label for="otcWk">Overtime after (hours per week)</label><input type="number" id="otcWk" min="0" step="any" inputmode="decimal" value="40"></div>
+    <div><label for="otcDl">Overtime after (hours per day)</label><input type="number" id="otcDl" min="0" step="any" inputmode="decimal" placeholder="Leave blank if none"></div>
+    <div><label for="otcDd">Double time after (hours per day)</label><input type="number" id="otcDd" min="0" step="any" inputmode="decimal" placeholder="Leave blank if none"></div>
+  </div>
+  <span class="otc-hint">Rules differ by country and contract. Leave a box blank to skip that rule. The overtime and double-time rates are the same as in Weekly totals.</span>
+  <div class="fields">
+    <div><label for="otcM1b">Overtime rate (× pay)</label><input type="number" id="otcM1b" min="1" step="any" inputmode="decimal" value="1.5"></div>
+    <div><label for="otcM2b">Double-time rate (× pay)</label><input type="number" id="otcM2b" min="1" step="any" inputmode="decimal" value="2"></div>
+  </div>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Total pay this week</span><b id="otcTotal">–</b></div>
+  <div class="stat"><span>Regular pay</span><b id="otcRegPay">–</b></div>
+  <div class="stat"><span>Overtime pay</span><b id="otcOtPay">–</b></div>
+  <div class="stat"><span>Double-time pay</span><b id="otcDtPay">–</b></div>
+  <div class="stat"><span>Total hours</span><b id="otcHours">–</b></div>
+  <div class="stat"><span>Average per hour</span><b id="otcAvg">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<h3>If every week were like this</h3>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Period</th><th>Hours</th><th>Pay before tax</th></tr></thead><tbody id="otcRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="otcCopy">Copy summary</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  var DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'], last = null;
+  $('otcDays').innerHTML = DAYS.map(function (d, i) { return '<div><label for="otcD' + i + '">' + d + '</label><input type="number" id="otcD' + i + '" min="0" max="24" step="any" inputmode="decimal" value="' + (i < 5 ? 8 : 0) + '"></div>'; }).join('');
+  function mode() { return $('otcMode').value === 'day' ? 'day' : 'tot'; }
+  function setMode(v) {
+    $('otcMode').value = v; $('otcTot').hidden = v !== 'tot'; $('otcDay').hidden = v !== 'day';
+    document.querySelectorAll('.otc .seg button').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.v === v ? 'true' : 'false'); });
+  }
+  // Splits daily hours into regular / overtime / double time. Daily rules first, then the weekly limit moves extra regular hours to overtime.
+  function split(hours, wk, dl, dd) {
+    var reg = 0, ot = 0, dt = 0;
+    hours.forEach(function (h) {
+      var d = isFinite(dd) ? Math.max(0, h - dd) : 0, cap = h - d;
+      var o = isFinite(dl) ? Math.max(0, cap - dl) : 0;
+      dt += d; ot += o; reg += cap - o;
+    });
+    if (isFinite(wk) && reg > wk) { ot += reg - wk; reg = wk; }
+    return { reg: reg, ot: ot, dt: dt };
+  }
+  function calc() {
+    var rate = num('otcRate'), m = mode(), h, m1, m2;
+    var fail = function (t) { ['otcTotal', 'otcRegPay', 'otcOtPay', 'otcDtPay', 'otcHours', 'otcAvg'].forEach(function (i) { $(i).textContent = '–'; }); $('otcRows').innerHTML = ''; last = null; say('bad', t); };
+    if (!(rate >= 0)) return fail('Enter your normal hourly pay.');
+    if (rate > 1e9) return fail('That hourly pay is too large.');
+    if (m === 'tot') {
+      h = { reg: num('otcReg') || 0, ot: num('otcH1') || 0, dt: num('otcH2') || 0 }; m1 = num('otcM1'); m2 = num('otcM2');
+      if (h.reg < 0 || h.ot < 0 || h.dt < 0) return fail('Hours cannot be negative.');
+      if (h.reg + h.ot + h.dt > 168) return fail('A week has only 168 hours. Check the hours you entered.');
+    } else {
+      var hrs = DAYS.map(function (d, i) { return num('otcD' + i) || 0; });
+      if (hrs.some(function (x) { return x < 0; })) return fail('Hours cannot be negative.');
+      if (hrs.some(function (x) { return x > 24; })) return fail('A day has only 24 hours. Check the hours for each day.');
+      var wk = num('otcWk'), dl = num('otcDl'), dd = num('otcDd');
+      if (wk < 0 || dl < 0 || dd < 0) return fail('Overtime limits cannot be negative.');
+      if (isFinite(dl) && isFinite(dd) && dd < dl) return fail('The double-time limit per day should be higher than the overtime limit per day.');
+      h = split(hrs, wk, dl, dd); m1 = num('otcM1b'); m2 = num('otcM2b');
+    }
+    if (!(m1 >= 1) || !(m2 >= 1) || m1 > 10 || m2 > 10) return fail('Overtime rates are multipliers like 1.5 (time and a half) or 2 (double time), between 1 and 10.');
+    var regPay = h.reg * rate, otPay = h.ot * rate * m1, dtPay = h.dt * rate * m2, tot = regPay + otPay + dtPay, hours = h.reg + h.ot + h.dt;
+    $('otcTotal').textContent = money(tot); $('otcRegPay').textContent = money(regPay);
+    $('otcOtPay').textContent = money(otPay); $('otcDtPay').textContent = money(dtPay);
+    $('otcHours').textContent = nfx(hours, 2) + ' h'; $('otcAvg').textContent = hours ? money(tot / hours) : '–';
+    var parts = [nfx(h.reg, 2) + ' regular'];
+    if (h.ot) parts.push(nfx(h.ot, 2) + ' overtime at ' + nfx(m1, 2) + '× (' + money(rate * m1) + '/h)');
+    if (h.dt) parts.push(nfx(h.dt, 2) + ' double time at ' + nfx(m2, 2) + '× (' + money(rate * m2) + '/h)');
+    say(hours ? 'ok' : '', hours ? 'Hours: ' + parts.join(', ') + '. Overtime adds ' + money(otPay + dtPay - (h.ot + h.dt) * rate) + ' on top of normal pay.' : 'Enter the hours you worked.');
+    $('otcRows').innerHTML = [['Week', 1], ['Two weeks', 2], ['Month (average)', 52 / 12], ['Year (52 weeks)', 52]].map(function (p) { return '<tr><td>' + p[0] + '</td><td>' + nfx(hours * p[1], 1) + '</td><td>' + money(tot * p[1]) + '</td></tr>'; }).join('');
+    last = { tot: tot, hours: hours, h: h, regPay: regPay, otPay: otPay, dtPay: dtPay };
+  }
+  document.querySelectorAll('.otc .seg button').forEach(function (b) { b.addEventListener('click', function () { setMode(b.dataset.v); $('otcMode').dispatchEvent(new Event('change', { bubbles: true })); calc(); }); });
+  // keep the two copies of the rate boxes in step
+  [['otcM1', 'otcM1b'], ['otcM2', 'otcM2b']].forEach(function (p) {
+    $(p[0]).addEventListener('input', function () { $(p[1]).value = $(p[0]).value; });
+    $(p[1]).addEventListener('input', function () { $(p[0]).value = $(p[1]).value; });
+  });
+  $('otcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    copyText('Hours: ' + nfx(last.hours, 2) + ' (' + nfx(last.h.reg, 2) + ' regular, ' + nfx(last.h.ot, 2) + ' overtime, ' + nfx(last.h.dt, 2) + ' double time)\nRegular pay: ' + money(last.regPay) + '\nOvertime pay: ' + money(last.otPay) + '\nDouble-time pay: ' + money(last.dtPay) + '\nTotal for the week: ' + money(last.tot), this);
+  });
+  $('otc').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  $('otcMode').addEventListener('change', function () { setMode(mode()); calc(); });
+  curWire(calc);
+  setMode('tot');
+  calc();
+})();
+</script>

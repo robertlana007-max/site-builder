@@ -1,0 +1,199 @@
+<style>
+.ia-out { border: 1px solid var(--line); border-radius: 12px; overflow: auto; max-height: 70vh; margin: 4px 0 12px; padding: 8px; background: #fff; }
+.ia-out.dark { background: #0d1117; }
+.ia-out pre { margin: 0; font-family: "Courier New", Courier, monospace; line-height: 1; letter-spacing: 0; white-space: pre; color: #111; }
+.ia-out.dark pre { color: #e6edf3; }
+.ia-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin: 0 0 14px; }
+.ia-sub { font-size: 14px; color: var(--muted); margin: -6px 0 14px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click, drop or paste a picture</b>JPG, PNG, WebP, GIF or BMP. It is turned into text on your device and never uploaded.</div>
+<input type="file" id="file" accept="image/*" hidden data-nomemo>
+<div class="btns" style="margin:-4px 0 16px"><button class="btn ghost" id="sample" type="button">Try with a sample picture</button></div>
+<div class="fields">
+  <div><label for="cols">Width: <span id="colsV">100</span> characters</label><input type="range" id="cols" min="20" max="300" step="2" value="100"></div>
+  <div><label for="set">Characters</label><select id="set">
+    <option value="std">Standard ( .:-=+*#%@)</option>
+    <option value="detail">Detailed (70 shades)</option>
+    <option value="blocks">Blocks (░▒▓█)</option>
+    <option value="simple">Simple ( .oO@)</option>
+    <option value="binary">Binary (0 and 1)</option>
+    <option value="custom">My own characters</option>
+  </select></div>
+  <div id="customRow" hidden><label for="custom">Your characters, light to dark</label><input type="text" id="custom" maxlength="80" value=" .-+#" autocomplete="off" spellcheck="false"></div>
+  <div><label for="mode">Output</label><select id="mode"><option value="mono">Plain text</option><option value="color">Colour (HTML)</option></select></div>
+  <div><label for="bright">Brightness: <span id="brightV">0</span></label><input type="range" id="bright" min="-100" max="100" step="5" value="0"></div>
+  <div><label for="contrast">Contrast: <span id="contrastV">0</span></label><input type="range" id="contrast" min="-100" max="100" step="5" value="0"></div>
+</div>
+<div class="checks">
+  <label><input type="checkbox" id="invert">Invert (for light text on a dark background)</label>
+  <label><input type="checkbox" id="dark">Dark preview and PNG background</label>
+</div>
+<div id="work" hidden>
+  <div class="stats" style="margin:0 0 12px">
+    <div class="stat"><span>Size</span><b id="sSize">–</b></div>
+    <div class="stat"><span>Characters</span><b id="sChars">–</b></div>
+  </div>
+  <div class="ia-out" id="box"><pre id="out" aria-label="ASCII art result"></pre></div>
+  <p class="ia-sub" id="fitNote"></p>
+  <div class="btns">
+    <button type="button" class="btn" id="copy">Copy text</button>
+    <button type="button" class="btn ghost" id="txt">Download TXT</button>
+    <button type="button" class="btn ghost" id="png">Download PNG</button>
+    <button type="button" class="btn ghost" id="html">Download HTML</button>
+  </div>
+</div>
+<p class="msg" id="msg"></p>
+<script>
+(function () {
+  'use strict';
+  var SETS = {
+    std: ' .:-=+*#%@',
+    detail: ' .\'`^",:;Il!i><~+_-?][}{1)(|\\/tfjrxnuvczXYUJCLQ0OZmwqpdbkhao*#MW&8%B@$',
+    blocks: ' ░▒▓█',
+    simple: ' .oO@',
+    binary: ' 01'
+  };
+  var src = null, name = 'picture', grid = null, job = 0, ASPECT = 0.5; // a character is about twice as tall as it is wide
+  function say(c, t) { $('msg').className = 'msg ' + (c || ''); $('msg').textContent = t || ''; }
+  function chars() {
+    var k = $('set').value, s = k === 'custom' ? $('custom').value : SETS[k];
+    var a = Array.from(s.replace(/[\r\n\t]/g, ''));
+    if (k === 'binary') return a; // ' ' for empty, then 0/1 by brightness
+    return a.length ? a : Array.from(SETS.std);
+  }
+
+  function convert() {
+    if (!src) return;
+    var cols = +$('cols').value, w = src.naturalWidth || src.width, h = src.naturalHeight || src.height;
+    var rows = Math.max(1, Math.round(cols * (h / w) * ASPECT));
+    if (rows > 1000) { rows = 1000; }
+    var c = document.createElement('canvas'); c.width = cols; c.height = rows;
+    var x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, cols, rows);
+    var d = x.getImageData(0, 0, cols, rows).data, set = chars(), n = set.length, inv = $('invert').checked;
+    var br = +$('bright').value / 100, ct = +$('contrast').value / 100, cf = ct >= 0 ? 1 + ct * 3 : 1 + ct;
+    var lines = [], cols3 = [];
+    for (var y = 0; y < rows; y++) {
+      var line = '', crow = [];
+      for (var i = 0; i < cols; i++) {
+        var p = (y * cols + i) * 4, a = d[p + 3] / 255;
+        // see-through pixels count as the page background
+        var bgv = inv ? 0 : 255, r = d[p] * a + bgv * (1 - a), g = d[p + 1] * a + bgv * (1 - a), b = d[p + 2] * a + bgv * (1 - a);
+        var L = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        L = (L - 0.5) * cf + 0.5 + br; L = L < 0 ? 0 : L > 1 ? 1 : L;
+        var dens = inv ? L : 1 - L; // how much "ink" this cell needs
+        var ch = set[Math.min(n - 1, Math.floor(dens * n))];
+        if ($('set').value === 'binary') ch = dens < 0.12 ? ' ' : (dens < 0.55 ? '0' : '1');
+        line += ch; crow.push([d[p], d[p + 1], d[p + 2]]);
+      }
+      lines.push(line.replace(/\s+$/, function (sp) { return $('mode').value === 'color' ? sp : ''; })); cols3.push(crow);
+    }
+    grid = { cols: cols, rows: rows, lines: lines, rgb: cols3 };
+    render();
+  }
+  function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function colorHtml(inline) { // runs of the same (rounded) colour share one span to keep the file small
+    var out = [];
+    grid.lines.forEach(function (line, y) {
+      var a = Array.from(line), s = '', run = '', cur = null;
+      a.forEach(function (ch, i) {
+        var c = grid.rgb[y][i], q = '#' + c.map(function (v) { return ('0' + (Math.round(v / 17) * 17).toString(16)).slice(-2); }).join('').replace(/^#(.)\1(.)\2(.)\3$/, '#$1$2$3');
+        if (q !== cur) { if (run) s += '<span style="color:' + cur + '">' + esc(run) + '</span>'; run = ''; cur = q; }
+        run += ch;
+      });
+      if (run) s += '<span style="color:' + cur + '">' + esc(run) + '</span>';
+      out.push(s);
+    });
+    return out.join('\n');
+  }
+  function fit() {
+    var pre = $('out'), box = $('box'), avail = box.clientWidth - 18;
+    var fs = Math.max(3, Math.min(14, avail / (grid.cols * 0.6)));
+    pre.style.fontSize = fs.toFixed(2) + 'px'; pre.style.lineHeight = (fs * 0.6 / ASPECT).toFixed(2) + 'px';
+    $('fitNote').textContent = fs <= 3 && avail / (grid.cols * 0.6) < 3 ? 'Shown small to fit your screen; scroll sideways inside the box to see it all. Copies and downloads are full size.' : '';
+  }
+  function render() {
+    var color = $('mode').value === 'color';
+    $('box').classList.toggle('dark', $('dark').checked);
+    if (color) $('out').innerHTML = colorHtml(); else $('out').textContent = grid.lines.join('\n');
+    fit();
+    $('sSize').textContent = grid.cols + ' × ' + grid.rows;
+    $('sChars').textContent = fmtNum(grid.lines.join('\n').length);
+    $('work').hidden = false; $('html').hidden = !color;
+    say('', '');
+  }
+  window.addEventListener('resize', function () { if (grid) fit(); });
+
+  function take(f) {
+    job++; var mine = job;
+    if (!f) return;
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) { say('bad', 'This is a HEIC photo, which this browser cannot open. Convert it to JPG first with the HEIC to JPG tool.'); return; }
+    if (!/^image\//.test(f.type)) { say('bad', '"' + f.name + '" is not a picture. Please choose a JPG, PNG, WebP, GIF or BMP file.'); return; }
+    say('', 'Opening ' + f.name + '…');
+    loadImage(f, function (im) {
+      if (mine !== job) return;
+      if (!im || !im.naturalWidth) { say('bad', 'Could not read "' + f.name + '". It may be damaged or in a format your browser cannot open.'); return; }
+      src = im; name = f.name.replace(/\.[^.]+$/, '') || 'picture'; convert();
+    });
+  }
+  var drop = $('drop'), input = $('file');
+  drop.addEventListener('click', function () { input.click(); });
+  drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); input.click(); } });
+  input.addEventListener('change', function () { var f = input.files[0]; input.value = ''; take(f); });
+  ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+  drop.addEventListener('drop', function (e) { take(e.dataTransfer.files[0]); });
+  document.addEventListener('paste', function (e) {
+    if (/^(INPUT|TEXTAREA)$/.test((document.activeElement || {}).tagName || '')) return;
+    var it = [].slice.call((e.clipboardData || {}).items || []).filter(function (i) { return i.type.indexOf('image/') === 0; })[0];
+    if (it) { var f = it.getAsFile(); if (f) take(new File([f], 'pasted.png', { type: f.type })); }
+  });
+  $('sample').addEventListener('click', function () { // a simple drawn scene, so there is no download
+    var c = document.createElement('canvas'); c.width = 400; c.height = 300; var x = c.getContext('2d');
+    var g = x.createLinearGradient(0, 0, 0, 300); g.addColorStop(0, '#7ec8ff'); g.addColorStop(1, '#e9f6ff'); x.fillStyle = g; x.fillRect(0, 0, 400, 300);
+    x.fillStyle = '#ffcc33'; x.beginPath(); x.arc(310, 70, 38, 0, 7); x.fill();
+    x.fillStyle = '#3a7d44'; x.beginPath(); x.moveTo(0, 300); x.lineTo(0, 210); x.quadraticCurveTo(110, 140, 220, 210); x.quadraticCurveTo(320, 260, 400, 200); x.lineTo(400, 300); x.fill();
+    x.fillStyle = '#8b5a2b'; x.fillRect(90, 160, 14, 60); x.fillStyle = '#2e6b34'; x.beginPath(); x.arc(97, 145, 34, 0, 7); x.fill();
+    x.fillStyle = '#c0392b'; x.fillRect(240, 170, 80, 60); x.fillStyle = '#7f2a1f'; x.beginPath(); x.moveTo(230, 172); x.lineTo(280, 130); x.lineTo(330, 172); x.fill();
+    c.toBlob(function (b) { take(new File([b], 'sample.png', { type: 'image/png' })); });
+  });
+
+  ['cols', 'bright', 'contrast'].forEach(function (id) { $(id).addEventListener('input', function () { $(id + 'V').textContent = $(id).value; convert(); }); });
+  $('set').addEventListener('change', function () { $('customRow').hidden = $('set').value !== 'custom'; convert(); });
+  $('dark').addEventListener('click', function () { $('invert').checked = $('dark').checked; }); // light ink on a dark page needs inverted shading
+  ['custom', 'invert', 'mode', 'dark'].forEach(function (id) { $(id).addEventListener(id === 'custom' ? 'input' : 'change', convert); });
+
+  function save(blob, ext) {
+    var a = document.createElement('a'), u = URL.createObjectURL(blob);
+    a.href = u; a.download = name + '-ascii.' + ext; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(u); }, 60000);
+    say('ok', 'Saved ' + a.download + ' (' + fmtBytes(blob.size) + ').');
+  }
+  $('copy').addEventListener('click', function () { if (grid) copyText(grid.lines.join('\n'), $('copy')); });
+  $('txt').addEventListener('click', function () { if (grid) save(new Blob([grid.lines.join('\r\n') + '\r\n'], { type: 'text/plain;charset=utf-8' }), 'txt'); });
+  $('html').addEventListener('click', function () {
+    if (!grid) return;
+    var bg = $('dark').checked ? '#0d1117' : '#ffffff';
+    var doc = '<!doctype html>\n<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>' + esc(name) + ' ASCII art</title></head>\n<body style="margin:0;padding:16px;background:' + bg + '">\n<pre style="font:10px/10px \'Courier New\',Courier,monospace;margin:0">' + colorHtml() + '</pre>\n</body></html>\n';
+    save(new Blob([doc], { type: 'text/html;charset=utf-8' }), 'html');
+  });
+  $('png').addEventListener('click', function () {
+    if (!grid) return;
+    var fs = 12, c = document.createElement('canvas'), x = c.getContext('2d'), font = fs + 'px "Courier New", Courier, monospace';
+    x.font = font; var cw = x.measureText('M').width, lh = cw / ASPECT;
+    var pad = 16, scale = Math.min(1, 16000 / (grid.cols * cw + pad * 2), 16000 / (grid.rows * lh + pad * 2));
+    c.width = Math.ceil((grid.cols * cw + pad * 2) * scale); c.height = Math.ceil((grid.rows * lh + pad * 2) * scale);
+    x.scale(scale, scale); x.fillStyle = $('dark').checked ? '#0d1117' : '#ffffff'; x.fillRect(0, 0, c.width / scale, c.height / scale);
+    x.font = font; x.textBaseline = 'top'; var color = $('mode').value === 'color';
+    x.fillStyle = $('dark').checked ? '#e6edf3' : '#111111';
+    grid.lines.forEach(function (line, y) {
+      Array.from(line).forEach(function (ch, i) {
+        if (ch === ' ') return;
+        if (color) { var v = grid.rgb[y][i]; x.fillStyle = 'rgb(' + v[0] + ',' + v[1] + ',' + v[2] + ')'; }
+        x.fillText(ch, pad + i * cw, pad + y * lh);
+      });
+    });
+    c.toBlob(function (b) { if (!b) { say('bad', 'Your browser could not make the PNG. Try a smaller width.'); return; } save(b, 'png'); }, 'image/png');
+  });
+})();
+</script>

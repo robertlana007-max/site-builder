@@ -1,0 +1,242 @@
+<style>
+.pcal fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.pcal legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.pcal textarea { min-height: 110px; font-family: inherit; font-size: 15px; }
+.pcal .pcal-hint { display: block; font-size: 13px; color: var(--muted); margin: 4px 0 12px; }
+.pcal .pcal-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.pcal .pcal-sw { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-bottom: 12px; }
+.pcal .pcal-sw button { width: 30px; height: 30px; border-radius: 50%; border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--line); cursor: pointer; padding: 0; }
+.pcal .pcal-sw button[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--ink); }
+.pcal input[type=color] { width: 44px; height: 32px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: var(--field); }
+.pcal .pcal-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
+.pcal .pcal-prev canvas { width: 100%; height: auto; display: block; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.pcal .pcal-prev.port canvas { max-width: 460px; }
+.pcal .pcal-nav { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; font-size: 14px; color: var(--muted); }
+.pcal .pcal-nav .btn { min-height: 38px; padding: 4px 12px; }
+</style>
+<div class="pcal" id="pcal">
+<fieldset><legend>Which dates?</legend>
+  <div class="fields">
+    <div><label for="pcLayout">Layout</label><select id="pcLayout"><option value="month">One month per page</option><option value="year">Whole year on one page</option></select></div>
+    <div><label for="pcYear">Year</label><input type="number" id="pcYear" min="1600" max="2600" step="1" inputmode="numeric"></div>
+    <div id="pcStartBox"><label for="pcStart">Starting month</label><select id="pcStart"></select></div>
+    <div id="pcCountBox"><label for="pcCount">Number of months</label><select id="pcCount"><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="6">6</option><option value="12" selected>12</option><option value="18">18</option><option value="24">24</option></select></div>
+  </div>
+</fieldset>
+<fieldset><legend>Language and week</legend>
+  <div class="fields">
+    <div><label for="pcLang">Month and day names</label><select id="pcLang"></select></div>
+    <div><label for="pcWeek">Week starts on</label><select id="pcWeek"><option value="auto">Automatic for my region</option><option value="1">Monday</option><option value="0">Sunday</option><option value="6">Saturday</option></select></div>
+  </div>
+  <label class="pcal-check"><input type="checkbox" id="pcWeekNo">Show week numbers (ISO)</label>
+  <label class="pcal-check"><input type="checkbox" id="pcWeekend" checked>Shade weekends</label>
+</fieldset>
+<fieldset><legend>Holidays, birthdays and events (optional)</legend>
+  <label for="pcEvents">One per line: a date, then the name</label>
+  <textarea id="pcEvents" data-nomemo maxlength="20000" placeholder="01-01 New Year's Day&#10;2026-03-20 Spring term ends&#10;08-14 Mum's birthday"></textarea>
+  <span class="pcal-hint">Write dates as YYYY-MM-DD for one day, or MM-DD to repeat every year. Nothing is added for you, so you choose the holidays of your own country.</span>
+</fieldset>
+<fieldset><legend>Design</legend>
+  <div class="fields">
+    <div><label for="pcStyle">Style</label><select id="pcStyle"><option value="modern">Modern</option><option value="classic">Classic</option><option value="minimal">Minimal</option><option value="bold">Bold</option></select></div>
+    <div><label for="pcPaper">Paper</label><select id="pcPaper" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+    <div><label for="pcOrient">Orientation</label><select id="pcOrient"><option value="land">Landscape</option><option value="port">Portrait</option></select></div>
+  </div>
+  <div class="pcal-sw" id="pcSw"><input type="color" id="pcColor" value="#2563eb" aria-label="Custom colour"></div>
+  <label class="pcal-check"><input type="checkbox" id="pcNotes">Add a notes area under each month</label>
+</fieldset>
+<div class="pcal-prev" id="pcPrevBox">
+  <div class="pcal-nav"><button type="button" class="btn ghost" id="pcPrevP" aria-label="Previous page">‹</button><span id="pcWho">Page 1</span><button type="button" class="btn ghost" id="pcNextP" aria-label="Next page">›</button></div>
+  <canvas id="pcCanvas" width="842" height="595" aria-label="Calendar preview"></canvas>
+</div>
+<div class="btns">
+  <button type="button" class="btn" id="pcPdf">Download PDF</button>
+  <button type="button" class="btn ghost" id="pcPng">This page as PNG</button>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+/*@GD*/
+/*@UT*/
+  var LANGS = [['auto', 'Same as my browser'], ['en', 'English'], ['es', 'Español'], ['fr', 'Français'], ['de', 'Deutsch'], ['pt', 'Português'], ['it', 'Italiano'], ['nl', 'Nederlands'], ['pl', 'Polski'], ['tr', 'Türkçe'], ['sv', 'Svenska'], ['ru', 'Русский'], ['uk', 'Українська'], ['el', 'Ελληνικά'], ['ar', 'العربية'], ['fa', 'فارسی'], ['ur', 'اردو'], ['he', 'עברית'], ['hi', 'हिन्दी'], ['bn', 'বাংলা'], ['ta', 'தமிழ்'], ['th', 'ไทย'], ['id', 'Bahasa Indonesia'], ['ms', 'Bahasa Melayu'], ['vi', 'Tiếng Việt'], ['sw', 'Kiswahili'], ['zh', '中文'], ['ja', '日本語'], ['ko', '한국어']];
+  var COLORS = ['#2563eb', '#dc2626', '#059669', '#7c3aed', '#ea580c', '#db2777', '#0f766e', '#111827'];
+  var color = COLORS[0], pageNo = 0, ready = false, busy = false;
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  LANGS.forEach(function (l) { var o = document.createElement('option'); o.value = l[0]; o.textContent = l[1]; $('pcLang').appendChild(o); });
+  COLORS.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c); b.setAttribute('aria-pressed', c === color); b.addEventListener('click', function () { setColor(c); }); $('pcSw').insertBefore(b, $('pcColor')); });
+  function setColor(c) { color = c; [].forEach.call($('pcSw').querySelectorAll('button'), function (b) { b.setAttribute('aria-pressed', b.style.background && rgbHex(b.style.background) === c); }); paint(); }
+  function rgbHex(s) { var m = s.match(/\d+/g); return m ? '#' + m.slice(0, 3).map(function (x) { return (+x).toString(16).padStart(2, '0'); }).join('') : s; }
+  var now = new Date();
+  // in the last months of the year, people usually want next year's calendar
+  $('pcYear').value = now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
+  $('pcPaper').value = UT.letter() ? 'letter' : 'a4';
+
+  function loc() { var v = $('pcLang').value; if (v !== 'auto') return v; try { return Intl.DateTimeFormat().resolvedOptions().locale; } catch (e) { return 'en'; } }
+  function fmt(opts) { try { return new Intl.DateTimeFormat(loc(), opts); } catch (e) { return new Intl.DateTimeFormat('en', opts); } }
+  function monthName(y, m) { var s = fmt({ month: 'long' }).format(new Date(y, m, 15)); return s.charAt(0).toLocaleUpperCase(loc()) + s.slice(1); }
+  function monthYear(y, m) { var s = fmt({ month: 'long', year: 'numeric' }).format(new Date(y, m, 15)); return s.charAt(0).toLocaleUpperCase(loc()) + s.slice(1); }
+  function dayName(dow, short) { var d = new Date(2023, 0, 1 + dow); return fmt({ weekday: short ? 'narrow' : 'short' }).format(d); } // 1 Jan 2023 was a Sunday
+  var NF = {}; function num(n) { var l = loc(); if (!NF[l]) { try { NF[l] = new Intl.NumberFormat(l, { useGrouping: false }); } catch (e) { NF[l] = new Intl.NumberFormat('en'); } } return NF[l].format(n); }
+  function yearText(y) { return fmt({ year: 'numeric' }).format(new Date(y, 5, 15)); }
+  function isRtl() { return /^(ar|fa|ur|he|ps|sd|ug|yi)\b/.test(loc()); }
+  function weekStart() { var v = $('pcWeek').value; return v === 'auto' ? UT.weekStart() : +v; }
+  function isoWeek(d) { var t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate())), day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day); var y0 = new Date(Date.UTC(t.getUTCFullYear(), 0, 1)); return Math.ceil(((t - y0) / 864e5 + 1) / 7); }
+  function readEvents() {
+    var ev = {}, bad = [];
+    $('pcEvents').value.split(/\r?\n/).forEach(function (line, i) {
+      line = line.trim(); if (!line) return;
+      var m = /^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\s*[:\-–]?\s*(.*)$/.exec(line), y = null, mo, d, t;
+      if (m) { y = +m[1]; mo = +m[2]; d = +m[3]; t = m[4]; }
+      else if ((m = /^(\d{1,2})[-/.](\d{1,2})\s*[:\-–]?\s*(.*)$/.exec(line))) { mo = +m[1]; d = +m[2]; t = m[3]; }
+      else { bad.push(i + 1); return; }
+      var test = new Date(y || 2024, mo - 1, d);
+      if (mo < 1 || mo > 12 || test.getMonth() !== mo - 1 || test.getDate() !== d) { bad.push(i + 1); return; }
+      var k = (y ? y + '-' : '*-') + mo + '-' + d;
+      (ev[k] = ev[k] || []).push(t.trim() || '•');
+    });
+    return { get: function (y, mo, d) { return (ev['*-' + (mo + 1) + '-' + d] || []).concat(ev[y + '-' + (mo + 1) + '-' + d] || []); }, bad: bad };
+  }
+  function pageSize() { var p = $('pcPaper').value === 'letter' ? [792, 612] : [841.89, 595.28]; return $('pcOrient').value === 'port' ? [p[1], p[0]] : p; }
+  function weekendDay(dow) { return weekStart() === 6 ? dow === 5 || dow === 6 : dow === 0 || dow === 6; }
+  function tint(hex, a) { var c = GD.rgb(hex); return '#' + c.map(function (v) { return Math.round((v * a + (1 - a)) * 255).toString(16).padStart(2, '0'); }).join(''); }
+
+  // ---------- a month as a grid ----------
+  function monthGrid(ops, y, m, x0, y0, w, h, o) {
+    var ws = weekStart(), rtl = isRtl(), first = new Date(y, m, 1), lead = (first.getDay() - ws + 7) % 7, days = new Date(y, m + 1, 0).getDate();
+    var rows = Math.ceil((lead + days) / 7), wkW = o.weekNo ? (o.mini ? w * 0.09 : 26) : 0, cw = (w - wkW) / 7, headH = o.mini ? Math.max(9, h * 0.11) : 22, ch = (h - headH) / (o.mini ? 6 : rows);
+    var st = $('pcStyle').value, c = color, ev = o.ev;
+    function colX(i) { return rtl ? x0 + w - wkW - (i + 1) * cw : x0 + wkW + i * cw; }
+    // weekday names
+    if (st === 'modern' || st === 'bold') ops.push({ k: 'rect', x: x0, y: y0, w: w, h: headH, fill: st === 'bold' ? c : tint(c, 0.15), r: o.mini ? 2 : 4 });
+    for (var i = 0; i < 7; i++) {
+      var dow = (ws + i) % 7, ds = o.mini ? Math.min(headH * 0.62, cw * 0.5) : 11;
+      ops.push({ k: 'text', t: dayName(dow, o.mini), x: colX(i) + cw / 2, y: y0 + headH / 2 + ds * 0.36, font: 'sansb', s: ds, fill: st === 'bold' ? '#ffffff' : weekendDay(dow) && $('pcWeekend').checked ? c : '#374151', align: 'center' });
+    }
+    var gy = y0 + headH;
+    for (var d = 1; d <= days; d++) {
+      var idx = lead + d - 1, r = Math.floor(idx / 7), col = idx % 7, dw = (ws + col) % 7, cx = colX(col), cy = gy + r * ch, list = ev.get(y, m, d), we = weekendDay(dw) && $('pcWeekend').checked;
+      if (o.mini) {
+        var fs = Math.min(ch * 0.55, cw * 0.48);
+        if (list.length) ops.push({ k: 'circle', x: cx + cw / 2, y: cy + ch / 2, r: Math.min(cw, ch) * 0.46, fill: tint(c, 0.25) });
+        ops.push({ k: 'text', t: num(d), x: cx + cw / 2, y: cy + ch / 2 + fs * 0.36, font: list.length ? 'sansb' : 'sans', s: fs, fill: we ? c : '#111827', align: 'center' });
+      } else {
+        if (we && st !== 'minimal') ops.push({ k: 'rect', x: cx, y: cy, w: cw, h: ch, fill: tint(c, 0.06) });
+        if (list.length) ops.push({ k: 'rect', x: cx, y: cy, w: cw, h: ch, fill: tint(c, 0.12) });
+        var ns = Math.min(16, ch * 0.28, cw * 0.22);
+        ops.push({ k: 'text', t: num(d), x: rtl ? cx + cw - 5 : cx + 5, y: cy + ns + 4, font: 'sansb', s: ns, fill: we || list.length ? c : '#111827', align: rtl ? 'right' : 'left' });
+        // event names under the number, as many lines as fit
+        var es = Math.max(5.5, Math.min(8.5, cw * 0.075)), ly = cy + ns + 6 + es, lines = [];
+        list.forEach(function (t) { lines = lines.concat(GD.wrap(t, 'sans', es, cw - 8)); });
+        var maxL = Math.max(0, Math.floor((cy + ch - 3 - (ly - es)) / (es + 2)));
+        if (lines.length > maxL && maxL > 0) { lines = lines.slice(0, maxL); lines[maxL - 1] = lines[maxL - 1].replace(/.{0,2}$/, '…'); }
+        lines.slice(0, maxL).forEach(function (t, k) { ops.push({ k: 'text', t: t, x: rtl ? cx + cw - 4 : cx + 4, y: ly + k * (es + 2), font: 'sans', s: es, fill: '#1f2937', align: rtl ? 'right' : 'left' }); });
+      }
+    }
+    // grid lines for the big month view
+    if (!o.mini && st !== 'minimal') {
+      var lc = st === 'classic' ? '#374151' : '#d1d5db', lw = st === 'classic' ? 0.9 : 0.7;
+      for (var rr = 0; rr <= rows; rr++) ops.push({ k: 'line', x1: x0 + wkW, y1: gy + rr * ch, x2: x0 + w, y2: gy + rr * ch, stroke: lc, lw: lw });
+      for (var cc = 0; cc <= 7; cc++) ops.push({ k: 'line', x1: x0 + wkW + cc * cw, y1: gy, x2: x0 + wkW + cc * cw, y2: gy + rows * ch, stroke: lc, lw: lw });
+    } else if (!o.mini) {
+      for (var r2 = 1; r2 < rows; r2++) ops.push({ k: 'line', x1: x0 + wkW, y1: gy + r2 * ch, x2: x0 + w, y2: gy + r2 * ch, stroke: '#e5e7eb', lw: 0.6 });
+    }
+    if (o.weekNo) for (var r3 = 0; r3 < rows; r3++) {
+      var dd = Math.max(1, Math.min(days, r3 * 7 - lead + 1)), wn = isoWeek(new Date(y, m, dd)), wsz = o.mini ? Math.min(ch * 0.45, wkW * 0.55) : 8;
+      ops.push({ k: 'text', t: num(wn), x: rtl ? x0 + w - wkW / 2 : x0 + wkW / 2, y: gy + r3 * ch + (o.mini ? ch / 2 + wsz * 0.36 : 12), font: 'sans', s: wsz, fill: '#9ca3af', align: 'center' });
+    }
+    return rows;
+  }
+  function pages() {
+    var P = pageSize(), W = P[0], H = P[1], M = 30, out = [], y0 = +$('pcYear').value, ev = readEvents(), st = $('pcStyle').value;
+    var wk = $('pcWeekNo').checked, notes = $('pcNotes').checked;
+    if ($('pcLayout').value === 'year') {
+      var ops = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }], port = H > W, cols = port ? 3 : 4, rows = port ? 4 : 3;
+      if (st === 'bold') ops.push({ k: 'rect', x: 0, y: 0, w: W, h: 64, fill: color });
+      ops.push({ k: 'text', t: yearText(y0), x: W / 2, y: 46, font: 'sansb', s: 32, fill: st === 'bold' ? '#ffffff' : color, align: 'center' });
+      var top = 78, listH = 0, evList = [];
+      for (var mm = 0; mm < 12; mm++) for (var d = 1; d <= new Date(y0, mm + 1, 0).getDate(); d++) ev.get(y0, mm, d).forEach(function (t) { evList.push([mm, d, t]); });
+      if (evList.length) listH = Math.min(H * 0.22, Math.ceil(evList.length / (port ? 2 : 3)) * 11 + 14);
+      var gw = (W - 2 * M - (cols - 1) * 18) / cols, gh = (H - top - M - listH - (rows - 1) * 12) / rows;
+      for (var i = 0; i < 12; i++) {
+        var cx = M + (isRtl() ? cols - 1 - i % cols : i % cols) * (gw + 18), cy = top + Math.floor(i / cols) * (gh + 12);
+        ops.push({ k: 'text', t: monthName(y0, i), x: cx + gw / 2, y: cy + 12, font: 'sansb', s: 12, fill: '#111827', align: 'center' });
+        monthGrid(ops, y0, i, cx, cy + 18, gw, gh - 18, { mini: true, ev: ev, weekNo: wk });
+      }
+      if (listH) {
+        var lc = port ? 2 : 3, lw = (W - 2 * M) / lc, per = Math.ceil(evList.length / lc), ly = H - M - listH + 12, maxRows = Math.floor((listH - 12) / 11), shown = 0;
+        evList.forEach(function (e, k) {
+          var c = Math.floor(k / per), r = k % per; if (r >= maxRows) return; shown++;
+          var t = fmt({ day: 'numeric', month: 'short' }).format(new Date(y0, e[0], e[1])) + '  ' + e[2];
+          ops.push({ k: 'text', t: t.length > 60 ? t.slice(0, 58) + '…' : t, x: M + c * lw, y: ly + r * 11, font: 'sans', s: 8, fill: '#374151' });
+        });
+      }
+      out.push({ ops: ops, W: W, H: H, label: yearText(y0) });
+    } else {
+      var start = +$('pcStart').value, n = +$('pcCount').value;
+      for (var k = 0; k < n; k++) {
+        var yy = y0 + Math.floor((start + k) / 12), m = (start + k) % 12, o2 = [{ k: 'rect', x: 0, y: 0, w: W, h: H, fill: '#ffffff' }], title = monthYear(yy, m), th = 44;
+        if (st === 'bold') { o2.push({ k: 'rect', x: 0, y: 0, w: W, h: th + 22, fill: color }); }
+        var ts = GD.fit(title, 'sansb', 28, W - 2 * M, 12);
+        o2.push({ k: 'text', t: title, x: isRtl() ? W - M : M, y: M + ts * 0.8 + 2, font: 'sansb', s: ts, fill: st === 'bold' ? '#ffffff' : st === 'minimal' ? '#111827' : color, align: isRtl() ? 'right' : 'left' });
+        if (st === 'modern') o2.push({ k: 'rect', x: isRtl() ? W - M - 60 : M, y: M + ts * 0.8 + 10, w: 60, h: 4, r: 2, fill: color });
+        var gy = M + th + 18, gh = H - gy - M - (notes ? H * 0.17 : 0);
+        monthGrid(o2, yy, m, M, gy, W - 2 * M, gh, { ev: ev, weekNo: wk });
+        if (notes) {
+          var ny = gy + gh + 22;
+          o2.push({ k: 'text', t: 'Notes', x: isRtl() ? W - M : M, y: ny, font: 'sansb', s: 11, fill: color, align: isRtl() ? 'right' : 'left' });
+          for (var ln = ny + 18; ln < H - M + 2; ln += 18) o2.push({ k: 'line', x1: M, y1: ln, x2: W - M, y2: ln, stroke: '#d1d5db', lw: 0.6 });
+        }
+        out.push({ ops: o2, W: W, H: H, label: title });
+      }
+    }
+    return { pages: out, bad: ev.bad };
+  }
+  function valid() {
+    var y = +$('pcYear').value;
+    if (!$('pcYear').value || !isFinite(y) || y !== Math.floor(y) || y < 1600 || y > 2600) { say('bad', 'Type a year between 1600 and 2600.'); return false; }
+    return true;
+  }
+  function paint() {
+    if (!ready) return;
+    $('pcStartBox').hidden = $('pcCountBox').hidden = $('pcLayout').value === 'year';
+    if (!valid()) return;
+    var r = pages(), ps = r.pages; pageNo = Math.max(0, Math.min(pageNo, ps.length - 1));
+    var pg = ps[pageNo], cv = $('pcCanvas'), sc = 1.6;
+    cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
+    $('pcPrevBox').classList.toggle('port', pg.H > pg.W);
+    GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+    $('pcWho').textContent = pg.label + (ps.length > 1 ? ' (' + (pageNo + 1) + ' of ' + ps.length + ')' : '');
+    $('pcPrevP').disabled = pageNo === 0; $('pcNextP').disabled = pageNo >= ps.length - 1;
+    say(r.bad.length ? 'bad' : '', r.bad.length ? 'Line ' + r.bad.slice(0, 5).join(', ') + ' of your events could not be read. Use a real date like 2026-12-31 or 12-31, then the name.' : '');
+  }
+  function fillMonths() {
+    var sel = $('pcStart'), v = sel.value; sel.innerHTML = '';
+    for (var i = 0; i < 12; i++) { var o = document.createElement('option'); o.value = i; o.textContent = monthName(2024, i); sel.appendChild(o); }
+    sel.value = v || '0';
+  }
+  var t = null; function later() { clearTimeout(t); t = setTimeout(paint, 150); }
+  $('pcLang').addEventListener('change', function () { NF = {}; fillMonths(); paint(); });
+  ['pcLayout', 'pcStart', 'pcCount', 'pcWeek', 'pcWeekNo', 'pcWeekend', 'pcStyle', 'pcPaper', 'pcOrient', 'pcNotes'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'pcLayout' || id === 'pcCount' || id === 'pcStart') pageNo = 0; paint(); }); });
+  $('pcYear').addEventListener('input', later); $('pcEvents').addEventListener('input', later);
+  $('pcColor').addEventListener('input', function () { setColor(this.value); });
+  $('pcPrevP').addEventListener('click', function () { pageNo--; paint(); });
+  $('pcNextP').addEventListener('click', function () { pageNo++; paint(); });
+  $('pcPng').addEventListener('click', function () { if (!valid()) return; $('pcCanvas').toBlob(function (b) { GD.download(b, 'calendar-' + $('pcYear').value + '.png'); say('ok', 'PNG saved.'); }, 'image/png'); });
+  $('pcPdf').addEventListener('click', async function () {
+    if (busy || !valid()) return;
+    busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
+    try {
+      var ps = pages().pages, env = await GD.newPdf('Calendar ' + $('pcYear').value, 'GetToolNest Printable Calendar', function (t) { say('', t); });
+      for (var i = 0; i < ps.length; i++) await GD.drawPdf(env, env.doc.addPage([ps[i].W, ps[i].H]), ps[i].ops);
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), 'calendar-' + $('pcYear').value + '.pdf');
+      say('ok', 'PDF saved with ' + ps.length + ' page' + (ps.length > 1 ? 's' : '') + '.');
+    } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false;
+  });
+  fillMonths();
+  GD.loadAll(['sans', 'sansb']).then(function () { ready = true; paint(); }, function () { say('bad', 'The fonts could not load. Check your connection and reload.'); });
+})();
+</script>

@@ -1,0 +1,316 @@
+<style>
+.rtc .stat b { font-size: clamp(17px, 4.6vw, 22px); overflow-wrap: normal; word-break: normal; }
+.rtc fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 0 0 14px; min-width: 0; }
+.rtc legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.rtc .rtc-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 18px 0 8px; }
+.rtc .rtc-head h3 { margin: 0; }
+.rtc .stat.rtc-good b { color: var(--ok); } .rtc .stat.rtc-bad b { color: var(--bad); }
+.rtc table.sched { min-width: 560px; } .rtc table.sched td, .rtc table.sched th { white-space: nowrap; }
+.rtc tr.rtc-ret td { font-weight: 700; }
+.fch { position: relative; margin: 16px 0 4px; }
+.fch canvas { display: block; width: 100%; height: 240px; touch-action: pan-y; }
+.fch-tip { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13.5px; color: var(--muted); margin-top: 6px; min-height: 20px; font-variant-numeric: tabular-nums; }
+.fch-tip b { color: var(--ink); }
+.fch-tip i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-inline-end: 5px; vertical-align: -1px; }
+@media (max-width: 480px) { .rtc .stats { grid-template-columns: 1fr 1fr; } .rtc .stat { padding: 10px 12px; } }
+</style>
+<div class="rtc" id="rtc">
+<fieldset>
+  <legend>You today</legend>
+  <div class="fields">
+    <div><label for="rtcCur">Currency</label><select id="rtcCur" data-cur></select></div>
+    <div hidden><label for="rtcSym">Your currency symbol</label><input type="text" id="rtcSym" data-cursym maxlength="6" placeholder="e.g. ¥ or KES"></div>
+    <div><label for="rtcAge">Current age</label><input type="number" id="rtcAge" min="0" max="110" step="1" inputmode="numeric" value="35"></div>
+    <div><label for="rtcRet">Retirement age</label><input type="number" id="rtcRet" min="0" max="110" step="1" inputmode="numeric" value="65"></div>
+    <div><label for="rtcEnd">Plan until age</label><input type="number" id="rtcEnd" min="1" max="120" step="1" inputmode="numeric" value="90"></div>
+  </div>
+  <div class="fields">
+    <div><label for="rtcSaved">Savings so far</label><input type="number" id="rtcSaved" min="0" step="any" inputmode="decimal" value="50000"></div>
+    <div><label for="rtcMonthly">You add each month</label><input type="number" id="rtcMonthly" min="0" step="any" inputmode="decimal" value="500"></div>
+    <div><label for="rtcRaise">Raise your saving each year by (%)</label><input type="number" id="rtcRaise" min="0" max="50" step="any" inputmode="decimal" value="2"></div>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Growth and prices</legend>
+  <div class="fields">
+    <div><label for="rtcGrow">Return before retiring (% per year)</label><input type="number" id="rtcGrow" step="any" inputmode="decimal" value="6"></div>
+    <div><label for="rtcPost">Return after retiring (% per year)</label><input type="number" id="rtcPost" step="any" inputmode="decimal" value="4"></div>
+    <div><label for="rtcInfl">Inflation (% per year)</label><input type="number" id="rtcInfl" step="any" inputmode="decimal" value="2.5"></div>
+  </div>
+</fieldset>
+<fieldset>
+  <legend>Retirement income</legend>
+  <div class="fields">
+    <div><label for="rtcIncome">Income you want per year (today's money)</label><input type="number" id="rtcIncome" min="0" step="any" inputmode="decimal" value="40000"></div>
+    <div><label for="rtcOther">Pension or other income per year (today's money)</label><input type="number" id="rtcOther" min="0" step="any" inputmode="decimal" value="0"></div>
+    <div><label for="rtcWd">Safe withdrawal rate (%)</label><input type="number" id="rtcWd" min="0.5" max="20" step="any" inputmode="decimal" value="4"></div>
+  </div>
+</fieldset>
+<div class="stats">
+  <div class="stat"><span>Savings needed at retirement (today's money)</span><b id="rtcNeed">–</b></div>
+  <div class="stat"><span>You are on track for (today's money)</span><b id="rtcHave">–</b></div>
+  <div class="stat" id="rtcGapBox"><span>Shortfall</span><b id="rtcGap">–</b></div>
+  <div class="stat"><span>Extra to save each month</span><b id="rtcExtra">–</b></div>
+  <div class="stat"><span>Years until retirement</span><b id="rtcYears">–</b></div>
+  <div class="stat"><span>Your money lasts until age</span><b id="rtcLast">–</b></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="rtc-head"><h3>Savings by age</h3>
+  <div class="seg" role="group" aria-label="Show amounts in"><button type="button" data-v="real" aria-pressed="true">Today's money</button><button type="button" data-v="nom" aria-pressed="false">Future money</button></div>
+</div>
+<div class="fch"><canvas id="rtcChart" role="img" aria-label="Line chart of your savings balance by age"></canvas><div class="fch-tip" id="rtcTip" aria-live="off"></div></div>
+<div class="rtc-head"><h3>Year by year</h3></div>
+<div class="scroll-x"><table class="sched"><thead><tr><th>Age</th><th>Added</th><th>Growth</th><th>Withdrawn</th><th>Balance</th><th>In today's money</th></tr></thead><tbody id="rtcRows"></tbody></table></div>
+<div class="btns"><button type="button" class="btn ghost" id="rtcCsv">Download table (CSV)</button><button type="button" class="btn ghost" id="rtcCopy">Copy summary</button></div>
+<a id="dl" hidden></a>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- shared helpers ----------
+  function num(id) { var el = typeof id === 'string' ? $(id) : id; var s = String(el.value).replace(/[\s,']/g, ''); return s === '' ? NaN : +s; }
+  function say(cls, text, id) { var m = $(id || 'msg'); if (!m) return; m.className = 'msg ' + (cls || ''); m.textContent = text || ''; }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+  function store(k, v) { try { if (v == null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function load(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function isoToday() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  function niceDate(iso) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || ''); return m ? (+m[3]) + ' ' + MONTHS[+m[2] - 1] + ' ' + m[1] : ''; }
+  // Region from the browser language (e.g. en-US -> US). Used only to pick sensible defaults.
+  function region() { var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l); return m ? m[1].toUpperCase() : ''; }
+  // Imperial by default where it is the everyday system (or when chosen in Settings); metric everywhere else.
+  function imperialDefault() { if (window.Prefs && Prefs.get().units === 'imperial') return true; return ['US', 'LR', 'MM'].indexOf(region()) !== -1; }
+  function nf(n, d) { return isFinite(n) ? fmtNum(n, d == null ? 2 : d) : '–'; }
+  function round(n, d) { var p = Math.pow(10, d || 0); return Math.round(n * p) / p; }
+  // Short axis labels: 1.2K, 3.4M
+  function shortNum(n) { try { return new Intl.NumberFormat('en-US', { notation: 'compact', maximumFractionDigits: 1 }).format(n); } catch (e) { return String(Math.round(n)); } }
+  // number with up to d decimals (trailing zeros dropped), in the visitor's number format
+  function nfx(n, d) { if (!isFinite(n)) return '–'; try { return Number(n).toLocaleString((window.Prefs && Prefs.get().numfmt) || 'en-US', { maximumFractionDigits: d == null ? 2 : d }); } catch (e) { return String(round(n, d == null ? 2 : d)); } }
+  function cssv(v, d) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || d; }
+  // ---------- money and currency ----------
+  var CURS = [['USD', 'US dollar'], ['EUR', 'Euro'], ['GBP', 'British pound'], ['INR', 'Indian rupee'], ['PKR', 'Pakistani rupee'], ['AED', 'UAE dirham'], ['SAR', 'Saudi riyal'],
+    ['CAD', 'Canadian dollar'], ['AUD', 'Australian dollar'], ['NZD', 'New Zealand dollar'], ['JPY', 'Japanese yen'], ['CNY', 'Chinese yuan'], ['SGD', 'Singapore dollar'],
+    ['MYR', 'Malaysian ringgit'], ['IDR', 'Indonesian rupiah'], ['PHP', 'Philippine peso'], ['BDT', 'Bangladeshi taka'], ['LKR', 'Sri Lankan rupee'], ['NPR', 'Nepalese rupee'],
+    ['NGN', 'Nigerian naira'], ['KES', 'Kenyan shilling'], ['GHS', 'Ghanaian cedi'], ['ZAR', 'South African rand'], ['EGP', 'Egyptian pound'], ['TRY', 'Turkish lira'],
+    ['BRL', 'Brazilian real'], ['MXN', 'Mexican peso'], ['CHF', 'Swiss franc'], ['SEK', 'Swedish krona'], ['NOK', 'Norwegian krone'], ['DKK', 'Danish krone'], ['PLN', 'Polish zloty'],
+    ['QAR', 'Qatari riyal'], ['KWD', 'Kuwaiti dinar'], ['KRW', 'South Korean won'], ['VND', 'Vietnamese dong'], ['THB', 'Thai baht']];
+  var REGION_CUR = { US: 'USD', GB: 'GBP', IN: 'INR', PK: 'PKR', AE: 'AED', SA: 'SAR', CA: 'CAD', AU: 'AUD', NZ: 'NZD', JP: 'JPY', CN: 'CNY', SG: 'SGD', MY: 'MYR', ID: 'IDR', PH: 'PHP',
+    BD: 'BDT', LK: 'LKR', NP: 'NPR', NG: 'NGN', KE: 'KES', GH: 'GHS', ZA: 'ZAR', EG: 'EGP', TR: 'TRY', BR: 'BRL', MX: 'MXN', CH: 'CHF', SE: 'SEK', NO: 'NOK', DK: 'DKK', PL: 'PLN',
+    QA: 'QAR', KW: 'KWD', KR: 'KRW', VN: 'VND', TH: 'THB', DE: 'EUR', FR: 'EUR', ES: 'EUR', IT: 'EUR', NL: 'EUR', IE: 'EUR', PT: 'EUR', BE: 'EUR', AT: 'EUR', FI: 'EUR', GR: 'EUR' };
+  function guessCur() {
+    var l = (navigator.languages && navigator.languages[0]) || navigator.language || '', m = /[-_]([a-z]{2})\b/i.exec(l);
+    return (m && REGION_CUR[m[1].toUpperCase()]) || 'USD';
+  }
+  // Fill a <select> with currencies (plus "Other"). The site restores a remembered choice after this runs.
+  function fillCur(sel) {
+    sel.innerHTML = CURS.map(function (c) { return '<option value="' + c[0] + '">' + c[0] + ' – ' + c[1] + '</option>'; }).join('') + '<option value="X">Other – type your own symbol</option>';
+    sel.value = guessCur();
+  }
+  var fmtCache = {};
+  function curCode() { var s = document.querySelector('[data-cur]'); return s ? s.value : 'USD'; }
+  function curSym() { var b = document.querySelector('[data-cursym]'), s = b ? b.value.trim() : ''; return s ? (/[A-Za-z]$/.test(s) ? s + ' ' : s) : ''; }
+  function numLocale(code) { var p = (window.Prefs && Prefs.get().numfmt) || 'en-US'; return code === 'INR' && p === 'en-US' ? 'en-IN' : p; }
+  // money(12.5) -> "$12.50" in the chosen currency; dp forces the number of decimals (e.g. 0 for big totals)
+  function money(n, dp) {
+    if (n == null || !isFinite(n)) return '–';
+    var code = curCode();
+    if (dp == null) dp = { JPY: 0, KRW: 0, VND: 0, KWD: 3 }[code]; if (dp == null) dp = 2;
+    if (code === 'X') return (n < 0 ? '−' : '') + curSym() + fmtNum(Math.abs(n), dp == null ? 2 : dp);
+    var k = code + '|' + dp + '|' + numLocale(code);
+    if (!fmtCache[k]) {
+      try { var o = { style: 'currency', currency: code }; if (dp != null) { o.minimumFractionDigits = dp; o.maximumFractionDigits = dp; } fmtCache[k] = new Intl.NumberFormat(numLocale(code), o); }
+      catch (e) { fmtCache[k] = { format: function (v) { return code + ' ' + fmtNum(v, dp == null ? 2 : dp); } }; }
+    }
+    return fmtCache[k].format(n).replace(/^-/, '−');
+  }
+  // Wire the currency picker: fills it, shows the "own symbol" box for Other, and calls cb on change.
+  function curWire(cb) {
+    var s = document.querySelector('[data-cur]'), b = document.querySelector('[data-cursym]');
+    fillCur(s);
+    function t() { if (b) b.closest('div').hidden = s.value !== 'X'; }
+    s.addEventListener('change', function () { t(); cb(); });
+    s.addEventListener('input', t);
+    if (b) b.addEventListener('input', cb);
+    t();
+  }
+  // ---------- small canvas chart (line or stacked bars), redraws on resize and theme change ----------
+  function Chart(cv, tip) {
+    var spec = null, geo = null, hover = -1;
+    function css(v, d) { var x = getComputedStyle(document.documentElement).getPropertyValue(v).trim(); return x || d; }
+    function draw() {
+      if (!spec || !cv.isConnected) return;
+      var dpr = window.devicePixelRatio || 1, W = cv.clientWidth, H = cv.clientHeight;
+      if (!W || !H) return;
+      cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+      var g = cv.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+      var ink = css('--muted', '#5f6b7a'), line = css('--line', '#e3e6eb'), font = '12px system-ui, -apple-system, Segoe UI, Roboto, sans-serif';
+      var L = spec.labels, n = L.length, S = spec.series, max = 0, min = 0;
+      if (!n) return;
+      for (var i = 0; i < n; i++) {
+        var stack = 0;
+        S.forEach(function (s) { var v = +s.data[i] || 0; if (spec.type === 'bar') stack += v; else { if (v > max) max = v; if (v < min) min = v; } });
+        if (spec.type === 'bar' && stack > max) max = stack;
+      }
+      if (max === min) max = min + 1;
+      // nice step
+      var raw = (max - min) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw))), step = [1, 2, 2.5, 5, 10].map(function (k) { return k * mag; }).find(function (s) { return s >= raw; });
+      var top = Math.ceil(max / step) * step, bot = Math.floor(min / step) * step;
+      g.font = font;
+      var padL = 8 + Math.max(g.measureText(shortNum(top)).width, g.measureText(shortNum(bot)).width), padR = 10, padT = 10, padB = 24;
+      var pw = W - padL - padR, ph = H - padT - padB;
+      function Y(v) { return padT + ph - (v - bot) / (top - bot) * ph; }
+      g.strokeStyle = line; g.fillStyle = ink; g.lineWidth = 1; g.textAlign = 'right'; g.textBaseline = 'middle';
+      for (var v = bot; v <= top + step / 2; v += step) { var y = Math.round(Y(v)) + .5; g.beginPath(); g.moveTo(padL, y); g.lineTo(W - padR, y); g.stroke(); g.fillText(shortNum(v), padL - 6, y); }
+      var bw = pw / n, X = function (i) { return padL + bw * (i + .5); };
+      // x labels: as many as fit
+      g.textAlign = 'center'; g.textBaseline = 'top';
+      var every = Math.max(1, Math.ceil(n / Math.max(1, Math.floor(pw / 46))));
+      for (i = 0; i < n; i++) if (i % every === 0 || i === n - 1 && n - 1 - (Math.floor((n - 1) / every) * every) > every / 2) g.fillText(L[i], X(i), H - padB + 6);
+      if (spec.type === 'bar') {
+        var w = Math.max(1, Math.min(36, bw * .7));
+        for (i = 0; i < n; i++) {
+          var base = 0;
+          S.forEach(function (s) { var v = Math.max(0, +s.data[i] || 0); if (!v) return; g.fillStyle = s.color; var y1 = Y(base + v), y0 = Y(base); g.fillRect(X(i) - w / 2, y1, w, Math.max(0, y0 - y1 - (base ? 1 : 0))); base += v; });
+        }
+      } else {
+        S.forEach(function (s) {
+          g.beginPath();
+          for (var i = 0; i < n; i++) { var x = n === 1 ? padL + pw / 2 : padL + pw * i / (n - 1), y = Y(+s.data[i] || 0); if (i) g.lineTo(x, y); else g.moveTo(x, y); }
+          g.strokeStyle = s.color; g.lineWidth = 2.5; g.lineJoin = 'round'; g.stroke();
+          if (s.fill && n > 1) { g.lineTo(padL + pw, Y(Math.max(bot, 0))); g.lineTo(padL, Y(Math.max(bot, 0))); g.closePath(); g.globalAlpha = .12; g.fillStyle = s.color; g.fill(); g.globalAlpha = 1; }
+        });
+      }
+      geo = { padL: padL, pw: pw, n: n, bw: bw, type: spec.type };
+      if (hover >= 0 && hover < n) {
+        var hx = spec.type === 'bar' ? X(hover) : (n === 1 ? padL + pw / 2 : padL + pw * hover / (n - 1));
+        g.strokeStyle = ink; g.globalAlpha = .5; g.beginPath(); g.moveTo(hx + .5, padT); g.lineTo(hx + .5, padT + ph); g.stroke(); g.globalAlpha = 1;
+      }
+    }
+    function showTip(i) {
+      if (!tip) return;
+      if (i < 0) { tip.hidden = true; return; }
+      tip.hidden = false;
+      tip.innerHTML = '<b>' + esc(spec.labels[i]) + '</b>' + spec.series.map(function (s) { return '<span><i style="background:' + s.color + '"></i>' + esc(s.name) + ': ' + esc(spec.fmt ? spec.fmt(+s.data[i] || 0) : s.data[i]) + '</span>'; }).join('');
+    }
+    function pick(e) {
+      if (!geo) return;
+      var r = cv.getBoundingClientRect(), x = e.clientX - r.left - geo.padL, i;
+      i = geo.type === 'bar' ? Math.floor(x / geo.bw) : Math.round(x / (geo.pw / Math.max(1, geo.n - 1)));
+      i = Math.max(0, Math.min(geo.n - 1, i));
+      if (i !== hover) { hover = i; draw(); showTip(i); }
+    }
+    cv.addEventListener('pointermove', pick); cv.addEventListener('pointerdown', pick);
+    cv.addEventListener('pointerleave', function () { hover = -1; draw(); });
+    if (window.ResizeObserver) new ResizeObserver(function () { draw(); }).observe(cv);
+    new MutationObserver(function () { draw(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'style', 'class'] });
+    return { set: function (s) { spec = s; if (hover >= s.labels.length) hover = -1; draw(); if (tip) showTip(hover >= 0 ? hover : s.labels.length - 1); } };
+  }
+  var chart = Chart($('rtcChart'), $('rtcTip')), view = 'real', last = null;
+  var IDS = ['rtcNeed', 'rtcHave', 'rtcGap', 'rtcExtra', 'rtcYears', 'rtcLast'];
+  function mrate(pct) { return Math.pow(1 + pct / 100, 1 / 12) - 1; } // monthly rate with the same yearly result
+
+  // Builds the full plan. Exposed for testing as window.__rtc.
+  function plan(o) {
+    var n = o.ret - o.age, r1 = mrate(o.grow), r2 = mrate(o.post), inf = o.infl / 100;
+    var bal = o.saved, rows = [], k, m;
+    for (k = 0; k < n; k++) {
+      var c = o.monthly * Math.pow(1 + o.raise / 100, k), start = bal, add = 0;
+      for (m = 0; m < 12; m++) { bal = bal * (1 + r1) + c; add += c; }
+      rows.push({ age: o.age + k + 1, add: add, growth: bal - start - add, wd: 0, bal: bal, real: bal / Math.pow(1 + inf, k + 1) });
+    }
+    var atRet = bal, atRetReal = bal / Math.pow(1 + inf, n);
+    var needReal = Math.max(0, o.income - o.other) / (o.wd / 100), needNom = needReal * Math.pow(1 + inf, n);
+    var gapNom = needNom - atRet;
+    var af = r1 === 0 ? 12 * n : (Math.pow(1 + r1, 12 * n) - 1) / r1;
+    var extra = gapNom > 0 && n > 0 ? gapNom / af : 0;
+    // Spending phase: withdraw (income - other) each month, rising with inflation every year.
+    var lastAge = null, draw = Math.max(0, o.income - o.other);
+    for (k = 0; k < o.end - o.ret; k++) {
+      var w = draw * Math.pow(1 + inf, n + k) / 12, start2 = bal, out = 0;
+      for (m = 0; m < 12; m++) {
+        var take = Math.min(w, bal); bal -= take; out += take;
+        if (bal <= 0 && take < w && lastAge == null) lastAge = o.ret + k + m / 12;
+        bal = bal * (1 + r2);
+      }
+      if (bal < 1e-9) bal = 0;
+      rows.push({ age: o.ret + k + 1, add: 0, growth: bal - start2 + out, wd: out, bal: bal, real: bal / Math.pow(1 + inf, n + k + 1) });
+    }
+    return { n: n, rows: rows, atRet: atRet, atRetReal: atRetReal, needReal: needReal, needNom: needNom, gapReal: needReal - atRetReal, extra: extra, lastAge: lastAge, draw: draw };
+  }
+  function read() {
+    return { age: num('rtcAge'), ret: num('rtcRet'), end: num('rtcEnd'), saved: num('rtcSaved') || 0, monthly: num('rtcMonthly') || 0, raise: num('rtcRaise') || 0,
+      grow: num('rtcGrow'), post: num('rtcPost'), infl: num('rtcInfl'), income: num('rtcIncome') || 0, other: num('rtcOther') || 0, wd: num('rtcWd') };
+  }
+  function check(o) {
+    var whole = function (v) { return isFinite(v) && Math.floor(v) === v; };
+    if (!whole(o.age) || o.age < 0 || o.age > 110) return 'Enter your current age as a whole number from 0 to 110.';
+    if (!whole(o.ret) || o.ret < o.age) return 'Enter a retirement age (whole number) that is the same as or later than your current age.';
+    if (o.ret > 110) return 'Enter a retirement age up to 110.';
+    if (!whole(o.end) || o.end <= o.ret || o.end > 120) return 'Enter a "Plan until age" later than your retirement age (up to 120).';
+    if (o.saved < 0 || o.monthly < 0 || o.income < 0 || o.other < 0 || o.raise < 0) return 'Amounts cannot be negative.';
+    if (o.saved > 1e15 || o.monthly > 1e13 || o.income > 1e13) return 'Those amounts are too large to work with. Try smaller numbers.';
+    if (!isFinite(o.grow) || !isFinite(o.post) || !isFinite(o.infl)) return 'Enter the returns and inflation as percentages (they can be 0).';
+    if (o.grow < -50 || o.grow > 50 || o.post < -50 || o.post > 50) return 'Enter yearly returns between -50% and 50%.';
+    if (o.infl < -10 || o.infl > 50) return 'Enter inflation between -10% and 50%.';
+    if (o.raise > 50) return 'Enter a yearly saving increase up to 50%.';
+    if (!(o.wd >= 0.5 && o.wd <= 20)) return 'Enter a withdrawal rate from 0.5% to 20%. Many planners use 3% to 4%.';
+    return '';
+  }
+  function calc() {
+    var o = read(), err = check(o);
+    if (err) { IDS.forEach(function (i) { $(i).textContent = '–'; }); $('rtcRows').innerHTML = ''; chart.set({ labels: [], series: [] }); last = null; return say('bad', err); }
+    var p = plan(o); last = { o: o, p: p };
+    $('rtcNeed').textContent = money(p.needReal, 0);
+    $('rtcHave').textContent = money(p.atRetReal, 0);
+    var short = p.gapReal > 0.5;
+    $('rtcGapBox').className = 'stat ' + (short ? 'rtc-bad' : 'rtc-good');
+    $('rtcGapBox').firstChild.textContent = short ? 'Shortfall' : 'Surplus';
+    $('rtcGap').textContent = money(Math.abs(p.gapReal), 0);
+    $('rtcExtra').textContent = !short ? money(0, 0) : p.n > 0 ? money(p.extra) : 'Retiring now';
+    $('rtcYears').textContent = p.n;
+    $('rtcLast').textContent = p.draw === 0 ? 'No withdrawals' : p.lastAge == null ? o.end + '+' : String(Math.floor(p.lastAge));
+    var notes = [];
+    if (p.draw === 0) notes.push('Your pension or other income covers the income you want, so you do not need to draw on savings.');
+    else if (p.lastAge != null) notes.push('At these numbers your savings run out at about age ' + Math.floor(p.lastAge) + ', before age ' + o.end + '.');
+    else notes.push('At these numbers your savings last past age ' + o.end + '.');
+    if (short && p.n > 0) notes.push('To reach the target, save about ' + money(p.extra) + ' more each month (in future money, at ' + o.grow + '% a year).');
+    if (o.wd > 5) notes.push('A withdrawal rate above 5% is optimistic; savings may not last.');
+    say(p.lastAge != null && p.draw > 0 ? 'bad' : 'ok', notes.join(' '));
+    table(); draw();
+  }
+  function table() {
+    if (!last) return;
+    var ret = last.o.ret;
+    $('rtcRows').innerHTML = last.p.rows.map(function (r) {
+      return '<tr' + (r.age === ret ? ' class="rtc-ret"' : '') + '><td>' + r.age + (r.age === ret ? ' (retire)' : '') + '</td><td>' + (r.add ? money(r.add, 0) : '–') + '</td><td>' + money(r.growth, 0) + '</td><td>' + (r.wd ? money(r.wd, 0) : '–') + '</td><td>' + money(r.bal, 0) + '</td><td>' + money(r.real, 0) + '</td></tr>';
+    }).join('');
+  }
+  function draw() {
+    if (!last) return;
+    var rows = [{ age: last.o.age, bal: last.o.saved, real: last.o.saved }].concat(last.p.rows);
+    chart.set({ type: 'line', labels: rows.map(function (r) { return String(r.age); }), fmt: function (v) { return money(v, 0); },
+      series: [{ name: view === 'real' ? "Balance (today's money)" : 'Balance (future money)', color: cssv('--accent', '#2563eb'), fill: true, data: rows.map(function (r) { return view === 'real' ? r.real : r.bal; }) }] });
+  }
+  document.querySelectorAll('.rtc .seg button').forEach(function (b) {
+    b.addEventListener('click', function () { view = b.dataset.v; document.querySelectorAll('.rtc .seg button').forEach(function (x) { x.setAttribute('aria-pressed', x === b ? 'true' : 'false'); }); draw(); });
+  });
+  $('rtcCsv').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    var lines = ['Age,Added,Growth,Withdrawn,Balance,In todays money'];
+    last.p.rows.forEach(function (r) { lines.push([r.age, r.add.toFixed(2), r.growth.toFixed(2), r.wd.toFixed(2), r.bal.toFixed(2), r.real.toFixed(2)].join(',')); });
+    var a = $('dl'); if (a.href) URL.revokeObjectURL(a.href);
+    a.href = URL.createObjectURL(new Blob([lines.join('\r\n')], { type: 'text/csv' })); a.download = 'retirement-plan.csv'; a.click();
+    say('ok', 'Saved retirement-plan.csv with ' + last.p.rows.length + ' rows.');
+  });
+  $('rtcCopy').addEventListener('click', function () {
+    if (!last) return say('bad', 'Fix the numbers above first.');
+    var p = last.p, o = last.o;
+    copyText('Retirement plan (today\'s money)\nRetire at ' + o.ret + ' in ' + p.n + ' years\nSavings needed: ' + money(p.needReal, 0) + '\nOn track for: ' + money(p.atRetReal, 0) +
+      '\n' + (p.gapReal > 0.5 ? 'Shortfall: ' + money(p.gapReal, 0) + '\nExtra to save each month: ' + money(p.extra) : 'Surplus: ' + money(-p.gapReal, 0)) +
+      '\nMoney lasts until age: ' + $('rtcLast').textContent, this);
+  });
+  $('rtc').addEventListener('input', function (e) { if (e.target.tagName !== 'SELECT') calc(); });
+  curWire(calc);
+  calc();
+})();
+</script>
