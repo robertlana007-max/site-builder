@@ -243,5 +243,16 @@ module.exports = {
 "tile-calculator":["tính số gạch"],
 "pet-age-calculator":["tuổi chó quy đổi"],
 "zodiac-sign-calculator":["cung hoàng đạo","con giáp"],
-"cooking-converter":["đổi cốc sang gram"]
+"cooking-converter":["đổi cốc sang gram"],
+"redact-pdf":["che thông tin pdf"],
+"fill-pdf-form":["điền form pdf"],
+"compare-pdf":["so sánh pdf"],
+"pdf-booklet":["in sách pdf"],
+"pdf-page-resize":["đổi khổ giấy pdf"],
+"text-to-pdf":["chuyển văn bản sang pdf"],
+"flatten-pdf":["làm phẳng pdf"],
+"pdf-metadata-editor":["sửa thông tin pdf"],
+"meeting-planner":["lên lịch họp múi giờ"],
+"world-clock":["giờ thế giới","dong ho the gioi"],
+"week-number":["tuần thứ mấy","so tuan"]
 };

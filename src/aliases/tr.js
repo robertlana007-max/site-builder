@@ -236,5 +236,16 @@ module.exports = {
 "tile-calculator":["fayans hesaplama"],
 "pet-age-calculator":["köpek yaşı hesaplama"],
 "zodiac-sign-calculator":["burç hesaplama","burcum ne"],
-"cooking-converter":["su bardağı gram"]
+"cooking-converter":["su bardağı gram"],
+"redact-pdf":["pdf karartma"],
+"fill-pdf-form":["pdf form doldurma","pdf doldur"],
+"compare-pdf":["pdf karşılaştırma"],
+"pdf-booklet":["kitapçık pdf"],
+"pdf-page-resize":["pdf sayfa boyutu değiştirme"],
+"text-to-pdf":["metni pdf yapma","txt pdf çevir"],
+"flatten-pdf":["pdf düzleştirme"],
+"pdf-metadata-editor":["pdf meta veri düzenleme"],
+"meeting-planner":["toplantı planlayıcı"],
+"world-clock":["dünya saati"],
+"week-number":["hafta numarası","kaçıncı hafta"]
 };

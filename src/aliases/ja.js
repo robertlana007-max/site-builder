@@ -257,5 +257,16 @@ module.exports = {
 "tile-calculator":["瓷砖计算器","タイル計算"],
 "pet-age-calculator":["狗狗年龄换算","猫の年齢 人間"],
 "zodiac-sign-calculator":["星座查询","生肖查询","星座 診断","干支"],
-"cooking-converter":["杯换算克","計量カップ グラム 換算"]
+"cooking-converter":["杯换算克","計量カップ グラム 換算"],
+"redact-pdf":["pdf涂黑","pdf脱敏","pdf黒塗り"],
+"fill-pdf-form":["填写pdf表单","pdf表单填写","pdfフォーム入力"],
+"compare-pdf":["pdf对比","比较pdf","pdf比較"],
+"pdf-booklet":["pdf小册子","一页多版","pdf冊子印刷"],
+"pdf-page-resize":["调整pdf页面大小","pdfページサイズ変更"],
+"text-to-pdf":["文本转pdf","txt转pdf","テキストをpdfに変換"],
+"flatten-pdf":["pdf扁平化","pdfフラット化"],
+"pdf-metadata-editor":["编辑pdf属性","pdfメタデータ編集"],
+"meeting-planner":["会议时间规划","跨时区会议","会議時間 調整 時差"],
+"world-clock":["世界时钟","世界時計"],
+"week-number":["第几周","周数查询","今週は第何週","週番号"]
 };

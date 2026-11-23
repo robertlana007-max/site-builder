@@ -635,21 +635,27 @@
           clear.addEventListener('click', function () { var s = read(); delete s.inputs[SLUG]; write(s); location.reload(); });
         }
         if (restored) setTimeout(function () { toast('Welcome back. Your last entries are restored.'); }, 500);
-        var saveTimer, ready = false;
+        var saveTimer = null, ready = false;
         setTimeout(function () { ready = true; }, 0); // ignore the events fired by the restore above
+        var saveNow = function () {
+          saveTimer = null;
+          var s = read(), v = {};
+          pick().forEach(function (el) { if (!el.disabled) v[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
+          if (!Object.keys(v).length) return; // this tool has nothing worth remembering
+          s.inputs[SLUG] = v; write(s);
+          if (clear) clear.hidden = false;
+        };
         var remember = function (e) {
           if (!read().prefs.rememberInputs) return;
           if (!ready) return;
           clearTimeout(saveTimer);
-          saveTimer = setTimeout(function () {
-            var s = read(), v = {};
-            pick().forEach(function (el) { if (!el.disabled) v[el.id] = el.type === 'checkbox' ? el.checked : el.value; });
-            if (!Object.keys(v).length) return; // this tool has nothing worth remembering
-            s.inputs[SLUG] = v; write(s);
-            if (clear) clear.hidden = false;
-          }, 500);
+          saveTimer = setTimeout(saveNow, 500);
         };
         card.addEventListener('input', remember); card.addEventListener('change', remember);
+        // save straight away if the visitor leaves or switches tab before the short delay ends
+        var flush = function () { if (saveTimer) { clearTimeout(saveTimer); saveNow(); } };
+        window.addEventListener('pagehide', flush);
+        document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') flush(); });
 
         // flash results when they change, and celebrate a finished download
         if (window.MutationObserver && !calm) {

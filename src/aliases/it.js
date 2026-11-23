@@ -223,5 +223,16 @@ module.exports = {
 "tile-calculator":["calcolo piastrelle"],
 "pet-age-calculator":["katzenalter","età del cane in anni umani"],
 "zodiac-sign-calculator":["segno zodiacale"],
-"cooking-converter":["tazze in grammi"]
+"cooking-converter":["tazze in grammi"],
+"redact-pdf":["oscurare pdf"],
+"fill-pdf-form":["compilare pdf","compilare modulo pdf"],
+"compare-pdf":["confrontare pdf"],
+"pdf-booklet":["opuscolo pdf","più pagine per foglio","buklet pdf"],
+"pdf-page-resize":["pdf a a4","ridimensionare pagine pdf"],
+"text-to-pdf":["txt a pdf"],
+"flatten-pdf":["pdf non modifiable","appiattire pdf","pdf non modificabile"],
+"pdf-metadata-editor":["modificare metadati pdf","edit metadata pdf"],
+"meeting-planner":["pianificatore riunioni","fusi orari riunione"],
+"world-clock":["orologio mondiale","ora nel mondo"],
+"week-number":["numero della settimana","che settimana è"]
 };

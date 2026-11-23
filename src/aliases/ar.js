@@ -266,5 +266,16 @@ module.exports = {
 "tile-calculator":["حاسبة البلاط"],
 "pet-age-calculator":["عمر الكلب بالسنوات البشرية"],
 "zodiac-sign-calculator":["برجي","حساب البرج"],
-"cooking-converter":["تحويل الكوب إلى جرام"]
+"cooking-converter":["تحويل الكوب إلى جرام"],
+"redact-pdf":["حجب نص pdf"],
+"fill-pdf-form":["تعبئة نموذج pdf","ملء pdf"],
+"compare-pdf":["مقارنة pdf","مقارنة ملفين pdf"],
+"pdf-booklet":["كتيب pdf"],
+"pdf-page-resize":["تغيير حجم صفحات pdf"],
+"text-to-pdf":["تحويل النص إلى pdf"],
+"flatten-pdf":["تسطيح pdf"],
+"pdf-metadata-editor":["تعديل بيانات pdf الوصفية"],
+"meeting-planner":["مخطط الاجتماعات"],
+"world-clock":["الساعة العالمية","التوقيت العالمي"],
+"week-number":["رقم الأسبوع"]
 };

@@ -23,6 +23,7 @@ module.exports = {
 "random-number-generator":["رینڈم نمبر","koi number chunein"],
 "lorem-ipsum-generator":["ڈمی ٹیکسٹ"],
 "remove-duplicate-lines":["دہرائی گئی لائنیں ہٹائیں","duplicate lines hatayein"],
+"color-converter":["رنگ کوڈ تبدیل کریں","hex se rgb"],
 "merge-pdf":["pdf jodna","pdf merge kaise kare","پی ڈی ایف ملائیں","pdf jodne wala","دو پی ڈی ایف جوڑیں","pdf jorna"],
 "split-pdf":["pdf alag kare","pdf ko alag kaise kare","پی ڈی ایف الگ کریں"],
 "compress-pdf":["pdf ka size kam kare","pdf chota kare","پی ڈی ایف کمپریس","pdf size kam","پی ڈی ایف کا سائز کم کریں","pdf choti karein"],
@@ -250,5 +251,16 @@ module.exports = {
 "tile-calculator":["kitni tiles lagengi","ٹائل کیلکولیٹر"],
 "pet-age-calculator":["kutte ki umar","کتے کی عمر"],
 "zodiac-sign-calculator":["rashi kaise jane","میرا برج"],
-"cooking-converter":["cup to gram hindi","کپ سے گرام"]
+"cooking-converter":["cup to gram hindi","کپ سے گرام"],
+"redact-pdf":["pdf me text chhupaye","پی ڈی ایف میں متن چھپائیں"],
+"fill-pdf-form":["pdf form kaise bhare","پی ڈی ایف فارم بھریں"],
+"compare-pdf":["pdf compare kare","پی ڈی ایف موازنہ"],
+"pdf-booklet":["ایک صفحے پر کئی صفحات"],
+"pdf-page-resize":["pdf a4 size","پی ڈی ایف صفحہ سائز"],
+"text-to-pdf":["text ko pdf banaye","متن سے پی ڈی ایف"],
+"flatten-pdf":["پی ڈی ایف فلیٹن"],
+"pdf-metadata-editor":["پی ڈی ایف میٹا ڈیٹا"],
+"meeting-planner":["میٹنگ پلانر"],
+"world-clock":["duniya ka time","عالمی گھڑی"],
+"week-number":["kaun sa hafta hai","ہفتہ نمبر"]
 };

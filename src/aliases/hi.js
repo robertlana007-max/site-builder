@@ -22,8 +22,10 @@ module.exports = {
 "tip-calculator":["टिप कैलकुलेटर","tip kitni de"],
 "days-between-dates":["दिनों की गिनती","din ginne"],
 "random-number-generator":["रैंडम नंबर जनरेटर","रैंडम नंबर","koi bhi number chune"],
+"uuid-generator":["यूनिक आईडी बनाएं","uuid banaye"],
 "lorem-ipsum-generator":["डमी टेक्स्ट","dummy text banaye"],
 "remove-duplicate-lines":["डुप्लिकेट लाइन हटाएं","duplicate hataye"],
+"hash-generator":["हैश जनरेटर","md5 banaye"],
 "color-converter":["कलर कन्वर्टर"],
 "merge-pdf":["पीडीएफ मर्ज करें","pdf jodna","pdf merge kaise kare","pdf jodne wala","दो पीडीएफ जोड़ें","पीडीएफ जोड़ें","pdf jodo","do pdf ek kare"],
 "split-pdf":["पीडीएफ स्प्लिट","pdf alag kare","pdf ko alag kaise kare"],
@@ -253,5 +255,16 @@ module.exports = {
 "tile-calculator":["टाइल्स कैलकुलेटर","kitni tiles lagengi"],
 "pet-age-calculator":["कुत्ते की उम्र","kutte ki umar"],
 "zodiac-sign-calculator":["मेरी राशि क्या है","rashi kaise jane"],
-"cooking-converter":["कप से ग्राम","cup to gram hindi"]
+"cooking-converter":["कप से ग्राम","cup to gram hindi"],
+"redact-pdf":["पीडीएफ में जानकारी छिपाएं","pdf me text chhupaye"],
+"fill-pdf-form":["पीडीएफ फॉर्म भरें","pdf form kaise bhare"],
+"compare-pdf":["दो पीडीएफ की तुलना","pdf compare kare"],
+"pdf-booklet":["पीडीएफ बुकलेट"],
+"pdf-page-resize":["पीडीएफ पेज साइज बदलें","pdf a4 size"],
+"text-to-pdf":["टेक्स्ट से पीडीएफ","text ko pdf banaye"],
+"flatten-pdf":["पीडीएफ फ्लैटन"],
+"pdf-metadata-editor":["पीडीएफ मेटाडेटा"],
+"meeting-planner":["मीटिंग प्लानर"],
+"world-clock":["विश्व घड़ी","duniya ka time"],
+"week-number":["सप्ताह संख्या","kaun sa hafta hai"]
 };

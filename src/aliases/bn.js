@@ -217,5 +217,16 @@ module.exports = {
 "tile-calculator":["টাইলস ক্যালকুলেটর"],
 "pet-age-calculator":["কুকুরের বয়স"],
 "zodiac-sign-calculator":["আমার রাশি"],
-"cooking-converter":["কাপ থেকে গ্রাম"]
+"cooking-converter":["কাপ থেকে গ্রাম"],
+"redact-pdf":["পিডিএফ তথ্য লুকান"],
+"fill-pdf-form":["পিডিএফ ফর্ম পূরণ"],
+"compare-pdf":["পিডিএফ তুলনা"],
+"pdf-booklet":["বুকলেট পিডিএফ"],
+"pdf-page-resize":["পিডিএফ পেজ সাইজ"],
+"text-to-pdf":["টেক্সট থেকে পিডিএফ"],
+"flatten-pdf":["পিডিএফ ফ্ল্যাটেন"],
+"pdf-metadata-editor":["পিডিএফ মেটাডেটা"],
+"meeting-planner":["মিটিং প্ল্যানার"],
+"world-clock":["বিশ্ব ঘড়ি"],
+"week-number":["সপ্তাহ নম্বর"]
 };
