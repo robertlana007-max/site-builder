@@ -171,6 +171,8 @@
 <div class="btns">
   <button type="button" class="btn" id="hbPdf">Download PDF for this month</button>
   <button type="button" class="btn ghost" id="hbExport">Back up my data</button>
+  <button type="button" class="btn ghost" id="hbImport">Restore a backup</button>
+  <input type="file" id="hbFile" accept=".json,application/json" hidden>
 </div>
 <p class="msg" id="msg" role="status" aria-live="polite"></p>
 </div>
@@ -438,6 +440,27 @@
   $('hbMonth').addEventListener('change', render);
   $('hbPaper').value = UT.letter() ? 'letter' : 'a4';
   $('hbExport').addEventListener('click', function () { var b = new Blob([JSON.stringify(D, null, 1)], { type: 'application/json' }); GD.download(b, 'habit-tracker-backup.json'); say('ok', 'Backup saved. Your ticks are kept in this browser; the file is a copy for safe keeping.'); });
+  $('hbImport').addEventListener('click', function () { $('hbFile').value = ''; $('hbFile').click(); });
+  $('hbFile').addEventListener('change', function () {
+    var f = this.files && this.files[0]; if (!f) return;
+    if (f.size > 5e6) return say('bad', 'That file is too big to be a habit tracker backup.');
+    f.text().then(function (t) {
+      var d = null; try { d = JSON.parse(t); } catch (e) {}
+      var ok = d && Array.isArray(d.habits) && d.marks && typeof d.marks === 'object' && d.habits.every(function (h) { return h && typeof h.name === 'string' && h.id != null; });
+      if (!ok) return say('bad', '"' + f.name + '" is not a habit tracker backup. Choose the file saved with "Back up my data".');
+      if (D.habits.length && !confirm('Replace your ' + D.habits.length + ' habit' + (D.habits.length > 1 ? 's' : '') + ' and ticks in this browser with the backup?')) return;
+      d.habits = d.habits.slice(0, 20).map(function (h) { return { id: String(h.id), name: String(h.name).slice(0, 40) }; });
+      Object.keys(d.marks).forEach(function (k) { if (!Array.isArray(d.marks[k])) delete d.marks[k]; else d.marks[k] = d.marks[k].filter(function (x) { return /^\d{4}-\d{2}-\d{2}$/.test(x); }); });
+      d.next = Math.max(+d.next || 1, d.habits.length + 1);
+      D = { habits: d.habits, marks: d.marks, next: d.next }; save(); render();
+      say('ok', 'Backup restored: ' + D.habits.length + ' habit' + (D.habits.length === 1 ? '' : 's') + '.');
+    }, function () { say('bad', 'That file could not be read.'); });
+  });
+  // weekend days of the visitor's region (for the shaded columns of the printout)
+  var WE = (function () {
+    try { var lo = new Intl.Locale(UT.langs()[0]); if (!lo.region && UT.region()) lo = new Intl.Locale(lo.language + '-' + UT.region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.weekend && wi.weekend.length) return wi.weekend.map(function (d) { return d % 7; }); } catch (e) {}
+    return [0, 6];
+  })();
   // ---------- printable month ----------
   $('hbPdf').addEventListener('click', async function () {
     if (busy) return; busy = true; var btn = this; btn.disabled = true; say('', 'Making the PDF…');
@@ -450,7 +473,7 @@
       if (!rows.length) rows = Array.from({ length: 10 }, function () { return null; });
       var top = M + 34, nameW = 150, endW = 44, cw = (W - 2 * M - nameW - endW) / n, rh = Math.min(36, (H - top - M - 22) / rows.length), ticks = $('hbTicks').checked;
       for (var d = 1; d <= n; d++) {
-        var x = M + nameW + (d - 1) * cw, we = [0, 6].indexOf(new Date(y, m - 1, d).getDay()) >= 0;
+        var x = M + nameW + (d - 1) * cw, we = WE.indexOf(new Date(y, m - 1, d).getDay()) >= 0;
         if (we) ops.push({ k: 'rect', x: x, y: top, w: cw, h: 22 + rows.length * rh, fill: '#f3f4f6' });
         ops.push({ k: 'text', t: String(d), x: x + cw / 2, y: top + 9, font: 'sansb', s: Math.min(8, cw * 0.5), fill: '#374151', align: 'center' });
         ops.push({ k: 'text', t: wfmt.format(new Date(y, m - 1, d)), x: x + cw / 2, y: top + 18, font: 'sans', s: Math.min(6.5, cw * 0.42), fill: '#6b7280', align: 'center' });

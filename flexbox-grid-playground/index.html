@@ -133,6 +133,8 @@
 .fg-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 14px; margin-bottom: 12px; }
 .fg-fields label { font-size: 13px; margin-bottom: 4px; font-family: var(--mono); }
 .fg-fields select, .fg-fields input { min-height: 40px; padding: 6px 10px; }
+.fg-fields [aria-invalid="true"] { border-color: var(--bad); }
+.fg-bad { display: block; color: var(--bad); font-size: 12px; margin-top: 3px; }
 .fg-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
 .fg-box h3 { margin: 0 0 10px !important; font-size: 15px; }
 .fg-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; max-height: 360px; overflow: auto; }
@@ -177,7 +179,9 @@
     d.innerHTML = html;
     var el = d.querySelector('select,input');
     var last = el.value;
-    function fire() { if (el.value === last) return; last = el.value; onset(el.value); } // a change event on blur must not rebuild the boxes, or the click that caused the blur is lost
+    function check() { var bad = !Array.isArray(p[1]) && !valid(p[0], el.value), note = d.querySelector('.fg-bad'); el.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (bad && !note) { note = document.createElement('small'); note.className = 'fg-bad'; note.textContent = 'Not valid for ' + p[0] + ', so it is left out of the code.'; d.appendChild(note); } else if (!bad && note) note.remove(); }
+    function fire() { if (el.value === last) return; last = el.value; check(); onset(el.value); } // a change event on blur must not rebuild the boxes, or the click that caused the blur is lost
+    check();
     el.addEventListener('input', fire);
     el.addEventListener('change', fire);
     return d;
@@ -197,9 +201,10 @@
     props.forEach(function (p) { c.appendChild(field(p, obj[p[0]], function (v) { obj[p[0]] = v; paint(); }, 'i-')); });
   }
   function safe(v) { return String(v).replace(/[;{}<>]/g, ''); }
+  function valid(prop, v) { v = String(v).trim(); if (!v) return true; if (/[;{}<>]/.test(v)) return false; try { return !window.CSS || !CSS.supports || CSS.supports(prop, v); } catch (e) { return true; } }
   function itemCss(it) {
     var props = mode === 'flex' ? FITEM : GITEM, obj = mode === 'flex' ? it.f : it.g, out = [];
-    props.forEach(function (p) { var def = Array.isArray(p[1]) ? p[1][0] : p[2]; if (String(obj[p[0]]).trim() !== def && String(obj[p[0]]).trim() !== '') out.push([p[0], safe(obj[p[0]]).trim()]); });
+    props.forEach(function (p) { var def = Array.isArray(p[1]) ? p[1][0] : p[2]; if (String(obj[p[0]]).trim() !== def && String(obj[p[0]]).trim() !== '' && valid(p[0], obj[p[0]])) out.push([p[0], safe(obj[p[0]]).trim()]); });
     return out;
   }
   function paint() {
@@ -226,7 +231,7 @@
   function css() {
     var obj = mode === 'flex' ? st.flex : st.grid, props = mode === 'flex' ? FLEX : GRID;
     var lines = ['.container {', '  display: ' + mode + ';'];
-    props.forEach(function (p) { var def = p[1] === 'text' ? '' : p[1][0], v = safe(obj[p[0]]).trim(); if (v && (p[1] === 'text' || v !== def)) lines.push('  ' + p[0] + ': ' + v + ';'); });
+    props.forEach(function (p) { var def = p[1] === 'text' ? '' : p[1][0], v = safe(obj[p[0]]).trim(); if (v && valid(p[0], obj[p[0]]) && (p[1] === 'text' || v !== def)) lines.push('  ' + p[0] + ': ' + v + ';'); });
     lines.push('}');
     st.items.forEach(function (it, i) { var ic = itemCss(it); if (ic.length) { lines.push('', '.item:nth-child(' + (i + 1) + ') {'); ic.forEach(function (x) { lines.push('  ' + x[0] + ': ' + x[1] + ';'); }); lines.push('}'); } });
     return lines.join('\n');
