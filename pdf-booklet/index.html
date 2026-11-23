@@ -299,17 +299,27 @@
       var tip = $('bkTip'); tip.hidden = false;
       tip.textContent = mode === 'booklet' ? (cols === 2 ? 'To print: choose double-sided printing and “flip on short edge”, at actual size (100%). Fold the printed stack in half' : 'To print: choose double-sided printing and “flip on long edge”, at actual size (100%). Fold the printed stack in half across the middle') + (+$('bkSig').value ? ', one section at a time, then stack the sections in order and staple or sew them.' : ', then staple along the fold.')
         : 'Print at actual size (100%), or choose “fit to page” if your printer uses a different paper size.';
-      // small preview of the first sides
+      preview(bytesOut, SW, SH, mode); // in the background, so a new file can be chosen straight away
+    }).then(function () { busy = false; });
+  });
+  // small preview of the first sides
+  var pvJob = 0;
+  async function preview(bytesOut, SW, SH, mode) {
+    var me = ++pvJob, pv = null, box = $('bkPrev');
+    try {
       pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
-      var pv = await pdfjsLib.getDocument({ data: bytesOut.slice() }).promise, box = $('bkPrev'); box.innerHTML = '';
+      pv = await pdfjsLib.getDocument({ data: bytesOut.slice() }).promise; box.innerHTML = '';
       for (var v = 1; v <= Math.min(4, pv.numPages); v++) {
-        var r2 = await PT.pageCanvas(pv, v, 150 / Math.max(SW, SH)), fig = document.createElement('figure'), cap = document.createElement('figcaption');
+        var r2 = await PT.pageCanvas(pv, v, 150 / Math.max(SW, SH));
+        if (me !== pvJob || $('dl').hidden) break; // options or file changed meanwhile
+        var fig = document.createElement('figure'), cap = document.createElement('figcaption');
         cap.textContent = mode === 'booklet' ? 'Sheet ' + Math.ceil(v / 2) + (v % 2 ? ', front' : ', back') : 'Side ' + v;
         fig.appendChild(r2.canvas); fig.appendChild(cap); box.appendChild(fig);
       }
-      pv.destroy();
-    }).then(function () { busy = false; });
-  });
+    } catch (e) { /* the preview is only a help */ }
+    if (pv) pv.destroy();
+    if (me !== pvJob || $('dl').hidden) box.innerHTML = '';
+  }
 })();
 </script>
 

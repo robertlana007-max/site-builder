@@ -164,11 +164,62 @@
   // ---------- text positions ----------
   var meas = document.createElement('canvas').getContext('2d');
   // Text of page i: items with their place in view units, and where each letter starts inside the item.
+  // Glyph widths of a PDF font by the text they stand for, so letters can be placed exactly (null if unknown).
+  var fontWidths = {};
+  function widthsOf(page, name) {
+    if (name in fontWidths) return fontWidths[name];
+    var w = null;
+    try {
+      var f = page.commonObjs.has(name) && page.commonObjs.get(name), map = f && f.toUnicode && f.toUnicode._map;
+      if (f && f.widths && map) {
+        var fm = f.fontMatrix && f.fontMatrix[0] ? f.fontMatrix[0] : .001;
+        w = {};
+        for (var code in map) { var u = map[code], g = f.widths[code]; if (typeof u === 'string' && u && typeof g === 'number' && g > 0 && !(u in w)) w[u] = g * fm; }
+        if (!Object.keys(w).length) w = null;
+      }
+    } catch (e) { w = null; }
+    return (fontWidths[name] = w);
+  }
+  // Where each letter of an item starts, as a share of the item width.
+  function letterShares(it, chars, st, fw, size) {
+    var adv = null;
+    if (fw) {
+      var known = 0, letters = 0, sum = 0, spaces = [];
+      adv = chars.map(function (c, j) {
+        var g = fw[c];
+        if (/\s/.test(c)) { spaces.push(j); return g ? g * size : 0; }
+        letters++;
+        if (g) { known++; sum += g * size; return g * size; }
+        return null;
+      });
+      if (!letters || known < letters * .8) adv = null;
+      else {
+        var avg = sum / known, tot = 0;
+        adv = adv.map(function (a) { a = a === null ? avg : a; tot += a; return a; });
+        // the rest of the width is letter or word spacing (or spaces pdf.js added for wide gaps)
+        var rest = it.width - tot, unknownSpaces = spaces.filter(function (j) { return !fw[chars[j]]; });
+        if (rest > 0 && spaces.length) { var on = unknownSpaces.length ? unknownSpaces : spaces; on.forEach(function (j) { adv[j] += rest / on.length; }); }
+        else if (rest > 0) adv = adv.map(function (a) { return a + rest / chars.length; });
+        else if (tot > 0) adv = adv.map(function (a) { return a * it.width / tot; });
+      }
+    }
+    if (!adv) { // no usable font data: measure with a similar system font
+      meas.font = '100px ' + (/serif/i.test(st.fontFamily || '') && !/sans/i.test(st.fontFamily || '') ? 'serif' : /mono/i.test(st.fontFamily || '') ? 'monospace' : 'sans-serif');
+      adv = chars.map(function (c) { return Math.max(1, meas.measureText(c).width); });
+    }
+    var pos = [0], s = 0;
+    adv.forEach(function (a) { s += Math.max(0, a); pos.push(s); });
+    return s > 0 ? pos.map(function (p) { return p / s; }) : pos.map(function (p, j) { return j / chars.length; });
+  }
   function pageText(i) {
     if (texts[i]) return texts[i];
     return (texts[i] = pdf.getPage(i).then(function (page) {
       var vp1 = page.getViewport({ scale: 1 });
       return page.getTextContent().then(function (tc) {
+        // the fonts reach this page only with its drawing instructions
+        var need = Object.keys(tc.styles).some(function (k) { return !(k in fontWidths) && !page.commonObjs.has(k); });
+        return (need ? page.getOperatorList().catch(function () {}) : Promise.resolve()).then(function () { return tc; });
+      }).then(function (tc) {
         var items = [];
         tc.items.forEach(function (it) {
           if (!it.str) { if (it.hasEOL && items.length) items[items.length - 1].eol = true; return; }
@@ -178,11 +229,8 @@
           var flat = Math.abs(m[1]) < .01 * fh && Math.abs(m[2]) < .01 * fh && m[0] > 0;
           var o = { str: it.str, eol: !!it.hasEOL, flat: flat, fh: fh, x: m[4], base: m[5], top: m[5] - fh * asc, bot: m[5] - fh * desc, w: it.width * Math.hypot(m[0], m[1]) / (Math.hypot(it.transform[0], it.transform[1]) || 1), m: m };
           if (!isFinite(o.w) || o.w <= 0) o.w = it.width || fh * it.str.length * .5;
-          // where each letter starts, as a share of the item width (measured with a similar font)
-          meas.font = '100px ' + (/serif/i.test(st.fontFamily || '') && !/sans/i.test(st.fontFamily || '') ? 'serif' : /mono/i.test(st.fontFamily || '') ? 'monospace' : 'sans-serif');
-          var chars = Array.from(it.str), pos = [0], sum = 0;
-          chars.forEach(function (c) { sum += Math.max(1, meas.measureText(c).width); pos.push(sum); });
-          o.chars = chars; o.pos = pos.map(function (p) { return p / sum; });
+          o.chars = Array.from(it.str);
+          o.pos = letterShares(it, o.chars, st, widthsOf(page, it.fontName), Math.hypot(it.transform[0], it.transform[1]));
           if (!flat) { // a rotated item: keep its outline, letters are not split
             var a = Math.atan2(m[1], m[0]), c0 = Math.cos(a), s0 = Math.sin(a), L = o.w, up = fh * asc, dn = -fh * desc, pts = [[0, dn], [L, dn], [L, -up], [0, -up]].map(function (q) { return [m[4] + q[0] * c0 - q[1] * s0, m[5] + q[0] * s0 + q[1] * c0]; });
             o.bx = Math.min.apply(null, pts.map(function (q) { return q[0]; })); o.by = Math.min.apply(null, pts.map(function (q) { return q[1]; }));
@@ -190,16 +238,37 @@
           }
           items.push(o);
         });
-        page.cleanup();
-        return { items: items, w: vp1.width, h: vp1.height };
+        return page.getAnnotations().catch(function () { return []; }).then(function (an) {
+          page.cleanup();
+          return { items: items, w: vp1.width, h: vp1.height, annots: annotTexts(an, vp1) };
+        });
       });
     }));
   }
+  // The words stored in notes, links and form fields, with the area each one covers on the page.
+  function annotTexts(an, vp) {
+    var out = [];
+    (an || []).forEach(function (a) {
+      if (!a || a.subtype === 'Popup') return;
+      var parts = [a.contentsObj && a.contentsObj.str, a.titleObj && a.titleObj.str, a.richText && a.richText.str, a.alternativeText, a.url, a.unsafeUrl, a.fieldName];
+      if (Array.isArray(a.textContent)) parts = parts.concat(a.textContent);
+      [].concat(a.fieldValue == null ? [] : a.fieldValue).forEach(function (v) { parts.push(String(v)); });
+      var text = parts.filter(function (x) { return typeof x === 'string' && x; }).join('\n');
+      if (!text || !a.rect) return;
+      var r = vp.convertToViewportRectangle(a.rect), x = Math.max(0, Math.min(r[0], r[2])), y = Math.max(0, Math.min(r[1], r[3]));
+      var w = Math.max(2, Math.abs(r[2] - r[0])), h = Math.max(2, Math.abs(r[3] - r[1]));
+      x = Math.min(x, vp.width - 2); y = Math.min(y, vp.height - 2);
+      out.push({ text: text, link: a.subtype === 'Link', box: { x: x, y: y, w: Math.min(w, vp.width - x), h: Math.min(h, vp.height - y) } });
+    });
+    return out;
+  }
+  // Letters are compared without accents and in their basic form (so "Garcia" finds "García", and Arabic letter shapes match).
+  function norm(c) { return c.normalize('NFKD').replace(/[\u0300-\u036f]/g, ''); }
   // one string for the whole page, with a map from each character back to its item and letter
   function joined(t) {
     var s = '', map = [];
     t.items.forEach(function (o, k) {
-      o.chars.forEach(function (c, j) { s += c; for (var q = 0; q < c.length; q++) map.push([k, j]); });
+      o.chars.forEach(function (c, j) { var n = norm(c); s += n; for (var q = 0; q < n.length; q++) map.push([k, j]); });
       var nx = t.items[k + 1], sep = '';
       if (o.eol) sep = '\n';
       else if (nx) { var gap = o.flat && nx.flat ? nx.x - (o.x + o.w) : 99, same = Math.abs(nx.base - o.base) < o.fh * .5; sep = !same ? '\n' : gap > o.fh * .12 ? ' ' : ''; }
@@ -211,34 +280,59 @@
     var x0 = o.x + o.pos[a] * o.w, x1 = o.x + o.pos[b] * o.w, ph = o.fh * .08;
     return { x: x0 - pad, y: o.top - ph, w: x1 - x0 + 2 * pad, h: o.bot - o.top + 2 * ph };
   }
+  // the middle of a letter: a box must cover this to hide the letter (so a box on the next line does not)
+  function letterCore(o, j) {
+    var b = letterBox(o, j, j + 1, 0);
+    return { x: b.x + b.w * .15, y: b.y + b.h * .3, w: b.w * .7, h: b.h * .35 };
+  }
   function escapeRe(s) { return s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
+  // Typed words are searched with all spaces left out (so l e t t e r - s p a c e d text is found too);
+  // "whole words" is then checked on the real text. Right-to-left words are also searched in reverse,
+  // because many PDFs store them in the order they appear on screen.
   function patterns() {
     var list = [], flags = 'gu' + ($('rdCase').checked ? '' : 'i'), whole = $('rdWhole').checked;
-    $('rdTerms').value.split(/\n/).map(function (t) { return t.trim(); }).filter(Boolean).forEach(function (t) {
-      var src = escapeRe(t).replace(/\s+/g, '\\s*');
-      if (whole) src = '(?<![\\p{L}\\p{N}_])' + src + '(?![\\p{L}\\p{N}_])';
-      list.push(new RegExp(src, flags));
+    $('rdTerms').value.split(/\n/).map(function (t) { return norm(t).replace(/\s+/g, ''); }).filter(Boolean).forEach(function (t) {
+      list.push({ re: new RegExp(escapeRe(t), flags), sq: true, whole: whole });
+      if (/[\u0590-\u08ff\ufb1d-\ufdff\ufe70-\ufeff]/.test(t)) list.push({ re: new RegExp(escapeRe(Array.from(t).reverse().join('')), flags), sq: true, whole: whole });
     });
-    if ($('rdEmail').checked) list.push(/[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu);
-    if ($('rdPhone').checked) list.push(/(?<![\p{L}\p{N}])(?:\+\s?\d{1,3}[\s.\-]*)?(?:\(\d{1,5}\)[\s.\-]*)?\d(?:[\s.\-]?\d){6,13}(?![\p{L}\p{N}])/gu);
-    if ($('rdNums').checked) list.push(/(?<![\p{L}\p{N}])\d(?:[\s\-]?\d){7,}(?![\p{L}\p{N}])/gu);
+    if ($('rdEmail').checked) list.push({ re: /[\p{L}\p{N}._%+-]+@[\p{L}\p{N}-]+(?:\.[\p{L}\p{N}-]+)+/gu });
+    if ($('rdPhone').checked) list.push({ re: /(?<![\p{L}\p{N}])(?:\+\s?\d{1,3}[\s.\-]*)?(?:\(\d{1,5}\)[\s.\-]*)?\d(?:[\s.\-]?\d){6,13}(?![\p{L}\p{N}])/gu });
+    if ($('rdNums').checked) list.push({ re: /(?<![\p{L}\p{N}])\d(?:[\s\-]?\d){7,}(?![\p{L}\p{N}])/gu });
     return list;
   }
+  // Every match in text s (already normalised) as [start, end) ranges of s.
+  function ranges(s, list) {
+    var sq = '', back = [], out = [], wordChar = /[\p{L}\p{N}_]/u;
+    for (var i = 0; i < s.length; i++) if (!/\s/.test(s[i])) { sq += s[i]; back.push(i); }
+    list.forEach(function (p) {
+      var re = p.re, text = p.sq ? sq : s, m;
+      re.lastIndex = 0;
+      while ((m = re.exec(text))) {
+        if (!m[0].length) { re.lastIndex++; continue; }
+        var a = m.index, b = m.index + m[0].length;
+        if (p.sq) { a = back[a]; b = back[b - 1] + 1; }
+        if (p.whole && (wordChar.test(s.charAt(a - 1)) || wordChar.test(s.charAt(b)))) { re.lastIndex = m.index + 1; continue; }
+        out.push([a, b]);
+      }
+    });
+    return out;
+  }
+  function plainText(str) { return Array.from(str).map(norm).join(''); }
   // every match of the patterns on page text t, as boxes in view units
   function findIn(t, list) {
     var j = joined(t), boxes = [];
-    list.forEach(function (re) {
-      re.lastIndex = 0; var m;
-      while ((m = re.exec(j.s))) {
-        if (!m[0].length) { re.lastIndex++; continue; }
-        var runs = {}; // item -> [first letter, last letter]
-        for (var q = m.index; q < m.index + m[0].length; q++) { var r = j.map[q]; if (!r) continue; var e = runs[r[0]] || (runs[r[0]] = [r[1], r[1]]); e[0] = Math.min(e[0], r[1]); e[1] = Math.max(e[1], r[1]); }
-        Object.keys(runs).forEach(function (k) {
-          var o = t.items[k], rg = runs[k];
-          boxes.push(o.flat ? letterBox(o, rg[0], rg[1] + 1, Math.max(.6, o.fh * .06)) : { x: o.bx - 1, y: o.by - 1, w: o.bw + 2, h: o.bh + 2 });
-        });
-      }
+    ranges(j.s, list).forEach(function (rg0) {
+      var runs = {}; // item -> [first letter, last letter]
+      for (var q = rg0[0]; q < rg0[1]; q++) { var r = j.map[q]; if (!r) continue; var e = runs[r[0]] || (runs[r[0]] = [r[1], r[1]]); e[0] = Math.min(e[0], r[1]); e[1] = Math.max(e[1], r[1]); }
+      Object.keys(runs).forEach(function (k) {
+        var o = t.items[k], rg = runs[k];
+        if (rg[0] === rg[1] && !o.chars[rg[0]].trim()) return; // only a space
+        boxes.push(o.flat ? letterBox(o, rg[0], rg[1] + 1, Math.max(.6, o.fh * .06)) : { x: o.bx - 1, y: o.by - 1, w: o.bw + 2, h: o.bh + 2 });
+      });
     });
+    // notes, links and form fields whose text matches: cover them too, so the page is rebuilt without them
+    // (links are not covered, so the words under them stay readable: matching links are taken out when saving)
+    (t.annots || []).forEach(function (a) { if (!a.link && ranges(plainText(a.text), list).length) boxes.push(a.box); });
     return boxes;
   }
   $('rdFind').addEventListener('click', async function () {
@@ -247,7 +341,7 @@
     try { list = patterns(); } catch (e) { return PT.say('bad', 'One of the words could not be searched for. Try writing it differently.'); }
     if (!list.length) { PT.say('bad', 'Type a word or phrase to find, or tick one of the boxes such as All email addresses.'); $('rdTerms').focus(); return; }
     busy = true; $('rdFind').disabled = true;
-    var found = 0, pages = [], noText = 0, before = JSON.stringify(marks);
+    var found = 0, already = 0, pages = [], noText = 0, before = JSON.stringify(marks);
     try {
       for (var i = 1; i <= n; i++) {
         if (n > 20 && i % 10 === 1) PT.say('', 'Searching page ' + i + ' of ' + n + '…');
@@ -256,13 +350,14 @@
         var b = findIn(t, list);
         if (b.length) {
           var have = marks[i] = marks[i] || [];
-          b.forEach(function (x) { if (!have.some(function (y) { return Math.abs(y.x - x.x) < .5 && Math.abs(y.y - x.y) < .5 && Math.abs(y.w - x.w) < .5; })) { have.push(x); found++; } });
+          b.forEach(function (x) { if (!have.some(function (y) { return Math.abs(y.x - x.x) < .5 && Math.abs(y.y - x.y) < .5 && Math.abs(y.w - x.w) < .5; })) { have.push(x); found++; } else already++; });
           pages.push(i);
         }
       }
       if (found) history.push(before);
       $('rdHits').textContent = found ? 'Marked ' + found + (found === 1 ? ' match' : ' matches') + ' on ' + (pages.length === 1 ? 'page ' + pages[0] : pages.length + ' pages (' + pages.slice(0, 12).join(', ') + (pages.length > 12 ? '…' : '') + ')') + '. Check each page, then press Redact PDF.'
-        : 'No matches found.' + (noText === n ? ' This PDF has no text layer (it is probably a scan), so words cannot be searched. Drag boxes over them instead.' : noText ? ' ' + noText + ' page(s) are scans without text: drag boxes over details on those pages.' : '');
+        : already ? 'All ' + already + (already === 1 ? ' match is' : ' matches are') + ' already marked. Check each page, then press Redact PDF.'
+        : 'No matches found.' + (noText === n ? ' This PDF has no text layer (it is probably a scan), so words cannot be searched. Drag boxes over them instead.' : noText ? ' ' + noText + (noText === 1 ? ' page has' : ' pages have') + ' no searchable text (for example a scanned page): drag boxes over details there.' : '');
       PT.say(found ? 'ok' : '', '');
       if (pages.length && pages.indexOf(cur) === -1) show(pages[0]);
     } catch (e) { PT.say('bad', 'The text of this PDF could not be read.'); }
@@ -275,9 +370,13 @@
     if (!f.size) return PT.say('bad', '"' + f.name + '" is empty.');
     if (!PT.isPdf(f)) return PT.say('bad', '"' + f.name + '" is not a PDF. Please choose a PDF file.');
     busy = true; PT.say('', 'Opening ' + f.name + '…');
-    PT.render(f).then(function (doc) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
+    // like PT.render, but keeping the font widths so words can be found letter by letter
+    f.arrayBuffer().then(function (buf) { return pdfjsLib.getDocument({ data: buf, fontExtraProperties: true }).promise; }).catch(function (e) {
+      throw new Error(e && e.name === 'PasswordException' ? '"' + f.name + '" is password protected. Remove the password first with the free Unlock PDF tool on this site, then try again.' : '"' + f.name + '" could not be read as a PDF.');
+    }).then(function (doc) {
       if (pdf) pdf.destroy();
-      file = f; pdf = doc; n = doc.numPages; marks = {}; history = []; texts = {};
+      file = f; pdf = doc; n = doc.numPages; marks = {}; history = []; texts = {}; fontWidths = {};
       $('rdWork').hidden = false; $('rdHits').textContent = '';
       $('drop').querySelector('b').textContent = f.name;
       busy = false; changed(); show(1);
@@ -287,6 +386,24 @@
 
   // ---------- redact ----------
   var fontBytes = null;
+  // Take out links whose web address matches the search (pages that are rebuilt lose all links anyway).
+  function dropLinks(page, list) {
+    if (!list.length) return;
+    var L = PDFLib, annots = page.node.Annots();
+    if (!annots) return;
+    for (var q = annots.size() - 1; q >= 0; q--) {
+      try {
+        var a = annots.lookup(q, L.PDFDict), act = a.lookup(L.PDFName.of('A')), uri = act instanceof L.PDFDict ? act.lookup(L.PDFName.of('URI')) : null;
+        if (uri && uri.decodeText && ranges(plainText(uri.decodeText()), list).length) {
+          // remove it from the page and from the file itself, or the address would still be inside the PDF
+          var ref = annots.get(q), aref = a.get(L.PDFName.of('A'));
+          annots.remove(q);
+          if (aref instanceof L.PDFRef) page.doc.context.delete(aref);
+          if (ref instanceof L.PDFRef) page.doc.context.delete(ref);
+        }
+      } catch (e) { /* leave it */ }
+    }
+  }
   function overlaps(a, b) { return a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h; }
   $('go').addEventListener('click', function () {
     if (!pdf || busy || !total()) return;
@@ -303,13 +420,14 @@
         if (!fontBytes) fontBytes = fetch('../assets/vendor/fonts/noto-sans-subset-400.ttf').then(function (r) { if (!r.ok) throw new Error(); return r.arrayBuffer(); }).catch(function (e) { fontBytes = null; throw e; });
         try { font = await out.embedFont(await fontBytes, { subset: true }); glyphs = font.embedder.font; } catch (e) { font = null; }
       }
-      var redacted = [], plain = [], copied;
+      var redacted = [], plain = [], copied, findList = [];
+      try { findList = patterns(); } catch (e) { findList = []; }
       function live(i) { return (marks[i] || []).filter(function (m) { return m.w > 0 && m.h > 0; }); }
       for (var i = 1; i <= n; i++) if (!live(i).length) plain.push(i - 1);
       copied = await out.copyPages(src, plain); // in one go, so shared fonts and pictures are stored once
       for (i = 1; i <= n; i++) {
         var ms = live(i);
-        if (!ms.length) { out.addPage(copied[plain.indexOf(i - 1)]); continue; }
+        if (!ms.length) { dropLinks(out.addPage(copied[plain.indexOf(i - 1)]), findList); continue; }
         PT.say('', 'Redacting page ' + i + ' of ' + n + '…');
         var page = await pdf.getPage(i), vp1 = page.getViewport({ scale: 1 }), k = Math.min(dpi / 72, Math.sqrt(16e6 / (vp1.width * vp1.height)));
         var vp = page.getViewport({ scale: k }), c = document.createElement('canvas');
@@ -336,7 +454,7 @@
             }
             var seg = null, segs = [];
             o.chars.forEach(function (ch, j) {
-              var hidden = ms.some(function (m) { return overlaps(m, letterBox(o, j, j + 1, 0)); }) || !glyphs.hasGlyphForCodePoint(ch.codePointAt(0));
+              var hidden = ms.some(function (m) { return overlaps(m, letterCore(o, j)); }) || !glyphs.hasGlyphForCodePoint(ch.codePointAt(0));
               if (hidden) { seg = null; return; }
               if (!seg) { seg = { a: j, s: '' }; segs.push(seg); }
               seg.s += ch; seg.b = j + 1;
@@ -357,18 +475,26 @@
       PT.say('', 'Saving…');
       var bytes = await out.save();
       // Check the result: search the new file for the same words, which must all be gone.
-      var left = 0, list = [];
+      var left = 0, where = [], list = [];
       try { list = patterns(); } catch (e) { list = []; }
       if (list.length) {
-        pdfjsLib.GlobalWorkerOptions.workerSrc = '../assets/vendor/pdf.worker.min.js';
-        var chk = await pdfjsLib.getDocument({ data: bytes.slice() }).promise;
+        PT.say('', 'Checking the result…');
+        var chk = await pdfjsLib.getDocument({ data: bytes.slice() }).promise, inText = [], inNotes = [];
         for (var p = 1; p <= chk.numPages; p++) {
-          var tc = await (await chk.getPage(p)).getTextContent(), s = tc.items.map(function (it) { return it.str + (it.hasEOL ? '\n' : ' '); }).join('');
-          list.forEach(function (re) { re.lastIndex = 0; var mm = s.match(re); if (mm) left += mm.length; });
+          var cp = await chk.getPage(p), tc = await cp.getTextContent(), s = plainText(tc.items.map(function (it) { return it.str + (it.hasEOL ? '\n' : ' '); }).join(''));
+          var hit = ranges(s, list).length;
+          annotTexts(await cp.getAnnotations().catch(function () { return []; }), cp.getViewport({ scale: 1 })).forEach(function (a) { var h = ranges(plainText(a.text), list).length; if (h) { hit += h; inNotes.push(p); } });
+          if (hit) { left += hit; if (inText.indexOf(p) < 0 && inNotes.indexOf(p) < 0) inText.push(p); }
         }
+        var md = await chk.getMetadata().catch(function () { return {}; }), info = md.info || {};
+        var details = ['Title', 'Author', 'Subject', 'Keywords', 'Creator', 'Producer'].map(function (k) { return typeof info[k] === 'string' ? info[k] : ''; }).join('\n');
+        var dh = ranges(plainText(details), list).length;
+        if (dh) { left += dh; where.push('the document details (title, author…)'); }
         chk.destroy();
+        var pg = inText.concat(inNotes.filter(function (x) { return inText.indexOf(x) < 0; })).sort(function (a, b) { return a - b; });
+        if (pg.length) where.unshift((pg.length === 1 ? 'page ' : 'pages ') + pg.slice(0, 12).join(', '));
       }
-      PT.done(bytes, PT.base(file.name) + '-redacted.pdf', 'application/pdf', 'Redacted ' + redacted.length + (redacted.length === 1 ? ' page' : ' pages') + (list.length ? (left ? '. Warning: ' + left + ' match(es) are still in the text of pages you did not mark. Check them' : '. Checked: none of the searched words are left in the file') : ''));
+      PT.done(bytes, PT.base(file.name) + '-redacted.pdf', 'application/pdf', 'Redacted ' + redacted.length + (redacted.length === 1 ? ' page' : ' pages') + (list.length ? (left ? '. Warning: ' + left + (left === 1 ? ' match of your search is' : ' matches of your search are') + ' still in the file, in ' + where.join(' and ') + (dh ? '. Tick "Also remove the title, author…" to clear the details' : '') + (pg.length ? '. Press Find and mark again to cover the rest' : '') : '. Checked: none of the searched words are left in the file') : ''));
       if (left) $('msg').className = 'msg bad';
     }).then(function () { busy = false; $('go').disabled = !total(); });
   });

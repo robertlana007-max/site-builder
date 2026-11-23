@@ -4670,7 +4670,7 @@ module.exports = [
       faq: [
         ['What counts as a change?', 'Every word that is in one PDF but not in the other, page by page. The Overlay and Side by side views also show changes in pictures, lines and layout that text cannot show.'],
         ['Can it compare scanned PDFs?', 'Scans have no text, so the word list stays empty, but Overlay and Side by side still compare them as pictures.'],
-        ['What if one PDF has more pages?', 'Extra pages are shown with a dashed border and listed as only in the first or only in the second PDF.'],
+        ['What if one PDF has more pages?', 'Extra pages are shown with a dashed border and listed as only in the first or only in the second PDF. Because the whole text is compared, words that simply moved onto another page are not shown as changes.'],
         ['Can I ignore small differences?', 'Yes. Tick Ignore capital letters or Ignore punctuation to hide changes that only affect those.'],
         ['Are my files uploaded?', 'No. Both PDFs are read and compared inside your browser.']
       ],

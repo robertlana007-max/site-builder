@@ -108,12 +108,24 @@
     return w;
   }
   // Myers' diff on two word lists. Returns [{ t: '=', '-', '+', w }] or null when the texts are too different.
+  // Each op also says where its word is: ia (index in a) and ib (index in b).
   function diff(a, b) {
-    var A = a.map(norm), B = b.map(norm), n = A.length, m = B.length, max = n + m, off = max + 1, v = new Int32Array(2 * max + 3), trace = [], limit = Math.min(max, 4000);
-    var pre = 0; while (pre < n && pre < m && A[pre] === B[pre]) pre++;
-    if (pre === n && pre === m) return a.map(function (w) { return { t: '=', w: w }; });
+    var A0 = a.map(norm), B0 = b.map(norm), pre = 0, suf = 0;
+    while (pre < A0.length && pre < B0.length && A0[pre] === B0[pre]) pre++;
+    while (suf < A0.length - pre && suf < B0.length - pre && A0[A0.length - 1 - suf] === B0[B0.length - 1 - suf]) suf++;
+    var head = [], tail = [], z;
+    for (z = 0; z < pre; z++) head.push({ t: '=', w: a[z], ia: z, ib: z });
+    for (z = suf; z > 0; z--) tail.push({ t: '=', w: a[a.length - z], ia: a.length - z, ib: b.length - z });
+    var mid = core(A0.slice(pre, A0.length - suf), B0.slice(pre, B0.length - suf));
+    if (!mid) return null;
+    return head.concat(mid.map(function (o) { return { t: o.t, w: o.t === '+' ? b[pre + o.j] : a[pre + o.i], ia: o.t === '+' ? -1 : pre + o.i, ib: o.t === '-' ? -1 : pre + o.j }; }), tail);
+  }
+  // Myers' diff on the parts that differ. Returns [{ t, i, j }] or null when they are too different.
+  function core(A, B) {
+    var n = A.length, m = B.length, max = n + m, off = max + 1, v = new Int32Array(2 * max + 3), trace = [], limit = Math.min(max, 4000), used = 0;
+    if (!n && !m) return [];
     for (var D = 0; D <= limit; D++) {
-      trace.push(v.slice());
+      trace.push(v.slice(off - D, off + D + 1)); used += 2 * D + 1; // only the diagonals step D can reach
       for (var k = -D; k <= D; k += 2) {
         var x = (k === -D || (k !== D && v[off + k - 1] < v[off + k + 1])) ? v[off + k + 1] : v[off + k - 1] + 1, y = x - k;
         while (x < n && y < m && A[x] === B[y]) { x++; y++; }
@@ -121,16 +133,16 @@
         if (x >= n && y >= m) { // walk back
           var out = [], cx = n, cy = m;
           for (var d = D; d > 0; d--) {
-            var pv = trace[d], kk = cx - cy, down = kk === -d || (kk !== d && pv[off + kk - 1] < pv[off + kk + 1]), pk = down ? kk + 1 : kk - 1, px = pv[off + pk], py = px - pk;
-            while (cx > px && cy > py) { out.push({ t: '=', w: a[cx - 1] }); cx--; cy--; }
-            if (down) out.push({ t: '+', w: b[cy - 1] }); else out.push({ t: '-', w: a[cx - 1] });
+            var pv = trace[d], kk = cx - cy, down = kk === -d || (kk !== d && pv[kk - 1 + d] < pv[kk + 1 + d]), pk = down ? kk + 1 : kk - 1, px = pv[pk + d], py = px - pk;
+            while (cx > px && cy > py) { out.push({ t: '=', i: cx - 1, j: cy - 1 }); cx--; cy--; }
+            if (down) out.push({ t: '+', j: cy - 1 }); else out.push({ t: '-', i: cx - 1 });
             cx = px; cy = py;
           }
-          while (cx > 0 && cy > 0) { out.push({ t: '=', w: a[cx - 1] }); cx--; cy--; }
+          while (cx > 0 && cy > 0) { out.push({ t: '=', i: cx - 1, j: cy - 1 }); cx--; cy--; }
           return out.reverse();
         }
       }
-      if (trace.length * v.length > 6e7) break; // too much memory: give up
+      if (used > 3e7) break; // too much memory: give up
     }
     return null;
   }
@@ -141,20 +153,49 @@
     try {
       var na = docs.A.numPages, nb = docs.B.numPages, n = Math.max(na, nb);
       result = [];
-      var tot = { pages: 0, add: 0, del: 0 };
-      for (var i = 1; i <= n; i++) {
+      var tot = { pages: 0, add: 0, del: 0 }, i;
+      // all words of each PDF, remembering the page and whether a line ends after them
+      var W = { A: { w: [], pg: [], nl: [] }, B: { w: [], pg: [], nl: [] } };
+      for (i = 1; i <= n; i++) {
         if (n > 10 && i % 5 === 1) say('', 'Reading page ' + i + ' of ' + n + '…');
-        var a = i <= na ? (texts.A[i] || (texts.A[i] = await pageWords(docs.A, i))) : null, b = i <= nb ? (texts.B[i] || (texts.B[i] = await pageWords(docs.B, i))) : null;
-        var r = { i: i, inA: !!a, inB: !!b }, ops = diff(a || [], b || []);
-        if (!ops) ops = (a || []).map(function (w) { return { t: '-', w: w }; }).concat((b || []).map(function (w) { return { t: '+', w: w }; }));
-        r.ops = ops; r.add = 0; r.del = 0;
-        ops.forEach(function (o) { if (o.w === '\n') return; if (o.t === '+') r.add++; else if (o.t === '-') r.del++; });
-        r.changed = r.add + r.del > 0 || !a || !b;
-        r.empty = (!a || !a.length) && (!b || !b.length);
-        if (r.changed) tot.pages++; tot.add += r.add; tot.del += r.del;
-        result.push(r);
+        for (var side of ['A', 'B']) {
+          if (i > docs[side].numPages) continue;
+          var t = texts[side][i] || (texts[side][i] = await pageWords(docs[side], i)), S = W[side];
+          t.forEach(function (w) { if (w === '\n') { if (S.w.length) S.nl[S.w.length - 1] = true; return; } S.w.push(w); S.pg.push(i); S.nl.push(false); });
+          if (S.w.length) S.nl[S.w.length - 1] = true; // a new page starts a new line
+        }
       }
       if (me !== job) return;
+      say('', 'Comparing…');
+      await new Promise(function (r0) { setTimeout(r0, 20); });
+      for (i = 1; i <= n; i++) result.push({ i: i, inA: i <= na, inB: i <= nb, ops: [], add: 0, del: 0, words: 0 });
+      W.A.pg.forEach(function (p) { result[p - 1].words++; }); W.B.pg.forEach(function (p) { result[p - 1].words++; });
+      // The whole documents are compared at once, so text that moved to the next page is not a change.
+      // Words are shown on the page where they are in the second PDF (removed words next to the words around them).
+      var ops = diff(W.A.w, W.B.w), last = 0;
+      if (ops) {
+        ops.forEach(function (o, z) {
+          var p, nl;
+          if (o.t === '-') {
+            p = W.A.pg[o.ia]; nl = W.A.nl[o.ia];
+            if (p <= nb) { if (last) p = last; else { var nx = ops.slice(z + 1).find(function (q) { return q.t !== '-'; }); p = nx ? W.B.pg[nx.ib] : Math.min(p, nb); } }
+          } else { p = W.B.pg[o.ib]; nl = W.B.nl[o.ib]; last = p; }
+          var r = result[p - 1];
+          r.ops.push({ t: o.t, w: o.w }); if (nl) r.ops.push({ t: o.t, w: '\n' });
+          if (o.t === '+') r.add++; else if (o.t === '-') r.del++;
+        });
+      } else { // too different to line up: compare page by page
+        for (i = 1; i <= n; i++) {
+          var a = i <= na ? texts.A[i] : null, b = i <= nb ? texts.B[i] : null, r1 = result[i - 1];
+          r1.ops = (a || []).map(function (w) { return { t: '-', w: w }; }).concat((b || []).map(function (w) { return { t: '+', w: w }; }));
+          r1.ops.forEach(function (o) { if (o.w === '\n') return; if (o.t === '+') r1.add++; else r1.del++; });
+        }
+      }
+      result.forEach(function (r) {
+        r.changed = r.add + r.del > 0 || (!ops && (!r.inA || !r.inB));
+        r.empty = !r.words;
+        if (r.changed) tot.pages++; tot.add += r.add; tot.del += r.del;
+      });
       var st = $('cpStats'); st.innerHTML = '';
       [['Pages (first / second)', na + ' / ' + nb], ['Pages with changes', tot.pages], ['Words removed', fmtNum(tot.del, 0)], ['Words added', fmtNum(tot.add, 0)]].forEach(function (x) {
         var d = document.createElement('div'); d.className = 'stat'; d.innerHTML = '<span></span><b></b>'; d.firstChild.textContent = x[0]; d.lastChild.textContent = x[1]; st.appendChild(d);
@@ -172,7 +213,7 @@
     result.forEach(function (r, k) {
       var b = document.createElement('button'); b.type = 'button'; b.textContent = r.i;
       if (r.changed) b.className = 'chg'; if (!r.inA || !r.inB) b.className += ' only';
-      b.title = !r.inA ? 'Only in the second PDF' : !r.inB ? 'Only in the first PDF' : r.changed ? r.del + ' removed, ' + r.add + ' added' : 'No text changes';
+      b.title = (!r.inA ? 'Only in the second PDF' : !r.inB ? 'Only in the first PDF' : '') + (!r.inA || !r.inB ? (r.changed ? ': ' : ', ') : '') + (r.changed ? r.del + ' removed, ' + r.add + ' added' : 'no text changes').replace(/^n/, !r.inA || !r.inB ? 'n' : 'N');
       b.setAttribute('aria-label', 'Page ' + r.i + ': ' + b.title);
       b.addEventListener('click', function () { show(k); });
       box.appendChild(b);
@@ -195,13 +236,13 @@
       lg.innerHTML = '<i style="background:#fde2e2;border:1px solid #b42318"></i>Removed (only in the first) &nbsp; <i style="background:#dcfce7;border:1px solid #166534"></i>Added (only in the second)';
       view.appendChild(lg);
       var box = document.createElement('div'); box.className = 'cp-text'; box.setAttribute('translate', 'no');
-      if (!r.inA) box.appendChild(document.createTextNode('This page is only in the second PDF.\n\n'));
-      if (!r.inB) box.appendChild(document.createTextNode('This page is only in the first PDF.\n\n'));
+      if (!r.inA) box.appendChild(document.createTextNode('This page is only in the second PDF.' + (r.ops.length ? '\n\n' : ' Its text was already in the first PDF, on earlier pages, so it is not a change.')));
+      if (!r.inB) box.appendChild(document.createTextNode('This page is only in the first PDF.' + (r.ops.length ? '\n\n' : ' Its text is still in the second PDF, on earlier pages, so it is not a change.')));
       if (r.empty) box.appendChild(document.createTextNode('No text on this page. Use Overlay or Side by side to compare it as a picture.'));
       var run = null;
       r.ops.forEach(function (o, z) {
         var tag = o.t === '+' ? 'ins' : o.t === '-' ? 'del' : null;
-        if (o.w === '\n') { if (o.t !== '+' || !r.inA) { run = null; box.appendChild(document.createTextNode('\n')); } return; }
+        if (o.w === '\n') { if (o.t !== '-' || !r.inB) { run = null; box.appendChild(document.createTextNode('\n')); } return; }
         if (!tag) { run = null; box.appendChild(document.createTextNode(o.w + ' ')); return; }
         if (!run || run.tagName.toLowerCase() !== tag) { run = document.createElement(tag); box.appendChild(run); }
         run.textContent += (run.textContent ? ' ' : '') + o.w;
