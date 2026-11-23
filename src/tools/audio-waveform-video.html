@@ -1,0 +1,450 @@
+<style>
+.vt-info { margin: -4px 0 14px; font-size: 15px; color: var(--muted); overflow-wrap: anywhere; }
+.vt-info b { color: var(--ink); }
+.vt-bar { height: 10px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 4px 0 14px; }
+.vt-bar i { display: block; height: 100%; width: 0; background: var(--accent); border-radius: 99px; transition: width .25s; }
+.vt-video { display: block; width: 100%; max-height: 360px; border-radius: 10px; border: 1px solid var(--line); background: #000; margin: 14px 0 4px; }
+.vt-hint { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+</style>
+<style>
+.aw-prev { display: block; max-width: 100%; height: auto; margin: 4px auto 8px; border-radius: 10px; border: 1px solid var(--line); background: #000; }
+.aw-ctl { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 14px; justify-content: center; }
+.aw-ctl .btn { flex: 0 1 220px; }
+.aw-img { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 14px; }
+.aw-img .btn { flex: 0 0 auto; }
+.aw-img span { font-size: 14px; color: var(--muted); overflow-wrap: anywhere; min-width: 0; flex: 1 1 160px; }
+.aw-range { display: flex; align-items: center; gap: 10px; }
+.aw-range input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.aw-range output { min-width: 3em; text-align: end; font-weight: 600; font-variant-numeric: tabular-nums; }
+.aw-sec { margin: 4px 0 8px; font-size: 16px; }
+</style>
+<div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a song, podcast or voice recording</b>MP3, M4A, WAV, OGG or FLAC. Nothing is uploaded.</div>
+<input type="file" id="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.oga,.opus,.flac,.mp4,.webm" hidden data-nomemo>
+<p class="vt-info" id="info"></p>
+<div id="editor" hidden>
+  <canvas class="aw-prev" id="prev" width="640" height="360" aria-label="Preview of the video"></canvas>
+  <div class="aw-ctl"><button class="btn ghost" type="button" id="hear">▶ Play preview</button></div>
+  <audio id="song" preload="auto" hidden></audio>
+  <h3 class="aw-sec">Size and picture</h3>
+  <div class="fields">
+    <div><label for="size">Video size</label><select id="size"><option value="1280x720">YouTube 720p (1280 × 720)</option><option value="1920x1080">YouTube 1080p (1920 × 1080)</option><option value="1080x1080">Instagram square (1080 × 1080)</option><option value="1080x1350">Instagram portrait 4:5 (1080 × 1350)</option><option value="1080x1920">Reels, Stories, TikTok, Shorts (1080 × 1920)</option></select></div>
+    <div><label for="bg">Background</label><select id="bg"><option value="grad">Colour gradient</option><option value="color">Plain colour</option><option value="image">My picture</option></select></div>
+    <div><label for="c1">Colour 1</label><input type="color" id="c1" value="#1e1b4b"></div>
+    <div id="c2Box"><label for="c2">Colour 2</label><input type="color" id="c2" value="#7c3aed"></div>
+  </div>
+  <div class="aw-img" id="imgBox" hidden><button class="btn ghost" type="button" id="imgBtn">Choose a picture</button><span id="imgName">JPG, PNG or WebP. It fills the frame; the edges are filled with a blurred copy if the shape differs.</span><input type="file" id="img" accept="image/*" hidden data-nomemo></div>
+  <h3 class="aw-sec">Waveform</h3>
+  <div class="fields">
+    <div><label for="style">Style</label><select id="style"><option value="cline">Smooth wave</option><option value="p2p">Filled wave</option><option value="bars">Frequency bars</option><option value="point">Dots</option></select></div>
+    <div><label for="wc">Colour</label><input type="color" id="wc" value="#ffffff"></div>
+    <div><label for="wpos">Position</label><select id="wpos"><option value="0.5">Middle</option><option value="0.78" selected>Lower part</option><option value="0.25">Upper part</option></select></div>
+    <div><label for="wh">Height</label><div class="aw-range"><input type="range" id="wh" min="10" max="60" step="1" value="28"><output id="whOut">28%</output></div></div>
+  </div>
+  <h3 class="aw-sec">Text</h3>
+  <div class="fields">
+    <div><label for="title">Title</label><input type="text" id="title" data-nomemo placeholder="Song or episode name" maxlength="120"></div>
+    <div><label for="sub">Second line</label><input type="text" id="sub" data-nomemo placeholder="Artist, show or website" maxlength="160"></div>
+    <div><label for="tc">Text colour</label><input type="color" id="tc" value="#ffffff"></div>
+    <div><label for="tpos">Text position</label><select id="tpos"><option value="0.32">Above the middle</option><option value="0.12">Top</option><option value="0.5">Middle</option><option value="0.9">Bottom</option></select></div>
+  </div>
+  <h3 class="aw-sec">Length</h3>
+  <div class="fields">
+    <div><label for="start">From (min:sec)</label><input type="text" id="start" value="0:00" inputmode="decimal" autocomplete="off" data-nomemo></div>
+    <div><label for="end">To (min:sec)</label><input type="text" id="end" value="0:00" inputmode="decimal" autocomplete="off" data-nomemo></div>
+    <div><label for="fps">Smoothness</label><select id="fps"><option value="25">25 frames a second</option><option value="30">30 frames a second</option><option value="15">15 frames a second (fastest)</option></select></div>
+  </div>
+  <p class="vt-hint" id="hint"></p>
+</div>
+<div class="vt-bar" id="bar" hidden><i id="barFill"></i></div>
+<div class="btns"><button class="btn" id="go" disabled>Make video</button><button class="btn ghost" id="stop" type="button" hidden>Cancel</button><a class="btn ghost" id="dl" hidden>Download MP4</a></div>
+<p class="msg" id="msg"></p>
+<script>
+// Video engine loader (ffmpeg.wasm, single-thread build, no special server headers needed).
+// The same copy is used by every video tool. Nothing is downloaded until a video is chosen.
+var FF = (function () {
+  var BASE = '../assets/vendor/ffmpeg/', WASM_BYTES = 32232419, MAX = 1024 * 1024 * 1024;
+  var wasmUrl = null, ff = null, loading = null, onLog = null, logTail = [];
+  function abs(p) { return new URL(BASE + p, location.href).href; }
+  function mb(n) { return Math.round(n / 1048576); }
+
+  function fetchWasm(say) {
+    if (wasmUrl) return Promise.resolve(wasmUrl);
+    return fetch(abs('ffmpeg-core.wasm')).then(function (res) {
+      if (!res.ok) throw new Error('The video engine could not be downloaded (error ' + res.status + '). Check your connection and try again.');
+      if (!res.body || !res.body.getReader) return res.blob();
+      var reader = res.body.getReader(), parts = [], got = 0;
+      function pump() {
+        return reader.read().then(function (r) {
+          if (r.done) return new Blob(parts, { type: 'application/wasm' });
+          parts.push(r.value); got += r.value.length;
+          say('', 'Downloading the video engine… ' + Math.min(99, Math.round(got / WASM_BYTES * 100)) + '% (' + mb(got) + ' of ' + mb(WASM_BYTES) + ' MB). This happens only once.');
+          return pump();
+        });
+      }
+      return pump();
+    }, function () { throw new Error('The video engine could not be downloaded. Check your connection and try again.'); })
+      .then(function (blob) { wasmUrl = URL.createObjectURL(blob.type === 'application/wasm' ? blob : new Blob([blob], { type: 'application/wasm' })); return wasmUrl; });
+  }
+
+  // Resolve with a ready FFmpeg instance. say(cls, text) shows status to the person.
+  function get(say) {
+    if (ff) return Promise.resolve(ff);
+    if (loading) return loading;
+    if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') return Promise.reject(new Error('This browser cannot run the video engine. Please use a recent Chrome, Edge, Firefox or Safari.'));
+    say('', 'Loading the video engine…');
+    loading = Promise.all([import(abs('index.js')), fetchWasm(say)]).then(function (r) {
+      say('', 'Starting the video engine…');
+      var f = new r[0].FFmpeg();
+      f.on('log', function (e) { var m = e.message; logTail.push(m); if (logTail.length > 60) logTail.shift(); if (onLog) onLog(m); });
+      return f.load({ coreURL: abs('ffmpeg-core.js'), wasmURL: wasmUrl }).then(function () { ff = f; return f; });
+    }).catch(function (e) {
+      if (e && /could not be downloaded|cannot run/.test(e.message)) throw e;
+      throw new Error('The video engine could not start in this browser. Please update your browser or try Chrome, Edge or Firefox.');
+    }).then(function (f) { loading = null; return f; }, function (e) { loading = null; throw e; });
+    return loading;
+  }
+
+  function secs(s) { var m = /(\d+):(\d+):(\d+(?:\.\d+)?)/.exec(s); return m ? +m[1] * 3600 + +m[2] * 60 + +m[3] : null; }
+
+  // Plain-language reason for a failed run, from the last log lines.
+  function reason(fallback) {
+    var t = logTail.join('\n');
+    if (/Invalid data found|moov atom not found|could not find codec parameters|EBML header parsing failed|Invalid argument.*input/i.test(t)) return 'This file could not be read as a video. It may be damaged, incomplete, or in a format the engine does not support.';
+    if (/Decoder .* not found|Unknown decoder|unsupported codec/i.test(t)) return 'The video inside this file uses a codec this tool cannot decode.';
+    if (/does not contain any stream|Output file .* does not contain|matches no streams/i.test(t)) return 'This file has no video track to work with.';
+    if (/out of memory|Cannot allocate memory|Aborted\(|OOM/i.test(t)) return 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.';
+    return fallback || 'Something went wrong while processing the video.';
+  }
+
+  var job = 0;
+  // Put the file into the engine's file system. WORKERFS reads it in pieces, so big files do not fill memory.
+  function mountIn(f, file, name) {
+    var dir = '/in' + (++job);
+    return f.createDir(dir).then(function () {
+      return f.mount('WORKERFS', { files: [new File([file], name)] }, dir).then(function () { return { path: dir + '/' + name, dir: dir, mounted: true }; }, function () {
+        return file.arrayBuffer().then(function (buf) { return f.writeFile(dir + '/' + name, new Uint8Array(buf)); }).then(function () { return { path: dir + '/' + name, dir: dir, mounted: false }; });
+      });
+    });
+  }
+  function unmountIn(f, inp) {
+    var p = inp.mounted ? f.unmount(inp.dir) : f.deleteFile(inp.path);
+    return p.catch(function () {}).then(function () { return f.deleteDir(inp.dir).catch(function () {}); });
+  }
+  function ext(file) { var m = /\.([a-z0-9]{1,5})$/i.exec(file.name); return m ? m[1].toLowerCase() : 'mp4'; }
+
+  // Check a file before doing anything with it. Returns an error message or ''.
+  function check(file) {
+    if (!file) return 'Please choose a video file.';
+    var okType = /^video\//.test(file.type) || /\.(mp4|m4v|mov|webm|mkv|avi|3gp|3g2|mpg|mpeg|ts|mts|m2ts|flv|wmv|ogv|qt)$/i.test(file.name);
+    if (!okType) return '"' + file.name + '" is not a video file. Please choose an MP4, MOV, WebM, MKV or AVI video.';
+    if (!file.size) return '"' + file.name + '" is empty.';
+    if (file.size > MAX) return 'This video is ' + fmtBytes(file.size) + '. Videos over 1 GB are too big to process inside a browser tab. Trim it first or use a desktop app.';
+    return '';
+  }
+
+  // Read duration, size, rotation and streams by asking ffmpeg to describe the file.
+  // audioOk: accept a file that only has sound (for the audio tools).
+  function probe(file, say, audioOk) {
+    return get(say).then(function (f) {
+      var lines = [];
+      onLog = function (m) { lines.push(m); };
+      return mountIn(f, file, 'input.' + ext(file)).then(function (inp) {
+        return f.exec(['-hide_banner', '-i', inp.path]).then(function () { return unmountIn(f, inp); });
+      }).then(function () {
+        onLog = null;
+        var t = lines.join('\n'), info = { duration: 0, width: 0, height: 0, rotate: 0, fps: 0, vcodec: '', audio: false, acodec: '' };
+        var d = /Duration:\s*(\d+:\d+:\d+(?:\.\d+)?)/.exec(t); if (d) info.duration = secs(d[1]);
+        var v = /Stream #\d+:\d+[^:]*: Video: ([a-z0-9_]+)[^\n]*?, (\d{2,5})x(\d{2,5})/.exec(t);
+        if (v) { info.vcodec = v[1]; info.width = +v[2]; info.height = +v[3]; }
+        var fr = /, ([\d.]+) fps/.exec(t) || /, ([\d.]+) tbr/.exec(t); if (fr) info.fps = +fr[1];
+        var r = /rotation of (-?[\d.]+) degrees/.exec(t); if (r) info.rotate = ((Math.round(-r[1] / 90) * 90) % 360 + 360) % 360;
+        if (info.rotate === 90 || info.rotate === 270) { var w = info.width; info.width = info.height; info.height = w; }
+        var a = /Stream #\d+:\d+[^:]*: Audio: ([a-z0-9_]+)/.exec(t); if (a) { info.audio = true; info.acodec = a[1]; }
+        if (!info.vcodec && !(audioOk && info.audio && info.duration > 0)) {
+          if (audioOk) throw new Error('"' + file.name + '" could not be read as an audio or video file. It may be damaged or in an unsupported format.');
+          if (/Invalid data|moov atom|EBML|could not find|No such file/i.test(t) || !d) throw new Error('"' + file.name + '" could not be read as a video. It may be damaged or in an unsupported format.');
+          throw new Error('"' + file.name + '" has no video track.');
+        }
+        if (!(info.duration > 0)) throw new Error('Could not read the length of this video. It may be damaged or still recording.');
+        return info;
+      }, function (e) { onLog = null; throw e; });
+    });
+  }
+
+  // Run ffmpeg. build(inPath) returns the argument list (with -y and no input already added
+  // by the caller); outName is the output file. total is the expected output length in seconds.
+  // file may also be an array of files: build then gets an array of paths. prep(f, paths), if given,
+  // runs before ffmpeg starts (for example to write a list file) and may return a promise.
+  function run(file, build, outName, total, onPct, say, prep) {
+    var many = Array.isArray(file), list = many ? file : [file];
+    return get(say).then(function (f) {
+      logTail = [];
+      onLog = function (m) {
+        var t = /time=\s*(-?\d+:\d+:\d+(?:\.\d+)?)/.exec(m);
+        if (t && total > 0) onPct(Math.max(0, Math.min(0.99, secs(t[1]) / total)));
+      };
+      var out = '/' + outName, inps = [];
+      return list.reduce(function (p, one) {
+        return p.then(function () { return mountIn(f, one, 'input.' + ext(one)).then(function (inp) { inps.push(inp); }); });
+      }, Promise.resolve()).then(function () {
+        var paths = inps.map(function (i) { return i.path; });
+        return Promise.resolve(prep ? prep(f, paths) : null).then(function () {
+          return f.exec(['-hide_banner', '-nostdin', '-y'].concat(build(many ? paths : paths[0]), [out]));
+        });
+      }).then(function (code) {
+        return Promise.all(inps.map(function (i) { return unmountIn(f, i); })).then(function () { return code; });
+      }).then(function (code) {
+        onLog = null;
+        if (code !== 0) { f.deleteFile(out).catch(function () {}); throw new Error(reason()); }
+        return f.readFile(out).then(function (data) {
+          f.deleteFile(out).catch(function () {});
+          if (!data || !data.length) throw new Error(reason('The result was empty. Try different settings.'));
+          onPct(1);
+          return data;
+        });
+      }, function (e) {
+        onLog = null;
+        if (e && e.message === 'called FFmpeg.terminate()') throw new Error('cancelled');
+        // the engine may be broken after a crash: start a fresh one next time
+        try { f.terminate(); } catch (x) {}
+        ff = null;
+        throw new Error(reason(e && /memory|abort/i.test(String(e.message || e)) ? 'Your browser ran out of memory. Try a shorter or smaller video, or a lower resolution.' : 'The video engine stopped unexpectedly. Try again, or try a smaller video.'));
+      });
+    });
+  }
+
+  function cancel() { if (ff) { try { ff.terminate(); } catch (e) {} ff = null; } onLog = null; }
+
+  return { get: get, check: check, probe: probe, run: run, cancel: cancel, secs: secs };
+})();
+
+// Page helpers shared by the video tools. Expect #drop #file #info #go #stop #bar #barFill #dl #msg.
+var VT = (function () {
+  var lastUrl = null, busy = false, cancelled = false;
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  function bar(p) { $('bar').hidden = p == null; if (p != null) $('barFill').style.width = Math.round(p * 100) + '%'; }
+  function clock(s) {
+    s = Math.round(Math.max(0, s) * 10) / 10; var h = Math.floor(s / 3600), m = Math.floor(s % 3600 / 60), x = s % 60;
+    var sec = (x < 10 ? '0' : '') + x.toFixed(1);
+    return (h ? h + ':' + (m < 10 ? '0' : '') : '') + m + ':' + sec;
+  }
+  function base(name) { return name.replace(/\.[^.]+$/, '') || 'video'; }
+  function showInfo(file, i) {
+    var el = $('info'); el.textContent = '';
+    var b = document.createElement('b'); b.textContent = file.name; el.appendChild(b);
+    el.appendChild(document.createTextNode(' · ' + fmtBytes(file.size) + ' · ' + clock(i.duration) + ' · ' + i.width + ' × ' + i.height + (i.audio ? ' · with sound' : ' · no sound')));
+  }
+  // Wire the drop zone. onReady(file, info) runs once the video has been checked and read.
+  function pick(onReset, onReady) {
+    var ticket = 0;
+    setupDrop('drop', 'file', function (file) {
+      $('file').value = '';
+      if (busy) { say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+      var mine = ++ticket;
+      onReset(); $('go').disabled = true; $('dl').hidden = true; $('info').textContent = ''; bar(null);
+      var bad = FF.check(file);
+      if (bad) { say('bad', bad); return; }
+      busy = true;
+      FF.probe(file, say).then(function (info) {
+        busy = false;
+        if (mine !== ticket) return;
+        showInfo(file, info); say('', ''); onReady(file, info); $('go').disabled = false;
+      }, function (e) { busy = false; if (mine === ticket) say('bad', e.message); });
+    });
+    $('stop').addEventListener('click', function () { if (!busy) return; cancelled = true; FF.cancel(); });
+    Array.prototype.forEach.call(document.querySelectorAll('.card input:not([type=file]), .card select'), function (el) {
+      el.addEventListener('input', function () { if (!busy) $('dl').hidden = true; });
+    });
+  }
+  // Run a job with the busy state, progress bar, Cancel button and error messages handled.
+  function go(label, job) {
+    if (busy) return;
+    busy = true; cancelled = false;
+    $('go').disabled = true; $('dl').hidden = true; $('stop').hidden = false; bar(0);
+    say('', label + '…');
+    var started = Date.now(), last = 0;
+    function show() { if (busy) say('', label + '… ' + Math.round(last * 100) + '% · ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, '')); }
+    function pct(p) { last = p; bar(p); show(); }
+    var tick = setInterval(function () { if (!/Downloading|Loading|Starting/.test($('msg').textContent)) show(); }, 1000);
+    return Promise.resolve().then(function () { return job(pct); }).then(function (note) {
+      clearInterval(tick);
+      say('ok', (note || 'Done') + ' · took ' + VT.clock((Date.now() - started) / 1000).replace(/\.\d$/, ''));
+    }, function (e) {
+      clearInterval(tick); bar(null);
+      if (cancelled || (e && e.message === 'cancelled')) say('', 'Cancelled. Change the settings and try again whenever you like.');
+      else say('bad', e && e.message ? e.message : 'Something went wrong with this video.');
+    }).then(function () { busy = false; $('go').disabled = false; $('stop').hidden = true; });
+  }
+  // Show the finished file on #dl. Returns the object URL.
+  function done(data, name, mime) {
+    var blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+    if (lastUrl) URL.revokeObjectURL(lastUrl);
+    lastUrl = URL.createObjectURL(blob);
+    var dl = $('dl'); dl.href = lastUrl; dl.download = name; dl.hidden = false; bar(1);
+    return lastUrl;
+  }
+  return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
+})();
+(function () {
+  var file = null, info = null, surl = null, img = null, busy = false, ticket = 0, S = $('song'), cv = $('prev'), actx = null, an = null, srcNode = null, raf = 0;
+  function parse(s) {
+    s = String(s).trim().replace(',', '.');
+    if (!/^\d+(?:\.\d+)?$|^\d+:\d{1,2}(?:\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(?:\.\d+)?$/.test(s)) return NaN;
+    return s.split(':').reduce(function (t, p) { return t * 60 + parseFloat(p); }, 0);
+  }
+  function dims() { var m = $('size').value.split('x'); return { W: +m[0], H: +m[1] }; }
+  function range() {
+    var a = parse($('start').value), b = parse($('end').value);
+    if (isNaN(a) || isNaN(b)) return { err: 'Write the times like 1:05 or 65.' };
+    if (a >= info.duration) return { err: 'The start is after the end of the audio (' + VT.clock(info.duration) + ').' };
+    b = Math.min(b, info.duration);
+    if (b - a < 1) return { err: 'The video must be at least 1 second long. Move the end time later.' };
+    return { a: a, b: b };
+  }
+  // ---------- the still picture behind the waveform ----------
+  function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(s); }
+  function fitText(g, text, maxW, px, weight) {
+    g.font = weight + ' ' + px + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
+    while (px > 10 && g.measureText(text).width > maxW) { px *= 0.92; g.font = weight + ' ' + px + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'; }
+    return px;
+  }
+  function background(c, W, H) {
+    var g = c.getContext('2d'), bg = $('bg').value;
+    if (bg === 'image' && img) {
+      var cs = Math.max(W / img.width, H / img.height), fs = Math.min(W / img.width, H / img.height);
+      if (Math.abs(img.width / img.height - W / H) < 0.02) { g.drawImage(img, (W - img.width * cs) / 2, (H - img.height * cs) / 2, img.width * cs, img.height * cs); }
+      else { // blurred copy behind, whole picture on top
+        var t = document.createElement('canvas'); t.width = 48; t.height = Math.max(8, Math.round(48 * H / W));
+        var tg = t.getContext('2d'), ts = Math.max(t.width / img.width, t.height / img.height); tg.drawImage(img, (t.width - img.width * ts) / 2, (t.height - img.height * ts) / 2, img.width * ts, img.height * ts);
+        g.imageSmoothingEnabled = true; g.imageSmoothingQuality = 'high'; g.drawImage(t, 0, 0, W, H);
+        g.fillStyle = 'rgba(0,0,0,.25)'; g.fillRect(0, 0, W, H);
+        g.drawImage(img, (W - img.width * fs) / 2, (H - img.height * fs) / 2, img.width * fs, img.height * fs);
+      }
+    } else if (bg === 'grad') {
+      var gr = g.createLinearGradient(0, 0, W, H); gr.addColorStop(0, $('c1').value); gr.addColorStop(1, $('c2').value); g.fillStyle = gr; g.fillRect(0, 0, W, H);
+    } else { g.fillStyle = $('c1').value; g.fillRect(0, 0, W, H); }
+    var t1 = $('title').value.trim(), t2 = $('sub').value.trim();
+    if (t1 || t2) {
+      var y = +$('tpos').value * H, base = Math.min(W, H), p1 = base * 0.075, p2 = base * 0.042, maxW = W * 0.88;
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = $('tc').value;
+      g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = base * 0.012; g.shadowOffsetY = base * 0.004;
+      var h1 = t1 ? fitText(g, t1, maxW, p1, '700') : 0, h2 = 0;
+      var total = (t1 ? h1 * 1.25 : 0) + (t2 ? p2 * 1.4 : 0); y = Math.max(total / 2 + base * 0.03, Math.min(H - total / 2 - base * 0.03, y));
+      var yy = y - total / 2;
+      if (t1) { g.direction = rtl(t1) ? 'rtl' : 'ltr'; fitText(g, t1, maxW, p1, '700'); g.fillText(t1, W / 2, yy + h1 * 0.62); yy += h1 * 1.25; }
+      if (t2) { g.direction = rtl(t2) ? 'rtl' : 'ltr'; h2 = fitText(g, t2, maxW, p2, '500'); g.globalAlpha = 0.88; g.fillText(t2, W / 2, yy + h2 * 0.7); g.globalAlpha = 1; }
+      g.shadowColor = 'transparent';
+    }
+  }
+  function waveBox(W, H) { var h = Math.round(H * +$('wh').value / 100 / 2) * 2, y = Math.round(Math.max(0, Math.min(H - h, +$('wpos').value * H - h / 2)) / 2) * 2, w = Math.round(W * 0.9 / 2) * 2; return { x: Math.round((W - w) / 4) * 2, y: y, w: w, h: h }; }
+  var bgCache = null, bgKey = '';
+  function draw(data) {
+    if (!info) return;
+    var d = dims(), k = Math.min(1, 640 / Math.max(d.W, d.H)), pw = Math.round(d.W * k), ph = Math.round(d.H * k);
+    if (cv.width !== pw || cv.height !== ph) { cv.width = pw; cv.height = ph; }
+    cv.style.width = Math.min(pw, Math.round(360 * pw / ph)) + 'px';
+    var key = [pw, ph, $('bg').value, $('c1').value, $('c2').value, $('title').value, $('sub').value, $('tc').value, $('tpos').value, img ? img.src : ''].join('|');
+    if (key !== bgKey) { bgCache = document.createElement('canvas'); bgCache.width = pw; bgCache.height = ph; background(bgCache, pw, ph); bgKey = key; }
+    var g = cv.getContext('2d'); g.drawImage(bgCache, 0, 0);
+    var b = waveBox(pw, ph), st = $('style').value, n = 96; g.strokeStyle = g.fillStyle = $('wc').value; g.lineWidth = Math.max(1, ph / 300);
+    var vals = [];
+    for (var i = 0; i < n; i++) vals.push(data ? data[Math.floor(i / n * data.length)] : Math.sin(i / n * Math.PI * 6) * 0.6 * Math.sin(i / n * Math.PI));
+    if (st === 'bars') { var bw = b.w / n; vals.forEach(function (v, i) { var hh = Math.abs(v) * b.h; g.fillRect(b.x + i * bw, b.y + b.h - hh, Math.max(1, bw * 0.7), hh); }); return; }
+    var mid = b.y + b.h / 2;
+    if (st === 'point') { vals.forEach(function (v, i) { g.fillRect(b.x + i / n * b.w, mid - v * b.h / 2, 2, 2); }); return; }
+    if (st === 'p2p') { vals.forEach(function (v, i) { var hh = Math.abs(v) * b.h / 2; g.fillRect(b.x + i / n * b.w, mid - hh, Math.max(1, b.w / n * 0.6), hh * 2); }); return; }
+    g.beginPath(); vals.forEach(function (v, i) { var x = b.x + i / (n - 1) * b.w, y = mid - v * b.h / 2; if (i) g.lineTo(x, y); else g.moveTo(x, y); }); g.stroke();
+  }
+  function hint() {
+    if (!info) return;
+    $('c2Box').hidden = $('bg').value !== 'grad'; $('imgBox').hidden = $('bg').value !== 'image';
+    $('whOut').textContent = $('wh').value + '%';
+    draw();
+    var r = range(), d = dims();
+    if (r.err) { $('hint').textContent = r.err; $('go').disabled = true; return; }
+    if ($('bg').value === 'image' && !img) { $('hint').textContent = 'Choose a picture, or pick a colour background.'; $('go').disabled = true; return; }
+    var len = r.b - r.a, slow = d.W * d.H / 921600 * (+$('fps').value / 25) * 0.9, mins = len * slow / 60;
+    $('hint').textContent = 'The video will be ' + VT.clock(len) + ' long, ' + d.W + ' × ' + d.H + '. Expect roughly ' + (mins < 1 ? 'under a minute' : Math.round(mins) + ' to ' + Math.round(mins * 2.5) + ' minutes') + ' on a computer, longer on a phone' + (d.W * d.H > 1e6 && len > 120 ? '. 720p or 15 frames a second is much faster' : '') + '. Keep this tab open.';
+    $('go').disabled = busy;
+  }
+  ['size', 'bg', 'c1', 'c2', 'style', 'wc', 'wpos', 'wh', 'title', 'sub', 'tc', 'tpos', 'start', 'end', 'fps'].forEach(function (id) { $(id).addEventListener('input', function () { $('dl').hidden = true; hint(); }); $(id).addEventListener('change', hint); });
+  $('imgBtn').addEventListener('click', function () { $('img').click(); });
+  $('img').addEventListener('change', function () {
+    var f = $('img').files[0]; $('img').value = '';
+    if (!f) return;
+    if (!/^image\//.test(f.type)) { VT.say('bad', '"' + f.name + '" is not a picture. Choose a JPG, PNG or WebP image.'); return; }
+    loadImage(f, function (im) {
+      if (!im) { VT.say('bad', 'This picture could not be opened. Try a JPG or PNG.'); return; }
+      img = im; $('imgName').textContent = f.name + ' · ' + im.width + ' × ' + im.height; VT.say('', ''); hint();
+    });
+  });
+
+  // ---------- opening the audio ----------
+  setupDrop('drop', 'file', function (f) {
+    $('file').value = '';
+    if (busy) { VT.say('bad', 'Please wait for the current video to finish, or press Cancel.'); return; }
+    stopHear(); file = null; info = null; $('editor').hidden = true; $('go').disabled = true; $('dl').hidden = true; $('info').textContent = '';
+    if (!/^(audio|video)\//.test(f.type) && !/\.(mp3|m4a|aac|wav|ogg|oga|opus|flac|mp4|webm|aif|aiff|wma)$/i.test(f.name)) return VT.say('bad', '"' + f.name + '" is not an audio file. Choose an MP3, M4A, WAV, OGG or FLAC file.');
+    if (!f.size) return VT.say('bad', '"' + f.name + '" is empty.');
+    if (f.size > 1024 * 1048576) return VT.say('bad', 'This file is ' + fmtBytes(f.size) + '. Files over 1 GB are too big to use in a browser.');
+    var mine = ++ticket; busy = true;
+    FF.probe(f, VT.say, true).then(function (i) {
+      busy = false; if (mine !== ticket) return;
+      if (!i.audio) throw new Error('"' + f.name + '" has no sound in it.');
+      file = f; info = i;
+      if (surl) URL.revokeObjectURL(surl); surl = URL.createObjectURL(f); S.src = surl;
+      var el = $('info'); el.textContent = ''; var b = document.createElement('b'); b.textContent = f.name; el.appendChild(b);
+      el.appendChild(document.createTextNode(' · ' + fmtBytes(f.size) + ' · ' + VT.clock(i.duration)));
+      $('start').value = '0:00'; $('end').value = VT.clock(i.duration);
+      if (!$('title').value) $('title').value = f.name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').slice(0, 120);
+      $('editor').hidden = false; VT.say('', ''); hint();
+    }).catch(function (e) { busy = false; if (mine === ticket) VT.say('bad', e.message); });
+  });
+  // ---------- live preview ----------
+  function stopHear() { S.pause(); cancelAnimationFrame(raf); $('hear').textContent = '▶ Play preview'; draw(); }
+  $('hear').addEventListener('click', function () {
+    if (!info) return;
+    if (!S.paused) return stopHear();
+    var AC = window.AudioContext || window.webkitAudioContext;
+    try { if (!actx && AC) { actx = new AC(); srcNode = actx.createMediaElementSource(S); an = actx.createAnalyser(); an.fftSize = 2048; srcNode.connect(an); an.connect(actx.destination); } if (actx && actx.resume) actx.resume(); } catch (e) { an = null; }
+    var r = range(); if (!r.err && (S.currentTime < r.a || S.currentTime >= r.b)) S.currentTime = r.a;
+    var p = S.play(); if (p && p.catch) p.catch(function () { VT.say('bad', 'Your browser cannot play this audio file here, but you can still make the video.'); stopHear(); });
+    $('hear').textContent = '■ Stop preview';
+    var td = new Float32Array(2048), fd = new Uint8Array(1024);
+    (function loop() {
+      if (S.paused) return;
+      if (an) { if ($('style').value === 'bars') { an.getByteFrequencyData(fd); var v = []; for (var i = 0; i < 96; i++) v.push(fd[Math.floor(Math.pow(i / 96, 2) * 700)] / 255); draw(v); } else { an.getFloatTimeDomainData(td); draw(td); } }
+      raf = requestAnimationFrame(loop);
+    })();
+  });
+  S.addEventListener('ended', stopHear);
+
+  // ---------- making the video ----------
+  $('go').addEventListener('click', function () {
+    if (!file || busy) return;
+    var r = range(); if (r.err) { VT.say('bad', r.err); return; }
+    stopHear();
+    var d = dims(), W = d.W, H = d.H, fps = +$('fps').value, len = r.b - r.a, b = waveBox(W, H), st = $('style').value, col = '0x' + $('wc').value.slice(1), f = file;
+    var c = document.createElement('canvas'); c.width = W; c.height = H; background(c, W, H);
+    busy = true;
+    VT.go('Making your video', function (pct) {
+      return new Promise(function (res, rej) { c.toBlob(function (bl) { if (!bl) rej(new Error('The picture could not be made.')); else bl.arrayBuffer().then(res); }, 'image/png'); }).then(function (png) {
+        var viz = st === 'bars'
+          ? 'showfreqs=s=' + b.w + 'x' + b.h + ':mode=bar:ascale=sqrt:fscale=log:win_size=2048:colors=' + col + ':rate=' + fps
+          : 'showwaves=s=' + b.w + 'x' + b.h + ':mode=' + st + ':colors=' + col + ':rate=' + fps + ':scale=sqrt:draw=full';
+        var graph = '[1:a]aformat=channel_layouts=mono,' + viz + ',format=rgba[w];[0:v][w]overlay=' + b.x + ':' + b.y + ':shortest=1,format=yuv420p[v]';
+        return FF.run(f, function (inp) {
+          return ['-loop', '1', '-framerate', String(fps), '-i', '/aw-bg.png', '-ss', r.a.toFixed(3), '-t', len.toFixed(3), '-i', inp,
+            '-filter_complex', graph,
+            '-map', '[v]', '-map', '1:a:0', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '23', '-r', String(fps),
+            '-c:a', 'aac', '-b:a', '192k', '-t', len.toFixed(3), '-shortest', '-movflags', '+faststart'];
+        }, 'waveform.mp4', len, pct, VT.say, function (ff) { return ff.writeFile('/aw-bg.png', new Uint8Array(png)); });
+      }).then(function (data) {
+        VT.done(data, VT.base(f.name) + '-waveform.mp4', 'video/mp4');
+        return 'Your ' + W + ' × ' + H + ' video is ready (' + fmtBytes(data.length) + ')';
+      });
+    }).then(function () { busy = false; });
+  });
+  $('stop').addEventListener('click', function () { if (busy) FF.cancel(); });
+})();
+</script>

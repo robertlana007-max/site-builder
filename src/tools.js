@@ -4803,5 +4803,658 @@ module.exports = [
         ['Can I download the weeks of a year?', 'Yes. Copy the year table or download it as a CSV file for a spreadsheet.']
       ],
       icon: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/><path d="M10 14h4v4"/>'
+  },
+  {
+    slug: 'css-gradient-generator', cat: 'Developer tools', name: 'CSS Gradient Generator',
+    title: 'CSS Gradient Generator - Linear, Radial & Conic',
+    desc: 'Create linear, radial and conic CSS gradients with draggable color stops, opacity and a live preview, then copy the CSS code.',
+    card: 'Design CSS gradients and copy the code.',
+    intro: 'Pick colors, drag color stops and set the angle to design a gradient. The preview updates live and the CSS is ready to copy.',
+    steps: ['Choose linear, radial or conic.', 'Edit the colors and drag the stops on the bar.', 'Adjust the angle or center.', 'Click Copy CSS and paste it into your stylesheet.'],
+    faq: [
+      ['Which browsers support these gradients?', 'Linear and radial gradients work in every current browser. Conic gradients need a browser from 2020 or later; the CSS includes a solid fallback color.'],
+      ['How do I make a transparent gradient?', 'Lower the Opacity slider on a color stop. That stop is written as an rgba() color, so whatever is behind the element shows through.'],
+      ['How many colors can I use?', 'Up to 16 color stops. Click the stop bar or press Add color to add one.'],
+      ['Can I make stripes?', 'Yes. Turn on Repeating, or put two stops at the same position to create a sharp edge.'],
+      ['Is the code free to use?', 'Yes. The CSS you create is yours to use in any project.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M3 15L15 3M3 21L21 3M9 21l12-12"/>'
+  },
+  {
+    slug: 'css-box-shadow-generator', cat: 'Developer tools', name: 'CSS Box Shadow Generator',
+    title: 'CSS Box Shadow Generator - Layers, Inset & Preview',
+    desc: 'Design CSS box shadows with sliders: offset, blur, spread, color, inset and multiple layers, with a live preview and copy-ready code.',
+    card: 'Design layered CSS box shadows visually.',
+    intro: 'Use sliders to set the offset, blur, spread and color of a shadow, stack several layers, and copy the box-shadow CSS.',
+    steps: ['Start from a preset or the default soft shadow.', 'Adjust offset, blur, spread, color and opacity.', 'Add layers or switch on Inset if you need them.', 'Click Copy CSS.'],
+    faq: [
+      ['What does spread do?', 'Spread makes the shadow bigger (positive) or smaller (negative) than the box before it is blurred.'],
+      ['Why use more than one layer?', 'Real shadows have a sharp dark part close to the object and a soft wide part further away. Two or more layers imitate that.'],
+      ['What is an inset shadow?', 'An inset shadow is drawn inside the box, which makes it look pressed in.'],
+      ['Does box-shadow work on images?', 'Yes, on any element. For the outline of a transparent PNG, use filter: drop-shadow() instead.']
+    ],
+    icon: '<rect x="3" y="3" width="14" height="14" rx="2"/><path d="M21 7v12a2 2 0 0 1-2 2H7"/>'
+  },
+  {
+    slug: 'css-border-radius-generator', cat: 'Developer tools', name: 'CSS Border Radius Generator',
+    title: 'CSS Border Radius Generator - Rounded & Elliptical',
+    desc: 'Round each corner separately, make elliptical blob shapes, preview live and copy the shortest border-radius CSS. Pixels or percent.',
+    card: 'Round corners and make blob shapes in CSS.',
+    intro: 'Set the curve of each corner with sliders, switch on elliptical corners for organic shapes, and copy the border-radius code.',
+    steps: ['Choose pixels or percent.', 'Move the sliders, for all corners or each one separately.', 'Tick Elliptical corners for blob shapes.', 'Click Copy CSS.'],
+    faq: [
+      ['What does the slash in border-radius mean?', 'Values before the slash are the horizontal radii and values after it are the vertical radii, in the order top left, top right, bottom right, bottom left.'],
+      ['How do I make a circle?', 'Use 50% on all corners on a square element. On a rectangle, 50% gives an oval.'],
+      ['Why is my 500px radius the same as 100px?', 'When the curves would overlap, browsers scale all radii down so they fit, so very large values all look the same.'],
+      ['Does border-radius work on images?', 'Yes. Put it on the img element, or on a parent with overflow: hidden.']
+    ],
+    icon: '<path d="M4 20V10a6 6 0 0 1 6-6h10"/><path d="M4 4h2M18 20h2v-2"/>'
+  },
+  {
+    slug: 'css-clip-path-generator', cat: 'Developer tools', name: 'CSS Clip Path Generator',
+    title: 'CSS Clip Path Generator - Polygon Shapes & Circles',
+    desc: 'Make CSS clip-path shapes: drag polygon points, pick stars, arrows, hexagons, circles and insets, preview on your image and copy the code.',
+    card: 'Cut elements into shapes with clip-path.',
+    intro: 'Choose a shape and drag its points on the preview to create a clip-path. Preview it on your own image and copy the CSS.',
+    steps: ['Pick a starting shape.', 'Drag the points, or use the sliders for circles and insets.', 'Optionally preview your own image.', 'Click Copy CSS.'],
+    faq: [
+      ['Which browsers support clip-path?', 'All current browsers support polygon(), circle(), ellipse() and inset(). The code also includes -webkit-clip-path for older Safari.'],
+      ['Can I animate a clip-path?', 'Yes, with a CSS transition or animation, as long as both shapes are the same type and polygons have the same number of points.'],
+      ['Why is my shadow gone?', 'clip-path also cuts off box-shadow. Put filter: drop-shadow() on a wrapping element instead.'],
+      ['Is my image uploaded?', 'No. The preview image is opened only in your browser.']
+    ],
+    icon: '<path d="M12 3l9 7-3.5 11h-11L3 10z"/><circle cx="12" cy="3" r="1.4"/><circle cx="21" cy="10" r="1.4"/>'
+  },
+  {
+    slug: 'flexbox-grid-playground', cat: 'Developer tools', name: 'Flexbox and Grid Playground',
+    title: 'Flexbox & CSS Grid Playground - Visual Layout Tool',
+    desc: 'Try CSS flexbox and grid properties on live boxes: justify, align, wrap, grow, columns, spans. See the layout change and copy the CSS.',
+    card: 'Try flexbox and grid properties on live boxes.',
+    intro: 'Change flexbox or grid settings and watch real boxes move. Select a box to set its own properties, then copy the CSS and HTML.',
+    steps: ['Choose Flexbox or Grid.', 'Change the container settings.', 'Click a box to edit its own settings.', 'Copy the CSS and HTML.'],
+    faq: [
+      ['What is the difference between flexbox and grid?', 'Flexbox lays items out in one direction, a row or a column. Grid places items in rows and columns at the same time.'],
+      ['Why does align-content not change anything?', 'It only affects multiple lines, so set flex-wrap to wrap and add enough boxes to fill more than one row.'],
+      ['Can I type my own values?', 'Yes. Text fields such as gap, flex-basis and grid-template-columns accept any valid CSS value.'],
+      ['Is the preview the same as a real browser?', 'Yes. The boxes are real HTML elements laid out by your browser using the CSS shown.']
+    ],
+    icon: '<rect x="3" y="3" width="7" height="18" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>'
+  },
+  {
+    slug: 'code-playground', cat: 'Developer tools', name: 'Code Playground',
+    title: 'HTML, CSS & JS Code Playground - Live Online Editor',
+    desc: 'Write HTML, CSS and JavaScript and see the result live with a console. Safe sandbox, share links, templates and download as one HTML file.',
+    card: 'Live HTML, CSS and JS editor with console.',
+    intro: 'Type HTML, CSS and JavaScript and see the result instantly in a sandboxed preview, with console output, errors, share links and download.',
+    steps: ['Write your code in the HTML, CSS and JS tabs.', 'Watch the preview update, or press Run.', 'Check the console for logs and errors.', 'Share a link or download the HTML file.'],
+    faq: [
+      ['Is my code uploaded?', 'No. It runs in your browser and is saved only in this browser. A share link contains the code itself after the # sign, which browsers do not send to servers.'],
+      ['Is it safe to run code from others?', 'The preview runs in a sandbox that cannot read this site, your cookies or saved data, and cannot redirect the page. Still, only run code you are willing to have running in a tab.'],
+      ['Can I use libraries like jQuery or React?', 'Yes, when you are online, by adding a script tag with the library address in the HTML tab.'],
+      ['Why did my loop stop?', 'Loops that run longer than 2.5 seconds are stopped to keep the page responsive.'],
+      ['Does it work offline?', 'Yes, once the page has loaded, as long as your code does not load anything from the internet.']
+    ],
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 13l-2 2 2 2M15 13l2 2-2 2"/>'
+  },
+  {
+    slug: 'ip-subnet-calculator', cat: 'Developer tools', name: 'IP Subnet Calculator',
+    title: 'IP Subnet Calculator - IPv4 CIDR, Mask & IPv6',
+    desc: 'Calculate network, broadcast, host range, subnet and wildcard masks for any IPv4 CIDR, split subnets, size by hosts, plus IPv6 basics.',
+    card: 'Network, broadcast, hosts and masks from CIDR.',
+    intro: 'Enter an IP address with a prefix to get its network, broadcast address, usable hosts, masks and binary form, split it into subnets, or work with IPv6.',
+    steps: ['Type an address such as 192.168.1.10/24.', 'Read the network, hosts, mask and broadcast.', 'Optionally split it into smaller subnets.', 'Copy the details or the subnet list.'],
+    faq: [
+      ['How many hosts does a /24 have?', '256 addresses, of which 254 can be used by devices. The first is the network address and the last is the broadcast address.'],
+      ['What is CIDR notation?', 'The /number after an address is the prefix length: how many bits, from the left, belong to the network. /24 equals the mask 255.255.255.0.'],
+      ['Why does /31 show 2 usable hosts?', 'RFC 3021 allows both addresses of a /31 to be used on point-to-point links, where no broadcast is needed.'],
+      ['Does it support IPv6?', 'Yes, for the basics: expand and compress addresses, network range, first and last address, address type and counts.']
+    ],
+    icon: '<rect x="9" y="2" width="6" height="6" rx="1"/><rect x="2" y="16" width="6" height="6" rx="1"/><rect x="16" y="16" width="6" height="6" rx="1"/><path d="M12 8v4M5 16v-2h14v2"/>'
+  },
+  {
+    slug: 'chmod-calculator', cat: 'Developer tools', name: 'Chmod Calculator',
+    title: 'Chmod Calculator - Octal ↔ Symbolic Permissions',
+    desc: 'Convert Linux file permissions between checkboxes, octal (755) and symbolic (rwxr-xr-x), with setuid, setgid, sticky bits and chmod commands.',
+    card: 'Convert file permissions: 755 ↔ rwxr-xr-x.',
+    intro: 'Tick read, write and execute for owner, group and others, or type 755 or rwxr-xr-x, and get the matching permissions, a plain explanation and the chmod command.',
+    steps: ['Tick the boxes, or type an octal or symbolic value.', 'Add special bits if needed.', 'Read the explanation.', 'Copy the chmod command.'],
+    faq: [
+      ['What does 755 mean?', 'The owner can read, write and execute (7 = 4+2+1); the group and others can read and execute (5 = 4+1).'],
+      ['What is the difference between 644 and 755?', '755 adds execute for everyone. Use 644 for normal files and 755 for folders and programs.'],
+      ['What are setuid, setgid and sticky?', 'setuid and setgid make a program run with the file owner\'s or group\'s rights; setgid on a folder makes new files inherit its group; sticky on a folder lets only owners delete their own files.'],
+      ['Does this change my files?', 'No. It only calculates. Run the copied command in your terminal to change a file.']
+    ],
+    icon: '<rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/><path d="M9 15h.01M12 15h.01M15 15h.01"/>'
+  },
+  {
+    slug: 'chemical-equation-balancer', cat: 'Study tools', name: 'Chemical Equation Balancer',
+    title: 'Chemical Equation Balancer - With Atom Check',
+    desc: 'Balance chemical equations instantly, including ions, electrons, brackets and hydrates. Shows coefficients and an atom-by-atom check table.',
+    card: 'Balance chemical equations with an atom check.',
+    intro: 'Type a chemical equation and get the balanced version with the smallest whole-number coefficients, plus a table that checks every atom and the charge.',
+    steps: ['Type the reactants, an = sign and the products.', 'Read the balanced equation.', 'Check the atom table.', 'Copy the result.'],
+    faq: [
+      ['How does it balance equations?', 'It writes one equation per element (and one for charge) and solves them exactly with linear algebra, then scales the answer to the smallest whole numbers.'],
+      ['Can it balance redox equations?', 'Yes, if you include the ions, H+ or OH-, water and, for half equations, electrons (e-).'],
+      ['How do I type charges?', 'Use ^ or braces: Fe^3+, SO4^2-, Cr2O7{2-}. A single + or - at the end also works, as in NH4+ or Cl-.'],
+      ['Why do I get "cannot be balanced"?', 'No set of positive whole numbers makes the atoms match, usually because a formula is wrong or a substance is missing.']
+    ],
+    icon: '<path d="M12 3v18M5 21h14"/><path d="M5 7h14M5 7l-3 6a3 3 0 0 0 6 0zM19 7l-3 6a3 3 0 0 0 6 0z"/>'
+  },
+  {
+    slug: 'molar-mass-calculator', cat: 'Study tools', name: 'Molar Mass Calculator',
+    title: 'Molar Mass Calculator - g/mol, % Composition',
+    desc: 'Find the molar mass of any chemical formula with element breakdown and percent composition. Brackets, hydrates, ions, and grams to moles.',
+    card: 'Molar mass, % composition and grams to moles.',
+    intro: 'Type a chemical formula to get its molar mass in g/mol, the mass and percentage of each element, and convert between grams, moles and particles.',
+    steps: ['Type a chemical formula such as H2SO4.', 'Read the molar mass and element breakdown.', 'Enter grams or moles to convert.', 'Copy the result.'],
+    faq: [
+      ['What is molar mass?', 'The mass of one mole of a substance, in grams per mole. Numerically it is the sum of the atomic masses of all atoms in the formula.'],
+      ['What is the molar mass of water?', '18.015 g/mol: 2 × 1.008 for hydrogen plus 15.999 for oxygen.'],
+      ['How do I enter a hydrate?', 'Use a dot or a star, for example CuSO4·5H2O or CuSO4*5H2O.'],
+      ['Which atomic weights are used?', 'IUPAC standard atomic weights (abridged), the same values most current textbooks use.']
+    ],
+    icon: '<path d="M9 3h6M10 3v6L4.5 18.5A2 2 0 0 0 6.2 21h11.6a2 2 0 0 0 1.7-2.5L14 9V3"/><path d="M7 15h10"/>'
+  },
+  {
+    slug: 'derivative-calculator', cat: 'Study tools', name: 'Derivative Calculator',
+    title: 'Derivative Calculator with Steps - Free & Online',
+    desc: 'Differentiate any function with step-by-step rules: product, quotient, chain. Higher and partial derivatives, tangent lines and a graph.',
+    card: 'Derivatives with steps, tangent lines and graph.',
+    intro: 'Type a function to get its derivative with each rule explained, plus higher derivatives, the tangent line at a point and a graph.',
+    steps: ['Type a function such as x^2 sin(x).', 'Choose the variable and which derivative.', 'Read the answer and the steps.', 'Optionally enter a point for the slope and tangent line.'],
+    faq: [
+      ['Does it show the steps?', 'Yes. Each step names the rule used (power, product, quotient, chain and so on) and shows the derivative of that part.'],
+      ['How do I know the answer is right?', 'Each first derivative is compared with a numerical derivative at several points, and a check mark confirms they match.'],
+      ['Is log base 10 or natural?', 'log(x) is base 10 and ln(x) is the natural logarithm. Use log(x, b) for base b.'],
+      ['Can it do implicit differentiation?', 'Not directly. It does partial derivatives: other letters are treated as constants.'],
+      ['Does it work offline?', 'Yes, once the page has loaded. Everything runs in your browser.']
+    ],
+    icon: '<path d="M3 20c4 0 5-14 9-14s5 8 9 8"/><path d="M7 4l10 10"/>'
+  },
+  {
+    slug: 'integral-calculator', cat: 'Study tools', name: 'Integral Calculator',
+    title: 'Integral Calculator - Definite & Indefinite, Steps',
+    desc: 'Find antiderivatives with steps, definite integrals with exact and numerical values, infinite limits and a shaded graph. Answers are verified.',
+    card: 'Antiderivatives and definite integrals with steps.',
+    intro: 'Type a function to find its antiderivative, with steps for common integrals, or switch to definite to get the area between two limits, including infinity.',
+    steps: ['Type the function to integrate.', 'Choose indefinite or definite and enter the limits.', 'Read the answer and steps.', 'Check the shaded graph.'],
+    faq: [
+      ['Does it show steps?', 'Yes, for integrals solved by basic rules and substitution. For harder ones it names the usual technique and shows the answer is verified by differentiation.'],
+      ['Can it do improper integrals?', 'Yes. Use inf or -inf as a limit. The value is computed numerically with an error estimate.'],
+      ['Why is there no answer for e^(x^2)?', 'Some integrals have no antiderivative in elementary functions. Use a definite integral for a numerical value.'],
+      ['How accurate are the decimal values?', 'Usually to 10 or more significant digits. The tool reports the estimated error.'],
+      ['Is my work sent anywhere?', 'No. All calculations run in your browser.']
+    ],
+    icon: '<path d="M14 4c-2-1-4 0-4 3v10c0 3-2 4-4 3"/><path d="M15 10h5M15 14h5"/>'
+  },
+  {
+    slug: 'probability-calculator', cat: 'Study tools', name: 'Probability Calculator',
+    title: 'Probability Calculator - nCr, nPr, Binomial, Events',
+    desc: 'Calculate combinations, permutations, factorials, two-event probabilities (independent or dependent), binomial probabilities and at-least-once chances.',
+    card: 'nCr, nPr, binomial and two-event probability.',
+    intro: 'Count combinations and permutations, combine the probabilities of two events, find binomial probabilities, or the chance of something happening at least once.',
+    steps: ['Choose the kind of calculation.', 'Enter the numbers or probabilities.', 'Read the results and the formula used.'],
+    faq: [
+      ['What is the difference between nCr and nPr?', 'nCr counts selections where order does not matter; nPr counts arrangements where order matters. nPr = nCr × r!.'],
+      ['How do I find P(A or B)?', 'P(A or B) = P(A) + P(B) − P(A and B). The tool works out P(A and B) from the relationship you choose.'],
+      ['What is a binomial probability?', 'The chance of exactly k successes in n independent trials that each succeed with probability p.'],
+      ['How big can n be?', 'Up to 5,000 for exact counting and 100,000 for the binomial distribution.']
+    ],
+    icon: '<rect x="3" y="3" width="13" height="13" rx="2"/><path d="M8 21h11a2 2 0 0 0 2-2V8"/><path d="M7 7h.01M12 12h.01M9.5 9.5h.01"/>'
+  },
+  {
+    slug: 'z-score-calculator', cat: 'Study tools', name: 'Z-Score Calculator',
+    title: 'Z-Score Calculator - Percentile, p-Value & Curve',
+    desc: 'Convert values to z-scores and percentiles, z-scores to p-values, probabilities to z (critical values), with a shaded normal distribution curve.',
+    card: 'Z-scores, percentiles and p-values with a curve.',
+    intro: 'Find a z-score from a value, mean and standard deviation, turn z-scores into probabilities and p-values, or find the z for any probability, with a shaded normal curve.',
+    steps: ['Choose what you want to find.', 'Enter the value and mean and standard deviation, a z-score or a probability.', 'Read the z-score, percentile and p-values.', 'Check the shaded curve.'],
+    faq: [
+      ['What is a z-score?', 'The number of standard deviations a value lies above (positive) or below (negative) the mean: z = (x − μ) / σ.'],
+      ['What z-score is 95% confidence?', '±1.96 for a two-sided 95% interval. For a one-sided 95% bound it is 1.645.'],
+      ['How do I get a p-value from a z-score?', 'Choose Probability from a z-score. The one-tailed p-value is the smaller tail area and the two-tailed p-value is double that.'],
+      ['Does it replace a z-table?', 'Yes, with more decimals and both tails at once.']
+    ],
+    icon: '<path d="M2 20h20"/><path d="M3 19c3 0 4-13 9-13s6 13 9 13"/><path d="M15 9v11"/>'
+  },
+  {
+    slug: 'truth-table-generator', cat: 'Study tools', name: 'Truth Table Generator',
+    title: 'Truth Table Generator - Logic & Boolean Expressions',
+    desc: 'Make truth tables for logic expressions with AND, OR, NOT, XOR, implies and iff. Step columns, tautology check, minterms and simplified form.',
+    card: 'Truth tables for any logic expression.',
+    intro: 'Type a logic or Boolean expression to get its full truth table with step columns, a tautology check, minterms and a simplified formula.',
+    steps: ['Type an expression such as (A and B) or not C.', 'Read the truth table and summary.', 'Compare expressions by separating them with commas.', 'Copy the table or the simplified formula.'],
+    faq: [
+      ['Which operators can I use?', 'AND, OR, NOT, XOR, NAND, NOR, implies (→) and iff (↔), as words, symbols like ∧ ∨ ¬, programming symbols like && || !, or digital notation like AB + C\'.'],
+      ['What is a tautology?', 'An expression that is true in every row of its truth table, such as p or not p.'],
+      ['How is the formula simplified?', 'With the Quine–McCluskey method, which finds a minimal sum of products for up to 10 variables.'],
+      ['How many variables can I use?', 'Up to 12, which gives 4,096 rows.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18M13 13l2 2 3-4"/>'
+  },
+  {
+      slug: 'word-search-maker', cat: 'Study tools', name: 'Word Search Maker',
+      title: 'Word Search Maker - Printable Puzzles with Answer Key',
+      desc: 'Make printable word search puzzles from your own word list, in any language. Choose difficulty and grid size, and get a PDF with the answer key.',
+      card: 'Make printable word searches with answers.',
+      intro: 'Type your words and get a word search puzzle in seconds. Choose easy, medium or hard, pick a grid size or let it size itself, and download a PDF with the puzzle and a separate answer key. Words in any language work, including Arabic, Hindi, Russian and Chinese.',
+      steps: ['Type a title and your words, one per line or separated by commas.', 'Choose the difficulty, grid size and letter style.', 'Press Make puzzle, then New layout until you like it.', 'Download the PDF with the puzzle and the answer key, or save a PNG.'],
+      faq: [
+        ['Can I use words in other languages?', 'Yes. The empty squares are filled with letters from the same alphabet as your words, so the puzzle looks natural in Spanish, Russian, Greek, Arabic, Hindi and more. Arabic and Hebrew words read right to left.'],
+        ['What do the difficulty levels mean?', 'Easy hides words across and down only. Medium adds diagonals. Hard also hides words backwards, in all eight directions.'],
+        ['Can I make different versions for a class?', 'Yes. Choose how many versions you want. Each one has the same words in a different layout, and each gets its own answer page.'],
+        ['How many words can I use?', 'Up to 80 words, each with 2 to 30 letters. Spaces and hyphens inside a word are removed in the grid but stay in the word list.'],
+        ['Is the answer key included?', 'Yes. The PDF has the puzzle pages first and the answer pages after them, with every word circled.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M7 8h2M11 8h2M15 8h2M7 12h2M15 12h2M7 16h2M11 16h2"/><rect x="9.5" y="10.5" width="9" height="3" rx="1.5" transform="rotate(45 14 12)"/>'
+  },
+  {
+      slug: 'crossword-maker', cat: 'Study tools', name: 'Crossword Maker',
+      title: 'Crossword Puzzle Maker - Free Printable with Answer Key',
+      desc: 'Make a crossword from your own words and clues. The grid is laid out and numbered for you. Download a printable PDF with Across, Down and the answers.',
+      card: 'Turn words and clues into a printable crossword.',
+      intro: 'Type each answer with its clue and the Crossword Maker builds the grid for you: it finds where the words cross, numbers the squares and writes the Across and Down clues. Download a PDF with the puzzle and a separate answer key. Answers can be in any language.',
+      steps: ['Type one answer and clue per line, like: planet - Earth is one of these.', 'Press Make crossword. Press Try another layout to get a different grid.', 'Press Show answers to check it.', 'Download the PDF with the puzzle and the answer key.'],
+      faq: [
+        ['How do I write the clues?', 'One per line: the answer, then a dash, colon or tab, then the clue. For example "oxygen - Gas we breathe in" or "atom: Tiny building block of matter".'],
+        ['Why was a word left out?', 'Every word must cross another word. A word that shares no letters with the others, or whose crossings are all blocked, is left out and listed. Try another layout or add words that share letters.'],
+        ['Can answers have two words?', 'Yes. The space is removed in the grid and the clue shows the word lengths, like (5,6).'],
+        ['Does it work in other languages?', 'Yes. Answers and clues can be in any language. Arabic and Hebrew crosswords read right to left.'],
+        ['How many words can I use?', 'From 2 to 60 answers, each up to 25 letters. 10 to 25 words make the nicest puzzles.']
+      ],
+      icon: '<rect x="3" y="3" width="6" height="6"/><rect x="9" y="3" width="6" height="6"/><rect x="15" y="3" width="6" height="6"/><rect x="9" y="9" width="6" height="6"/><rect x="9" y="15" width="6" height="6"/><path d="M4.5 4.5h1"/>'
+  },
+  {
+      slug: 'sudoku-generator', cat: 'Study tools', name: 'Sudoku Generator',
+      title: 'Sudoku Generator - Play, Print and Solve Sudoku Free',
+      desc: 'Make new sudoku puzzles with exactly one solution at easy, medium, hard or expert level. Play online, print PDF puzzle books with answers, or solve any sudoku.',
+      card: 'Make, play, print and solve sudoku.',
+      intro: 'Generate fresh sudoku puzzles that always have exactly one solution, graded easy, medium, hard or expert by the solving methods they need. Play right here with notes, hints and mistake checks, print up to 100 puzzles with answers as a PDF, or type in a puzzle from a book and solve it.',
+      steps: ['Choose the difficulty.', 'Play: tap a square and a number; use notes, check and hints.', 'Print: choose how many puzzles and how many per page, then make the PDF with answers.', 'Solve: type or paste a puzzle and press Solve.'],
+      faq: [
+        ['Does every puzzle have one solution?', 'Yes. Each puzzle is checked by a solver, and a number is only removed if the puzzle still has exactly one solution.'],
+        ['How is difficulty decided?', 'Easy and medium puzzles can be solved by finding the only place or the only number for a square. Hard puzzles need techniques like pairs and pointing. Expert puzzles need even more advanced logic.'],
+        ['Is my game saved?', 'Yes. Your current game, notes and time are saved on this device, so you can close the page and continue later.'],
+        ['Can it solve a puzzle from a newspaper?', 'Yes. Open Solve, type the numbers on the board or paste 81 digits with 0 for empty squares. It also tells you if the puzzle has no solution or more than one.'],
+        ['Can I print a puzzle book?', 'Yes. Print up to 100 puzzles, 1 to 6 per page, with the answers at the end.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M9 3v18M15 3v18M3 9h18M3 15h18"/><path d="M5.5 6.5h1M17 12h1.5M11.5 18h1"/>'
+  },
+  {
+      slug: 'maze-generator', cat: 'Study tools', name: 'Maze Generator',
+      title: 'Maze Generator - Printable Square and Circle Mazes',
+      desc: 'Make printable mazes in rectangle or circle shapes, from easy to expert. Every maze has one solution. Download a PDF with many mazes and the answers.',
+      card: 'Printable square and round mazes with answers.',
+      intro: 'Create a new maze with one click: a rectangle or a round maze, easy to expert, with long winding paths or many short dead ends. Show the solution on screen, save a PNG, or print up to 50 different mazes in one PDF with the solutions at the end.',
+      steps: ['Choose Rectangle or Circle and a difficulty.', 'Pick the path style, or choose your own size.', 'Press New maze until you like it, and Show solution to check.', 'Set how many mazes to print and download the PDF.'],
+      faq: [
+        ['Can every maze be solved?', 'Yes. Every maze is a "perfect" maze: there is exactly one path between any two points, so there is always one route from start to finish.'],
+        ['What do the path styles mean?', 'Long winding paths make long corridors that twist around. Many short dead ends make lots of side branches, which feels harder near the start.'],
+        ['How big can a maze be?', 'Rectangles up to 100 × 100 squares and circles up to 50 rings.'],
+        ['Where are the start and finish?', 'Green marks the start and red marks the finish. Rectangle mazes go from top to bottom; circle mazes go from the outside to the centre.'],
+        ['Are the solutions included?', 'Yes, on pages at the end of the PDF, unless you turn them off.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="1"/><path d="M3 9h6v6M15 3v6h-3M21 15h-6v6M9 21v-3"/>'
+  },
+  {
+      slug: 'quote-image-maker', cat: 'Social media tools', name: 'Quote Image Maker',
+      title: 'Quote Image Maker - Quote Pictures for Instagram and Stories',
+      desc: 'Turn a quote into a shareable image. Pick a background, font and size for posts, stories or link previews, add the author and your handle, and download.',
+      card: 'Turn a quote into a shareable image.',
+      intro: 'Type a quote and its author and get a stylish picture ready to post. Choose a gradient, your own colour or a photo as the background, pick a font and size for square posts, portrait posts, stories or landscape posts, add your name or handle, and download a PNG or JPG.',
+      steps: ['Type the quote and the author.', 'Choose the size for where you will post it.', 'Pick a background, font and alignment, or press Surprise me.', 'Download the PNG or JPG, or copy it.'],
+      faq: [
+        ['Which sizes are there?', 'Square post 1080 × 1080, portrait post 1080 × 1350, story or reel 1080 × 1920, landscape post 1600 × 900 and link preview 1200 × 628.'],
+        ['Can I use my own photo?', 'Yes. Add a photo and use the slider to darken it so the text stays easy to read.'],
+        ['Does it work in other languages?', 'Yes. Arabic and Hebrew quotes are written right to left, and Chinese, Japanese, Hindi and other scripts use your device\'s fonts.'],
+        ['What if my quote is long?', 'The text shrinks to fit. If it is still too long, you will see a warning; choose the Story size for long quotes.'],
+        ['Can I share it straight away?', 'Press Copy image and paste it into your post or chat, or download it first.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="3"/><path d="M8 10c0-1.5 1-2.5 2.5-2.5M8 10v3h3v-3H8zM13 10c0-1.5 1-2.5 2.5-2.5M13 10v3h3v-3h-3z"/><path d="M8 17h8"/>'
+  },
+  {
+      slug: 'printable-calendar', cat: 'Generators', name: 'Printable Calendar',
+      title: 'Printable Calendar Maker - Monthly or Yearly PDF, Any Year',
+      desc: 'Make a printable monthly or yearly calendar for any year in your language. Week starts on your local day. Add your own holidays and birthdays. Free PDF.',
+      card: 'Monthly or yearly calendars to print, any language.',
+      intro: 'Make a calendar for any year from 1600 to 2600. Choose one month per page or the whole year on one page, the language for month and day names, and whether the week starts on Monday, Sunday or Saturday. Add your own holidays, birthdays and events, pick a style and colour, and download a PDF.',
+      steps: ['Choose one month per page or the whole year, then the year and months.', 'Pick the language and the first day of the week.', 'Add your own holidays, birthdays and events (optional).', 'Choose a style, colour and paper, then download the PDF.'],
+      faq: [
+        ['Which holidays are included?', 'None are added for you, because holidays differ by country, region and faith. Type the ones you want, such as "12-25 Holiday" for every year or "2026-03-20 School trip" for one date.'],
+        ['Which day does the week start on?', 'By default the day used in your region, for example Monday in most of Europe, Sunday in the USA and Saturday in some Middle Eastern countries. You can change it.'],
+        ['Can I make it in my language?', 'Yes. Month and day names come in more than 25 languages, including Arabic, Hindi, Chinese, Japanese and Russian, and Arabic calendars run right to left.'],
+        ['Can I print week numbers?', 'Yes. Turn on week numbers to show ISO week numbers next to each week.'],
+        ['Which paper sizes work?', 'A4 and US Letter, in landscape or portrait.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/><path d="M7 13h2M11 13h2M15 13h2M7 17h2M11 17h2"/>'
+  },
+  {
+      slug: 'paper-generator', cat: 'Generators', name: 'Paper Generator',
+      title: 'Printable Paper - Lined, Graph, Dot, Isometric, Music',
+      desc: 'Print lined, graph, dot grid, isometric, music staff, handwriting or Cornell notes paper. Set exact spacing in mm or inches. Free PDF in A4 or Letter.',
+      card: 'Lined, graph, dot and music paper to print.',
+      intro: 'Make your own printable paper with exact spacing. Choose lined, graph, dot grid, isometric, music staff, handwriting practice or Cornell notes, set the spacing in millimetres or inches, and download a vector PDF of up to 200 pages that prints sharp on any printer.',
+      steps: ['Choose the type of paper.', 'Set the spacing in mm or inches, and the colour and thickness of the lines.', 'Choose the paper size, margins and number of pages.', 'Download the PDF and print it at 100% (actual size).'],
+      faq: [
+        ['Will the spacing be exact?', 'Yes, as long as you print at 100% or "Actual size". With "Fit to page" the printer shrinks the page a little.'],
+        ['What spacing is college rule?', 'About 7.1 mm (9/32 in). Wide rule is about 8.7 mm (11/32 in) and narrow rule about 6.4 mm (1/4 in).'],
+        ['Can I make engineering graph paper?', 'Yes. Choose Graph, set the square size to 1 mm, and add a bold line every 10 squares.'],
+        ['What is handwriting paper?', 'Rows with a top line, a dashed middle line and a baseline, with space for letters that go below the line. It is used to learn to write.'],
+        ['Which paper sizes are there?', 'A4, US Letter, US Legal, A5 and A3, in portrait or landscape.']
+      ],
+      icon: '<path d="M6 3h12v18H6z"/><path d="M6 8h12M6 12h12M6 16h12M9 3v18"/>'
+  },
+  {
+      slug: 'signature-generator', cat: 'Generators', name: 'Signature Generator',
+      title: 'Signature Generator - Handwritten Signature PNG, Free',
+      desc: 'Type your name to see it in 10 handwritten signature styles, or draw your own. Download a transparent PNG or SVG for documents and emails.',
+      card: 'Make a handwritten-style signature image.',
+      intro: 'Type your name and see it written in ten handwriting styles, from elegant script to casual pen. Choose ink colour, slant and an underline flourish, then download a transparent PNG or a sharp SVG. Prefer your real signature? Draw it with a finger, stylus or mouse.',
+      steps: ['Type your name, or switch to Draw it and sign in the box.', 'Pick a style, ink colour and slant.', 'Choose an image size.', 'Download the transparent PNG or SVG and add it to your document.'],
+      faq: [
+        ['Is a typed signature legally valid?', 'In many places an electronic signature can be valid when the signer intends to sign, but rules differ by country and document. For contracts and official forms, check what the receiver accepts.'],
+        ['Is the background transparent?', 'Yes. The PNG has a transparent background, so it sits nicely on any document or email.'],
+        ['Can I use letters with accents?', 'Yes, the styles include common accented Latin letters such as é, ñ, ü and ç. For other alphabets, use Draw it.'],
+        ['Is my signature saved anywhere?', 'No. It is made in your browser and is not uploaded or stored.'],
+        ['How do I add it to a PDF?', 'Download the PNG, then use our Sign PDF tool or your PDF app to place the picture.']
+      ],
+      icon: '<path d="M3 17c3-1 4-9 6-9s-1 9 2 9 3-5 5-5 1 4 3 4 2-1 2-1"/><path d="M3 21h18"/>'
+  },
+  {
+      slug: 'logo-maker', cat: 'Generators', name: 'Logo Maker',
+      title: 'Free Logo Maker - Simple Text and Icon Logos, PNG and SVG',
+      desc: 'Make a simple logo from your name, an icon and a shape. Pick fonts and colours, then download a transparent PNG or a sharp SVG. No sign-up, no watermark.',
+      card: 'Make a simple text and icon logo.',
+      intro: 'Type your business or project name, pick one of 30 simple icons or your initials, choose a shape, layout, font and colours, and download your logo as a transparent PNG or an SVG that stays sharp at any size. Text is turned into shapes, so the SVG looks the same on every computer.',
+      steps: ['Type your name and an optional tagline.', 'Pick an icon or your initials, a shape and a layout.', 'Choose a font and a colour set, or your own colours.', 'Download the PNG or SVG.'],
+      faq: [
+        ['Can I use the logo for my business?', 'Yes. The icons were drawn for this tool and the fonts are open-licence fonts that allow commercial use. Check that your logo is not too close to a trademark someone else already uses.'],
+        ['What is the difference between PNG and SVG?', 'PNG is a picture for websites, documents and social media. SVG is a vector file that stays sharp at any size, for printing, signs and designers.'],
+        ['Is the background transparent?', 'Yes, unless you choose White, Light tint or Dark as the background.'],
+        ['Can I write my name in another alphabet?', 'Yes. Latin, Greek and Cyrillic letters become shapes. Other alphabets, such as Arabic or Chinese, are written with your device\'s font.'],
+        ['Can I make a square profile picture?', 'Yes. Choose "Square (profile picture)" before downloading.']
+      ],
+      icon: '<circle cx="8" cy="12" r="5"/><path d="M6 12l2-2 2 2-2 2z"/><path d="M15 10h6M15 14h4"/>'
+  },
+  {
+      slug: 'poster-maker', cat: 'Generators', name: 'Poster Maker',
+      title: 'Poster and Flyer Maker - Free Printable PDF and PNG',
+      desc: 'Make posters and flyers for events, sales, notices, parties and classes. Add text and a photo, pick colours, then download a PDF to print or a PNG to share.',
+      card: 'Make posters and flyers to print or share.',
+      intro: 'Choose a template for an event, sale, notice, party, class or photo poster, type your headline and details, add a picture and pick colours. Download a PDF for printing on A4, US Letter or A3, or a PNG sized for social media posts and stories.',
+      steps: ['Pick a template. Sample text is filled in for you.', 'Write your headline, details and contact line, and add a photo if you like.', 'Choose colours, a headline font and the size.', 'Download a PDF to print or a PNG to share.'],
+      faq: [
+        ['Which sizes can I make?', 'A4, US Letter and A3 paper, plus square (1080 × 1080), portrait (1080 × 1350), story (1080 × 1920) and wide (1920 × 1080) for social media and screens.'],
+        ['Can I add my own photo?', 'Yes. Add a JPG, PNG or WebP picture. The Photo template uses it as the full background with your text on top.'],
+        ['Will long text fit?', 'Text shrinks to fit its space. If it still does not fit you see a warning, so you can shorten it or choose a bigger size.'],
+        ['Can I write in my language?', 'Yes, including Arabic, Hindi, Chinese, Russian and accented letters. The PDF keeps the text correct.'],
+        ['Is there a watermark?', 'No. It is free, with no watermark and no sign-up.']
+      ],
+      icon: '<rect x="5" y="2" width="14" height="20" rx="1"/><path d="M8 6h8M8 9h6"/><circle cx="12" cy="15" r="3"/>'
+  },
+  {
+      slug: 'bingo-card-generator', cat: 'Generators', name: 'Bingo Card Generator',
+      title: 'Bingo Card Generator - Printable 75, 90-Ball and Word Cards',
+      desc: 'Make unique printable bingo cards: 75-ball, 90-ball tickets or your own words. Up to 500 cards in one PDF, plus a caller\'s sheet and an on-screen caller.',
+      card: 'Print unique bingo cards with a caller sheet.',
+      intro: 'Make as many different bingo cards as you need, up to 500 in one PDF. Choose classic 75-ball cards, 90-ball tickets, or cards with your own words for classrooms, parties and baby showers. Every card is unique and numbered, a caller\'s sheet is included, and a fair on-screen caller is built in.',
+      steps: ['Choose 75-ball, 90-ball or your own words.', 'Type a title and how many cards you need.', 'Press Make cards to see the first page.', 'Download the PDF and use the caller on screen or the printed sheet.'],
+      faq: [
+        ['Are all cards different?', 'Yes. No two cards are the same. With a short word list, some cards may share the same words in a different order, and you are told when that happens.'],
+        ['How do 75-ball cards work?', 'Each card is 5 × 5 under B I N G O. B has 1 to 15, I 16 to 30, N 31 to 45, G 46 to 60 and O 61 to 75, with a free square in the middle.'],
+        ['How do 90-ball tickets work?', 'Each ticket has 3 rows and 9 columns. Every row has 5 numbers, column 1 has 1 to 9, column 2 has 10 to 19 and so on up to 90.'],
+        ['How many words do I need?', 'At least as many as squares on a card: 24 for 5 × 5 with a free square, 16 for 4 × 4, 8 for 3 × 3 with a free square. More words make cards more different.'],
+        ['Is the caller fair?', 'Yes. It uses your browser\'s secure random numbers, never repeats a call, and every number or word has the same chance.']
+      ],
+      icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M3 15h18M9 3v18M15 3v18"/><circle cx="12" cy="12" r="1.5"/>'
+  },
+  {
+      slug: 'giveaway-picker', cat: 'Generators', name: 'Giveaway Picker',
+      title: 'Giveaway Picker - Random Comment Winner, Fair and Free',
+      desc: 'Pick random giveaway winners from pasted names or comments. Removes duplicates, filters by keyword, picks backups, and uses secure random numbers.',
+      card: 'Pick fair random winners from names or comments.',
+      intro: 'Paste the names or comments from your giveaway, one per line, and pick winners fairly. The tool can take the @username from each comment, keep one entry per person, only count comments with a keyword or hashtag, leave out your own account, and pick backup winners. Winners are drawn with your browser\'s secure random numbers.',
+      steps: ['Paste entries, one per line (names or copied comments).', 'Choose how to read each line and set any filters.', 'Choose the number of winners and backups.', 'Press Pick winners, then copy the results.'],
+      faq: [
+        ['Is the draw really random and fair?', 'Yes. It uses crypto.getRandomValues, the browser\'s secure random number generator, without bias, so every valid entry has exactly the same chance.'],
+        ['Can it remove duplicate entries?', 'Yes. With "One entry per person" on, each name or @username counts once, ignoring capital letters, so commenting many times does not raise someone\'s chance.'],
+        ['How do I get the comments?', 'Copy them from the app or website and paste them here, or paste a list exported from a comment tool. Each comment should be on its own line.'],
+        ['Can I pick backup winners?', 'Yes. Backups are drawn in order in case a winner does not reply.'],
+        ['Is my list uploaded?', 'No. Everything happens in your browser.']
+      ],
+      icon: '<path d="M8 3h8v6a4 4 0 0 1-8 0z"/><path d="M8 5H5a3 3 0 0 0 3.5 4.5M16 5h3a3 3 0 0 1-3.5 4.5M12 13v4M8 21h8M10 17h4l1 4H9z"/>'
+  },
+  {
+      slug: 'secret-santa-generator', cat: 'Generators', name: 'Secret Santa Generator',
+      title: 'Secret Santa Generator - Draw Names with Private Links',
+      desc: 'Draw names for a gift exchange. Set who cannot draw whom, add a budget and date, then send everyone a private link or print folded slips. No sign-up.',
+      card: 'Draw names for a gift exchange, no sign-up.',
+      intro: 'Type the names of everyone in your gift exchange, add pairs who should not draw each other, and press Draw names. Nobody gets themselves. Each person gets a private link that shows only who they are giving to, with the budget, date and your message, or you can print slips to fold and hand out. The organiser can take part too.',
+      steps: ['Type the names, one per line.', 'Add pairs who should not draw each other, and the budget, date and message.', 'Press Draw names.', 'Send each person their private link, or print the slips.'],
+      faq: [
+        ['How do the private links work?', 'Each link holds only that person\'s own result, scrambled inside the link, so the page can show it without any server or account. Send each person only their own link.'],
+        ['Can the organiser take part?', 'Yes. The organiser sees only the list of names and links, not who got whom, unless they choose to show all pairs.'],
+        ['Can I stop couples drawing each other?', 'Yes. Add one pair per line, like "Anna, Ben". By default it works both ways.'],
+        ['Is the draw fair?', 'Yes. Names are shuffled with secure random numbers until every rule is met, so every allowed result is equally likely.'],
+        ['What if I draw again?', 'A new draw changes everyone\'s result, so links you already sent become out of date. Your last draw is kept on this device.']
+      ],
+      icon: '<rect x="3" y="9" width="18" height="12" rx="1"/><path d="M3 13h18M12 9v12"/><path d="M12 9c-1.5-4-6-4-5-1 .6 1.4 5 1 5 1zM12 9c1.5-4 6-4 5-1-.6 1.4-5 1-5 1z"/>'
+  },
+  {
+      slug: 'habit-tracker', cat: 'Generators', name: 'Habit Tracker',
+      title: 'Habit Tracker - Free Online and Printable Monthly Tracker',
+      desc: 'Track daily habits on your phone or computer with streaks and monthly progress, and print a monthly habit tracker PDF. No account needed.',
+      card: 'Track daily habits and print a monthly sheet.',
+      intro: 'Add the habits you want to build, such as drinking water, reading or walking, and tick a box each day you do them. See your current streak, best streak and monthly completion. Your ticks are saved on this device, and you can print a monthly tracker sheet, blank or with your ticks.',
+      steps: ['Add a habit and press Add.', 'Tick the box for each day you keep the habit.', 'Watch your streaks and monthly completion grow.', 'Download a printable PDF for the month.'],
+      faq: [
+        ['Where are my ticks saved?', 'In this browser on this device. Nothing is uploaded. Use "Back up my data" to keep a copy.'],
+        ['How is a streak counted?', 'It counts the days in a row you ticked, up to today. If today is not ticked yet, the streak counts up to yesterday, so it does not break before the day is over.'],
+        ['How many habits can I track?', 'Up to 20.'],
+        ['Can I print a blank tracker?', 'Yes. The PDF lists your habits with empty boxes, plus extra empty rows to write in more habits by hand.'],
+        ['Can I go back to past months?', 'Yes. Use the arrows or pick a month to see and change earlier months.']
+      ],
+      icon: '<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18"/><path d="M7 13l1.5 1.5L11 12M7 17l1.5 1.5L11 16M14 13h3M14 17h3"/>'
+  },
+  {
+      slug: 'label-sheet-maker', cat: 'Generators', name: 'Label Sheet Maker',
+      title: 'Label Maker - Print Address Labels on A4 and Letter Sheets',
+      desc: 'Print address and name labels on common A4 and US Letter label sheets, or a custom size. Type labels or import a CSV. Exact PDF, start at any label.',
+      card: 'Print address labels from a list or CSV.',
+      intro: 'Make printable label sheets for addresses, names, jars and parcels. Pick a common A4 or US Letter layout or enter your own measurements, type your labels or import a spreadsheet saved as CSV, and download a PDF with every label in exactly the right place. Start at any label to use up part-used sheets.',
+      steps: ['Choose your label sheet layout, or enter a custom size.', 'Type your labels, use the same text on all, or import a CSV.', 'Set the text size, alignment and start position.', 'Download the PDF and print at 100% (actual size).'],
+      faq: [
+        ['Which label sheets work?', 'Common layouts such as A4 21 per sheet (63.5 × 38.1 mm), 14, 24, 8, 30 and 65 per sheet, and US Letter 30 per sheet (2⅝ × 1 in), 20, 14, 10 and 80 per sheet. For others, choose Custom size and type the measurements from the box.'],
+        ['How do I print addresses from a spreadsheet?', 'Save the spreadsheet as CSV, choose "From a spreadsheet (CSV)" and pick the file. Then write the layout using column names in curly brackets, like {Name} and {City}.'],
+        ['Can I use a sheet that is partly used?', 'Yes. Set "Start at label number" to the first empty label. Labels are counted across, then down.'],
+        ['My print is a little off. What can I do?', 'Print at 100% ("Actual size"), not "Fit to page". If it is still off, move everything right or down by a millimetre or two and print a test on plain paper.'],
+        ['Can I write in other languages?', 'Yes, any language, including Arabic and Hebrew right to left.']
+      ],
+      icon: '<rect x="3" y="2" width="18" height="20" rx="1"/><rect x="5" y="5" width="6" height="3" rx="1"/><rect x="13" y="5" width="6" height="3" rx="1"/><rect x="5" y="10.5" width="6" height="3" rx="1"/><rect x="13" y="10.5" width="6" height="3" rx="1"/><rect x="5" y="16" width="6" height="3" rx="1"/><rect x="13" y="16" width="6" height="3" rx="1"/>'
+  },
+  {
+    slug: 'spell-checker', cat: 'Text tools', name: 'Spell Checker',
+    title: 'Spell Checker - Check Spelling in 12 Languages Online',
+    desc: 'Check spelling in English, Spanish, French, German, Portuguese, Italian, Dutch, Russian, Turkish and Indonesian. Mistakes underlined, suggestions shown.',
+    card: 'Find spelling mistakes in 12 languages.',
+    intro: 'Paste your text and every word the dictionary does not know is underlined. Click it for suggestions, fix it in one click, ignore it, or add it to your own dictionary. It uses Hunspell, the spell checker inside LibreOffice and Firefox, running entirely in your browser.',
+    steps: ['Choose the language of your text.', 'Type or paste your text, then press Check spelling (it also checks as you type).', 'Click an underlined word to see suggestions and pick the right one.', 'Ignore words that are fine, or add names and terms to your dictionary, then copy the corrected text.'],
+    faq: [
+      ['Which languages are supported?', 'English (US and UK), Spanish, French, German, Portuguese (Brazil and Portugal), Italian, Dutch, Russian, Turkish and Indonesian. Each dictionary downloads only when you first use it.'],
+      ['Is my text uploaded?', 'No. The dictionary is downloaded to your browser and the checking happens on your device. Your text is never sent anywhere.'],
+      ['Does it check grammar?', 'No. It finds words that are not in the dictionary. Real words used wrongly, such as their instead of there, are not flagged.'],
+      ['Where are the words I add saved?', 'In this browser only. They are accepted in every language and you can remove them under My dictionary.'],
+      ['Why is a correct word underlined?', 'Names, brands, new words and technical terms are often missing from dictionaries. Ignore the word or add it to your dictionary.']
+    ],
+    icon: '<path d="M3 15l3-9 3 9M4.2 12h3.6"/><path d="M12 6v9h2.5a2.2 2.2 0 0 0 0-4.5H12M12 10.5h2a2.2 2.2 0 0 0 0-4.5h-2"/><path d="M14 19l2 2 5-5"/>'
+  },
+  {
+    slug: 'url-slug-generator', cat: 'Text tools', name: 'URL Slug Generator',
+    title: 'URL Slug Generator - Turn Titles into Clean URLs, Any Language',
+    desc: 'Turn any title into a clean, SEO-friendly URL slug. Transliterates Cyrillic, Greek, Arabic, Chinese and more. Separators, max length and bulk mode.',
+    card: 'Make clean URL slugs from titles in any language.',
+    intro: 'Type a page title and get a short, readable web address part such as 10-tips-for-cafe-owners. Accents are removed and other alphabets are turned into Latin letters, so titles in Russian, Greek, Arabic, Hindi, Chinese and many more languages work too. Paste many titles to make many slugs at once.',
+    steps: ['Type or paste a title. For many slugs, put one title on each line.', 'Pick a separator and a maximum length, and choose options like lowercase or removing short words.', 'Check the slug, or the full address preview if you entered your site address.', 'Copy the slug, or copy and download all of them as CSV.'],
+    faq: [
+      ['What is a URL slug?', 'The readable part of a web address that names a page, such as how-to-bake-bread in example.com/blog/how-to-bake-bread.'],
+      ['Can I keep letters in my own language?', 'Yes. Tick Keep non-Latin letters to make a Unicode slug such as привет-мир. Most modern sites support them, but they appear encoded (%D0%BF…) when copied.'],
+      ['How are other alphabets converted?', 'Cyrillic, Greek, Arabic, Hebrew, Devanagari, Thai, Korean, Japanese kana and Chinese (pinyin) are turned into Latin letters with common romanization rules.'],
+      ['Why were Japanese kanji left out?', 'Kanji can be read in several ways and need a dictionary. Write those words in kana or Latin letters to include them.'],
+      ['Does it keep repeated slugs apart?', 'Yes. In bulk mode, repeated slugs get -2, -3 and so on, unless you turn that off.']
+    ],
+    icon: '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>'
+  },
+  {
+    slug: 'markdown-table-generator', cat: 'Text tools', name: 'Markdown Table Generator',
+    title: 'Markdown Table Generator - Paste from Excel, Get Markdown/HTML',
+    desc: 'Build Markdown and HTML tables in an editable grid. Paste from Excel, Google Sheets or CSV, set column alignment and copy neatly aligned output.',
+    card: 'Build Markdown tables from a grid or Excel.',
+    intro: 'Type into a spreadsheet-like grid, or paste cells straight from Excel, Google Sheets, LibreOffice or a CSV file, and get a tidy Markdown table for GitHub, README files, docs and forums. Set the alignment of each column and switch to HTML with one click.',
+    steps: ['Type in the grid, or paste cells copied from a spreadsheet into any cell.', 'Add or remove rows and columns, and choose the alignment of each column.', 'Pick Markdown or HTML output and check the preview.', 'Copy the table or download it as a .md or .html file.'],
+    faq: [
+      ['Can I paste from Excel or Google Sheets?', 'Yes. Copy the cells and paste them into any cell of the grid; they fill the grid from that cell. You can also paste CSV, semicolon-separated data or an existing Markdown table under Import.'],
+      ['Does it handle pipes and line breaks in cells?', 'Yes. A | in a cell is written as \\| so it does not break the table, and line breaks become <br>.'],
+      ['What does Line up columns do?', 'It pads cells with spaces so the columns line up in plain text, which is easier to read and edit. Chinese, Japanese and Korean characters count as two columns wide.'],
+      ['Is there a size limit?', 'You can import up to 100 columns and thousands of rows. The editor shows the first 500 rows, and the output always contains all of them.']
+    ],
+    icon: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 10h18M3 15h18M9 4v16M15 4v16"/>'
+  },
+  {
+    slug: 'invisible-character', cat: 'Text tools', name: 'Invisible Character',
+    title: 'Invisible Character - Copy Blank Text & Remove Hidden Characters',
+    desc: 'Copy invisible characters like Hangul Filler and zero-width space for blank names and messages, or find and remove hidden characters from any text.',
+    card: 'Copy blank characters or remove hidden ones.',
+    intro: 'Copy a blank character for an empty name, message or bio with one click, and learn what each one is for. Or paste any text to reveal hidden characters, such as zero-width spaces, byte order marks, direction marks and special spaces, and remove them safely while keeping the joiners that emoji and some languages need.',
+    steps: ['To copy, choose how many you need and press Copy on a character.', 'Paste it where you need it: a game name, a message or a social profile.', 'To clean text, paste it into Text to check; hidden characters are marked in red and orange.', 'Press Remove hidden characters, then copy the cleaned text.'],
+    faq: [
+      ['Which invisible character works for blank names?', 'Hangul Filler (U+3164) and Braille Pattern Blank (U+2800) work in most apps and games. Apps can change their rules, so if one is removed, try another.'],
+      ['Why does my text have hidden characters?', 'They come along when copying from web pages, PDFs, chat apps and word processors. They can break passwords, code, search and spreadsheets without being visible.'],
+      ['Will cleaning break emoji or other languages?', 'No. By default, joiners inside emoji like 👨‍👩‍👧 and in Persian, Arabic and Indic words are kept. You can change that with the options.'],
+      ['Is my text sent anywhere?', 'No. Everything happens in your browser.']
+    ],
+    icon: '<path d="M3 3l18 18"/><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>'
+  },
+  {
+    slug: 'transliteration', cat: 'Text tools', name: 'Transliteration Tool',
+    title: 'Transliteration Tool - Cyrillic, Greek, Arabic, Hindi to Latin',
+    desc: 'Convert Cyrillic, Greek, Arabic, Hebrew, Devanagari, Thai, Korean, Japanese kana and Chinese into Latin letters with standard systems like ISO 9 and Hepburn.',
+    card: 'Convert other alphabets into Latin letters.',
+    intro: 'Paste text in another writing system and read it in Latin letters straight away. Choose the romanization system you need, such as ISO 9, ALA-LC or passport style for Cyrillic, ELOT 743 for Greek, IAST for Sanskrit and Hindi, Hepburn for Japanese and pinyin for Chinese. Mixed text works too: each script is detected and converted.',
+    steps: ['Paste or type your text, or try one of the examples.', 'The scripts in your text are detected and converted as you type.', 'Pick the system you need for each script, and tick Plain ASCII if you want no accents.', 'Copy the result or download it as a text file.'],
+    faq: [
+      ['Which scripts are supported?', 'Cyrillic (Russian, Ukrainian, Belarusian, Bulgarian, Serbian, Macedonian), Greek, Arabic, Persian and Urdu, Hebrew, Devanagari, Thai, Korean Hangul, Japanese hiragana and katakana, Chinese, Georgian and Armenian.'],
+      ['Why are some Arabic or Hebrew vowels missing?', 'These scripts usually do not write short vowels, so only the written letters can be converted. Text with vowel marks gives a full reading.'],
+      ['Can it read Japanese kanji?', 'No. Kanji have several readings that depend on the word, so they are kept unchanged. Hiragana and katakana are converted.'],
+      ['Is it the same as translation?', 'No. Transliteration changes the letters, not the language: Москва becomes Moskva, not a translated word.'],
+      ['Which system should I use for a passport name?', 'For Russian and Ukrainian, choose Passport (ICAO 9303) for the system used in machine-readable passports. Always check with the official document.']
+    ],
+    icon: '<path d="M3 5h8M7 3v2M5 5c0 4 3 7 6 8M9 5c0 4-3 7-6 8"/><path d="M13 21l4-9 4 9M14.5 18h5"/>'
+  },
+  {
+    slug: 'bionic-reading', cat: 'Text tools', name: 'Bionic Reading Converter',
+    title: 'Bionic Reading Converter - Bold the Start of Every Word',
+    desc: 'Make text easier to skim by bolding the first part of each word. Adjust the bold amount, then copy formatted text or HTML for email, Docs or Word.',
+    card: 'Bold the start of words for faster reading.',
+    intro: 'Paste any text and the first letters of every word turn bold, guiding your eyes along the line. Many readers find it easier to stay focused, especially on screens. Adjust how much of each word is bold, fade the rest, then copy it with formatting into an email, Google Docs or Word.',
+    steps: ['Paste or type your text.', 'Move the slider to choose how much of each word is bold.', 'Optionally fade the rest of each word, skip short words or bold numbers.', 'Copy the formatted text, copy the HTML, or download an HTML page.'],
+    faq: [
+      ['Does bionic reading really make reading faster?', 'Studies have not shown a clear speed gain for everyone, but many people, including some with ADHD or dyslexia, say it helps them stay focused. Try it and see what works for you.'],
+      ['Which languages work?', 'Any language written with letters: Latin, Cyrillic, Greek, Arabic, Hebrew, Indic scripts and Thai. Chinese, Japanese and Korean characters are left unchanged.'],
+      ['Will the bold text paste into Word or Google Docs?', 'Yes. Copy formatted text puts rich text on the clipboard, so the bold parts are kept when you paste.'],
+      ['Is my text uploaded?', 'No. It is converted in your browser.']
+    ],
+    icon: '<path d="M3 4h5.5a3.5 3.5 0 0 1 0 7H3zM3 11h6.5a3.5 3.5 0 0 1 0 7H3z"/><path d="M15 7h6M15 12h6M15 17h4"/>'
+  },
+  {
+    slug: 'character-map', cat: 'Text tools', name: 'Character Map',
+    title: 'Character Map - Browse Unicode, Search Symbols, Copy Codes',
+    desc: 'Browse all Unicode blocks, search symbols by name, and copy any character with its code point, HTML entity, CSS, JavaScript and UTF-8 codes.',
+    card: 'Find any Unicode symbol and copy its codes.',
+    intro: 'Find any character among the 150,000 in Unicode 15.1: arrows, maths, currency, emoji, accented letters and every alphabet. Search by name such as arrow or euro, by code such as U+20AC, or browse by block. Click a character to see and copy its code point, HTML entity, CSS and JavaScript escapes and UTF-8 bytes.',
+    steps: ['Search by name (in English), paste a character, type a code like U+00E9, or pick a block.', 'Click a character to see its name and codes.', 'Copy the character or any of its codes with one click.', 'Press Add (or double-click) to collect several characters, then copy them together.'],
+    faq: [
+      ['What can I search for?', 'Words from the official Unicode name (heart, arrow, check), a code point like U+2713 or 2713, an HTML entity like &check; or &#10003;, or characters you paste.'],
+      ['Why do some characters show as empty boxes?', 'Your device has no font with that character. The character is still correct and will show on devices that have a suitable font.'],
+      ['What is the difference between the HTML codes?', 'Named entities like &eacute; are easy to read; numeric ones like &#233; or &#xE9; work for every character.'],
+      ['Which Unicode version is used?', 'Unicode 15.1 names and blocks.']
+    ],
+    icon: '<rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 16h2.5v-1.2A4 4 0 1 1 13.5 14.8V16H16"/>'
+  },
+  {
+    slug: 'xml-formatter', cat: 'Developer tools', name: 'XML Formatter',
+    title: 'XML Formatter - Format, Minify and Validate XML Online',
+    desc: 'Format or minify XML and check it is well-formed, with the exact line and column of any error. Keeps comments, CDATA and mixed content intact.',
+    card: 'Beautify, minify and validate XML.',
+    intro: 'Paste XML or open a file to pretty-print it with clean indentation, shrink it to one line, or simply check that it is well-formed. Errors show the line and column with the code around them. Comments, CDATA, the XML declaration and text mixed with tags are kept exactly as written.',
+    steps: ['Paste XML or open an .xml, .svg, .rss or other XML file.', 'Choose the indent and options such as removing comments.', 'Press Format, Minify or Validate only.', 'Copy the result or download the file.'],
+    faq: [
+      ['How are errors shown?', 'The browser\'s own XML parser checks your document. The first error is shown with its line, column and the lines around it, with a marker under the problem.'],
+      ['Will formatting change my data?', 'No. Only whitespace between tags changes. Text that sits next to tags, such as a paragraph with bold words, is kept exactly as written.'],
+      ['Can it handle large files?', 'Yes, files of several megabytes format in a few seconds, depending on your device.'],
+      ['Is my XML uploaded?', 'No. Everything runs in your browser.']
+    ],
+    icon: '<path d="M8 6l-6 6 6 6M16 6l6 6-6 6M14 4l-4 16"/>'
+  },
+  {
+    slug: 'html-entity-encoder', cat: 'Developer tools', name: 'HTML Entity Encoder / Decoder',
+    title: 'HTML Entity Encoder & Decoder - Named and Numeric Entities',
+    desc: 'Encode text to HTML entities or decode entities back to text. Supports all 2,125 named HTML5 entities, decimal and hex codes, and old no-semicolon forms.',
+    card: 'Encode and decode HTML entities.',
+    intro: 'Make text safe to put into HTML by encoding < > & and quotes, or encode every non-ASCII character too. Decoding turns &eacute;, &#233; and &#xE9; back into é, using the full list of HTML5 entity names and the same rules as browsers.',
+    steps: ['Paste text or HTML.', 'For encoding, choose which characters to encode and whether to use names or numbers.', 'Press Encode or Decode.', 'Copy the result, or use it as the new input to keep working.'],
+    faq: [
+      ['Which characters must be encoded in HTML?', 'The ampersand &, less-than < and greater-than >, plus double and single quotes inside attribute values. Encoding just those is enough for UTF-8 pages.'],
+      ['Named or numeric entities?', 'Named entities like &copy; are easier to read. Numeric ones like &#169; work for every character, including emoji.'],
+      ['Why does &#150; become a dash?', 'HTML treats numbers 128 to 159 as Windows-1252 characters, so &#150; is an en dash. The decoder does the same as browsers.'],
+      ['What happens to unknown names?', 'They are left as they are and listed in the message, so you can fix typos.']
+    ],
+    icon: '<path d="M7 8l-4 4 4 4M17 8l4 4-4 4"/><path d="M9.5 12h.01M12 12h.01M14.5 12h.01"/>'
+  },
+  {
+    slug: 'json-to-typescript', cat: 'Developer tools', name: 'JSON to TypeScript',
+    title: 'JSON to TypeScript - Generate Interfaces, Types or JSON Schema',
+    desc: 'Turn JSON into TypeScript interfaces or types, or a JSON Schema. Nested objects get their own names, and keys missing in some items become optional.',
+    card: 'Generate TypeScript interfaces from JSON.',
+    intro: 'Paste a JSON sample, such as an API response, and get ready-to-use TypeScript interfaces or type aliases. Every object in an array is merged, so fields that appear only sometimes are marked optional and mixed values become union types. You can also produce a JSON Schema (draft 2020-12).',
+    steps: ['Paste your JSON or try the example.', 'Choose interfaces, types or JSON Schema, and name the root type.', 'Pick options such as export, readonly or making every property optional.', 'Copy the code or download it as a .ts or .schema.json file.'],
+    faq: [
+      ['How are optional properties detected?', 'When an array holds several objects, a key that is missing from some of them is marked optional with ?.'],
+      ['What about null values?', 'A key that is always null is typed null; if it also has other values the type becomes a union like string | null.'],
+      ['How are nested types named?', 'From their key in PascalCase. Array items get a singular name, so orders becomes Order. Identical shapes share one type.'],
+      ['Is my JSON uploaded?', 'No. It is converted in your browser.']
+    ],
+    icon: '<path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M12 8h8M16 8v10"/>'
+  },
+  {
+    slug: 'fake-data-generator', cat: 'Developer tools', name: 'Fake Data Generator',
+    title: 'Fake Data Generator - Test Data as CSV, JSON or SQL, 16 Locales',
+    desc: 'Generate up to 10,000 rows of made-up names, emails, phones, addresses, dates and UUIDs for 16 countries. Download as CSV, JSON or SQL INSERT.',
+    card: 'Make realistic test data as CSV, JSON or SQL.',
+    intro: 'Create realistic but completely made-up test data for apps, databases and spreadsheets. Pick your columns, choose a country for local names, addresses and phone formats, and download CSV, JSON, JSON Lines or SQL INSERT statements. Emails use the reserved example.com domains, and a seed lets you get the same data again.',
+    steps: ['Choose a country or language, or Mixed for all of them.', 'Set up your columns: pick a data type and a column name for each.', 'Enter how many rows you need, choose the format and press Generate.', 'Check the preview, then copy or download the file.'],
+    faq: [
+      ['Are these real people?', 'No. Names, addresses and companies are random combinations of common words, and emails use example.com, example.org and example.net, which are reserved and never belong to anyone.'],
+      ['Are the phone numbers real?', 'They follow each country\'s format. United States numbers use the fictional 555-01xx range and United Kingdom numbers the Ofcom drama range. Elsewhere they are random and could match a real number, so never call or text them.'],
+      ['What is the seed for?', 'With the same seed and settings you get exactly the same data again, which helps with repeatable tests.'],
+      ['How many rows can I make?', 'Up to 10,000 per batch, made in your browser in about a second.']
+    ],
+    icon: '<circle cx="8" cy="8" r="3"/><path d="M3 19a5 5 0 0 1 10 0"/><path d="M15 7h6M15 12h6M15 17h6"/>'
+  },
+  {
+    slug: 'robots-txt-generator', cat: 'Developer tools', name: 'Robots.txt Generator',
+    title: 'Robots.txt Generator and Sitemap.xml Generator - Free',
+    desc: 'Build a robots.txt with rules per crawler, block AI training bots, add sitemap lines and test any URL. Also turns a list of URLs into a sitemap.xml.',
+    card: 'Make robots.txt and sitemap.xml files.',
+    intro: 'Create a correct robots.txt without remembering the syntax: start from a preset, add Allow and Disallow rules for all crawlers or specific ones, block AI training crawlers with one tick and add your sitemap. Test any page path to see if it is allowed. Below, paste your page addresses to get a ready sitemap.xml.',
+    steps: ['Choose a preset, then edit the rules for each crawler.', 'Tick Block AI training crawlers if you want, and add your sitemap address.', 'Test a page path, then copy or download robots.txt and upload it to your site root.', 'For a sitemap, paste your page URLs, choose the options and press Make sitemap.'],
+    faq: [
+      ['Where do I put robots.txt?', 'At the root of your domain, so it opens at https://your-site/robots.txt. It only applies to that host.'],
+      ['Does robots.txt hide pages from Google?', 'It stops crawling, not indexing. A blocked page can still appear in results if other sites link to it. Use a noindex tag to keep a page out of search.'],
+      ['How are Allow and Disallow decided?', 'Like Google: the most specific (longest) matching rule wins, and Allow wins a tie. The tester uses the same rule, including * and $.'],
+      ['How many URLs can a sitemap have?', 'Up to 50,000 addresses and 50 MB. For bigger sites, split them into several sitemaps.'],
+      ['Do all AI crawlers obey robots.txt?', 'The major ones listed say they do, but robots.txt is a request, not a lock.']
+    ],
+    icon: '<rect x="4" y="8" width="16" height="12" rx="2"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6M2 13v2M22 13v2"/><circle cx="12" cy="3" r="1"/>'
   }
 ];
