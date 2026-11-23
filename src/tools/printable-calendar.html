@@ -289,7 +289,12 @@
     return { get: function (y, mo, d) { return (ev['*-' + (mo + 1) + '-' + d] || []).concat(ev[y + '-' + (mo + 1) + '-' + d] || []); }, bad: bad };
   }
   function pageSize() { var p = $('pcPaper').value === 'letter' ? [792, 612] : [841.89, 595.28]; return $('pcOrient').value === 'port' ? [p[1], p[0]] : p; }
-  function weekendDay(dow) { return weekStart() === 6 ? dow === 5 || dow === 6 : dow === 0 || dow === 6; }
+  // weekend days of the visitor's region (Friday and Saturday in Israel and much of the Middle East, Sunday only in India…)
+  var WE = (function () {
+    try { var l = UT.langs()[0], lo = new Intl.Locale(l); if (!lo.region && UT.region()) lo = new Intl.Locale(lo.language + '-' + UT.region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.weekend && wi.weekend.length) return wi.weekend.map(function (d) { return d % 7; }); } catch (e) {}
+    return null;
+  })();
+  function weekendDay(dow) { if (WE && $('pcWeek').value === 'auto') return WE.indexOf(dow) >= 0; return weekStart() === 6 ? dow === 5 || dow === 6 : dow === 0 || dow === 6; }
   function tint(hex, a) { var c = GD.rgb(hex); return '#' + c.map(function (v) { return Math.round((v * a + (1 - a)) * 255).toString(16).padStart(2, '0'); }).join(''); }
 
   // ---------- a month as a grid ----------
@@ -362,6 +367,7 @@
           var t = fmt({ day: 'numeric', month: 'short' }).format(new Date(y0, e[0], e[1])) + '  ' + e[2];
           ops.push({ k: 'text', t: t.length > 60 ? t.slice(0, 58) + '…' : t, x: M + c * lw, y: ly + r * 11, font: 'sans', s: 8, fill: '#374151' });
         });
+        if (shown < evList.length) ops.push({ k: 'text', t: '+ ' + num(evList.length - shown) + ' …', x: W - M, y: H - M + 10, font: 'sansb', s: 8, fill: '#6b7280', align: 'right' });
       }
       out.push({ ops: ops, W: W, H: H, label: yearText(y0) });
     } else {

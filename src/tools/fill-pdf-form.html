@@ -371,6 +371,17 @@
   function covers(font, s) { var g = font.embedder.font; return Array.from(String(s)).every(function (c) { var cp = c.codePointAt(0); return cp < 32 || g.hasGlyphForCodePoint(cp); }); }
   function rgb(hex) { var v = parseInt(hex.slice(1), 16); return PDFLib.rgb((v >> 16) / 255, (v >> 8 & 255) / 255, (v & 255) / 255); }
 
+  // pdf-lib needs every box of a field to have a stored look before it can flatten or remove it:
+  // give boxes without one (readers that draw fields themselves leave none) an empty look
+  function ensureLook(d, f) {
+    try {
+      f.acroField.getWidgets().forEach(function (w) {
+        try { w.getNormalAppearance(); return; } catch (e) { /* none yet */ }
+        var r = w.getRectangle();
+        w.setNormalAppearance(d.context.register(d.context.formXObject([], { BBox: [0, 0, Math.max(1, r.width), Math.max(1, r.height)] })));
+      });
+    } catch (e) { /* leave it */ }
+  }
   $('go').addEventListener('click', function () {
     if (!doc || busy) return;
     if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
@@ -431,7 +442,7 @@
               T.draw(pg, ln, { x: sp.x + 2, y: y, size: size, font: font, color: L.rgb(0, 0, 0), width: sp.w - 4, align: al });
             });
           });
-          form.removeField(s.f);
+          ensureLook(d, s.f); form.removeField(s.f);
         } else {
           // the reader draws these answers itself, with its own fonts
           s.f.acroField.getWidgets().forEach(function (w) { w.dict.delete(L.PDFName.of('AP')); });
@@ -451,7 +462,7 @@
         }
         pg.pushOperators(L.popGraphicsState());
       });
-      if (flat) form.flatten({ updateFieldAppearances: false });
+      if (flat) { form.getFields().forEach(function (f) { ensureLook(d, f); }); form.flatten({ updateFieldAppearances: false }); }
       // pdf-lib can leave links to removed boxes (radio buttons) in a page's list of annotations; drop them
       pages.forEach(function (pg) {
         var a = pg.node.Annots(); if (!a) return;

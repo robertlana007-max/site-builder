@@ -59,7 +59,7 @@
       ['IP address', s4(addr)], ['Network address', s4(net) + '/' + p], ['Usable host range', r.hosts ? s4(r.first) + ' – ' + s4(r.last) : '–'], ['Broadcast address', p >= 31 ? 'none' : s4(r.bc)],
       ['Total addresses', fmtNum(size)], ['Usable hosts', fmtNum(r.hosts)], ['Subnet mask', s4(mask)], ['Wildcard mask', s4(~mask >>> 0)], ['CIDR notation', '/' + p],
       ['IP class', class4(addr)], ['Address type', type4(addr)], ['Binary address', '<span class="sn-bin">' + bin4(addr, p) + '</span>'], ['Binary mask', '<span class="sn-bin">' + bin4(mask, p) + '</span>'],
-      ['Hex address', '0x' + addr.toString(16).toUpperCase().padStart(8, '0')], ['Integer', String(addr)], ['Reverse DNS zone', s4(addr).split('.').reverse().join('.') + '.in-addr.arpa'], ['IPv4-mapped IPv6', '::ffff:' + s4(addr)]
+      ['Hex address', '0x' + addr.toString(16).toUpperCase().padStart(8, '0')], ['Integer', String(addr)], ['Reverse DNS (PTR) name', s4(addr).split('.').reverse().join('.') + '.in-addr.arpa'], ['IPv4-mapped IPv6', '::ffff:' + s4(addr)]
     ];
     if (r.note) rows.push(['Note', r.note]);
     if (addr === net && p < 31) rows.push(['Note', 'This is the network address itself, which is not given to a device.']);
@@ -84,6 +84,7 @@
   function full6(n) { return groups(n).map(function (x) { return x.toString(16).padStart(4, '0'); }).join(':'); }
   function short6(n) { // RFC 5952
     var g = groups(n), best = -1, bl = 0;
+    if (g[5] === 0xffff && !g[0] && !g[1] && !g[2] && !g[3] && !g[4]) return '::ffff:' + s4(Number(n & 0xFFFFFFFFn)); // IPv4-mapped, written the usual way
     for (var i = 0; i < 8;) { if (g[i] === 0) { var j = i; while (j < 8 && g[j] === 0) j++; if (j - i > bl && j - i > 1) { best = i; bl = j - i; } i = j; } else i++; }
     var h = g.map(function (x) { return x.toString(16); });
     if (best < 0) return h.join(':');
@@ -110,7 +111,7 @@
     var raw = $('ip').value.trim().replace(/\s+/g, ' '), ip = raw, p = null;
     $('out').hidden = true; cur = null;
     if (!raw) return msg('Type an IP address, for example 192.168.1.10/24.');
-    var m = /^(.*?)(?:\s*\/\s*(\d{1,3})|\s+(\d+\.\d+\.\d+\.\d+))$/.exec(raw);
+    var m = /^(.*?)(?:\s*\/\s*(\d{1,3})|(?:\s+|\s*\/\s*)(\d+\.\d+\.\d+\.\d+))$/.exec(raw);
     if (m) { ip = m[1].trim(); if (m[2] !== undefined) p = +m[2]; else { var mk = p4(m[3]); if (mk === null) return msg('"' + m[3] + '" is not a valid subnet mask.', true); var b = mk.toString(2).padStart(32, '0'); if (!/^1*0*$/.test(b)) return msg(m[3] + ' is not a valid subnet mask: the 1 bits must all come first (like 255.255.255.0).', true); p = b.indexOf('0') < 0 ? 32 : b.indexOf('0'); } }
     if (ip.indexOf(':') >= 0) {
       var a6 = p6(ip);
@@ -165,8 +166,8 @@
     $('smsg').textContent = fmtNum(n) + ' subnets of /' + q + ', each with ' + fmtNum(range4(0, q).hosts) + ' usable hosts.' + (n > show ? ' The first ' + fmtNum(show) + ' are listed.' : '');
   }
   var t; $('ip').addEventListener('input', function () { clearTimeout(t); t = setTimeout(run, 200); });
-  $('pfx').addEventListener('change', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim() + '/' + $('pfx').value; run(); $('ip').dispatchEvent(new Event('change', { bubbles: true })); });
-  $('need').addEventListener('input', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim(); if ($('need').value) run('need'); });
+  $('pfx').addEventListener('change', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d+\.\d+\.\d+\.\d+|\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim() + '/' + $('pfx').value; run(); $('ip').dispatchEvent(new Event('change', { bubbles: true })); });
+  $('need').addEventListener('input', function () { $('ip').value = $('ip').value.replace(/\s*(\/\s*\d+\.\d+\.\d+\.\d+|\/\s*\d*|\s+\d+\.\d+\.\d+\.\d+)\s*$/, '').trim(); if ($('need').value) run('need'); });
   $('split').addEventListener('change', split);
   $('cpAll').addEventListener('click', function () { if (cur) copyText(cur.rows.map(function (r) { return r[0] + ': ' + r[1].replace(/<[^>]+>/g, ''); }).join('\n'), $('cpAll')); });
   $('cpCsv').addEventListener('click', function () { copyText(csv, $('cpCsv')); });

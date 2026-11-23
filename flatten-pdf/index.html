@@ -260,6 +260,17 @@
     return true;
   }
 
+  // pdf-lib needs every box of a field to have a stored look before it can flatten or remove it:
+  // give boxes without one (readers that draw fields themselves leave none) an empty look
+  function ensureLook(d, f) {
+    try {
+      f.acroField.getWidgets().forEach(function (w) {
+        try { w.getNormalAppearance(); return; } catch (e) { /* none yet */ }
+        var r = w.getRectangle();
+        w.setNormalAppearance(d.context.register(d.context.formXObject([], { BBox: [0, 0, Math.max(1, r.width), Math.max(1, r.height)] })));
+      });
+    } catch (e) { /* leave it */ }
+  }
   async function flattenKeep(d) {
     var L = PDFLib, ctx = d.context, pages = d.getPages(), doForms = $('flForms').checked, doAnn = $('flAnnots').checked, keepLinks = $('flLinks').checked;
     var stats = { fields: 0, annots: 0, pictures: 0 }, patches = [];
@@ -286,12 +297,23 @@
           s.f.acroField.getWidgets().forEach(function (w) {
             var r = w.getRectangle(), pi = pages.findIndex(function (p) { var a = p.node.Annots(); if (!a) return false; for (var i = 0; i < a.size(); i++) if (a.lookup(i) === w.dict) return true; return false; });
             if (pi < 0 || !s.text) return;
+            var multi = false; try { multi = s.f instanceof L.PDFTextField && s.f.isMultiline(); } catch (e) { multi = false; }
+            if (multi) { // line by line from the top, as a reader shows a multi-line box
+              var ms = Math.max(6, Math.min(11, r.height / 3)), lines = [];
+              s.text.split(/\r\n?|\n/).forEach(function (para) { lines = lines.concat(para ? T.wrap(para, ms, font, r.width - 4) : ['']); });
+              lines.forEach(function (ln, k) {
+                var ly = r.y + r.height - 2 - ms * (k + 1) * 1.15 + ms * .2;
+                if (ln && ly >= r.y - 1) T.draw(pages[pi], ln, { x: r.x + 2, y: ly, size: ms, font: font, color: L.rgb(0, 0, 0), width: r.width - 4 });
+              });
+              return;
+            }
             var size = Math.max(6, Math.min(12, r.height * .62)); while (size > 5 && T.width(s.text, size, font) > r.width - 4) size -= .5;
             T.draw(pages[pi], s.text, { x: r.x + 2, y: r.y + (r.height - size * .7) / 2, size: size, font: font, color: L.rgb(0, 0, 0), width: r.width - 4 });
           });
-          form.removeField(s.f);
+          ensureLook(d, s.f); form.removeField(s.f);
         });
       }
+      form.getFields().forEach(function (f) { ensureLook(d, f); });
       form.flatten({ updateFieldAppearances: false });
       var af = d.catalog.lookup(N('AcroForm'));
       if (af instanceof L.PDFDict) { var fa = af.lookup(N('Fields')); if (!fa || !fa.size || !fa.size()) d.catalog.delete(N('AcroForm')); }

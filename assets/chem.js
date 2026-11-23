@@ -65,7 +65,7 @@
         if (/[a-z]/.test(c)) throw new ChemErr('"' + c + '" should be a capital letter. Element symbols start with a capital, like Na or Cl.');
         if (c === ')' || c === ']' || c === '}') throw new ChemErr('There is a "' + c + '" without a matching opening bracket.');
         if (c === '·' || c === '.') break;
-        throw new ChemErr('"' + c + '" is not allowed in a formula.');
+        throw new ChemErr('"' + String.fromCodePoint(body.codePointAt(i)) + '" is not allowed in a formula.');
       }
       if (!any) throw new ChemErr('Something is missing in "' + src + '".');
       return out;

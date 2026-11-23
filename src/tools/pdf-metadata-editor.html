@@ -196,6 +196,21 @@
     cat.set(N('Metadata'), d.context.register(st));
   }
 
+  // Drop every object nothing points to any more (old copies of the details, older saved versions of the file),
+  // so removed or changed details are really gone from the saved bytes.
+  function sweep(d) {
+    var L = PDFLib, ctx = d.context, seen = new Set(), todo = [ctx.trailerInfo.Root, ctx.trailerInfo.Info, ctx.trailerInfo.Encrypt];
+    while (todo.length) {
+      var o = todo.pop();
+      if (!o) continue;
+      if (o instanceof L.PDFRef) { var k = o.toString(); if (seen.has(k)) continue; seen.add(k); todo.push(ctx.lookup(o)); continue; }
+      if (o instanceof L.PDFStream) o = o.dict;
+      if (o instanceof L.PDFDict) o.values().forEach(function (v) { todo.push(v); });
+      else if (o instanceof L.PDFArray) o.asArray().forEach(function (v) { todo.push(v); });
+    }
+    ctx.enumerateIndirectObjects().forEach(function (e) { if (!seen.has(e[0].toString())) ctx.delete(e[0]); });
+  }
+
   // ---------- saving ----------
   function readDate(id) { var v = $(id).value; if (!v) return null; var d = new Date(v); return isNaN(d) ? 'bad' : d; }
   function save(strip) {
@@ -207,6 +222,7 @@
         d.context.trailerInfo.Info = undefined;
         cat.delete(N('Metadata')); cat.delete(N('PieceInfo'));
         d.getPages().forEach(function (p) { p.node.delete(N('Metadata')); p.node.delete(N('PieceInfo')); });
+        sweep(d);
         var out = await d.save({ updateFieldAppearances: false });
         Object.keys(MAIN).forEach(function (k) { $(MAIN[k]).value = ''; });
         ['mdCreated', 'mdModified'].forEach(function (id) { $(id).value = ''; }); $('mdCustom').innerHTML = '';
@@ -231,15 +247,16 @@
       Array.prototype.forEach.call($('mdCustom').children, function (row) {
         var k = row.children[0].value.trim(), val = row.children[1].value.trim();
         if (!k && !val) return;
-        if (!/^[A-Za-z0-9_.\-]+$/.test(k) || KNOWN.indexOf(k) !== -1) { bad = k; return; }
+        if (!/^[\x21-\x7E][\x20-\x7E]*$/.test(k) || KNOWN.indexOf(k) !== -1) { bad = k; return; }
         info.set(N(k), L.PDFHexString.fromText(val));
       });
-      if (bad != null) throw new Error(bad ? 'The property name "' + bad + '" cannot be used. Use English letters, digits, dots, dashes or underscores, and not a name from the boxes above.' : 'A property has a value but no name. Give it a name or remove it.');
+      if (bad != null) throw new Error(bad ? 'The property name "' + bad + '" cannot be used. Use English letters, digits and signs (no accents or other alphabets), and not a name from the boxes above.' : 'A property has a value but no name. Give it a name or remove it.');
       if (lang) cat.set(N('Lang'), L.PDFHexString.fromText(lang)); else cat.delete(N('Lang'));
       var vp = cat.lookup(N('ViewerPreferences'));
       if ($('mdShowTitle').checked) { if (!(vp instanceof L.PDFDict)) { vp = d.context.obj({}); cat.set(N('ViewerPreferences'), vp); } vp.set(N('DisplayDocTitle'), L.PDFBool.True); }
       else if (vp instanceof L.PDFDict) vp.delete(N('DisplayDocTitle'));
       updateXmp(d, v);
+      sweep(d);
       var out2 = await d.save({ updateFieldAppearances: false });
       PT.done(out2, file.name.replace(/\.pdf$/i, '') + '.pdf', 'application/pdf', 'Saved the new details');
     }).then(function () { busy = false; $('mdStrip').disabled = !file; });

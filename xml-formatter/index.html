@@ -193,10 +193,10 @@
     for (var i = 0; i < toks.length; i++) {
       var k = toks[i];
       if (close[i] > i + 2) { out.push({ d: depth, s: toks.slice(i, close[i] + 1).join('') }); i = close[i]; continue; }
-      if (k.charAt(0) !== '<') { // text
-        var tx = k.trim();
-        if (!tx) continue;
-        out.push({ d: depth, s: tx, text: true }); continue;
+      if (k.charAt(0) !== '<') { // text: only an element's sole content gets here (mixed content is copied above), so keep it exactly
+        var last = out[out.length - 1];
+        if (!k.trim() && !(last && last.open && toks[i - 1] === last.src && /^<\//.test(toks[i + 1] || ''))) continue; // spaces between tags
+        out.push({ d: depth, s: k, text: true }); continue;
       }
       if (k.indexOf('<!--') === 0) { if (!noCom) out.push({ d: depth, s: k }); continue; }
       if (k.indexOf('</') === 0) {
@@ -204,7 +204,7 @@
         var prev = out[out.length - 1], prev2 = out[out.length - 2];
         // <a></a> or <a>text</a> stay on one line
         if (prev && prev.open && prev.d === depth) { if (self) { prev.s = prev.s.replace(/\s*>$/, '/>'); prev.open = false; } else prev.s += k; prev.open = false; continue; }
-        if (prev && prev.text && prev2 && prev2.open && prev2.d === depth && !/\n/.test(prev.s)) { prev2.s += prev.s + k; prev2.open = false; out.pop(); continue; }
+        if (prev && prev.text && prev2 && prev2.open && prev2.d === depth) { prev2.s += prev.s + k; prev2.open = false; out.pop(); continue; }
         out.push({ d: depth, s: k }); continue;
       }
       if (/^<!\[CDATA\[/.test(k)) { out.push({ d: depth, s: k, text: true }); continue; }
@@ -215,7 +215,7 @@
         if (parts && parts.length > 3) tag = parts[0] + '\n' + parts.slice(1, -1).map(function (a) { return pad(depth + 1) + a; }).join('\n') + parts[parts.length - 1];
       }
       if (minify) tag = tag.replace(/\s+(\/?>)$/, '$1').replace(/\s{2,}(?=(?:[^"']|"[^"]*"|'[^']*')*$)/g, ' ');
-      out.push({ d: depth, s: tag, open: !isSelf });
+      out.push({ d: depth, s: tag, open: !isSelf, src: k });
       if (!isSelf) depth++;
     }
     if (minify) return out.map(function (o) { return o.s; }).join('');
@@ -264,7 +264,7 @@
 <section class="guide" id="about"><h2>What is XML Formatter?</h2><p>The XML Formatter makes XML readable with consistent indentation, shrinks it to a single line, or checks that it is well-formed, showing the exact line and column of the first error.</p><p>It works with any XML: configuration files, SVG, RSS and Atom feeds, sitemaps, SOAP messages, Android layouts, Office XML parts and more. Comments, CDATA, processing instructions and the DOCTYPE are preserved.</p></section>
 <section class="guide" id="uses"><h2>What you can use it for</h2><div class="uses"><div class="use"><h3>Reading API responses</h3><p>Pretty-print a compact XML response to understand its structure.</p></div><div class="use"><h3>Fixing broken files</h3><p>Find the missing or mismatched tag that stops a config file or feed from loading.</p></div><div class="use"><h3>Smaller files</h3><p>Minify XML before sending or embedding it.</p></div><div class="use"><h3>SVG cleanup</h3><p>Format an SVG to edit it by hand, with long tags split over lines.</p></div><div class="use"><h3>Checking feeds and sitemaps</h3><p>Make sure an RSS feed or sitemap is well-formed before publishing.</p></div></div></section>
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use XML Formatter</h2><ol class="tut"><li><h3>Add your XML</h3><p>Paste it, or press Open file to load an .xml, .svg, .rss, .kml, .gpx or similar file.</p></li><li><h3>Choose the indent</h3><p>Pick 2 spaces, 4 spaces or a tab.</p></li><li><h3>Set options</h3><p>Remove comments, write empty elements as &lt;tag/&gt;, or put each attribute on its own line for long tags.</p></li><li><h3>Format or minify</h3><p>Press Format for readable XML or Minify for a single line.</p></li><li><h3>Fix errors</h3><p>If the XML is not well-formed, the message gives the line and column and the box below shows the lines around it with a marker.</p></li><li><h3>Save</h3><p>Press Copy or Download.</p></li></ol></section>
-<section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Exact error position</b>Uses your browser's XML parser and shows the line, column and surrounding code.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Keeps your content</b>Text mixed with tags, CDATA, comments, the declaration and DOCTYPE stay exactly as written.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Safety check</b>The result is parsed again before it replaces your text.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Attribute wrapping</b>Optionally puts attributes of long tags on separate lines.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Large files</b>Several megabytes in a few seconds, without uploading anything.</span></li></ul></section>
+<section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Exact error position</b>Uses your browser's XML parser and shows the line, column and surrounding code.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Keeps your content</b>Text inside elements (including its spaces and line breaks), text mixed with tags, CDATA, comments, the declaration and DOCTYPE stay exactly as written.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Safety check</b>The result is parsed again before it replaces your text.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Attribute wrapping</b>Optionally puts attributes of long tags on separate lines.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Large files</b>Several megabytes in a few seconds, without uploading anything.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>A broken config file</h2><p>Paste &lt;root&gt;&lt;a&gt;&lt;b&gt;text&lt;/a&gt;&lt;/root&gt; and press Format. The message says Invalid XML at line 1 with the mismatched closing tag, and the marker points at &lt;/a&gt;. Change it to &lt;/b&gt;&lt;/a&gt; and press Format again to get a neatly indented file.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Validate only checks without changing your text.</li><li>HTML is not XML: entities like &amp;nbsp; and unclosed tags such as &lt;br&gt; are errors in XML.</li><li>Use Minify before embedding XML in code or URLs.</li><li>Keep a copy of the original if you remove comments.</li></ul></section>
 <section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>Unexpected entity error</summary><p>XML knows only &amp;amp; &amp;lt; &amp;gt; &amp;quot; and &amp;apos;. Write other characters directly or as numbers like &amp;#160;.</p></details><details><summary>Content outside the root element</summary><p>An XML document must have exactly one top-level element. Wrap everything in one root tag.</p></details><details><summary>The file does not open</summary><p>Only text files up to 30 MB can be opened. Binary files such as .docx must be unzipped first.</p></details></div></section>

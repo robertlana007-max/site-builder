@@ -236,6 +236,7 @@
       make: ['maker', 'generator', 'creator'], create: ['maker', 'generator'], build: ['maker', 'builder'], cv: ['resume'],
       count: ['counter'], timer: ['timer', 'countdown'], weight: ['bmi', 'weight'], fat: ['body fat', 'bmi']
     };
+    function isStop(w) { return STOP[w] || (window.TOOL_STOP && window.TOOL_STOP[w]); }
     function synOf(w) { var x = (window.TOOL_SYNONYMS && window.TOOL_SYNONYMS[w]) || []; return (SYN[w] || []).concat(x); }
     var index = null, aliasState = 0;
     // Alias files (other names, typos, task phrases, other languages) load only when someone searches:
@@ -261,26 +262,33 @@
       index = (window.TOOLS || []).map(function (t) {
         if (AL[t[0]] && !t[5]) t = t.concat([AL[t[0]]]);
         var name = norm(t[1]), extra = norm(t[2] + ' ' + t[4] + ' ' + t[0]), alias = norm(t[5] || '');
-        var toks = {}; (name + ' ' + extra + ' ' + alias).split(' ').forEach(function (w) { if (w) toks[w] = 1; });
-        return { t: t, name: name, nameToks: name.split(' '), all: name + ' ' + extra + ' ' + alias, flat: (name + '|' + alias.split('|').join('|')).replace(/ /g, ''), aliasList: (t[5] || '').split('|').map(norm), toks: Object.keys(toks) };
+        var toks = {}; (name + ' ' + extra + ' ' + alias).split(/[ |]+/).forEach(function (w) { if (w) toks[w] = 1; });
+        return { t: t, name: name, nameToks: name.split(' '), all: name + ' ' + extra + ' ' + alias, flat: (name + '|' + alias.split('|').join('|')).replace(/ /g, ''), aliasList: (t[5] || '').split('|').map(norm), aliasCore: (t[5] || '').split('|').map(function (a) { return norm(a).split(' ').filter(function (x) { return x && !isStop(x); }).join(' '); }), toks: Object.keys(toks) };
       });
     }
+    var dcache = {};
+    function dfast(a, b, max) { var k = a + '\u0001' + b + '\u0001' + max; if (!(k in dcache)) dcache[k] = dist(a, b, max); return dcache[k]; }
     function wordScore(e, w) {
       var wide = /[^\x00-\x7f]/.test(w), best = 0, i, tk;
       for (i = 0; i < e.nameToks.length; i++) { tk = e.nameToks[i]; if (tk === w) return 6; if (tk.indexOf(w) === 0 && (w.length > 1 || wide)) best = Math.max(best, 5); }
       if (e.all.indexOf(w) !== -1 && (w.length > 2 || wide)) best = Math.max(best, e.name.indexOf(w) !== -1 ? 4 : 3);
       if (!best && w.length >= 5 && e.flat.indexOf(w) !== -1) best = 3; // words typed together, e.g. "mergepdf"
+      if (!best && wide && w.length >= 2) { // e.g. Japanese "動画をmp3に": find known words inside it
+        var hits = 0; for (var h = 0; h < e.toks.length; h++) { var tt = e.toks[h]; if (tt.length >= 2 && /[^\x00-\x7f]/.test(tt) && w.indexOf(tt) !== -1) hits += tt.length; }
+        if (hits) best = Math.min(4, 1.5 + hits * 0.4);
+      }
       if (best || w.length < 4) return best;
       var max = w.length >= 6 ? 2 : 1;
       for (i = 0; i < e.toks.length; i++) {
         tk = e.toks[i]; if (tk.length < 3) continue;
-        if (dist(w, tk, max) <= max) { best = Math.max(best, e.nameToks.indexOf(tk) !== -1 ? 2.5 : 2); }
-        else if (tk.length > w.length && dist(w, tk.slice(0, w.length), max) <= max) best = Math.max(best, 1.5); // typo while still typing
+        if (dfast(w, tk, max) <= max) { best = Math.max(best, e.nameToks.indexOf(tk) !== -1 ? 2.5 : 2); }
+        else if (tk.length > w.length && dfast(w, tk.slice(0, w.length), max) <= max) best = Math.max(best, 1.5); // typo while still typing
         if (best >= 2.5) break;
       }
       return best;
     }
     function rank(e, words, q, loose) {
+      var core = words.join(' ');
       var score = 0, miss = 0;
       for (var i = 0; i < words.length; i++) {
         var s = wordScore(e, words[i]), alts = synOf(words[i]);
@@ -290,14 +298,26 @@
       if (!score) return 0;
       if (!loose && miss > (words.length >= 3 ? Math.floor(words.length / 2) : 0)) return 0;
       if (e.name === q) score += 20; else if (e.name.indexOf(q) === 0) score += 8; else if (e.name.indexOf(q) !== -1) score += 5;
-      for (var k = 0; k < e.aliasList.length; k++) if (e.aliasList[k] && (e.aliasList[k] === q || e.aliasList[k].indexOf(q) === 0)) { score += e.aliasList[k] === q ? 12 : 4; break; }
+      for (var k = 0; k < e.aliasList.length; k++) {
+        if (e.aliasList[k] && (e.aliasList[k] === q || e.aliasList[k].indexOf(q) === 0)) { score += e.aliasList[k] === q ? 12 : 4; break; }
+        if (core && e.aliasCore[k] === core) { score += 10; break; }
+      }
       return score - miss * 2;
     }
     function mark() { links.forEach(function (a, i) { a.classList.toggle('sel', i === sel); if (i === sel) a.scrollIntoView({ block: 'nearest' }); }); }
     function render() {
       var q = norm(input.value), all = q.split(' ').filter(Boolean), list, close = false;
+      // Languages written without spaces (Chinese, Japanese, Thai, Lao, Khmer, Burmese): let the browser split the words.
+      if (/[\u3040-\u30ff\u4e00-\u9fff\u0e00-\u0eff\u1780-\u17ff\u1000-\u109f]/.test(q) && window.Intl && Intl.Segmenter) {
+        try {
+          var seg = new Intl.Segmenter(/[\u3040-\u30ff]/.test(q) ? 'ja' : /[\u0e00-\u0e7f]/.test(q) ? 'th' : 'zh', { granularity: 'word' }), parts = [];
+          all.forEach(function (w) { var it = seg.segment(w)[Symbol.iterator](), r; while (!(r = it.next()).done) { var x = r.value; if (x.isWordLike && !/^[\u3040-\u309f]$/.test(x.segment)) parts.push(x.segment); } });
+          if (parts.length) all = parts;
+        } catch (err) {}
+      }
+      if (Object.keys(dcache).length > 200000) dcache = {};
       // People often describe the job ("how do i make my photo smaller"): drop filler words, keep the meaning.
-      var words = all.filter(function (w) { return !STOP[w]; }); if (!words.length) words = all;
+      var words = all.filter(function (w) { return !isStop(w); }); if (!words.length) words = all;
       if (words.length >= 3) { var core = words.filter(function (w) { return !/^(make|makes|making|made|create|change|turn)$/.test(w); }); if (core.length >= 2) words = core; }
       loadAliases(q, false);
       if (!index) build();

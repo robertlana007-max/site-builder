@@ -296,7 +296,7 @@ write('assets/tools-index.js', 'window.TOOLS=' + JSON.stringify(tools.map(t => [
     for (const f of fs.readdirSync(dir).filter(f => /^[a-z]{2,3}(-[a-z]+)?\.js$|^core\.js$/.test(f))) {
       let AL = {}; try { AL = require(path.join(dir, f)); } catch (e) { console.warn('aliases: skipped ' + f + ': ' + e.message); continue; }
       const name = f.replace(/\.js$/, ''), syn = name === 'core' && AL.__synonyms ? AL.__synonyms : null;
-      write('assets/aliases/' + name + '.js', 'window.TOOL_ALIASES=window.TOOL_ALIASES||{};(function(a,s){for(var k in a)window.TOOL_ALIASES[k]=(window.TOOL_ALIASES[k]?window.TOOL_ALIASES[k]+"|":"")+a[k];' + (syn ? 'window.TOOL_SYNONYMS=s;' : '') + '})(' + JSON.stringify(pack(AL)) + ',' + JSON.stringify(syn || 0) + ');\n');
+      write('assets/aliases/' + name + '.js', 'window.TOOL_ALIASES=window.TOOL_ALIASES||{};(function(a,s){for(var k in a)window.TOOL_ALIASES[k]=(window.TOOL_ALIASES[k]?window.TOOL_ALIASES[k]+"|":"")+a[k];' + (syn ? 'window.TOOL_SYNONYMS=s;' : '') + (name === 'core' && AL.__stop ? 'window.TOOL_STOP=' + JSON.stringify((Array.isArray(AL.__stop) ? AL.__stop : Object.keys(AL.__stop)).reduce((o, w) => (o[String(w).toLowerCase()] = 1, o), {})) + ';' : '') + '})(' + JSON.stringify(pack(AL)) + ',' + JSON.stringify(syn || 0) + ');\n');
       if (name !== 'core') langs.push(name);
     }
   }

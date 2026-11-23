@@ -218,11 +218,17 @@
     $('mpInvite').value = title + '\n' + dayName(start, base, true) + ' · ' + (len < 60 ? len + ' minutes' : len / 60 + (len === 60 ? ' hour' : ' hours')) + '\n\n' + lines.join('\n') + '\n\nUTC: ' + new Date(start).toISOString().slice(0, 16).replace('T', ' ') + '–' + new Date(end).toISOString().slice(11, 16);
     // calendar file
     var stamp = function (t) { return new Date(t).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }, esc = function (s) { return s.replace(/\\/g, '\\\\').replace(/[,;]/g, '\\$&').replace(/\n/g, '\\n'); };
-    var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GetToolNest//Meeting Planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT', 'UID:' + Date.now().toString(36) + Math.random().toString(36).slice(2) + '@gettoolnest', 'DTSTAMP:' + stamp(Date.now()), 'DTSTART:' + stamp(start), 'DTEND:' + stamp(end), 'SUMMARY:' + esc(title), 'DESCRIPTION:' + esc(lines.join('\n')), 'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+    var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//GetToolNest//Meeting Planner//EN', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'BEGIN:VEVENT', 'UID:' + Date.now().toString(36) + Math.random().toString(36).slice(2) + '@gettoolnest', 'DTSTAMP:' + stamp(Date.now()), 'DTSTART:' + stamp(start), 'DTEND:' + stamp(end), 'SUMMARY:' + esc(title), 'DESCRIPTION:' + esc(lines.join('\n')), 'END:VEVENT', 'END:VCALENDAR'].map(fold75).join('\r\n');
     var a2 = $('mpIcs'); if (a2.href && a2.href.indexOf('blob:') === 0) URL.revokeObjectURL(a2.href);
     a2.href = URL.createObjectURL(new Blob([ics], { type: 'text/calendar' })); a2.download = title.replace(/[\\/:*?"<>|]+/g, ' ').trim().slice(0, 60) + '.ics';
     $('mpSlot').hidden = false;
     if (!quiet) $('mpSlot').scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+  }
+  // calendar files must break lines longer than 75 bytes, going on after a space
+  function fold75(line) {
+    var out = '', n = 0, enc = new TextEncoder();
+    Array.from(line).forEach(function (ch) { var w = enc.encode(ch).length; if (n + w > 75) { out += '\r\n '; n = 1; } out += ch; n += w; });
+    return out;
   }
   function changed() { save(); drawRows(); grid(); }
   ['mpDate', 'mpFmt'].forEach(function (id) { $(id).addEventListener('change', function () { save(); drawRows(); grid(); }); });

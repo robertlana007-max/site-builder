@@ -59,7 +59,7 @@
       if ('+-*/^(),|[]{}!'.indexOf(c) >= 0) { out.push({ k: c === '[' || c === '{' ? '(' : c === ']' || c === '}' ? ')' : c }); i++; continue; }
       if (c === "'") throw new CErr('Write the function itself, like x^2 + 3x. You do not need f(x) = or a \' mark.');
       if (c === '=') throw new CErr('Leave out the "=" sign. Type only the expression, for example x^2 + 3x.');
-      throw new CErr('"' + c + '" is not understood. Use + - * / ^ and brackets.');
+      throw new CErr('"' + String.fromCodePoint(s.codePointAt(i)) + '" is not understood. Use + - * / ^ and brackets.');
     }
     return out;
   }
@@ -754,6 +754,25 @@
           if (val(x.e) === -1 && k === key(simplify(add([pow(X, N(2)), N(1)])))) { step('Standard integral', '∫ 1/(1 + x²) dx = arctan(x)'); return done(fn('atan', X)); }
           if (val(x.e) === -0.5 && k === key(simplify(add([negate(pow(X, N(2))), N(1)])))) { step('Standard integral', '∫ 1/√(1 − x²) dx = arcsin(x)'); return done(fn('asin', X)); }
           void xs;
+        }
+        // 1/(a x² + b x + c) and 1/√(a x² + b x + c) with numeric a, b, c: complete the square
+        if (isN(x.e) && (val(x.e) === -1 || val(x.e) === -0.5)) {
+          var d1 = simplify(derive(x.b, v)), d2 = simplify(derive(d1, v));
+          if (isN(d2) && val(d2) !== 0) {
+            var qa = simplify(mul([HALF(), d2])), qb = simplify(subst(d1, v, N(0))), qc = simplify(subst(x.b, v, N(0)));
+            if (isN(qa) && isN(qb) && isN(qc)) {
+              var A = val(qa), u = simplify(add([X, div(qb, mul([N(2), qa]))])), k2 = simplify(div(sub(mul([N(4), qa, qc]), pow(qb, N(2))), mul([N(4), pow(qa, N(2))]))), K = val(k2);
+              // with u = x + b/(2a) and k² = (4ac − b²)/(4a²): a x² + b x + c = a(u² + k²)
+              if (val(x.e) === -1) {
+                if (Math.abs(K) < 1e-12) { step('Perfect square', 'a x² + b x + c = a(x + b/2a)², so use the power rule'); return done(negate(pow(mul([qa, u]), N(-1)))); }
+                if (K > 0) { var k = pow(k2, HALF()); step('Complete the square', '∫ 1/(a(u² + k²)) dx = arctan(u/k)/(a·k), with u = ' + Tn(u) + ' and k² = ' + Tn(k2)); return done(div(fn('atan', div(u, k)), mul([qa, k]))); }
+                var m = pow(negate(k2), HALF()); step('Partial fractions', '∫ 1/(a(u² − m²)) dx = ln|(u − m)/(u + m)|/(2a·m), with u = ' + Tn(u) + ' and m² = ' + Tn(simplify(negate(k2))));
+                return done(div(fn('ln', fn('abs', div(sub(u, m), add([u, m])))), mul([N(2), qa, m])));
+              }
+              if (A > 0) { var ra = pow(qa, HALF()); step('Complete the square', '∫ 1/√(a(u² + k²)) dx = ln|u + √(u² + k²)|/√a, with u = ' + Tn(u)); return done(div(fn('ln', fn('abs', add([u, pow(div(x.b, qa), HALF())]))), ra)); }
+              if (K < 0) { var m2 = pow(negate(k2), HALF()); step('Complete the square', '∫ 1/√(−a(m² − u²)) dx = arcsin(u/m)/√(−a), with u = ' + Tn(u)); return done(div(fn('asin', div(u, m2)), pow(negate(qa), HALF()))); }
+            }
+          }
         }
         return null;
       }
