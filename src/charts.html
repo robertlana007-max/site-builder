@@ -665,7 +665,7 @@ function indColor(ind, i) { return (ind.c && ind.c[i]) || IND[ind.k].c[i] || '#2
 
 // ---------- view ----------
 var V = { barW: 8, right: 0, auto: true, vMin: 0, vMax: 1 }, W = 0, H = 0, plotW = 0, axW = 64, axH = 26, mainH = 0, panes = [], mouse = null, axisTags = [];
-var sel = null, cur = null, tool = null, RT = new WeakMap();
+var sel = null, cur = null, tool = null, RT = new WeakMap(), posHits = [];
 function rightPad() { return Math.max(3, Math.round(70 / V.barW)); }
 function xOf(i) { return plotW - (V.right - i) * V.barW; }
 function iOf(x) { return V.right - (plotW - x) / V.barW; }
@@ -936,7 +936,7 @@ function plots(ind, yf, i0, i1) {
 }
 function draw() {
   var P = PAL(), n = bars.length, i, x, y, b;
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H); layout(); axisTags = [];
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.fillStyle = P.bg; ctx.fillRect(0, 0, W, H); layout(); axisTags = []; posHits = [];
   if (!n) { legend(-1); return; }
   V.barW = clamp(V.barW, .5, 80); V.right = clamp(V.right, Math.min(n - 1, 3), n - 1 + plotW / V.barW - 3);
   var i0 = Math.max(0, Math.floor(iOf(0)) - 1), i1 = Math.min(n - 1, Math.ceil(iOf(plotW)) + 1), lineType = /^(line|markers|step|area|baseline)$/.test(S.type);
@@ -1007,9 +1007,10 @@ function draw() {
   var last = rawB ? { o: disp[n - 1].c, c: lastB().c } : disp[n - 1], lcol = last.c >= last.o ? S.up : S.dn, ly = yOf(last.c);
   if (TH.ll !== false) { ctx.strokeStyle = lcol; ctx.lineWidth = 1; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(0, Math.round(ly) + .5); ctx.lineTo(plotW, Math.round(ly) + .5); ctx.stroke(); }
   S.alerts.forEach(function (al) { if (al.sym !== S.sym || al.done || al.kind) return; y = Math.round(yOf(al.p)) + .5; ctx.strokeStyle = '#e0a100'; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.fillStyle = '#e0a100'; ctx.font = FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Alert ' + fmt(al.p), plotW - 6, y - 2); axisTags.push({ y: y, s: fmt(al.p), bg: '#e0a100', fg: '#1a1300' }); });
-  var pl = function (pr, col, txt, dash) { var yy = Math.round(yOf(pr)) + .5; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.font = FONT; var w = ctx.measureText(txt).width + 12; ctx.fillStyle = col; ctx.fillRect(10, yy - 9, w, 18); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 16, yy); axisTags.push({ y: yy, s: fmt(pr), bg: col }); };
-  S.paper.ord.forEach(function (q) { if (q.sym === S.sym) pl(q.price, '#7b8494', (q.type === 'limit' ? 'LIMIT ' : 'STOP ') + (q.side > 0 ? 'BUY ' : 'SELL ') + fmtK(q.amt) + (q.lev > 1 ? '  ' + q.lev + 'x' : ''), [2, 3]); });
-  S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; var pn = (lastB().c - q.entry) * q.qty * q.side, m = function (v) { v = (v - q.entry) * q.qty * q.side; return (v >= 0 ? '+' : '') + v.toFixed(2); }; pl(q.entry, '#2f6fed', (q.side > 0 ? 'LONG ' : 'SHORT ') + fmtK(q.qty) + '   P/L ' + (pn >= 0 ? '+' : '') + pn.toFixed(2), []); if (q.tp) pl(q.tp, S.up, 'TP  ' + m(q.tp) + '   drag to move', [5, 4]); if (q.sl) pl(q.sl, S.dn, 'SL  ' + m(q.sl) + '   drag to move', [5, 4]); });
+  var pl = function (pr, col, txt, dash, hit) { var yy = Math.round(yOf(pr)) + .5; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.font = FONT; var w = ctx.measureText(txt).width + 12; ctx.fillStyle = col; ctx.fillRect(10, yy - 9, w, 18); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 16, yy); axisTags.push({ y: yy, s: fmt(pr), bg: col });
+    if (hit) { var cx = 10 + w + 2; ctx.fillStyle = '#e5484d'; ctx.fillRect(cx, yy - 9, 22, 18); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(cx + 7, yy - 4); ctx.lineTo(cx + 15, yy + 4); ctx.moveTo(cx + 15, yy - 4); ctx.lineTo(cx + 7, yy + 4); ctx.stroke(); ctx.lineWidth = 1; posHits.push({ x0: 10, x1: cx, x2: cx + 22, y0: yy - 9, y1: yy + 9, q: hit.q, k: hit.k }); } };
+  S.paper.ord.forEach(function (q) { if (q.sym === S.sym) pl(q.price, '#7b8494', (q.type === 'limit' ? 'LIMIT ' : 'STOP ') + (q.side > 0 ? 'BUY ' : 'SELL ') + fmtK(q.amt) + (q.lev > 1 ? '  ' + q.lev + 'x' : ''), [2, 3], { q: q, k: 'ord' }); });
+  S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; var pn = (lastB().c - q.entry) * q.qty * q.side, m = function (v) { v = (v - q.entry) * q.qty * q.side; return (v >= 0 ? '+' : '') + v.toFixed(2); }; pl(q.entry, '#2f6fed', (q.side > 0 ? 'LONG ' : 'SHORT ') + fmtK(q.qty) + '   P/L ' + (pn >= 0 ? '+' : '') + pn.toFixed(2), [], { q: q, k: 'pos' }); if (q.tp) pl(q.tp, S.up, 'TP  ' + m(q.tp) + '   drag to move', [5, 4], { q: q, k: 'tp' }); if (q.sl) pl(q.sl, S.dn, 'SL  ' + m(q.sl) + '   drag to move', [5, 4], { q: q, k: 'sl' }); });
   ctx.setLineDash([]);
   // drawings
   if (!S.hide) draws().forEach(function (d) { drawOne(d); });
@@ -1161,6 +1162,7 @@ function checkAlerts(sym, prev, now) {
 var elBal = h('span', { text: 'Paper trading' }), elPos = h('div', { class: 'tc-list' });
 elSide.appendChild(h('h3', {}, [elBal, h('span', { class: 'tc-sp' }), h('button', { class: 'tc-b', title: 'Paper trading report: win rate, profit and loss', html: svg('<path d="M5 20V10M10 20V4M15 20v-7M20 20V8"/>', 16), onclick: function () { reportDlg(); } }), h('button', { class: 'tc-b', title: 'Reset the practice balance to 10,000', html: svg('<path d="M4 12a8 8 0 1 0 2.500-5.800M4 4v4h4"/>', 16), onclick: function () { if (!window.confirm('Close all practice positions and reset the balance to 10,000?')) return; S.paper = clone(DEF.paper); save(); renderPos(); dirty(); } }), h('button', { class: 'tc-b', title: 'New paper trade', text: '+', onclick: function () { tradeDlg(1); } })])); elSide.appendChild(elPos);
 function lastPx(sym) { return sym === S.sym && bars.length ? (rawB ? lastB().c : full ? full[full.length - 1].c : bars[bars.length - 1].c) : (tick[sym] || {}).c; }
+function posHit(p) { var m = ptrTouch ? 8 : 2; for (var i = posHits.length - 1; i >= 0; i--) { var hh = posHits[i]; if (p.x >= hh.x0 - m && p.x <= hh.x2 + m && p.y >= hh.y0 - m && p.y <= hh.y1 + m) return hh; } return null; }
 function pnlOf(q, px) { return (px - q.entry) * q.qty * q.side; }
 function renderPos() {
   elBal.textContent = 'Paper · ' + fmt(S.paper.bal, 2); elPos.textContent = '';
@@ -1229,6 +1231,10 @@ cv.addEventListener('pointerdown', function (e) {
   if (pickRp && z !== 'price' && z !== 'time') return rpStart(Math.round(iOf(p.x)));
   if (z === 'main' && tool) return startTool(p);
   if (z === 'main') {
+    var ph = posHit(p); if (ph) {
+      if (p.x >= ph.x1) { if (ph.k === 'pos') { var cp = lastPx(S.sym); if (cp) closePos(ph.q, cp); } else if (ph.k === 'ord') { S.paper.ord = S.paper.ord.filter(function (x) { return x !== ph.q; }); save(); renderPos(); toast('Order cancelled'); } else { ph.q[ph.k] = null; save(); renderPos(); toast(ph.k === 'tp' ? 'Take profit removed' : 'Stop loss removed'); } dirty(); return; }
+      if (ph.k === 'pos') { editPos(ph.q); return; }
+    }
     var tl = null; S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; ['tp', 'sl'].forEach(function (f) { if (q[f] && Math.abs(yOf(q[f]) - p.y) < 7) tl = { k: 'tpsl', pos: q, f: f }; }); }); if (tl) { drag = tl; return; }
     var free = function (d) { return !d.lock && !S.lock; };
     if (sel && free(sel)) { var hi = hitHandle(sel, p.x, p.y); if (hi >= 0) { snap(); drag = { k: 'handle', i: hi }; return; } }
@@ -1242,7 +1248,7 @@ cv.addEventListener('pointermove', function (e) {
   var p = pos(e); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, p);
   if (pinch && ptrs.size === 2) { var a = Array.from(ptrs.values()), mx = (a[0].x + a[1].x) / 2; V.barW = clamp(pinch.bw * (Math.abs(a[0].x - a[1].x) || 1) / pinch.d, .5, 80); V.right = pinch.i + (plotW - mx) / V.barW; dirty(); return; }
   mouse = p;
-  if (!drag) { var z = zoneOf(p); cv.style.cursor = z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : 'crosshair'; dirty(); return; }
+  if (!drag) { var z = zoneOf(p); cv.style.cursor = z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : posHit(p) || (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : 'crosshair'; dirty(); return; }
   if (drag.k === 'pan') {
     var now = performance.now(), dt = now - drag.lt; if (dt > 8) { drag.vx = .7 * (p.x - drag.lx) / dt + .3 * drag.vx; drag.lx = p.x; drag.lt = now; }
     // decide once per drag: a clearly vertical start moves the price scale too, and switches off auto-fit
