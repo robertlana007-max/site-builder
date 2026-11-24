@@ -31,9 +31,13 @@
     timer = setTimeout(function () {
       if (!doc) return;
       var s = Store.read();
-      doc.set({ favs: s.favs, recent: s.recent, inputs: s.inputs, prefs: s.prefs, t: s.t }).catch(function () {});
+      doc.set(own(s), OWN).catch(function () {});
     }, 1500);
   }
+  // Only these fields belong to the tools. Other fields in the same document (the Live Charts page keeps
+  // its data in "charts") must be left alone, so writes replace these fields and nothing else.
+  var OWN = { mergeFields: ['favs', 'recent', 'inputs', 'prefs', 't'] };
+  function own(s) { return { favs: s.favs || [], recent: s.recent || [], inputs: s.inputs || {}, prefs: s.prefs === undefined ? null : s.prefs, t: +s.t || 0 }; }
   // Plain-language messages for the errors people actually hit.
   function why(e) {
     var c = (e && e.code) || '';
@@ -69,7 +73,7 @@
         var m = merge(Store.read(), snap.exists ? snap.data() : null);
         Store.replace(m);
         doc = ref;
-        return ref.set(m);
+        return ref.set(own(m), OWN);
       }).catch(function () { if (window.toast) toast('Could not sync right now. Your tools are still saved on this device.'); });
     });
     document.addEventListener('gtn:change', push);
