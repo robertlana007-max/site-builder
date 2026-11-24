@@ -98,6 +98,13 @@ html, body { margin: 0; height: 100%; background: #10141b; overflow: hidden; }
 .tc .tc-mob .tc-b { flex: 1 1 0; min-width: 0; height: 48px; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600; padding: 0 2px; }
 .tc-phone .tc-top .hid-ph, .tc-phone .tc-top .tf:not(.on) { display: none; }
 .tc-phone .tc-bot .hid-ph { display: none; }
+.tc-mw { position: absolute; inset: 0; z-index: 14; display: grid; gap: 2px; background: var(--tl); }
+.tc-mw[hidden] { display: none; }
+.tc-mw.l2h { grid-template-columns: 1fr 1fr; } .tc-mw.l2v { grid-template-rows: 1fr 1fr; } .tc-mw.l4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.tc-mw iframe { width: 100%; height: 100%; border: 0; display: block; background: var(--tb); min-width: 0; min-height: 0; }
+.tc-pane .hid-pane, .tc-pane .tc-bot, .tc-pane .tc-mob, .tc-pane .tc-fav, .tc-pane .tc-bs { display: none !important; }
+.tc-multi .tc-top > *:not(.keep-m), .tc-multi .tc-bot, .tc-multi .tc-mob { display: none; }
+.tc-phone.tc-multi .tc-top .keep-m { display: inline-flex; }
 .tc-stabs { display: flex; border-bottom: 1px solid var(--tl); flex: none; }
 .tc .tc-stabs .tc-b { flex: 1 1 0; border-radius: 0; height: 32px; font-size: 12px; font-weight: 600; color: var(--tm); }
 .tc .tc-stabs .tc-b.on { color: var(--ta); box-shadow: inset 0 -2px 0 var(--ta); background: none; }
@@ -148,6 +155,7 @@ html, body { margin: 0; height: 100%; background: #10141b; overflow: hidden; }
       <h3>Alerts<span class="tc-sp"></span><button type="button" class="tc-b" id="tcAAdd" title="Add alert">+</button></h3>
       <div class="tc-list" id="tcAlerts"></div>
     </aside>
+    <div class="tc-mw" id="tcMulti" hidden></div>
   </div>
   <div class="tc-bot" id="tcBot"></div>
   <div class="tc-top tc-mob" id="tcMob"></div>
@@ -155,7 +163,7 @@ html, body { margin: 0; height: 100%; background: #10141b; overflow: hidden; }
   <div class="tc-modal" id="tcModal" hidden></div>
 </div>
 
-<script>window.FIREBASE_CONFIG = {"apiKey":"AIzaSyCqeIkR-rHXuJc-2n7el3zyFf51aN2yYsA","authDomain":"gettoolnest-d0f2e.firebaseapp.com","projectId":"gettoolnest-d0f2e","storageBucket":"gettoolnest-d0f2e.firebasestorage.app","messagingSenderId":"767749992795","appId":"1:767749992795:web:db89d1757c3d3a611bea7e"};</script>
+<script>window.FIREBASE_CONFIG = {"apiKey":"AIzaSyCqeIkR-rHXuJc-2n7el3zyFf51aN2yYsA","authDomain":"gettoolnest-d0f2e.firebaseapp.com","projectId":"gettoolnest-d0f2e","storageBucket":"gettoolnest-d0f2e.firebasestorage.app","messagingSenderId":"767749992795","appId":"1:767749992795:web:db89d1757c3d3a611bea7e"}; window.CHARTS_API = "";</script>
 <script>
 (function () {
 'use strict';
@@ -182,13 +190,15 @@ var TFS = [['1s', 1000], ['5s', 5000], ['10s', 1e4], ['15s', 15e3], ['30s', 3e4]
 var SEC = { '1s': 1, '5s': 5, '10s': 10, '15s': 15, '30s': 30 }, BIG = { '3M': 3, '6M': 6, '1y': 12 };
 var TFNAME = { '1s': '1 second', '5s': '5 seconds', '10s': '10 seconds', '15s': '15 seconds', '30s': '30 seconds', '3M': '3 months', '6M': '6 months', '1y': '1 year', '8h': '8 hours', '1m': '1 minute', '3m': '3 minutes', '5m': '5 minutes', '15m': '15 minutes', '30m': '30 minutes', '1h': '1 hour', '2h': '2 hours', '4h': '4 hours', '6h': '6 hours', '12h': '12 hours', '1d': '1 day', '3d': '3 days', '1w': '1 week', '1M': '1 month' };
 var TYPES = [['candles', 'Candles'], ['hollow', 'Hollow candles'], ['ha', 'Heikin Ashi'], ['bars', 'Bars (OHLC)'], ['hilo', 'High-low'], ['line', 'Line'], ['markers', 'Line with markers'], ['step', 'Step line'], ['area', 'Area'], ['baseline', 'Baseline'], ['columns', 'Columns'], ['hlc', 'HLC bars'], ['hlband', 'High-low band'], ['renko', 'Renko'], ['linebreak', 'Line break'], ['kagi', 'Kagi'], ['pnf', 'Point and figure']];
-var DEF = { sym: 'BTCUSDT', tf: '1h', type: 'candles', dark: null, log: false, pct: false, utc: false, grid: true, up: '#12a06b', dn: '#e5484d', magnet: false, lock: false, hide: false, stay: false, tm: {}, tpl: {}, fav: ['trend', 'hline', 'fibret', 'rect', 'long', 'short'], sets: [], side: null, inds: [{ id: 1, k: 'vol', p: { len: 20 } }], watch: ['F:XAUUSDT', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'K:PAXG/USD', 'K:EUR/USD', 'K:GBP/USD', 'K:USD/JPY', 'BNBUSDT', 'XRPUSDT'], alerts: [], draw: {}, cmp: [], paper: { bal: 10000, pos: [], hist: [], ord: [] }, tdKey: '', _t: 0, _uid: '', _g: 0 };
+var DEF = { sym: 'BTCUSDT', tf: '1h', type: 'candles', dark: null, log: false, pct: false, utc: false, grid: true, up: '#12a06b', dn: '#e5484d', magnet: false, lock: false, hide: false, stay: false, layout: '1', tm: {}, tpl: {}, fav: ['trend', 'hline', 'fibret', 'rect', 'long', 'short'], sets: [], side: null, inds: [{ id: 1, k: 'vol', p: { len: 20 } }], watch: ['F:XAUUSDT', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'K:PAXG/USD', 'K:EUR/USD', 'K:GBP/USD', 'K:USD/JPY', 'BNBUSDT', 'XRPUSDT'], alerts: [], draw: {}, cmp: [], paper: { bal: 10000, pos: [], hist: [], ord: [] }, tdKey: '', _t: 0, _uid: '', _g: 0 };
 var S = (function () { var s = {}; try { s = JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) {} var o = clone(DEF); for (var k in o) if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; if (!TFS.some(function (t) { return t[0] === o.tf; })) o.tf = '1h'; return o; })();
+var PANE = +((location.search.match(/[?&]pane=(\d)/) || [])[1] || 0);
+if (PANE) { var pv = {}; try { pv = JSON.parse(localStorage.getItem(LS + '-p' + PANE)) || {}; } catch (e) {} S.sym = pv.sym || [S.sym, 'ETHUSDT', 'F:XAUUSDT', 'K:EUR/USD'][PANE - 1] || S.sym; if (pv.tf && TFS.some(function (t) { return t[0] === pv.tf; })) S.tf = pv.tf; }
 if (S.dark === null) S.dark = document.documentElement.getAttribute('data-theme') === 'dark';
 if (S.side === null) S.side = window.innerWidth > 1000;
 var saveT = 0;
 function ser(o) { return JSON.stringify(o, function (k, v) { return k === '_r' || k === '_s' ? undefined : v; }); }
-function flush() { clearTimeout(saveT); if (!S) return; try { localStorage.setItem(LS, ser(S)); } catch (e) { toast('Your browser storage is full, so the latest change could not be saved'); } }
+function flush() { clearTimeout(saveT); if (!S) return; try { if (PANE) { localStorage.setItem(LS + '-p' + PANE, JSON.stringify({ sym: S.sym, tf: S.tf })); var keep = {}, o = JSON.parse(ser(S)); try { keep = JSON.parse(localStorage.getItem(LS)) || {}; } catch (e2) {} ['sym', 'tf', 'side', 'layout', '_uid'].forEach(function (k) { if (keep[k] !== undefined) o[k] = keep[k]; }); localStorage.setItem(LS, JSON.stringify(o)); } else localStorage.setItem(LS, ser(S)); } catch (e) { toast('Your browser storage is full, so the latest change could not be saved'); } }
 function save() { S._t = Date.now(); clearTimeout(saveT); saveT = setTimeout(flush, 300); cloudPush(); }
 window.addEventListener('pagehide', flush); document.addEventListener('visibilitychange', function () { if (document.hidden) flush(); });
 try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
@@ -206,6 +216,7 @@ var KFX = {
 };
 var FFX = { 'F:XAUUSDT': { n: 'XAU / USD', d: 'Gold spot / US Dollar · Binance perpetual', cat: 'Gold', f: 'XAUUSD GOLD XAU SPOT' }, 'F:XAGUSDT': { n: 'XAG / USD', d: 'Silver / US Dollar · Binance perpetual', cat: 'Gold', f: 'XAGUSD SILVER XAG SPOT' } };
 function isF(s) { return !!FFX[s]; }
+if (window.CHARTS_API && S._g !== 2) { S._g = 2; S.watch = ['T:XAU/USD'].concat(S.watch.filter(function (x) { return x !== 'T:XAU/USD' && x !== 'F:XAUUSDT'; })); }
 if (!S._g) { S._g = 1; if (!S.tdKey && S.watch.indexOf('T:XAU/USD') < 0) S.watch = ['F:XAUUSDT'].concat(S.watch.filter(function (x) { return x !== 'F:XAUUSDT'; })); }
 function isB(s) { return !FFX[s] && s.slice(0, 2) !== 'K:' && s.slice(0, 2) !== 'T:'; }
 var TDS = { 'T:XAU/USD': { d: 'Gold spot / US Dollar', cat: 'Gold', f: 'XAUUSD GOLD XAU SPOT' }, 'T:XAG/USD': { d: 'Silver spot / US Dollar', cat: 'Gold', f: 'XAGUSD SILVER XAG SPOT' } };
@@ -213,6 +224,7 @@ var TDS = { 'T:XAU/USD': { d: 'Gold spot / US Dollar', cat: 'Gold', f: 'XAUUSD G
 'AAPL:Apple TSLA:Tesla NVDA:Nvidia MSFT:Microsoft AMZN:Amazon GOOGL:Alphabet META:Meta NFLX:Netflix AMD:AMD SPY:S&P_500_ETF QQQ:Nasdaq_100_ETF'.split(' ').forEach(function (x) { var q = x.split(':'); TDS['T:' + q[0]] = { d: q[1].replace(/_/g, ' ') + ' · US stock', cat: 'Stocks', f: q[0] + ' ' + q[1].toUpperCase().replace(/[^A-Z0-9]/g, '') }; });
 var TTF = { '1m': '1min', '5m': '5min', '15m': '15min', '30m': '30min', '1h': '1h', '2h': '2h', '4h': '4h', '1d': '1day', '1w': '1week', '1M': '1month' }, TNEAR = { '3m': '5m', '6h': '4h', '8h': '4h', '12h': '4h', '3d': '1d' };
 function isT(s) { return s.slice(0, 2) === 'T:'; }
+var RELAY = String(window.CHARTS_API || '').replace(/\/+$/, '');   // the owner's relay: Twelve Data for every visitor, without a key in the page
 Object.keys(S.tm || {}).forEach(function (k) { if (!TDS[k] && S.tm[k] && S.tm[k].d) TDS[k] = S.tm[k]; });
 var KTF = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080 }, KNEAR = { '3m': '5m', '2h': '1h', '6h': '4h', '8h': '4h', '12h': '4h', '3d': '1d', '1M': '1w' };
 S.watch = S.watch.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); S.cmp = S.cmp.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); if ((S.sym.slice(0, 2) === 'K:' && !KFX[S.sym]) || (S.sym.slice(0, 2) === 'F:' && !FFX[S.sym])) S.sym = 'BTCUSDT';
@@ -289,9 +301,9 @@ function getK0(sym, tf, limit, end) {
     });
   }
   if (isT(sym)) {
-    if (!S.tdKey) { var ne = new Error('This symbol needs a Twelve Data key. Open settings (the gear button) and paste your key.'); return Promise.reject(ne); }
+    if (!S.tdKey && !RELAY) { var ne = new Error('This symbol needs a Twelve Data key. Open settings (the gear button) and paste your key.'); return Promise.reject(ne); }
     if (!TTF[tf]) return Promise.resolve({ bars: [], dec: 2 });
-    return fetch('https://api.twelvedata.com/time_series?symbol=' + encodeURIComponent(sym.slice(2)) + '&interval=' + TTF[tf] + '&outputsize=' + Math.min(limit, 1000) + '&timezone=UTC&order=ASC&apikey=' + encodeURIComponent(S.tdKey) + (end ? '&end_date=' + encodeURIComponent(new Date(end).toISOString().slice(0, 19).replace('T', ' ')) : ''), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
+    return fetch((S.tdKey ? 'https://api.twelvedata.com/time_series?timezone=UTC&order=ASC&apikey=' + encodeURIComponent(S.tdKey) + '&' : RELAY + '/k?') + 'symbol=' + encodeURIComponent(sym.slice(2)) + '&interval=' + TTF[tf] + '&outputsize=' + Math.min(limit, 1000) + (end ? '&end_date=' + encodeURIComponent(new Date(end).toISOString().slice(0, 19).replace('T', ' ')) : ''), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) {
       if (j.status !== 'ok' || !j.values) throw new Error(j.code === 429 ? 'Your Twelve Data key has used its limit for this minute or day. Wait a little and press Try again.' : j.code === 401 ? 'Twelve Data did not accept this key. Check it in settings.' : (j.message || 'Twelve Data could not load this symbol.'));
       var a = j.values.map(function (v) { var d = String(v.datetime); return { t: Date.parse(d.length > 10 ? d.replace(' ', 'T') + 'Z' : d + 'T00:00:00Z'), o: +v.open, h: +v.high, l: +v.low, c: +v.close, v: +v.volume || 0 }; }).filter(function (b) { return b.t === b.t && b.c > 0; }), c = a.length ? a[a.length - 1].c : 1;
       return { bars: a, dec: (TDS[sym] || {}).cat === 'Stocks' || c >= 500 ? 2 : c >= 20 ? 3 : 5 };
@@ -396,7 +408,7 @@ function connect() {
     if (fst.length) fws = sock('wss://fstream.binance.com/market/stream?streams=' + fst.join('/'), 'F', null, bmsg('F:', my));
     if (kst.length) kws = sock('wss://ws.kraken.com/v2', 'K', function (k) { k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ticker', symbol: kst } })); if (ms === 'K') k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'trade', symbol: [S.sym.slice(2)], snapshot: false } })); if (ms === 'K' && KTF[S.tf] && !own) k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ohlc', symbol: [S.sym.slice(2)], interval: KTF[S.tf], snapshot: false } })); }, function (ev) { if (my === wsId) kmsg(ev); });
     var tst = uniq((ms === 'T' ? [S.sym] : []).concat(all, S.cmp).filter(isT)).slice(0, 8).map(function (x) { return x.slice(2); });
-    if (tst.length && S.tdKey) tws = sock('wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(S.tdKey), 'T', function (w) { w.send(JSON.stringify({ action: 'subscribe', params: { symbols: tst.join(',') } })); }, function (ev) { if (my !== wsId) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.event === 'price') tdTick('T:' + m.symbol, +m.price); });
+    if (tst.length && (S.tdKey || RELAY)) tws = sock(S.tdKey ? 'wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(S.tdKey) : RELAY.replace(/^http/, 'ws') + '/ws', 'T', function (w) { w.send(JSON.stringify({ action: 'subscribe', params: { symbols: tst.join(',') } })); }, function (ev) { if (my !== wsId) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.event === 'price') tdTick('T:' + m.symbol, +m.price); });
   } catch (e) { fail(); }
 }
 function startPoll() {
@@ -428,7 +440,7 @@ function loadAllSyms() {
     allSyms.sort(function (a, b) { return rank(b) - rank(a); }); allSyms = allSyms.concat(kList()); return allSyms;
   }).catch(function () { return S.watch.concat(DEF.watch, ['ADAUSDT', 'AVAXUSDT', 'LINKUSDT', 'DOTUSDT', 'LTCUSDT', 'TRXUSDT', 'TONUSDT', 'SHIBUSDT', 'PEPEUSDT', 'ETHBTC', 'BTCEUR']).filter(function (s, i, a) { return a.indexOf(s) === i; }).map(function (s) { var p = splitSym(s), t = tick[s] || {}; return { s: s, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0 }; }).filter(function (x) { return isB(x.s); }).concat(kList()); });
 }
-function kList() { return (S.tdKey ? Object.keys(TDS).map(function (x) { var m = TDS[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1] || '', c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }) : []).concat(kList1()); }
+function kList() { return (S.tdKey || RELAY ? Object.keys(TDS).map(function (x) { var m = TDS[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1] || '', c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }) : []).concat(kList1()); }
 function kList1() { return Object.keys(FFX).map(function (x) { var m = FFX[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }).concat(kList0()); }
 function kList0() { return Object.keys(KFX).map(function (x) { var m = KFX[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.alt + ' ' + (m.f || '') + ' ' + m.d.toUpperCase().replace(/[^A-Z0-9]/g, '') }; }); }
 
@@ -778,7 +790,7 @@ function doUndo(back) { var a = back ? undo : redo, b = back ? redo : undo; if (
 // ---------- rendering ----------
 var raf = 0, dpr = 1, FONT = '11px system-ui, -apple-system, "Segoe UI", sans-serif';
 function dirty() { if (!raf) raf = requestAnimationFrame(function () { raf = 0; draw(); }); }
-function resize() { var r = stage.getBoundingClientRect(); root.classList.toggle('tc-narrow', root.clientWidth < 1520); root.classList.toggle('tc-phone', root.clientWidth < 700); W = Math.max(60, Math.floor(r.width)); H = Math.max(60, Math.floor(r.height)); dpr = window.devicePixelRatio || 1; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); dirty(); }
+function resize() { var r = stage.getBoundingClientRect(); root.classList.toggle('tc-narrow', root.clientWidth < 1520); root.classList.toggle('tc-phone', !PANE && root.clientWidth < 700); W = Math.max(60, Math.floor(r.width)); H = Math.max(60, Math.floor(r.height)); dpr = window.devicePixelRatio || 1; cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr); dirty(); }
 function niceStep(r, n) { var s = r / Math.max(1, n), m = Math.pow(10, Math.floor(Math.log10(s))), f = s / m; return (f < 1.5 ? 1 : f < 3 ? 2 : f < 7 ? 5 : 10) * m; }
 function layout() {
   ctx.font = FONT; var ref = bars.length ? bars[bars.length - 1].c * 1.2 : 0; axW = Math.max(52, Math.ceil(ctx.measureText(fmt(ref)).width) + 16); plotW = W - axW;
@@ -899,7 +911,7 @@ function draw() {
   ctx.font = FONT; ctx.fillStyle = P.text; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
   pt.forEach(function (v) { y = yOf(v); if (y > 8 && y < mainH - 6) ctx.fillText(S.pct ? fmtPct((v / base - 1) * 100) : fmt(v), plotW + 6, y); });
   panes.forEach(function (pn) { var st = niceStep(pn.hi - pn.lo, Math.max(2, pn.h / 30)); for (var v = Math.ceil(pn.lo / st) * st; v < pn.hi; v += st) { y = pn.yf(v); if (y > pn.top + 8 && y < pn.top + pn.h - 6) ctx.fillText(fmtK(Math.abs(v) < 1e-12 ? 0 : v), plotW + 6, y); } });
-  ctx.textAlign = 'center'; tt.forEach(function (t) { x = xOf(t.i); if (x < 14 || x > plotW - 14) return; ctx.fillStyle = t.b ? P.ink : P.text; ctx.font = (t.b ? '600 ' : '') + FONT; ctx.fillText(t.s, x, H - axH / 2); });
+  ctx.textAlign = 'center'; var ltx = -1e9; tt.forEach(function (t) { x = xOf(t.i); if (x < 14 || x > plotW - 14 || x - ltx < 62) return; ltx = x; ctx.fillStyle = t.b ? P.ink : P.text; ctx.font = (t.b ? '600 ' : '') + FONT; ctx.fillText(t.s, x, H - axH / 2); });
   axisTags.forEach(function (t) { if (t.y > 0 && t.y < mainH) axTag(t.y, t.s, t.bg, t.fg); });
   panes.forEach(function (pn) { var r = pn.ind._r || []; r.forEach(function (pl) { if (pl.k !== 'line') return; var v = pl.v[n - 1]; if (v === v && v != null) axTag(clamp(pn.yf(v), pn.top + 9, pn.top + pn.h - 9), fmtK(v), indColor(pn.ind, pl.ci)); }); });
   if (ly > -9 && ly < mainH + 9) { axTag(clamp(ly, 9, mainH - 9), S.pct ? fmtPct((last.c / base - 1) * 100) : fmt(last.c), lcol); var left = rawB ? 0 : bars[n - 1].t + tfMs() - Date.now(); if (left > 0 && left < tfMs() * 1.5) { var s = Math.floor(left / 1000), cd = s >= 86400 ? Math.floor(s / 86400) + 'd ' + Math.floor(s % 86400 / 3600) + 'h' : (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); axTag(clamp(ly, 9, mainH - 9) + 17, cd, rgba(lcol, .75)); } }
@@ -1018,6 +1030,7 @@ function addAlert(price, sym) {
   } }]);
 }
 function checkAlerts(sym, prev, now) {
+  if (PANE) return;   // only the main page fires alerts and fills orders, so nothing happens twice
   S.alerts.forEach(function (a) {
     if (a.done || a.sym !== sym || !((prev < a.p && now >= a.p) || (prev > a.p && now <= a.p))) return;
     a.done = true; var msg = symName(sym) + ' crossed ' + a.p; toast('Alert: ' + msg); beep(); save(); renderAlerts(); dirty();
@@ -1057,6 +1070,7 @@ function editPos(q) {
 }
 function closePos(q, price, why) { if (S.paper.pos.indexOf(q) < 0) return; var pn = pnlOf(q, price); if (q.margin && pn < -q.margin) pn = -q.margin; S.paper.bal += pn; S.paper.pos = S.paper.pos.filter(function (x) { return x !== q; }); S.paper.hist.unshift({ sym: q.sym, side: q.side, pnl: pn, t: Date.now(), entry: q.entry, exit: price, lev: q.lev || 1 }); S.paper.hist.length = Math.min(S.paper.hist.length, 200); save(); renderPos(); dirty(); toast((why || 'Position closed') + ': ' + symName(q.sym) + ' ' + (pn >= 0 ? '+' : '') + pn.toFixed(2)); if (why) beep(); }
 function checkPaper(sym, price) {
+  if (PANE) return;
   S.paper.ord.slice().forEach(function (o) { if (o.sym !== sym) return; var hit = o.type === 'limit' ? (o.side > 0 ? price <= o.price : price >= o.price) : (o.side > 0 ? price >= o.price : price <= o.price); if (!hit) return; S.paper.ord = S.paper.ord.filter(function (x) { return x !== o; }); openPos(o, o.price); toast((o.type === 'limit' ? 'Limit' : 'Stop') + ' order filled: ' + symName(sym) + ' at ' + fmt(o.price)); beep(); save(); renderPos(); dirty(); });
   S.paper.pos.slice().forEach(function (q) { if (q.sym !== sym) return; if (q.tp && (q.side > 0 ? price >= q.tp : price <= q.tp)) closePos(q, q.tp, 'Take profit hit'); else if (q.sl && (q.side > 0 ? price <= q.sl : price >= q.sl)) closePos(q, q.sl, 'Stop loss hit'); else if (q.lev > 1 && q.margin && pnlOf(q, price) <= -q.margin * .95) closePos(q, price, 'Liquidated'); });
 }
@@ -1195,6 +1209,7 @@ function buildTop() {
   elTop.appendChild(tb('gear', 'Chart settings', settings));
   U.side = tb('list', 'Watchlist, alerts, live trades and order book', function () { var was = bookOn(); S.side = !S.side; elSide.hidden = !S.side; save(); syncTop(); resize(); tapeSoon(); bookSoon(); if (was !== bookOn()) connect(); }); elTop.appendChild(U.side);
   U.full = tb('full', 'Full screen', function () { setFull(!root.classList.contains('tc-full')); }); elTop.appendChild(U.full);
+  [elTop.firstChild, U.sets, U.acct].forEach(function (c) { if (c) c.classList.add('keep-m'); }); if (PANE) [elTop.firstChild, U.sets, U.side, U.full, U.acct].forEach(function (c) { if (c) c.classList.add('hid-pane'); });
   Array.prototype.forEach.call(elTop.children, function (c) { if (c !== elTop.firstChild && c !== U.sym && U.tfs.indexOf(c) < 0 && c !== U.tfMore && c !== U.type && c.id !== 'tcLive' && !c.classList.contains('tc-sp')) c.classList.add('hid-ph'); });
 }
 function buildMob() {
@@ -1292,11 +1307,11 @@ function symSearch(forWatch) {
       var inW = S.watch.indexOf(x.s) >= 0, star = h('button', { class: 'del tc-b' + (inW ? ' on' : ''), title: inW ? 'Remove from watchlist' : 'Add to watchlist', html: svg(inW ? IC.x : IC.plus, 14), onclick: function () { if (S.watch.indexOf(x.s) >= 0) S.watch = S.watch.filter(function (w) { return w !== x.s; }); else S.watch.push(x.s); tick[x.s] = tick[x.s] || { c: x.c, o: x.o }; save(); renderWatch(); connect(); show(); } });
       res.appendChild(symRow(x.s, x, function (sy) { if (forWatch) { star.click(); return; } closeModal(); if (cmpMode) addCmp(sy); else setSym(sy); }, star));
     });
-    if (!n) res.appendChild(h('div', { class: 'tc-empty', text: tab === 'Stocks' && !S.tdKey ? 'Stocks need a Twelve Data key. Add it in settings (the gear button).' : 'No symbol matches. Available: Binance spot pairs, forex and gold. A Twelve Data key in settings adds spot gold, more forex and US stocks.' }));
+    if (!n) res.appendChild(h('div', { class: 'tc-empty', text: tab === 'Stocks' && !S.tdKey && !RELAY ? 'Stocks need a Twelve Data key. Add it in settings (the gear button).' : 'No symbol matches. Available: Binance spot pairs, forex and gold. A Twelve Data key in settings adds spot gold, more forex and US stocks.' }));
   };
   ['All', 'Forex', 'Gold', 'Stocks', 'USDT', 'USDC', 'BTC', 'ETH'].forEach(function (t) { var b = h('button', { class: 'tc-b' + (t === tab ? ' on' : ''), text: t, onclick: function () { tab = t; Array.prototype.forEach.call(tabs.children, function (c) { c.classList.toggle('on', c === b); }); show(); } }); tabs.appendChild(b); });
   var stT = 0; q.addEventListener('input', function () {
-    clearTimeout(stT); var v = q.value.trim(); if (!S.tdKey || v.length < 2) return;
+    clearTimeout(stT); var v = q.value.trim(); if (!(S.tdKey || RELAY) || v.length < 2) return;
     stT = setTimeout(function () { fetch('https://api.twelvedata.com/symbol_search?symbol=' + encodeURIComponent(v) + '&outputsize=40').then(function (r) { return r.json(); }).then(function (j) {
       var add = 0; (j.data || []).forEach(function (x) {
         var ty = String(x.instrument_type), id = 'T:' + x.symbol; if (TDS[id] || !(/Physical Currency|Precious Metal|^Index$/.test(ty) || (/Common Stock|ETF/.test(ty) && /^(NASDAQ|NYSE|NYSE ARCA|CBOE)$/i.test(x.exchange)))) return;
@@ -1331,7 +1346,7 @@ function settings() {
 }
 
 // ---------- account: everything is saved to the signed-in account and follows it to other devices ----------
-var FB = window.FIREBASE_CONFIG || null, fbReady = null, fbUser = null, fbDoc = null, fbUnsub = null, cloudT = 0, DEV = Math.random().toString(36).slice(2);
+var FB = PANE ? null : window.FIREBASE_CONFIG || null, fbReady = null, fbUser = null, fbDoc = null, fbUnsub = null, cloudT = 0, DEV = Math.random().toString(36).slice(2);
 var SYNC = ['tpl', 'fav', 'sets', 'tm', 'stay', 'type', 'log', 'pct', 'utc', 'grid', 'up', 'dn', 'magnet', 'inds', 'watch', 'alerts', 'draw', 'cmp', 'paper', 'tdKey'];
 function fbLoad() {
   if (fbReady) return fbReady; var SDK = 'https://www.gstatic.com/firebasejs/10.12.2/', ld = function (n) { return new Promise(function (ok, no) { var e = document.createElement('script'); e.src = SDK + n; e.onload = ok; e.onerror = function () { no(new Error('net')); }; document.head.appendChild(e); }); };
@@ -1420,7 +1435,7 @@ function linePrice(d, ic) {
   return a.p + (b.p - a.p) * (ic - i0) / (i1 - i0);
 }
 function evalAlerts() {
-  if (!bars.length || full || !S.alerts.length) return; var n = bars.length - 1, px = bars[n].c, fired = false;
+  if (PANE || !bars.length || full || !S.alerts.length) return; var n = bars.length - 1, px = bars[n].c, fired = false;
   S.alerts.forEach(function (a) {
     if (a.done || a.sym !== S.sym || !a.kind) return; var v = null;
     if (a.kind === 'ind') { if (a.tf !== S.tf || !IND[a.k]) return; var r; try { r = IND[a.k].f(B, a.p2 || {}); } catch (e) { return; } var x = r[a.pl] && r[a.pl].v[n]; if (x == null || x !== x) return; v = a.op === 'pcross' ? px - x : x - a.v; }
@@ -1439,8 +1454,19 @@ function indAlert(ind) {
   } }]);
 }
 function renderFav() { var el = document.getElementById('tcFav'); el.textContent = ''; S.fav.forEach(function (k) { if (T[k]) el.appendChild(h('button', { class: 'tc-b' + (tool === k ? ' on' : ''), title: T[k].n, html: svg(T[k].ic, 18), onclick: function () { setTool(tool === k ? null : k); } })); }); }
+function setLayout(m) {
+  S.layout = m; save(); var el = document.getElementById('tcMulti'), n = m === '4' ? 4 : m === '1' ? 0 : 2; el.textContent = ''; el.hidden = !n; el.className = 'tc-mw l' + m; root.classList.toggle('tc-multi', !!n);
+  for (var i = 1; i <= n; i++) el.appendChild(h('iframe', { src: location.pathname + '?pane=' + i, title: 'Chart ' + i, allow: 'fullscreen' }));
+  if (!n) resize();
+}
+// charts in other frames or tabs save to the same place: take their changes in without reloading
+window.addEventListener('storage', function (e) {
+  if (e.key !== LS || !e.newValue || !S) return; var o; try { o = JSON.parse(e.newValue); } catch (x) { return; } if (!o || !(o._t > (S._t || 0))) return;
+  var hadKey = S.tdKey; SYNC.forEach(function (k) { if (o[k] !== undefined && o[k] !== null) S[k] = o[k]; }); S._t = o._t; sel = null; cur = null; sanitize(); legKey = ''; recalc(); syncTop(); syncTools(); syncBot(); selBar(); renderWatch(); renderAlerts(); renderPos(); dirty(); if (hadKey !== S.tdKey) { allSyms = null; connect(); } cloudPush();
+});
 function setupsMenu(at) {
-  var items = [{ h: 'Saved chart setups' }, { t: 'Save the current setup…', ic: IC.plus, fn: function () { var nm = h('input', { type: 'text', value: 'Setup ' + (S.sets.length + 1), maxlength: 30 }); modal('Save chart setup', h('div', {}, [h('p', { class: 'tc-empty', style: 'padding:0 0 10px', text: 'Saves the indicators with their settings, the chart type, the time frame and the scale. Pick it later to get the same chart in one click.' }), nm]), [{ t: 'Cancel', fn: function () {} }, { t: 'Save', pri: 1, fn: function () { var n = nm.value.trim() || 'Setup'; S.sets = S.sets.filter(function (x) { return x.name !== n; }); S.sets.push({ name: n, tf: S.tf, type: S.type, log: S.log, pct: S.pct, inds: JSON.parse(ser(S.inds)) }); save(); toast('Setup saved: ' + n); } }]); } }];
+  var L = function (m, t) { return { t: t, on: (S.layout || '1') === m, fn: function () { setLayout(m); } }; };
+  var items = [{ h: 'Charts on screen' }, L('1', '1 chart'), L('2h', '2 charts side by side'), L('2v', '2 charts stacked'), L('4', '4 charts'), { h: 'Saved chart setups' }, { t: 'Save the current setup…', ic: IC.plus, fn: function () { var nm = h('input', { type: 'text', value: 'Setup ' + (S.sets.length + 1), maxlength: 30 }); modal('Save chart setup', h('div', {}, [h('p', { class: 'tc-empty', style: 'padding:0 0 10px', text: 'Saves the indicators with their settings, the chart type, the time frame and the scale. Pick it later to get the same chart in one click.' }), nm]), [{ t: 'Cancel', fn: function () {} }, { t: 'Save', pri: 1, fn: function () { var n = nm.value.trim() || 'Setup'; S.sets = S.sets.filter(function (x) { return x.name !== n; }); S.sets.push({ name: n, tf: S.tf, type: S.type, log: S.log, pct: S.pct, inds: JSON.parse(ser(S.inds)) }); save(); toast('Setup saved: ' + n); } }]); } }];
   S.sets.forEach(function (x) { items.push({ t: x.name, small: x.tf + ' · ' + x.inds.length + ' indicators', fn: function () { S.inds = clone(x.inds).filter(function (i) { return IND[i.k]; }).map(function (i, k) { i.id = Date.now() + k; return i; }); S.type = x.type; S.log = !!x.log; S.pct = !!x.pct; V.auto = true; save(); syncTop(); syncBot(); if (x.tf !== S.tf) setTf(x.tf); else { recalc(); dirty(); } toast('Setup loaded: ' + x.name); } }); });
   if (S.sets.length) { items.push({ h: 'Remove' }); S.sets.forEach(function (x) { items.push({ t: 'Delete ' + x.name, ic: IC.trash, fn: function () { S.sets = S.sets.filter(function (q) { return q !== x; }); save(); } }); }); }
   pop(at, items);
@@ -1453,12 +1479,12 @@ if (!S.paper || !Array.isArray(S.paper.pos)) S.paper = clone(DEF.paper); ['watch
   if (!Array.isArray(S.paper.ord)) S.paper.ord = []; if (!Array.isArray(S.paper.hist)) S.paper.hist = []; if (!S.tpl || typeof S.tpl !== 'object') S.tpl = {}; if (!Array.isArray(S.sets)) S.sets = []; S.fav = (Array.isArray(S.fav) ? S.fav : []).filter(function (k) { return T[k]; });
 }
 sanitize();
-root.classList.toggle('tc-dark', S.dark); elSide.hidden = !S.side;
+root.classList.toggle('tc-dark', S.dark); root.classList.toggle('tc-pane', !!PANE); elSide.hidden = PANE ? true : !S.side;
 buildTop(); buildTools(); buildBot(); buildMob(); syncTop(); syncTools(); syncBot(); clock(); renderWatch(); renderAlerts(); renderPos();
 document.getElementById('tcWAdd').addEventListener('click', function () { symSearch(true); });
 document.getElementById('tcAAdd').addEventListener('click', function () { if (bars.length) addAlert(bars[bars.length - 1].c); });
 if (window.ResizeObserver) new ResizeObserver(resize).observe(stage); else window.addEventListener('resize', resize);
-resize(); loadBars(); if (FB) fbLoad();
+resize(); loadBars(); if (FB) fbLoad(); if (!PANE && S.layout && S.layout !== '1') setLayout(S.layout);
 setInterval(function () { clock(); if (bars.length) dirty(); }, 1000);
 var hidAt = 0;
 document.addEventListener('visibilitychange', function () {
