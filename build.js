@@ -420,48 +420,155 @@ ${g.example ? `<section class="guide" id="example"><div class="example"><h2>${es
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips">${g.tips.map(p => `<li>${esc(p)}</li>`).join('')}</ul></section>
 <section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs">${g.problems.map(([q, a]) => `<details><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join('')}</div></section>`;
 }
-// ---------- tool page themes: every tool page gets its own look (assets/themes.css) ----------
-// One choice per dimension from a hash of the slug, so a tool keeps its look between builds. Neighbours in a
-// category are pushed apart, and no two tools may share the full combination.
+// ---------- tool page themes: every tool page gets its own design (assets/themes.css) ----------
+// One choice per dimension from a hash of the slug, so a tool keeps its look between builds. The whole page varies:
+// palette and page background, header bar, heading font, hero layout and fill, family box, buttons, tool card,
+// guide/FAQ sections, motion. Colours are computed here with a WCAG contrast solver, so every text colour on every
+// surface reaches AA in light and dark mode. Neighbours in a category are pushed apart, and no two tools may share
+// the full combination.
 const THEME = (() => {
   const HEROES = ['aurora', 'grid', 'waves', 'paper', 'neon', 'glass', 'blobs', 'stripes', 'dots', 'sunrise', 'blueprint', 'confetti', 'mesh', 'bubbles', 'origami', 'terminal', 'retro', 'brutal', 'rings', 'memphis'];
-  const DIMS = { te: 10, tt: 11, ti: 7, tk: 20, td: 20, tb: 12, tl: 4, tc: 6, mo: 5 };
+  // te entrance, tt title effect, ti icon motion, tk card frame, td section divider, tb button hover, tl hero layout,
+  // tc corners, mo icon motif, pt palette/tone, pb page background, hd header bar, ft heading font, fw heading style,
+  // hf hero fill, fm family box, bs button shape, fq guide/FAQ style, ac accent hue
+  const DIMS = { te: 10, tt: 11, ti: 7, tk: 24, td: 20, tb: 12, tl: 7, tc: 6, mo: 5, pt: 10, pb: 12, hd: 8, ft: 10, fw: 5, hf: 4, fm: 8, bs: 6, fq: 8, ac: 3 };
+  const STRONG = ['hero', 'pt', 'pb', 'hd', 'ft', 'tl', 'fm', 'bs', 'fq', 'tk'];
+  const FONTS = [ // [family, Google Fonts axis spec, fallback, size scale]
+    ['Fraunces', 'Fraunces:wght@500..800', 'Georgia, serif', 1],
+    ['Nunito', 'Nunito:wght@500..900', 'system-ui, sans-serif', 1.02],
+    ['Space Grotesk', 'Space+Grotesk:wght@500..700', 'system-ui, sans-serif', 1],
+    ['Oswald', 'Oswald:wght@500..700', '"Arial Narrow", sans-serif', 1.1],
+    ['JetBrains Mono', 'JetBrains+Mono:wght@500..800', 'ui-monospace, monospace', .88],
+    ['Unbounded', 'Unbounded:wght@500..800', 'system-ui, sans-serif', .82],
+    ['Playfair Display', 'Playfair+Display:wght@500..800', 'Georgia, serif', 1.05],
+    ['Roboto Slab', 'Roboto+Slab:wght@500..800', 'Rockwell, Georgia, serif', .97],
+    ['Outfit', 'Outfit:wght@500..800', 'system-ui, sans-serif', 1.02],
+    ['Bricolage Grotesque', 'Bricolage+Grotesque:wght@500..800', 'system-ui, sans-serif', 1]
+  ];
+  const DARKHERO = new Set(['neon', 'blueprint', 'terminal', 'retro']);
+  const BOXHERO = new Set([...DARKHERO, 'paper', 'brutal', 'waves', 'sunrise', 'mesh', 'bubbles']);
   const fnv = s => { let h = 2166136261; for (let i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = Math.imul(h, 16777619); } return h >>> 0; };
   const rand = s => { let a = fnv(s); return () => { a = (a + 0x6D2B79F5) >>> 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
-  const hue = (hex, dh, dl) => {
-    let [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255);
-    const mx = Math.max(r, g, b), mn = Math.min(r, g, b); let h = 0, s = 0; const l = (mx + mn) / 2, d = mx - mn;
-    if (d) { s = d / (1 - Math.abs(2 * l - 1)); h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
-    h = (h + dh + 360) % 360; const L = Math.min(.62, Math.max(.3, l + dl / 100));
-    const c = (1 - Math.abs(2 * L - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = L - c / 2;
-    [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
-    return '#' + [r, g, b].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('');
+
+  // ---- colour maths (sRGB, the same space CSS color-mix(in srgb) uses) ----
+  const rgb = h => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255);
+  const hex = a => '#' + a.map(v => Math.round(Math.min(1, Math.max(0, v)) * 255).toString(16).padStart(2, '0')).join('');
+  const hsl = (h, s, l) => {
+    h = ((h % 360) + 360) % 360; s /= 100; l /= 100;
+    const c = (1 - Math.abs(2 * l - 1)) * s, x = c * (1 - Math.abs((h / 60) % 2 - 1)), m = l - c / 2;
+    const [r, g, b] = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
+    return hex([r + m, g + m, b + m]);
   };
+  const hueSat = hx => {
+    const [r, g, b] = rgb(hx), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn, l = (mx + mn) / 2;
+    let h = 0; if (d) { h = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; h *= 60; }
+    return [(h + 360) % 360, d ? d / (1 - Math.abs(2 * l - 1)) * 100 : 0];
+  };
+  const lum = hx => { const [r, g, b] = rgb(hx).map(v => v <= .04045 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4); return .2126 * r + .7152 * g + .0722 * b; };
+  const cr = (a, b) => { const A = lum(a), B = lum(b); return (Math.max(A, B) + .05) / (Math.min(A, B) + .05); };
+  const mix = (a, b, t) => { const A = rgb(a), B = rgb(b); return hex(A.map((v, i) => v * (1 - t) + B[i] * t)); }; // t = share of b
+  // walk the lightness from `from` towards `to` and return the first colour that passes
+  const solve = (h, s, from, to, ok) => { const st = from < to ? 1 : -1; for (let l = from; st > 0 ? l <= to : l >= to; l += st) { const c = hsl(h, s, l); if (ok(c)) return c; } return hsl(h, s, to); };
+  const all = (c, list, min) => list.every(x => cr(c, x) >= min);
+
+  // ---- palettes: [light, dark]; a "dark" entry in both slots makes a page that is dark in either mode ----
+  const TONES = [
+    H => [{ bg: hsl(H, 18, 97), surface: '#ffffff' }, { bg: hsl(H, 14, 8), surface: hsl(H, 12, 12) }], // clean
+    H => [{ bg: hsl(H, 55, 94), surface: hsl(H, 60, 99) }, { bg: hsl(H, 35, 10), surface: hsl(H, 28, 15) }], // tint
+    H => [{ bg: hsl(H, 62, 87), surface: hsl(H, 70, 97) }, { bg: hsl(H, 45, 13), surface: hsl(H, 36, 19) }], // pastel
+    () => [{ bg: hsl(40, 42, 91), surface: hsl(44, 60, 97), ink: '#2b2116' }, { bg: hsl(30, 14, 9), surface: hsl(32, 14, 13), ink: '#f1e8da' }], // paper
+    () => [{ bg: hsl(214, 18, 89), surface: hsl(210, 25, 98), ink: hsl(215, 35, 12) }, { bg: hsl(216, 28, 8), surface: hsl(216, 24, 13) }], // slate
+    H => [{ dark: 1, bg: hsl(H, 42, 8), surface: hsl(H, 34, 13) }, { bg: hsl(H, 42, 8), surface: hsl(H, 34, 13) }], // night
+    () => [{ dark: 1, bg: '#0a0a0b', surface: '#161618', ink: '#f5f5f4' }, { bg: '#0a0a0b', surface: '#161618', ink: '#f5f5f4' }], // ink
+    H => [{ bg: hsl(H + 150, 50, 93), surface: '#ffffff' }, { bg: hsl(H + 150, 30, 9), surface: hsl(H + 150, 22, 14) }], // duo
+    H => [{ dark: 1, bg: hsl(H, 48, 15), surface: hsl(H, 40, 21) }, { bg: hsl(H, 48, 15), surface: hsl(H, 40, 21) }], // deep
+    H => [{ bg: '#ffffff', surface: hsl(H, 35, 97) }, { bg: '#060607', surface: hsl(H, 18, 11) }] // white
+  ];
+  const palette = (t, H, Ha, dark) => {
+    const p = { bg: t.bg, surface: t.surface };
+    p.ink = t.ink || (dark ? hsl(H, 18, 94) : hsl(H, 28, 11));
+    p.field = dark ? mix(t.bg, '#000000', .25) : (lum(t.surface) > .9 ? '#ffffff' : t.surface);
+    const soft = a => { for (const k of [.15, .12, .09, .06]) { const s = mix(p.surface, a, k); if (cr(a, s) >= 4.5) return s; } return p.surface; };
+    if (dark) {
+      p.onAccent = hsl(Ha, 45, 8);
+      p.accent = solve(Ha, 85, 58, 94, c => all(c, [p.bg, p.surface, p.field, p.onAccent], 4.6));
+      p.onC = hsl(H, 45, 8);
+      p.c = solve(H, 80, 52, 94, c => all(c, [p.bg, p.surface], 3.3) && cr(c, p.onC) >= 4.6);
+      p.ok = solve(155, 60, 50, 92, c => all(c, [p.bg, p.surface], 4.6));
+      p.bad = solve(4, 90, 62, 94, c => all(c, [p.bg, p.surface], 4.6));
+      p.line = mix(p.bg, p.ink, .17);
+    } else {
+      p.onAccent = '#ffffff';
+      p.accent = solve(Ha, 75, 48, 8, c => all(c, [p.bg, p.surface, p.field, '#ffffff'], 4.6));
+      p.c = solve(H, 72, 46, 8, c => all(c, ['#ffffff'], 4.6) && all(c, [p.bg, p.surface], 3.3));
+      p.onC = '#ffffff';
+      p.ok = solve(152, 75, 34, 6, c => all(c, [p.bg, p.surface], 4.6));
+      p.bad = solve(0, 72, 44, 8, c => all(c, [p.bg, p.surface], 4.6));
+      p.line = mix(p.bg, p.ink, .13);
+    }
+    p.dark = dark;
+    p.soft = soft(p.accent);
+    p.muted = p.ink;
+    for (let k = .5; k <= 1; k += .04) { const m = mix(p.surface, p.ink, k); if (all(m, [p.bg, p.surface, p.soft, p.field], p.dark ? 6.4 : 5.6)) { p.muted = m; break; } }
+    p.dark = dark;
+    return p;
+  };
+  const vars = p => `--bg:${p.bg};--surface:${p.surface};--field:${p.field};--ink:${p.ink};--muted:${p.muted};--line:${p.line};--accent:${p.accent};--accent-soft:${p.soft};--on-accent:${p.onAccent};--c:${p.c};--on-c:${p.onC};--ok:${p.ok};--bad:${p.bad};--shadow:${p.dark ? '0 1px 2px rgba(0,0,0,.5),0 10px 24px -14px rgba(0,0,0,.7)' : `0 1px 2px rgba(16,24,40,.05),0 8px 22px -12px ${mix(p.c, '#101828', .5)}55`};color-scheme:${p.dark ? 'dark' : 'light'}`;
+
   const out = {}, seen = new Map(), lastInCat = {};
-  let minDiff = 99;
+  let minDiff = 99, minStrong = 99;
+  const valid = (pick) => {
+    const hero = HEROES[pick.hero];
+    if (pick.tl === 5 && (BOXHERO.has(hero) || pick.hf)) return false; // open hero: no box to fill
+    if (pick.hf && BOXHERO.has(hero)) return false; // these heroes paint their own box
+    if (pick.ft === 5 && pick.fw === 1) return false; // wide font in capitals is too long
+    if (pick.pb === 7 && (pick.hd === 1 || pick.tl === 5)) return false; // coloured band needs a solid header and a boxed hero
+    return true;
+  };
   for (const t of tools) {
     const prev = lastInCat[t.cat] || [];
     let hero = fnv(t.slug) % HEROES.length;
     for (let k = 0; k < HEROES.length && prev.slice(-3).some(p => p.hero === hero); k++) hero = (hero + 7) % HEROES.length;
-    let pick, key;
-    for (let salt = 0; salt < 200; salt++) {
+    let pick, key, ok = false;
+    for (let salt = 0; salt < 4000 && !ok; salt++) {
       const r = rand(t.slug + '|' + salt);
       pick = { hero };
       for (const d in DIMS) pick[d] = Math.floor(r() * DIMS[d]);
       key = Object.values(pick).join('.');
+      if (seen.has(key) || !valid(pick)) continue;
       const p = prev[prev.length - 1];
-      const diff = p ? Object.keys(pick).filter(d => pick[d] !== p[d]).length : 99;
-      if (!seen.has(key) && diff >= 7) { if (p) minDiff = Math.min(minDiff, diff); break; }
+      if (!p) { ok = true; break; }
+      const diff = Object.keys(pick).filter(d => pick[d] !== p[d]).length;
+      const strong = STRONG.filter(d => pick[d] !== p[d]).length;
+      const far = prev.slice(-3).every(q => q.pt !== pick.pt && q.ft !== pick.ft) && prev.slice(-2).every(q => q.tl !== pick.tl && q.hd !== pick.hd && q.fm !== pick.fm);
+      if (diff >= Object.keys(pick).length - 3 && strong === STRONG.length && far) { ok = true; minDiff = Math.min(minDiff, diff); minStrong = Math.min(minStrong, strong); }
     }
+    if (!ok) throw new Error(`No distinct theme found for ${t.slug}`);
     if (seen.has(key)) throw new Error(`Theme combination of ${t.slug} is the same as ${seen.get(key)}`);
     seen.set(key, t.slug);
     (lastInCat[t.cat] = prev).push(pick);
     const r = rand(t.slug + '#look');
     const between = (a, b, dp = 0) => +(a + r() * (b - a)).toFixed(dp);
-    const color = hue(COLOR[t.cat], between(-14, 14), between(-6, 6));
-    out[t.slug] = { pick, color, cls: `tv tv-${HEROES[pick.hero]} ` + Object.keys(DIMS).map(d => d + '-' + pick[d]).join(' ') };
+    // hue: the category colour turned by up to ±26°, so tools in one category still feel related
+    const [H0, S0] = hueSat(COLOR[t.cat]);
+    const H = Math.round(H0 + between(-26, 26)), Ha = H + [0, 38, -38][pick.ac];
+    const sat = Math.max(55, Math.min(90, S0));
+    const color = hsl(H, sat, 44);
+    const tone = TONES[pick.pt](H);
+    const L = palette(tone[0], H, Ha, !!tone[0].dark), D = palette(tone[1], H, Ha, true);
+    // card palette: the tool card always follows the real light/dark mode, so tool screens look as designed
+    const CL = L.dark ? palette({ bg: hsl(H, 30, 95), surface: '#ffffff' }, H, Ha, false) : L;
+    // strong colours that carry white text: header bar, solid hero, family box
+    const deep = (h, s) => solve(h, s, 42, 8, c => cr(c, '#ffffff') >= 6.2 && cr(mix(c, '#ffffff', .16), '#ffffff') >= 4.6);
+    const deep1 = deep(H, Math.min(78, sat + 6)), deep2 = deep(Ha + 34, 70), deep3 = deep(H - 40, 62);
+    const font = FONTS[pick.ft];
+    const sel = 'html:not([data-contrast]) body.tv', selD = 'html[data-theme="dark"]:not([data-contrast]) body.tv';
+    const css = `body.tv{--hf:"${font[0]}",${font[2]};--hs:${font[3]};--deep:${deep1};--deep2:${deep2};--deep3:${deep3};--onDeep:#fff}` +
+      `${sel}{${vars(L)}}` + (CL !== L ? `${sel} .card{${vars(CL)}}` : '') + `${selD}{${vars(D)}}${selD} .card{${vars(D)}}`;
+    const fontHref = `https://fonts.googleapis.com/css2?family=${font[1]}&display=swap`;
+    out[t.slug] = { pick, color, css, fontHref, dark: [L.dark, D.dark], pal: { L, D, CL }, cls: `tv tv-${HEROES[pick.hero]} ` + Object.keys(DIMS).map(d => d + '-' + pick[d]).join(' ') + (L.dark ? ' tv-dk' : '') };
   }
-  console.log(`Tool themes: ${tools.length} tools, ${seen.size} different combinations, neighbours in a category differ in at least ${minDiff} of ${Object.keys(DIMS).length + 1} dimensions`);
+  console.log(`Tool themes: ${tools.length} tools, ${seen.size} different combinations of ${Object.keys(DIMS).length + 1} dimensions; neighbours in a category differ in at least ${minDiff} dimensions and in all ${minStrong} strong ones (palette, page, header, font, hero, family box, buttons, sections, card)`);
   // the tool's own icon as hero motif, with positions, sizes and turns seeded by the slug
   const motif = (t, mo) => {
     const r = rand(t.slug + '#motif'), b = (a, c, dp = 0) => +(a + r() * (c - a)).toFixed(dp);
@@ -492,7 +599,7 @@ for (const t of tools) {
   write(`${t.slug}/index.html`, layout({
     rel: '../', urlPath: t.slug + '/', slug: t.slug, here: t.name, color: th.color, bodyClass: th.cls,
     title: `${t.title} | ${cfg.siteName}`, desc: t.desc,
-    head: '<link rel="stylesheet" href="../assets/themes.css">\n' + jsonLd({
+    head: `<link rel="stylesheet" href="../assets/themes.css">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="${th.fontHref}">\n<style>${th.css}</style>\n` + jsonLd({
       '@context': 'https://schema.org', '@type': 'WebApplication', name: t.name, url: `${SITE}/${t.slug}/`,
       description: t.desc, applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -576,6 +683,7 @@ ${analytics}
 ${adsPolicy}
 <h2>Hosting</h2>
 <p>The site is served by GitHub Pages, which may log technical data such as IP addresses for security purposes. See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">GitHub privacy statement</a>.</p>
+<p>Tool pages load one heading font from Google Fonts, so your browser asks Google for that font file. Google can see your IP address for that request. See the <a href="https://developers.google.com/fonts/faq/privacy" rel="noopener">Google Fonts privacy FAQ</a>.</p>
 <h2>Contact</h2>
 ${contact}` },
   { slug: 'terms', title: 'Terms of Use', desc: `Terms for using the free tools on ${cfg.siteName}.`, html: `
