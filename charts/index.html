@@ -279,23 +279,24 @@ function applyK(k) {
   if (k.t === last.t) bars[n - 1] = k; else if (k.t > last.t) { bars.push(k); if (V.right >= n - 1) V.right += 1; } else return;
   checkAlerts(S.sym, last.c, k.c); checkPaper(S.sym, k.c); tick[S.sym] = tick[S.sym] || {}; tick[S.sym].c = k.c; recalcSoon(); dirty();
 }
-function setLive(s) { live = s; var e = document.getElementById('tcLive'); if (!e) return; e.className = 'tc-live ' + (s === 'ok' ? 'ok' : s === 'poll' ? 'mid' : s === 'bad' ? 'bad' : ''); e.lastChild.textContent = s === 'ok' ? 'Live' : s === 'poll' ? (isT(S.sym) ? 'Live (15 s)' : 'Live (3 s)') : s === 'bad' ? 'Offline' : 'Loading'; }
+function setLive(s) { live = s; var e = document.getElementById('tcLive'); if (!e) return; e.className = 'tc-live ' + (s === 'ok' ? 'ok' : s === 'poll' ? 'mid' : s === 'bad' ? 'bad' : ''); e.lastChild.textContent = s === 'ok' ? 'Live' : s === 'poll' ? (isT(S.sym) ? 'Live (15 s)' : isK(S.sym) ? 'Live (9 s)' : 'Live (3 s)') : s === 'bad' ? 'Offline' : 'Loading'; }
 var kws = null, liveUp = false;
 function shut(w) { if (w) { w.onopen = w.onclose = w.onerror = w.onmessage = null; try { w.close(); } catch (e) {} } }
 function kmsg(ev) {
   var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (!m || !m.data || !m.data.length) return;
   if (m.channel === 'ticker') m.data.forEach(function (d) {
     var sy = 'K:' + d.symbol, o = tick[sy], c = +d.last; if (!(c > 0)) return; tick[sy] = { c: c, o: c / (1 + (+d.change_pct || 0) / 100) };
-    if (sy === S.sym) { var l = bars[bars.length - 1]; if (l && !full && c !== l.c && Date.now() < l.t + tfMs()) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
+    if (sy === S.sym) { lastMsg = Date.now(); var l = bars[bars.length - 1]; if (l && !full && c !== l.c && Date.now() < l.t + tfMs()) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
     if (cmpData[sy] && bars.length) { cmpData[sy][bars[bars.length - 1].t] = c; dirty(); } watchSoon();
   });
-  else if (m.channel === 'ohlc') m.data.forEach(function (x) { if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) applyK({ t: Date.parse(String(x.interval_begin).slice(0, 19) + 'Z'), o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +x.volume }); });
+  else if (m.channel === 'ohlc') m.data.forEach(function (x) { if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) lastMsg = Date.now(); if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) applyK({ t: Date.parse(String(x.interval_begin).slice(0, 19) + 'Z'), o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +x.volume }); });
 }
-var fws = null;
+var fws = null, lastMsg = 0;
 function bmsg(pre, my) {
   return function (ev) {
     if (my !== wsId) return; var m; try { m = JSON.parse(ev.data).data; } catch (e) { return; } if (!m || !m.s) return; var sy = pre + m.s;
-    if (m.e === 'kline' && sy === S.sym && m.k.i === S.tf) applyK({ t: m.k.t, o: +m.k.o, h: +m.k.h, l: +m.k.l, c: +m.k.c, v: +m.k.v });
+    if (m.e === 'kline' && sy === S.sym && m.k.i === S.tf) { lastMsg = Date.now(); applyK({ t: m.k.t, o: +m.k.o, h: +m.k.h, l: +m.k.l, c: +m.k.c, v: +m.k.v }); }
+    else if (m.e === 'aggTrade' && sy === S.sym) { lastMsg = Date.now(); var l = bars[bars.length - 1], c = +m.p; if (l && !full && c > 0 && c !== l.c && m.T >= l.t && m.T < l.t + tfMs()) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); }
     else if (m.e === 'kline' && cmpData[sy] && m.k.i === S.tf) { cmpData[sy][m.k.t] = +m.k.c; dirty(); }
     else if (m.e === '24hrMiniTicker') { var o = tick[sy]; tick[sy] = { c: +m.c, o: +m.o }; if (sy !== S.sym) { if (o) checkAlerts(sy, o.c, +m.c); checkPaper(sy, +m.c); } watchSoon(); }
   };
@@ -303,7 +304,7 @@ function bmsg(pre, my) {
 var tws = null;
 function tdTick(sy, c) {
   if (!(c > 0)) return; var o = tick[sy]; tick[sy] = { c: c, o: o && o.o };
-  if (sy === S.sym) { var l = bars[bars.length - 1], m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
+  if (sy === S.sym) { lastMsg = Date.now(); var l = bars[bars.length - 1], m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
   else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
   if (cmpData[sy] && bars.length) { cmpData[sy][bars[bars.length - 1].t] = c; dirty(); } watchSoon();
 }
@@ -311,15 +312,15 @@ setInterval(function () { if (tws && tws.readyState === 1) try { tws.send('{"act
 function connect() {
   clearTimeout(wsT); shut(ws); shut(kws); shut(fws); shut(tws); ws = kws = fws = tws = null; liveUp = false; if (!bars.length) return;
   var my = ++wsId, ms = isK(S.sym) ? 'K' : isF(S.sym) ? 'F' : isT(S.sym) ? 'T' : 'B', all = uniq(S.watch.concat([S.sym], S.paper.pos.map(function (q) { return q.sym; }), S.alerts.filter(function (a) { return !a.done; }).map(function (a) { return a.sym; })));
-  var st = function (ok, main) { return (main ? [S.sym.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf] : []).concat(all.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@miniTicker'; }), S.cmp.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf; })); };
+  var st = function (ok, main) { return (main ? [S.sym.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf, S.sym.replace(/^F:/, '').toLowerCase() + '@aggTrade'] : []).concat(all.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@miniTicker'; }), S.cmp.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf; })); };
   var bst = st(isB, ms === 'B'), fst = st(isF, ms === 'F'), kst = uniq(all.concat(S.cmp).filter(isK)).map(function (x) { return x.slice(2); });
   var fail = function () { if (my !== wsId) return; clearTimeout(wsT); wsId++; shut(ws); shut(kws); shut(fws); shut(tws); ws = kws = fws = tws = null; liveUp = false; wsFail++; wsI = (wsI + 1) % WSH.length; startPoll(); wsT = setTimeout(connect, Math.min(60000, 3000 * wsFail)); };
-  var up = function () { clearTimeout(wsT); liveUp = true; wsFail = 0; stopPoll(); setLive('ok'); };
+  var up = function () { clearTimeout(wsT); liveUp = true; wsFail = 0; lastMsg = Date.now(); setLive('ok'); };
   var sock = function (url, src, onopen, onmsg) { var w = new WebSocket(url); w.onopen = function () { if (my !== wsId) return; if (onopen) onopen(w); if (ms === src) up(); }; w.onmessage = onmsg; w.onclose = w.onerror = function () { if (ms === src) fail(); }; return w; };
   startPoll(); wsT = setTimeout(function () { if (my === wsId && !liveUp) fail(); }, 8000);
   try {
     if (bst.length) ws = sock(WSH[wsI] + '/stream?streams=' + bst.join('/'), 'B', null, bmsg('', my));
-    if (fst.length) fws = sock('wss://fstream.binance.com/stream?streams=' + fst.join('/'), 'F', null, bmsg('F:', my));
+    if (fst.length) fws = sock('wss://fstream.binance.com/market/stream?streams=' + fst.join('/'), 'F', null, bmsg('F:', my));
     if (kst.length) kws = sock('wss://ws.kraken.com/v2', 'K', function (k) { k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ticker', symbol: kst } })); if (ms === 'K') k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ohlc', symbol: [S.sym.slice(2)], interval: KTF[S.tf], snapshot: false } })); }, function (ev) { if (my === wsId) kmsg(ev); });
     var tst = uniq((ms === 'T' ? [S.sym] : []).concat(all, S.cmp).filter(isT)).slice(0, 8).map(function (x) { return x.slice(2); });
     if (tst.length && S.tdKey) tws = sock('wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(S.tdKey), 'T', function (w) { w.send(JSON.stringify({ action: 'subscribe', params: { symbols: tst.join(',') } })); }, function (ev) { if (my !== wsId) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.event === 'price') tdTick('T:' + m.symbol, +m.price); });
@@ -328,12 +329,16 @@ function connect() {
 function startPoll() {
   if (pollT) return; var n = 0;
   pollT = setInterval(function () {
-    if (document.hidden || !bars.length) return; var id = loadId;
-    if (isT(S.sym)) { if (n % 5 === 4 && S.tdKey) fetch('https://api.twelvedata.com/price?symbol=' + encodeURIComponent(S.sym.slice(2)) + '&apikey=' + encodeURIComponent(S.tdKey), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) { if (id !== loadId || !(+j.price > 0)) return; tdTick(S.sym, +j.price); if (!liveUp) setLive('poll'); }).catch(function () {}); }
-    else getK(S.sym, S.tf, 2).then(function (r) { if (id !== loadId) return; r.bars.forEach(applyK); if (!liveUp) setLive('poll'); }).catch(function () { setLive('bad'); });
-    if (n++ % 5 === 0) { loadTickers(); S.cmp.filter(function (x) { return !isT(x); }).forEach(loadCmp); }
+    if (document.hidden || !bars.length) return; var id = loadId, quiet = Date.now() - lastMsg, kq = isK(S.sym);
+    if (n++ % 5 === 0) { loadTickers(); if (!liveUp) S.cmp.filter(function (x) { return !isT(x); }).forEach(loadCmp); }
+    if (liveUp && quiet < (kq ? 20000 : 6000)) { if (live !== 'ok') setLive('ok'); return; }   // the stream is delivering
+    if (isT(S.sym)) { if (n % 5 === 0 && S.tdKey) fetch('https://api.twelvedata.com/price?symbol=' + encodeURIComponent(S.sym.slice(2)) + '&apikey=' + encodeURIComponent(S.tdKey), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (j) { if (id !== loadId || !(+j.price > 0)) return; tdTick(S.sym, +j.price); if (!liveUp) setLive('poll'); }).catch(function () {}); return; }
+    if (kq && n % 3) return;   // Kraken sends its whole history on every request, so ask less often
+    getK(S.sym, S.tf, 2).then(function (r) { if (id !== loadId) return; r.bars.forEach(applyK); setLive(liveUp && kq ? 'ok' : 'poll'); }).catch(function () { if (!liveUp) setLive('bad'); });
+    if (liveUp && !kq && quiet > 30000 && Date.now() - lastKick > 60000) { lastKick = Date.now(); connect(); }   // open but silent for long: reconnect
   }, 3000);
 }
+var lastKick = 0;
 function stopPoll() { clearInterval(pollT); pollT = 0; }
 function loadTickers() {
   var all = uniq(S.watch.concat(S.alerts.map(function (a) { return a.sym; }), S.paper.pos.map(function (a) { return a.sym; }))), list = all.filter(isB), kl = all.filter(isK);
