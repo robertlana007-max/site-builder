@@ -399,7 +399,8 @@ var VT = (function () {
   return { say: say, bar: bar, clock: clock, base: base, pick: pick, go: go, done: done };
 })();
 (function () {
-  var file = null, info = null, url = null, P = $('player'), mode = 'rev', MAXLEN = 180;
+  var file = null, info = null, url = null, P = $('player'), mode = 'rev', MAXLEN = 180, stopped = false;
+  $('stop').addEventListener('click', function () { stopped = true; });
   function parse(s) {
     s = String(s).trim().replace(',', '.');
     if (!/^\d+(?:\.\d+)?$|^\d+:\d{1,2}(?:\.\d+)?$|^\d+:\d{1,2}:\d{1,2}(?:\.\d+)?$/.test(s)) return NaN;
@@ -461,18 +462,24 @@ var VT = (function () {
     VT.go(boom ? 'Making the boomerang' : 'Reversing', function (pct) {
       function stepPct(p) { pct(Math.min(0.99, (done + p) / steps)); }
       var chain = Promise.resolve();
+      stopped = false;
       if (boom) chain = chain.then(function () {
         return FF.run(f, function (inp) { return ['-ss', r.a.toFixed(3), '-t', len.toFixed(3), '-i', inp, '-vf', vf, '-frames:v', String(frames(0, len))].concat(enc); }, 'fwd.mp4', len / sp, stepPct, VT.say)
           .then(function (d) { parts.fwd = d; done++; });
       });
       for (var k = n - 1; k >= 0; k--) (function (k) { // the last piece first
         chain = chain.then(function () {
+          if (stopped) throw new Error('cancelled');
+          // the video engine keeps a little memory after every run, so start a fresh one now and then (long videos crashed the tab)
+          if (done && done % 8 === 0) FF.cancel();
           var a = r.a + k * piece, l = Math.min(piece, r.b - a);
           return FF.run(f, function (inp) { return ['-ss', a.toFixed(3), '-t', l.toFixed(3), '-i', inp, '-vf', 'reverse,' + vf, '-frames:v', String(frames(a - r.a, l))].concat(enc); }, 'piece.mp4', l / sp, stepPct, VT.say)
             .then(function (d) { parts.push(d); done++; });
         });
       })(k);
       return chain.then(function () {
+        if (stopped) throw new Error('cancelled');
+        FF.cancel(); // a fresh engine for the joining step
         var names = [], list = [];
         if (boom) names.push('/rv-fwd.mp4');
         parts.forEach(function (_, k) { names.push('/rv-p' + k + '.mp4'); });

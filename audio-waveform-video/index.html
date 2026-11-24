@@ -427,6 +427,24 @@ var VT = (function () {
   }
   // ---------- the still picture behind the waveform ----------
   function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(s); }
+  // Split a title into up to 3 lines (at spaces, or anywhere for languages without spaces) when it is too wide for one line.
+  function wrapText(g, text, maxW, px, weight) {
+    var F = function (v) { g.font = weight + ' ' + v + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'; };
+    F(px);
+    if (g.measureText(text).width <= maxW) return { px: px, lines: [text] };
+    var size = px * 0.72, lines;
+    for (;;) {
+      F(size); lines = []; var line = '';
+      text.split(/(\s+)/).forEach(function (w) {
+        var test = line + w;
+        if (line && g.measureText(test).width > maxW && w.trim()) { lines.push(line.trim()); line = w.replace(/^\s+/, ''); } else line = test;
+        while (g.measureText(line).width > maxW && line.length > 1) { var cut = line.length - 1; while (cut > 1 && g.measureText(line.slice(0, cut)).width > maxW) cut--; lines.push(line.slice(0, cut)); line = line.slice(cut); }
+      });
+      if (line.trim()) lines.push(line.trim());
+      if (lines.length <= 4 || size < 6) return { px: size, lines: lines };
+      size *= 0.88;
+    }
+  }
   function fitText(g, text, maxW, px, weight) {
     g.font = weight + ' ' + px + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif';
     while (px > 10 && g.measureText(text).width > maxW) { px *= 0.92; g.font = weight + ' ' + px + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'; }
@@ -452,10 +470,10 @@ var VT = (function () {
       var y = +$('tpos').value * H, base = Math.min(W, H), p1 = base * 0.075, p2 = base * 0.042, maxW = W * 0.88;
       g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = $('tc').value;
       g.shadowColor = 'rgba(0,0,0,.45)'; g.shadowBlur = base * 0.012; g.shadowOffsetY = base * 0.004;
-      var h1 = t1 ? fitText(g, t1, maxW, p1, '700') : 0, h2 = 0;
-      var total = (t1 ? h1 * 1.25 : 0) + (t2 ? p2 * 1.4 : 0); y = Math.max(total / 2 + base * 0.03, Math.min(H - total / 2 - base * 0.03, y));
+      var w1 = t1 ? wrapText(g, t1, maxW, p1, '700') : null, h1 = w1 ? w1.px : 0, n1 = w1 ? w1.lines.length : 0, h2 = 0;
+      var total = (t1 ? h1 * 1.25 * n1 : 0) + (t2 ? p2 * 1.4 : 0); y = Math.max(total / 2 + base * 0.03, Math.min(H - total / 2 - base * 0.03, y));
       var yy = y - total / 2;
-      if (t1) { g.direction = rtl(t1) ? 'rtl' : 'ltr'; fitText(g, t1, maxW, p1, '700'); g.fillText(t1, W / 2, yy + h1 * 0.62); yy += h1 * 1.25; }
+      if (t1) { g.direction = rtl(t1) ? 'rtl' : 'ltr'; g.font = '700 ' + h1 + 'px system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif'; w1.lines.forEach(function (l) { g.fillText(l, W / 2, yy + h1 * 0.62); yy += h1 * 1.25; }); }
       if (t2) { g.direction = rtl(t2) ? 'rtl' : 'ltr'; h2 = fitText(g, t2, maxW, p2, '500'); g.globalAlpha = 0.88; g.fillText(t2, W / 2, yy + h2 * 0.7); g.globalAlpha = 1; }
       g.shadowColor = 'transparent';
     }
