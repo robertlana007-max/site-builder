@@ -232,11 +232,11 @@ var KFX = {
   'K:PAXG/USD': { alt: 'PAXGUSD', key: 'PAXGUSD', dec: 2, cat: 'Gold', d: 'Gold / US Dollar (PAX Gold, 1 token = 1 oz)', f: 'XAUUSD GOLD XAU' }, 'K:XAUT/USD': { alt: 'XAUTUSD', key: 'XAUTUSD', dec: 1, cat: 'Gold', d: 'Gold / US Dollar (Tether Gold, 1 token = 1 oz)', f: 'XAUUSD GOLD XAU' }
 };
 var FFX = { 'F:XAUUSDT': { n: 'XAU / USD', d: 'Gold spot / US Dollar · Binance perpetual', cat: 'Gold', f: 'XAUUSD GOLD XAU SPOT' }, 'F:XAGUSDT': { n: 'XAG / USD', d: 'Silver / US Dollar · Binance perpetual', cat: 'Gold', f: 'XAGUSD SILVER XAG SPOT' } };
-function isF(s) { return !!FFX[s]; }
+function isF(s) { return s.slice(0, 2) === 'F:'; }   // Binance futures: perpetual contracts
 if (window.OANDA_TOKEN && S._g !== 3) { S._g = 3; S.watch = ['O:XAU_USD', 'O:EUR_USD', 'O:GBP_USD', 'O:USD_JPY'].concat(S.watch.filter(function (x) { return !/^(O:XAU_USD|O:EUR_USD|O:GBP_USD|O:USD_JPY|F:XAUUSDT|K:EUR\/USD|K:GBP\/USD|K:USD\/JPY|K:PAXG\/USD)$/.test(x); })); if (!isO(S.sym) && /^(F:XAUUSDT|K:)/.test(S.sym)) S.sym = 'O:XAU_USD'; }
 if (window.CHARTS_API && S._g !== 2 && S._g !== 3) { S._g = 2; S.watch = ['T:XAU/USD'].concat(S.watch.filter(function (x) { return x !== 'T:XAU/USD' && x !== 'F:XAUUSDT'; })); }
 if (false) { S._g = 1; if (!S.tdKey && S.watch.indexOf('T:XAU/USD') < 0) S.watch = ['F:XAUUSDT'].concat(S.watch.filter(function (x) { return x !== 'F:XAUUSDT'; })); }
-function isB(s) { return !FFX[s] && !/^[KTOD]:/.test(s); }
+function isB(s) { return !/^[KTODF]:/.test(s); }
 function isD(s) { return s.slice(0, 2) === 'D:'; }
 var DDS = { 'D:frxXAUUSD': { n: 'XAU / USD', d: 'Gold', cat: 'Gold', f: 'XAUUSD GOLD XAU SPOT MT5' }, 'D:frxXAGUSD': { n: 'XAG / USD', d: 'Silver', cat: 'Gold', f: 'XAGUSD SILVER XAG MT5' }, 'D:frxXPTUSD': { n: 'XPT / USD', d: 'Platinum', cat: 'Gold', f: 'XPTUSD PLATINUM' }, 'D:frxXPDUSD': { n: 'XPD / USD', d: 'Palladium', cat: 'Gold', f: 'XPDUSD PALLADIUM' } };
 'EURUSD GBPUSD USDJPY AUDUSD USDCAD USDCHF NZDUSD EURGBP EURJPY GBPJPY AUDJPY EURAUD EURCHF EURCAD GBPAUD GBPCAD GBPCHF AUDCAD AUDCHF AUDNZD EURNZD GBPNZD NZDJPY USDMXN USDNOK USDPLN USDSEK'.split(' ').forEach(function (x) { DDS['D:frx' + x] = { n: x.slice(0, 3) + ' / ' + x.slice(3), d: 'Forex', cat: 'Forex', f: x + ' MT5' }; });
@@ -282,11 +282,11 @@ function isT(s) { return s.slice(0, 2) === 'T:'; }
 var RELAY = String(window.CHARTS_API || '').replace(/\/+$/, '');   // the owner's relay: Twelve Data for every visitor, without a key in the page
 Object.keys(S.tm || {}).forEach(function (k) { if (!TDS[k] && S.tm[k] && S.tm[k].d) TDS[k] = S.tm[k]; });
 var KTF = { '1m': 1, '5m': 5, '15m': 15, '30m': 30, '1h': 60, '4h': 240, '1d': 1440, '1w': 10080 }, KNEAR = { '3m': '5m', '2h': '1h', '6h': '4h', '8h': '4h', '12h': '4h', '3d': '1d', '1M': '1w' };
-S.watch = S.watch.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); S.cmp = S.cmp.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); if ((S.sym.slice(0, 2) === 'K:' && !KFX[S.sym]) || (S.sym.slice(0, 2) === 'F:' && !FFX[S.sym])) S.sym = 'BTCUSDT';
+S.watch = S.watch.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); S.cmp = S.cmp.filter(function (x) { return x.slice(0, 2) !== 'K:' || KFX[x]; }); if ((S.sym.slice(0, 2) === 'K:' && !KFX[S.sym]) || (S.sym.slice(0, 2) === 'F:' && !/^F:[A-Z0-9]{5,20}$/.test(S.sym))) S.sym = 'BTCUSDT';
 function isK(s) { return s.slice(0, 2) === 'K:' && !!KFX[s]; }
 function uniq(a) { return a.filter(function (s, i) { return a.indexOf(s) === i; }); }
-function splitSym(s) { if (isD(s)) return DDS[s] && DDS[s].n.indexOf(' / ') > 0 ? DDS[s].n.split(' / ') : /^D:frx[A-Z]{6}$/.test(s) ? [s.slice(5, 8), s.slice(8)] : [(DDS[s] || {}).n || s.slice(2), '']; if (FFX[s]) return FFX[s].n.split(' / '); if (s.slice(0, 2) === 'O:') return ODS[s] && ODS[s].cat === 'Indices' ? [s.slice(2).split('_')[0], ''] : s.slice(2).split('_'); if (s.slice(0, 2) === 'K:' || s.slice(0, 2) === 'T:') return s.slice(2).split('/'); for (var i = 0; i < QUOTES.length; i++) { var q = QUOTES[i]; if (s.length > q.length && s.slice(-q.length) === q) return [s.slice(0, -q.length), q]; } return [s, '']; }
-function symName(s) { if (FFX[s]) return FFX[s].n; if (s === 'K:PAXG/USD') return 'GOLD / USD'; var p = splitSym(s); return p[1] ? p[0] + ' / ' + p[1] : isO(s) || isD(s) ? p[0] : s.replace(/^T:/, ''); }
+function splitSym(s) { if (s.slice(0, 2) === 'F:' && !FFX[s]) return splitSym(s.slice(2)); if (isD(s)) return DDS[s] && DDS[s].n.indexOf(' / ') > 0 ? DDS[s].n.split(' / ') : /^D:frx[A-Z]{6}$/.test(s) ? [s.slice(5, 8), s.slice(8)] : [(DDS[s] || {}).n || s.slice(2), '']; if (FFX[s]) return FFX[s].n.split(' / '); if (s.slice(0, 2) === 'O:') return ODS[s] && ODS[s].cat === 'Indices' ? [s.slice(2).split('_')[0], ''] : s.slice(2).split('_'); if (s.slice(0, 2) === 'K:' || s.slice(0, 2) === 'T:') return s.slice(2).split('/'); for (var i = 0; i < QUOTES.length; i++) { var q = QUOTES[i]; if (s.length > q.length && s.slice(-q.length) === q) return [s.slice(0, -q.length), q]; } return [s, '']; }
+function symName(s) { if (FFX[s]) return FFX[s].n; if (s === 'K:PAXG/USD') return 'GOLD / USD'; var p = splitSym(s); return p[1] ? p[0] + ' / ' + p[1] + (s.slice(0, 2) === 'F:' ? ' perp' : '') : isO(s) || isD(s) ? p[0] : s.replace(/^T:/, ''); }
 
 // ---------- formatting ----------
 var dec = 2;
@@ -397,6 +397,7 @@ function loadBars() {
   }).catch(function (e) {
     if (id !== loadId) return; setLive('bad');
     if (isD(S.sym)) { var alt = S.sym === 'D:frxXAUUSD' ? 'F:XAUUSDT' : 'K:' + S.sym.slice(5, 8) + '/' + S.sym.slice(8); if (alt === 'F:XAUUSDT' || KFX[alt]) { dBlocked = true; toast('The MT5 broker feed is not reachable on this network. Showing another feed: its price is NOT the MT5 price.'); S.sym = alt; save(); syncTop(); renderWatch(); return loadBars(); } showStat(e.message || 'The broker feed could not load this symbol.', true); return; }
+    if (isF(S.sym) && !FFX[S.sym]) { showStat('Binance futures could not be reached on this network. The spot chart of the same coin still works: search for it under Crypto spot.', true); return; }
     if (S.sym === 'F:XAUUSDT') { toast('Spot gold feed is not reachable on this network, showing GOLD / USD instead'); S.sym = 'K:PAXG/USD'; save(); syncTop(); renderWatch(); return loadBars(); }
     if (isO(S.sym)) { showStat(e.message || 'OANDA could not load this symbol.', true); return; }
     if (isT(S.sym)) { showStat(e.message || 'Twelve Data could not load this symbol.', true); return; }
@@ -450,7 +451,7 @@ function kmsg(ev) {
   else if (m.channel === 'trade') m.data.forEach(function (x) { if ('K:' + x.symbol !== S.sym) return; lastMsg = Date.now(); tickTo(+x.price + offOf(S.sym), +x.qty); tapeAdd(+x.price + offOf(S.sym), +x.qty, x.side === 'buy', Date.parse(String(x.timestamp).slice(0, 19) + 'Z')); });
   else if (m.channel === 'ohlc') m.data.forEach(function (x) { if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) lastMsg = Date.now(); var dk = offOf(S.sym); if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) applyK({ t: Date.parse(String(x.interval_begin).slice(0, 19) + 'Z'), o: +x.open + dk, h: +x.high + dk, l: +x.low + dk, c: +x.close + dk, v: +x.volume }); });
 }
-var fws = null, lastMsg = 0;
+var fws = null, fbk = null, lastMsg = 0;
 function bmsg(pre, my) {
   return function (ev) {
     if (my !== wsId) return; var w, m; try { w = JSON.parse(ev.data); m = w.data; } catch (e) { return; } if (!m) return;
@@ -473,7 +474,7 @@ function tdTick(sy, c) {
 }
 setInterval(function () { if (tws && tws.readyState === 1) try { tws.send('{"action":"heartbeat"}'); } catch (e) {} }, 10000);
 function connect() {
-  clearTimeout(wsT); clearInterval(oaT); oaT = 0; shut(ws); shut(kws); shut(fws); shut(tws); ws = kws = fws = tws = null; liveUp = false; if (!bars.length) return;
+  clearTimeout(wsT); clearInterval(oaT); oaT = 0; shut(ws); shut(kws); shut(fws); shut(tws); shut(fbk); ws = kws = fws = tws = fbk = null; liveUp = false; if (!bars.length) return;
   var my = ++wsId, ms = isK(S.sym) ? 'K' : isF(S.sym) ? 'F' : isT(S.sym) ? 'T' : isO(S.sym) ? 'O' : isD(S.sym) ? 'D' : 'B', all = uniq(S.watch.concat([S.sym], S.paper.pos.map(function (q) { return q.sym; }), S.alerts.filter(function (a) { return !a.done; }).map(function (a) { return a.sym; })));
   var own = SEC[S.tf] || BIG[S.tf], st = function (ok, main) { var b = S.sym.replace(/^F:/, '').toLowerCase(); return (main ? (SEC[S.tf] ? [] : [b + '@kline_' + (BIG[S.tf] ? '1M' : S.tf)]).concat([b + '@aggTrade'], bookOn() ? [b + '@depth20@100ms'] : []) : []).concat(all.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@miniTicker'; }), own ? [] : S.cmp.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf; })); };
   var bst = st(isB, ms === 'B'), fst = st(isF, ms === 'F'), kst = uniq(all.concat(S.cmp).filter(isK)).map(function (x) { return x.slice(2); });
@@ -487,7 +488,9 @@ function connect() {
   if (ost.length && otok()) { var opoll = function () { if (document.hidden || my !== wsId) return; oaAcct().then(function (id) { return oa('/v3/accounts/' + id + '/pricing?instruments=' + ost.join('%2C')); }).then(function (j) { if (my !== wsId) return; (j.prices || []).forEach(function (q) { var bid = q.bids && q.bids[0] ? +q.bids[0].price : +q.closeoutBid; if (bid > 0) tdTick('O:' + q.instrument, bid); }); if (ms === 'O') { lastMsg = Date.now(); if (!liveUp) up(); } }).catch(function () {}); }; oaT = setInterval(opoll, 1000); opoll(); }
   try {
     if (bst.length) ws = sock(WSH[wsI] + '/stream?streams=' + bst.join('/'), 'B', null, bmsg('', my));
+    fst = fst.filter(function (x) { return x.indexOf('@depth') < 0; });   // on futures the order book lives at a different address
     if (fst.length) fws = sock('wss://fstream.binance.com/market/stream?streams=' + fst.join('/'), 'F', null, bmsg('F:', my));
+    if (ms === 'F' && bookOn()) { fbk = new WebSocket('wss://fstream.binance.com/public/stream?streams=' + S.sym.slice(2).toLowerCase() + '@depth20@100ms'); fbk.onmessage = bmsg('F:', my); }
     if (kst.length) kws = sock('wss://ws.kraken.com/v2', 'K', function (k) { k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ticker', symbol: kst } })); if (ms === 'K') k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'trade', symbol: [S.sym.slice(2)], snapshot: false } })); if (ms === 'K' && KTF[S.tf] && !own) k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ohlc', symbol: [S.sym.slice(2)], interval: KTF[S.tf], snapshot: false } })); }, function (ev) { if (my === wsId) kmsg(ev); });
     var tst = uniq((ms === 'T' ? [S.sym] : []).concat(all, S.cmp).filter(isT)).slice(0, 8).map(function (x) { return x.slice(2); });
     if (tst.length && (S.tdKey || RELAY)) tws = sock(S.tdKey ? 'wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(S.tdKey) : RELAY.replace(/^http/, 'ws') + '/ws', 'T', function (w) { w.send(JSON.stringify({ action: 'subscribe', params: { symbols: tst.join(',') } })); }, function (ev) { if (my !== wsId) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.event === 'price') tdTick('T:' + m.symbol, +m.price); });
@@ -521,12 +524,14 @@ function loadAllSyms() {
   return api('/api/v3/ticker/24hr?type=MINI').then(function (r) {
     allSyms = r.filter(function (t) { return +t.quoteVolume > 0 && +t.lastPrice > 0; }).map(function (t) { var p = splitSym(t.symbol); return { s: t.symbol, b: p[0], q: p[1], c: +t.lastPrice, o: +t.openPrice, qv: +t.quoteVolume }; });
     var rank = function (x) { return x.q === 'USDT' ? x.qv : x.q === 'USDC' || x.q === 'FDUSD' ? x.qv * .5 : x.q === 'BTC' ? x.qv * 1000 : x.q === 'ETH' ? x.qv * 50 : x.qv * .0005; };
-    allSyms.sort(function (a, b) { return rank(b) - rank(a); }); return dList().then(function () { allSyms = allSyms.concat(kList()); return allSyms; });
+    allSyms.sort(function (a, b) { return rank(b) - rank(a); }); return Promise.all([dList(), futList()]).then(function (a) { allSyms = allSyms.concat(kList(), a[1]); return allSyms; });
   }).catch(function () { return S.watch.concat(DEF.watch, ['ADAUSDT', 'AVAXUSDT', 'LINKUSDT', 'DOTUSDT', 'LTCUSDT', 'TRXUSDT', 'TONUSDT', 'SHIBUSDT', 'PEPEUSDT', 'ETHBTC', 'BTCEUR']).filter(function (s, i, a) { return a.indexOf(s) === i; }).map(function (s) { var p = splitSym(s), t = tick[s] || {}; return { s: s, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0 }; }).filter(function (x) { return isB(x.s); }).concat(kList()); });
 }
 function kList() { return Object.keys(DDS).map(function (x) { var m = DDS[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1] || '', c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }).concat(kList3().filter(function (x) { return !(x.s === 'F:XAUUSDT' || x.s === 'F:XAGUSDT' || x.s === 'K:PAXG/USD' || x.s === 'K:XAUT/USD' || (isK(x.s) && DDS['D:frx' + x.s.slice(2, 5) + x.s.slice(6)])); })); }
 function kList3() { return (otok() ? Object.keys(ODS).map(function (x) { var m = ODS[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1] || '', c: t.c, o: t.o, qv: 0, cat: m.cat === 'Indices' ? 'Stocks' : m.cat, f: m.f }; }) : []).concat(kList2()); }
 function kList2() { return (S.tdKey || RELAY ? Object.keys(TDS).map(function (x) { var m = TDS[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1] || '', c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }) : []).concat(kList1()); }
+// every USDT perpetual contract on Binance futures, most traded first
+function futList() { return fetch('https://fapi.binance.com/fapi/v1/ticker/24hr', { cache: 'no-store' }).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (a) { return a.filter(function (t) { return /USDT$/.test(t.symbol) && +t.quoteVolume > 0 && !FFX['F:' + t.symbol]; }).sort(function (x, y) { return y.quoteVolume - x.quoteVolume; }).map(function (t) { var p = splitSym(t.symbol); return { s: 'F:' + t.symbol, b: p[0], q: p[1], c: +t.lastPrice, o: +t.openPrice, qv: +t.quoteVolume, cat: 'Futures', f: t.symbol + ' ' + t.symbol + 'P PERP FUTURES' }; }); }).catch(function () { return []; }); }
 function kList1() { return Object.keys(FFX).map(function (x) { var m = FFX[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.f }; }).concat(kList0()); }
 function kList0() { return Object.keys(KFX).map(function (x) { var m = KFX[x], p = splitSym(x), t = tick[x] || {}; return { s: x, b: p[0], q: p[1], c: t.c, o: t.o, qv: 0, cat: m.cat, f: m.alt + ' ' + (m.f || '') + ' ' + m.d.toUpperCase().replace(/[^A-Z0-9]/g, '') }; }); }
 
@@ -1068,12 +1073,12 @@ function draw() {
 }
 var legKey = '', legEls = [], legMain = null;
 function setHtml(e, s) { if (e._h !== s) { e._h = s; e.innerHTML = s; } }
-function srcName(sym) { return isD(sym) ? 'Deriv, an MT5 broker (' + ((DDS[sym] || {}).d || 'market') + ', bid price)' : isO(sym) ? 'OANDA (' + ((ODS[sym] || {}).d || 'broker') + ', bid price)' : isK(sym) ? 'Kraken exchange (' + KFX[sym].d + ')' : isF(sym) ? 'Binance futures (' + sym.slice(2) + ' contract, follows spot ' + (sym === 'F:XAUUSDT' ? 'gold' : 'silver') + ')' : isT(sym) ? 'Twelve Data (' + ((TDS[sym] || {}).d || 'spot') + ')' : 'Binance exchange (spot)'; }
+function srcName(sym) { return isD(sym) ? 'Deriv, an MT5 broker (' + ((DDS[sym] || {}).d || 'market') + ', bid price)' : isO(sym) ? 'OANDA (' + ((ODS[sym] || {}).d || 'broker') + ', bid price)' : isK(sym) ? 'Kraken exchange (' + KFX[sym].d + ')' : isF(sym) ? (FFX[sym] ? 'Binance futures (' + sym.slice(2) + ' contract, follows spot ' + (sym === 'F:XAUUSDT' ? 'gold' : 'silver') + ')' : 'Binance futures (' + sym.slice(2) + ' perpetual contract)') : isT(sym) ? 'Twelve Data (' + ((TDS[sym] || {}).d || 'spot') + ')' : 'Binance exchange (spot)'; }
 function legend(ci) {
   var key = S.sym + S.tf + offOf(S.sym) + S.inds.map(function (i) { return i.id + indLabel(i); }).join() + '|' + S.cmp.join();
   if (key !== legKey) {
     legKey = key; elLegs.textContent = ''; legMain = h('span'); legEls = [];
-    elLegs.appendChild(h('div', { class: 'tc-leg' }, [h('b', { class: 'tc-title', text: symName(S.sym) }), h('span', { class: 'm', text: tfShort(S.tf) }), h('span', { class: 'tc-src' + (isF(S.sym) || isK(S.sym) ? ' warn' : ''), title: 'Where the prices on this chart come from', text: (isF(S.sym) || isK(S.sym) ? 'NOT MT5 price · ' : '') + 'Chart data: ' + srcName(S.sym) + (offOf(S.sym) ? ' · matched to your MT5 (' + (offOf(S.sym) > 0 ? '+' : '') + offOf(S.sym) + ')' : '') }), legMain]));
+    elLegs.appendChild(h('div', { class: 'tc-leg' }, [h('b', { class: 'tc-title', text: symName(S.sym) }), h('span', { class: 'm', text: tfShort(S.tf) }), h('span', { class: 'tc-src' + (FFX[S.sym] || isK(S.sym) ? ' warn' : ''), title: 'Where the prices on this chart come from', text: (FFX[S.sym] || isK(S.sym) ? 'NOT MT5 price · ' : '') + 'Chart data: ' + srcName(S.sym) + (offOf(S.sym) ? ' · matched to your MT5 (' + (offOf(S.sym) > 0 ? '+' : '') + offOf(S.sym) + ')' : '') }), legMain]));
     S.inds.forEach(function (ind) {
       var v = h('span'), row = h('div', { class: 'tc-leg' + (IND[ind.k].ov ? '' : ' abs') }, [h('span', { class: 'm', text: indLabel(ind) }), v, h('span', { class: 'x' }, [ind.k !== 'vol' && ind.k !== 'sess' && h('button', { title: 'Alert on this indicator', html: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/>', 14), onclick: function () { indAlert(ind); } }), h('button', { title: 'Settings', html: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>', 14), onclick: function () { indSettings(ind); } }), h('button', { title: 'Remove', html: svg('<path d="M6 6l12 12M18 6L6 18"/>', 14), onclick: function () { S.inds = S.inds.filter(function (q) { return q !== ind; }); save(); dirty(); } })])]);
       elLegs.appendChild(row); legEls.push({ ind: ind, row: row, v: v });
@@ -1473,14 +1478,14 @@ function symSearch(forWatch) {
   var show = function () {
     var s = q.value.trim().toUpperCase().replace(/[^A-Z0-9]/g, ''), n = 0; res.textContent = '';
     var crypto = list.filter(function (x) { return !x.cat; }), other = list.filter(function (x) { return x.cat; });
-    (s ? other.concat(crypto) : crypto.slice(0, 3).concat(other.filter(function (x) { return x.cat !== 'Stocks'; }).slice(0, 12), crypto.slice(3), other)).filter(function (x, i, a) { return a.indexOf(x) === i; }).forEach(function (x) {
-      if (n >= 120 || (tab !== 'All' && (tab === 'Forex' || tab === 'Gold' || tab === 'Stocks' ? x.cat !== tab : x.cat || x.q !== tab)) || (s && (x.f || x.s).indexOf(s) < 0)) return; if (s && !x.cat && x.b.indexOf(s) !== 0 && x.s.indexOf(s) !== 0 && n > 60) return; n++; x.c = (tick[x.s] || x).c; x.o = (tick[x.s] || x).o;
+    (s ? other.concat(crypto) : crypto.slice(0, 3).concat(other.filter(function (x) { return x.cat !== 'Stocks' && x.cat !== 'Futures'; }).slice(0, 12), crypto.slice(3), other)).filter(function (x, i, a) { return a.indexOf(x) === i; }).forEach(function (x) {
+      if (n >= 120 || (tab !== 'All' && (tab === 'Forex' || tab === 'Gold' || tab === 'Stocks' || tab === 'Futures' ? x.cat !== tab : x.cat || x.q !== tab)) || (s && (x.f || x.s).indexOf(s) < 0)) return; if (s && !x.cat && x.b.indexOf(s) !== 0 && x.s.indexOf(s) !== 0 && n > 60) return; n++; x.c = (tick[x.s] || x).c; x.o = (tick[x.s] || x).o;
       var inW = S.watch.indexOf(x.s) >= 0, star = h('button', { class: 'del tc-b' + (inW ? ' on' : ''), title: inW ? 'Remove from watchlist' : 'Add to watchlist', html: svg(inW ? IC.x : IC.plus, 14), onclick: function () { if (S.watch.indexOf(x.s) >= 0) S.watch = S.watch.filter(function (w) { return w !== x.s; }); else S.watch.push(x.s); tick[x.s] = tick[x.s] || { c: x.c, o: x.o }; save(); renderWatch(); connect(); show(); } });
       res.appendChild(symRow(x.s, x, function (sy) { if (forWatch) { star.click(); return; } closeModal(); if (cmpMode) addCmp(sy); else setSym(sy); }, star));
     });
     if (!n) res.appendChild(h('div', { class: 'tc-empty', text: tab === 'Stocks' && !S.tdKey && !RELAY ? 'Stocks need a Twelve Data key. Add it in settings (the gear button).' : 'No symbol matches. Available: gold, silver, forex and indices from an MT5 broker feed, and every Binance crypto pair.' }));
   };
-  ['All', 'Forex', 'Gold', 'Stocks', 'USDT', 'USDC', 'BTC', 'ETH'].forEach(function (t) { var b = h('button', { class: 'tc-b' + (t === tab ? ' on' : ''), text: t, onclick: function () { tab = t; Array.prototype.forEach.call(tabs.children, function (c) { c.classList.toggle('on', c === b); }); show(); } }); tabs.appendChild(b); });
+  ['All', 'Forex', 'Gold', 'Stocks', 'Futures', 'USDT', 'USDC', 'BTC', 'ETH'].forEach(function (t) { var b = h('button', { class: 'tc-b' + (t === tab ? ' on' : ''), title: t === 'Futures' ? 'Crypto perpetual futures (Binance)' : t === 'USDT' ? 'Crypto spot against USDT (Binance)' : t === 'Forex' ? 'Forex and broker crypto, MT5 broker prices' : t, text: t === 'Futures' ? 'Crypto futures' : t === 'USDT' ? 'Crypto spot' : t, onclick: function () { tab = t; Array.prototype.forEach.call(tabs.children, function (c) { c.classList.toggle('on', c === b); }); show(); } }); tabs.appendChild(b); });
   var stT = 0; q.addEventListener('input', function () {
     clearTimeout(stT); var v = q.value.trim(); if (!(S.tdKey || RELAY) || v.length < 2) return;
     stT = setTimeout(function () { fetch('https://api.twelvedata.com/symbol_search?symbol=' + encodeURIComponent(v) + '&outputsize=40').then(function (r) { return r.json(); }).then(function (j) {
