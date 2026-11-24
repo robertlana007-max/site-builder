@@ -1010,7 +1010,7 @@ write('404.html', layout({
 
 // ---------- crawl files ----------
 // Live Charts is its own full-screen page (src/charts.html), separate from the tools.
-write('charts/index.html', fs.readFileSync(path.join(ROOT, 'src/charts.html'), 'utf8').split('{{SITE}}').join(SITE).split('{{FIREBASE}}').join(JSON.stringify(cfg.firebase && cfg.firebase.apiKey ? cfg.firebase : null)));
+write('charts/index.html', fs.readFileSync(path.join(ROOT, 'src/charts.html'), 'utf8').split('{{SITE}}').join(SITE).split('{{FIREBASE}}').join(JSON.stringify(cfg.firebase && cfg.firebase.apiKey ? cfg.firebase : null)).split('{{CHARTSAPI}}').join(JSON.stringify(cfg.chartsApi || '')));
 const urls = ['', 'charts/', ...tools.map(t => t.slug + '/'), ...pages.filter(p => p.slug !== 'donate').map(p => p.slug + '/')];
 write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
