@@ -191,7 +191,7 @@ ${head}
 <body${bodyClass ? ` class="${bodyClass}"` : ''}>
 <header class="site-header"><div class="wrap">
   <a class="logo" href="${rel || './'}"><img src="${rel}assets/favicon.svg" alt="" width="30" height="30"><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
-  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
+  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a class="navcharts" href="${rel}charts/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4M7 15v6M17 3v6M17 17v4"/><rect x="5" y="7" width="4" height="8" rx=".5"/><rect x="15" y="9" width="4" height="8" rx=".5"/></svg><span>Live Charts</span></a><a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
   <span class="sp"></span>
   <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
   <button class="hbtn" id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
@@ -266,7 +266,7 @@ ${body}
 <footer class="site-footer"><div class="wrap">
   <div class="foot-grid">
     ${footCols.map(col => `<div><h2>${esc(col.title)}</h2>${col.items.map(t => `<a href="${rel}${t.slug}/">${esc(t.name)}</a>`).join('')}</div>`).join('\n    ')}
-    <div><h2>Site</h2><a href="${rel}guides/">Guides and tutorials</a><a href="${rel}donate/">Support us</a><a href="${rel}app/">Get the app</a><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
+    <div><h2>Site</h2><a href="${rel}charts/">Live Charts</a><a href="${rel}guides/">Guides and tutorials</a><a href="${rel}donate/">Support us</a><a href="${rel}app/">Get the app</a><a href="${rel}about/">About</a><a href="${rel}contact/">Contact</a><a href="${rel}privacy/">Privacy</a><a href="${rel}terms/">Terms</a></div>
   </div>
   <div class="foot-bottom">© ${YEAR} ${esc(cfg.siteName)}. ${tools.length} free tools that run in your browser.</div>
 </div></footer>
@@ -1009,7 +1009,9 @@ write('404.html', layout({
 }
 
 // ---------- crawl files ----------
-const urls = ['', ...tools.map(t => t.slug + '/'), ...pages.map(p => p.slug + '/')];
+// Live Charts is its own full-screen page (src/charts.html), separate from the tools.
+write('charts/index.html', fs.readFileSync(path.join(ROOT, 'src/charts.html'), 'utf8').split('{{SITE}}').join(SITE));
+const urls = ['', 'charts/', ...tools.map(t => t.slug + '/'), ...pages.map(p => p.slug + '/')];
 write('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls.map(u => `  <url><loc>${SITE}/${u}</loc><lastmod>${TODAY}</lastmod></url>`).join('\n')}
