@@ -192,7 +192,7 @@
 <script src="../assets/vendor/cm/addon/comment.js"></script>
 <script>
 (function () {
-  var KEY = 'gtn-playground', token = '', timer, count = 0;
+  var KEY = 'gtn-playground', token = '', timer, count = 0, loading = false, keepDraft = false; // keepDraft: code from a shared link is not saved over the visitor's own draft until they edit it
   var TPL = {
     hello: { h: '<h1>Hello, world!</h1>\n<p>Edit the HTML, CSS and JS tabs. The preview updates as you type.</p>\n<button id="btn">Say hello</button>', c: 'body {\n  font-family: system-ui, sans-serif;\n  padding: 24px;\n  color: #1f2937;\n}\nh1 { color: #4f46e5; }\nbutton {\n  padding: 10px 18px;\n  border: 0;\n  border-radius: 8px;\n  background: #4f46e5;\n  color: white;\n  font-size: 16px;\n  cursor: pointer;\n}', j: "document.getElementById('btn').addEventListener('click', function () {\n  console.log('Hello from the console!', { time: new Date().toLocaleTimeString() });\n});\nconsole.log('Page loaded');" },
     counter: { h: '<div class="box">\n  <p>You clicked <b id="n">0</b> times</p>\n  <button id="plus">+1</button>\n  <button id="reset">Reset</button>\n</div>', c: 'body { font: 18px system-ui, sans-serif; display: grid; place-items: center; min-height: 90vh; margin: 0; background: #f1f5f9; }\n.box { background: white; padding: 28px 36px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,.08); text-align: center; }\nbutton { font-size: 18px; padding: 8px 16px; margin: 4px; border-radius: 8px; border: 1px solid #cbd5e1; cursor: pointer; }', j: "let n = 0;\nconst out = document.getElementById('n');\ndocument.getElementById('plus').onclick = () => { out.textContent = ++n; console.log('count is', n); };\ndocument.getElementById('reset').onclick = () => { n = 0; out.textContent = n; console.warn('counter reset'); };" },
@@ -207,7 +207,7 @@
     extraKeys: { 'Ctrl-Enter': function () { run(); }, 'Cmd-Enter': function () { run(); }, 'Ctrl-/': 'toggleComment', 'Cmd-/': 'toggleComment', Tab: function (c) { if (c.somethingSelected()) c.indentSelection('add'); else c.replaceSelection('  '); } } });
   var docs = { h: CodeMirror.Doc('', 'htmlmixed'), c: CodeMirror.Doc('', 'css'), j: CodeMirror.Doc('', 'javascript') };
   cm.swapDoc(docs.h);
-  function load(c) { ['h', 'c', 'j'].forEach(function (k) { docs[k].setValue(c[k] || ''); docs[k].clearHistory(); }); }
+  function load(c) { loading = true; ['h', 'c', 'j'].forEach(function (k) { docs[k].setValue(c[k] || ''); docs[k].clearHistory(); }); loading = false; }
   function cur() { return { h: docs.h.getValue(), c: docs.c.getValue(), j: docs.j.getValue() }; }
   function tab(l) {
     lang = l; cm.swapDoc(docs[l]);
@@ -304,7 +304,11 @@
     if (forDownload) {
       var head = '<meta charset="utf-8">\n<meta name="viewport" content="width=device-width, initial-scale=1">\n<title>My page</title>\n' + style;
       var scr = js ? '<script>\n' + esc(js) + '\n<\/script>\n' : '';
-      if (full) return c.h.replace(/<head[^>]*>/i, function (m) { return m + '\n' + style; }).replace(/<\/body>/i, scr + '</body>');
+      if (full) {
+        var d = c.h;
+        if (style) d = /<head[^>]*>/i.test(d) ? d.replace(/<head[^>]*>/i, function (m) { return m + '\n' + style; }) : /<html[^>]*>/i.test(d) ? d.replace(/<html[^>]*>/i, function (m) { return m + '\n<head>\n' + style + '</head>'; }) : d.replace(/^(\s*<!doctype[^>]*>)?/i, function (m) { return m + '\n' + style; });
+        return /<\/body>/i.test(d) ? d.replace(/<\/body>/i, function () { return scr + '</body>'; }) : d + '\n' + scr;
+      }
       return '<!doctype html>\n<html lang="en">\n<head>\n' + head + '</head>\n<body>\n' + c.h + '\n' + scr + '</body>\n</html>\n';
     }
     var gj = js ? guard(js) : '';
@@ -343,6 +347,7 @@
     clearLog();
     var size = c.h.length + c.c.length + c.j.length;
     if (size > 2000000) { msg('This code is larger than 2 MB. Please make it smaller.', true); return; }
+    if (/larger than 2 MB/.test($('msg').textContent)) msg('Your code runs in a locked-down sandbox and is saved in this browser only. Share links contain the code itself; nothing is uploaded.');
     // a fresh iframe each run, so timers and listeners from the last run are gone
     var old = $('frame'), f = old.cloneNode(false); f.removeAttribute('srcdoc');
     f.style.height = old.style.height;
@@ -350,8 +355,8 @@
     f.srcdoc = build(c);
     save();
   }
-  function save() { try { localStorage.setItem(KEY, JSON.stringify(cur())); } catch (e) {} }
-  ['h', 'c', 'j'].forEach(function (k) { docs[k].on('change', function () { clearTimeout(timer); if ($('auto').checked) timer = setTimeout(run, 700); else timer = setTimeout(save, 700); }); });
+  function save() { if (keepDraft) return; try { localStorage.setItem(KEY, JSON.stringify(cur())); } catch (e) {} }
+  ['h', 'c', 'j'].forEach(function (k) { docs[k].on('change', function (d, ch) { if (!loading && !(ch && ch.origin === 'setValue')) { keepDraft = false; if (/^#pg/.test(location.hash)) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {} } clearTimeout(timer); if ($('auto').checked) timer = setTimeout(run, 700); else timer = setTimeout(save, 700); }); });
   $('run').addEventListener('click', run);
   $('clr').addEventListener('click', clearLog);
   $('repl').addEventListener('keydown', function (e) {
@@ -364,6 +369,7 @@
     var t = TPL[$('tpl').value]; if (!t) return;
     var now = cur();
     if ((now.h + now.c + now.j).trim() && !confirm('Replace your current code with this template?')) { $('tpl').value = ''; return; }
+    keepDraft = false; if (/^#pg/.test(location.hash)) try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
     load(t); $('tpl').value = ''; tab('h'); run();
   });
   // share links: the code is compressed into the part of the address after #, which is never sent to a server
@@ -398,13 +404,13 @@
   // start: a shared link wins, then the saved draft, then the hello template
   var saved = null; try { saved = JSON.parse(localStorage.getItem(KEY)); } catch (e) {}
   decode(location.hash).then(function (shared) {
-    if (shared) { load(shared); msg('Loaded the code from the shared link. Your own saved draft is replaced when you edit.'); }
+    if (shared) { keepDraft = true; load(shared); msg('Loaded the code from the shared link. Your own saved draft is replaced when you edit.'); }
     else if (saved && typeof saved === 'object' && (saved.h || saved.c || saved.j)) load({ h: String(saved.h || ''), c: String(saved.c || ''), j: String(saved.j || '') });
     else load(TPL.hello);
     run();
   }).catch(function () { load(saved && saved.h !== undefined ? saved : TPL.hello); msg('The shared link is damaged or incomplete, so it could not be opened.', true); run(); });
   window.addEventListener('hashchange', function () { // a shared link pasted into this same tab
-    decode(location.hash).then(function (shared) { if (shared) { load(shared); tab('h'); run(); msg('Loaded the code from the shared link.'); } }).catch(function () { msg('The shared link is damaged or incomplete, so it could not be opened.', true); });
+    decode(location.hash).then(function (shared) { if (shared) { keepDraft = true; load(shared); tab('h'); run(); msg('Loaded the code from the shared link.'); } }).catch(function () { msg('The shared link is damaged or incomplete, so it could not be opened.', true); });
   });
 })();
 </script>

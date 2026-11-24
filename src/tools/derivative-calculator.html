@@ -53,8 +53,9 @@
   function numCheck(f, d, v) {
     var fe = C.compile(f, v), de = C.compile(d, v), n = 0, bad = 0;
     [0.37, 0.83, 1.41, 2.29, -0.61, -1.73, 3.3, 0.11].forEach(function (x0) {
-      var h = 1e-5 * Math.max(1, Math.abs(x0)), a = (fe(x0 + h) - fe(x0 - h)) / (2 * h), b = de(x0);
-      if (!isFinite(a) || !isFinite(b) || Math.abs(a) > 1e8) return;
+      // central differences at two step sizes; where they disagree the function changes too fast to check here, so skip the point
+      var h = 1e-4 * Math.max(1, Math.abs(x0)), a1 = (fe(x0 + h) - fe(x0 - h)) / (2 * h), a2 = (fe(x0 + h / 2) - fe(x0 - h / 2)) / h, a = (4 * a2 - a1) / 3, b = de(x0);
+      if (!isFinite(a) || !isFinite(b) || Math.abs(a) > 1e8 || Math.abs(a1 - a2) > 1e-3 * Math.max(1, Math.abs(a2))) return;
       n++; if (Math.abs(a - b) > 1e-4 * Math.max(1, Math.abs(b))) bad++;
     });
     return n >= 3 ? (bad ? 'bad' : 'ok') : 'skip';
@@ -112,7 +113,8 @@
       if (ord === 1 && isFinite(y0) && isFinite(m)) {
         tangent = { m: m, x0: x0, y0: y0, color: '#0f9d58' };
         var b = y0 - m * x0;
-        $('tan').textContent = 'Tangent line at x = ' + fmt(x0) + ':  y = ' + fmt(m) + v + (b < 0 ? ' − ' + fmt(-b) : ' + ' + fmt(b)) + '. The slope of the curve at this point is ' + fmt(m) + '.';
+        var line = m === 0 ? fmt(b) : (m === 1 ? '' : m === -1 ? '−' : fmt(m)) + v + (b < 0 ? ' − ' + fmt(-b) : b > 0 ? ' + ' + fmt(b) : '');
+        $('tan').textContent = 'Tangent line at ' + v + ' = ' + fmt(x0) + ':  y = ' + line + '. The slope of the curve at this point is ' + fmt(m) + '.';
         $('legT').hidden = false;
       } else $('tan').textContent = isFinite(m) ? '' : 'The derivative is not defined at this point.';
     }

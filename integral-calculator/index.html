@@ -188,10 +188,13 @@
     var env = {}; others.forEach(function (s, i) { env[s] = 1.3 + i * 0.7; });
     var n = 0, bad = 0;
     [0.31, 0.77, 1.29, 2.13, 3.7, -0.43, -1.61, -2.9, 0.05, 5.3].forEach(function (x0) {
-      var h = 1e-5 * Math.max(1, Math.abs(x0)), e1 = Object.assign({}, env), e2 = Object.assign({}, env), e3 = Object.assign({}, env);
+      var h = 1e-4 * Math.max(1, Math.abs(x0)), e1 = Object.assign({}, env), e2 = Object.assign({}, env), e3 = Object.assign({}, env);
       e1[v] = x0 + h; e2[v] = x0 - h; e3[v] = x0;
       var d = (C.evaluate(F, e1) - C.evaluate(F, e2)) / (2 * h), y = C.evaluate(f, e3);
-      if (!isFinite(d) || !isFinite(y) || Math.abs(y) > 1e7) return;
+      e1[v] = x0 + h / 2; e2[v] = x0 - h / 2;
+      var d2 = (C.evaluate(F, e1) - C.evaluate(F, e2)) / h; // where two step sizes disagree, F changes too fast to check at this point
+      if (!isFinite(d) || !isFinite(y) || Math.abs(y) > 1e7 || !(Math.abs(d - d2) <= 1e-3 * Math.max(1, Math.abs(d2)))) return;
+      d = (4 * d2 - d) / 3;
       n++; if (Math.abs(d - y) > 1e-4 * Math.max(1, Math.abs(y))) bad++;
     });
     return n >= 3 && !bad;
@@ -231,6 +234,50 @@
     var n = C.parse(t, { vars: [], strictVars: true, allowInf: true }), val = C.evaluate(n, {});
     if (isNaN(val)) throw new C.Err('A limit must be a number, like 0, 2.5, pi/2 or inf.');
     return { node: n, v: val };
+  }
+  // numerical value with singularity handling: a point inside [a, b] where f blows up or is undefined is found
+  // and the integral is split there, so integrable singularities (ln|x| on [-1, 1]) work and poles (tan x on [0, pi]) are caught
+  function findSing(fe, a, b) {
+    var n = 400, w = b - a, best = -1, bestY = -1;
+    for (var k = 0; k <= n; k++) {
+      var x = a + w * k / n, y = fe(x);
+      if (!isFinite(y)) { if (k > 0 && k < n) { var l = fe(x - w * 1e-4), r = fe(x + w * 1e-4); return { x: x, nan: isNaN(y) && (isNaN(l) || isNaN(r)) }; } continue; }
+      if (Math.abs(y) > bestY) { bestY = Math.abs(y); best = k; }
+    }
+    if (best <= 0 || best >= n) return null;
+    var edge = w * 1e-6;
+    var lo = a + w * (best - 1) / n, hi = a + w * (best + 1) / n, m30 = 0, xm = (lo + hi) / 2;
+    for (var it = 0; it < 90 && hi > lo; it++) {
+      var m1 = lo + (hi - lo) / 3, m2 = hi - (hi - lo) / 3, y1 = Math.abs(fe(m1)), y2 = Math.abs(fe(m2));
+      if (!isFinite(y1)) { xm = m1; m30 = 0; bestY = Infinity; break; }
+      if (!isFinite(y2)) { xm = m2; m30 = 0; bestY = Infinity; break; }
+      if (y1 > y2) hi = m2; else lo = m1;
+      xm = (lo + hi) / 2; bestY = Math.max(y1, y2);
+      if (it === 29) m30 = bestY;
+    }
+    if (xm - a < edge || b - xm < edge) return null; // next to an end: handled by the end checks and the integrator
+    if (bestY === Infinity || (m30 > 0 && bestY > 100 * m30 && bestY > 1e6)) return { x: xm, nan: false };
+    return null;
+  }
+  // how fast |f| grows next to a point c (|f| ~ d^-p): p >= 1 means the area there is infinite
+  function growth(fe, c, dir, w) {
+    var f1 = Math.abs(fe(c + dir * w * 1e-4)), f2 = Math.abs(fe(c + dir * w * 1e-8));
+    if (!isFinite(f2)) return isNaN(f2) ? 0 : 9;
+    if (!isFinite(f1) || f2 < 1e4) return 0;
+    return Math.log(f2 / f1) / Math.log(1e4);
+  }
+  function numInt(fe, a, b, depth) {
+    if (!isFinite(a) || !isFinite(b) || a === b) return C.integrateNum(fe, a, b);
+    var lo = Math.min(a, b), hi = Math.max(a, b), w = hi - lo;
+    if (!depth) { if (growth(fe, lo, 1, w) > 0.995) return { ok: false, pole: true, at: lo }; if (growth(fe, hi, -1, w) > 0.995) return { ok: false, pole: true, at: hi }; }
+    var s = findSing(fe, lo, hi);
+    if (!s) return C.integrateNum(fe, a, b);
+    if (s.nan) return { ok: false, domain: true, at: s.x, value: NaN, error: Infinity };
+    if (depth > 8 || growth(fe, s.x, -1, w) > 0.995 || growth(fe, s.x, 1, w) > 0.995) return { ok: false, pole: true, at: s.x, value: NaN, error: Infinity };
+    var L = numInt(fe, lo, s.x, depth + 1), R = numInt(fe, s.x, hi, depth + 1);
+    if (L.domain || R.domain) return L.domain ? L : R;
+    if (!L.ok || !R.ok) return { ok: false, pole: !!(L.pole || R.pole), at: L.pole ? L.at : R.pole ? R.at : s.x, value: NaN, error: Infinity };
+    return { ok: true, value: (a < b ? 1 : -1) * (L.value + R.value), error: L.error + R.error };
   }
   function run() {
     var id = ++runId, src = $('fx').value, v = ($('var').value || 'x').trim(), def = $('mode').value === 'd';
@@ -283,10 +330,9 @@
       var sp = C.text(F).match(/\b(erf|Si|Ci|Ei)\(/);
       if (sp) msg({ erf: 'erf is the error function, erf(x) = (2/√π) ∫₀ˣ e^(−t²) dt. It is not an elementary function, but it is standard and tabulated.', Si: 'Si is the sine integral, Si(x) = ∫₀ˣ sin(t)/t dt, a standard special function.', Ci: 'Ci is the cosine integral, a standard special function.', Ei: 'Ei is the exponential integral, a standard special function.' }[sp[1]]);
     } else {
-      var fe = C.compile(f, v), N = C.integrateNum(fe, A.v, B.v), exactTxt = '';
-      var blowUp = false;
-      if (isFinite(A.v) && isFinite(B.v)) for (var k = 0; k <= 400; k++) { var y = fe(A.v + (B.v - A.v) * k / 400); if (k > 0 && k < 400 && !isFinite(y)) blowUp = true; }
-      if (F && isFinite(A.v) && isFinite(B.v) && !blowUp) {
+      var fe = C.compile(f, v), N = numInt(fe, A.v, B.v, 0), exactTxt = '';
+      var blowUp = !!N.pole, noReal = !!N.domain;
+      if (F && isFinite(A.v) && isFinite(B.v) && !blowUp && !noReal) {
         try {
           var Fa = C.subst(F, v, A.node), Fb = C.subst(F, v, B.node), ex = C.tidy(C.sub(Fb, Fa)), ev = C.evaluate(ex, {});
           if (isFinite(ev) && N.ok && Math.abs(ev - N.value) <= 1e-6 * Math.max(1, Math.abs(ev)) && C.size(ex) < 60) exactTxt = C.html(ex);
@@ -294,11 +340,12 @@
         } catch (e) { if (!(e instanceof C.Err)) throw e; }
       }
       $('resLbl').textContent = 'Value of the definite integral';
-      if (!N.ok || !isFinite(N.value) || blowUp) {
+      if (!N.ok || !isFinite(N.value) || blowUp || noReal) {
         html = '<span class="ic-int">∫</span><sub>' + C.html(A.node) + '</sub><sup>' + C.html(B.node) + '</sup> ' + C.html(f) + ' d<i>' + v + '</i>';
-        numTxt = 'Does not converge';
         check = '';
-        msg(blowUp ? 'The function goes to infinity inside the interval, so this integral has no finite value (or it needs to be split at that point).' : 'The integral does not settle on a finite value. It probably diverges (grows without limit).', true);
+        var atT = N.at !== undefined && Math.abs(N.at) < 1e-9 ? '0' : fmt(+(+N.at).toPrecision(6));
+        msg(noReal ? 'The function is not a real number for part of the interval (near ' + v + ' = ' + atT + '), for example a square root or log of a negative number, so this integral has no real value.' : blowUp ? 'The function goes to infinity at ' + v + ' ≈ ' + atT + ' and the area there is infinite, so this integral has no finite value.' : 'The integral does not settle on a finite value. It probably diverges (grows without limit), or it oscillates too slowly for a numerical answer.', true);
+        numTxt = noReal ? 'No real value' : 'Does not converge';
         copy = 'diverges';
       } else {
         html = '<span class="ic-int">∫</span><sub>' + C.html(A.node) + '</sub><sup>' + C.html(B.node) + '</sup> ' + C.html(f) + ' d<i>' + v + '</i>' + (exactTxt ? ' = ' + exactTxt : '');
@@ -354,7 +401,7 @@
 <section class="guide" id="tutorial"><h2>Step-by-step tutorial: how to use Integral Calculator</h2><ol class="tut"><li><h3>Type the function</h3><p>Enter the integrand, for example x e^x or 1/(1 + x^2). You can leave out * between a number and a letter.</p></li><li><h3>Choose the type</h3><p>Indefinite gives the antiderivative + C. Definite asks for a lower limit a and upper limit b.</p></li><li><h3>Enter limits</h3><p>Limits can be numbers or expressions such as pi/2, sqrt(2) or e, and inf or -inf for infinity.</p></li><li><h3>Read the answer</h3><p>For indefinite integrals you get F(x) + C, checked by differentiation. For definite integrals you get the exact value when one is found, and always a decimal value.</p></li><li><h3>Read the steps</h3><p>For integrals solved with basic rules, each step shows the rule and the result. For harder ones, the tool says which technique is usually needed and shows that the answer was verified.</p></li><li><h3>Look at the graph</h3><p>In definite mode the area is shaded; parts below the x-axis count as negative. In indefinite mode the dashed curve is F(x) with C = 0.</p></li></ol></section>
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Steps for common integrals</b>Sum, constant multiple, power, reciprocal, exponential, trigonometric and hyperbolic rules, with linear substitution.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Harder integrals</b>Integration by parts, partial fractions and more through the nerdamer algebra engine, loaded only when needed.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Verified answers</b>Every antiderivative is differentiated numerically and compared with your function.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Accurate numbers</b>Adaptive Gauss–Kronrod integration with an error estimate, also for infinite limits.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Honest results</b>Tells you when no antiderivative is found or when an integral diverges.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Graph with shading</b>See the area you are calculating.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: ∫ from 0 to 3 of x² dx</h2><p>The power rule gives the antiderivative F(x) = x³/3. The definite integral is F(3) − F(0) = 27/3 − 0 = 9, and the numerical check also gives 9. The graph shades the area under the parabola from 0 to 3. Switching to indefinite shows ∫ x² dx = x³/3 + C.</p></div></section>
-<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Always add + C to an indefinite integral: any constant gives a valid antiderivative.</li><li>ln|x| is used for ∫ 1/x dx so the answer also works for negative x.</li><li>Some functions, like e^(−x²) and sin(x)/x, have no antiderivative in elementary functions; the tool may express them with erf or Si, or you can use a definite integral for a number.</li><li>If a function goes to infinity inside your interval, split the integral at that point; the tool warns you.</li><li>Antiderivatives can look different but differ only by a constant, for example −cos²(x)/2 and sin²(x)/2.</li></ul></section>
+<section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>Always add + C to an indefinite integral: any constant gives a valid antiderivative.</li><li>ln|x| is used for ∫ 1/x dx so the answer also works for negative x.</li><li>Some functions, like e^(−x²) and sin(x)/x, have no antiderivative in elementary functions; the tool may express them with erf or Si, or you can use a definite integral for a number.</li><li>If a function goes to infinity inside your interval, the tool splits the integral at that point by itself: it gives the value when the area is finite (like ln|x| from −1 to 1) and warns you when it is infinite (like tan x from 0 to π).</li><li>Antiderivatives can look different but differ only by a constant, for example −cos²(x)/2 and sin²(x)/2.</li></ul></section>
 <section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>No antiderivative was found</summary><p>The integral may have no formula in standard functions, or it may be beyond this tool. Definite integrals still work numerically.</p></details><details><summary>It says the integral does not converge</summary><p>The area is infinite, or the function blows up inside the interval, as with 1/x from −1 to 1.</p></details><details><summary>The answer looks different from my book</summary><p>Antiderivatives can differ by a constant or be written in another form. Differentiate both or compare values to check.</p></details><details><summary>Working on it… stays for a moment</summary><p>Harder integrals load the algebra engine the first time, which takes a second on slow connections.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>

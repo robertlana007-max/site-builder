@@ -133,6 +133,8 @@
 .fg-fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px 14px; margin-bottom: 12px; }
 .fg-fields label { font-size: 13px; margin-bottom: 4px; font-family: var(--mono); }
 .fg-fields select, .fg-fields input { min-height: 40px; padding: 6px 10px; }
+.fg-fields [aria-invalid="true"] { border-color: var(--bad); }
+.fg-bad { display: block; color: var(--bad); font-size: 12px; margin-top: 3px; }
 .fg-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 14px; }
 .fg-box h3 { margin: 0 0 10px !important; font-size: 15px; }
 .fg-code { background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font: 13.5px/1.55 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 8px 0 0; max-height: 360px; overflow: auto; }
@@ -177,7 +179,9 @@
     d.innerHTML = html;
     var el = d.querySelector('select,input');
     var last = el.value;
-    function fire() { if (el.value === last) return; last = el.value; onset(el.value); } // a change event on blur must not rebuild the boxes, or the click that caused the blur is lost
+    function check() { var bad = !Array.isArray(p[1]) && !valid(p[0], el.value), note = d.querySelector('.fg-bad'); el.setAttribute('aria-invalid', bad ? 'true' : 'false'); if (bad && !note) { note = document.createElement('small'); note.className = 'fg-bad'; note.textContent = 'Not valid for ' + p[0] + ', so it is left out of the code.'; d.appendChild(note); } else if (!bad && note) note.remove(); }
+    function fire() { if (el.value === last) return; last = el.value; check(); onset(el.value); } // a change event on blur must not rebuild the boxes, or the click that caused the blur is lost
+    check();
     el.addEventListener('input', fire);
     el.addEventListener('change', fire);
     return d;
@@ -197,9 +201,10 @@
     props.forEach(function (p) { c.appendChild(field(p, obj[p[0]], function (v) { obj[p[0]] = v; paint(); }, 'i-')); });
   }
   function safe(v) { return String(v).replace(/[;{}<>]/g, ''); }
+  function valid(prop, v) { v = String(v).trim(); if (!v) return true; if (/[;{}<>]/.test(v)) return false; try { return !window.CSS || !CSS.supports || CSS.supports(prop, v); } catch (e) { return true; } }
   function itemCss(it) {
     var props = mode === 'flex' ? FITEM : GITEM, obj = mode === 'flex' ? it.f : it.g, out = [];
-    props.forEach(function (p) { var def = Array.isArray(p[1]) ? p[1][0] : p[2]; if (String(obj[p[0]]).trim() !== def && String(obj[p[0]]).trim() !== '') out.push([p[0], safe(obj[p[0]]).trim()]); });
+    props.forEach(function (p) { var def = Array.isArray(p[1]) ? p[1][0] : p[2]; if (String(obj[p[0]]).trim() !== def && String(obj[p[0]]).trim() !== '' && valid(p[0], obj[p[0]])) out.push([p[0], safe(obj[p[0]]).trim()]); });
     return out;
   }
   function paint() {
@@ -226,7 +231,7 @@
   function css() {
     var obj = mode === 'flex' ? st.flex : st.grid, props = mode === 'flex' ? FLEX : GRID;
     var lines = ['.container {', '  display: ' + mode + ';'];
-    props.forEach(function (p) { var def = p[1] === 'text' ? '' : p[1][0], v = safe(obj[p[0]]).trim(); if (v && (p[1] === 'text' || v !== def)) lines.push('  ' + p[0] + ': ' + v + ';'); });
+    props.forEach(function (p) { var def = p[1] === 'text' ? '' : p[1][0], v = safe(obj[p[0]]).trim(); if (v && valid(p[0], obj[p[0]]) && (p[1] === 'text' || v !== def)) lines.push('  ' + p[0] + ': ' + v + ';'); });
     lines.push('}');
     st.items.forEach(function (it, i) { var ic = itemCss(it); if (ic.length) { lines.push('', '.item:nth-child(' + (i + 1) + ') {'); ic.forEach(function (x) { lines.push('  ' + x[0] + ': ' + x[1] + ';'); }); lines.push('}'); } });
     return lines.join('\n');
@@ -253,7 +258,7 @@
 <section class="guide" id="features"><h2>Features</h2><ul class="feats"><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Flexbox and Grid</b>All common container and item properties for both layout systems.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Per-item settings</b>Select any box to set its own flex or grid placement.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Suggestions</b>Text fields offer common values like repeat(3, 1fr) or span 2.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Resizable preview</b>Drag the container corner to test responsive behavior.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Minimal CSS</b>Only values that differ from the defaults are written.</span></li><li><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg><span><b>Up to 24 boxes</b>Enough to test wrapping and grid auto-placement.</span></li></ul></section>
 <section class="guide" id="example"><div class="example"><h2>Worked example: a header bar</h2><p>In Flexbox, set justify-content to space-between and align-items to center. Box 1 moves to the left edge, box 5 to the right edge and the rest spread evenly. Click box 2 and set flex-grow to 1: it now takes up the spare space, like a search field in a header. Copy CSS gives .container { display: flex; justify-content: space-between; align-items: center; gap: 10px; } and .item:nth-child(2) { flex-grow: 1; }.</p></div></section>
 <section class="guide" id="tips"><h2>Tips and tricks</h2><ul class="tips"><li>justify-content works along the main axis (a row by default) and align-items across it; switching flex-direction to column swaps them.</li><li>align-content only has an effect when items wrap onto more than one line.</li><li>In grid, 1 / -1 in grid-column makes an item span every column.</li><li>The fr unit shares out leftover space, so 1fr 2fr gives the second column twice as much.</li><li>Use gap instead of margins between items; it does not add space at the outer edges.</li></ul></section>
-<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>justify-content does nothing</summary><p>There is no spare space: the boxes already fill the row, or one has flex-grow. Make the container wider or remove flex-grow.</p></details><details><summary>align-items: center does not center vertically</summary><p>The container must be taller than its items. Drag the container corner down or give it a height.</p></details><details><summary>My grid value is ignored</summary><p>An invalid value, such as a missing bracket, is ignored by the browser. Check the spelling, for example repeat(3, 1fr).</p></details><details><summary>The copied CSS uses .container and .item</summary><p>Rename these classes to match your own HTML, or use Copy HTML to get matching markup.</p></details></div></section>
+<section class="guide" id="problems"><h2>Problems and how to fix them</h2><div class="faq probs"><details><summary>justify-content does nothing</summary><p>There is no spare space: the boxes already fill the row, or one has flex-grow. Make the container wider or remove flex-grow.</p></details><details><summary>align-items: center does not center vertically</summary><p>The container must be taller than its items. Drag the container corner down or give it a height.</p></details><details><summary>My grid value is ignored</summary><p>An invalid value, such as a missing bracket, is marked in red and left out of the CSS code. Check the spelling, for example repeat(3, 1fr).</p></details><details><summary>The copied CSS uses .container and .item</summary><p>Rename these classes to match your own HTML, or use Copy HTML to get matching markup.</p></details></div></section>
 
 <h2 id="faq">Questions and answers</h2>
 <div class="faq"><details open><summary>What is the difference between flexbox and grid?</summary><p>Flexbox lays items out in one direction, a row or a column. Grid places items in rows and columns at the same time.</p></details><details><summary>Why does align-content not change anything?</summary><p>It only affects multiple lines, so set flex-wrap to wrap and add enough boxes to fill more than one row.</p></details><details><summary>Can I type my own values?</summary><p>Yes. Text fields such as gap, flex-basis and grid-template-columns accept any valid CSS value.</p></details><details><summary>Is the preview the same as a real browser?</summary><p>Yes. The boxes are real HTML elements laid out by your browser using the CSS shown.</p></details></div>

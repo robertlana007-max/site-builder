@@ -65,7 +65,7 @@
         if (/[a-z]/.test(c)) throw new ChemErr('"' + c + '" should be a capital letter. Element symbols start with a capital, like Na or Cl.');
         if (c === ')' || c === ']' || c === '}') throw new ChemErr('There is a "' + c + '" without a matching opening bracket.');
         if (c === '·' || c === '.') break;
-        throw new ChemErr('"' + c + '" is not allowed in a formula.');
+        throw new ChemErr('"' + String.fromCodePoint(body.codePointAt(i)) + '" is not allowed in a formula.');
       }
       if (!any) throw new ChemErr('Something is missing in "' + src + '".');
       return out;
@@ -131,7 +131,7 @@
       if (c === '}' || c === ')' || c === ']') depth--;
       if (c === '+' && depth === 0 && s[i - 1] !== '^') {
         var rest = s.slice(i + 1).replace(/^\s+/, ''), spaced = /\s/.test(s[i - 1] || '') || /\s/.test(s[i + 1] || '');
-        if (rest === '' ) { cur += c; continue; }
+        if (rest === '') { if (/\s/.test(s[i - 1] || '') || !cur.trim()) throw new ChemErr('Something is missing after the last "+". Remove it or add the missing substance.'); cur += c; continue; }
         if (/^[A-Z(\[{\d]/.test(rest) || (/^e(?![a-z])/.test(rest) && (spaced || /[A-Za-z)\]}\d+-]/.test(s[i - 1] || '')))) { if (cur.trim()) { parts.push(cur.trim()); cur = ''; continue; } }
         if (spaced && cur.trim() && !/^\+/.test(rest)) { parts.push(cur.trim()); cur = ''; continue; }
       }

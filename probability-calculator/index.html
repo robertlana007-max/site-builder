@@ -243,9 +243,10 @@
   function bin() {
     var n = int('bn', 'n', 100000), p = prob('bp', 'p'), k = int('bk', 'k');
     if (k > n) throw new Error('k cannot be larger than n.');
-    var eq = pmf(n, k, p), le = 0, ps = [];
-    for (var i = 0; i <= n; i++) { var v = pmf(n, i, p); ps.push(v); if (i <= k) le += v; }
-    var lt = le - eq, ge = 1 - lt, gt = 1 - le;
+    var eq = pmf(n, k, p), lt = 0, gt = 0, ps = [];
+    for (var i = 0; i <= n; i++) { var v = pmf(n, i, p); ps.push(v); if (i < k) lt += v; else if (i > k) gt += v; }
+    // each tail is summed on its own, so a tiny tail is not lost by computing 1 − (almost 1)
+    var le = lt + eq, ge = gt + eq;
     var clamp = function (v) { return Math.min(1, Math.max(0, v)); };
     $('bOut').innerHTML = stat([['P(X = ' + k + ')', f(eq)], ['P(X ≤ ' + k + ')', f(clamp(le))], ['P(X < ' + k + ')', f(clamp(lt))], ['P(X ≥ ' + k + ')', f(clamp(ge))], ['P(X > ' + k + ')', f(clamp(gt))], ['Mean np', f(n * p)], ['Standard deviation', f(Math.sqrt(n * p * (1 - p)))]]);
     $('bWork').textContent = 'P(X = k) = C(n, k) × pᵏ × (1 − p)ⁿ⁻ᵏ = C(' + n + ', ' + k + ') × ' + f(p) + '^' + k + ' × ' + f(1 - p) + '^' + (n - k) + ' = ' + f(eq) + ' (' + pc(eq) + ').';
@@ -259,7 +260,7 @@
   function rep() {
     var p = prob('rp', 'p'), n = int('rn', 'n', 1e9);
     if (n < 1) throw new Error('n must be at least 1.');
-    var none = Math.pow(1 - p, n), one = 1 - none, half = p > 0 && p < 1 ? Math.ceil(Math.log(0.5) / Math.log(1 - p)) : p === 1 ? 1 : Infinity;
+    var lq = Math.log1p(-p), none = p === 1 ? 0 : Math.exp(n * lq), one = p === 1 ? 1 : -Math.expm1(n * lq), half = p > 0 && p < 1 ? Math.ceil(Math.log(0.5) / lq) : p === 1 ? 1 : Infinity;
     $('rOut').innerHTML = stat([['At least once', f(one) + ' (' + pc(one) + ')'], ['Never', f(none) + ' (' + pc(none) + ')'], ['Every time', f(Math.pow(p, n))], ['Tries for a 50% chance', isFinite(half) ? fmtNum(half) : 'never'], ['Expected number of times', f(n * p)]]);
     $('rWork').textContent = 'P(at least once) = 1 − (1 − p)ⁿ = 1 − (1 − ' + f(p) + ')^' + n + ' = ' + f(one) + '. For example, the chance of at least one six in 4 rolls of a die is 1 − (5/6)⁴ ≈ 0.5177.';
   }
