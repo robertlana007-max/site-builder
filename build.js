@@ -683,6 +683,7 @@ ${analytics}
 ${adsPolicy}
 <h2>Hosting</h2>
 <p>The site is served by GitHub Pages, which may log technical data such as IP addresses for security purposes. See the <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">GitHub privacy statement</a>.</p>
+<p>Tool pages load one heading font from Google Fonts, so your browser asks Google for that font file. Google can see your IP address for that request. See the <a href="https://developers.google.com/fonts/faq/privacy" rel="noopener">Google Fonts privacy FAQ</a>.</p>
 <h2>Contact</h2>
 ${contact}` },
   { slug: 'terms', title: 'Terms of Use', desc: `Terms for using the free tools on ${cfg.siteName}.`, html: `
