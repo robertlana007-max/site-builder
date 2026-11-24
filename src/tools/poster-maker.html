@@ -274,9 +274,9 @@
   // largest size at which text wraps into the box
   function block(t, font, max, min, w, h, lh) {
     lh = lh || 1.18;
-    for (var s = max; s >= min; s *= 0.94) { var L = []; lines(t).forEach(function (p) { L = L.concat(GD.wrap(p, font, s, w)); }); if (L.length * s * lh <= h && L.every(function (l) { return GD.width(l, font, s) <= w + 0.5; })) return { lines: L, s: s, h: L.length * s * lh, lh: lh }; }
+    for (var s = max; s >= min; s *= 0.94) { var L = []; lines(t).forEach(function (p) { L = L.concat(GD.wrap(p, font, s, w)); }); if (L.length * s * lh <= h && L.every(function (l) { return GD.width(l, font, s) <= w + 0.5; })) return { lines: L, s: s, h: L.length * s * lh, lh: lh, w: Math.max.apply(null, L.map(function (l) { return GD.width(l, font, s); }).concat(0)) }; }
     var LL = []; lines(t).forEach(function (p) { LL = LL.concat(GD.wrap(p, font, min, w)); }); var n = Math.max(1, Math.floor(h / (min * lh)));
-    return { lines: LL.slice(0, n), s: min, h: Math.min(LL.length, n) * min * lh, lh: lh, cut: LL.length > n };
+    return { lines: LL.slice(0, n), s: min, h: Math.min(LL.length, n) * min * lh, lh: lh, cut: LL.length > n, w: w };
   }
   function put(ops, b, x, y, font, fill, align, width) { b.lines.forEach(function (l, i) { ops.push({ k: 'text', t: l, x: align === 'center' ? x + width / 2 : align === 'right' ? x + width : x, y: y + b.s * 0.9 + i * b.s * b.lh, font: font, s: b.s, fill: fill, align: align }); }); return y + b.h; }
   function rng(seed) { return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
@@ -319,9 +319,9 @@
     if (d.sub) { var sb = tb(d.sub, tpl === 'notice' ? 'serifb' : 'sansb', 7 * u, 2.4 * u, colW, rest * 0.16); y = put(ops, sb, colX, y + 2.5 * u, tpl === 'notice' ? 'serifb' : 'sansb', tx, align, colW); }
     if (imgH) { ops.push({ k: 'img', img: IMG, x: M, y: y + 3 * u, w: CW, h: imgH, fit: 'cover', clip: 2 * u }); y += imgH + 3 * u; }
     if (lines(d.det).length) {
-      var db = tb(d.det, 'sansb', 5.2 * u, 2 * u, colW - (tpl === 'event' ? 6 * u : 0), rest * 0.22);
+      var boxed = tpl === 'event' || tpl === 'party', db = tb(d.det, 'sansb', 5.2 * u, 2 * u, boxed ? colW - 6 * u : colW, rest * 0.22); // the details must fit inside their box
       y += 4 * u;
-      if (tpl === 'event' || tpl === 'party') { ops.push({ k: 'rect', x: colX + (align === 'center' ? colW * 0.1 : 0), y: y - 1.5 * u, w: align === 'center' ? colW * 0.8 : colW, h: db.h + 3 * u, r: 2 * u, fill: ac, op: tpl === 'party' ? 0.2 : 0.18 }); }
+      if (tpl === 'event' || tpl === 'party') { ops.push({ k: 'rect', x: colX + (align === 'center' ? Math.max(0, (colW - 6 * u - db.w) / 2) : 0), y: y - 1.5 * u, w: align === 'center' ? Math.min(colW, db.w + 6 * u) : colW, h: db.h + 3 * u, r: 2 * u, fill: ac, op: tpl === 'party' ? 0.2 : 0.18 }); }
       y = put(ops, db, colX + (tpl === 'event' && align !== 'center' ? 3 * u : 0), y, 'sansb', tpl === 'sale' || tpl === 'event' ? ac : tx, align, colW - (tpl === 'event' && align !== 'center' ? 6 * u : 0));
       if (tpl === 'event' || tpl === 'party') y += 1.5 * u;
     }

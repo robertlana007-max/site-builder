@@ -426,16 +426,41 @@
     var dirs = DIRS[level], longest = 0, total = 0;
     words.forEach(function (w) { longest = Math.max(longest, w.g.length); total += w.g.length; });
     var n = size === 'auto' ? Math.max(8, longest, Math.ceil(Math.sqrt(total * (level === 'easy' ? 2.2 : 1.8)))) : +size;
-    if (size !== 'auto' && longest > n) return { err: 'The longest word has ' + longest + ' letters, which does not fit a ' + n + ' × ' + n + ' grid. Choose a bigger grid or Automatic.' };
+    if (size !== 'auto' && longest > n) return { err: 'The longest word has ' + longest + ' letters, which does not fit the ' + n + ' × ' + n + ' grid. Choose a bigger grid or Automatic.' };
     for (; n <= 40; n++) {
       for (var a = 0; a < (size === 'auto' ? 25 : 120); a++) { var r = tryPlace(words, n, dirs); if (r) return finish(r, n, words); }
-      if (size !== 'auto') return { err: 'All ' + words.length + ' words do not fit in a ' + n + ' × ' + n + ' grid at this difficulty. Choose a bigger grid, Automatic, or fewer words.' };
+      if (size !== 'auto') return { err: 'These ' + words.length + ' words do not all fit in the ' + n + ' × ' + n + ' grid at this difficulty. Choose a bigger grid, Automatic, or fewer words.' };
     }
     return { err: 'These words could not be fitted together. Try fewer or shorter words.' };
   }
+  // every place a word can be read (any of the 8 directions) other than where it was hidden
+  function extraCopies(r, n) {
+    var out = [], D = DIRS.hard, own = {};
+    r.place.forEach(function (p) { var L = p.w.g.length - 1, a = p.y * n + p.x, b = (p.y + p.dy * L) * n + p.x + p.dx * L; own[Math.min(a, b) + ',' + Math.max(a, b)] = 1; });
+    r.place.forEach(function (p) {
+      var g = p.w.g, L = g.length, found = {};
+      for (var d = 0; d < 8; d++) for (var y = 0; y < n; y++) for (var x = 0; x < n; x++) {
+        var dx = D[d][0], dy = D[d][1], ex = x + dx * (L - 1), ey = y + dy * (L - 1);
+        if (ex < 0 || ex >= n || ey < 0 || ey >= n) continue;
+        var k = 0; while (k < L && r.grid[(y + dy * k) * n + x + dx * k] === g[k]) k++;
+        if (k < L) continue;
+        var a = y * n + x, b = ey * n + ex, id = Math.min(a, b) + ',' + Math.max(a, b);
+        if (own[id] || found[id]) continue;
+        found[id] = 1; var cs = []; for (k = 0; k < L; k++) cs.push((y + dy * k) * n + x + dx * k); out.push(cs);
+      }
+    });
+    return out;
+  }
   function finish(r, n, words) {
     var abc = fillAlphabet(words);
-    for (var i = 0; i < r.grid.length; i++) if (r.grid[i] === null) r.grid[i] = abc[UT.rnd(abc.length)];
+    var free = [];
+    for (var i = 0; i < r.grid.length; i++) if (r.grid[i] === null) { free[i] = 1; r.grid[i] = abc[UT.rnd(abc.length)]; }
+    // the random letters must not spell a hidden word a second time (easy with short words or few letters, as in Chinese)
+    for (var round = 0; round < 300; round++) {
+      var extra = extraCopies(r, n);
+      if (!extra.length) break;
+      extra.forEach(function (cellsOf) { var fx = cellsOf.filter(function (c) { return free[c]; }); if (fx.length) { var c = fx[UT.rnd(fx.length)]; r.grid[c] = abc[UT.rnd(abc.length)]; } });
+    }
     // right-to-left languages: mirror the grid so "forwards" reads right to left
     if (words.some(function (w) { return UT.rtl(w.g.join('')); })) {
       var g2 = r.grid.slice();

@@ -202,7 +202,7 @@
   function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
   function nameOf(line) {
     var mode = $('gvMode').value;
-    if (mode === 'at') { var m = /@[\p{L}\p{N}_.]+/u.exec(line); return m ? m[0].replace(/\.+$/, '') : null; }
+    if (mode === 'at') { var m = /(?<![\p{L}\p{N}_.@])@[\p{L}\p{N}_.]+/u.exec(line); /* not the @ inside an email address */ return m ? m[0].replace(/\.+$/, '') : null; }
     if (mode === 'first') { var w = line.trim().split(/\s+/)[0]; return w ? w.replace(/[:,;]+$/, '') : null; }
     return line.trim().replace(/\s+/g, ' ');
   }
@@ -231,10 +231,11 @@
     if (rolling) return;
     var e = count(), w = +$('gvWin').value, b = +$('gvBackup').value || 0;
     if (!e.lines) return say('bad', 'Paste the entries first, one per line.');
+    if (!e.list.length && Object.keys(excluded).length) return say('bad', 'Every entry has already won in an earlier draw. Press Pick winners to draw from everyone again.');
     if (!e.list.length) return say('bad', e.noName && $('gvMode').value === 'at' ? 'No @usernames were found. Choose "The whole line is one entry" instead.' : 'No entries are left after the filters. Check "Only lines that contain" and "Leave out".');
     if (!(w >= 1 && w <= 500 && w === Math.floor(w))) return say('bad', 'Choose between 1 and 500 winners.');
     if (!(b >= 0 && b <= 50 && b === Math.floor(b))) return say('bad', 'Choose between 0 and 50 backup winners.');
-    if (w > e.list.length) return say('bad', 'You asked for ' + w + ' winners but there are only ' + e.list.length + ' entries.');
+    if (w > e.list.length) return say('bad', Object.keys(excluded).length ? 'Only ' + e.list.length + ' entr' + (e.list.length === 1 ? 'y is' : 'ies are') + ' left after leaving out earlier winners. Ask for fewer winners, or press Pick winners to draw from everyone again.' : 'You asked for ' + w + ' winners but there ' + (e.list.length === 1 ? 'is only 1 entry.' : 'are only ' + e.list.length + ' entries.'));
     var total = Math.min(e.list.length, w + b), res = draw(e.list, total), anim = $('gvAnim').checked && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     last = { winners: res.slice(0, w), backups: res.slice(w), pool: e.list.length, at: new Date(), dup: e.dup, again: Object.keys(excluded).length > 0 };
     $('gvStage').hidden = false; $('gvOut').innerHTML = ''; $('gvMeta').textContent = ''; say('', '');
@@ -262,7 +263,7 @@
     if (window.burst) try { burst($('gvRoll')); } catch (e) {}
     $('gvOut')._last = L;
   }
-  $('gvPick').addEventListener('click', pick);
+  $('gvPick').addEventListener('click', function () { if (rolling) return; excluded = {}; pick(); }); // a fresh draw from everyone; "Draw again" is the one that leaves winners out
   $('gvAgain').addEventListener('click', function () { if (!last || rolling) return; last.winners.concat(last.backups).forEach(function (x) { excluded[x.k] = 1; }); count(); pick(); });
   $('gvList').addEventListener('input', function () { excluded = {}; });
   $('gvCopy').addEventListener('click', function () {

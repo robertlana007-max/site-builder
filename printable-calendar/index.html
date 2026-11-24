@@ -387,7 +387,8 @@
   $('pcPaper').value = UT.letter() ? 'letter' : 'a4';
 
   function loc() { var v = $('pcLang').value; if (v !== 'auto') return v; try { return Intl.DateTimeFormat().resolvedOptions().locale; } catch (e) { return 'en'; } }
-  function fmt(opts) { try { return new Intl.DateTimeFormat(loc(), opts); } catch (e) { return new Intl.DateTimeFormat('en', opts); } }
+  // the grid is always the Gregorian calendar, so names must be too (Persian, Thai or Saudi settings would otherwise give other calendars' months and years)
+  function fmt(opts) { opts = Object.assign({ calendar: 'gregory' }, opts); try { return new Intl.DateTimeFormat(loc(), opts); } catch (e) { return new Intl.DateTimeFormat('en', opts); } }
   function monthName(y, m) { var s = fmt({ month: 'long' }).format(new Date(y, m, 15)); return s.charAt(0).toLocaleUpperCase(loc()) + s.slice(1); }
   function monthYear(y, m) { var s = fmt({ month: 'long', year: 'numeric' }).format(new Date(y, m, 15)); return s.charAt(0).toLocaleUpperCase(loc()) + s.slice(1); }
   function dayName(dow, short) { var d = new Date(2023, 0, 1 + dow); return fmt({ weekday: short ? 'narrow' : 'short' }).format(d); } // 1 Jan 2023 was a Sunday
@@ -412,7 +413,12 @@
     return { get: function (y, mo, d) { return (ev['*-' + (mo + 1) + '-' + d] || []).concat(ev[y + '-' + (mo + 1) + '-' + d] || []); }, bad: bad };
   }
   function pageSize() { var p = $('pcPaper').value === 'letter' ? [792, 612] : [841.89, 595.28]; return $('pcOrient').value === 'port' ? [p[1], p[0]] : p; }
-  function weekendDay(dow) { return weekStart() === 6 ? dow === 5 || dow === 6 : dow === 0 || dow === 6; }
+  // weekend days of the visitor's region (Friday and Saturday in Israel and much of the Middle East, Sunday only in India…)
+  var WE = (function () {
+    try { var l = UT.langs()[0], lo = new Intl.Locale(l); if (!lo.region && UT.region()) lo = new Intl.Locale(lo.language + '-' + UT.region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.weekend && wi.weekend.length) return wi.weekend.map(function (d) { return d % 7; }); } catch (e) {}
+    return null;
+  })();
+  function weekendDay(dow) { if (WE && $('pcWeek').value === 'auto') return WE.indexOf(dow) >= 0; return weekStart() === 6 ? dow === 5 || dow === 6 : dow === 0 || dow === 6; }
   function tint(hex, a) { var c = GD.rgb(hex); return '#' + c.map(function (v) { return Math.round((v * a + (1 - a)) * 255).toString(16).padStart(2, '0'); }).join(''); }
 
   // ---------- a month as a grid ----------
@@ -421,6 +427,7 @@
     var rows = Math.ceil((lead + days) / 7), wkW = o.weekNo ? (o.mini ? w * 0.09 : 26) : 0, cw = (w - wkW) / 7, headH = o.mini ? Math.max(9, h * 0.11) : 22, ch = (h - headH) / (o.mini ? 6 : rows);
     var st = $('pcStyle').value, c = color, ev = o.ev;
     function colX(i) { return rtl ? x0 + w - wkW - (i + 1) * cw : x0 + wkW + i * cw; }
+    var gL = rtl ? x0 : x0 + wkW; // left edge of the day grid (the week-number column is on the reading side)
     // weekday names
     if (st === 'modern' || st === 'bold') ops.push({ k: 'rect', x: x0, y: y0, w: w, h: headH, fill: st === 'bold' ? c : tint(c, 0.15), r: o.mini ? 2 : 4 });
     for (var i = 0; i < 7; i++) {
@@ -450,10 +457,10 @@
     // grid lines for the big month view
     if (!o.mini && st !== 'minimal') {
       var lc = st === 'classic' ? '#374151' : '#d1d5db', lw = st === 'classic' ? 0.9 : 0.7;
-      for (var rr = 0; rr <= rows; rr++) ops.push({ k: 'line', x1: x0 + wkW, y1: gy + rr * ch, x2: x0 + w, y2: gy + rr * ch, stroke: lc, lw: lw });
-      for (var cc = 0; cc <= 7; cc++) ops.push({ k: 'line', x1: x0 + wkW + cc * cw, y1: gy, x2: x0 + wkW + cc * cw, y2: gy + rows * ch, stroke: lc, lw: lw });
+      for (var rr = 0; rr <= rows; rr++) ops.push({ k: 'line', x1: gL, y1: gy + rr * ch, x2: gL + 7 * cw, y2: gy + rr * ch, stroke: lc, lw: lw });
+      for (var cc = 0; cc <= 7; cc++) ops.push({ k: 'line', x1: gL + cc * cw, y1: gy, x2: gL + cc * cw, y2: gy + rows * ch, stroke: lc, lw: lw });
     } else if (!o.mini) {
-      for (var r2 = 1; r2 < rows; r2++) ops.push({ k: 'line', x1: x0 + wkW, y1: gy + r2 * ch, x2: x0 + w, y2: gy + r2 * ch, stroke: '#e5e7eb', lw: 0.6 });
+      for (var r2 = 1; r2 < rows; r2++) ops.push({ k: 'line', x1: gL, y1: gy + r2 * ch, x2: gL + 7 * cw, y2: gy + r2 * ch, stroke: '#e5e7eb', lw: 0.6 });
     }
     if (o.weekNo) for (var r3 = 0; r3 < rows; r3++) {
       var dd = Math.max(1, Math.min(days, r3 * 7 - lead + 4)), wn = isoWeek(new Date(y, m, dd)), wsz = o.mini ? Math.min(ch * 0.45, wkW * 0.55) : 8;
@@ -484,6 +491,7 @@
           var t = fmt({ day: 'numeric', month: 'short' }).format(new Date(y0, e[0], e[1])) + '  ' + e[2];
           ops.push({ k: 'text', t: t.length > 60 ? t.slice(0, 58) + '…' : t, x: M + c * lw, y: ly + r * 11, font: 'sans', s: 8, fill: '#374151' });
         });
+        if (shown < evList.length) ops.push({ k: 'text', t: '+ ' + num(evList.length - shown) + ' …', x: W - M, y: H - M + 10, font: 'sansb', s: 8, fill: '#6b7280', align: 'right' });
       }
       out.push({ ops: ops, W: W, H: H, label: yearText(y0) });
     } else {

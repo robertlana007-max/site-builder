@@ -317,11 +317,13 @@
       for (var j = 0; j <= ny; j++) { var mj2 = major && j % major === 0; line(gx, gy + j * g, gx + nx * g, gy + j * g, { w: mj2 ? lw * 2 : lw }); }
     } else if (type === 'dot') {
       var dx = Math.floor(box.w / g + 1e-6), dy = Math.floor(box.h / g + 1e-6), ox = box.x + (box.w - dx * g) / 2, oy = box.y + (box.h - dy * g) / 2, r = Math.max(0.45, lw * 0.95);
-      for (var a = 0; a <= dx; a++) for (var b = 0; b <= dy; b++) ops.push({ k: 'circle', x: ox + a * g, y: oy + b * g, r: r, fill: color });
+      var dots = { k: 'dots', pts: [], r: r, fill: color }; ops.push(dots);
+      for (var a = 0; a <= dx; a++) for (var b = 0; b <= dy; b++) dots.pts.push(ox + a * g, oy + b * g);
     } else if (type === 'iso') {
       var hstep = g * Math.sqrt(3) / 2, cols = Math.floor(box.w / hstep + 1e-6), ix = box.x + (box.w - cols * hstep) / 2;
       if ($('ppIso').value === 'dots') {
-        for (var c = 0; c <= cols; c++) for (var yy = box.y + (c % 2 ? g / 2 : 0); yy <= box.y + box.h + 0.01; yy += g) ops.push({ k: 'circle', x: ix + c * hstep, y: yy, r: Math.max(0.45, lw * 0.95), fill: color });
+        var idots = { k: 'dots', pts: [], r: Math.max(0.45, lw * 0.95), fill: color }; ops.push(idots);
+        for (var c = 0; c <= cols; c++) for (var yy = box.y + (c % 2 ? g / 2 : 0); yy <= box.y + box.h + 0.01; yy += g) idots.pts.push(ix + c * hstep, yy);
       } else {
         var ib = { x: ix, y: box.y, w: cols * hstep, h: box.h };
         for (var c2 = 0; c2 <= cols; c2++) line(ix + c2 * hstep, box.y, ix + c2 * hstep, box.y + box.h);
@@ -364,6 +366,27 @@
     cv.width = Math.round(pg.W * sc); cv.height = Math.round(pg.H * sc);
     $('ppPrevBox').classList.toggle('land', pg.W > pg.H);
     GD.drawCanvas(pg.ops, cv.getContext('2d'), sc);
+    dotsCanvas(pg.ops, cv.getContext('2d'), sc);
+  }
+  // thousands of dots are drawn as one shape (one circle per dot made big pages freeze and PDFs of many MB)
+  function dotsCanvas(ops, ctx, sc) {
+    ops.forEach(function (o) {
+      if (o.k !== 'dots') return;
+      ctx.fillStyle = o.fill; ctx.beginPath();
+      for (var i = 0; i < o.pts.length; i += 2) { ctx.moveTo((o.pts[i] + o.r) * sc, o.pts[i + 1] * sc); ctx.arc(o.pts[i] * sc, o.pts[i + 1] * sc, o.r * sc, 0, Math.PI * 2); }
+      ctx.fill();
+    });
+  }
+  // in the PDF each dot is a very short line with round ends, all in one compressed drawing
+  function dotsPdf(doc, page, ops) {
+    var H = page.getHeight(), parts = [];
+    ops.forEach(function (o) {
+      if (o.k !== 'dots') return;
+      var c = GD.rgb(o.fill), s = ['q', c.map(function (v) { return v.toFixed(3); }).join(' ') + ' RG', (o.r * 2).toFixed(3) + ' w', '1 J'];
+      for (var i = 0; i < o.pts.length; i += 2) { var x = o.pts[i], y = H - o.pts[i + 1]; s.push(x.toFixed(2) + ' ' + y.toFixed(2) + ' m ' + (x + 0.01).toFixed(2) + ' ' + y.toFixed(2) + ' l'); }
+      s.push('S', 'Q'); parts.push(s.join('\n'));
+    });
+    if (parts.length) page.node.addContentStream(doc.context.register(doc.context.flateStream(parts.join('\n'))));
   }
   var tm = null;
   $('ppGap').addEventListener('input', function () { clearTimeout(tm); tm = setTimeout(paint, 200); });
@@ -379,7 +402,8 @@
       var pg = pageOps(), n = +$('ppPages').value;
       // draw the page once, then place that same drawing on every page so the file stays small
       var one = await GD.newPdf('Paper', 'GetToolNest', null);
-      await GD.drawPdf(one, one.doc.addPage([pg.W, pg.H]), pg.ops);
+      var pg1 = one.doc.addPage([pg.W, pg.H]);
+      await GD.drawPdf(one, pg1, pg.ops); dotsPdf(one.doc, pg1, pg.ops);
       var env = await GD.newPdf(TYPES[type][0] + ' paper', 'GetToolNest Paper Generator', null);
       var emb = (await env.doc.embedPdf(await one.doc.save()))[0];
       for (var i = 0; i < n; i++) env.doc.addPage([pg.W, pg.H]).drawPage(emb, { x: 0, y: 0, width: pg.W, height: pg.H });
@@ -389,8 +413,13 @@
     } catch (e) { say('bad', 'The PDF could not be made. ' + (e && e.message ? e.message : '')); }
     busy = false; btn.disabled = false;
   });
-  $('ppGap').value = unit() === 'mm' ? TYPES.lined[2] : TYPES.lined[3];
-  setType('lined', false);
+  // remember the paper type and spacing for the next visit
+  function keep() { try { localStorage.setItem('gtnPaper', JSON.stringify({ type: type, gap: $('ppGap').value, unit: unit() })); } catch (e) {} }
+  var sv = null; try { sv = JSON.parse(localStorage.getItem('gtnPaper')); } catch (e) {}
+  if (sv && TYPES[sv.type] && (sv.unit === 'mm' || sv.unit === 'in') && sv.gap) { $('ppUnit').value = sv.unit; $('ppGap').value = sv.gap; setType(sv.type, false); }
+  else { $('ppGap').value = unit() === 'mm' ? TYPES.lined[2] : TYPES.lined[3]; setType('lined', false); }
+  $('ppGap').addEventListener('input', keep); $('ppUnit').addEventListener('change', keep);
+  $('ppType').addEventListener('click', keep);
   GD.loadAll(['sans', 'sansb']).then(function () { ready = true; paint(); }, function () { ready = true; paint(); });
 })();
 </script>
