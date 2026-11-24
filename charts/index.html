@@ -181,7 +181,7 @@ function clone(o) { return JSON.parse(JSON.stringify(o)); }
 var TFS = [['1s', 1000], ['5s', 5000], ['10s', 1e4], ['15s', 15e3], ['30s', 3e4], ['1m', 6e4], ['3m', 18e4], ['5m', 3e5], ['15m', 9e5], ['30m', 18e5], ['1h', 36e5], ['2h', 72e5], ['4h', 144e5], ['6h', 216e5], ['8h', 288e5], ['12h', 432e5], ['1d', 864e5], ['3d', 2592e5], ['1w', 6048e5], ['1M', 2592e6], ['3M', 7776e6], ['6M', 15552e6], ['1y', 31536e6]];
 var SEC = { '1s': 1, '5s': 5, '10s': 10, '15s': 15, '30s': 30 }, BIG = { '3M': 3, '6M': 6, '1y': 12 };
 var TFNAME = { '1s': '1 second', '5s': '5 seconds', '10s': '10 seconds', '15s': '15 seconds', '30s': '30 seconds', '3M': '3 months', '6M': '6 months', '1y': '1 year', '8h': '8 hours', '1m': '1 minute', '3m': '3 minutes', '5m': '5 minutes', '15m': '15 minutes', '30m': '30 minutes', '1h': '1 hour', '2h': '2 hours', '4h': '4 hours', '6h': '6 hours', '12h': '12 hours', '1d': '1 day', '3d': '3 days', '1w': '1 week', '1M': '1 month' };
-var TYPES = [['candles', 'Candles'], ['hollow', 'Hollow candles'], ['ha', 'Heikin Ashi'], ['bars', 'Bars (OHLC)'], ['hilo', 'High-low'], ['line', 'Line'], ['markers', 'Line with markers'], ['step', 'Step line'], ['area', 'Area'], ['baseline', 'Baseline'], ['columns', 'Columns'], ['hlc', 'HLC bars'], ['hlband', 'High-low band']];
+var TYPES = [['candles', 'Candles'], ['hollow', 'Hollow candles'], ['ha', 'Heikin Ashi'], ['bars', 'Bars (OHLC)'], ['hilo', 'High-low'], ['line', 'Line'], ['markers', 'Line with markers'], ['step', 'Step line'], ['area', 'Area'], ['baseline', 'Baseline'], ['columns', 'Columns'], ['hlc', 'HLC bars'], ['hlband', 'High-low band'], ['renko', 'Renko'], ['linebreak', 'Line break'], ['kagi', 'Kagi'], ['pnf', 'Point and figure']];
 var DEF = { sym: 'BTCUSDT', tf: '1h', type: 'candles', dark: null, log: false, pct: false, utc: false, grid: true, up: '#12a06b', dn: '#e5484d', magnet: false, lock: false, hide: false, stay: false, tm: {}, tpl: {}, fav: ['trend', 'hline', 'fibret', 'rect', 'long', 'short'], sets: [], side: null, inds: [{ id: 1, k: 'vol', p: { len: 20 } }], watch: ['F:XAUUSDT', 'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'K:PAXG/USD', 'K:EUR/USD', 'K:GBP/USD', 'K:USD/JPY', 'BNBUSDT', 'XRPUSDT'], alerts: [], draw: {}, cmp: [], paper: { bal: 10000, pos: [], hist: [], ord: [] }, tdKey: '', _t: 0, _uid: '', _g: 0 };
 var S = (function () { var s = {}; try { s = JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) {} var o = clone(DEF); for (var k in o) if (s[k] !== undefined && s[k] !== null) o[k] = s[k]; if (!TFS.some(function (t) { return t[0] === o.tf; })) o.tf = '1h'; return o; })();
 if (S.dark === null) S.dark = document.documentElement.getAttribute('data-theme') === 'dark';
@@ -273,12 +273,12 @@ function getK(sym, tf, limit, end) {
 }
 // second candles move on their own clock: a new candle starts every step even when nothing trades
 setInterval(function () {
-  if (!SEC[S.tf] || !bars.length || full || document.hidden) return; var ms = tfMs(), now = Math.floor(Date.now() / ms) * ms, l = bars[bars.length - 1];
+  if (!SEC[S.tf] || !bars.length || full || document.hidden) return; var ms = tfMs(), now = Math.floor(Date.now() / ms) * ms, l = lastB();
   if (now - l.t > 900 * ms) { if (!secReload) { secReload = 1; loadBars(); } return; } secReload = 0;
   for (var g = l.t + ms; g <= now; g += ms) applyK({ t: g, o: l.c, h: l.c, l: l.c, c: l.c, v: 0 });
 }, 200);
 var secReload = 0;
-function tickTo(c, q) { var l = bars[bars.length - 1]; if (!l || full || !(c > 0)) return; if (!SEC[S.tf] && Date.now() >= l.t + tfMs()) return; if (c === l.c && !q) return; applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v + (SEC[S.tf] ? q || 0 : 0) }); }
+function tickTo(c, q) { var l = lastB(); if (!l || full || !(c > 0)) return; if (!SEC[S.tf] && Date.now() >= l.t + tfMs()) return; if (c === l.c && !q) return; applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v + (SEC[S.tf] ? q || 0 : 0) }); }
 function getK0(sym, tf, limit, end) {
   if (isK(sym)) {
     if (end || !KTF[tf]) return Promise.resolve({ bars: [], dec: KFX[sym].dec });
@@ -301,11 +301,11 @@ function getK0(sym, tf, limit, end) {
   return api('/api/v3/klines?symbol=' + sym + '&interval=' + tf + '&limit=' + limit + (end ? '&endTime=' + end : '')).then(function (k) { return { bars: k.map(parseK), dec: findDec(k) }; });
 }
 function loadBars() {
-  tape = []; book = null; tapeSoon(); bookSoon(); var id = ++loadId; clearInterval(rpT); rpT = 0; full = null; rp = null; pickRp = false; rpBar(); bars = []; B = null; disp = []; noMore = false; loadingOld = false; sel = null; cur = null; setLive('load'); showStat('Loading ' + symName(S.sym) + '…'); recalc(); dirty();
+  tape = []; book = null; tapeSoon(); bookSoon(); rawB = null; var id = ++loadId; clearInterval(rpT); rpT = 0; full = null; rp = null; pickRp = false; rpBar(); bars = []; B = null; disp = []; noMore = false; loadingOld = false; sel = null; cur = null; setLive('load'); showStat('Loading ' + symName(S.sym) + '…'); recalc(); dirty();
   var near = SEC[S.tf] || BIG[S.tf] ? null : isK(S.sym) && !KTF[S.tf] ? KNEAR[S.tf] : isT(S.sym) && !TTF[S.tf] ? TNEAR[S.tf] : null; if (near) { toast(symName(S.sym) + ' has no ' + S.tf + ' chart, showing ' + near); S.tf = near; save(); syncTop(); }
   getK(S.sym, S.tf, 1000).then(function (r) {
     if (id !== loadId) return;
-    bars = r.bars; dec = r.dec; noMore = isK(S.sym) || r.bars.length < 50 || (SEC[S.tf] && !isB(S.sym)); cmpData = {}; S.cmp.forEach(loadCmp); V.right = bars.length - 1 + rightPad(); V.auto = true; showStat(bars.length ? '' : 'No data for this symbol.'); recalc(); dirty(); connect(); loadTickers();
+    ntBox = 0; rawB = NT[S.type] ? r.bars : null; bars = rawB ? transform(rawB) : r.bars; dec = r.dec; noMore = isK(S.sym) || r.bars.length < 50 || (SEC[S.tf] && !isB(S.sym)); cmpData = {}; S.cmp.forEach(loadCmp); V.right = bars.length - 1 + rightPad(); V.auto = true; showStat(bars.length ? '' : 'No data for this symbol.'); recalc(); dirty(); connect(); loadTickers();
   }).catch(function (e) {
     if (id !== loadId) return; setLive('bad');
     if (S.sym === 'F:XAUUSDT') { toast('Spot gold feed is not reachable on this network, showing GOLD / USD instead'); S.sym = 'K:PAXG/USD'; save(); syncTop(); renderWatch(); return loadBars(); }
@@ -316,13 +316,32 @@ function loadBars() {
 function loadOlder() {
   if (full || loadingOld || noMore || !bars.length || bars.length >= 30000) return;
   loadingOld = true; var id = loadId;
-  getK(S.sym, S.tf, 1000, bars[0].t - 1).then(function (r) {
-    if (id !== loadId) return; loadingOld = false; var k = r.bars.filter(function (b) { return b.t < bars[0].t; });
+  var ft = (rawB || bars)[0].t;
+  getK(S.sym, S.tf, 1000, ft - 1).then(function (r) {
+    if (id !== loadId) return; loadingOld = false; var k = r.bars.filter(function (b) { return b.t < ft; });
     if (k.length < 5) noMore = true; if (!k.length) return;
-    bars = k.concat(bars); V.right += k.length; recalc(); dirty();
+    if (rawB) { var n0 = bars.length; rawB = k.concat(rawB); bars = transform(rawB); V.right += bars.length - n0; if (bars.length - n0 < 3) noMore = true; } else { bars = k.concat(bars); V.right += k.length; } recalc(); dirty();
   }).catch(function () { if (id === loadId) setTimeout(function () { loadingOld = false; }, isT(S.sym) ? 65000 : 4000); });
 }
+var NT = { renko: 1, linebreak: 1, kagi: 1, pnf: 1 }, rawB = null, ntBox = 0, ntT = 0;
+function lastB() { var a = rawB || bars; return a[a.length - 1]; }
+function transform(raw) {
+  var n = raw.length, out = [], i; if (!n) return out;
+  if (!ntBox) { var sm = 0, c = 0; for (i = Math.max(1, n - 60); i < n; i++) { sm += Math.max(raw[i].h - raw[i].l, Math.abs(raw[i].h - raw[i - 1].c), Math.abs(raw[i].l - raw[i - 1].c)); c++; } ntBox = +Math.max(c ? sm / c : 0, raw[n - 1].c * .0005).toPrecision(2); }
+  var box = ntBox, bar = function (t, o, c2, v) { return { t: t, o: o, c: c2, h: Math.max(o, c2), l: Math.min(o, c2), v: v, bx: box }; }, vol = 0;
+  if (S.type === 'renko') { var base = Math.round(raw[0].c / box) * box, dir = 0; raw.forEach(function (b) { vol += b.v; for (var j = 0; j < 200; j++) { var o; if (b.c >= base + box * (dir < 0 ? 2 : 1)) { o = dir < 0 ? base + box : base; out.push(bar(b.t + j, o, o + box, vol)); base = o + box; dir = 1; } else if (b.c <= base - box * (dir > 0 ? 2 : 1)) { o = dir > 0 ? base - box : base; out.push(bar(b.t + j, o, o - box, vol)); base = o - box; dir = -1; } else break; vol = 0; } }); }
+  else if (S.type === 'linebreak') { out.push(bar(raw[0].t, raw[0].o, raw[0].c, raw[0].v)); raw.forEach(function (b, k) { if (!k) return; vol += b.v; var l3 = out.slice(-3), hi = Math.max.apply(null, l3.map(function (x) { return x.h; })), lo = Math.min.apply(null, l3.map(function (x) { return x.l; })), pc = out[out.length - 1].c; if (b.c > hi || b.c < lo) { out.push(bar(b.t, b.c > hi ? Math.max(pc, out[out.length - 1].o) : Math.min(pc, out[out.length - 1].o), b.c, vol)); vol = 0; } }); }
+  else if (S.type === 'kagi') { var cur = null, st = raw[0].c; raw.forEach(function (b) { vol += b.v; if (!cur) { if (Math.abs(b.c - st) >= box) { cur = bar(b.t, st, b.c, vol); out.push(cur); vol = 0; } return; } var up = cur.c >= cur.o; if (up ? b.c > cur.c : b.c < cur.c) { cur.c = b.c; cur.h = Math.max(cur.o, cur.c); cur.l = Math.min(cur.o, cur.c); cur.v += vol; vol = 0; } else if (Math.abs(b.c - cur.c) >= box) { cur = bar(Math.max(b.t, cur.t + 1), cur.c, b.c, vol); out.push(cur); vol = 0; } }); }
+  else { var col = null, top = Math.round(raw[0].c / box) * box; raw.forEach(function (b) { vol += b.v; var lvl; if (!col) { if (b.c >= top + box) { col = bar(b.t, top, Math.floor(b.c / box) * box, vol); col.x = 1; out.push(col); vol = 0; } else if (b.c <= top - box) { col = bar(b.t, top, Math.ceil(b.c / box) * box, vol); col.x = 0; out.push(col); vol = 0; } return; }
+      if (col.x) { if (b.c >= col.c + box) { col.c = Math.floor(b.c / box) * box; } else if (b.c <= col.c - 3 * box) { lvl = Math.ceil(b.c / box) * box; col = bar(Math.max(b.t, col.t + 1), col.c - box, lvl, vol); col.x = 0; out.push(col); vol = 0; return; } }
+      else { if (b.c <= col.c - box) { col.c = Math.ceil(b.c / box) * box; } else if (b.c >= col.c + 3 * box) { lvl = Math.floor(b.c / box) * box; col = bar(Math.max(b.t, col.t + 1), col.c + box, lvl, vol); col.x = 1; out.push(col); vol = 0; return; } }
+      col.h = Math.max(col.o, col.c); col.l = Math.min(col.o, col.c); col.v += vol; vol = 0; }); }
+  if (!out.length) { var e = raw[n - 1]; out.push(bar(e.t, e.o, e.c, e.v)); }
+  return out;
+}
+function ntSoon() { if (!ntT) ntT = setTimeout(function () { ntT = 0; if (!rawB || full) return; var n0 = bars.length, atEnd = V.right >= n0 - 1; bars = transform(rawB); if (atEnd) V.right += bars.length - n0; recalc(); dirty(); }, 300); }
 function applyK(k) {
+  if (rawB) { var rn = rawB.length, rl = rawB[rn - 1]; if (!rl) return; if (k.t === rl.t) rawB[rn - 1] = k; else if (k.t > rl.t) rawB.push(k); else return; checkAlerts(S.sym, rl.c, k.c); checkPaper(S.sym, k.c); tick[S.sym] = tick[S.sym] || {}; tick[S.sym].c = k.c; ntSoon(); dirty(); return; }
   if (full) { var fl = full[full.length - 1]; if (k.t === fl.t) full[full.length - 1] = k; else if (k.t > fl.t) full.push(k); return; }
   var n = bars.length; if (!n) return; var last = bars[n - 1];
   if (k.t === last.t) bars[n - 1] = k; else if (k.t > last.t) { bars.push(k); if (V.right >= n - 1) V.right += 1; } else return;
@@ -358,7 +377,7 @@ var tws = null;
 function tdTick(sy, c) {
   if (!(c > 0)) return; var o = tick[sy]; tick[sy] = { c: c, o: o && o.o }; if (sy === S.sym) tapeAdd(c, 0, !o || c >= o.c, Date.now());
   if (sy === S.sym && (SEC[S.tf] || BIG[S.tf])) { lastMsg = Date.now(); tickTo(c); }
-  else if (sy === S.sym) { lastMsg = Date.now(); var l = bars[bars.length - 1], m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
+  else if (sy === S.sym) { lastMsg = Date.now(); var l = lastB(), m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
   else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
   if (cmpData[sy] && bars.length) { cmpData[sy][bars[bars.length - 1].t] = c; dirty(); } watchSoon();
 }
@@ -807,7 +826,7 @@ function draw() {
   var i0 = Math.max(0, Math.floor(iOf(0)) - 1), i1 = Math.min(n - 1, Math.ceil(iOf(plotW)) + 1), lineType = /^(line|markers|step|area|baseline)$/.test(S.type);
   if (iOf(0) < 40) loadOlder();
   if (pendRange !== null) { var need = pendRange ? pendRange / tfMs() : n; V.barW = clamp(plotW / (Math.min(need, n) + 4), .5, 80); V.right = n - 1 + 3; pendRange = null; i0 = Math.max(0, Math.floor(iOf(0)) - 1); i1 = n - 1; }
-  if (V.auto) { var lo = Infinity, hi = -Infinity; for (i = i0; i <= i1; i++) { b = disp[i]; if (!b) continue; if (lineType) { if (b.c < lo) lo = b.c; if (b.c > hi) hi = b.c; } else { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; } } if (lo === Infinity) { lo = bars[n - 1].l; hi = bars[n - 1].h; } var a0 = sc(lo), a1 = sc(hi); if (a1 - a0 < 1e-12) { a0 -= Math.abs(a0) * .01 || 1; a1 += Math.abs(a1) * .01 || 1; } V.vMin = a0 - (a1 - a0) * .14; V.vMax = a1 + (a1 - a0) * .1; }
+  if (V.auto) { var lo = Infinity, hi = -Infinity; for (i = i0; i <= i1; i++) { b = disp[i]; if (!b) continue; if (lineType) { if (b.c < lo) lo = b.c; if (b.c > hi) hi = b.c; } else { if (b.l < lo) lo = b.l; if (b.h > hi) hi = b.h; } } if (lo === Infinity) { lo = bars[n - 1].l; hi = bars[n - 1].h; } if (S.type === 'pnf') hi += ntBox; var a0 = sc(lo), a1 = sc(hi); if (a1 - a0 < 1e-12) { a0 -= Math.abs(a0) * .01 || 1; a1 += Math.abs(a1) * .01 || 1; } V.vMin = a0 - (a1 - a0) * .14; V.vMax = a1 + (a1 - a0) * .1; }
   var pt = priceTicks(), tt = timeTicks(i0, i1), base = disp[Math.max(i0, Math.min(i1, Math.ceil(iOf(0))))].c;
   ctx.save(); ctx.beginPath(); ctx.rect(0, 0, plotW, H - axH); ctx.clip();
   if (S.grid) { ctx.strokeStyle = P.grid; ctx.lineWidth = 1; ctx.beginPath(); pt.forEach(function (v) { y = Math.round(yOf(v)) + .5; ctx.moveTo(0, y); ctx.lineTo(plotW, y); }); tt.forEach(function (t) { x = Math.round(xOf(t.i)) + .5; ctx.moveTo(x, 0); ctx.lineTo(x, H - axH); }); ctx.stroke(); }
@@ -825,7 +844,9 @@ function draw() {
     ctx.strokeStyle = P.cross; ctx.globalAlpha = .5; ctx.setLineDash([2, 4]); ctx.beginPath(); for (i = Math.max(1, i0); i <= i1; i++) if (Math.floor(bars[i].t / 864e5) !== Math.floor(bars[i - 1].t / 864e5)) { x = Math.round(xOf(i) - V.barW / 2) + .5; ctx.moveTo(x, 0); ctx.lineTo(x, mainH); } ctx.stroke(); ctx.setLineDash([]); ctx.globalAlpha = 1;
   }
   // price series
-  if (S.type === 'hlband') {
+  if (S.type === 'kagi') { ctx.lineWidth = 2; ctx.lineJoin = 'miter'; for (i = i0; i <= i1; i++) { b = disp[i]; x = Math.round(xOf(i)) + .5; ctx.strokeStyle = b.c >= b.o ? S.up : S.dn; ctx.beginPath(); ctx.moveTo(x, yOf(b.o)); ctx.lineTo(x, yOf(b.c)); if (disp[i + 1]) ctx.lineTo(Math.round(xOf(i + 1)) + .5, yOf(b.c)); ctx.stroke(); } }
+  else if (S.type === 'pnf') { ctx.lineWidth = 1.4; for (i = i0; i <= i1; i++) { b = disp[i]; var bx = b.bx || 1, pu = b.c >= b.o, plo = Math.min(b.o, b.c), phi = Math.max(b.o, b.c), xp = xOf(i), hw = Math.max(1, Math.min(V.barW * .38, Math.abs(yOf(plo) - yOf(plo + bx)) * .42)); ctx.strokeStyle = pu ? S.up : S.dn; ctx.beginPath(); for (var pv2 = plo, g = 0; pv2 < phi + bx * .01 && g < 400; pv2 += bx, g++) { var cy = (yOf(pv2) + yOf(pv2 + bx)) / 2, hh = Math.abs(yOf(pv2) - yOf(pv2 + bx)) * .38; if (pu) { ctx.moveTo(xp - hw, cy - hh); ctx.lineTo(xp + hw, cy + hh); ctx.moveTo(xp + hw, cy - hh); ctx.lineTo(xp - hw, cy + hh); } else { ctx.moveTo(xp + hw, cy); ctx.ellipse(xp, cy, hw, Math.max(.5, hh), 0, 0, 6.2832); } } ctx.stroke(); } }
+  else if (S.type === 'hlband') {
     ctx.beginPath(); for (i = i0; i <= i1; i++) { if (i === i0) ctx.moveTo(xOf(i), yOf(disp[i].h)); else ctx.lineTo(xOf(i), yOf(disp[i].h)); } for (i = i1; i >= i0; i--) ctx.lineTo(xOf(i), yOf(disp[i].l)); ctx.closePath(); ctx.fillStyle = rgba(P.acc, .18); ctx.fill(); ctx.strokeStyle = rgba(P.acc, .5); ctx.lineWidth = 1; ctx.stroke();
     linePath(disp.map(function (q) { return q.c; }), yOf, i0, i1); ctx.strokeStyle = P.acc; ctx.lineWidth = 1.8; ctx.lineJoin = 'round'; ctx.stroke();
   } else if (lineType) {
@@ -851,12 +872,12 @@ function draw() {
     ctx.strokeStyle = CMPC[ci % 4]; ctx.lineWidth = 1.6; ctx.lineJoin = 'round'; linePath(v, yOf, i0, i1); ctx.stroke(); axisTags.push({ y: yOf(lv * k), s: fmtPct((lv / m[bars[bi].t] - 1) * 100), bg: CMPC[ci % 4] });
   });
   // last price line and alerts
-  var last = disp[n - 1], lcol = last.c >= last.o ? S.up : S.dn, ly = yOf(last.c);
+  var last = rawB ? { o: disp[n - 1].c, c: lastB().c } : disp[n - 1], lcol = last.c >= last.o ? S.up : S.dn, ly = yOf(last.c);
   ctx.strokeStyle = lcol; ctx.lineWidth = 1; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(0, Math.round(ly) + .5); ctx.lineTo(plotW, Math.round(ly) + .5); ctx.stroke();
   S.alerts.forEach(function (al) { if (al.sym !== S.sym || al.done || al.kind) return; y = Math.round(yOf(al.p)) + .5; ctx.strokeStyle = '#e0a100'; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.fillStyle = '#e0a100'; ctx.font = FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Alert ' + fmt(al.p), plotW - 6, y - 2); axisTags.push({ y: y, s: fmt(al.p), bg: '#e0a100', fg: '#1a1300' }); });
   var pl = function (pr, col, txt, dash) { var yy = Math.round(yOf(pr)) + .5; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.font = FONT; var w = ctx.measureText(txt).width + 12; ctx.fillStyle = col; ctx.fillRect(10, yy - 9, w, 18); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 16, yy); axisTags.push({ y: yy, s: fmt(pr), bg: col }); };
   S.paper.ord.forEach(function (q) { if (q.sym === S.sym) pl(q.price, '#7b8494', (q.type === 'limit' ? 'LIMIT ' : 'STOP ') + (q.side > 0 ? 'BUY ' : 'SELL ') + fmtK(q.amt) + (q.lev > 1 ? '  ' + q.lev + 'x' : ''), [2, 3]); });
-  S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; var pn = (bars[n - 1].c - q.entry) * q.qty * q.side, m = function (v) { v = (v - q.entry) * q.qty * q.side; return (v >= 0 ? '+' : '') + v.toFixed(2); }; pl(q.entry, '#2f6fed', (q.side > 0 ? 'LONG ' : 'SHORT ') + fmtK(q.qty) + '   P/L ' + (pn >= 0 ? '+' : '') + pn.toFixed(2), []); if (q.tp) pl(q.tp, S.up, 'TP  ' + m(q.tp) + '   drag to move', [5, 4]); if (q.sl) pl(q.sl, S.dn, 'SL  ' + m(q.sl) + '   drag to move', [5, 4]); });
+  S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; var pn = (lastB().c - q.entry) * q.qty * q.side, m = function (v) { v = (v - q.entry) * q.qty * q.side; return (v >= 0 ? '+' : '') + v.toFixed(2); }; pl(q.entry, '#2f6fed', (q.side > 0 ? 'LONG ' : 'SHORT ') + fmtK(q.qty) + '   P/L ' + (pn >= 0 ? '+' : '') + pn.toFixed(2), []); if (q.tp) pl(q.tp, S.up, 'TP  ' + m(q.tp) + '   drag to move', [5, 4]); if (q.sl) pl(q.sl, S.dn, 'SL  ' + m(q.sl) + '   drag to move', [5, 4]); });
   ctx.setLineDash([]);
   // drawings
   if (!S.hide) draws().forEach(function (d) { drawOne(d); });
@@ -881,7 +902,7 @@ function draw() {
   ctx.textAlign = 'center'; tt.forEach(function (t) { x = xOf(t.i); if (x < 14 || x > plotW - 14) return; ctx.fillStyle = t.b ? P.ink : P.text; ctx.font = (t.b ? '600 ' : '') + FONT; ctx.fillText(t.s, x, H - axH / 2); });
   axisTags.forEach(function (t) { if (t.y > 0 && t.y < mainH) axTag(t.y, t.s, t.bg, t.fg); });
   panes.forEach(function (pn) { var r = pn.ind._r || []; r.forEach(function (pl) { if (pl.k !== 'line') return; var v = pl.v[n - 1]; if (v === v && v != null) axTag(clamp(pn.yf(v), pn.top + 9, pn.top + pn.h - 9), fmtK(v), indColor(pn.ind, pl.ci)); }); });
-  if (ly > -9 && ly < mainH + 9) { axTag(clamp(ly, 9, mainH - 9), S.pct ? fmtPct((last.c / base - 1) * 100) : fmt(last.c), lcol); var left = bars[n - 1].t + tfMs() - Date.now(); if (left > 0 && left < tfMs() * 1.5) { var s = Math.floor(left / 1000), cd = s >= 86400 ? Math.floor(s / 86400) + 'd ' + Math.floor(s % 86400 / 3600) + 'h' : (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); axTag(clamp(ly, 9, mainH - 9) + 17, cd, rgba(lcol, .75)); } }
+  if (ly > -9 && ly < mainH + 9) { axTag(clamp(ly, 9, mainH - 9), S.pct ? fmtPct((last.c / base - 1) * 100) : fmt(last.c), lcol); var left = rawB ? 0 : bars[n - 1].t + tfMs() - Date.now(); if (left > 0 && left < tfMs() * 1.5) { var s = Math.floor(left / 1000), cd = s >= 86400 ? Math.floor(s / 86400) + 'd ' + Math.floor(s % 86400 / 3600) + 'h' : (s >= 3600 ? Math.floor(s / 3600) + ':' : '') + p2(Math.floor(s % 3600 / 60)) + ':' + p2(s % 60); axTag(clamp(ly, 9, mainH - 9) + 17, cd, rgba(lcol, .75)); } }
   // crosshair
   var ci = n - 1;
   if (mouse && mouse.x < plotW && mouse.y < H - axH && !(drag && drag.k === 'pan' && ptrTouch)) {
@@ -907,7 +928,7 @@ function legend(ci) {
   }
   document.getElementById('tcFav').style.right = (axW + 6) + 'px';
   var b = disp[ci], pv = disp[ci - 1], bs = document.getElementById('tcBs');
-  if (!b || rp || !U.buy) bs.hidden = true; else { bs.hidden = false; bs.style.top = Math.max(60, mainH - 46) + 'px'; var lp = fmt(bars[bars.length - 1].c); if (U.buy._p !== lp) { U.buy._p = lp; U.buy.lastChild.textContent = lp; U.sell.lastChild.textContent = lp; } }
+  if (!b || rp || !U.buy) bs.hidden = true; else { bs.hidden = false; bs.style.top = Math.max(60, mainH - 46) + 'px'; var lp = fmt(lastB().c); if (U.buy._p !== lp) { U.buy._p = lp; U.buy.lastChild.textContent = lp; U.sell.lastChild.textContent = lp; } }
   if (!b) { setHtml(legMain, ''); return; }
   var col = b.c >= b.o ? S.up : S.dn, ch = b.c - (pv ? pv.c : b.o), sp = function (l, v) { return '<span class="m">' + l + '</span><span style="color:' + col + '">' + v + '</span> '; };
   setHtml(legMain, sp('O', fmt(b.o)) + sp('H', fmt(b.h)) + sp('L', fmt(b.l)) + sp('C', fmt(b.c)) + '<span style="color:' + col + '">' + (ch >= 0 ? '+' : '') + fmt(ch) + ' (' + fmtPct(ch / ((pv ? pv.c : b.o) || 1) * 100) + ')</span>');
@@ -954,10 +975,10 @@ function rpBar() {
 function rpRun() { clearInterval(rpT); rpT = 0; if (rp && rp.on) rpT = setInterval(rpStep, 1000 / rp.sp); }
 function rpStep() { if (!rp || !full) return; if (bars.length >= full.length) { rp.on = false; rpRun(); rpBar(); toast('Replay reached the latest candle'); return; } var atEnd = V.right >= bars.length - 1; bars.push(full[bars.length]); if (atEnd) V.right += 1; recalc(); dirty(); }
 function rpStart(i) { pickRp = false; full = bars; bars = full.slice(0, clamp(i, 5, full.length - 2) + 1); rp = { on: false, sp: 1 }; V.right = bars.length - 1 + rightPad(); V.auto = true; sel = null; selBar(); recalc(); rpBar(); dirty(); toast('Replay: press play or step forward'); }
-function rpExit() { clearInterval(rpT); rpT = 0; pickRp = false; if (full) { bars = full; full = null; } rp = null; recalc(); rpBar(); resetView(); }
+function rpExit() { clearInterval(rpT); rpT = 0; pickRp = false; if (full) { bars = rawB ? transform(rawB) : full; full = null; } rp = null; recalc(); rpBar(); resetView(); }
 function setSym(s) { if (s === S.sym) return; S.sym = s; S.cmp = S.cmp.filter(function (q) { return q !== s; }); undo = []; redo = []; sel = null; selBar(); save(); syncTop(); renderWatch(); renderAlerts(); loadBars(); }
 function setTf(tf) { if (tf === S.tf) return; S.tf = tf; save(); syncTop(); loadBars(); }
-function setType(t) { S.type = t; save(); syncTop(); recalc(); dirty(); }
+function setType(t) { var re = NT[t] || NT[S.type]; S.type = t; save(); syncTop(); if (re && !rp) loadBars(); else { recalc(); dirty(); } }
 function setTool(t) { tool = t; cur = null; if (pickRp) { pickRp = false; rpBar(); } if (t) { lastTool[T[t].g] = t; sel = null; selBar(); } syncTools(); cv.style.cursor = 'crosshair'; dirty(); }
 function zoom(f, x) { if (x == null) x = plotW; var i = iOf(x); V.barW = clamp(V.barW * f, .5, 80); V.right = i + (plotW - x) / V.barW; dirty(); }
 function resetView() { V.barW = 8; V.right = bars.length - 1 + rightPad(); V.auto = true; syncBot(); dirty(); }
@@ -1005,7 +1026,7 @@ function checkAlerts(sym, prev, now) {
 }
 var elBal = h('span', { text: 'Paper trading' }), elPos = h('div', { class: 'tc-list' });
 elSide.appendChild(h('h3', {}, [elBal, h('span', { class: 'tc-sp' }), h('button', { class: 'tc-b', title: 'Paper trading report: win rate, profit and loss', html: svg('<path d="M5 20V10M10 20V4M15 20v-7M20 20V8"/>', 16), onclick: function () { reportDlg(); } }), h('button', { class: 'tc-b', title: 'Reset the practice balance to 10,000', html: svg('<path d="M4 12a8 8 0 1 0 2.500-5.800M4 4v4h4"/>', 16), onclick: function () { if (!window.confirm('Close all practice positions and reset the balance to 10,000?')) return; S.paper = clone(DEF.paper); save(); renderPos(); dirty(); } }), h('button', { class: 'tc-b', title: 'New paper trade', text: '+', onclick: function () { tradeDlg(1); } })])); elSide.appendChild(elPos);
-function lastPx(sym) { return sym === S.sym && bars.length ? (full ? full[full.length - 1].c : bars[bars.length - 1].c) : (tick[sym] || {}).c; }
+function lastPx(sym) { return sym === S.sym && bars.length ? (rawB ? lastB().c : full ? full[full.length - 1].c : bars[bars.length - 1].c) : (tick[sym] || {}).c; }
 function pnlOf(q, px) { return (px - q.entry) * q.qty * q.side; }
 function renderPos() {
   elBal.textContent = 'Paper · ' + fmt(S.paper.bal, 2); elPos.textContent = '';
@@ -1442,6 +1463,7 @@ setInterval(function () { clock(); if (bars.length) dirty(); }, 1000);
 var hidAt = 0;
 document.addEventListener('visibilitychange', function () {
   if (document.hidden) { hidAt = Date.now(); return; } if (!bars.length || full || Date.now() - hidAt < 30000) return; var id = loadId;
+  if (rawB) { loadBars(); return; }
   getK(S.sym, S.tf, 1000).then(function (r) { var k = r.bars; if (id !== loadId || !k.length) return; var keep = bars.filter(function (b) { return b.t < k[0].t; }), atEnd = V.right >= bars.length - 1, d = keep.length + k.length - bars.length; bars = keep.concat(k); if (atEnd) V.right += d; recalc(); dirty(); if (!liveUp) connect(); }).catch(function () {});
 });
 })();
