@@ -207,7 +207,8 @@ ${head}
       </div>
     </div>
   <div class="lang-menu notranslate" id="langMenu" translate="no" hidden><p>Translated by Google</p>${LANGS.map(([code, name]) => `<button data-lang="${code}" lang="${code}">${name}</button>`).join('')}</div>
-</div></header>
+</div>
+<a class="chartsbar" href="${rel}charts/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4M7 15v6M17 3v6M17 17v4"/><rect x="5" y="7" width="4" height="8" rx=".5"/><rect x="15" y="9" width="4" height="8" rx=".5"/></svg><b>Live Charts</b><span>crypto, gold and forex, live</span><em>Open</em></a></header>
 <div id="gt"></div>
 <dialog class="palette" id="palette" aria-label="Search tools">
   <div class="finder">${icon('search')}<input type="search" id="palInput" data-empty="all" placeholder="Search ${tools.length} tools…" aria-label="Search tools" autocomplete="off"></div>
