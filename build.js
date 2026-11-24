@@ -347,7 +347,7 @@ write('index.html', layout({
   <div class="finder">${icon('search')}<input type="search" id="toolSearch" placeholder="Search in any language, e.g. “merge pdf” or “unir pdf”" aria-label="Search tools" autocomplete="off"><div class="f-list" id="heroResults" hidden></div></div>
   <p class="popular">Popular: ${popular.map(t => `<a href="${t.slug}/">${esc(t.name)}</a>`).join('')}</p>
   <ul class="trust"><li>${icon('check')}100% free</li><li>${icon('check')}Zero ads</li><li>${icon('check')}Unlimited use</li><li>${icon('check')}Files stay on your device</li><li>${icon('check')}Works on your phone</li></ul>
-  ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p><b>You are not a customer here, you are family.</b> And for us, family is everything. Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
+  ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p>Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
   <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
 <section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
@@ -619,7 +619,7 @@ for (const t of tools) {
   <p class="crumbs"><a href="../">Home</a> › ${esc(t.cat)}</p>
   <div class="title-row">${tile(t)}<h1 class="page-title">${esc(t.name)}</h1></div>
   <p class="lead">${esc(t.intro)}</p>
-  ${cfg.contactEmail ? `<div class="family"><span class="fam-ic" aria-hidden="true">❤️</span><div class="fam-txt"><b>You are not a customer here, you are family.</b><span>Zero ads, unlimited use, free forever. Want something new added to ${esc(t.name)}, or need a new tool? Email us and we will make it for you.</span></div><a class="fam-btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">✉ Email us</a></div>` : ''}
+  ${cfg.contactEmail ? `<div class="family"><span class="fam-ic" aria-hidden="true">❤️</span><div class="fam-txt"><span>Zero ads, unlimited use, free forever. Want something new added to ${esc(t.name)}, or need a new tool? Email us and we will make it for you.</span></div><a class="fam-btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + t.name)}">✉ Email us</a></div>` : ''}
   <div class="head-actions"><button id="pinBtn" aria-pressed="false">${icon('star')}<span>Pin this tool</span></button><button id="shareBtn">${icon('share')}<span>Share</span></button><button id="clearBtn" hidden>${icon('undo')}<span>Clear my saved entries</span></button></div>
 </div>
 <div class="cols${t.wide ? ' wide' : ''}" style="--c:${th.color}">
@@ -913,7 +913,7 @@ write('404.html', layout({
     <div class="ty-card ty-letter ty-w2">
       <h2>💌 A note from us to you</h2>
       <p>Dear friend, everything here is free, and nobody asked you to pay. <b>You chose to help anyway</b>, and that means the world to us. ${esc(cfg.siteName)} is not a big company. It is a small project built with late nights, a lot of testing and a lot of love, and gifts like yours tell us the work really helps people.</p>
-      <p class="ty-quote">You are not a customer here. <b>You are family.</b> And for us, family is everything. ❤</p>
+      
     </div>
 
     <div class="ty-card">
