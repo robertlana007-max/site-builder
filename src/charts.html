@@ -49,6 +49,7 @@ html, body { margin: 0; height: 100%; background: #10141b; overflow: hidden; }
 .tc-leg .x button { width: 20px; height: 20px; border-radius: 4px; color: var(--tm); display: inline-grid; place-items: center; }
 .tc-leg .x button:hover { background: var(--th); color: var(--ti); }
 .tc-src { font-size: 11px; padding: 1px 6px; border-radius: 4px; background: var(--th); color: var(--ti); }
+.tc-src.warn { background: #e5484d; color: #fff; }
 .tc-title { font-size: 14px; }
 .tc-stat { position: absolute; left: 50%; top: 45%; transform: translate(-50%, -50%); text-align: center; color: var(--tm); font-size: 14px; max-width: 80%; pointer-events: none; }
 .tc-stat button { pointer-events: auto; margin-top: 8px; }
@@ -229,7 +230,10 @@ function isB(s) { return !FFX[s] && !/^[KTOD]:/.test(s); }
 function isD(s) { return s.slice(0, 2) === 'D:'; }
 var DDS = { 'D:frxXAUUSD': { n: 'XAU / USD', d: 'Gold', cat: 'Gold', f: 'XAUUSD GOLD XAU SPOT MT5' }, 'D:frxXAGUSD': { n: 'XAG / USD', d: 'Silver', cat: 'Gold', f: 'XAGUSD SILVER XAG MT5' }, 'D:frxXPTUSD': { n: 'XPT / USD', d: 'Platinum', cat: 'Gold', f: 'XPTUSD PLATINUM' }, 'D:frxXPDUSD': { n: 'XPD / USD', d: 'Palladium', cat: 'Gold', f: 'XPDUSD PALLADIUM' } };
 'EURUSD GBPUSD USDJPY AUDUSD USDCAD USDCHF NZDUSD EURGBP EURJPY GBPJPY AUDJPY EURAUD EURCHF EURCAD GBPAUD GBPCAD GBPCHF AUDCAD AUDCHF AUDNZD EURNZD GBPNZD NZDJPY USDMXN USDNOK USDPLN USDSEK'.split(' ').forEach(function (x) { DDS['D:frx' + x] = { n: x.slice(0, 3) + ' / ' + x.slice(3), d: 'Forex', cat: 'Forex', f: x + ' MT5' }; });
-if (S._g !== 4 && !window.OANDA_TOKEN) { S._g = 4; var dmap = function (x) { return x === 'F:XAUUSDT' || x === 'K:PAXG/USD' ? 'D:frxXAUUSD' : /^K:[A-Z]{3}\/[A-Z]{3}$/.test(x) && DDS['D:frx' + x.slice(2, 5) + x.slice(6)] ? 'D:frx' + x.slice(2, 5) + x.slice(6) : x; }; S.watch = ['D:frxXAUUSD', 'D:frxEURUSD', 'D:frxGBPUSD', 'D:frxUSDJPY'].concat(S.watch.map(dmap)).filter(function (x, i, a) { return a.indexOf(x) === i; }); S.sym = dmap(S.sym); }
+var dBlocked = false;   // set when the broker feed cannot be reached, so the chart stops retrying it in this visit
+function dMap(x) { return x === 'F:XAUUSDT' || x === 'K:PAXG/USD' || x === 'K:XAUT/USD' || x === 'T:XAU/USD' && !S.tdKey ? 'D:frxXAUUSD' : x === 'F:XAGUSDT' ? 'D:frxXAGUSD' : /^K:[A-Z]{3}\/[A-Z]{3}$/.test(x) && DDS['D:frx' + x.slice(2, 5) + x.slice(6)] ? 'D:frx' + x.slice(2, 5) + x.slice(6) : x; }
+function dMapAll() { if (dBlocked || window.OANDA_TOKEN) return; S.watch = S.watch.map(dMap).filter(function (x, i, a) { return a.indexOf(x) === i; }); if (Array.isArray(S.cmp)) S.cmp = S.cmp.map(dMap).filter(function (x, i, a) { return a.indexOf(x) === i; }); }
+if (!window.OANDA_TOKEN) { if (S._g !== 4) { S._g = 4; S.watch = ['D:frxXAUUSD', 'D:frxEURUSD', 'D:frxGBPUSD', 'D:frxUSDJPY'].concat(S.watch); } dMapAll(); S.sym = dMap(S.sym); }
 var DALIAS = { OTC_DJI: 'US30 DOW DJ30 DOWJONES', OTC_NDX: 'NAS100 NASDAQ USTEC US100 NDX', OTC_SPC: 'SPX500 SP500 US500 SPX', OTC_GDAXI: 'GER40 DAX DE40 GER30', OTC_FTSE: 'UK100 FTSE', OTC_N225: 'JP225 NIKKEI JPN225', OTC_FCHI: 'FRA40 CAC', OTC_HSI: 'HK50 HANGSENG', OTC_AS51: 'AUS200 ASX', OTC_SX5E: 'EU50 STOXX', OTC_SSMI: 'SWI20 SMI', OTC_AEX: 'NL25 AEX' };
 var DWS = 'wss://api.derivws.com/trading/v1/options/ws/public', DTF = { '1m': 60, '3m': 180, '5m': 300, '15m': 900, '30m': 1800, '1h': 3600, '2h': 7200, '4h': 14400, '8h': 28800, '1d': 86400 }, DNEAR = { '6h': '4h', '12h': '8h', '3d': '1d' };
 var dws = null, dOpen = null, dReq = {}, dSeq = 1, dHs = {}, dPip = {}, dWait = {}, dSubd = {};
@@ -382,7 +386,7 @@ function loadBars() {
     ntBox = 0; rawB = NT[S.type] ? r.bars : null; bars = rawB ? transform(rawB) : r.bars; dec = r.dec; noMore = isK(S.sym) || r.bars.length < 50 || (SEC[S.tf] && !isB(S.sym)); cmpData = {}; S.cmp.forEach(loadCmp); V.right = bars.length - 1 + rightPad(); V.auto = true; showStat(bars.length ? '' : 'No data for this symbol.'); recalc(); dirty(); connect(); loadTickers();
   }).catch(function (e) {
     if (id !== loadId) return; setLive('bad');
-    if (isD(S.sym)) { var alt = S.sym === 'D:frxXAUUSD' ? 'F:XAUUSDT' : 'K:' + S.sym.slice(5, 8) + '/' + S.sym.slice(8); if (alt === 'F:XAUUSDT' || KFX[alt]) { toast('The MT5 broker feed is not reachable on this network, showing another feed'); S.sym = alt; save(); syncTop(); renderWatch(); return loadBars(); } showStat(e.message || 'The broker feed could not load this symbol.', true); return; }
+    if (isD(S.sym)) { var alt = S.sym === 'D:frxXAUUSD' ? 'F:XAUUSDT' : 'K:' + S.sym.slice(5, 8) + '/' + S.sym.slice(8); if (alt === 'F:XAUUSDT' || KFX[alt]) { dBlocked = true; toast('The MT5 broker feed is not reachable on this network. Showing another feed: its price is NOT the MT5 price.'); S.sym = alt; save(); syncTop(); renderWatch(); return loadBars(); } showStat(e.message || 'The broker feed could not load this symbol.', true); return; }
     if (S.sym === 'F:XAUUSDT') { toast('Spot gold feed is not reachable on this network, showing GOLD / USD instead'); S.sym = 'K:PAXG/USD'; save(); syncTop(); renderWatch(); return loadBars(); }
     if (isO(S.sym)) { showStat(e.message || 'OANDA could not load this symbol.', true); return; }
     if (isT(S.sym)) { showStat(e.message || 'Twelve Data could not load this symbol.', true); return; }
@@ -1034,7 +1038,7 @@ function legend(ci) {
   var key = S.sym + S.tf + offOf(S.sym) + S.inds.map(function (i) { return i.id + indLabel(i); }).join() + '|' + S.cmp.join();
   if (key !== legKey) {
     legKey = key; elLegs.textContent = ''; legMain = h('span'); legEls = [];
-    elLegs.appendChild(h('div', { class: 'tc-leg' }, [h('b', { class: 'tc-title', text: symName(S.sym) }), h('span', { class: 'm', text: tfShort(S.tf) }), h('span', { class: 'tc-src', title: 'Where the prices on this chart come from', text: 'Chart data: ' + srcName(S.sym) + (offOf(S.sym) ? ' · matched to your MT5 (' + (offOf(S.sym) > 0 ? '+' : '') + offOf(S.sym) + ')' : '') }), legMain]));
+    elLegs.appendChild(h('div', { class: 'tc-leg' }, [h('b', { class: 'tc-title', text: symName(S.sym) }), h('span', { class: 'm', text: tfShort(S.tf) }), h('span', { class: 'tc-src' + (isF(S.sym) || isK(S.sym) ? ' warn' : ''), title: 'Where the prices on this chart come from', text: (isF(S.sym) || isK(S.sym) ? 'NOT MT5 price · ' : '') + 'Chart data: ' + srcName(S.sym) + (offOf(S.sym) ? ' · matched to your MT5 (' + (offOf(S.sym) > 0 ? '+' : '') + offOf(S.sym) + ')' : '') }), legMain]));
     S.inds.forEach(function (ind) {
       var v = h('span'), row = h('div', { class: 'tc-leg' + (IND[ind.k].ov ? '' : ' abs') }, [h('span', { class: 'm', text: indLabel(ind) }), v, h('span', { class: 'x' }, [ind.k !== 'vol' && ind.k !== 'sess' && h('button', { title: 'Alert on this indicator', html: svg('<path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/>', 14), onclick: function () { indAlert(ind); } }), h('button', { title: 'Settings', html: svg('<circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M5.6 18.4l2.1-2.1M16.3 7.7l2.1-2.1"/>', 14), onclick: function () { indSettings(ind); } }), h('button', { title: 'Remove', html: svg('<path d="M6 6l12 12M18 6L6 18"/>', 14), onclick: function () { S.inds = S.inds.filter(function (q) { return q !== ind; }); save(); dirty(); } })])]);
       elLegs.appendChild(row); legEls.push({ ind: ind, row: row, v: v });
@@ -1596,7 +1600,7 @@ function setupsMenu(at) {
 // ---------- start ----------
 function sanitize() {
   S.inds = (Array.isArray(S.inds) ? S.inds : []).filter(function (i) { return i && IND[i.k] && i.p; }); Object.keys(S.draw).forEach(function (k) { S.draw[k] = (Array.isArray(S.draw[k]) ? S.draw[k] : []).filter(function (d) { return d && T[d.type] && Array.isArray(d.pts) && d.pts.length; }); });
-if (!S.paper || !Array.isArray(S.paper.pos)) S.paper = clone(DEF.paper); ['watch', 'alerts', 'cmp'].forEach(function (k) { if (!Array.isArray(S[k])) S[k] = clone(DEF[k]); }); if (!S.draw || typeof S.draw !== 'object') S.draw = {}; if (!S.tm || typeof S.tm !== 'object') S.tm = {};
+if (!S.paper || !Array.isArray(S.paper.pos)) S.paper = clone(DEF.paper); ['watch', 'alerts', 'cmp'].forEach(function (k) { if (!Array.isArray(S[k])) S[k] = clone(DEF[k]); }); if (!S.draw || typeof S.draw !== 'object') S.draw = {}; if (!S.tm || typeof S.tm !== 'object') S.tm = {}; dMapAll();
   if (!Array.isArray(S.paper.ord)) S.paper.ord = []; if (!Array.isArray(S.paper.hist)) S.paper.hist = []; if (!S.tpl || typeof S.tpl !== 'object') S.tpl = {}; if (!Array.isArray(S.sets)) S.sets = []; if (!S.off || typeof S.off !== 'object') S.off = {}; S.ctf = (Array.isArray(S.ctf) ? S.ctf : []).filter(function (m) { return m >= 2 && m <= 43200 && m === Math.round(m); }); S.ctf.forEach(regTf); S.fav = (Array.isArray(S.fav) ? S.fav : []).filter(function (k) { return T[k]; });
 }
 sanitize();
