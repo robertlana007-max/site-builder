@@ -5677,22 +5677,5 @@ module.exports = [
       ['Is my data stored?', 'No. Results stay on screen only; nothing is uploaded or saved.']
     ],
     icon: '<path d="M6 9a6 6 0 1 1 12 0c0 3-2 4-3 5s-1 3-3 3a2 2 0 0 1-2-2"/><path d="M9 9a3 3 0 0 1 6 0"/>'
-  },
-  {
-      slug: 'trading-charts', cat: 'Finance calculators', name: 'Live Trading Charts', wide: true,
-      title: 'Live Trading Charts - Free Crypto Charts with Drawing Tools',
-      desc: 'Free live candlestick charts with 44 drawing tools, 27 indicators, Fibonacci, patterns, price alerts and a watchlist. No sign-up, nothing to pay.',
-      card: 'Live candlestick charts with drawing tools and indicators.',
-      intro: 'Watch live prices on a full charting screen: 11 chart types, 14 time frames, trend lines, Fibonacci, patterns, long and short position tools, 27 indicators, price alerts and a watchlist. Your drawings are saved in this browser.',
-      steps: ['Press the symbol name at the top left and search for a market, for example BTC, ETH or PAXG (gold).', 'Pick a time frame such as 15m, 1h or D, and a chart type such as Candles or Heikin Ashi.', 'Choose a drawing tool from the bar on the left and click on the chart to place its points.', 'Press Indicators to add RSI, MACD, moving averages and more. Right-click the chart to add a price alert.'],
-      faq: [
-        ['Is it really free?', 'Yes. Every drawing tool, indicator, time frame and alert is free, with no account and no limit on how many you use.'],
-        ['Where do the prices come from?', 'From the public Binance market data feed. Candles update live, usually several times a second. The dot at the top right shows Live when the stream is connected.'],
-        ['Which markets can I chart?', 'Every spot pair listed on Binance: Bitcoin, Ethereum and thousands of other crypto pairs, tokenised gold (PAXG) and a few currency pairs such as EUR/USDT. Stocks and regular forex pairs are not available, because no free live feed exists for them.'],
-        ['Are my drawings saved?', 'Yes. Drawings are saved per symbol in this browser, together with your indicators, watchlist, alerts and settings. They are not uploaded, so they do not move to another device.'],
-        ['How do price alerts work?', 'Right-click the chart or press Alert, and set a price. When the price crosses it you get a sound and a message, plus a browser notification if you allow it. Alerts only work while this page is open.'],
-        ['Can I trade from this chart?', 'No. This is a charting and analysis tool only. It does not place orders and it is not financial advice.']
-      ],
-      icon: '<path d="M7 3v4M7 15v6M17 3v6M17 17v4"/><rect x="5" y="7" width="4" height="8" rx=".5"/><rect x="15" y="9" width="4" height="8" rx=".5"/>'
   }
 ];
