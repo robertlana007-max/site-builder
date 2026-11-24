@@ -98,6 +98,21 @@ html, body { margin: 0; height: 100%; background: #10141b; overflow: hidden; }
 .tc .tc-mob .tc-b { flex: 1 1 0; min-width: 0; height: 48px; flex-direction: column; gap: 2px; font-size: 11px; font-weight: 600; padding: 0 2px; }
 .tc-phone .tc-top .hid-ph, .tc-phone .tc-top .tf:not(.on) { display: none; }
 .tc-phone .tc-bot .hid-ph { display: none; }
+.tc-stabs { display: flex; border-bottom: 1px solid var(--tl); flex: none; }
+.tc .tc-stabs .tc-b { flex: 1 1 0; border-radius: 0; height: 32px; font-size: 12px; font-weight: 600; color: var(--tm); }
+.tc .tc-stabs .tc-b.on { color: var(--ta); box-shadow: inset 0 -2px 0 var(--ta); background: none; }
+.tc-side[data-tab=trades] .sd-list, .tc-side[data-tab=book] .sd-list, .tc-side[data-tab=list] .sd-trades, .tc-side[data-tab=book] .sd-trades, .tc-side[data-tab=list] .sd-book, .tc-side[data-tab=trades] .sd-book { display: none; }
+.tc-tape { flex: 1 1 auto; overflow-y: auto; font-size: 12px; font-variant-numeric: tabular-nums; }
+.tc-tr { display: grid; grid-template-columns: 62px 1fr 1fr; gap: 6px; padding: 2px 10px; position: relative; }
+.tc-tr span:nth-child(2), .tc-tr span:nth-child(3) { text-align: end; }
+.tc-tr.hd { color: var(--tm); font-size: 11px; padding-top: 6px; padding-bottom: 4px; border-bottom: 1px solid var(--tl); position: sticky; top: 0; background: var(--tb); z-index: 1; }
+.tc-tr i { position: absolute; top: 0; bottom: 0; right: 0; opacity: .14; }
+.tc-mid2 { padding: 6px 10px; font-weight: 700; font-size: 14px; border-top: 1px solid var(--tl); border-bottom: 1px solid var(--tl); display: flex; justify-content: space-between; }
+.tc-scr th { position: sticky; top: 0; background: var(--tb); text-align: end; padding: 6px 8px; font-size: 12px; color: var(--tm); cursor: pointer; white-space: nowrap; border-bottom: 1px solid var(--tl); }
+.tc-scr th:first-child, .tc-scr td:first-child { text-align: start; }
+.tc-scr td { text-align: end; padding: 6px 8px; font-variant-numeric: tabular-nums; border-bottom: 1px solid var(--tb2); white-space: nowrap; }
+.tc-scr tr { cursor: pointer; } .tc-scr tbody tr:hover { background: var(--th); }
+.tc-scr { width: 100%; border-collapse: collapse; font-size: 13px; }
 .tc-fav { position: absolute; top: 4px; display: flex; gap: 1px; padding: 2px; background: var(--tb); border: 1px solid var(--tl); border-radius: 8px; z-index: 4; opacity: .94; }
 .tc-fav:empty, .tc-phone .tc-fav { display: none; }
 .tc .tc-fav .tc-b { width: 28px; height: 28px; min-width: 0; padding: 0; }
@@ -210,6 +225,7 @@ function symName(s) { if (FFX[s]) return FFX[s].n; if (s === 'K:PAXG/USD') retur
 var dec = 2;
 function fmt(p, d) { if (p == null || p !== p) return '–'; d = d == null ? dec : d; var s = Math.abs(p).toFixed(d), i = s.indexOf('.'), a = i < 0 ? s : s.slice(0, i), b = i < 0 ? '' : s.slice(i); if (a.length > 3) a = a.replace(/\B(?=(\d{3})+(?!\d))/g, ','); return (p < 0 ? '-' : '') + a + b; }
 function fmtK(v) { if (v == null || v !== v) return '–'; var a = Math.abs(v); return a >= 1e9 ? (v / 1e9).toFixed(2) + 'B' : a >= 1e6 ? (v / 1e6).toFixed(2) + 'M' : a >= 1e4 ? (v / 1e3).toFixed(2) + 'K' : a >= 100 ? v.toFixed(1) : a >= 1 ? v.toFixed(2) : v.toFixed(Math.min(8, Math.max(2, dec))); }
+function fmtQ(v) { return v >= 1e4 ? fmtK(v) : v >= 100 ? v.toFixed(1) : v >= 1 ? v.toFixed(3) : String(+v.toPrecision(3)); }
 function fmtPct(v) { return (v >= 0 ? '+' : '') + v.toFixed(2) + '%'; }
 var MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'], DOW = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 function dparts(t) { var d = new Date(t); return S.utc ? { y: d.getUTCFullYear(), mo: d.getUTCMonth(), d: d.getUTCDate(), h: d.getUTCHours(), mi: d.getUTCMinutes(), w: d.getUTCDay() } : { y: d.getFullYear(), mo: d.getMonth(), d: d.getDate(), h: d.getHours(), mi: d.getMinutes(), w: d.getDay() }; }
@@ -285,7 +301,7 @@ function getK0(sym, tf, limit, end) {
   return api('/api/v3/klines?symbol=' + sym + '&interval=' + tf + '&limit=' + limit + (end ? '&endTime=' + end : '')).then(function (k) { return { bars: k.map(parseK), dec: findDec(k) }; });
 }
 function loadBars() {
-  var id = ++loadId; clearInterval(rpT); rpT = 0; full = null; rp = null; pickRp = false; rpBar(); bars = []; B = null; disp = []; noMore = false; loadingOld = false; sel = null; cur = null; setLive('load'); showStat('Loading ' + symName(S.sym) + '…'); recalc(); dirty();
+  tape = []; book = null; tapeSoon(); bookSoon(); var id = ++loadId; clearInterval(rpT); rpT = 0; full = null; rp = null; pickRp = false; rpBar(); bars = []; B = null; disp = []; noMore = false; loadingOld = false; sel = null; cur = null; setLive('load'); showStat('Loading ' + symName(S.sym) + '…'); recalc(); dirty();
   var near = SEC[S.tf] || BIG[S.tf] ? null : isK(S.sym) && !KTF[S.tf] ? KNEAR[S.tf] : isT(S.sym) && !TTF[S.tf] ? TNEAR[S.tf] : null; if (near) { toast(symName(S.sym) + ' has no ' + S.tf + ' chart, showing ' + near); S.tf = near; save(); syncTop(); }
   getK(S.sym, S.tf, 1000).then(function (r) {
     if (id !== loadId) return;
@@ -322,22 +338,25 @@ function kmsg(ev) {
     if (sy === S.sym) { lastMsg = Date.now(); tickTo(c); } else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
     if (cmpData[sy] && bars.length) { cmpData[sy][bars[bars.length - 1].t] = c; dirty(); } watchSoon();
   });
+  else if (m.channel === 'trade') m.data.forEach(function (x) { if ('K:' + x.symbol !== S.sym) return; lastMsg = Date.now(); tickTo(+x.price, +x.qty); tapeAdd(+x.price, +x.qty, x.side === 'buy', Date.parse(String(x.timestamp).slice(0, 19) + 'Z')); });
   else if (m.channel === 'ohlc') m.data.forEach(function (x) { if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) lastMsg = Date.now(); if ('K:' + x.symbol === S.sym && x.interval === KTF[S.tf]) applyK({ t: Date.parse(String(x.interval_begin).slice(0, 19) + 'Z'), o: +x.open, h: +x.high, l: +x.low, c: +x.close, v: +x.volume }); });
 }
 var fws = null, lastMsg = 0;
 function bmsg(pre, my) {
   return function (ev) {
-    if (my !== wsId) return; var m; try { m = JSON.parse(ev.data).data; } catch (e) { return; } if (!m || !m.s) return; var sy = pre + m.s;
+    if (my !== wsId) return; var w, m; try { w = JSON.parse(ev.data); m = w.data; } catch (e) { return; } if (!m) return;
+    if (w.stream && w.stream.indexOf('@depth') > 0) { book = { b: m.bids || m.b || [], a: m.asks || m.a || [] }; bookSoon(); return; }
+    if (!m.s) return; var sy = pre + m.s;
     if (m.e === 'kline' && sy === S.sym && m.k.i === S.tf) { lastMsg = Date.now(); applyK({ t: m.k.t, o: +m.k.o, h: +m.k.h, l: +m.k.l, c: +m.k.c, v: +m.k.v }); }
     else if (m.e === 'kline' && sy === S.sym && BIG[S.tf]) { lastMsg = Date.now(); tickTo(+m.k.c); }
-    else if (m.e === 'aggTrade' && sy === S.sym) { lastMsg = Date.now(); tickTo(+m.p, +m.q); }
+    else if (m.e === 'aggTrade' && sy === S.sym) { lastMsg = Date.now(); tickTo(+m.p, +m.q); tapeAdd(+m.p, +m.q, !m.m, m.T); }
     else if (m.e === 'kline' && cmpData[sy] && m.k.i === S.tf) { cmpData[sy][m.k.t] = +m.k.c; dirty(); }
     else if (m.e === '24hrMiniTicker') { var o = tick[sy]; tick[sy] = { c: +m.c, o: +m.o }; if (sy !== S.sym) { if (o) checkAlerts(sy, o.c, +m.c); checkPaper(sy, +m.c); } watchSoon(); }
   };
 }
 var tws = null;
 function tdTick(sy, c) {
-  if (!(c > 0)) return; var o = tick[sy]; tick[sy] = { c: c, o: o && o.o };
+  if (!(c > 0)) return; var o = tick[sy]; tick[sy] = { c: c, o: o && o.o }; if (sy === S.sym) tapeAdd(c, 0, !o || c >= o.c, Date.now());
   if (sy === S.sym && (SEC[S.tf] || BIG[S.tf])) { lastMsg = Date.now(); tickTo(c); }
   else if (sy === S.sym) { lastMsg = Date.now(); var l = bars[bars.length - 1], m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
   else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
@@ -347,7 +366,7 @@ setInterval(function () { if (tws && tws.readyState === 1) try { tws.send('{"act
 function connect() {
   clearTimeout(wsT); shut(ws); shut(kws); shut(fws); shut(tws); ws = kws = fws = tws = null; liveUp = false; if (!bars.length) return;
   var my = ++wsId, ms = isK(S.sym) ? 'K' : isF(S.sym) ? 'F' : isT(S.sym) ? 'T' : 'B', all = uniq(S.watch.concat([S.sym], S.paper.pos.map(function (q) { return q.sym; }), S.alerts.filter(function (a) { return !a.done; }).map(function (a) { return a.sym; })));
-  var own = SEC[S.tf] || BIG[S.tf], st = function (ok, main) { var b = S.sym.replace(/^F:/, '').toLowerCase(); return (main ? (SEC[S.tf] ? [] : [b + '@kline_' + (BIG[S.tf] ? '1M' : S.tf)]).concat([b + '@aggTrade']) : []).concat(all.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@miniTicker'; }), own ? [] : S.cmp.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf; })); };
+  var own = SEC[S.tf] || BIG[S.tf], st = function (ok, main) { var b = S.sym.replace(/^F:/, '').toLowerCase(); return (main ? (SEC[S.tf] ? [] : [b + '@kline_' + (BIG[S.tf] ? '1M' : S.tf)]).concat([b + '@aggTrade'], bookOn() ? [b + '@depth20@100ms'] : []) : []).concat(all.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@miniTicker'; }), own ? [] : S.cmp.filter(ok).map(function (x) { return x.replace(/^F:/, '').toLowerCase() + '@kline_' + S.tf; })); };
   var bst = st(isB, ms === 'B'), fst = st(isF, ms === 'F'), kst = uniq(all.concat(S.cmp).filter(isK)).map(function (x) { return x.slice(2); });
   var fail = function () { if (my !== wsId) return; clearTimeout(wsT); wsId++; shut(ws); shut(kws); shut(fws); shut(tws); ws = kws = fws = tws = null; liveUp = false; wsFail++; wsI = (wsI + 1) % WSH.length; startPoll(); wsT = setTimeout(connect, Math.min(60000, 3000 * wsFail)); };
   var up = function () { clearTimeout(wsT); liveUp = true; wsFail = 0; lastMsg = Date.now(); setLive('ok'); };
@@ -356,7 +375,7 @@ function connect() {
   try {
     if (bst.length) ws = sock(WSH[wsI] + '/stream?streams=' + bst.join('/'), 'B', null, bmsg('', my));
     if (fst.length) fws = sock('wss://fstream.binance.com/market/stream?streams=' + fst.join('/'), 'F', null, bmsg('F:', my));
-    if (kst.length) kws = sock('wss://ws.kraken.com/v2', 'K', function (k) { k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ticker', symbol: kst } })); if (ms === 'K' && KTF[S.tf] && !own) k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ohlc', symbol: [S.sym.slice(2)], interval: KTF[S.tf], snapshot: false } })); }, function (ev) { if (my === wsId) kmsg(ev); });
+    if (kst.length) kws = sock('wss://ws.kraken.com/v2', 'K', function (k) { k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ticker', symbol: kst } })); if (ms === 'K') k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'trade', symbol: [S.sym.slice(2)], snapshot: false } })); if (ms === 'K' && KTF[S.tf] && !own) k.send(JSON.stringify({ method: 'subscribe', params: { channel: 'ohlc', symbol: [S.sym.slice(2)], interval: KTF[S.tf], snapshot: false } })); }, function (ev) { if (my === wsId) kmsg(ev); });
     var tst = uniq((ms === 'T' ? [S.sym] : []).concat(all, S.cmp).filter(isT)).slice(0, 8).map(function (x) { return x.slice(2); });
     if (tst.length && S.tdKey) tws = sock('wss://ws.twelvedata.com/v1/quotes/price?apikey=' + encodeURIComponent(S.tdKey), 'T', function (w) { w.send(JSON.stringify({ action: 'subscribe', params: { symbols: tst.join(',') } })); }, function (ev) { if (my !== wsId) return; var m; try { m = JSON.parse(ev.data); } catch (e) { return; } if (m && m.event === 'price') tdTick('T:' + m.symbol, +m.price); });
   } catch (e) { fail(); }
@@ -1144,6 +1163,7 @@ function buildTop() {
   U.replay = tb('<path d="M4 5v14M9 12l11-7v14z"/>', 'Bar replay: play back past candles one by one', function () { if (rp) return rpExit(); if (bars.length < 20) return; setTool(null); pickRp = true; rpBar(); toast('Click the candle where the replay should start'); }, 'Replay', { class: 'tc-b lbl' }); elTop.appendChild(U.replay);
   elTop.appendChild(tb('<path d="M4 17l5-6 4 3 7-9M15 5h5v5"/>', 'Paper trade: buy or sell with practice money, with TP and SL', function () { tradeDlg(1); }, 'Trade', { class: 'tc-b lbl' }));
   U.sets = tb('<rect x="3" y="4" width="8" height="7" rx="1"/><rect x="13" y="4" width="8" height="7" rx="1"/><rect x="3" y="13" width="18" height="7" rx="1"/>', 'Layouts and saved chart setups', function () { setupsMenu(U.sets); }, 'Layouts', { class: 'tc-b lbl', 'data-pop': 1 }); elTop.appendChild(U.sets);
+  elTop.appendChild(tb('<path d="M4 5h16M7 10h10M10 15h4M11 20h2"/>', 'Market screener: most traded, gainers, losers, RSI', screener, 'Screener', { class: 'tc-b lbl' }));
   elTop.appendChild(h('span', { class: 'tc-sep' }));
   U.undo = tb('undo', 'Undo (Ctrl+Z)', function () { doUndo(true); }); U.redo = tb('redo', 'Redo (Ctrl+Y)', function () { doUndo(false); }); elTop.appendChild(U.undo); elTop.appendChild(U.redo);
   elTop.appendChild(h('span', { class: 'tc-sp' }));
@@ -1152,7 +1172,7 @@ function buildTop() {
   elTop.appendChild(tb('cam', 'Save chart as image', snapshot));
   elTop.appendChild(tb('sun', 'Light or dark chart', function () { S.dark = !S.dark; root.classList.toggle('tc-dark', S.dark); save(); dirty(); }));
   elTop.appendChild(tb('gear', 'Chart settings', settings));
-  U.side = tb('list', 'Watchlist and alerts', function () { S.side = !S.side; elSide.hidden = !S.side; save(); syncTop(); resize(); }); elTop.appendChild(U.side);
+  U.side = tb('list', 'Watchlist, alerts, live trades and order book', function () { var was = bookOn(); S.side = !S.side; elSide.hidden = !S.side; save(); syncTop(); resize(); tapeSoon(); bookSoon(); if (was !== bookOn()) connect(); }); elTop.appendChild(U.side);
   U.full = tb('full', 'Full screen', function () { setFull(!root.classList.contains('tc-full')); }); elTop.appendChild(U.full);
   Array.prototype.forEach.call(elTop.children, function (c) { if (c !== elTop.firstChild && c !== U.sym && U.tfs.indexOf(c) < 0 && c !== U.tfMore && c !== U.type && c.id !== 'tcLive' && !c.classList.contains('tc-sp')) c.classList.add('hid-ph'); });
 }
@@ -1164,7 +1184,7 @@ function buildMob() {
   mb('bell', 'Alert', function () { if (bars.length) addAlert(lastPx(S.sym)); });
   mb('list', 'Watchlist', function () { U.side.click(); });
   var more = mb('<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>', 'More', function () {
-    pop(more, [{ t: 'Compare with another symbol', ic: IC.plus, fn: function () { symSearch('cmp'); } }, { t: rp ? 'Exit bar replay' : 'Bar replay', ic: '<path d="M4 5v14M9 12l11-7v14z"/>', fn: function () { U.replay.click(); } }, FB && { t: fbUser ? 'Your account' : 'Sign in to save your chart', ic: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', fn: acctDlg }, { t: 'Saved chart setups', ic: IC.list, fn: function () { setupsMenu(more); } }, { t: 'Position size calculator', fn: calcDlg }, { t: 'Paper trading report', fn: reportDlg }, { t: 'Settings, data key, backup', ic: IC.gear, fn: settings }, { t: 'Save chart as image', ic: IC.cam, fn: snapshot }, { t: 'Light or dark chart', ic: IC.sun, fn: function () { S.dark = !S.dark; root.classList.toggle('tc-dark', S.dark); save(); dirty(); } }, { t: 'Percent scale', on: S.pct, fn: function () { U.pct.click(); } }, { t: 'Logarithmic scale', on: S.log, fn: function () { U.log.click(); } }, { t: 'Undo', ic: IC.undo, fn: function () { doUndo(true); } }, { t: 'Redo', ic: IC.redo, fn: function () { doUndo(false); } }, { t: 'Full screen', ic: IC.full, fn: function () { U.full.click(); } }]);
+    pop(more, [{ t: 'Compare with another symbol', ic: IC.plus, fn: function () { symSearch('cmp'); } }, { t: rp ? 'Exit bar replay' : 'Bar replay', ic: '<path d="M4 5v14M9 12l11-7v14z"/>', fn: function () { U.replay.click(); } }, FB && { t: fbUser ? 'Your account' : 'Sign in to save your chart', ic: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', fn: acctDlg }, { t: 'Market screener', ic: '<path d="M4 5h16M7 10h10M10 15h4M11 20h2"/>', fn: screener }, { t: 'Live trades and order book', fn: function () { if (elSide.hidden) U.side.click(); setSideTab('trades'); } }, { t: 'Saved chart setups', ic: IC.list, fn: function () { setupsMenu(more); } }, { t: 'Position size calculator', fn: calcDlg }, { t: 'Paper trading report', fn: reportDlg }, { t: 'Settings, data key, backup', ic: IC.gear, fn: settings }, { t: 'Save chart as image', ic: IC.cam, fn: snapshot }, { t: 'Light or dark chart', ic: IC.sun, fn: function () { S.dark = !S.dark; root.classList.toggle('tc-dark', S.dark); save(); dirty(); } }, { t: 'Percent scale', on: S.pct, fn: function () { U.pct.click(); } }, { t: 'Logarithmic scale', on: S.log, fn: function () { U.log.click(); } }, { t: 'Undo', ic: IC.undo, fn: function () { doUndo(true); } }, { t: 'Redo', ic: IC.redo, fn: function () { doUndo(false); } }, { t: 'Full screen', ic: IC.full, fn: function () { U.full.click(); } }]);
   });
   more.setAttribute('data-pop', 1);
   var bs = document.getElementById('tcBs'); bs.textContent = ''; U.sell = h('button', { class: 's', title: 'Sell / short with practice money', onclick: function () { tradeDlg(-1); } }, [h('span', { text: 'SELL' }), h('small')]); U.buy = h('button', { class: 'b', title: 'Buy / long with practice money', onclick: function () { tradeDlg(1); } }, [h('span', { text: 'BUY' }), h('small')]); bs.appendChild(U.sell); bs.appendChild(U.buy);
@@ -1334,6 +1354,41 @@ function acctDlg() {
   if (fbUser) return modal('Your account', h('div', {}, [h('p', { style: 'margin:0 0 8px;font-size:14px', text: 'Signed in as ' + (fbUser.email || fbUser.displayName || 'your account') }), h('p', { class: 'tc-empty', style: 'padding:0', text: 'Your drawings, indicators, watchlist, alerts, paper trades and settings are saved to this account automatically. Sign in on another phone or computer and they appear there too.' }), msg]), [{ t: 'Sign out', red: 1, fn: function () { return run(function () { return firebase.auth().signOut(); }); } }, { t: 'Close', pri: 1, fn: function () {} }]);
   var em = h('input', { type: 'text', placeholder: 'Email', autocomplete: 'email', inputmode: 'email' }), pw = h('input', { type: 'password', placeholder: 'Password (6 or more characters)', autocomplete: 'current-password' });
   modal('Sign in to save your chart', h('div', {}, [h('p', { class: 'tc-empty', style: 'padding:0 0 10px', text: 'With an account, everything you draw and set up is saved automatically and appears on any phone or computer where you sign in. It is the same account as the rest of GetToolNest.' }), h('button', { class: 'tc-btn pri', style: 'width:100%;margin-bottom:12px', text: 'Continue with Google', onclick: function () { run(function () { return firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()); }); } }), h('div', { style: 'display:grid;gap:8px' }, [em, pw]), msg]), [{ t: 'Create account', fn: function () { return run(function () { return firebase.auth().createUserWithEmailAndPassword(em.value.trim(), pw.value); }); } }, { t: 'Sign in', pri: 1, fn: function () { return run(function () { return firebase.auth().signInWithEmailAndPassword(em.value.trim(), pw.value); }); } }]);
+}
+
+// ---------- side panel tabs: list, live trades, order book ----------
+var tape = [], book = null, tapeT = 0, bookT = 0, sideTab = 'list', elTape = h('div', { class: 'tc-tape sd-trades' }), elBook = h('div', { class: 'tc-tape sd-book' }), elTabs = h('div', { class: 'tc-stabs' });
+function bookOn() { return sideTab === 'book' && !elSide.hidden; }
+function tapeAdd(p, q, buy, t) { tape.unshift({ p: p, q: q, b: buy, t: t }); if (tape.length > 70) tape.length = 70; tapeSoon(); }
+function tapeSoon() { if (!tapeT) tapeT = setTimeout(function () { tapeT = 0; if (sideTab !== 'trades' || elSide.hidden) return; elTape.textContent = ''; elTape.appendChild(h('div', { class: 'tc-tr hd' }, [h('span', { text: 'Time' }), h('span', { text: 'Price' }), h('span', { text: 'Size' })]));
+  if (!tape.length) elTape.appendChild(h('div', { class: 'tc-empty', text: 'Waiting for the next trade on ' + symName(S.sym) + '…' }));
+  tape.forEach(function (x) { var d = new Date(x.t); elTape.appendChild(h('div', { class: 'tc-tr ' + (x.b ? 'tc-up' : 'tc-dn') }, [h('span', { style: 'color:var(--tm)', text: p2(S.utc ? d.getUTCHours() : d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds()) }), h('span', { text: fmt(x.p) }), h('span', { style: 'color:var(--ti)', text: x.q ? fmtQ(x.q) : '' })])); }); }, 250); }
+function bookSoon() { if (!bookT) bookT = setTimeout(function () { bookT = 0; if (!bookOn()) return; elBook.textContent = '';
+  if (!isB(S.sym) && !isF(S.sym)) { elBook.appendChild(h('div', { class: 'tc-empty', text: 'The order book is available for crypto pairs and XAU / USD.' })); return; }
+  if (!book || !book.a.length) { elBook.appendChild(h('div', { class: 'tc-empty', text: 'Loading the order book…' })); return; }
+  var N = 14, a = book.a.slice(0, N).map(function (x) { return [+x[0], +x[1]]; }), b = book.b.slice(0, N).map(function (x) { return [+x[0], +x[1]]; }), mx = 0, row = function (x, cls) { var r = h('div', { class: 'tc-tr ' + cls }, [h('span', { text: '' }), h('span', { text: fmt(x[0]) }), h('span', { style: 'color:var(--ti)', text: fmtQ(x[1]) })]); r.appendChild(h('i', { style: 'width:' + (x[1] / mx * 100).toFixed(1) + '%;background:currentColor' })); return r; };
+  a.concat(b).forEach(function (x) { if (x[1] > mx) mx = x[1]; });
+  elBook.appendChild(h('div', { class: 'tc-tr hd' }, [h('span', { text: '' }), h('span', { text: 'Price' }), h('span', { text: 'Size' })]));
+  a.slice().reverse().forEach(function (x) { elBook.appendChild(row(x, 'tc-dn')); });
+  if (a.length && b.length) elBook.appendChild(h('div', { class: 'tc-mid2' }, [h('span', { text: fmt((a[0][0] + b[0][0]) / 2) }), h('span', { style: 'color:var(--tm);font-weight:500;font-size:12px', text: 'spread ' + fmt(a[0][0] - b[0][0]) })]));
+  b.forEach(function (x) { elBook.appendChild(row(x, 'tc-up')); }); }, 200); }
+function setSideTab(t) { var was = bookOn(); sideTab = t; elSide.setAttribute('data-tab', t); Array.prototype.forEach.call(elTabs.children, function (c) { c.classList.toggle('on', c._t === t); }); tapeSoon(); bookSoon(); if (was !== bookOn()) { book = null; connect(); } }
+(function () { Array.prototype.forEach.call(elSide.children, function (c) { c.classList.add('sd-list'); }); [['list', 'Watchlist'], ['trades', 'Trades'], ['book', 'Order book']].forEach(function (x) { var b = h('button', { class: 'tc-b', text: x[1], onclick: function () { setSideTab(x[0]); } }); b._t = x[0]; elTabs.appendChild(b); }); elSide.insertBefore(elTabs, elSide.firstChild); elSide.appendChild(elTape); elSide.appendChild(elBook); elSide.setAttribute('data-tab', 'list'); elTabs.firstChild.classList.add('on'); })();
+// ---------- market screener ----------
+var rsiCache = {};
+function screener() {
+  var sortK = 'qv', dir = -1, rows = [], body = h('tbody'), q = h('input', { type: 'search', placeholder: 'Filter, for example BTC', autocomplete: 'off' }), tabs = h('div', { class: 'tc-tabs' }), wrap = h('div', { style: 'max-height:56vh;overflow:auto;margin:0 -16px' }, [h('div', { class: 'tc-empty', style: 'padding:10px 16px', text: 'Loading the market…' })]);
+  var show = function () {
+    var f = q.value.trim().toUpperCase(), list = rows.filter(function (x) { return !f || x.s.indexOf(f) >= 0; }).sort(function (a, b) { var va = a[sortK], vb = b[sortK]; if (va == null) va = -Infinity * dir; if (vb == null) vb = -Infinity * dir; return (va > vb ? 1 : va < vb ? -1 : 0) * dir; }).slice(0, 80);
+    body.textContent = ''; list.forEach(function (x) { var rc = h('td', { text: x.rsi == null ? '…' : x.rsi.toFixed(1), class: x.rsi >= 70 ? 'tc-dn' : x.rsi <= 30 ? 'tc-up' : '' }); x._c = rc; body.appendChild(h('tr', { onclick: function () { closeModal(); setSym(x.s); } }, [h('td', {}, [h('b', { text: symName(x.s) })]), h('td', { text: fmt(x.c, x.c >= 1000 ? 2 : x.c >= 1 ? 4 : 6) }), h('td', { class: x.ch >= 0 ? 'tc-up' : 'tc-dn', text: fmtPct(x.ch) }), h('td', { text: fmtK(x.qv) }), rc])); });
+    var todo = list.filter(function (x) { return x.rsi == null && !x._w; }).slice(0, 30), run = function () { var x = todo.shift(); if (!x || elModal.hidden) return; x._w = 1; api('/api/v3/klines?symbol=' + x.s + '&interval=1h&limit=60').then(function (k) { var r = rsi(k.map(function (v) { return +v[4]; }), 14); x.rsi = rsiCache[x.s] = r[r.length - 1]; if (x._c) { x._c.textContent = x.rsi === x.rsi ? x.rsi.toFixed(1) : '–'; x._c.className = x.rsi >= 70 ? 'tc-dn' : x.rsi <= 30 ? 'tc-up' : ''; } }).catch(function () {}).then(run); };
+    run(); run(); run(); run();
+  };
+  var th = function (label, key) { return h('th', { text: label, title: 'Sort by ' + label, onclick: function () { if (sortK === key) dir = -dir; else { sortK = key; dir = key === 's' ? 1 : -1; } show(); } }); };
+  [['Most traded', 'qv', -1], ['Top gainers', 'ch', -1], ['Top losers', 'ch', 1]].forEach(function (t, i) { var b = h('button', { class: 'tc-b' + (i ? '' : ' on'), text: t[0], onclick: function () { sortK = t[1]; dir = t[2]; Array.prototype.forEach.call(tabs.children, function (c) { c.classList.toggle('on', c === b); }); show(); } }); tabs.appendChild(b); });
+  q.addEventListener('input', show);
+  modal('Market screener', h('div', {}, [q, tabs, wrap]));
+  allSyms = null; loadAllSyms().then(function (l) { rows = l.filter(function (x) { return !x.cat && x.q === 'USDT' && x.o > 0; }).map(function (x) { return { s: x.s, c: x.c, ch: (x.c / x.o - 1) * 100, qv: x.qv, rsi: rsiCache[x.s] }; }); wrap.textContent = ''; wrap.appendChild(h('table', { class: 'tc-scr' }, [h('thead', {}, [h('tr', {}, [th('Symbol', 's'), th('Price', 'c'), th('24h', 'ch'), th('Volume (USDT)', 'qv'), th('RSI 1h', 'rsi')])]), body])); show(); });
 }
 
 // ---------- alerts on lines and indicators, favourites, saved setups ----------
