@@ -422,7 +422,7 @@ function loadBars() {
     ntBox = 0; rawB = NT[S.type] ? r.bars : null; bars = rawB ? transform(rawB) : r.bars; dec = r.dec; noMore = isK(S.sym) || r.bars.length < 50 || (SEC[S.tf] && !isB(S.sym)); cmpData = {}; S.cmp.forEach(loadCmp); V.right = bars.length - 1 + rightPad(); V.auto = true; showStat(bars.length ? '' : 'No data for this symbol.'); detSoon(); recalc(); dirty(); connect(); loadTickers(); if (rpKeep) rpResume();
   }).catch(function (e) {
     if (id !== loadId) return; setLive('bad'); rpKeep = null;
-    if (isD(S.sym)) { var alt = S.sym === 'D:frxXAUUSD' ? 'F:XAUUSDT' : 'K:' + S.sym.slice(5, 8) + '/' + S.sym.slice(8); if (alt === 'F:XAUUSDT' || KFX[alt]) { dBlocked = true; toast('The MT5 broker feed is not reachable on this network. Showing another feed: its price is NOT the MT5 price.'); S.sym = alt; save(); syncTop(); renderWatch(); return loadBars(); } showStat(e.message || 'The broker feed could not load this symbol.', true); return; }
+    if (isD(S.sym)) { var alt = S.sym === 'D:frxXAUUSD' ? 'F:XAUUSDT' : 'K:' + S.sym.slice(5, 8) + '/' + S.sym.slice(8); if (alt === 'F:XAUUSDT' || KFX[alt]) { dBlocked = true; toast('The MT5 broker feed is not reachable on this network. Showing another feed: its price is NOT the MT5 price.'); S.sym = alt; save(); syncTop(); renderWatch(); return loadBars(); } if (/rate limit/i.test(e.message || '')) { showStat('Many charts were opened quickly, so the broker feed asked for a short pause. This chart loads by itself in a few seconds…'); setTimeout(function () { if (id === loadId) loadBars(); }, 20000); return; } showStat(e.message || 'The broker feed could not load this symbol.', true); return; }
     if (isF(S.sym) && !FFX[S.sym]) { showStat('Binance futures could not be reached on this network. The spot chart of the same coin still works: search for it under Crypto spot.', true); return; }
     if (S.sym === 'F:XAUUSDT') { toast('Spot gold feed is not reachable on this network, showing GOLD / USD instead'); S.sym = 'K:PAXG/USD'; save(); syncTop(); renderWatch(); return loadBars(); }
     if (isO(S.sym)) { showStat(e.message || 'OANDA could not load this symbol.', true); return; }
@@ -1923,7 +1923,7 @@ function settings() {
 
 // ---------- account: everything is saved to the signed-in account and follows it to other devices ----------
 var FB = PANE ? null : window.FIREBASE_CONFIG || null, fbReady = null, fbUser = null, fbDoc = null, fbUnsub = null, cloudT = 0, DEV = Math.random().toString(36).slice(2);
-var SYNC = ['bt', 'rph', 'isets', 'cmpOwn', 'keys', 'lk', 'ls', 'ev', 'lists', 'li', 'th', 'up', 'dn', 'grid', 'off', 'ctf', 'tpl', 'fav', 'sets', 'tm', 'stay', 'type', 'log', 'pct', 'utc', 'grid', 'up', 'dn', 'magnet', 'inds', 'watch', 'alerts', 'draw', 'cmp', 'paper', 'tdKey', 'oaTok'];
+var SYNC = ['sym', 'tf', 'dark', 'inv', 'cursor', 'subK', 'bt', 'rph', 'isets', 'cmpOwn', 'keys', 'lk', 'ls', 'ev', 'lists', 'li', 'th', 'up', 'dn', 'grid', 'off', 'ctf', 'tpl', 'fav', 'sets', 'tm', 'stay', 'type', 'log', 'pct', 'utc', 'grid', 'up', 'dn', 'magnet', 'inds', 'watch', 'alerts', 'draw', 'cmp', 'paper', 'tdKey', 'oaTok'];
 function fbLoad() {
   if (fbReady) return fbReady; var SDK = 'https://www.gstatic.com/firebasejs/10.12.2/', ld = function (n) { return new Promise(function (ok, no) { var e = document.createElement('script'); e.src = SDK + n; e.onload = ok; e.onerror = function () { no(new Error('net')); }; document.head.appendChild(e); }); };
   fbReady = ld('firebase-app-compat.js').then(function () { return Promise.all([ld('firebase-auth-compat.js'), ld('firebase-firestore-compat.js')]); }).then(function () { firebase.initializeApp(FB); firebase.auth().onAuthStateChanged(onUser); });
@@ -1934,24 +1934,32 @@ function cloudPush() {
   if (!fbDoc) return; clearTimeout(cloudT);
   cloudT = setTimeout(function () { if (!fbDoc) return; var d = pack(); if (d.length > 900000) { toast('There are too many drawings to save to your account. Remove some old ones.'); return; } fbDoc.set({ charts: { d: d, t: S._t || Date.now(), dev: DEV } }, { merge: true }).catch(function () {}); }, 2000);
 }
-function redrawAll() { sel = null; cur = null; undo = []; redo = []; sanitize(); allSyms = null; legKey = ''; recalc(); syncTop(); syncTools(); syncBot(); selBar(); renderWatch(); renderAlerts(); renderPos(); clock(); connect(); dirty(); }
-function applyRemote(o, t) { SYNC.forEach(function (k) { if (o[k] !== undefined && o[k] !== null) S[k] = o[k]; }); S._t = t; redrawAll(); flush(); }
+function redrawAll() { sel = null; cur = null; undo = []; redo = []; sanitize(); root.classList.toggle('tc-dark', !!S.dark); root.classList.toggle('tc-ls', !!S.ls); allSyms = null; legKey = ''; recalc(); syncTop(); syncTools(); syncBot(); selBar(); renderWatch(); renderAlerts(); renderPos(); clock(); connect(); dirty(); }
+function okSym(o) { return typeof o.sym === 'string' && /^[A-Za-z0-9:\/_.]{2,24}$/.test(o.sym) && typeof o.tf === 'string' && (TFS.some(function (x) { return x[0] === o.tf; }) || /^c\d{1,5}$/.test(o.tf)); }
+// first = the account was just opened on this device: then the symbol and time frame come along too. Later live updates never switch the chart you are looking at.
+function applyRemote(o, t, first) { var s0 = S.sym, t0 = S.tf; SYNC.forEach(function (k) { if (k === 'sym' || k === 'tf') return; if (o[k] !== undefined && o[k] !== null) S[k] = o[k]; }); if (first && okSym(o) && !rp) { S.sym = o.sym; S.tf = o.tf; } S._t = t; redrawAll(); flush(); if (S.sym !== s0 || S.tf !== t0) loadBars(); }
 function mergeRemote(o) {
-  var k, ids; o.draw = o.draw && typeof o.draw === 'object' ? o.draw : {};
+  var k, ids, w0 = S.watch.slice(); o.draw = o.draw && typeof o.draw === 'object' ? o.draw : {};
   for (k in o.draw) { if (!Array.isArray(o.draw[k])) continue; var mine = S.draw[k] || (S.draw[k] = []); ids = mine.map(function (d) { return d.id; }); o.draw[k].forEach(function (d) { if (d && ids.indexOf(d.id) < 0) mine.push(d); }); }
   if (Array.isArray(o.watch)) S.watch = uniq(o.watch.concat(S.watch));
   if (Array.isArray(o.alerts)) { ids = S.alerts.map(function (a) { return a.id; }); o.alerts.forEach(function (a) { if (a && ids.indexOf(a.id) < 0) S.alerts.push(a); }); }
   if (Array.isArray(o.inds) && ser(S.inds.map(function (i) { return [i.k, i.p]; })) === ser(DEF.inds.map(function (i) { return [i.k, i.p]; }))) S.inds = o.inds;
   if (o.paper && !S.paper.pos.length && S.paper.bal === 10000 && !S.paper.hist.length) S.paper = o.paper;
   if (!S.tdKey && o.tdKey) S.tdKey = o.tdKey;
-  redrawAll();
+  // everything else: whatever is still untouched on this device takes the value saved in the account
+  var s0 = S.sym, t0 = S.tf, sysDark = document.documentElement.getAttribute('data-theme') === 'dark';
+  SYNC.forEach(function (k2) { if (['draw', 'watch', 'alerts', 'inds', 'paper', 'tdKey', 'sym', 'tf', 'lists', 'li', 'dark'].indexOf(k2) >= 0 || o[k2] === undefined || o[k2] === null) return; if (ser(S[k2]) === ser(DEF[k2])) S[k2] = o[k2]; });
+  if (typeof o.dark === 'boolean' && S.dark === sysDark) S.dark = o.dark;
+  if (Array.isArray(o.lists) && o.lists.length > 1 && (!S.lists || S.lists.length <= 1)) { S.lists = o.lists; S.li = clamp(o.li | 0, 0, o.lists.length - 1); var known = []; S.lists.forEach(function (l) { if (l && Array.isArray(l.syms)) known = known.concat(l.syms); }); if (S.lists[S.li] && Array.isArray(S.lists[S.li].syms)) S.watch = uniq(S.lists[S.li].syms.concat(w0.filter(function (x) { return known.indexOf(x) < 0; }))); }
+  if (okSym(o) && S.sym === DEF.sym && S.tf === DEF.tf && !rp) { S.sym = o.sym; S.tf = o.tf; }
+  redrawAll(); if (S.sym !== s0 || S.tf !== t0) loadBars();
 }
 function onUser(u) {
   fbUser = u; fbDoc = null; clearTimeout(cloudT); if (fbUnsub) { fbUnsub(); fbUnsub = null; } syncAcct(); if (!u) return;
   var ref = firebase.firestore().collection('users').doc(u.uid);
   ref.get().then(function (sn) {
     if (fbUser !== u) return; var r = sn.exists && sn.data().charts, o = null, push = true; try { if (r && r.d) o = JSON.parse(r.d); } catch (e) {}
-    if (o) { if (!S._uid) mergeRemote(o); else if (S._uid !== u.uid || r.t > (S._t || 0)) { applyRemote(o, r.t); push = false; } else if (r.t === S._t) push = false; }
+    if (o) { if (!S._uid) mergeRemote(o); else if (S._uid !== u.uid || r.t > (S._t || 0)) { applyRemote(o, r.t, true); push = false; } else if (r.t === S._t) push = false; }
     if (push) S._t = Date.now(); S._uid = u.uid; flush(); fbDoc = ref; if (push) cloudPush();
     fbUnsub = ref.onSnapshot(function (s2) { var c = s2.exists && s2.data().charts; if (!c || !c.d || c.dev === DEV || !(c.t > (S._t || 0))) return; try { applyRemote(JSON.parse(c.d), c.t); toast('Updated from your account'); } catch (e) {} }, function () {});
   }).catch(function () { toast('Could not reach your account right now. Everything is still saved on this device.'); });
