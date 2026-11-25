@@ -9,7 +9,7 @@
     else if (window.__TAURI_INTERNALS__ || window.isTauri) { k = 'win'; v = o && o.k === 'win' && o.v ? o.v : '1.0.0'; }
     if (!k) return;
     var base = (document.currentScript && document.currentScript.src) ? new URL('..', document.currentScript.src).pathname : '/';
-    location.replace(base + 'appshell/?app=' + k + '&v=' + encodeURIComponent(v));
+    location.replace(base + 'appshell/?app=' + k + '&v=' + encodeURIComponent(v) + (o && o.k === k && o.nu ? '&nu=1' : '')); // nu: the Windows app updates itself
   } catch (e) {}
 })();
 // Shared behaviour for every page. Loaded in <head> (not deferred) because the
