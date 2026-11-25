@@ -4,8 +4,7 @@
 // The site's own service worker gives offline support after the first visit.
 // When the site cannot load at all, a bundled offline page (dist/offline.html) is shown.
 // Since 1.2: closing the window hides it to the notification-area tray, only one copy runs at a time, and
-// the app updates itself: it checks /appshell/version.json, downloads the new Setup.exe, verifies its
-// SHA-256 and runs it silently (/S /UPDATE /R: the Tauri NSIS installer relaunches the app when done).
+// the app updates itself with no clicks (see "native updater" below). It installs per user.
 // The start URL says so with &nu=1, and the shell then hides its own update bar.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
@@ -19,8 +18,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
-use tauri::{AppHandle, Manager, Url, WebviewUrl, WindowEvent, Wry};
-use tauri_plugin_dialog::{DialogExt, MessageDialogButtons, MessageDialogKind};
+use tauri::{AppHandle, Manager, Url, WebviewUrl, WindowEvent};
 use tauri_plugin_notification::NotificationExt;
 use update_logic::{file_hash_matches, is_newer, normalize_sha256, to_hex};
 
@@ -166,21 +164,14 @@ fn first_hide_notice(app: &AppHandle) {
     }
 }
 
-/// "Quit" in the tray menu: installs a downloaded update first (silently, then the app restarts), else just exits.
+/// "Quit" in the tray menu: installs a downloaded update first (silently, without restarting), then exits.
 fn quit(app: &AppHandle) {
     if let Some(w) = app.get_webview_window("main") {
         let _ = w.hide();
     }
-    let has_update = app.state::<Updater>().pending.lock().unwrap().is_some();
-    if !has_update {
+    if !install_update(app, false) {
         app.exit(0);
-        return;
     }
-    let app = app.clone();
-    std::thread::spawn(move || {
-        let _ = start_installer(&app);
-        app.exit(0);
-    });
 }
 
 fn build_tray(app: &AppHandle) -> tauri::Result<()> {
@@ -195,7 +186,6 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             "open" => show_main(app),
             "quit" => quit(app),
-            "update" => restart_to_update(app),
             _ => {}
         })
         .on_tray_icon_event(|tray, event| match event {
@@ -207,26 +197,34 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
         tray = tray.icon(icon.clone());
     }
     tray.build(app)?;
-    app.manage(TrayMenu(menu));
     Ok(())
 }
 
-struct TrayMenu(Menu<Wry>);
-
 // ---------- native updater ----------
+// Fully automatic, no clicks: the app is installed per user (%LOCALAPPDATA%\GetToolNest), so the installer
+// needs no admin rights. A new Setup.exe is downloaded in the background, its SHA-256 checked against
+// version.json, and it is installed silently at a quiet moment: when the window is hidden in the tray, after
+// 5 minutes without keyboard or mouse input, or at the next start before the window shows. The installer then
+// starts the app again (/R), with the window shown again if it was visible, and a notification says so.
+
+const IDLE_SECS: u32 = 5 * 60;
+const CHECK_EVERY: Duration = Duration::from_secs(6 * 3600);
+const MAX_ATTEMPTS: u64 = 3;
+/// Argument the installer passes to the restarted app (/ARGS): window visible or kept in the tray.
+const ARG_UPDATED: &str = "--updated";
+const ARG_UPDATED_TRAY: &str = "--updated-tray";
 
 #[derive(Clone)]
 struct Pending {
     version: String,
     sha256: String,
     path: PathBuf,
+    attempts: u64,
 }
 
 #[derive(Default)]
 struct Updater {
     pending: Mutex<Option<Pending>>,
-    menu_item: Mutex<Option<MenuItem<Wry>>>,
-    prompted: Mutex<Option<String>>,
     installing: AtomicBool,
 }
 
@@ -243,21 +241,73 @@ fn update_dir() -> PathBuf {
     std::env::temp_dir().join("GetToolNest-update")
 }
 
+fn pending_file() -> PathBuf {
+    update_dir().join("pending.json")
+}
+
+fn save_pending(p: &Pending) {
+    let j = serde_json::json!({ "version": p.version, "sha256": p.sha256, "path": p.path, "attempts": p.attempts });
+    let _ = std::fs::write(pending_file(), j.to_string());
+}
+
+/// A downloaded update left from an earlier run (the app was quit or Windows shut down before it installed).
+fn load_pending() -> Option<Pending> {
+    let j: serde_json::Value = serde_json::from_str(&std::fs::read_to_string(pending_file()).ok()?).ok()?;
+    Some(Pending {
+        version: j["version"].as_str()?.to_string(),
+        sha256: normalize_sha256(j["sha256"].as_str()?)?,
+        path: PathBuf::from(j["path"].as_str()?),
+        attempts: j["attempts"].as_u64().unwrap_or(0),
+    })
+}
+
+fn clear_pending() {
+    let _ = std::fs::remove_dir_all(update_dir());
+}
+
+/// Seconds since the last keyboard or mouse input anywhere in the Windows session.
+#[cfg(windows)]
+fn idle_secs() -> u32 {
+    use windows::Win32::System::SystemInformation::GetTickCount;
+    use windows::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
+    unsafe {
+        let mut li = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+        if GetLastInputInfo(&mut li).as_bool() {
+            GetTickCount().wrapping_sub(li.dwTime) / 1000
+        } else {
+            0
+        }
+    }
+}
+
+#[cfg(not(windows))]
+fn idle_secs() -> u32 {
+    0
+}
+
+fn main_visible(app: &AppHandle) -> bool {
+    app.get_webview_window("main").map(|w| w.is_visible().unwrap_or(false)).unwrap_or(false)
+}
+
 /// About 10 s after start, then every 6 hours (by the wall clock, so sleep or hibernation does not delay it).
+/// Every 30 s it looks for a quiet moment to install a downloaded update.
 fn start_updater(app: AppHandle) {
     std::thread::spawn(move || {
         std::thread::sleep(Duration::from_secs(10));
+        let mut last_check: Option<SystemTime> = None;
         loop {
-            if let Err(e) = check_for_update(&app) {
-                eprintln!("update check failed: {e}");
-            }
-            let since = SystemTime::now();
-            loop {
-                std::thread::sleep(Duration::from_secs(5 * 60));
-                if since.elapsed().map(|d| d >= Duration::from_secs(6 * 3600)).unwrap_or(true) {
-                    break;
+            let due = last_check.map(|t| t.elapsed().map(|d| d >= CHECK_EVERY).unwrap_or(true)).unwrap_or(true);
+            if due {
+                last_check = Some(SystemTime::now());
+                if let Err(e) = check_for_update(&app) {
+                    eprintln!("update check failed: {e}");
                 }
             }
+            let has_update = app.state::<Updater>().pending.lock().unwrap().is_some();
+            if has_update && (!main_visible(&app) || idle_secs() >= IDLE_SECS) {
+                install_update(&app, true);
+            }
+            std::thread::sleep(Duration::from_secs(30));
         }
     });
 }
@@ -277,8 +327,7 @@ fn check_for_update(app: &AppHandle) -> Result<(), String> {
     if !is_newer(&latest, VERSION) {
         return Ok(());
     }
-    let url = j["windowsSetup"].as_str().unwrap_or("");
-    let url = Url::parse(url).map_err(|e| e.to_string())?;
+    let url = Url::parse(j["windowsSetup"].as_str().unwrap_or("")).map_err(|e| e.to_string())?;
     if url.scheme() != "https" {
         return Err("setup URL is not https".into());
     }
@@ -303,9 +352,9 @@ fn check_for_update(app: &AppHandle) -> Result<(), String> {
         let _ = std::fs::remove_file(&path);
         return Err("downloaded file does not match windowsSha256".into());
     }
-
-    *state.pending.lock().unwrap() = Some(Pending { version: latest.clone(), sha256: sha, path });
-    update_ready_ui(app, &latest);
+    let p = Pending { version: latest, sha256: sha, path, attempts: 0 };
+    save_pending(&p);
+    *state.pending.lock().unwrap() = Some(p);
     Ok(())
 }
 
@@ -343,118 +392,61 @@ fn download(agent: &ureq::Agent, url: &str, part: &Path, sha: &str) -> Result<()
     }
 }
 
-/// An update is downloaded and verified: a tray menu item, the tray tooltip, and a prompt (once per version).
-fn update_ready_ui(app: &AppHandle, ver: &str) {
-    let state = app.state::<Updater>();
-    let label = format!("Restart to update to {ver}");
+/// Starts the verified installer silently: /S silent, /UPDATE keeps the user's shortcuts and skips WebView2,
+/// and with `relaunch`, /R starts the app again when done, passing /ARGS to it.
+/// The hash is checked again right before: a file that does not match is never run.
+fn spawn_installer(p: &Pending, relaunch: Option<&str>) -> bool {
+    if !file_hash_matches(&p.path, &p.sha256) {
+        clear_pending();
+        return false;
+    }
+    let mut cmd = std::process::Command::new(&p.path);
+    cmd.args(["/S", "/UPDATE"]);
+    if let Some(arg) = relaunch {
+        cmd.args(["/R", "/ARGS", arg]);
+    }
+    #[cfg(windows)]
     {
-        let mut item = state.menu_item.lock().unwrap();
-        match item.as_ref() {
-            Some(i) => {
-                let _ = i.set_text(&label);
-            }
-            None => {
-                if let Ok(i) = MenuItem::with_id(app, "update", &label, true, None::<&str>) {
-                    if let Some(menu) = app.try_state::<TrayMenu>() {
-                        let _ = menu.0.prepend(&i);
-                    }
-                    *item = Some(i);
-                }
-            }
-        }
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x0000_0008); // DETACHED_PROCESS: it outlives this app
     }
-    if let Some(tray) = app.tray_by_id(TRAY_ID) {
-        let _ = tray.set_tooltip(Some(format!("GetToolNest - update {ver} ready")));
-    }
-    {
-        let mut prompted = state.prompted.lock().unwrap();
-        if prompted.as_deref() == Some(ver) {
-            return;
-        }
-        *prompted = Some(ver.to_string());
-    }
-    let mut dialog = app
-        .dialog()
-        .message(format!(
-            "Update ready: GetToolNest {ver}.\n\nRestart now to install it. If you choose Later, it installs when you quit GetToolNest from the tray icon."
-        ))
-        .title("GetToolNest update")
-        .kind(MessageDialogKind::Info)
-        .buttons(MessageDialogButtons::OkCancelCustom("Restart now".into(), "Later".into()));
-    if let Some(w) = app.get_webview_window("main") {
-        if w.is_visible().unwrap_or(false) {
-            dialog = dialog.parent(&w);
-        }
-    }
-    let app = app.clone();
-    dialog.show(move |restart| {
-        if restart {
-            restart_to_update(&app);
-        }
-    });
+    cmd.spawn().is_ok()
 }
 
-/// "Restart now": run the installer; the app exits so its files can be replaced, and the installer starts it again.
-fn restart_to_update(app: &AppHandle) {
-    let app = app.clone();
-    std::thread::spawn(move || {
-        if start_installer(&app) {
-            app.exit(0);
-        } else {
-            app.dialog()
-                .message("The update could not be started. GetToolNest will try again later.")
-                .title("GetToolNest update")
-                .kind(MessageDialogKind::Warning)
-                .show(|_| {});
-        }
-    });
-}
-
-/// Runs the verified installer silently. Returns true when it started (the user accepted the UAC prompt).
-fn start_installer(app: &AppHandle) -> bool {
+/// Installs the downloaded update and exits so the files can be replaced (the installer would close the app anyway).
+fn install_update(app: &AppHandle, relaunch: bool) -> bool {
     let state = app.state::<Updater>();
     if state.installing.swap(true, Ordering::SeqCst) {
         return false;
     }
-    let pending = state.pending.lock().unwrap().clone();
-    let ok = match pending {
-        // the hash is checked again right before running: never run a file that does not match
-        Some(p) if file_hash_matches(&p.path, &p.sha256) => run_installer(&p.path),
-        Some(p) => {
-            let _ = std::fs::remove_file(&p.path);
-            *state.pending.lock().unwrap() = None;
-            false
-        }
-        None => false,
-    };
-    if !ok {
+    let Some(mut p) = state.pending.lock().unwrap().clone() else {
         state.installing.store(false, Ordering::SeqCst);
-    }
-    ok
-}
-
-/// /S silent, /UPDATE keeps shortcuts and skips WebView2, /R restarts the app after the install
-/// (the Tauri NSIS template runs it as the normal, non-elevated user). The installer is perMachine,
-/// so ShellExecute shows one UAC prompt.
-#[cfg(windows)]
-fn run_installer(path: &Path) -> bool {
-    use windows::core::{HSTRING, PCWSTR};
-    use windows::Win32::System::Com::{CoInitializeEx, COINIT_APARTMENTTHREADED, COINIT_DISABLE_OLE1DDE};
-    use windows::Win32::UI::Shell::ShellExecuteW;
-    use windows::Win32::UI::WindowsAndMessaging::SW_SHOWNORMAL;
-    unsafe {
-        let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE);
-        let verb = HSTRING::from("runas");
-        let file = HSTRING::from(path.as_os_str());
-        let params = HSTRING::from("/S /UPDATE /R");
-        let r = ShellExecuteW(None, &verb, &file, &params, PCWSTR::null(), SW_SHOWNORMAL);
-        r.0 as isize > 32
+        return false;
+    };
+    p.attempts += 1;
+    save_pending(&p);
+    let arg = if main_visible(app) { ARG_UPDATED } else { ARG_UPDATED_TRAY };
+    if spawn_installer(&p, relaunch.then_some(arg)) {
+        app.exit(0);
+        true
+    } else {
+        *state.pending.lock().unwrap() = None;
+        state.installing.store(false, Ordering::SeqCst);
+        false
     }
 }
 
-#[cfg(not(windows))]
-fn run_installer(_path: &Path) -> bool {
-    false
+/// At start, before the window shows: a downloaded update from an earlier run is installed now.
+/// Returns true when the installer started and this process must end.
+fn install_pending_at_start() -> bool {
+    let Some(mut p) = load_pending() else { return false };
+    if !is_newer(&p.version, VERSION) || p.attempts >= MAX_ATTEMPTS {
+        clear_pending(); // installed already, or it keeps failing: download again later
+        return false;
+    }
+    p.attempts += 1;
+    save_pending(&p);
+    spawn_installer(&p, Some(ARG_UPDATED))
 }
 
 fn main() {
@@ -469,7 +461,6 @@ fn main() {
                 .build(),
         )
         .plugin(tauri_plugin_notification::init())
-        .plugin(tauri_plugin_dialog::init())
         .manage(Updater::default())
         // the X button hides the window to the tray; "Quit" in the tray menu ends the app
         .on_window_event(|window, event| {
@@ -482,6 +473,21 @@ fn main() {
             }
         })
         .setup(|app| {
+            if install_pending_at_start() {
+                std::process::exit(0);
+            }
+            let args: Vec<String> = std::env::args().collect();
+            let updated = args.iter().any(|a| a == ARG_UPDATED || a == ARG_UPDATED_TRAY);
+            let start_in_tray = args.iter().any(|a| a == ARG_UPDATED_TRAY);
+            if updated {
+                clear_pending();
+                let _ = app
+                    .notification()
+                    .builder()
+                    .title("GetToolNest")
+                    .body(format!("GetToolNest updated to {VERSION}"))
+                    .show();
+            }
             let handle = app.handle().clone();
             let window = WebviewWindowBuilder::new(
                 app,
@@ -493,6 +499,7 @@ fn main() {
             .min_inner_size(400.0, 500.0)
             .resizable(true)
             .center()
+            .visible(!start_in_tray)
             // Links inside the app window: keep site pages, send everything else to the browser.
             // Sign-in pages stay too: Google sign-in falls back to a redirect when a popup cannot open.
             .on_navigation(|url| {
