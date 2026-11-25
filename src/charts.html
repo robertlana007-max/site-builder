@@ -1264,6 +1264,9 @@ function rpBar() {
   elRbar.appendChild(tb('<path d="M6 5l9 7-9 7zM18 5v14"/>', 'Forward one candle', rpStep));
   elRbar.appendChild(tb(null, 'Replay speed (candles per second)', function () { var z = [1, 2, 5, 10, .5], i = z.indexOf(rp.sp); rp.sp = z[(i + 1) % z.length]; rpRun(); rpBar(); }, rp.sp + 'x'));
   elRbar.appendChild(tb('<path d="M12 3v18M5 8l-3 4 3 4M19 8l3 4-3 4"/>', 'Pick another candle to start the replay from', function () { rpExit(); U.replay.click(); }));
+  rpSl = h('input', { type: 'range', id: 'tcRpSl', min: 5, max: full.length - 2, step: 1, value: bars.length - 1, title: 'Drag to move the replay to any candle', 'aria-label': 'Replay position', style: 'flex:1;min-width:150px;padding:0;height:26px;accent-color:#2f6fed' }); rpSl.addEventListener('input', function () { rpSeek(+rpSl.value, true); }); rpSl.addEventListener('change', function () { rpSl.blur(); rpBar(); });
+  rpDl = tb('<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', 'Jump the replay to a date, loading older years when needed', rpDate, ''); rpDl.id = 'tcRpDate'; rpDl.style.cssText = 'font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap';
+  elRbar.appendChild(h('div', { style: 'flex:1 0 100%;display:flex;align-items:center;gap:6px;padding:0 4px' }, [rpSl, rpDl])); rpPosUp();
   elRbar.appendChild(h('span', { class: 'tc-sep' }));
   var bb = tb(null, 'Buy at the price of the last replay candle', function () { rpTrade(1); }, 'Buy'), sb = tb(null, 'Sell at the price of the last replay candle', function () { rpTrade(-1); }, 'Sell'); bb.style.cssText = 'color:#fff;background:#12a06b;font-weight:700;padding:0 10px'; sb.style.cssText = 'color:#fff;background:#e5484d;font-weight:700;padding:0 10px'; bb.id = 'tcRpBuy'; sb.id = 'tcRpSell'; elRbar.appendChild(sb); elRbar.appendChild(bb);
   if (rp.acc.pos.length) elRbar.appendChild(tb(null, 'Close every open replay trade at the price of the last candle', function () { var px = rpPx(); rp.acc.pos.slice().forEach(function (q) { rpClose(q, px, 'Closed by you'); }); rpBar(); dirty(); }, 'Close'));
@@ -1272,8 +1275,31 @@ function rpBar() {
   elRbar.appendChild(h('span', { class: 'tc-sep' })); elRbar.appendChild(tb('x', 'Exit replay', rpExit, 'Exit'));
 }
 function rpRun() { clearInterval(rpT); rpT = 0; if (rp && rp.on) rpT = setInterval(rpStep, 1000 / rp.sp); }
-function rpStep() { if (!rp || !full) return; if (bars.length >= full.length) { rp.on = false; rpRun(); rpBar(); toast('Replay reached the latest candle'); return; } var atEnd = V.right >= bars.length - 1; bars.push(full[bars.length]); if (atEnd) V.right += 1; var n0 = rp.acc.pos.length, hit = n0 ? rpCheck() : null; if (hit) { rp.on = false; rpRun(); rpBar(); toast(hit + ': ' + rpSg(rp.acc.hist[rp.acc.hist.length - 1].pnl)); beep(); } else rpInfoUp(); recalc(); dirty(); }
+function rpStep() { if (!rp || !full) return; if (bars.length >= full.length) { rp.on = false; rpRun(); rpBar(); toast('Replay reached the latest candle'); return; } var atEnd = V.right >= bars.length - 1; bars.push(full[bars.length]); if (atEnd) V.right += 1; var n0 = rp.acc.pos.length, hit = n0 ? rpCheck() : null; if (hit) { rp.on = false; rpRun(); rpBar(); toast(hit + ': ' + rpSg(rp.acc.hist[rp.acc.hist.length - 1].pnl)); beep(); } else { rpInfoUp(); rpPosUp(); } recalc(); dirty(); }
 function rpBack() { if (!rp || !full || bars.length <= 6) return; rp.on = false; rpRun(); var atEnd = V.right >= bars.length - 1; bars = bars.slice(0, -1); if (atEnd) V.right -= 1; rpUndo(); recalc(); rpBar(); dirty(); }
+// replay position: a slider over every loaded candle, and a date jump that loads older years first
+var rpSl = null, rpDl = null;
+function rpPosUp() { if (!rp || !rpSl || !full) return; rpSl.max = full.length - 2; rpSl.value = bars.length - 1; if (rpDl) rpDl.lastChild.textContent = new Date(bars[bars.length - 1].t).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) + (tfMs() < 864e5 ? ' ' + new Date(bars[bars.length - 1].t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''); }
+function rpSeek(i, fromSlider) {
+  if (!rp || !full) return; i = clamp(Math.round(i), 5, full.length - 2); var cur = bars.length - 1, hit = null; if (i === cur) return; rp.on = false; rpRun();
+  if (i > cur && rp.acc.pos.length) { while (bars.length - 1 < i && !hit) { bars.push(full[bars.length]); hit = rp.acc.pos.length ? rpCheck() : null; } } else { bars = full.slice(0, i + 1); if (i < cur) rpUndo(); }
+  V.right = bars.length - 1 + rightPad(); V.auto = true; recalc();
+  if (hit || !fromSlider || i < cur) { var keep = fromSlider && !hit && document.activeElement === rpSl; if (keep) { rpInfoUp(); rpPosUp(); } else rpBar(); } else { rpInfoUp(); rpPosUp(); }
+  if (hit) { toast(hit + ': ' + rpSg(rp.acc.hist[rp.acc.hist.length - 1].pnl)); beep(); } dirty();
+}
+function rpOlder(untilT) {
+  var id = loadId, tries = 0, step = function () {
+    if (id !== loadId || !rp || !full) return Promise.resolve(false); if (full[0].t <= untilT || noMore || full.length >= 60000 || tries++ >= 60) return Promise.resolve(true);
+    var ft = full[0].t; return getK(S.sym, S.tf, 1000, ft - 1).then(function (r) { if (id !== loadId || !rp || !full) return false; var k = r.bars.filter(function (b) { return b.t < ft; }); if (k.length < 5) noMore = true; if (!k.length) return true;
+      full = k.concat(full); bars = k.concat(bars); rp.acc.pos.forEach(function (q) { q.ei += k.length; }); rp.acc.hist.forEach(function (x) { x.xi += k.length; if (rp.acc.pos.indexOf(x.q) < 0) x.q.ei += k.length; }); V.right += k.length; showStat('Loading older candles… ' + new Date(full[0].t).toLocaleDateString([], { month: 'short', year: 'numeric' })); return step(); });
+  };
+  return step();
+}
+function rpDate() {
+  if (!rp || !full) return; rp.on = false; rpRun(); var inp = h('input', { type: tfMs() < 864e5 ? 'datetime-local' : 'date', value: new Date(bars[bars.length - 1].t - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, tfMs() < 864e5 ? 16 : 10) }), y = new Date().getFullYear(), yrs = h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:10px' }), go = function (t) { if (t !== t) return false; if (rawB) { toast('Switch to candles to load older years in the replay'); return; } closeModal(); var need = t < full[0].t; (need ? rpOlder(t) : Promise.resolve(true)).then(function (ok) { showStat(''); if (!ok || !rp) return; var i = 0; while (i < full.length - 2 && full[i].t < t) i++; recalc(); rpSeek(Math.max(5, i)); rpBar(); if (need && full[0].t > t) toast('The oldest candles available on ' + tfShort(S.tf) + ' start at ' + new Date(full[0].t).toLocaleDateString() + '. Use a bigger time frame to go back further.'); }).catch(function () { showStat(''); toast('Older candles could not be loaded. Try again.'); }); };
+  for (var k = 0; k < 12; k++) (function (yy) { yrs.appendChild(h('button', { class: 'tc-btn', text: String(yy), onclick: function () { go(new Date(yy, 0, 1).getTime()); } })); })(y - k);
+  modal('Move the replay to a date', h('div', {}, [h('div', { class: 'tc-f' }, [h('label', { text: 'Date' }), inp]), h('p', { class: 'tc-empty', style: 'padding:10px 0 0;text-align:start', text: 'Or pick the start of a year. Older candles are loaded first when needed. Loaded now: from ' + new Date(full[0].t).toLocaleDateString() + '. For many years of history use the 4h, D or W time frame.' }), yrs]), [{ t: 'Cancel', fn: function () {} }, { t: 'Go', pri: 1, fn: function () { return go(new Date(inp.value).getTime()); } }]);
+}
 // trading inside the replay: its own practice balance, filled at replay prices, never mixed with the live paper account
 var rpInfo = null;
 function rpSg(v) { return (v >= 0 ? '+' : '-') + fmt(Math.abs(v), 2); }
