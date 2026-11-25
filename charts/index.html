@@ -1996,7 +1996,7 @@ function mergeRemote(o) {
   redrawAll(); if (S.sym !== s0 || S.tf !== t0) loadBars();
 }
 function onUser(u) {
-  fbUser = u; fbDoc = null; clearTimeout(cloudT); if (fbUnsub) { fbUnsub(); fbUnsub = null; } syncAcct(); if (!u) return;
+  fbUser = u; fbDoc = null; clearTimeout(cloudT); if (fbUnsub) { fbUnsub(); fbUnsub = null; } syncAcct(); atUser(); if (!u) return;
   var ref = firebase.firestore().collection('users').doc(u.uid);
   ref.get().then(function (sn) {
     if (fbUser !== u) return; var r = sn.exists && sn.data().charts, o = null, push = true; try { if (r && r.d) o = JSON.parse(r.d); } catch (e) {}
@@ -2012,7 +2012,7 @@ function authWhy(e) {
 }
 function acctDlg() {
   if (!FB) return; var msg = h('p', { class: 'tc-empty', style: 'padding:10px 0 0;min-height:18px' }), run = function (f, keep) { msg.textContent = 'Please wait…'; fbLoad().then(f).then(function () { if (!keep) closeModal(); }).catch(function (e) { msg.textContent = authWhy(e); }); return false; };
-  if (fbUser) return modal('Your account', h('div', {}, [h('p', { style: 'margin:0 0 8px;font-size:14px', text: 'Signed in as ' + (fbUser.email || fbUser.displayName || 'your account') }), h('p', { class: 'tc-empty', style: 'padding:0', text: 'Your drawings, indicators, watchlist, alerts, paper trades and settings are saved to this account automatically. Sign in on another phone or computer and they appear there too.' }), msg]), [{ t: 'Sign out', red: 1, fn: function () { return run(function () { return firebase.auth().signOut(); }); } }, { t: 'Close', pri: 1, fn: function () {} }]);
+  if (fbUser) return modal('Your account', h('div', {}, [h('p', { style: 'margin:0 0 8px;font-size:14px', text: 'Signed in as ' + (fbUser.email || fbUser.displayName || 'your account') }), h('p', { class: 'tc-empty', style: 'padding:0', text: 'Your drawings, indicators, watchlist, alerts, paper trades and settings are saved to this account automatically. Sign in on another phone or computer and they appear there too.' }), msg]), (atOk ? [{ t: 'Auto trade', fn: function () { atDlg(); return false; } }] : []).concat([{ t: 'Sign out', red: 1, fn: function () { return run(function () { return firebase.auth().signOut(); }); } }, { t: 'Close', pri: 1, fn: function () {} }]));
   var em = h('input', { type: 'text', placeholder: 'Email', autocomplete: 'email', inputmode: 'email' }), pw = h('input', { type: 'password', placeholder: 'Password (6 or more characters)', autocomplete: 'current-password' });
   modal('Sign in to save your chart', h('div', {}, [h('p', { class: 'tc-empty', style: 'padding:0 0 10px', text: 'With an account, everything you draw and set up is saved automatically and appears on any phone or computer where you sign in. It is the same account as the rest of GetToolNest.' }), h('button', { class: 'tc-btn pri', style: 'width:100%;margin-bottom:12px', text: 'Continue with Google', onclick: function () { run(function () { return firebase.auth().signInWithPopup(new firebase.auth.GoogleAuthProvider()); }); } }), h('div', { style: 'display:grid;gap:8px' }, [em, pw]), msg]), [{ t: 'Create account', fn: function () { return run(function () { return firebase.auth().createUserWithEmailAndPassword(em.value.trim(), pw.value); }); } }, { t: 'Sign in', pri: 1, fn: function () { return run(function () { return firebase.auth().signInWithEmailAndPassword(em.value.trim(), pw.value); }); } }]);
 }
@@ -2178,6 +2178,66 @@ function gtnCalc(b, p) {
 }
 Object.assign(IND, { sig: { n: 'GetToolNest Special', s: 'GetToolNest Special', ov: 1, nl: 1, p: { target: 1 }, opt: { target: [[1, 'Target 2 x the stop'], [2, 'Target 3 x the stop'], [3, 'Target the same size as the stop']] }, c: [], ns: 1, f: function (b, p) { return gtnCalc(b, p); } } });
 IMETA.sig = { c: -1, d: 'Our own indicator, our own strategy, found by testing 1.1 million candles: enter on strength with one stop and one target that is bigger than the stop; when price is half-way the stop moves to the entry. Every finished trade is kept on record.', a: 'gettoolnest special signal signals buy sell auto trade entry tp sl long short smart best own' };
+
+// ---------- private: auto trading on an MT5 account through MetaApi. Shown only to chosen, verified accounts ----------
+var AT_OK = ['ac2dda49957704046877d03b5bd0c6d1f824ca85f00e8d56a13da2fd543c0006'], AT_PROV = 'https://mt-provisioning-api-v1.agiliumtrade.agiliumtrade.ai', AT_GOOD = ['ERR_NO_ERROR', 'TRADE_RETCODE_PLACED', 'TRADE_RETCODE_DONE', 'TRADE_RETCODE_DONE_PARTIAL', 'TRADE_RETCODE_NO_CHANGES'];
+var atOk = false, atLog = [], atT = 0, atBusy = false, atLast = '', atN = 0, AT = (function () { var o = {}; try { o = JSON.parse(localStorage.getItem('gtn-at')) || {}; } catch (e) {} o.map = o.map || {}; o.pos = o.pos || {}; o.done = o.done || []; o.risk = +o.risk > 0 ? Math.min(+o.risk, 10) : 1; if (o.half == null) o.half = true; return o; })();
+function atSave() { try { localStorage.setItem('gtn-at', JSON.stringify(AT)); } catch (e) {} }
+function atSay(t) { atLog.unshift(new Date().toLocaleTimeString() + '  ' + t); if (atLog.length > 40) atLog.length = 40; var e = document.getElementById('tcAtLog'); if (e) e.textContent = atLog.join('\n'); }
+function atUser() { atOk = false; var u = fbUser; if (!u || !u.email || !u.emailVerified || !window.crypto || !crypto.subtle || !window.TextEncoder) { atStop(); return; } crypto.subtle.digest('SHA-256', new TextEncoder().encode('gtn-at:' + u.email.trim().toLowerCase())).then(function (buf) { if (fbUser !== u) return; var hx = Array.prototype.map.call(new Uint8Array(buf), function (x) { return ('0' + x.toString(16)).slice(-2); }).join(''); atOk = AT_OK.indexOf(hx) >= 0; if (atOk && AT.on) atStart(); }).catch(function () {}); }
+function atReq(url, opt) { opt = opt || {}; return fetch(url, { method: opt.method || 'GET', headers: Object.assign({ 'auth-token': AT.tok || '', Accept: 'application/json' }, opt.body ? { 'Content-Type': 'application/json' } : {}), body: opt.body ? JSON.stringify(opt.body) : undefined }).then(function (r) { return r.text().then(function (t) { var j = null; try { j = t ? JSON.parse(t) : null; } catch (e) {} if (!r.ok) throw new Error((j && j.message) || 'Error ' + r.status); return j; }); }); }
+function atApi(path, opt) { return atReq('https://mt-client-api-v1.' + AT.region + '.' + (AT.dom || 'agiliumtrade.ai') + '/users/current/accounts/' + AT.acc + '/' + path, opt); }
+function atTrade(body) { return atApi('trade', { method: 'POST', body: body }).then(function (r) { if (!r || AT_GOOD.indexOf(r.stringCode) < 0) throw new Error((r && (r.message || r.stringCode)) || 'The broker refused the trade'); return r; }); }
+function atVol(v, sp) { var st = sp.volumeStep > 0 ? sp.volumeStep : .01; return +(Math.floor(v / st + 1e-9) * st).toFixed(4); }
+// one trade: the stop and target distances come from the chart, the prices from the broker, so a small price difference between the two does not matter
+function atOpen(d, risk, tpR, id, tiny) {
+  var sym = AT.map[S.sym], q = 'symbols/' + encodeURIComponent(sym) + '/';
+  return Promise.all([atApi('account-information'), atApi(q + 'specification'), atApi(q + 'current-price')]).then(function (r) {
+    var ai = r[0], sp = r[1], px = r[2], e = d > 0 ? px.ask : px.bid, last = bars.length ? bars[bars.length - 1].c : 0, dg = sp.digits != null ? sp.digits : 5;
+    if (!(e > 0) || !(sp.tickSize > 0)) throw new Error('No price from the broker for ' + sym);
+    if (last > 0 && Math.abs(e / last - 1) > .03) throw new Error('The broker price of ' + sym + ' (' + e + ') is far from this chart (' + fmt(last) + '). Check the broker symbol name.');
+    var tv = px.lossTickValue || px.profitTickValue, per = risk / sp.tickSize * tv, lots = tiny ? sp.minVolume : atVol(ai.balance * AT.risk / 100 / per, sp); if (!(per > 0)) throw new Error('No tick value from the broker');
+    if (sp.maxVolume > 0 && lots > sp.maxVolume) lots = sp.maxVolume; if (!(lots >= sp.minVolume)) throw new Error('Account too small for ' + AT.risk + '% risk on this trade. Trade skipped.');
+    var sl = +(e - d * risk).toFixed(dg), tp = +(e + d * tpR * risk).toFixed(dg);
+    return atTrade({ actionType: d > 0 ? 'ORDER_TYPE_BUY' : 'ORDER_TYPE_SELL', symbol: sym, volume: lots, stopLoss: sl, takeProfit: tp, comment: 'GetToolNest' }).then(function (t) {
+      var pid = String(t.positionId || t.orderId || ''); if (pid) AT.pos[pid] = { sym: sym, d: d, hl: +(e + d * risk).toFixed(dg), mv: sp.minVolume, st: sp.volumeStep, half: false }; if (id) { AT.done.push(id); if (AT.done.length > 200) AT.done = AT.done.slice(-200); } atSave();
+      atSay((d > 0 ? 'BUY ' : 'SELL ') + lots + ' ' + sym + ' at about ' + e + ', stop ' + sl + ', target ' + tp); toast('Auto trade: ' + (d > 0 ? 'BUY ' : 'SELL ') + lots + ' ' + sym); beep(); }); });
+}
+// half-way to the target: close half and move the stop to the entry
+function atManage() {
+  var ids = Object.keys(AT.pos); if (!ids.length) return Promise.resolve();
+  return atApi('positions').then(function (ps) { var by = {}; (ps || []).forEach(function (p) { by[String(p.id)] = p; }); var chain = Promise.resolve();
+    ids.forEach(function (id) { var m = AT.pos[id], p = by[id]; if (!p) { delete AT.pos[id]; atSave(); atSay('Trade ' + id + ' on ' + m.sym + ' is closed'); return; } if (m.half || !(p.currentPrice > 0) || !(m.d > 0 ? p.currentPrice >= m.hl : p.currentPrice <= m.hl)) return;
+      m.half = true; atSave(); var hv = atVol(p.volume / 2, { volumeStep: m.st }), can = AT.half && hv >= m.mv && p.volume - hv >= m.mv - 1e-9;
+      chain = chain.then(function () { return can ? atTrade({ actionType: 'POSITION_PARTIAL', positionId: id, volume: hv }).then(function () { atSay('Half closed in profit on ' + m.sym); }) : (AT.half ? atSay('Lot too small to split on ' + m.sym + ', keeping the whole trade') : null); }).catch(function (e) { atSay('Could not close half: ' + e.message); })
+        .then(function () { return atTrade({ actionType: 'POSITION_MODIFY', positionId: id, stopLoss: p.openPrice, takeProfit: p.takeProfit }); }).then(function () { atSay('Stop moved to the entry on ' + m.sym + ' (break-even)'); toast('Auto trade: stop moved to the entry'); }).catch(function (e) { atSay('Could not move the stop: ' + e.message); }); });
+    return chain; });
+}
+function atTick() {
+  if (!AT.on || !atOk || atBusy || !AT.tok || !AT.acc) return; atBusy = true; var work = Promise.resolve();
+  if (++atN % 3 === 0) work = atManage();
+  if (!rp && B && AT.map[S.sym]) { var n = B.c.length, key = S.sym + '|' + S.tf + '|' + B.t[n - 1]; if (n > 260 && key !== atLast) { atLast = key; var tr = gtnRun(B, gtnMode(), 2, 1), t = tr[tr.length - 1];
+      if (t && t.out === 'open' && t.i === n - 1 && AT.done.indexOf(key) < 0 && Date.now() - B.t[n - 1] <= Math.max(6e4, tfMs() * .2) && !Object.keys(AT.pos).some(function (k) { return AT.pos[k].sym === AT.map[S.sym]; })) work = work.then(function () { return atOpen(t.d, t.risk, 2, key); }); } }
+  work.catch(function (e) { atSay('Problem: ' + e.message); }).then(function () { atBusy = false; });
+}
+function atStart() { clearInterval(atT); atT = setInterval(atTick, 5000); }
+function atStop() { clearInterval(atT); atT = 0; }
+function atDlg() {
+  if (!atOk) return; var tok = h('input', { type: 'password', placeholder: 'MetaApi token', value: AT.tok || '', autocomplete: 'off' }), acc = h('select', {}, [h('option', { value: AT.acc || '', text: AT.acc ? (AT.name || 'Saved account') : 'Press Connect first' })]), sym = h('input', { type: 'text', placeholder: 'for example XAUUSDm', value: AT.map[S.sym] || '' }), risk = h('input', { type: 'number', min: '0.1', max: '10', step: '0.1', value: AT.risk }), half = h('input', { type: 'checkbox' }); half.checked = !!AT.half;
+  var list = [], st = h('p', { class: 'tc-empty', style: 'padding:6px 0;min-height:18px', text: AT.on ? 'Running. Keep this page open.' : 'Stopped.' }), log = h('pre', { id: 'tcAtLog', style: 'margin:8px 0 0;max-height:150px;overflow:auto;font-size:12px;white-space:pre-wrap', text: atLog.join('\n') });
+  var keep = function () { AT.tok = tok.value.trim(); AT.risk = clamp(+risk.value || 1, .1, 10); AT.half = half.checked; var a = list.filter(function (x) { return x._id === acc.value; })[0]; if (a) { AT.acc = a._id; AT.region = a.region; AT.name = (a.name || a.login) + ' · ' + a.server; } var v = sym.value.trim(); if (v) AT.map[S.sym] = v; else delete AT.map[S.sym]; atSave(); };
+  var connect = function () { keep(); if (!AT.tok) { st.textContent = 'Paste your MetaApi token first.'; return; } st.textContent = 'Connecting…';
+    atReq(AT_PROV + '/users/current/servers/mt-client-api').then(function (d) { if (d && d.domain) AT.dom = d.domain; }).catch(function () {}).then(function () { return atReq(AT_PROV + '/users/current/accounts'); }).then(function (r) { list = Array.isArray(r) ? r : (r && r.items) || []; acc.textContent = ''; if (!list.length) { acc.appendChild(h('option', { value: '', text: 'No MT5 account added in MetaApi yet' })); st.textContent = 'Add your MT5 account on the MetaApi website first.'; return; }
+      list.forEach(function (a) { acc.appendChild(h('option', { value: a._id, text: (a.name || a.login) + ' · ' + a.server + ' · ' + (a.state === 'DEPLOYED' ? (a.connectionStatus === 'CONNECTED' ? 'connected' : 'not connected to the broker yet') : 'switched off') })); }); if (AT.acc) acc.value = AT.acc; keep(); st.textContent = 'Connected to MetaApi: ' + list.length + ' account' + (list.length === 1 ? '' : 's') + ' found.';
+      var a = list.filter(function (x) { return x._id === AT.acc; })[0]; if (a && a.state !== 'DEPLOYED') atReq(AT_PROV + '/users/current/accounts/' + a._id + '/deploy', { method: 'POST' }).then(function () { st.textContent = 'The account is being switched on at MetaApi. Wait 2 minutes and press Connect again.'; }).catch(function () {}); }).catch(function (e) { st.textContent = 'Could not connect: ' + e.message; }); };
+  var need = function () { keep(); if (!AT.tok || !AT.acc) { st.textContent = 'Paste the token, press Connect and choose the account first.'; return false; } if (!AT.map[S.sym]) { st.textContent = 'Type the name your broker uses for ' + symName(S.sym) + '.'; return false; } return true; };
+  var body = h('div', {}, [h('p', { class: 'tc-empty', style: 'padding:0 0 10px', text: 'Takes the GetToolNest Special trades on your MT5 account: stop, target 2 x the stop, half closed and stop to entry at the half-way point. It trades the chart that is open here (' + symName(S.sym) + ' ' + tfShort(S.tf) + ') and only while this page stays open.' }),
+    h('div', { class: 'tc-f' }, [h('label', { text: 'MetaApi token' }), tok, h('label', { text: 'MT5 account' }), acc, h('label', { text: 'Broker name of ' + symName(S.sym) }), sym, h('label', { text: 'Risk per trade, percent of balance' }), risk, h('label', { text: 'Close half at the half-way point' }), half]),
+    h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:12px' }, [h('button', { class: 'tc-btn', text: 'Connect', onclick: connect }), h('button', { class: 'tc-btn', text: 'Test trade (smallest lot)', onclick: function () { if (!need()) return; var a = (B && B.c.length > 20 ? atr(B, 14)[B.c.length - 1] : 0) || bars[bars.length - 1].c * .003; st.textContent = 'Sending a test trade…'; atOpen(1, 2 * a, 2, null, true).then(function () { st.textContent = 'Test trade is in. Check your MT5. Close it there if you do not want it.'; }).catch(function (e) { st.textContent = 'Test trade failed: ' + e.message; }); } }),
+      h('button', { class: 'tc-btn pri', text: AT.on ? 'Stop' : 'Start', onclick: function () { if (!AT.on && !need()) return; AT.on = !AT.on; atSave(); if (AT.on) { atLast = ''; atStart(); atSay('Started on ' + symName(S.sym) + ' ' + tfShort(S.tf)); } else { atStop(); atSay('Stopped'); } this.textContent = AT.on ? 'Stop' : 'Start'; st.textContent = AT.on ? 'Running. Keep this page open.' : 'Stopped.'; } })]),
+    st, log, h('p', { class: 'tc-empty', style: 'padding:8px 0 0', text: 'Real money can be lost. Try a demo account first. The token is kept only in this browser.' })]);
+  modal('Auto trade (private)', body, [{ t: 'Close', pri: 1, fn: function () { keep(); } }]);
+}
 
 // ---------- strategy tester: buy and sell rules tried on the candles that are loaded ----------
 var btMarks = null;
