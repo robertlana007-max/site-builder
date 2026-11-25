@@ -194,7 +194,7 @@ ${head}
 <body${bodyClass ? ` class="${bodyClass}"` : ''}>
 <header class="site-header"><div class="wrap">
   <a class="logo" href="${rel || './'}"><img src="${rel}assets/favicon.svg" alt="" width="30" height="30"><span class="notranslate" translate="no">${esc(cfg.siteName)}</span></a>
-  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a class="navcharts" href="${rel}charts/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4M7 15v6M17 3v6M17 17v4"/><rect x="5" y="7" width="4" height="8" rx=".5"/><rect x="15" y="9" width="4" height="8" rx=".5"/></svg><span>Live Charts</span></a><a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/">${icon('phone')}Get the app</a></nav>
+  <nav class="mainnav" aria-label="Sections">${NAV.map(([cat, label]) => `<a href="${rel}#${catId(cat)}">${label}</a>`).join('')}<a class="navcharts" href="${rel}charts/"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3v4M7 15v6M17 3v6M17 17v4"/><rect x="5" y="7" width="4" height="8" rx=".5"/><rect x="15" y="9" width="4" height="8" rx=".5"/></svg><span>Live Charts</span></a><a href="${rel}guides/">Guides</a><a class="navapp" href="${rel}app/" title="Get the app: Windows, Android, iPhone">${icon('phone')}<span>App</span></a></nav>
   <span class="sp"></span>
   <button class="hbtn" id="palBtn" aria-label="Search tools">${icon('search')}<span>Search</span></button>
   <button class="hbtn" id="langBtn" aria-label="Choose language" aria-haspopup="true" aria-expanded="false">${icon('globe')}<span class="notranslate" translate="no">EN</span></button>
@@ -707,7 +707,7 @@ ${contact}` },
   { slug: 'app', title: 'Get the app', desc: `Install the free ${cfg.siteName} app on Android, iPhone, iPad or your computer. ${tools.length} tools that work offline.`, html: `
 <div class="apphero">
   <img src="../assets/icon-512.png" alt="${esc(cfg.siteName)} app icon" width="96" height="96">
-  <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, works without internet, and updates by itself.</p></div>
+  <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, most tools work without internet, and it updates by itself. Live Charts (trading) needs internet.</p></div>
 </div>
 <div class="app-note" role="note"><b>A quick note before you download</b><p>Sorry, our app is not on the Google Play Store or the Apple App Store yet. You can still download it safely right here, for Android phones and for computers (Windows, Linux and Chromebook).</p><p><b>To our iPhone, iPad and Mac users: we are truly sorry.</b> We cannot offer a downloadable app for Apple devices yet. On iPhone and iPad you can still add ${esc(cfg.siteName)} to your Home Screen from Safari (the steps are below), and it opens and works just like an app. On a Mac, every tool works right here in your browser.</p></div>
 <div class="dlrow">
@@ -734,7 +734,7 @@ ${cfg.windowsSetup ? `<ol><li>Click <b>Download for Windows</b> above. This save
 <h2>Install on Linux or Chromebook</h2>
 <ol><li>Open ${esc(cfg.siteName)} in Chrome or Edge.</li><li>Click the install icon in the address bar, or <b>Install now</b> above.</li></ol>
 <h2>Why use the app</h2>
-<ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },
+<ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet. <b>Live Charts (trading) always needs an internet connection</b>, because prices come in live.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },
   { slug: 'donate', title: 'Support GetToolNest', desc: `${cfg.siteName} is free. If it helps you, you can support it by card or with USDT, USDC or Bitcoin.`, html: `
 <p class="lead" style="margin-top:0"><b>All our services are free</b>, and they will stay free. There is nothing to buy and nothing locked.</p>
 <p><b>But if you would like to support us, you can send a gift</b> by card or with crypto, in any amount. It pays for the website and helps us build new tools. Thank you! ❤</p>
