@@ -709,6 +709,7 @@ ${contact}` },
   <img src="../assets/icon-512.png" alt="${esc(cfg.siteName)} app icon" width="96" height="96">
   <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, works without internet, and updates by itself.</p></div>
 </div>
+<div class="app-note" role="note"><b>A quick note before you download</b><p>Sorry, our app is not on the Google Play Store or the Apple App Store yet. You can still download it safely right here, for Android phones and for computers (Windows, Mac, Linux and Chromebook).</p><p><b>To our iPhone and iPad users: we are truly sorry.</b> We cannot offer a downloadable iPhone app yet. You can still add ${esc(cfg.siteName)} to your Home Screen from Safari (the steps are below), and it opens and works just like an app.</p></div>
 <div class="dlrow">
   ${cfg.androidApk ? `<a class="dl-card" data-os="android" href="../${cfg.androidApk}" download="GetToolNest.apk"><b>Download for Android</b><small>APK · version ${esc(cfg.androidApkVersion)} · ${Math.max(1, Math.round(fs.statSync(path.join(ROOT, cfg.androidApk)).size / 1024))} KB · Android 7 and newer</small></a>` : ''}
   <button class="dl-card" type="button" data-os="windows" data-install><b>Download for Windows</b><small>Installs from Edge or Chrome · Windows 10 and 11</small></button>
