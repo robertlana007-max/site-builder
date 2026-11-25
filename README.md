@@ -40,3 +40,11 @@ service cloud.firestore {
   }
 }
 ```
+
+## Live Charts
+
+`/charts/` is a separate full-screen page, not one of the tools. Its whole source is `src/charts.html`; `build.js` copies it to `charts/index.html` and fills in the site URL and the Firebase config.
+
+- Data: gold, silver, forex and indices come from Deriv's public market data feed (an MT5 broker, bid prices, no key). Crypto comes from Binance. Kraken and the Binance gold contract are fallbacks when the broker feed cannot be reached. A visitor can paste their own Twelve Data key in the chart settings to add spot gold (XAU/USD), silver, more forex and US stocks. The key is never put in this repository: it stays in the visitor's browser and their account.
+- Relay (optional): `server/charts-relay/` is a Cloudflare Worker that shares one Twelve Data key with every visitor. Put its address in `config.json` → `chartsApi` to turn it on. See its README.
+- Saving: everything a visitor draws or sets up is saved in `localStorage`. When they are signed in it is also saved to the `charts` field of their `users/{uid}` document, so it appears on any device where they sign in. `assets/cloud.js` only writes its own fields, so the tools' sync and the charts' sync do not overwrite each other.
