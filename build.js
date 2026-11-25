@@ -321,6 +321,7 @@ const homeFaq = [
 // Live tiles beside the hero: each one acts out what its tool does.
 const live = (slug, label, scene) => { const t = bySlug(slug); return `<a class="live" style="--c:${COLOR[t.cat]}" href="${slug}/" aria-label="${esc(t.name)}"><span class="scene" aria-hidden="true">${scene}</span><b>${label}</b></a>`; };
 const bento = [
+  `<a class="live live-chart" id="liveChart" href="charts/" aria-label="Live Charts: live crypto, gold and forex prices"><span class="lc-top"><span class="lc-dot" aria-hidden="true"></span><span class="lc-name">Live market</span><span class="lc-price"></span></span><canvas aria-hidden="true"></canvas><span class="lc-bot"><b>Live Charts</b><span class="lc-chg"></span><em>Open →</em></span></a>`,
   live('qr-code-generator', 'QR code', `<span class="qr" id="liveQr">${'<i></i>'.repeat(49)}</span>`),
   live('countdown-timer', 'Timer', '<span class="sc-timer"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="arc" id="liveArc" cx="18" cy="18" r="15"/></svg><span id="liveTimer">05:00</span></span>'),
   live('stopwatch', 'Stopwatch', '<span class="sc-big" id="liveSw">00:00.00</span>'),
@@ -352,6 +353,7 @@ write('index.html', layout({
   ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p>Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
   <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
+<script src="assets/live-chart-tile.js" defer></script>
 <section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
   <div class="spot-track" id="spotTrack">
     ${spot('edit-pdf', 'Change the text inside any PDF', 'Click on a word in your PDF and type. The new text uses the same font and size, so nobody can tell it was changed.', ['Keeps the original font', 'No watermark', 'Nothing uploaded'], '<span class="art-doc"><i></i><i></i><span class="art-swap"><b>Total: $500</b><b>Total: $750</b></span><i></i><i class="s"></i></span>')}
