@@ -3,6 +3,11 @@
 (function () {
   var root = document.documentElement;
   root.classList.add('js');
+  // App mode: the page is shown inside the app shell (/appshell/, used by the Windows and Android apps) or opened
+  // with ?app=1. Only the tool itself shows; the shell gives the header, search and navigation (see style.css).
+  var APPMODE = /[?&]app=1(&|$)/.test(location.search);
+  if (!APPMODE && window.top !== window) { try { APPMODE = /^\/appshell\//.test(window.parent.location.pathname); } catch (e) {} }
+  if (APPMODE) root.setAttribute('data-appmode', '');
   var REL = root.getAttribute('data-rel') || '';
   var SLUG = root.getAttribute('data-slug') || '';
   var calmOS = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = calmOS;
@@ -341,11 +346,12 @@
     input.addEventListener('focus', render);
     input.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (links.length) { sel = (sel + (e.key === 'ArrowDown' ? 1 : links.length - 1)) % links.length; mark(); } }
-      else if (e.key === 'Enter' && links[sel]) { e.preventDefault(); if (onPick) onPick(); location.href = links[sel].href; }
+      else if (e.key === 'Enter' && links[sel]) { e.preventDefault(); if (onPick && onPick(links[sel]) === false) return; location.href = links[sel].href; }
       else if (e.key === 'Escape' && !input.closest('dialog')) { input.value = ''; render(); input.blur(); }
     });
     return render;
   }
+  window.GTNFinder = finder; // the app shell (src/appshell.html) uses the same search
 
   document.addEventListener('DOMContentLoaded', function () {
     // theme
