@@ -1,8 +1,33 @@
+// Older app installs (Windows 1.0, Android 1.0) open the plain website. Send them to the app interface, which
+// also tells them a newer version is ready. Tools shown inside the app interface run in frames and are not moved.
+(function () {
+  try {
+    if (window.top !== window || /\/appshell\//.test(location.pathname)) return;
+    var o = null; try { o = JSON.parse(sessionStorage.getItem('gtnApp')); } catch (e) {}
+    var m = /GetToolNestApp\/([0-9.]+)/.exec(navigator.userAgent), k = '', v = '';
+    if (m) { k = 'android'; v = m[1]; }
+    else if (window.__TAURI_INTERNALS__ || window.isTauri) { k = 'win'; v = o && o.k === 'win' && o.v ? o.v : '1.0.0'; }
+    if (!k) return;
+    var base = (document.currentScript && document.currentScript.src) ? new URL('..', document.currentScript.src).pathname : '/';
+    location.replace(base + 'appshell/?app=' + k + '&v=' + encodeURIComponent(v));
+  } catch (e) {}
+})();
 // Shared behaviour for every page. Loaded in <head> (not deferred) because the
 // tool scripts further down the page call these helpers as they run.
 (function () {
   var root = document.documentElement;
   root.classList.add('js');
+  // App mode: the page is shown inside the app shell (/appshell/, used by the Windows and Android apps) or opened
+  // with ?app=1. Only the tool itself shows; the shell gives the header, search and navigation (see style.css).
+  var APPMODE = /[?&]app=1(&|$)/.test(location.search);
+  if (!APPMODE && window.top !== window) { try { APPMODE = /^\/appshell\//.test(window.parent.location.pathname); } catch (e) {} }
+  if (APPMODE) {
+    root.setAttribute('data-appmode', '');
+    // the shell's shortcuts (Ctrl K search, Ctrl W close tab, Ctrl Tab ...) work while a tool has the focus
+    document.addEventListener('keydown', function (e) {
+      try { var sh = window.parent !== window && window.parent.GTNShell; if (sh && sh.key && sh.key(e)) { e.preventDefault(); e.stopImmediatePropagation(); } } catch (x) {}
+    }, true);
+  }
   var REL = root.getAttribute('data-rel') || '';
   var SLUG = root.getAttribute('data-slug') || '';
   var calmOS = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = calmOS;
@@ -341,11 +366,12 @@
     input.addEventListener('focus', render);
     input.addEventListener('keydown', function (e) {
       if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); if (links.length) { sel = (sel + (e.key === 'ArrowDown' ? 1 : links.length - 1)) % links.length; mark(); } }
-      else if (e.key === 'Enter' && links[sel]) { e.preventDefault(); if (onPick) onPick(); location.href = links[sel].href; }
+      else if (e.key === 'Enter' && links[sel]) { e.preventDefault(); if (onPick && onPick(links[sel]) === false) return; location.href = links[sel].href; }
       else if (e.key === 'Escape' && !input.closest('dialog')) { input.value = ''; render(); input.blur(); }
     });
     return render;
   }
+  window.GTNFinder = finder; // the app shell (src/appshell.html) uses the same search
 
   document.addEventListener('DOMContentLoaded', function () {
     // theme

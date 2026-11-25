@@ -40,7 +40,10 @@ import java.util.ArrayList;
  * tools make (they are blob: or data: links), and sharing.
  */
 public class MainActivity extends Activity {
-    static final String HOME = "https://gettoolnest.xyz/?source=android";
+    // Keep VERSION equal to VERSION_NAME in build_apk.py. The app shell (loaded from the website, so it updates
+    // without a new APK) uses it to offer an update when a newer APK is published.
+    static final String VERSION = "1.1";
+    static final String HOME = "https://gettoolnest.xyz/appshell/?app=android&v=" + VERSION;
     static final String HOST = "gettoolnest.xyz";
     static final int PICK = 7;
 
@@ -59,7 +62,7 @@ public class MainActivity extends Activity {
     static final String OFFLINE = "<!doctype html><meta name=viewport content='width=device-width,initial-scale=1'>"
         + "<body style='font-family:sans-serif;text-align:center;padding:72px 24px;color:#111827;background:#f6f7f9'>"
         + "<div style='width:64px;height:64px;border-radius:16px;background:#2563eb;margin:0 auto 20px'></div>"
-        + "<h2>You are offline</h2><p style='color:#5f6b7a'>Connect to the internet once, and most tools will then work without it.</p>"
+        + "<h2>You are offline</h2><p style='color:#5f6b7a'>Connect to the internet once, and most tools will then work without it. Live Charts (trading) always needs internet.</p>"
         + "<button onclick=\"location.href='" + HOME + "'\" style='margin-top:16px;font-size:16px;padding:12px 22px;border:0;border-radius:10px;background:#2563eb;color:#fff'>Try again</button></body>";
 
     @Override
@@ -84,7 +87,7 @@ public class MainActivity extends Activity {
         s.setUseWideViewPort(true);
         s.setLoadWithOverviewMode(true);
         s.setMediaPlaybackRequiresUserGesture(false);
-        s.setUserAgentString(s.getUserAgentString() + " GetToolNestApp/1.0 (Android)");
+        s.setUserAgentString(s.getUserAgentString() + " GetToolNestApp/" + VERSION + " (Android)");
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(web, true);
 
@@ -249,6 +252,30 @@ public class MainActivity extends Activity {
         }
 
         @JavascriptInterface
-        public String version() { return "1.0"; }
+        public String version() { return VERSION; }
+
+        /** The app shell sets the status bar to its theme: a colour like "#11151c", and whether it is light. */
+        @JavascriptInterface
+        public void bars(final String color, final boolean light) {
+            runOnUiThread(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        Window w = getWindow();
+                        w.setStatusBarColor(Color.parseColor(color));
+                        if (Build.VERSION.SDK_INT >= 23) {
+                            int f = w.getDecorView().getSystemUiVisibility();
+                            w.getDecorView().setSystemUiVisibility(light ? (f | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR) : (f & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR));
+                        }
+                        if (Build.VERSION.SDK_INT >= 26) {
+                            w.setNavigationBarColor(Color.parseColor(color));
+                            int f = w.getDecorView().getSystemUiVisibility();
+                            w.getDecorView().setSystemUiVisibility(light ? (f | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR) : (f & ~View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
+                        }
+                        web.setBackgroundColor(Color.parseColor(color));
+                    } catch (Exception e) { /* a colour the phone does not understand: keep the old one */ }
+                }
+            });
+        }
     }
 }
