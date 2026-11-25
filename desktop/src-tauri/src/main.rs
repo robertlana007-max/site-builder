@@ -1,4 +1,6 @@
-// GetToolNest desktop app: a native window that shows https://gettoolnest.xyz/.
+// GetToolNest desktop app: a native window that shows the app shell, https://gettoolnest.xyz/appshell/.
+// Everything (the shell, the tools, Live Charts) loads from the website, so site updates reach the app at once.
+// The shell gets the installed version (?app=win&v=...) to offer an update when a newer installer is out.
 // The site's own service worker gives offline support after the first visit.
 // When the site cannot load at all, a bundled offline page (dist/offline.html) is shown.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
@@ -6,7 +8,7 @@
 use tauri::webview::{NewWindowResponse, WebviewWindowBuilder};
 use tauri::{Manager, Url, WebviewUrl};
 
-const HOME: &str = "https://gettoolnest.xyz/";
+const HOME: &str = concat!("https://gettoolnest.xyz/appshell/?app=win&v=", env!("CARGO_PKG_VERSION"));
 
 /// Pages of the site itself stay inside the app window.
 fn is_site(url: &Url) -> bool {
@@ -121,8 +123,9 @@ fn main() {
             .resizable(true)
             .center()
             // Links inside the app window: keep site pages, send everything else to the browser.
+            // Sign-in pages stay too: Google sign-in falls back to a redirect when a popup cannot open.
             .on_navigation(|url| {
-                if is_site(url) || is_local(url) || matches!(url.scheme(), "about" | "blob" | "data") {
+                if is_site(url) || is_local(url) || is_sign_in_popup(url) || matches!(url.scheme(), "about" | "blob" | "data") {
                     true
                 } else {
                     open_in_browser(url);
@@ -132,8 +135,18 @@ fn main() {
             // target="_blank" and window.open().
             .on_new_window(move |url, _features| {
                 if is_site(&url) {
+                    // a page of the site: open it as a tab of the app shell
                     if let Some(w) = handle.get_webview_window("main") {
-                        let _ = w.navigate(url);
+                        let target = if url.path().starts_with("/appshell/") {
+                            url
+                        } else {
+                            let mut u = Url::parse(HOME).unwrap();
+                            let mut path = url.path().to_string();
+                            if let Some(q) = url.query() { path.push('?'); path.push_str(q); }
+                            u.query_pairs_mut().append_pair("open", &path);
+                            u
+                        };
+                        let _ = w.navigate(target);
                     }
                     NewWindowResponse::Deny
                 } else if is_sign_in_popup(&url) || matches!(url.scheme(), "about" | "blob") {
