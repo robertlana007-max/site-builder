@@ -621,6 +621,7 @@ html[data-android-app] .no-android { display: none !important; }
     try { w = ifr.contentWindow; d = ifr.contentDocument; } catch (e) { return; }
     if (!w || !d || w.__gtnShell) return;
     w.__gtnShell = 1;
+    ['pointerdown', 'keydown', 'input'].forEach(function (ev) { w.addEventListener(ev, function () { touch(tab.id); }, true); });
     w.addEventListener('keydown', function (e) { if (e.key === 'F11' || (e.key === 'Escape' && inFocus() && !e.defaultPrevented)) { e.preventDefault(); setFocus(e.key === 'F11' ? !inFocus() : false); } });
     var p = w.location.pathname;
     if (p.indexOf(BASE) === 0 && p !== 'blank') {
@@ -703,6 +704,7 @@ html[data-android-app] .no-android { display: none !important; }
     if (target === 'settings') renderSettings();
     if (target === 'search') setTimeout(function () { if (!phoneMq.matches) return; var i = el('mSearch'); i.focus(); }, 60);
     if (!tab && inFocus()) setFocus(false);
+    if (prev !== target && frames[prev] && frames[prev].stale) setTimeout(function () { quietReload(prev); }, 0);
     persist(); renderTabs(); renderNav(); renderChrome();
     if (tab && frames[tab.id] && !phoneMq.matches) { try { frames[tab.id].ifr.focus(); } catch (e) {} }
   }
@@ -772,6 +774,33 @@ html[data-android-app] .no-android { display: none !important; }
     var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} }
   }
   window.gtnFocus = setFocus;
+
+  // ---------- live updates: every site release reaches the app within seconds ----------
+  // The shell polls appshell/build.json. On a new release, tools nobody is using are reloaded at once; the tool
+  // you are working in is reloaded as soon as you leave it or stop using it for two minutes, so no work is lost;
+  // the shell itself reloads when you are not in a tool, or when the app is in the background.
+  var BUILD = null, pendingShell = false, lastAct = {};
+  function touch(id) { lastAct[id] = Date.now(); }
+  function idleFor(id, ms) { return Date.now() - (lastAct[id] || 0) > ms; }
+  ['pointerdown', 'keydown', 'input'].forEach(function (ev) { document.addEventListener(ev, function () { touch('shell'); }, true); });
+  function quietReload(id) { var f = frames[id]; if (!f) return; f.stale = false; lastAct[id] = 0; try { f.ifr.contentWindow.location.reload(); } catch (e) { var t = tabById(id); if (t) f.ifr.src = frameSrc(t.path); } }
+  function applyUpdates() {
+    Object.keys(frames).forEach(function (id) { var f = frames[id]; if (!f.stale) return; if (id !== S.active || idleFor(id, 120000)) quietReload(id); });
+    if (!pendingShell) return;
+    var busy = Object.keys(frames).some(function (id) { return !idleFor(id, 120000); });
+    if (document.visibilityState === 'hidden' || (!tabById(S.active) && !busy && idleFor('shell', 20000) && el('pal').hidden)) { pendingShell = false; location.reload(); }
+  }
+  function checkBuild() {
+    if (!navigator.onLine) return;
+    fetch(BASE + 'appshell/build.json?t=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.ok ? r.json() : null; }).then(function (d) {
+      if (!d || !d.build) return;
+      if (BUILD === null) { BUILD = d.build; return; }
+      if (d.build !== BUILD) { BUILD = d.build; pendingShell = true; Object.keys(frames).forEach(function (id) { frames[id].stale = true; }); }
+      applyUpdates();
+    }).catch(function () {});
+  }
+  checkBuild(); setInterval(function () { if (document.visibilityState === 'visible') checkBuild(); else applyUpdates(); }, 20000);
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') applyUpdates(); else checkBuild(); });
   document.addEventListener('fullscreenchange', function () { if (!document.fullscreenElement && realFs && inFocus()) setFocus(false); });
   el('fsBtn').onclick = el('mFull').onclick = function () { setFocus(!inFocus()); };
   el('fsExit').onclick = function () { setFocus(false); };
