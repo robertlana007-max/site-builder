@@ -1076,13 +1076,17 @@ Object.assign(DR, {
   },
   sine: function (g, P) { var dx = P[1].x - P[0].x; if (Math.abs(dx) < 3) return g.seg(P[0], P[1]); var o = [], m = (P[0].y + P[1].y) / 2, am = (P[0].y - P[1].y) / 2; for (var x = Math.min(P[0].x, P[1].x); x < plotW + 4 && o.length < 3000; x += 3) o.push({ x: x, y: m + am * Math.cos(Math.PI * (x - P[0].x) / dx) }); g.poly(o); }
 });
+// box-shaped tools get eight handles like other charting tools: four corners, and one in the middle of each side
+var BOXT = { rect: 1, ellipse: 1, image: 1, gannbox: 1, measure: 1, pricerange: 1, daterange: 1, vprofile: 1 };
+function boxH(d, P) { if (!BOXT[d.type] || P.length !== 2) return null; var a = P[0], b = P[1], mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2; return [a, b, { x: b.x, y: a.y }, { x: a.x, y: b.y }, { x: mx, y: a.y, sq: 1 }, { x: mx, y: b.y, sq: 1 }, { x: a.x, y: my, sq: 1 }, { x: b.x, y: my, sq: 1 }]; }
+function hCur(p) { if (!sel || tool || mode || S.lock || sel.lock) return ''; var i = hitHandle(sel, p.x, p.y); if (i < 0) return ''; var rt = RT.get(sel); if (!rt || !rt.H) return 'pointer'; if (i === 4 || i === 5) return 'ns-resize'; if (i === 6 || i === 7) return 'ew-resize'; var a = rt.P[0], b = rt.P[1], same = (b.x - a.x) * (b.y - a.y) > 0; return (i < 2) === same ? 'nwse-resize' : 'nesw-resize'; }
 function drawOne(d, pre) {
   if (!pre && (d.hid || (d.vtf && d.vtf.m && !(d.vtf.m === 'eq' ? tfMs() === d.vtf.ms : d.vtf.m === 'le' ? tfMs() <= d.vtf.ms : tfMs() >= d.vtf.ms)))) { RT.delete(d); return; }
   var P = d.pts.map(px), g = mkG(d);
   ctx.save(); ctx.strokeStyle = ctx.fillStyle = d.color; ctx.lineWidth = d.w || 2; ctx.setLineDash(d.dash === 1 ? [7, 5] : d.dash === 2 ? [2, 4] : []); ctx.lineJoin = 'round';
   try { DR[d.type](g, P, d); } catch (e) {}
-  ctx.restore(); RT.set(d, { hit: g.hit, area: g.area, P: P });
-  if (d === sel || pre || msel.indexOf(d) >= 0) { ctx.save(); ctx.fillStyle = PAL().bg; ctx.strokeStyle = d.color; ctx.lineWidth = 1.5; var hp = T[d.type].pts === 'free' ? [] : P; hp.forEach(function (p) { ctx.beginPath(); ctx.arc(p.x, p.y, ptrTouch ? 7 : 5, 0, 6.3); ctx.fill(); ctx.stroke(); }); ctx.restore(); }
+  ctx.restore(); var BH = pre ? null : boxH(d, P); RT.set(d, { hit: g.hit, area: g.area, P: P, H: BH });
+  if (d === sel || pre || msel.indexOf(d) >= 0) { ctx.save(); ctx.fillStyle = PAL().bg; ctx.strokeStyle = d.color; ctx.lineWidth = 1.5; var hp = T[d.type].pts === 'free' ? [] : (d === sel && BH) || P, hr = ptrTouch ? 7 : 5; hp.forEach(function (p) { ctx.beginPath(); if (p.sq) { if (ctx.roundRect) ctx.roundRect(p.x - hr, p.y - hr, hr * 2, hr * 2, 2.5); else ctx.rect(p.x - hr, p.y - hr, hr * 2, hr * 2); } else ctx.arc(p.x, p.y, hr, 0, 6.3); ctx.fill(); ctx.stroke(); }); ctx.restore(); }
 }
 function hitTest(x, y) {
   var ds = draws(), r = null; if (S.hide) return null;
@@ -1090,7 +1094,7 @@ function hitTest(x, y) {
   for (var i = ds.length - 1; i >= 0 && !r; i--) { var rt = RT.get(ds[i]); if (rt && (ctx.isPointInStroke(rt.hit, x, y) || ctx.isPointInPath(rt.area, x, y))) r = ds[i]; }
   ctx.restore(); return r;
 }
-function hitHandle(d, x, y) { var rt = RT.get(d); if (!rt || T[d.type].pts === 'free') return -1; for (var i = rt.P.length - 1; i >= 0; i--) if (Math.hypot(rt.P[i].x - x, rt.P[i].y - y) < (ptrTouch ? 24 : 10)) return i; return -1; }
+function hitHandle(d, x, y) { var rt = RT.get(d); if (!rt || T[d.type].pts === 'free') return -1; var H = rt.H || rt.P, best = -1, bd = ptrTouch ? 24 : 10; for (var i = 0; i < H.length; i++) { var dd = Math.hypot(H[i].x - x, H[i].y - y); if (dd < bd) { bd = dd; best = i; } } return best; }
 var undo = [], redo = [];
 function snap() { undo.push(ser(draws())); if (undo.length > 80) undo.shift(); redo.length = 0; syncTop(); }
 function doUndo(back) { var a = back ? undo : redo, b = back ? redo : undo; if (!a.length) return; b.push(ser(draws())); S.draw[S.sym] = JSON.parse(a.pop()); sel = null; syncTop(); selBar(); save(); dirty(); }
@@ -1706,7 +1710,7 @@ cv.addEventListener('pointermove', function (e) {
   var p = pos(e); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, p);
   if (pinch && ptrs.size === 2) { var a = Array.from(ptrs.values()), mx = (a[0].x + a[1].x) / 2; V.barW = clamp(pinch.bw * (Math.abs(a[0].x - a[1].x) || 1) / pinch.d, .5, 80); V.right = pinch.i + (plotW - mx) / V.barW; dirty(); return; }
   mouse = p;
-  if (!drag) { var z = zoneOf(p); cv.style.cursor = panes.length && Math.abs(p.y - mainH) < 6 && p.x < plotW && !tool && !mode ? 'row-resize' : z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : mode === 'erase' ? 'cell' : mode === 'zoom' ? 'zoom-in' : alertHit(p) ? 'ns-resize' : posHit(p) || (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : S.cursor === 'arrow' ? 'default' : 'crosshair'; dirty(); return; }
+  if (!drag) { var z = zoneOf(p); cv.style.cursor = panes.length && Math.abs(p.y - mainH) < 6 && p.x < plotW && !tool && !mode ? 'row-resize' : z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : mode === 'erase' ? 'cell' : mode === 'zoom' ? 'zoom-in' : alertHit(p) ? 'ns-resize' : hCur(p) ? hCur(p) : posHit(p) || (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : S.cursor === 'arrow' ? 'default' : 'crosshair'; dirty(); return; }
   if (drag.k === 'pan') {
     var now = performance.now(), dt = now - drag.lt; if (dt > 8) { drag.vx = .7 * (p.x - drag.lx) / dt + .3 * drag.vx; drag.lx = p.x; drag.lt = now; }
     // decide once per drag: a clearly vertical start moves the price scale too, and switches off auto-fit
@@ -1720,7 +1724,7 @@ cv.addEventListener('pointermove', function (e) {
   else if (drag.k === 'split') S.subK = clamp((H - axH - p.y) / (H - axH), .08, .8);
   else if (drag.k === 'time') V.barW = clamp(drag.bw * Math.exp(-(p.x - drag.x) * .006), .5, 80);
   else if (drag.k === 'free' && cur) cur.pts.push(mkPt(p, true));
-  else if (drag.k === 'handle' && sel) { sel.pts[drag.i] = mkPt(p); fixD(sel); }
+  else if (drag.k === 'handle' && sel) { var hp2 = mkPt(p), hi2 = drag.i; if (hi2 < 2 || !BOXT[sel.type] || sel.pts.length !== 2) sel.pts[hi2] = hp2; else { var A0 = { t: sel.pts[0].t, p: sel.pts[0].p }, B0 = { t: sel.pts[1].t, p: sel.pts[1].p }; if (hi2 === 2) { B0.t = hp2.t; A0.p = hp2.p; } else if (hi2 === 3) { A0.t = hp2.t; B0.p = hp2.p; } else if (hi2 === 4) A0.p = hp2.p; else if (hi2 === 5) B0.p = hp2.p; else if (hi2 === 6) A0.t = hp2.t; else B0.t = hp2.t; sel.pts = [A0, B0]; } fixD(sel); }
   else if (drag.k === 'move' && sel) { var di = Math.round((p.x - drag.x) / V.barW), dy = p.y - drag.y; if (!drag.m && Math.hypot(p.x - drag.x, dy) < 3) return; if (!drag.m) { snap(); drag.m = 1; } drag.g.forEach(function (it) { it.d.pts = it.o.map(function (o) { return { t: tOfI(o.i + di), p: pOf(o.y + dy) }; }); fixD(it.d); }); }
   dirty();
 });
