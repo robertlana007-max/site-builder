@@ -88,6 +88,9 @@
     on: true,
     user: function () { return user; },
     google: function () { return run(function () { return auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }); },
+    // for windows where a popup cannot open: leaves the page, signs in, comes back signed in
+    googleRedirect: function () { return run(function () { return auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }); },
+    ready: function () { return ready; },
     signIn: function (email, pass) { return run(function () { return auth.signInWithEmailAndPassword(email, pass); }); },
     signUp: function (name, email, pass) {
       return run(function () {

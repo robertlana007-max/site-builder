@@ -1028,8 +1028,11 @@ write('charts/index.html', fs.readFileSync(path.join(ROOT, 'src/charts.html'), '
     cats: cats.map(c => [c, COLOR[c], (CATINFO[c] || [''])[0], SHELLCAT[c] || 'gen']),
     icons: Object.fromEntries(tools.map(t => [t.slug, ICON[t.slug] || t.icon || ICON.star])),
     firebase: cfg.firebase && cfg.firebase.apiKey ? cfg.firebase : null,
-    v: { site: assetV('assets/site.js'), index: assetV('assets/tools-index.js') }
+    v: { site: assetV('assets/site.js'), index: assetV('assets/tools-index.js'), cloud: assetV('assets/cloud.js') },
+    // newest app programs, so the shell can offer an update to an older installed app (it tells its version: ?app=win&v=1.1.0)
+    latest: { win: cfg.windowsSetupVersion || '', android: cfg.androidApkVersion || '', winUrl: cfg.windowsSetup || '', androidUrl: cfg.androidApk || '' }
   };
+  write('appshell/version.json', JSON.stringify({ windows: data.latest.win, windowsSetup: SITE + '/' + data.latest.winUrl, android: data.latest.android, androidApk: SITE + '/' + data.latest.androidUrl }, null, 2) + '\n');
   write('appshell/index.html', fs.readFileSync(path.join(ROOT, 'src/appshell.html'), 'utf8').split('{{SITE}}').join(SITE).split('{{N}}').join(String(tools.length))
     .split('{{VSITE}}').join(data.v.site).split('{{VINDEX}}').join(data.v.index)
     .split('{{DATA}}').join(JSON.stringify(data).replace(/</g, '\\u003c')));

@@ -7,7 +7,13 @@
   // with ?app=1. Only the tool itself shows; the shell gives the header, search and navigation (see style.css).
   var APPMODE = /[?&]app=1(&|$)/.test(location.search);
   if (!APPMODE && window.top !== window) { try { APPMODE = /^\/appshell\//.test(window.parent.location.pathname); } catch (e) {} }
-  if (APPMODE) root.setAttribute('data-appmode', '');
+  if (APPMODE) {
+    root.setAttribute('data-appmode', '');
+    // the shell's shortcuts (Ctrl K search, Ctrl W close tab, Ctrl Tab ...) work while a tool has the focus
+    document.addEventListener('keydown', function (e) {
+      try { var sh = window.parent !== window && window.parent.GTNShell; if (sh && sh.key && sh.key(e)) { e.preventDefault(); e.stopImmediatePropagation(); } } catch (x) {}
+    }, true);
+  }
   var REL = root.getAttribute('data-rel') || '';
   var SLUG = root.getAttribute('data-slug') || '';
   var calmOS = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches, calm = calmOS;
