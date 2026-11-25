@@ -13,7 +13,7 @@ import os, shutil, struct, subprocess, sys, tempfile, zipfile, zlib
 HERE = os.path.dirname(os.path.abspath(__file__))
 ANDROID_JAR, DX_JAR, APKSIG_JAR, KEYSTORE, OUT = sys.argv[1:6]
 STOREPASS = 'GTN_STOREPASS'  # name of the environment variable that holds the keystore password
-PACKAGE, VERSION_CODE, VERSION_NAME = 'xyz.gettoolnest.app', 1, '1.0'
+PACKAGE, VERSION_CODE, VERSION_NAME = 'xyz.gettoolnest.app', 2, '1.1'  # keep VERSION in MainActivity.java equal to VERSION_NAME
 MIN_SDK, TARGET_SDK = 24, 34
 ICON_ID = 0x7f010000  # mipmap/ic_launcher, defined in the resources.arsc built below
 
