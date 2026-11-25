@@ -611,7 +611,7 @@ html[data-android-app] .no-android { display: none !important; }
       var ld = document.createElement('div'); ld.className = 'ld';
       box.appendChild(ifr); box.appendChild(ld);
       if (isCharts(tab.path)) { var off = document.createElement('div'); off.className = 'offnote'; off.hidden = navigator.onLine; off.innerHTML = '<div><div class="big">' + ic('i-wifi') + '</div><h2>Live Charts needs internet</h2><p>Live Charts (trading) always needs internet for live prices. Your other tools keep working offline.</p><button class="btn" type="button">Try again</button></div>'; off.querySelector('button').onclick = function () { if (navigator.onLine) { off.hidden = true; reload(tab); } else say('Still offline. Connect to the internet and try again.'); }; box.appendChild(off); }
-      ifr.addEventListener('load', function () { ld.hidden = true; wire(ifr, tab); });
+      ifr.addEventListener('load', function () { ld.hidden = true; f.loaded = true; f.stale = false; lastAct[tab.id] = 0; wire(ifr, tab); if (S.active === tab.id) focusFrame(tab.id, true); });
       el('frames').appendChild(box);
       f = frames[tab.id] = { box: box, ifr: ifr };
     }
@@ -619,6 +619,16 @@ html[data-android-app] .no-android { display: none !important; }
     var max = phoneMq.matches ? 3 : 8;
     while (lru.length > max) { var old = lru.shift(); if (old !== tab.id && tabById(old) && !isCharts(tabById(old).path)) dropFrame(old); }
     return f;
+  }
+  // Keyboard focus goes into a tool only once its page has loaded: keys sent to a frame that is still loading are lost,
+  // so until then they stay with the shell (Ctrl W, Ctrl Tab, Ctrl K keep working). When the page has loaded it takes
+  // the focus, unless the person has meanwhile put it somewhere else.
+  function focusFrame(id, onLoad) {
+    var f = frames[id]; if (!f) return;
+    var a = document.activeElement;
+    if (!f.loaded) { if (a && a.tagName === 'IFRAME') try { a.blur(); } catch (e) {} return; }
+    if (onLoad && ((a && a !== document.body) || gated() || !el('pal').hidden || phoneMq.matches)) return;
+    try { f.ifr.focus(); } catch (e) {}
   }
   function dropFrame(id) { var f = frames[id]; if (f) { f.box.remove(); delete frames[id]; } lru = lru.filter(function (x) { return x !== id; }); }
   function reload(tab) { var f = frames[tab.id]; if (!f) return; f.box.querySelector('.ld').hidden = false; try { f.ifr.contentWindow.location.reload(); } catch (e) { f.ifr.src = frameSrc(tab.path); } }
@@ -676,7 +686,7 @@ html[data-android-app] .no-android { display: none !important; }
       t = { id: 't' + (seq++), path: path, title: '' };
       var at = S.tabs.indexOf(tabById(S.active));
       if (at === -1 || o.end) S.tabs.push(t); else S.tabs.splice(at + 1, 0, t);
-      if (S.tabs.length > 20) { var gone = S.tabs.shift(); dropFrame(gone.id); }
+      if (S.tabs.length > 20) { for (var j = 0; j < S.tabs.length; j++) if (S.tabs[j] !== t && S.tabs[j].id !== S.active) { dropFrame(S.tabs.splice(j, 1)[0].id); break; } } // the oldest tab, never the open one or the new one
     }
     if (o.bg && !phoneMq.matches) { persist(); renderTabs(); say(info(t).name + ' opened in a new tab'); return t; }
     go(t.id);
@@ -713,13 +723,15 @@ html[data-android-app] .no-android { display: none !important; }
     if (target === 'settings') renderSettings();
     if (target === 'search') setTimeout(function () { if (!phoneMq.matches) return; var i = el('mSearch'); i.focus(); }, 60);
     if (!tab && inFocus()) setFocus(false);
-    if (prev !== target && frames[prev] && frames[prev].stale) setTimeout(function () { quietReload(prev); }, 0);
+    if (prev !== target && frames[prev] && frames[prev].stale && !hasWork(prev)) setTimeout(function () { quietReload(prev); }, 0);
     persist(); renderTabs(); renderNav(); renderChrome();
-    if (tab && frames[tab.id] && !phoneMq.matches) { try { frames[tab.id].ifr.focus(); } catch (e) {} }
+    if (tab && !phoneMq.matches) focusFrame(tab.id);
   }
   window.addEventListener('popstate', function (e) {
     var v = e.state && e.state.v;
+    if (fsBack) { fsBack = false; return; } // the step back that only removed the full-screen entry
     if (!el('pal').hidden) { closePal(); }
+    if (inFocus()) { setFocus(false, true); if (v === S.active) return; }
     go(v && (PAGES[v] || tabById(v)) ? v : 'home', { noHistory: true });
   });
 
@@ -757,6 +769,7 @@ html[data-android-app] .no-android { display: none !important; }
     el('tbar').hidden = !tab || (x && x.live);
     el('mbar').hidden = !(tab && !x.live);
     el('fsBtn').hidden = !tab;
+    el('fsExit').classList.toggle('onchart', !!(tab && x.live && inFocus()));
     if (!tab) return;
     var tiles = [el('tbTile'), el('mTile')];
     tiles.forEach(function (t) { t.style.setProperty('--c', x.color); t.innerHTML = x.svg; });
@@ -765,6 +778,7 @@ html[data-android-app] .no-android { display: none !important; }
     var on = x.slug && store().favs.indexOf(x.slug) !== -1;
     [el('tbPin'), el('mPin')].forEach(function (b) { b.hidden = !x.slug; b.setAttribute('aria-pressed', on ? 'true' : 'false'); b.title = on ? 'Unpin' : 'Pin to your tools'; });
     el('tbOpen').href = BASE + tab.path.slice(1);
+    el('tbOpen').hidden = !!APPK.k; // inside the apps a site link in a new window only reloads the app on the same page, so the button is left out
     document.title = x.name + ' · GetToolNest';
     if (!phone) return;
   }
@@ -774,33 +788,44 @@ html[data-android-app] .no-android { display: none !important; }
   // full screen: hide the sidebar, tabs and bars so only the open page shows; also asks the window for real full screen
   var realFs = false;
   function inFocus() { return el('app').classList.contains('focus'); }
-  function setFocus(on) {
+  // Full screen gets its own history entry, so the Android back button (and the browser's Back) leaves full screen
+  // first instead of leaving the page; leaving it by a button or a key takes that entry away again.
+  var fsBack = false;
+  function setFocus(on, fromPop) {
+    on = !!on;
     if (on && !tabById(S.active)) return;
+    var was = inFocus();
     var tt = tabById(S.active); el('fsExit').classList.toggle('onchart', !!(on && tt && isCharts(tt.path)));
     el('app').classList.toggle('focus', on); el('fsExit').hidden = !on;
+    if (on && !was && !fromPop) { try { history.pushState({ v: S.active, fs: 1 }, ''); } catch (e) {} }
+    if (!on && was && !fromPop && history.state && history.state.fs && history.state.v === S.active) { fsBack = true; try { history.back(); } catch (e) { fsBack = false; } }
     if (on) { try { var r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.then) r.then(function () { realFs = true; }, function () {}); } catch (e) {} }
     else { realFs = false; if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen().catch(function () {}); } catch (e) {} } }
-    var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} }
+    var t = tabById(S.active); if (t) focusFrame(t.id);
   }
   window.gtnFocus = setFocus;
-  function setSide(hide) { el('app').classList.toggle('sbhide', hide); try { localStorage.setItem('gtnSbHide', hide ? '1' : ''); } catch (e) {} }
+  function setSide(hide) { if (inFocus()) return; el('app').classList.toggle('sbhide', hide); try { localStorage.setItem('gtnSbHide', hide ? '1' : ''); } catch (e) {} }
   try { if (localStorage.getItem('gtnSbHide') === '1') setSide(true); } catch (e) {}
   document.querySelectorAll('[data-sbt]').forEach(function (b) { b.addEventListener('click', function () { setSide(!el('app').classList.contains('sbhide')); }); });
 
   // ---------- live updates: every site release reaches the app within seconds ----------
-  // The shell polls appshell/build.json. On a new release, tools nobody is using are reloaded at once; the tool
-  // you are working in is reloaded as soon as you leave it or stop using it for two minutes, so no work is lost;
-  // the shell itself reloads when you are not in a tool, or when the app is in the background.
+  // The shell polls appshell/build.json. On a new release, open tools you have not touched since they loaded are
+  // reloaded at once. A tool you have typed, clicked or dropped a file in is never reloaded by an update (not when
+  // you leave it, not when it sits idle, not when the app goes to the background): it keeps working as it is and
+  // gets the new version the next time it is opened. The shell itself reloads only when no open tool holds work and
+  // nothing is being typed in the shell: when you are on a shell page and idle, or when the app is in the background.
   var BUILD = null, pendingShell = false, lastAct = {};
   function touch(id) { lastAct[id] = Date.now(); }
   function idleFor(id, ms) { return Date.now() - (lastAct[id] || 0) > ms; }
+  function hasWork(id) { return !!lastAct[id]; } // the person used this frame since its page loaded (reset on every load)
+  function shellTyping() { return !el('pal').hidden || [].some.call(document.querySelectorAll(gated() ? '#gForm input' : '#acctBox input'), function (i) { return !!i.value; }); }
   ['pointerdown', 'keydown', 'input'].forEach(function (ev) { document.addEventListener(ev, function () { touch('shell'); }, true); });
   function quietReload(id) { var f = frames[id]; if (!f) return; f.stale = false; lastAct[id] = 0; try { f.ifr.contentWindow.location.reload(); } catch (e) { var t = tabById(id); if (t) f.ifr.src = frameSrc(t.path); } }
   function applyUpdates() {
-    Object.keys(frames).forEach(function (id) { var f = frames[id]; if (!f.stale) return; if (id !== S.active || idleFor(id, 120000)) quietReload(id); });
+    Object.keys(frames).forEach(function (id) { var f = frames[id]; if (f.stale && f.loaded && !hasWork(id)) quietReload(id); });
     if (!pendingShell) return;
-    var busy = Object.keys(frames).some(function (id) { return !idleFor(id, 120000); });
-    if (document.visibilityState === 'hidden' || (!tabById(S.active) && !busy && idleFor('shell', 20000) && el('pal').hidden)) { pendingShell = false; location.reload(); }
+    if (Object.keys(frames).some(hasWork) || shellTyping()) return;
+    if (document.visibilityState === 'hidden' || (!tabById(S.active) && idleFor('shell', 20000))) { pendingShell = false; location.reload(); }
   }
   function checkBuild() {
     if (!navigator.onLine) return;
@@ -1017,10 +1042,10 @@ html[data-android-app] .no-android { display: none !important; }
   function openPal() {
     if (phoneMq.matches) return go('search');
     var p = el('pal'); if (!p.hidden) return;
-    palFrom = document.activeElement; p.hidden = false; p.classList.remove('enter'); void p.offsetWidth; if (!calm()) p.classList.add('enter');
+    palFrom = document.activeElement; p.hidden = false; inertApp(); p.classList.remove('enter'); void p.offsetWidth; if (!calm()) p.classList.add('enter');
     el('palIn').value = ''; palRender(); el('palIn').focus();
   }
-  function closePal() { var p = el('pal'); if (p.hidden) return; p.hidden = true; el('palRes').hidden = true; var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} } else if (palFrom && palFrom.focus) palFrom.focus(); }
+  function closePal() { var p = el('pal'); if (p.hidden) return; p.hidden = true; el('palRes').hidden = true; inertApp(); var t = tabById(S.active); if (t && frames[t.id]) focusFrame(t.id); else if (palFrom && palFrom.focus) palFrom.focus(); }
 
   // ---------- keyboard ----------
   function keys(e) {
@@ -1058,7 +1083,7 @@ html[data-android-app] .no-android { display: none !important; }
       '<div class="sgroup"><h2>About</h2><div class="sbox">' +
       '<div class="sr"><div><b>GetToolNest app</b><small id="setVer"></small></div><a class="btn ghost" href="' + BASE + 'app/" data-tool-page="app">Get the app</a></div>' +
       '<div class="sr"><div><b>Works offline</b><small>Most tools keep working without internet after you open them once. Live Charts (trading) always needs internet.</small></div></div>' +
-      '<div class="sr"><div><b>Website</b><small>gettoolnest.xyz, the same tools in your browser.</small></div><a class="btn ghost" href="{{SITE}}/" target="_blank" rel="noopener">Open ' + ic('i-ext') + '</a></div>' +
+      '<div class="sr' + (APPK.k ? '" hidden>' : '">') + '<div><b>Website</b><small>gettoolnest.xyz, the same tools in your browser.</small></div><a class="btn ghost" href="{{SITE}}/" target="_blank" rel="noopener">Open ' + ic('i-ext') + '</a></div>' +
       '</div></div></div>';
     el('vSettings').addEventListener('click', function (e) {
       var b = e.target.closest('#setTheme [data-v]'); if (b) { setPref('theme', b.dataset.v); return; }
@@ -1148,7 +1173,7 @@ html[data-android-app] .no-android { display: none !important; }
   var APPK = { k: '', v: '' };
   (function () {
     var q = new URLSearchParams(location.search), k = q.get('app'), v = q.get('v');
-    if (k === 'win' || k === 'android') { APPK = { k: k, v: /^[0-9][0-9.]{0,15}$/.test(v || '') ? v : '' }; try { sessionStorage.setItem('gtnApp', JSON.stringify(APPK)); } catch (e) {} }
+    if (k === 'win' || k === 'android') { APPK = { k: k, v: /^[0-9][0-9.]{0,15}$/.test(v || '') ? v : '', nu: q.get('nu') === '1' }; try { sessionStorage.setItem('gtnApp', JSON.stringify(APPK)); } catch (e) {} }
     else { try { var o = JSON.parse(sessionStorage.getItem('gtnApp')); if (o && o.k) APPK = o; } catch (e) {} }
     var m = /GetToolNestApp\/([0-9.]+)/.exec(navigator.userAgent);
     if (!APPK.k && m) APPK = { k: 'android', v: m[1] };
@@ -1156,8 +1181,8 @@ html[data-android-app] .no-android { display: none !important; }
   var WIN = (APPK.k === 'win' || APPK.k === 'android') && !!D.firebase; // inside the Windows or Android app: signing in is required
   function gate(mode) {
     var g = el('gate');
-    if (!mode) { if (!g.hidden) { g.hidden = true; var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} } } return; }
-    var was = g.hidden; g.hidden = false; if (was && !calm()) { g.classList.remove('enter'); void g.offsetWidth; g.classList.add('enter'); }
+    if (!mode) { if (!g.hidden) { g.hidden = true; inertApp(); var t = tabById(S.active); if (t) focusFrame(t.id); } return; }
+    var was = g.hidden; g.hidden = false; inertApp(); if (was && !calm()) { g.classList.remove('enter'); void g.offsetWidth; g.classList.add('enter'); }
     el('gWait').hidden = mode !== 'wait'; el('gMain').hidden = mode === 'wait';
     if (mode === 'form' || mode === 'down') {
       el('gT').textContent = 'Welcome to GetToolNest';
@@ -1168,12 +1193,16 @@ html[data-android-app] .no-android { display: none !important; }
     }
   }
   function gated() { return !el('gate').hidden; }
+  // while the search box or the sign-in screen is up, the app behind it cannot take the keyboard focus (Tab stays in the dialog)
+  function inertApp() { el('app').inert = gated() || !el('pal').hidden; }
 
   // ---------- update check for the installed app program ----------
   function newer(a, b) { a = String(a).split('.').map(Number); b = String(b).split('.').map(Number); for (var i = 0; i < Math.max(a.length, b.length); i++) { var x = a[i] || 0, y = b[i] || 0; if (x !== y) return x > y; } return false; }
   function checkUpdate() {
     var L = D.latest || {}, latest = APPK.k === 'win' ? L.win : APPK.k === 'android' ? L.android : '', url = APPK.k === 'win' ? L.winUrl : L.androidUrl;
     if (!APPK.k || !APPK.v || !latest || !url || !newer(latest, APPK.v)) return;
+    // Windows app 1.2+ with &nu=1 updates itself (native updater, no clicks): no bar. 1.0/1.1 keep the bar.
+    if (APPK.k === 'win' && APPK.nu && !newer('1.2.0', APPK.v)) return;
     try { if (sessionStorage.getItem('gtnUpdLater') === latest) return; } catch (e) {}
     el('updV').textContent = 'Version ' + latest + ' (you have ' + APPK.v + ').';
     // Windows: the download is opened through the public GitHub copy, an outside address, so the app hands it to
@@ -1199,7 +1228,7 @@ html[data-android-app] .no-android { display: none !important; }
   window.addEventListener('storage', function (e) { if (e.key === 'gtn1') { if (window.applyPrefs) applyPrefs(); themeBars(); again(); } });
   window.addEventListener('focus', again);
   if (window.matchMedia) matchMedia('(prefers-color-scheme: dark)').addEventListener('change', function () { setTimeout(function () { syncFrames(); themeBars(); }, 0); });
-  phoneMq.addEventListener('change', function () { renderChrome(); themeBars(); });
+  phoneMq.addEventListener('change', function () { if (phoneMq.matches) closePal(); renderChrome(); themeBars(); }); // the search box does not show on a phone-sized window
 
   // ---------- start ----------
   var params = new URLSearchParams(location.search);
@@ -1208,11 +1237,13 @@ html[data-android-app] .no-android { display: none !important; }
   var open = params.get('open') || params.get('tool');
   if (params.has('open') || params.has('tool') || params.has('source') || params.has('app') || params.has('v')) { try { history.replaceState(null, '', location.pathname); } catch (e) {} }
   if (open && /^[a-z0-9-]+$/.test(open)) open = '/' + open + '/';
-  var startAt = S.active;
-  try { history.replaceState({ v: 'home' }, ''); } catch (e) {}
-  if (open && /^\//.test(open) && !/^\/\//.test(open)) { go('home', { noHistory: true }); route(open); }
-  else if (startAt !== 'home' && (PAGES[startAt] || tabById(startAt))) { go('home', { noHistory: true }); go(startAt); }
-  else go('home', { noHistory: true });
+  var startAt = S.active, hs = history.state && history.state.v;
+  var valid = function (v) { return !!(v && (PAGES[v] || tabById(v))); };
+  if (open && /^\//.test(open) && !/^\/\//.test(open)) { try { history.replaceState({ v: 'home' }, ''); } catch (e) {} go('home', { noHistory: true }); route(open); }
+  // after a reload (by hand or by a live update) the page keeps its history entries: stay on the entry's own view, so Back
+  // and the Android back button carry on from where they were instead of stepping through an extra Home
+  else if (valid(hs) && hs === startAt) go(startAt, { noHistory: true });
+  else { try { history.replaceState({ v: 'home' }, ''); } catch (e) {} if (startAt !== 'home' && valid(startAt)) { go('home', { noHistory: true }); go(startAt); } else go('home', { noHistory: true }); }
   // accounts: the site's cloud.js, loaded after the shell is on screen
   if (D.firebase) {
     window.FIREBASE_CONFIG = D.firebase;
