@@ -1,3 +1,17 @@
+// Older app installs (Windows 1.0, Android 1.0) open the plain website. Send them to the app interface, which
+// also tells them a newer version is ready. Tools shown inside the app interface run in frames and are not moved.
+(function () {
+  try {
+    if (window.top !== window || /\/appshell\//.test(location.pathname)) return;
+    var o = null; try { o = JSON.parse(sessionStorage.getItem('gtnApp')); } catch (e) {}
+    var m = /GetToolNestApp\/([0-9.]+)/.exec(navigator.userAgent), k = '', v = '';
+    if (m) { k = 'android'; v = m[1]; }
+    else if (window.__TAURI_INTERNALS__ || window.isTauri) { k = 'win'; v = o && o.k === 'win' && o.v ? o.v : '1.0.0'; }
+    if (!k) return;
+    var base = (document.currentScript && document.currentScript.src) ? new URL('..', document.currentScript.src).pathname : '/';
+    location.replace(base + 'appshell/?app=' + k + '&v=' + encodeURIComponent(v));
+  } catch (e) {}
+})();
 // Shared behaviour for every page. Loaded in <head> (not deferred) because the
 // tool scripts further down the page call these helpers as they run.
 (function () {
