@@ -611,7 +611,7 @@ html[data-android-app] .no-android { display: none !important; }
       var ld = document.createElement('div'); ld.className = 'ld';
       box.appendChild(ifr); box.appendChild(ld);
       if (isCharts(tab.path)) { var off = document.createElement('div'); off.className = 'offnote'; off.hidden = navigator.onLine; off.innerHTML = '<div><div class="big">' + ic('i-wifi') + '</div><h2>Live Charts needs internet</h2><p>Live Charts (trading) always needs internet for live prices. Your other tools keep working offline.</p><button class="btn" type="button">Try again</button></div>'; off.querySelector('button').onclick = function () { if (navigator.onLine) { off.hidden = true; reload(tab); } else say('Still offline. Connect to the internet and try again.'); }; box.appendChild(off); }
-      ifr.addEventListener('load', function () { ld.hidden = true; wire(ifr, tab); });
+      ifr.addEventListener('load', function () { ld.hidden = true; f.loaded = true; lastAct[tab.id] = 0; wire(ifr, tab); if (S.active === tab.id) focusFrame(tab.id, true); });
       el('frames').appendChild(box);
       f = frames[tab.id] = { box: box, ifr: ifr };
     }
@@ -619,6 +619,16 @@ html[data-android-app] .no-android { display: none !important; }
     var max = phoneMq.matches ? 3 : 8;
     while (lru.length > max) { var old = lru.shift(); if (old !== tab.id && tabById(old) && !isCharts(tabById(old).path)) dropFrame(old); }
     return f;
+  }
+  // Keyboard focus goes into a tool only once its page has loaded: keys sent to a frame that is still loading are lost,
+  // so until then they stay with the shell (Ctrl W, Ctrl Tab, Ctrl K keep working). When the page has loaded it takes
+  // the focus, unless the person has meanwhile put it somewhere else.
+  function focusFrame(id, onLoad) {
+    var f = frames[id]; if (!f) return;
+    var a = document.activeElement;
+    if (!f.loaded) { if (a && a.tagName === 'IFRAME') try { a.blur(); } catch (e) {} return; }
+    if (onLoad && ((a && a !== document.body) || gated() || !el('pal').hidden || phoneMq.matches)) return;
+    try { f.ifr.focus(); } catch (e) {}
   }
   function dropFrame(id) { var f = frames[id]; if (f) { f.box.remove(); delete frames[id]; } lru = lru.filter(function (x) { return x !== id; }); }
   function reload(tab) { var f = frames[tab.id]; if (!f) return; f.box.querySelector('.ld').hidden = false; try { f.ifr.contentWindow.location.reload(); } catch (e) { f.ifr.src = frameSrc(tab.path); } }
@@ -676,7 +686,7 @@ html[data-android-app] .no-android { display: none !important; }
       t = { id: 't' + (seq++), path: path, title: '' };
       var at = S.tabs.indexOf(tabById(S.active));
       if (at === -1 || o.end) S.tabs.push(t); else S.tabs.splice(at + 1, 0, t);
-      if (S.tabs.length > 20) { var gone = S.tabs.shift(); dropFrame(gone.id); }
+      if (S.tabs.length > 20) { for (var j = 0; j < S.tabs.length; j++) if (S.tabs[j] !== t && S.tabs[j].id !== S.active) { dropFrame(S.tabs.splice(j, 1)[0].id); break; } } // the oldest tab, never the open one or the new one
     }
     if (o.bg && !phoneMq.matches) { persist(); renderTabs(); say(info(t).name + ' opened in a new tab'); return t; }
     go(t.id);
@@ -715,7 +725,7 @@ html[data-android-app] .no-android { display: none !important; }
     if (!tab && inFocus()) setFocus(false);
     if (prev !== target && frames[prev] && frames[prev].stale) setTimeout(function () { quietReload(prev); }, 0);
     persist(); renderTabs(); renderNav(); renderChrome();
-    if (tab && frames[tab.id] && !phoneMq.matches) { try { frames[tab.id].ifr.focus(); } catch (e) {} }
+    if (tab && !phoneMq.matches) focusFrame(tab.id);
   }
   window.addEventListener('popstate', function (e) {
     var v = e.state && e.state.v;
@@ -780,10 +790,10 @@ html[data-android-app] .no-android { display: none !important; }
     el('app').classList.toggle('focus', on); el('fsExit').hidden = !on;
     if (on) { try { var r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.then) r.then(function () { realFs = true; }, function () {}); } catch (e) {} }
     else { realFs = false; if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen().catch(function () {}); } catch (e) {} } }
-    var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} }
+    var t = tabById(S.active); if (t) focusFrame(t.id);
   }
   window.gtnFocus = setFocus;
-  function setSide(hide) { el('app').classList.toggle('sbhide', hide); try { localStorage.setItem('gtnSbHide', hide ? '1' : ''); } catch (e) {} }
+  function setSide(hide) { if (inFocus()) return; el('app').classList.toggle('sbhide', hide); try { localStorage.setItem('gtnSbHide', hide ? '1' : ''); } catch (e) {} }
   try { if (localStorage.getItem('gtnSbHide') === '1') setSide(true); } catch (e) {}
   document.querySelectorAll('[data-sbt]').forEach(function (b) { b.addEventListener('click', function () { setSide(!el('app').classList.contains('sbhide')); }); });
 
@@ -1020,7 +1030,7 @@ html[data-android-app] .no-android { display: none !important; }
     palFrom = document.activeElement; p.hidden = false; p.classList.remove('enter'); void p.offsetWidth; if (!calm()) p.classList.add('enter');
     el('palIn').value = ''; palRender(); el('palIn').focus();
   }
-  function closePal() { var p = el('pal'); if (p.hidden) return; p.hidden = true; el('palRes').hidden = true; var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} } else if (palFrom && palFrom.focus) palFrom.focus(); }
+  function closePal() { var p = el('pal'); if (p.hidden) return; p.hidden = true; el('palRes').hidden = true; var t = tabById(S.active); if (t && frames[t.id]) focusFrame(t.id); else if (palFrom && palFrom.focus) palFrom.focus(); }
 
   // ---------- keyboard ----------
   function keys(e) {
@@ -1156,7 +1166,7 @@ html[data-android-app] .no-android { display: none !important; }
   var WIN = (APPK.k === 'win' || APPK.k === 'android') && !!D.firebase; // inside the Windows or Android app: signing in is required
   function gate(mode) {
     var g = el('gate');
-    if (!mode) { if (!g.hidden) { g.hidden = true; var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} } } return; }
+    if (!mode) { if (!g.hidden) { g.hidden = true; var t = tabById(S.active); if (t) focusFrame(t.id); } return; }
     var was = g.hidden; g.hidden = false; if (was && !calm()) { g.classList.remove('enter'); void g.offsetWidth; g.classList.add('enter'); }
     el('gWait').hidden = mode !== 'wait'; el('gMain').hidden = mode === 'wait';
     if (mode === 'form' || mode === 'down') {
