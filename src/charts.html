@@ -1271,7 +1271,7 @@ function draw() {
   // last price line and alerts
   var last = rawB ? { o: disp[n - 1].c, c: lastB().c } : disp[n - 1], lcol = last.c >= last.o ? S.up : S.dn, ly = yOf(last.c);
   if (TH.ll !== false) { ctx.strokeStyle = TH.pl || lcol; ctx.lineWidth = 1; ctx.setLineDash([1, 3]); ctx.beginPath(); ctx.moveTo(0, Math.round(ly) + .5); ctx.lineTo(plotW, Math.round(ly) + .5); ctx.stroke(); }
-  S.alerts.forEach(function (al) { if (al.sym !== S.sym || al.done || al.kind) return; y = Math.round(yOf(al.p)) + .5; ctx.strokeStyle = '#e0a100'; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.fillStyle = '#e0a100'; ctx.font = FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Alert ' + fmt(al.p), plotW - 6, y - 2); axisTags.push({ y: y, s: fmt(al.p), bg: '#e0a100', fg: '#1a1300' }); });
+  S.alerts.forEach(function (al) { if (al.sym !== S.sym || al.done || al.kind) return; y = Math.round(yOf(al.p)) + .5; var hot = (drag && drag.al === al) || (!drag && mouse && alertHit(mouse) === al); ctx.lineWidth = hot ? 2 : 1; ctx.strokeStyle = '#e0a100'; ctx.setLineDash([6, 4]); ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(plotW, y); ctx.stroke(); ctx.fillStyle = '#e0a100'; ctx.font = FONT; ctx.textAlign = 'right'; ctx.textBaseline = 'bottom'; ctx.fillText('Alert ' + fmt(al.p) + (hot ? '  ·  drag to move' : ''), plotW - 6, y - 2); ctx.lineWidth = 1; axisTags.push({ y: y, s: fmt(al.p), bg: '#e0a100', fg: '#1a1300' }); });
   var pl = function (pr, col, txt, dash, hit) { var yy = Math.round(yOf(pr)) + .5; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.setLineDash(dash); ctx.beginPath(); ctx.moveTo(0, yy); ctx.lineTo(plotW, yy); ctx.stroke(); ctx.font = FONT; var w = ctx.measureText(txt).width + 12; ctx.fillStyle = col; ctx.fillRect(10, yy - 9, w, 18); ctx.fillStyle = '#fff'; ctx.textAlign = 'left'; ctx.textBaseline = 'middle'; ctx.fillText(txt, 16, yy); axisTags.push({ y: yy, s: fmt(pr), bg: col });
     if (hit) { var cx = 10 + w + 2; ctx.fillStyle = '#e5484d'; ctx.fillRect(cx, yy - 9, 22, 18); ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.6; ctx.setLineDash([]); ctx.beginPath(); ctx.moveTo(cx + 7, yy - 4); ctx.lineTo(cx + 15, yy + 4); ctx.moveTo(cx + 15, yy - 4); ctx.lineTo(cx + 7, yy + 4); ctx.stroke(); ctx.lineWidth = 1; posHits.push({ x0: 10, x1: cx, x2: cx + 22, y0: yy - 9, y1: yy + 9, q: hit.q, k: hit.k }); } };
   S.paper.ord.forEach(function (q) { if (q.sym === S.sym) pl(q.price, '#7b8494', (q.type === 'limit' ? 'LIMIT ' : 'STOP ') + (q.side > 0 ? 'BUY ' : 'SELL ') + fmtK(q.amt) + (q.lev > 1 ? '  ' + q.lev + 'x' : ''), [2, 3], { q: q, k: 'ord' }); });
@@ -1515,6 +1515,11 @@ function editText(d) {
   var ta = h('textarea', { rows: 4, value: d.text || '', placeholder: 'Type your text' });
   modal('Text', ta, [{ t: 'Cancel', fn: function () {} }, { t: 'OK', pri: 1, fn: function () { snap(); d.text = ta.value.slice(0, 500); save(); dirty(); } }]);
 }
+function alertHit(p) { if (!p || p.x >= plotW || p.y >= mainH || full) return null; var hit = null, tol = ptrTouch ? 13 : 7; S.alerts.forEach(function (al) { if (al.sym !== S.sym || al.done || al.kind) return; var dy = Math.abs(yOf(al.p) - p.y); if (dy < tol) { tol = dy; hit = al; } }); return hit; }
+function quickAlert(price) {
+  var v = +(+price).toFixed(dec); if (!(v > 0)) return; S.alerts.push({ id: Date.now(), sym: S.sym, p: v }); save(); renderAlerts(); dirty(); connect(); toast('Alert added at ' + fmt(v) + '. Drag its line up or down to move it.');
+  try { if (window.Notification && Notification.permission === 'default') Notification.requestPermission(); } catch (e) {}
+}
 function addAlert(price, sym) {
   var inp = h('input', { type: 'number', step: 'any', value: +(+price).toFixed(dec) });
   modal('Price alert for ' + symName(sym || S.sym), h('div', {}, [h('div', { class: 'tc-f' }, [h('label', { text: 'Alert me when price crosses' }), inp]), h('p', { class: 'tc-empty', style: 'padding:10px 0 0', text: 'You get a sound and a message when the price crosses this level. Alerts only work while this page is open in your browser.' })]), [{ t: 'Cancel', fn: function () {} }, { t: 'Create alert', pri: 1, fn: function () {
@@ -1526,7 +1531,7 @@ function addAlert(price, sym) {
 function checkAlerts(sym, prev, now) {
   if (PANE) return;   // only the main page fires alerts and fills orders, so nothing happens twice
   S.alerts.forEach(function (a) {
-    if (a.done || a.sym !== sym || !((prev < a.p && now >= a.p) || (prev > a.p && now <= a.p))) return;
+    if (a.done || a.sym !== sym || (drag && drag.al === a) || !((prev < a.p && now >= a.p) || (prev > a.p && now <= a.p))) return;
     a.done = true; var msg = symName(sym) + ' crossed ' + a.p; toast('Alert: ' + msg); beep(); save(); renderAlerts(); dirty();
     try { if (window.Notification && Notification.permission === 'granted') new Notification('Price alert', { body: msg }); } catch (e) {}
   });
@@ -1614,6 +1619,7 @@ cv.addEventListener('pointerdown', function (e) {
     }
     if (rp && rp.acc) { var rt = null; rp.acc.pos.forEach(function (q) { ['tp', 'sl'].forEach(function (f) { if (q[f] && Math.abs(yOf(q[f]) - p.y) < 8) rt = { k: 'rpl', pos: q, f: f }; }); }); rp.acc.ord.forEach(function (o) { if (Math.abs(yOf(o.price) - p.y) < 8) rt = { k: 'rpl', pos: o, f: 'price' }; }); if (rt) { drag = rt; return; } }
     var tl = null; S.paper.pos.forEach(function (q) { if (q.sym !== S.sym) return; ['tp', 'sl'].forEach(function (f) { if (q[f] && Math.abs(yOf(q[f]) - p.y) < 7) tl = { k: 'tpsl', pos: q, f: f }; }); }); if (tl) { drag = tl; return; }
+    var ah = alertHit(p); if (ah) { drag = { k: 'alert', al: ah }; cv.style.cursor = 'ns-resize'; dirty(); return; }
     var free = function (d) { return !d.lock && !S.lock; };
     if (sel && free(sel)) { var hi = hitHandle(sel, p.x, p.y); if (hi >= 0) { snap(); drag = { k: 'handle', i: hi }; return; } }
     var d = hitTest(p.x, p.y);
@@ -1630,7 +1636,7 @@ cv.addEventListener('pointermove', function (e) {
   var p = pos(e); if (ptrs.has(e.pointerId)) ptrs.set(e.pointerId, p);
   if (pinch && ptrs.size === 2) { var a = Array.from(ptrs.values()), mx = (a[0].x + a[1].x) / 2; V.barW = clamp(pinch.bw * (Math.abs(a[0].x - a[1].x) || 1) / pinch.d, .5, 80); V.right = pinch.i + (plotW - mx) / V.barW; dirty(); return; }
   mouse = p;
-  if (!drag) { var z = zoneOf(p); cv.style.cursor = panes.length && Math.abs(p.y - mainH) < 6 && p.x < plotW && !tool && !mode ? 'row-resize' : z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : mode === 'erase' ? 'cell' : mode === 'zoom' ? 'zoom-in' : posHit(p) || (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : S.cursor === 'arrow' ? 'default' : 'crosshair'; dirty(); return; }
+  if (!drag) { var z = zoneOf(p); cv.style.cursor = panes.length && Math.abs(p.y - mainH) < 6 && p.x < plotW && !tool && !mode ? 'row-resize' : z === 'price' ? 'ns-resize' : z === 'time' ? 'ew-resize' : tool || z !== 'main' ? 'crosshair' : mode === 'erase' ? 'cell' : mode === 'zoom' ? 'zoom-in' : alertHit(p) ? 'ns-resize' : posHit(p) || (sel && hitHandle(sel, p.x, p.y) >= 0) || hitTest(p.x, p.y) ? 'pointer' : S.cursor === 'arrow' ? 'default' : 'crosshair'; dirty(); return; }
   if (drag.k === 'pan') {
     var now = performance.now(), dt = now - drag.lt; if (dt > 8) { drag.vx = .7 * (p.x - drag.lx) / dt + .3 * drag.vx; drag.lx = p.x; drag.lt = now; }
     // decide once per drag: a clearly vertical start moves the price scale too, and switches off auto-fit
@@ -1640,6 +1646,7 @@ cv.addEventListener('pointermove', function (e) {
   else if (drag.k === 'price') { if (V.auto) { V.auto = false; syncBot(); } var f = Math.exp((p.y - drag.y) * .006), c = (drag.a + drag.b) / 2, hf = (drag.b - drag.a) / 2 * f; V.vMin = c - hf; V.vMax = c + hf; }
   else if (drag.k === 'tpsl') { var np = pOf(clamp(p.y, 0, mainH)), cp = bars[bars.length - 1].c, q = drag.pos; if ((drag.f === 'tp') === (q.side > 0) ? np > cp : np < cp) q[drag.f] = +np.toFixed(dec); }
   else if (drag.k === 'rpl') { var rn = +pOf(clamp(p.y, 0, mainH)).toFixed(dec), rc = bars[bars.length - 1].c, rq = drag.pos; if (drag.f === 'price') { if ((rn > rc) === rq.up) rq.price = rn; } else if ((drag.f === 'tp') === (rq.side > 0) ? rn > rc : rn < rc) rq[drag.f] = rn; }
+  else if (drag.k === 'alert') { var an = +pOf(clamp(p.y, 0, mainH)).toFixed(dec); if (an > 0) { drag.al.p = an; drag.m = 1; } }
   else if (drag.k === 'split') S.subK = clamp((H - axH - p.y) / (H - axH), .08, .8);
   else if (drag.k === 'time') V.barW = clamp(drag.bw * Math.exp(-(p.x - drag.x) * .006), .5, 80);
   else if (drag.k === 'free' && cur) cur.pts.push(mkPt(p, true));
@@ -1654,6 +1661,7 @@ function ptrEnd(e) {
     if (drag.k === 'free') finish();
     else if (drag.k === 'draw' && cur && cur.pts.length === 1 && Math.hypot(p.x - drag.x, p.y - drag.y) > 10) { cur.pts.push(mkPt(p)); if (T[cur.type].pts !== 'poly' && cur.pts.length >= T[cur.type].pts) finish(); }
     else if (drag.k === 'move' || drag.k === 'handle' || drag.k === 'tpsl' || drag.k === 'split') { save(); renderPos(); }
+    else if (drag.k === 'alert') { if (drag.m) { save(); renderAlerts(); toast('Alert moved to ' + fmt(drag.al.p)); } }
     else if (drag.k === 'pan' && performance.now() - drag.lt < 90 && Math.abs(drag.vx) > .25) glide(drag.vx);
     else if (drag.k === 'zoom') { var xa = Math.min(drag.x, p.x), xb = Math.max(drag.x, p.x), ya = Math.min(drag.y, p.y), yb = Math.max(drag.y, p.y); if (xb - xa > 12 && yb - ya > 12) { var ia = iOf(xa), ib = iOf(xb), pa = pOf(clamp(ya, 0, mainH)), pb = pOf(clamp(yb, 0, mainH)); V.barW = clamp(plotW / Math.max(2, ib - ia), .5, 80); V.right = ib; V.auto = false; V.vMin = Math.min(sc(pa), sc(pb)); V.vMax = Math.max(sc(pa), sc(pb)); syncBot(); } setMode(null); }
   }
@@ -1681,7 +1689,7 @@ cv.addEventListener('contextmenu', function (e) {
   if (zc === 'time') return pop(at, [{ h: 'Time scale' }, { t: 'Go to date…', fn: goDate }, { t: 'Go to the latest candle', fn: goLast }, { t: 'Reset time scale', fn: resetView }, { t: S.utc ? 'Use my local time' : 'Use UTC time', fn: function () { S.utc = !S.utc; save(); clock(); dirty(); } }]);
   if (cur || tool || mode) return setTool(null);
   if (d) { if (grp().indexOf(d) < 0) { sel = d; msel = []; } selBar(); dirty(); items.push({ t: 'Delete drawing', fn: delSel }, { t: 'Clone drawing', fn: cloneSel }, { t: 'Copy (Ctrl+C)', fn: copySel }, { t: 'Bring to front', fn: function () { order(d, true); } }, { t: 'Send to back', fn: function () { order(d, false); } }, { t: d.lock ? 'Unlock drawing' : 'Lock drawing', fn: function () { d.lock = !d.lock; save(); selBar(); } }); }
-  if (zoneOf(p) === 'main') items.push({ t: 'Add alert at ' + fmt(pr), fn: function () { addAlert(pr); } }, { t: 'Horizontal line at ' + fmt(pr), fn: function () { snap(); draws().push({ id: Date.now(), type: 'hline', color: '#2f6fed', w: 2, pts: [{ t: tOfI(Math.round(iOf(p.x))), p: pr }] }); save(); dirty(); } });
+  if (zoneOf(p) === 'main') items.push({ t: 'Add alert at ' + fmt(pr), fn: function () { quickAlert(pr); } }, { t: 'Horizontal line at ' + fmt(pr), fn: function () { snap(); draws().push({ id: Date.now(), type: 'hline', color: '#2f6fed', w: 2, pts: [{ t: tOfI(Math.round(iOf(p.x))), p: pr }] }); save(); dirty(); } });
   if (zoneOf(p) === 'main') { var ci = clamp(Math.round(iOf(p.x)), 0, bars.length - 1);
     if (rp) items.push({ t: 'Buy order at ' + fmt(pr) + ' (replay)', fn: function () { rpTrade(1, pr); } }, { t: 'Sell order at ' + fmt(pr) + ' (replay)', fn: function () { rpTrade(-1, pr); } }, { t: 'Move the replay to this candle', fn: function () { rpSeek(ci); rpBar(); } });
     else items.push({ t: 'Buy / long now (paper trade)', fn: function () { tradeDlg(1); } }, { t: 'Sell / short now (paper trade)', fn: function () { tradeDlg(-1); } }, { t: 'Buy order at ' + fmt(pr) + ' (paper trade)', fn: function () { tradeDlg(1, pr); } }, { t: 'Sell order at ' + fmt(pr) + ' (paper trade)', fn: function () { tradeDlg(-1, pr); } }, { t: 'Start the replay from this candle', fn: function () { if (bars.length >= 20 && !rawB) rpStart(ci); } }); }
@@ -1734,7 +1742,7 @@ function buildTop() {
   elTop.appendChild(tb('<circle cx="11" cy="11" r="6.500"/><path d="M16 16l4.500 4.500M9 11h4M11 9v4"/>', 'Find anything: every tool, indicator and feature (Ctrl+K)', findDlg, 'Find', { class: 'tc-b lbl', id: 'tcFind' }));
   U.type = tb('candles', 'Chart type', function () { pop(U.type, TYPES.map(function (t) { return { t: t[1], on: S.type === t[0], fn: function () { setType(t[0]); } }; })); }, '', { 'data-pop': 1, class: 'tc-b lbl' }); elTop.appendChild(U.type);
   elTop.appendChild(tb('ind', 'Indicators', indPicker, 'Indicators', { class: 'tc-b lbl' }));
-  elTop.appendChild(tb('bell', 'Create a price alert', function () { if (bars.length) addAlert(bars[bars.length - 1].c); }, 'Alert', { class: 'tc-b lbl' }));
+  elTop.appendChild(tb('bell', 'Add a price alert at the current price, then drag its line to the level you want', function () { if (bars.length) quickAlert(bars[bars.length - 1].c); }, 'Alert', { class: 'tc-b lbl' }));
   elTop.appendChild(tb('plus', 'Compare with another symbol', function () { symSearch('cmp'); }, 'Compare', { class: 'tc-b lbl' }));
   U.replay = tb('<path d="M4 5v14M9 12l11-7v14z"/>', 'Bar replay: play back past candles one by one', function () { if (rp) return rpExit(); if (bars.length < 20) return; setTool(null); pickRp = true; rpBar(); toast('Click the candle where the replay should start'); }, 'Replay', { class: 'tc-b lbl' }); elTop.appendChild(U.replay);
   elTop.appendChild(tb('<path d="M4 17l5-6 4 3 7-9M15 5h5v5"/>', 'Paper trade: buy or sell with practice money, with TP and SL', function () { tradeDlg(1); }, 'Trade', { class: 'tc-b lbl' }));
@@ -1763,7 +1771,7 @@ function buildMob() {
   el.textContent = '';
   mb('ind', 'Indicators', indPicker);
   mb('<path d="M4 17l5-6 4 3 7-9M15 5h5v5"/>', 'Trade', function () { tradeDlg(1); });
-  mb('bell', 'Alert', function () { if (bars.length) addAlert(lastPx(S.sym)); });
+  mb('bell', 'Alert', function () { if (bars.length) quickAlert(lastPx(S.sym) || bars[bars.length - 1].c); });
   mb('list', 'Watchlist', function () { U.side.click(); });
   var more = mb('<circle cx="5" cy="12" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="19" cy="12" r="1.7"/>', 'More', function () {
     pop(more, [{ t: 'Find anything', ic: IC.search, fn: findDlg }, { t: 'Keyboard shortcuts', ic: '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M7 10h1M11 10h1M15 10h1M8 14h8"/>', fn: keysDlg }, { t: 'Saved replay sessions', ic: '<path d="M4 5v14M9 12l11-7v14z"/>', fn: rpHist }, { t: 'Alert from a formula', ic: IC.bell, fn: function () { if (bars.length) fxAlert(); } }, { t: 'Economic calendar (news)', ic: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>', fn: calDlg }, { t: 'Full screen', ic: IC.full, fn: function () { U.full.click(); } }, { t: 'Strategy tester (backtest)', ic: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>', fn: stratDlg }, { t: 'Compare with another symbol', ic: IC.plus, fn: function () { symSearch('cmp'); } }, { t: rp ? 'Exit bar replay' : 'Bar replay', ic: '<path d="M4 5v14M9 12l11-7v14z"/>', fn: function () { U.replay.click(); } }, FB && { t: fbUser ? 'Your account' : 'Sign in to save your chart', ic: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', fn: acctDlg }, { t: 'Match your MT5 price', ic: '<path d="M4 8h13l-3-3M20 16H7l3 3"/>', fn: matchDlg }, { t: 'Custom interval', ic: IC.plus, fn: customTf }, { t: 'Download candles (CSV)', fn: exportCsv }, { t: 'Market screener', ic: '<path d="M4 5h16M7 10h10M10 15h4M11 20h2"/>', fn: screener }, { t: 'Live trades and order book', fn: function () { if (elSide.hidden) U.side.click(); setSideTab('trades'); } }, { t: 'Saved chart setups', ic: IC.list, fn: function () { setupsMenu(more); } }, { t: 'Position size calculator', fn: calcDlg }, { t: 'Paper trading report', fn: reportDlg }, { t: 'Settings, data key, backup', ic: IC.gear, fn: settings }, { t: 'Save chart as image', ic: IC.cam, fn: snapshot }, { t: 'Copy a link to this chart', fn: shareLink }, { t: 'Paste drawings', fn: pasteSel }, { t: 'Light or dark chart', ic: IC.sun, fn: function () { S.dark = !S.dark; root.classList.toggle('tc-dark', S.dark); save(); dirty(); } }, { t: 'Percent scale', on: S.pct, fn: function () { U.pct.click(); } }, { t: 'Logarithmic scale', on: S.log, fn: function () { U.log.click(); } }, { t: 'Undo', ic: IC.undo, fn: function () { doUndo(true); } }, { t: 'Redo', ic: IC.redo, fn: function () { doUndo(false); } }, { t: 'Full screen', ic: IC.full, fn: function () { U.full.click(); } }]);
@@ -1864,7 +1872,7 @@ function renderWatch() {
 function renderAlerts() {
   var el = document.getElementById('tcAlerts'); el.textContent = '';
   S.alerts.forEach(function (a) { el.appendChild(h('div', { class: 'tc-row', style: a.done ? 'opacity:.55' : '', onclick: function (e) { if (!e.target.closest('.del')) setSym(a.sym); } }, [h('b', { text: symName(a.sym) }), h('span', { style: 'white-space:normal;text-align:end', text: a.label || String(a.p) }), h('span', { class: 'm', text: a.done ? 'done' : 'active' }), h('button', { class: 'del', title: 'Delete alert', html: svg(IC.x, 14), onclick: function () { S.alerts = S.alerts.filter(function (q) { return q !== a; }); save(); renderAlerts(); dirty(); } })])); });
-  if (!S.alerts.length) el.appendChild(h('div', { class: 'tc-empty', text: 'No alerts yet. Press + or right-click the chart.' }));
+  if (!S.alerts.length) el.appendChild(h('div', { class: 'tc-empty', text: 'No alerts yet. Press Alert, then drag the line on the chart.' }));
 }
 var SYMA = { BITCOIN: 'BTC', BITCOINS: 'BTC', ETHEREUM: 'ETH', ETHER: 'ETH', SOLANA: 'SOL', RIPPLE: 'XRP', DOGECOIN: 'DOGE', CARDANO: 'ADA', BINANCE: 'BNB', EURO: 'EUR', EUROS: 'EUR', POUND: 'GBP', STERLING: 'GBP', CABLE: 'GBPUSD', YEN: 'JPY', FRANC: 'CHF', AUSSIE: 'AUD', KIWI: 'NZD', LOONIE: 'CAD', SONA: 'XAU', CHANDI: 'XAG' };
 function symSearch(forWatch) {
