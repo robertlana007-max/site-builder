@@ -391,6 +391,14 @@ html[data-android-app] .no-android { display: none !important; }
 .sbar input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: transparent; font-size: 16px; color: var(--ink); }
 .sres { margin-top: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 6px; }
 .sres:empty { display: none; }
+/* ---------- full screen: only the open page ---------- */
+.app.focus { grid-template-columns: minmax(0, 1fr) !important; grid-template-rows: minmax(0, 1fr) !important; }
+.app.focus .sb, .app.focus .tabbar, .app.focus .tbar, .app.focus .mbar, .app.focus .bnav, .app.focus .upd { display: none !important; }
+.app.focus .main { padding-top: 0; }
+.fsexit { position: fixed; top: calc(10px + var(--sat)); right: 12px; z-index: 70; display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); font: 600 12.5px/1 inherit; box-shadow: var(--shadow-lg); opacity: .4; transition: opacity var(--t); cursor: pointer; }
+.fsexit:hover, .fsexit:focus-visible { opacity: 1; }
+.fsexit svg.i { width: 15px; height: 15px; }
+@media (hover: none) { .fsexit { opacity: .75; } }
 </style>
 <script src="../assets/tools-index.js?v=ac988e70bb"></script>
 <script src="../assets/site.js?v=0b6ff6484d"></script>
@@ -423,6 +431,7 @@ html[data-android-app] .no-android { display: none !important; }
       <div class="tabs" id="tabs" role="tablist" aria-label="Open tools"></div>
       <button class="newtab" id="newTab" type="button" title="Open a tool (Ctrl T)" aria-label="Open a tool"><svg class="i"><use href="#i-plus"/></svg></button>
       <span class="sp"></span>
+      <button class="ib" id="fsBtn" type="button" title="Full screen: show only this page (F11)" aria-label="Full screen" hidden><svg class="i"><use href="#i-full"/></svg></button>
     </header>
     <div class="tbar" id="tbar" hidden>
       <span class="tile" id="tbTile"></span>
@@ -437,6 +446,7 @@ html[data-android-app] .no-android { display: none !important; }
       <h1 id="mName"></h1>
       <button class="ib" id="mPin" type="button" aria-label="Pin this tool" aria-pressed="false"><svg class="i"><use href="#i-star"/></svg></button>
       <button class="ib" id="mReload" type="button" aria-label="Reload"><svg class="i"><use href="#i-reload"/></svg></button>
+      <button class="ib" id="mFull" type="button" aria-label="Full screen"><svg class="i"><use href="#i-full"/></svg></button>
     </header>
     <div class="stage" id="stage">
       <div class="view" id="vHome" data-v="home"></div>
@@ -454,6 +464,7 @@ html[data-android-app] .no-android { display: none !important; }
     </div>
   </section>
 
+  <button class="fsexit" id="fsExit" type="button" hidden title="Exit full screen (Esc)"><svg class="i"><use href="#i-unfull"/></svg><span>Exit full screen</span></button>
   <nav class="bnav" id="bnav" aria-label="App">
     <button data-go="home" type="button"><span class="pillbg"></span><svg class="i"><use href="#i-home"/></svg>Home</button>
     <button data-go="tools" type="button"><span class="pillbg"></span><svg class="i"><use href="#i-grid"/></svg>Tools</button>
@@ -512,6 +523,8 @@ html[data-android-app] .no-android { display: none !important; }
   <symbol id="i-next" viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></symbol>
   <symbol id="i-star" viewBox="0 0 24 24"><polygon points="12 2.5 15 8.6 21.6 9.5 16.8 14.2 18 20.8 12 17.6 6 20.8 7.2 14.2 2.4 9.5 9 8.6 12 2.5"/></symbol>
   <symbol id="i-reload" viewBox="0 0 24 24"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-unfull" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
   <symbol id="i-ext" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
   <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
   <symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></symbol>
@@ -603,6 +616,7 @@ html[data-android-app] .no-android { display: none !important; }
     try { w = ifr.contentWindow; d = ifr.contentDocument; } catch (e) { return; }
     if (!w || !d || w.__gtnShell) return;
     w.__gtnShell = 1;
+    w.addEventListener('keydown', function (e) { if (e.key === 'F11' || (e.key === 'Escape' && inFocus() && !e.defaultPrevented)) { e.preventDefault(); setFocus(e.key === 'F11' ? !inFocus() : false); } });
     var p = w.location.pathname;
     if (p.indexOf(BASE) === 0 && p !== 'blank') {
       var np = '/' + p.slice(BASE.length) + (isCharts('/' + p.slice(BASE.length)) ? '' : w.location.search.replace(/[?&]app=1/, '').replace(/^&/, '?'));
@@ -683,6 +697,7 @@ html[data-android-app] .no-android { display: none !important; }
     if (target === 'tools') renderTools();
     if (target === 'settings') renderSettings();
     if (target === 'search') setTimeout(function () { if (!phoneMq.matches) return; var i = el('mSearch'); i.focus(); }, 60);
+    if (!tab && inFocus()) setFocus(false);
     persist(); renderTabs(); renderNav(); renderChrome();
     if (tab && frames[tab.id] && !phoneMq.matches) { try { frames[tab.id].ifr.focus(); } catch (e) {} }
   }
@@ -725,6 +740,7 @@ html[data-android-app] .no-android { display: none !important; }
     var tab = tabById(S.active), x = tab && info(tab), phone = phoneMq.matches;
     el('tbar').hidden = !tab || (x && x.live);
     el('mbar').hidden = !(tab && !x.live);
+    el('fsBtn').hidden = !tab;
     if (!tab) return;
     var tiles = [el('tbTile'), el('mTile')];
     tiles.forEach(function (t) { t.style.setProperty('--c', x.color); t.innerHTML = x.svg; });
@@ -739,6 +755,20 @@ html[data-android-app] .no-android { display: none !important; }
   function pinActive() { var tab = tabById(S.active), s = tab && slugOf(tab.path); if (!s) return; var on = Store.toggleFav(s); say(on ? 'Pinned' : 'Unpinned'); }
   el('tbPin').onclick = el('mPin').onclick = pinActive;
   el('tbReload').onclick = el('mReload').onclick = function () { var t = tabById(S.active); if (t) reload(t); };
+  // full screen: hide the sidebar, tabs and bars so only the open page shows; also asks the window for real full screen
+  var realFs = false;
+  function inFocus() { return el('app').classList.contains('focus'); }
+  function setFocus(on) {
+    if (on && !tabById(S.active)) return;
+    el('app').classList.toggle('focus', on); el('fsExit').hidden = !on;
+    if (on) { try { var r = document.documentElement.requestFullscreen && document.documentElement.requestFullscreen(); if (r && r.then) r.then(function () { realFs = true; }, function () {}); } catch (e) {} }
+    else { realFs = false; if (document.fullscreenElement && document.exitFullscreen) { try { document.exitFullscreen().catch(function () {}); } catch (e) {} } }
+    var t = tabById(S.active); if (t && frames[t.id]) { try { frames[t.id].ifr.focus(); } catch (e) {} }
+  }
+  window.gtnFocus = setFocus;
+  document.addEventListener('fullscreenchange', function () { if (!document.fullscreenElement && realFs && inFocus()) setFocus(false); });
+  el('fsBtn').onclick = el('mFull').onclick = function () { setFocus(!inFocus()); };
+  el('fsExit').onclick = function () { setFocus(false); };
   el('mBack').onclick = function () { if (history.state && history.length > 1) history.back(); else go('home'); };
 
   // ---------- sidebar ----------
@@ -950,6 +980,8 @@ html[data-android-app] .no-android { display: none !important; }
     if (mod && k === 'Tab') { var ids = ['home'].concat(S.tabs.map(function (t) { return t.id; })), cur = ids.indexOf(PAGES[S.active] ? 'home' : S.active); go(ids[(cur + (e.shiftKey ? ids.length - 1 : 1)) % ids.length]); return true; }
     if (mod && /^[1-9]$/.test(k)) { var n = +k; var t = n === 9 ? S.tabs[S.tabs.length - 1] : S.tabs[n - 1]; if (t) go(t.id); return true; }
     if (k === 'F5' && tabById(S.active)) { reload(tabById(S.active)); return true; }
+    if (k === 'F11' && tabById(S.active)) { setFocus(!inFocus()); return true; }
+    if (k === 'Escape' && inFocus() && el('pal').hidden) { setFocus(false); return true; }
     if (k === 'Escape' && !el('pal').hidden) { closePal(); return true; }
     return false;
   }
