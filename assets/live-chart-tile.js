@@ -33,8 +33,8 @@
     g.strokeStyle = last >= bars[n - 1][1] ? up : dn; g.setLineDash([2, 3]); g.beginPath(); g.moveTo(0, ly); g.lineTo(W, ly); g.stroke(); g.setLineDash([]);
   }
   function label() {
-    var m = M[k]; nm.innerHTML = '<b></b><small></small>'; nm.firstChild.textContent = m[1]; nm.lastChild.textContent = m[2];
-    if (bars.length) px.textContent = '$' + fmt(bars[bars.length - 1][4], m[3]);
+    var m = M[k]; nm.innerHTML = '<b></b><small class="notranslate" translate="no"></small>'; nm.firstChild.textContent = m[1]; nm.lastChild.textContent = m[2];
+    px.textContent = bars.length ? '$' + fmt(bars[bars.length - 1][4], m[3]) : '…';
     if (day != null) { ch.textContent = (day >= 0 ? '▲ ' : '▼ ') + Math.abs(day).toFixed(2) + '% 24h'; ch.className = 'lc-chg ' + (day >= 0 ? 'up' : 'dn'); } else ch.textContent = '';
   }
   function load(first) {

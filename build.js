@@ -324,7 +324,7 @@ const homeFaq = [
 // Live tiles beside the hero: each one acts out what its tool does.
 const live = (slug, label, scene) => { const t = bySlug(slug); return `<a class="live" style="--c:${COLOR[t.cat]}" href="${slug}/" aria-label="${esc(t.name)}"><span class="scene" aria-hidden="true">${scene}</span><b>${label}</b></a>`; };
 const bento = [
-  `<a class="live live-chart" id="liveChart" href="charts/" aria-label="Live Charts: live crypto, gold and forex prices"><span class="lc-top"><span class="lc-dot" aria-hidden="true"></span><span class="lc-name">Live market</span><span class="lc-price"></span></span><canvas aria-hidden="true"></canvas><span class="lc-bot"><b>Live Charts</b><span class="lc-chg"></span><em>Open →</em></span></a>`,
+  `<a class="live live-chart" id="liveChart" href="charts/" aria-label="Live Charts: live crypto, gold and forex prices"><span class="lc-top"><span class="lc-dot" aria-hidden="true"></span><span class="lc-name">Live market</span><span class="lc-price notranslate" translate="no"></span></span><canvas aria-hidden="true"></canvas><span class="lc-bot"><b>Live Charts</b><span class="lc-chg notranslate" translate="no"></span><em>Open →</em></span></a>`,
   live('qr-code-generator', 'QR code', `<span class="qr" id="liveQr">${'<i></i>'.repeat(49)}</span>`),
   live('countdown-timer', 'Timer', '<span class="sc-timer"><svg viewBox="0 0 36 36"><circle cx="18" cy="18" r="15"/><circle class="arc" id="liveArc" cx="18" cy="18" r="15"/></svg><span id="liveTimer">05:00</span></span>'),
   live('stopwatch', 'Stopwatch', '<span class="sc-big" id="liveSw">00:00.00</span>'),
@@ -709,12 +709,12 @@ ${contact}` },
   <img src="../assets/icon-512.png" alt="${esc(cfg.siteName)} app icon" width="96" height="96">
   <div><p class="lead" style="margin:0">All ${tools.length} tools in one free app. Opens full screen, works without internet, and updates by itself.</p></div>
 </div>
-<div class="app-note" role="note"><b>A quick note before you download</b><p>Sorry, our app is not on the Google Play Store or the Apple App Store yet. You can still download it safely right here, for Android phones and for computers (Windows, Mac, Linux and Chromebook).</p><p><b>To our iPhone and iPad users: we are truly sorry.</b> We cannot offer a downloadable iPhone app yet. You can still add ${esc(cfg.siteName)} to your Home Screen from Safari (the steps are below), and it opens and works just like an app.</p></div>
+<div class="app-note" role="note"><b>A quick note before you download</b><p>Sorry, our app is not on the Google Play Store or the Apple App Store yet. You can still download it safely right here, for Android phones and for computers (Windows, Linux and Chromebook).</p><p><b>To our iPhone and iPad users: we are truly sorry.</b> We cannot offer a downloadable iPhone app yet. You can still add ${esc(cfg.siteName)} to your Home Screen from Safari (the steps are below), and it opens and works just like an app.</p></div>
 <div class="dlrow">
   ${cfg.androidApk ? `<a class="dl-card" data-os="android" href="../${cfg.androidApk}" download="GetToolNest.apk"><b>Download for Android</b><small>APK · version ${esc(cfg.androidApkVersion)} · ${Math.max(1, Math.round(fs.statSync(path.join(ROOT, cfg.androidApk)).size / 1024))} KB · Android 7 and newer</small></a>` : ''}
   <button class="dl-card" type="button" data-os="windows" data-install><b>Download for Windows</b><small>Installs from Edge or Chrome · Windows 10 and 11</small></button>
   <button class="dl-card" type="button" data-os="ios" data-install><b>Get it on iPhone or iPad</b><small>Add to Home Screen from Safari</small></button>
-  <button class="dl-card" type="button" data-os="mac" data-install><b>Mac, Linux, Chromebook</b><small>Installs from Chrome or Edge</small></button>
+  <button class="dl-card" type="button" data-os="mac" data-install><b>Linux, Chromebook</b><small>Installs from Chrome or Edge</small></button>
 </div>
 <div class="stores">
   <button class="btn big" type="button" data-install>${icon('phone')}Install now</button>
@@ -730,7 +730,7 @@ ${contact}` },
 <ol><li>Open ${esc(cfg.siteName)} in <b>Safari</b>.</li><li>Tap the <b>Share</b> button.</li><li>Tap <b>Add to Home Screen</b>, then <b>Add</b>.</li></ol>
 <h2>Install on Windows</h2>
 <ol><li>Open ${esc(cfg.siteName)} in <b>Microsoft Edge</b> or <b>Google Chrome</b>.</li><li>Click <b>Download for Windows</b> above, then <b>Install</b>. (Or click the install icon at the right of the address bar.)</li><li>${esc(cfg.siteName)} opens in its own window and appears in the Start menu and taskbar. To remove it, use Settings → Apps.</li></ol>
-<h2>Install on Mac, Linux or Chromebook</h2>
+<h2>Install on Linux or Chromebook</h2>
 <ol><li>Open ${esc(cfg.siteName)} in Chrome or Edge.</li><li>Click the install icon in the address bar, or <b>Install now</b> above.</li></ol>
 <h2>Why use the app</h2>
 <ul><li><b>Works offline.</b> Calculators, converters, text tools and the PDF tools you have used before keep working without internet.</li><li><b>Always up to date.</b> New tools and fixes arrive by themselves. There is nothing to update.</li><li><b>Same settings everywhere.</b> Sign in once and your theme, pinned tools and saved work follow you between the app and the website.</li><li><b>Private.</b> Like the website, the app never uploads your files.</li><li><b>Small.</b> It takes almost no space on your phone.</li></ul>` },
