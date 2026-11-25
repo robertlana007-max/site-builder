@@ -3,6 +3,9 @@
 // Output is written to the repository root so GitHub Pages can serve it directly.
 const fs = require('fs');
 const path = require('path');
+// short content hash for asset links, so a new release never pairs new pages with old cached CSS or JS
+const _av = {};
+const assetV = f => _av[f] || (_av[f] = require('crypto').createHash('md5').update(fs.readFileSync(path.join(ROOT, f))).digest('hex').slice(0, 10));
 
 const ROOT = __dirname;
 const cfg = JSON.parse(fs.readFileSync(path.join(ROOT, 'config.json'), 'utf8'));
@@ -180,9 +183,9 @@ ${cfg.googleSiteVerification ? `<meta name="google-site-verification" content="$
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="${esc(cfg.siteName)}">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<link rel="stylesheet" href="${rel}assets/style.css">
-<script src="${rel}assets/tools-index.js"></script>
-<script src="${rel}assets/site.js"></script>
+<link rel="stylesheet" href="${rel}assets/style.css?v=${assetV('assets/style.css')}">
+<script src="${rel}assets/tools-index.js?v=${assetV('assets/tools-index.js')}"></script>
+<script src="${rel}assets/site.js?v=${assetV('assets/site.js')}"></script>
 ${cfg.firebase ? `<script>window.FIREBASE_CONFIG=${JSON.stringify(cfg.firebase).replace(/</g, '\\u003c')};</script><script defer src="${rel}assets/cloud.js"></script>` : ''}
 ${cfg.adsenseClient ? `<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${esc(cfg.adsenseClient)}" crossorigin="anonymous"></script>` : ''}
 ${cfg.googleAnalyticsId ? `<script async src="https://www.googletagmanager.com/gtag/js?id=${esc(cfg.googleAnalyticsId)}"></script><script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}gtag('js',new Date());gtag('config','${esc(cfg.googleAnalyticsId)}');</script>` : ''}
@@ -340,7 +343,7 @@ write('index.html', layout({
   rel: '', urlPath: '',
   title: `${cfg.siteName} - Free Online Tools: PDF, Image, Calculators`,
   desc: `${tools.length} free online tools: merge PDF, edit PDF text, compress PDF, image compressor, mortgage calculator and more. No sign-up needed. Files never leave your device.`,
-  head: jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, alternateName: 'GetToolNest free online tools', url: SITE + '/', potentialAction: { '@type': 'SearchAction', target: SITE + '/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) + jsonLd({ '@context': 'https://schema.org', '@type': 'Organization', name: cfg.siteName, url: SITE + '/', logo: SITE + '/assets/icon-512.png', email: cfg.contactEmail || undefined }) ,
+  head: `<style>${fs.readFileSync(path.join(ROOT, 'assets/style.css'), 'utf8').split('/* home page: live candlestick tile */')[1] || ''}</style>` + jsonLd({ '@context': 'https://schema.org', '@type': 'WebSite', name: cfg.siteName, alternateName: 'GetToolNest free online tools', url: SITE + '/', potentialAction: { '@type': 'SearchAction', target: SITE + '/?q={search_term_string}', 'query-input': 'required name=search_term_string' } }) + jsonLd({ '@context': 'https://schema.org', '@type': 'Organization', name: cfg.siteName, url: SITE + '/', logo: SITE + '/assets/icon-512.png', email: cfg.contactEmail || undefined }) ,
   body: `<section class="hero hero2"><div class="hero-copy">
   <p class="hello"><span class="wave" aria-hidden="true">👋</span> Welcome, dear friends!</p>
   <h1>Use any tool you need, <span class="hl">completely free</span></h1>
@@ -353,7 +356,7 @@ write('index.html', layout({
   ${cfg.contactEmail ? `<div class="ask"><span class="ask-ic" aria-hidden="true">💌</span><p>Want something new added to a tool, or need a brand-new tool on the website? Just email us and we will make it for you.</p><a class="btn" href="mailto:${esc(cfg.contactEmail)}?subject=${encodeURIComponent('Idea for ' + cfg.siteName)}">Email us</a></div>` : ''}
   <a class="scrollcue" href="#tools">Scroll down to see all tools <span aria-hidden="true">↓</span></a>
 </div><div class="bento" aria-label="Popular tools">${bento}</div></section>
-<script src="assets/live-chart-tile.js" defer></script>
+<script src="assets/live-chart-tile.js?v=${assetV('assets/live-chart-tile.js')}" defer></script>
 <section class="spot" aria-roledescription="carousel" aria-label="Featured tools">
   <div class="spot-track" id="spotTrack">
     ${spot('edit-pdf', 'Change the text inside any PDF', 'Click on a word in your PDF and type. The new text uses the same font and size, so nobody can tell it was changed.', ['Keeps the original font', 'No watermark', 'Nothing uploaded'], '<span class="art-doc"><i></i><i></i><span class="art-swap"><b>Total: $500</b><b>Total: $750</b></span><i></i><i class="s"></i></span>')}
@@ -602,7 +605,7 @@ for (const t of tools) {
   write(`${t.slug}/index.html`, layout({
     rel: '../', urlPath: t.slug + '/', slug: t.slug, here: t.name, color: th.color, bodyClass: th.cls,
     title: `${t.title} | ${cfg.siteName}`, desc: t.desc,
-    head: `<link rel="stylesheet" href="../assets/themes.css">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="${th.fontHref}">\n<style>${th.css}</style>\n` + jsonLd({
+    head: `<link rel="stylesheet" href="../assets/themes.css?v=${assetV('assets/themes.css')}">\n<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>\n<link rel="stylesheet" href="${th.fontHref}">\n<style>${th.css}</style>\n` + jsonLd({
       '@context': 'https://schema.org', '@type': 'WebApplication', name: t.name, url: `${SITE}/${t.slug}/`,
       description: t.desc, applicationCategory: 'UtilitiesApplication', operatingSystem: 'Any',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' }
@@ -1076,7 +1079,7 @@ self.addEventListener('fetch', e => {
   }
   const lib = url.pathname.startsWith('/assets/vendor/');
   // files: from the cache when we have them (each release gets a fresh cache), otherwise fetch and keep a copy
-  e.respondWith(caches.match(req, { ignoreSearch: !lib }).then(hit => hit || fetch(req).then(res => {
+  e.respondWith(caches.match(req, { ignoreSearch: false }).then(hit => hit || fetch(req).then(res => {
     if (res.ok) { const copy = res.clone(); caches.open(lib ? 'gtn-lib' : 'gtn-' + VERSION).then(c => c.put(req, copy)); }
     return res;
   })));
