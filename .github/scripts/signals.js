@@ -1,7 +1,8 @@
 // Reads the public web page of a Telegram channel and keeps the trading signals it posts in charts/signals.json.
 // Run by .github/workflows/signals.yml. It only ever writes that one file.
 const fs = require('fs');
-const CH = 'sniperxauusd77', FILE = 'charts/signals.json', KEEP = 300;
+const SETS = [{ src: 1, ch: 'sniperxauusd77', file: 'charts/signals.json' }, { src: 2, ch: 'VIP_FOREX_CLUB6745', file: 'charts/signals2.json' }], ALL = 'charts/signals-all.json', KEEP = 300;   // signals-all.json is what the page reads
+let CH = SETS[0].ch, FILE = SETS[0].file;
 
 function messages(html) {
   const re = /data-post="[^"\/]+\/(\d+)"[\s\S]*?(?=data-post="|$)/g, out = []; let m;
@@ -18,13 +19,15 @@ function signal(m) {
   if (m.rep || !(m.t > 0)) return null;
   const tx = m.text.replace(/,/g, ''), h = /\b(gold|xau\s*\/?\s*usd)\b[^\n]{0,30}?\b(buy|sell)\b[^\d\n]{0,24}(\d{3,6}(?:\.\d+)?)(?:[^\d\n]{1,6}(\d{3,6}(?:\.\d+)?))?/i.exec(tx);
   if (!h) return null;
-  const d = /buy/i.test(h[2]) ? 1 : -1, e1 = +h[3], e2 = h[4] ? +h[4] : +h[3], tp = [], sl = +((/(?:stop+\s*los+|\bsl\b)\s*:?\s*(\d{3,6}(?:\.\d+)?)/i.exec(tx) || [])[1] || 0);
-  let t; const tr = /\btp\s*\d?\s*:?\s*(\d{3,6}(?:\.\d+)?)/gi; while ((t = tr.exec(tx)) && tp.length < 4) tp.push(+t[1]);
+  const d = /buy/i.test(h[2]) ? 1 : -1, e1 = +h[3], tp = [], sl = +((/(?:stop+\s*los+|\bsl\b)\s*:?\s*(\d{3,6}(?:\.\d+)?)/i.exec(tx) || [])[1] || 0);
+  let e2 = h[4] ? +h[4] : e1; if (Math.abs(e2 - e1) / e1 > .006) { const alt = e2 + (e2 > e1 ? -100 : 100); e2 = Math.abs(alt - e1) / e1 <= .006 ? alt : e1; }   // "3570/3664" is a slip for 3570/3564
+  let t; const tr = /\btp(?:\s*\d(?!\d))?\s*:?\s*(\d{3,6}(?:\.\d+)?)/gi; while ((t = tr.exec(tx)) && tp.length < 6) tp.push(+t[1]);
   if (!(e1 > 0) || !(sl > 0) || !tp.length) return null;
   const e = d > 0 ? Math.max(e1, e2) : Math.min(e1, e2);
   if (d > 0 ? !(sl < e && tp[0] > e) : !(sl > e && tp[0] < e)) return null;       // numbers must make sense for the direction
   if (Math.abs(sl - e) / e > .03 || tp.some(x => Math.abs(x - e) / e > .08)) return null;
   tp.sort((a, b) => d > 0 ? a - b : b - a);
+  const near = tp.filter(x => Math.abs(x - e) <= 5 * Math.abs(sl - e)); if (near.length && near.length < tp.length) { tp.length = 0; near.forEach(x => tp.push(x)); }   // a target typed 100 away by mistake
   return { id: m.id, t: m.t, d, e1, e2, tp, sl };
 }
 // what the channel says after a signal: "SL update 3922", "break even", "close half", "close"
@@ -43,12 +46,12 @@ async function page(before) {
   if (!r.ok) throw new Error('HTTP ' + r.status);
   return messages(await r.text());
 }
-(async () => {
+async function one() {
   let old = []; try { old = JSON.parse(fs.readFileSync(FILE, 'utf8')); } catch (e) {}
   if (!Array.isArray(old)) old = [];
   const pages = +process.argv[2] || 2; let ms = [], before = 0;
   for (let k = 0; k < pages; k++) { const p = await page(before); if (!p.length) break; ms = ms.concat(p); before = Math.min(...p.map(x => x.id)); }
-  if (!ms.length) { console.log('no messages read, file left as it is'); return; }
+  if (!ms.length) { console.log(CH + ': no messages read, file left as it is'); return; }
   const by = {}; old.forEach(s => { if (s && s.id) by[s.id] = s; });
   let added = 0; ms.forEach(m => { const s = signal(m); if (s && !by[s.id]) { by[s.id] = s; added++; } });
   // attach each follow-up to the signal it answers, or to the newest signal of the last 8 hours
@@ -57,5 +60,11 @@ async function page(before) {
   // the channel re-posts a signal a few minutes later with the same numbers: keep the first one only
   const list = Object.values(by).sort((a, b) => a.t - b.t).filter((s, i, a) => !a.slice(Math.max(0, i - 6), i).some(q => q.d === s.d && q.e1 === s.e1 && q.sl === s.sl && s.t - q.t < 36e5)).slice(-KEEP);
   const txt = JSON.stringify(list);
-  if (txt !== JSON.stringify(old)) { fs.writeFileSync(FILE, txt); console.log('signals now', list.length, '| new this run', added); } else console.log('nothing new,', list.length, 'signals kept');
+  if (txt !== JSON.stringify(old)) { fs.writeFileSync(FILE, txt); console.log(CH + ': signals now', list.length, '| new this run', added); } else console.log(CH + ': nothing new,', list.length, 'signals kept');
+}
+(async () => {
+  for (const st of SETS) { CH = st.ch; FILE = st.file; try { await one(); } catch (e) { console.error(CH + ': could not read the channel:', e.message); } }
+  const all = {}; SETS.forEach(st => { try { all[st.src] = JSON.parse(fs.readFileSync(st.file, 'utf8')); } catch (e) { all[st.src] = []; } });
+  const txt = JSON.stringify(all); let was = ''; try { was = fs.readFileSync(ALL, 'utf8'); } catch (e) {}
+  if (txt !== was) fs.writeFileSync(ALL, txt);
 })().catch(e => { console.error('could not read the channel:', e.message); process.exit(0); });
