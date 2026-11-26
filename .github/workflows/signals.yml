@@ -5,11 +5,12 @@ name: Refresh Telegram signals
 
 on:
   schedule:
-    - cron: '*/5 * * * *'
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: signals
@@ -24,7 +25,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          end=$((SECONDS+270))
+          end=$((SECONDS+3000))
           first=1
           while [ $SECONDS -lt $end ]; do
             if [ $first = 1 ]; then node .github/scripts/signals.js 2; first=0; else node .github/scripts/signals.js 1; fi
@@ -35,3 +36,9 @@ jobs:
             fi
             sleep 20
           done
+      # GitHub starts scheduled jobs late or not at all, so each run starts the next one itself.
+      - name: Start the next run
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh workflow run signals.yml --ref main --repo "$GITHUB_REPOSITORY"
