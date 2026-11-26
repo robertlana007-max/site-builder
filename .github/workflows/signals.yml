@@ -11,18 +11,27 @@ on:
 permissions:
   contents: write
 
-concurrency: signals
+concurrency:
+  group: signals
+  cancel-in-progress: false
 
 jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Read the channel and keep its signals
-        run: node .github/scripts/signals.js 2
-      - name: Commit when it changed
+      - name: Watch the channel and publish each change at once
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add charts/signals.json
-          git diff --cached --quiet || (git commit -m "Refresh Telegram signals" && git pull --rebase -q && git push)
+          end=$((SECONDS+270))
+          first=1
+          while [ $SECONDS -lt $end ]; do
+            if [ $first = 1 ]; then node .github/scripts/signals.js 2; first=0; else node .github/scripts/signals.js 1; fi
+            if ! git diff --quiet -- charts/signals.json; then
+              git add charts/signals.json
+              git commit -q -m "Refresh Telegram signals"
+              git pull --rebase -q && git push -q || true
+            fi
+            sleep 40
+          done
