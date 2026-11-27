@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"vibration-meter":["振动仪","测振仪","测量振动","加速度计","洗衣机振动"],
+"light-meter":["照度计","测光表","光照度测量","在线测光","植物光照"],
+"protractor":["量角器","在线量角器","测量角度","图片测角度","在线尺子"],
+"compass":["指南针","在线指南针","罗盘","北方在哪","磁偏角"],
+"bubble-level":["水平仪","气泡水平仪","手机水平仪","在线水平仪","倾角仪"],
 "pros-and-cons":["利弊清单","优缺点列表","帮我做决定","随机是或否","随机抽选"],
 "decision-matrix":["决策矩阵","加权决策矩阵","比较选项","决策工具","加权评分"],
 "moon-phase":["今天月相","月相日历","下一次满月","新月日期","月出时间"],

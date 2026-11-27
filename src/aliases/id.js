@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"vibration-meter":["alat ukur getaran","vibration meter","mengukur getaran","akselerometer","getaran mesin cuci"],
+"light-meter":["lux meter","pengukur cahaya","alat ukur cahaya","light meter online","cahaya untuk tanaman"],
+"protractor":["busur derajat","busur derajat online","mengukur sudut","ukur sudut foto","penggaris online"],
+"compass":["kompas","kompas online","arah utara","kompas digital","penunjuk arah"],
+"bubble-level":["waterpass","waterpass online","alat ukur kemiringan","level digital","waterpas hp"],
 "pros-and-cons":["daftar pro dan kontra","kelebihan dan kekurangan","bantu memutuskan","ya atau tidak acak"],
 "decision-matrix":["matriks keputusan","matriks keputusan berbobot","membandingkan pilihan","alat bantu keputusan"],
 "moon-phase":["fase bulan hari ini","kalender bulan","bulan purnama berikutnya","bulan baru","bulan terbit"],

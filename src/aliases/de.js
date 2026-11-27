@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"vibration-meter":["vibrationsmesser","schwingungsmesser","vibration messen","beschleunigungsmesser","waschmaschine vibration"],
+"light-meter":["luxmeter","belichtungsmesser","licht messen","lux messen","licht für pflanzen"],
+"protractor":["winkelmesser","winkelmesser online","winkel messen","winkel im bild messen","lineal online"],
+"compass":["kompass","kompass online","wo ist norden","digitaler kompass","missweisung"],
+"bubble-level":["wasserwaage","wasserwaage online","wasserwaage handy","digitale wasserwaage","neigungsmesser"],
 "pros-and-cons":["pro und contra liste","vor- und nachteile","entscheidungshilfe","ja oder nein generator","zufallsauswahl liste"],
 "decision-matrix":["entscheidungsmatrix","gewichtete entscheidungsmatrix","nutzwertanalyse","optionen vergleichen","entscheidungshilfe"],
 "moon-phase":["mondphase heute","mondkalender","nächster vollmond","neumond","mondaufgang"],

@@ -1,0 +1,382 @@
+<style>
+.cp-dial { display: flex; justify-content: center; margin: 0 0 4px; }
+.cp-dial svg { width: min(320px, 100%); height: auto; display: block; }
+.cp-dial .face { fill: var(--bg); stroke: var(--line); stroke-width: 2; }
+.cp-dial .tk { stroke: var(--muted); stroke-width: 1; }
+.cp-dial .tk.big { stroke: var(--ink); stroke-width: 2; }
+.cp-dial .card { fill: var(--ink); font: 700 22px system-ui, sans-serif; }
+.cp-dial .card.n { fill: var(--bad); }
+.cp-dial .num { fill: var(--muted); font: 600 11px system-ui, sans-serif; }
+.cp-dial .lub { fill: var(--accent); }
+.cp-dial .lock { fill: #f59e0b; stroke: #b45309; stroke-width: 1; }
+.cp-dial .needle-n { fill: var(--bad); } .cp-dial .needle-s { fill: var(--muted); }
+.cp-read { text-align: center; }
+.cp-big { font-size: clamp(54px, 16vw, 92px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.cp-big small { font-size: 26px; color: var(--muted); font-weight: 700; letter-spacing: 0; margin-inline-start: 8px; }
+.cp-sub { color: var(--muted); font-weight: 600; margin: 6px 0 0; min-height: 1.4em; }
+.cp-turn { font-weight: 700; margin: 4px 0 0; min-height: 1.4em; }
+.cp-turn.on { color: var(--ok); }
+.cp-warn { border: 1px solid #f59e0b; background: rgba(245, 158, 11, .12); border-radius: 12px; padding: 10px 12px; margin: 12px 0 0; font-size: 14px; }
+.cp-warn b { display: block; margin-bottom: 2px; }
+.cp-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+.cp-main .btn { flex: 1 1 140px; justify-content: center; min-height: 50px; }
+.cp-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 16px 0 0; }
+.cp-box h3 { margin: 0 0 6px; font-size: 16px; }
+.cp-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.cp-box .fields { margin-top: 8px; }
+.cp-eight { display: block; width: 120px; height: 60px; margin: 6px auto; }
+.cp-eight path { fill: none; stroke: var(--line); stroke-width: 4; }
+.cp-eight circle { fill: var(--accent); }
+.cp-sun { font-variant-numeric: tabular-nums; }
+.cp-sun b { color: var(--ink); }
+</style>
+<div class="cp" id="cp">
+<div class="cp-dial" aria-hidden="true">
+  <svg viewBox="0 0 300 300">
+    <circle class="face" cx="150" cy="150" r="140"/>
+    <g id="card"></g>
+    <g id="lockMark" hidden><path class="lock" d="M150 14 l-9 -12 h18 z"/></g>
+    <path class="lub" d="M150 4 l-10 16 h20 z"/>
+    <path class="needle-n" d="M150 70 l9 80 h-18 z" opacity=".25"/>
+  </svg>
+</div>
+<div class="cp-read" aria-live="polite">
+  <div class="cp-big"><span id="deg">–</span>°<small id="dir"></small></div>
+  <div class="cp-sub" id="ref">Press Start compass</div>
+  <div class="cp-turn" id="turn"></div>
+</div>
+<div class="cp-warn" id="warn" hidden><b id="warnT">Compass may be disturbed</b><span id="warnX"></span></div>
+<div class="cp-main">
+  <button class="btn" type="button" id="start">Start compass</button>
+  <button class="btn ghost" type="button" id="lock" disabled>Lock this bearing</button>
+</div>
+<p class="msg" id="msg"></p>
+<div class="fields" style="margin-top:12px">
+  <div><label for="north">North reference</label><select id="north"><option value="mag">Magnetic north</option><option value="true">True north (map north)</option></select></div>
+  <div><label for="smooth">Smoothing</label><select id="smooth"><option value="0.08">Low (fast)</option><option value="0.3" selected>Medium</option><option value="0.8">High (steady)</option></select></div>
+</div>
+
+<div class="cp-box">
+  <h3>Your location (for true north and the sun)</h3>
+  <p>Used only on this device to work out magnetic declination (World Magnetic Model 2025) and where the sun is. It is never sent anywhere.</p>
+  <div class="fields">
+    <div><label for="lat">Latitude (north +, south −)</label><input type="number" id="lat" inputmode="decimal" step="any" placeholder="for example 51.5" data-nomemo></div>
+    <div><label for="lon">Longitude (east +, west −)</label><input type="number" id="lon" inputmode="decimal" step="any" placeholder="for example -0.13" data-nomemo></div>
+  </div>
+  <div class="btns">
+    <button class="btn ghost" type="button" id="geo">Use my location</button>
+    <button class="btn ghost danger" type="button" id="forget">Forget location</button>
+  </div>
+  <p class="msg" id="locMsg"></p>
+</div>
+
+<div class="cp-box">
+  <h3>Calibrate</h3>
+  <p><b>Figure-8:</b> if the reading jumps or looks wrong, hold the phone and slowly draw a big figure 8 in the air 3 times, turning your wrist as you go. Stay away from metal, magnets, speakers, laptops, cars and magnetic phone cases.</p>
+  <svg class="cp-eight" viewBox="0 0 120 60" aria-hidden="true"><path id="eightPath" d="M60 30 C80 0 115 0 115 30 C115 60 80 60 60 30 C40 0 5 0 5 30 C5 60 40 60 60 30 Z"/><circle id="eightDot" r="6" cx="60" cy="30"/></svg>
+  <p><b>Fine-tune:</b> point the top of the phone at something whose bearing you know (a landmark on a map, or the sun), type that bearing and press Set. The correction is saved on this device.</p>
+  <div class="fields">
+    <div><label for="known">I am pointing at (degrees)</label><input type="number" id="known" inputmode="decimal" step="any" min="0" max="360" placeholder="for example 90" data-nomemo></div>
+  </div>
+  <div class="btns">
+    <button class="btn ghost" type="button" id="setKnown" disabled>Set</button>
+    <button class="btn ghost" type="button" id="useSun" disabled>Point at the sun and set</button>
+    <button class="btn ghost" type="button" id="calReset">Reset correction</button>
+  </div>
+  <p class="msg" id="calMsg"></p>
+</div>
+
+<div class="cp-box">
+  <h3>No compass sensor? Use the sun</h3>
+  <p class="cp-sun" id="sunOut">Set your location above to see where the sun is now.</p>
+  <p><b>Shadow-stick method:</b> push a stick upright into flat ground and mark the tip of its shadow. Wait 15–20 minutes and mark the new tip. A line from the first mark to the second points roughly east; west is behind you. Works anywhere, best around midday.</p>
+  <p style="margin:0"><b>At night:</b> in the Northern Hemisphere, the North Star (Polaris) is within 1° of true north. In the Southern Hemisphere, extend the long axis of the Southern Cross about 4.5 times its length to find the point above due south.</p>
+</div>
+
+<div class="cp-box">
+  <h3>Convert a bearing</h3>
+  <p>Change a map (true) bearing to a compass (magnetic) bearing, or back. Uses the declination for your location above.</p>
+  <div class="fields">
+    <div><label for="cvIn">Bearing (degrees)</label><input type="number" id="cvIn" inputmode="decimal" step="any" placeholder="for example 120"></div>
+    <div><label for="cvDir">Convert</label><select id="cvDir"><option value="t2m">Map (true) to compass</option><option value="m2t">Compass to map (true)</option></select></div>
+  </div>
+  <p class="msg" id="cvOut"></p>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-compass', D = Math.PI / 180;
+  var st = (function () { try { var o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function okNum(v) { return typeof v === 'number' && isFinite(v); }
+  var corr = okNum(st.corr) ? st.corr : 0, lockB = okNum(st.lock) ? st.lock : null;
+  if (okNum(st.lat) && okNum(st.lon)) { $('lat').value = st.lat; $('lon').value = st.lon; }
+
+  // World Magnetic Model 2025 (NOAA / BGS, public-domain coefficients), valid 2025-2030. Declination in degrees, east positive.
+  var WMM = { G: [-29351.8,-1410.8,-2556.6,2951.1,1649.3,1361,-2404.1,1243.8,453.6,895,799.5,55.7,-281.1,12.1,-233.2,368.9,187.2,-138.7,-142,20.9,64.4,63.8,76.9,-115.7,-40.9,14.9,-60.7,79.5,-77,-8.8,59.3,15.8,2.5,-11.1,14.2,23.2,10.8,-17.5,2,-21.7,16.9,15,-16.8,0.9,4.6,7.8,3,-0.2,-2.5,-13.1,2.4,8.6,-8.7,-12.9,-1.3,-6.4,0.2,2,-1,-0.6,-0.9,1.5,0.9,-2.7,-3.9,2.9,-1.5,-2.5,2.4,-0.6,-0.1,-0.6,-0.1,1.1,-1,-0.2,2.6,-2,-0.2,0.3,1.2,-1.3,0.6,0.6,0.5,-0.1,-0.4,-0.2,-1.3,-0.7], H: [0,4545.4,0,-3133.6,-815.1,0,-56.6,237.5,-549.5,0,278.6,-133.9,212,-375.6,0,45.4,220.2,-122.9,43,106.1,0,-18.4,16.8,48.8,-59.8,10.9,72.7,0,-48.9,-14.4,-1,23.4,-7.4,-25.1,-2.3,0,7.1,-12.6,11.4,-9.7,12.7,0.7,-5.2,3.9,0,-24.8,12.2,8.3,-3.3,-5.2,7.2,-0.6,0.8,10,0,3.3,0,2.4,5.3,-9.1,0.4,-4.2,-3.8,0.9,-9.1,0,0,2.9,-0.6,0.2,0.5,-0.3,-1.2,-1.7,-2.9,-1.8,-2.3,0,-1.3,0.7,1,-1.4,0,0.6,-0.1,0.8,0.1,-1,0.1,0.2], GT: [12,9.7,-11.6,-5.2,-8,-1.3,-4.2,0.4,-15.6,-1.6,-2.4,-6,5.6,-7,0.6,1.4,0,0.6,2.2,0.9,-0.2,-0.4,0.9,1.2,-0.9,0.3,0.9,0,-0.1,-0.1,0.5,-0.1,-0.8,-0.8,0.8,-0.1,0.2,0,0.5,-0.1,0.3,0.2,0,0.2,0,-0.1,0.1,0.3,-0.3,0,0.3,-0.1,0.1,-0.1,0.1,0,0.1,0.1,0,-0.3,0,-0.1,-0.1,0,0,0,0,0,0,0,-0.1,0,0,-0.1,-0.1,-0.1,-0.1,0,0,0,0,0,0,0.1,0,0,0,-0.1,0,-0.1], HT: [0,-21.5,0,-27.7,-12.1,0,4,-0.3,-4.1,0,-1.1,4.1,1.6,-4.4,0,-0.5,2.2,0.4,1.7,1.9,0,0.3,-1.6,-0.4,0.9,0.7,0.9,0,0.6,0.5,-0.8,0,-1,0.6,-0.2,0,-0.2,0.5,-0.4,0.4,-0.5,-0.6,0.3,0.2,0,-0.3,0.3,-0.3,0.3,0.2,-0.1,-0.2,0.4,0.1,0,0,0,-0.2,0.1,-0.1,0.1,0,-0.1,0.2,0,0,0,0.1,0,0.1,0,0,0.1,0,0,0,0,0,0,0,-0.1,0.1,0,0,0,0,0,0,0,-0.1] };
+  function declination(lat, lon, date) {
+    var N = 12, yr = 2025 + (date - Date.UTC(2025, 0, 1)) / 31557600000, a = 6378.137, b = 6356.7523142, r0 = 6371.2, D = Math.PI / 180;
+    var la = lat * D, lo = lon * D, sl = Math.sin(la), cl = Math.cos(la);
+    var th = Math.atan2(cl * a * a, sl * b * b), r = Math.sqrt((Math.pow(a, 4) - (Math.pow(a, 4) - Math.pow(b, 4)) * sl * sl) / (a * a - (a * a - b * b) * sl * sl));
+    var c = Math.cos(th), s = Math.sin(th), invS = 1 / (s || 1e-8), P = [], DP = [], n, m;
+    for (n = 0; n <= N; n++) { P.push(new Array(N + 1).fill(0)); DP.push(new Array(N + 1).fill(0)); }
+    P[0][0] = 1; P[1][1] = s; DP[1][1] = c; P[1][0] = c; DP[1][0] = -s;
+    for (n = 2; n <= N; n++) { var rt = Math.sqrt((2 * n - 1) / (2 * n)); P[n][n] = P[n - 1][n - 1] * s * rt; DP[n][n] = (DP[n - 1][n - 1] * s + P[n - 1][n - 1] * c) * rt; }
+    for (m = 0; m <= N; m++) for (n = Math.max(m + 1, 2); n <= N; n++) {
+      var k0 = Math.sqrt((n - 1) * (n - 1) - m * m), k1 = 1 / Math.sqrt(n * n - m * m);
+      P[n][m] = (P[n - 1][m] * c * (2 * n - 1) - P[n - 2][m] * k0) * k1;
+      DP[n][m] = ((DP[n - 1][m] * c - P[n - 1][m] * s) * (2 * n - 1) - DP[n - 2][m] * k0) * k1;
+    }
+    var dt = yr - 2025, f0 = r0 / r, fn = f0 * f0, BR = 0, BT = 0, BP = 0;
+    for (n = 1; n <= N; n++) {
+      var c1 = 0, c2 = 0, c3 = 0;
+      for (m = 0; m <= n; m++) {
+        var i = n * (n + 1) / 2 - 1 + m, gg = WMM.G[i] + dt * WMM.GT[i], hh = WMM.H[i] + dt * WMM.HT[i], cm = Math.cos(m * lo), sm = Math.sin(m * lo), t = gg * cm + hh * sm;
+        c1 += t * P[n][m]; c2 += t * DP[n][m]; c3 += m * (gg * sm - hh * cm) * P[n][m];
+      }
+      fn *= f0; BR += (n + 1) * c1 * fn; BT -= c2 * fn; BP += c3 * fn * invS;
+    }
+    var psi = th - (Math.PI / 2 - la), x = -BT * Math.cos(psi) - BR * Math.sin(psi), y = BP;
+    return Math.atan2(y, x) / D;
+  }
+
+  // ---------- helpers ----------
+  function say(id, c, t) { var el = $(id); el.className = 'msg ' + (c || ''); el.textContent = t || ''; }
+  function n360(a) { return ((a % 360) + 360) % 360; }
+  function diff(a, b) { return ((a - b + 540) % 360) - 180; } // a - b, in -180..180
+  var NAMES = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  var LONG = { N: 'north', NNE: 'north-north-east', NE: 'north-east', ENE: 'east-north-east', E: 'east', ESE: 'east-south-east', SE: 'south-east', SSE: 'south-south-east', S: 'south', SSW: 'south-south-west', SW: 'south-west', WSW: 'west-south-west', W: 'west', WNW: 'west-north-west', NW: 'north-west', NNW: 'north-north-west' };
+  function cardinal(h) { return NAMES[Math.round(n360(h) / 22.5) % 16]; }
+  function screenAngle() { var a = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (typeof window.orientation === 'number' ? window.orientation : 0); return n360(a); }
+  function loc() {
+    var la = parseFloat($('lat').value), lo = parseFloat($('lon').value);
+    if (!isFinite(la) || !isFinite(lo) || Math.abs(la) > 90 || Math.abs(lo) > 180) return null;
+    return { lat: la, lon: lo };
+  }
+  function decl() { var l = loc(); return l ? declination(l.lat, l.lon, Date.now()) : null; }
+  function declText(d) { return Math.abs(d) < 0.05 ? '0°' : fmtNum(Math.round(Math.abs(d) * 10) / 10, 1) + '° ' + (d > 0 ? 'east' : 'west'); }
+
+  // ---------- dial ----------
+  (function buildCard() {
+    var g = $('card'), ns = 'http://www.w3.org/2000/svg', h = '';
+    for (var a = 0; a < 360; a += 5) {
+      var big = a % 30 === 0, r1 = 140, r2 = big ? 124 : a % 10 === 0 ? 130 : 134, s = Math.sin(a * D), c = Math.cos(a * D);
+      h += '<line class="tk' + (big ? ' big' : '') + '" x1="' + (150 + r1 * s).toFixed(1) + '" y1="' + (150 - r1 * c).toFixed(1) + '" x2="' + (150 + r2 * s).toFixed(1) + '" y2="' + (150 - r2 * c).toFixed(1) + '"/>';
+      if (big && a % 90) h += '<text class="num" text-anchor="middle" transform="rotate(' + a + ' 150 150)" x="150" y="40">' + a + '</text>';
+    }
+    ['N', 'E', 'S', 'W'].forEach(function (t, i) { h += '<text class="card' + (i ? '' : ' n') + '" text-anchor="middle" transform="rotate(' + i * 90 + ' 150 150)" x="150" y="50">' + t + '</text>'; });
+    ['NE', 'SE', 'SW', 'NW'].forEach(function (t, i) { h += '<text class="num" style="font-size:13px;font-weight:700" text-anchor="middle" transform="rotate(' + (45 + i * 90) + ' 150 150)" x="150" y="42">' + t + '</text>'; });
+    g.innerHTML = h; void ns;
+  })();
+
+  // ---------- sensor ----------
+  var running = false, got = false, kind = '', hx = null, hy = null, lastT = 0, head = null, noTimer = 0, lastRaw = null, jumps = [], wake = null, accWarn = false, relOnly = false;
+  function rot(a, b, g) { // device -> earth rotation matrix, W3C Z-X'-Y''
+    var cA = Math.cos(a * D), sA = Math.sin(a * D), cB = Math.cos(b * D), sB = Math.sin(b * D), cG = Math.cos(g * D), sG = Math.sin(g * D);
+    return [[cA * cG - sA * sB * sG, -sA * cB, cA * sG + sA * sB * cG], [sA * cG + cA * sB * sG, cA * cB, sA * sG - cA * sB * cG], [-cB * sG, sB, cB * cG]];
+  }
+  function headingFromAngles(a, b, g) {
+    var R = rot(a, b || 0, g || 0), th = screenAngle() * D;
+    var u = [Math.sin(th), Math.cos(th), 0]; // the screen's "up" direction in device coordinates
+    var e = R[0][0] * u[0] + R[0][1] * u[1], n = R[1][0] * u[0] + R[1][1] * u[1];
+    if (Math.hypot(e, n) < 0.5) { e = -R[0][2]; n = -R[1][2]; } // phone held upright: use the direction the back camera faces
+    return n360(Math.atan2(e, n) / D);
+  }
+  function onAbs(e) { if (e.alpha == null) return; kind = kind || 'abs'; if (kind !== 'abs') return; use(headingFromAngles(e.alpha, e.beta, e.gamma), null, e); }
+  function onOri(e) {
+    if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
+      kind = 'ios';
+      var flat = e.beta == null || (Math.abs(e.beta) < 50 && Math.abs(e.gamma || 0) < 50);
+      return use(n360(e.webkitCompassHeading + (flat ? screenAngle() : 0)), typeof e.webkitCompassAccuracy === 'number' ? e.webkitCompassAccuracy : null, e);
+    }
+    if (e.absolute === true && e.alpha != null && (!kind || kind === 'abs1')) { kind = 'abs1'; return use(headingFromAngles(e.alpha, e.beta, e.gamma), null, e); }
+    if (e.alpha != null && !kind) relOnly = true;
+  }
+  function use(h, acc, e) {
+    var now = performance.now();
+    if (!got) {
+      got = true; clearTimeout(noTimer);
+      $('lock').disabled = $('setKnown').disabled = false; $('useSun').disabled = !loc();
+      say('msg', 'ok', 'Compass is running. Hold the phone flat, like a plate, with the top pointing where you want to go.');
+    }
+    // magnetic interference: heading jumping much faster than a person can turn
+    if (lastRaw != null && lastT) {
+      var rate = Math.abs(diff(h, lastRaw)) / Math.max(0.016, (now - lastT) / 1000);
+      jumps.push(rate > 720 ? now : 0);
+    }
+    jumps = jumps.filter(function (t) { return t && now - t < 3000; });
+    accWarn = acc != null && (acc < 0 || acc > 25);
+    lastRaw = h;
+    var tau = parseFloat($('smooth').value) || 0.3, dt = lastT ? Math.min(1, (now - lastT) / 1000) : 1, k = 1 - Math.exp(-dt / tau);
+    lastT = now;
+    var x = Math.cos(h * D), y = Math.sin(h * D);
+    if (hx == null || Math.abs(diff(h, head)) > 90) { hx = x; hy = y; } else { hx += (x - hx) * k; hy += (y - hy) * k; }
+    head = n360(Math.atan2(hy, hx) / D);
+    if (e && e.beta != null && Math.abs(e.beta) > 70 && Math.abs(e.beta) < 110) tilt = 'up'; else if (e && e.beta != null && (Math.abs(e.beta) > 25 || Math.abs(e.gamma || 0) > 25)) tilt = 'tilt'; else tilt = '';
+    lastAcc = acc;
+    if (!cRaf) { cRaf = true; requestAnimationFrame(function () { cRaf = false; draw(lastAcc); }); }
+  }
+  var tilt = '', cRaf = false, lastAcc = null;
+  function shown() { // heading after correction and north choice
+    if (head == null) return null;
+    var h = head + corr, dc = decl();
+    if ($('north').value === 'true' && dc != null) h += dc;
+    return n360(h);
+  }
+  function draw(acc) {
+    var h = shown();
+    if (h == null) return;
+    $('card').setAttribute('transform', 'rotate(' + (-h).toFixed(1) + ' 150 150)');
+    var r = Math.round(h) % 360;
+    $('deg').textContent = r; $('dir').textContent = cardinal(h);
+    var dc = decl(), t = $('north').value === 'true';
+    $('ref').textContent = (t && dc == null ? 'Magnetic north (set your location below for true north)' : t ? 'True north (declination ' + declText(dc) + ')' : 'Magnetic north') + (corr ? ' · corrected ' + (corr > 0 ? '+' : '') + fmtNum(Math.round(corr * 10) / 10, 1) + '°' : '') + (acc != null && acc >= 0 ? ' · accuracy ±' + Math.round(acc) + '°' : '');
+    if (lockB != null) {
+      $('lockMark').hidden = false;
+      $('lockMark').setAttribute('transform', 'rotate(' + diff(lockB, h).toFixed(1) + ' 150 150)');
+      var d = diff(lockB, h);
+      $('turn').textContent = Math.abs(d) <= 3 ? 'On bearing ' + Math.round(lockB) + '°' : 'Turn ' + (d > 0 ? 'right' : 'left') + ' ' + Math.round(Math.abs(d)) + '° to ' + Math.round(lockB) + '° ' + cardinal(lockB);
+      $('turn').className = 'cp-turn' + (Math.abs(d) <= 3 ? ' on' : '');
+    } else { $('lockMark').hidden = true; $('turn').textContent = ''; }
+    var w = '';
+    if (accWarn || jumps.length >= 3) w = 'The reading is unsteady, which usually means a magnet or metal is nearby, or the compass needs calibrating. Move away from metal and electronics, then draw a figure 8 in the air with the phone (see Calibrate below).';
+    else if (tilt === 'tilt') w = 'Hold the phone flat (screen facing the sky) for the most accurate reading.';
+    else if (tilt === 'up') w = 'The phone is upright, so the direction shown is where the back camera points.';
+    $('warn').hidden = !w; $('warnX').textContent = w;
+    $('warnT').textContent = accWarn || jumps.length >= 3 ? 'Compass may be disturbed' : 'Tip';
+  }
+  function askPermission() {
+    var reqs = [];
+    try {
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') reqs.push(DeviceOrientationEvent.requestPermission());
+    } catch (e) { return Promise.reject(e); }
+    return Promise.all(reqs).then(function (r) { return !r.some(function (x) { return x === 'denied'; }); });
+  }
+  function start() {
+    if (!window.isSecureContext) return say('msg', 'bad', 'The compass only works on a secure (https) page. Open this tool from its https:// address.');
+    if (!window.DeviceOrientationEvent) return noSensor('This browser cannot read the compass sensor.');
+    $('start').disabled = true;
+    askPermission().then(function (ok) {
+      $('start').disabled = false;
+      if (!ok) return say('msg', 'bad', 'Compass access was blocked. iPhone or iPad: close this tab, open the page again, press Start compass and choose Allow (on older iPhones also turn on Settings > Safari > Motion & Orientation Access). Android or computer: tap the icon next to the web address, allow Motion sensors, then try again.');
+      running = true; got = false; kind = ''; hx = hy = head = null; lastT = 0; lastRaw = null; jumps = []; relOnly = false;
+      window.addEventListener('deviceorientationabsolute', onAbs);
+      window.addEventListener('deviceorientation', onOri);
+      $('start').textContent = 'Stop compass';
+      say('msg', '', 'Waiting for the compass sensor…');
+      clearTimeout(noTimer); noTimer = setTimeout(function () { if (!got) noSensor(''); }, 3000);
+      if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {});
+    }, function () { $('start').disabled = false; say('msg', 'bad', 'The browser did not show the permission question. Tap Start compass again (it must be a direct tap).'); });
+  }
+  function noSensor(why) {
+    var rel = relOnly; stop();
+    say('msg', 'bad', (why ? why + ' ' : '') + (rel ? 'This browser only reports how the phone turns, not where north is, so it cannot be used as a compass. Try Chrome on Android or Safari on iPhone.' : 'No compass sensor answered. Laptops, desktop computers and some cheap phones have no compass (magnetometer).') + ' You can still find directions with the sun below.');
+  }
+  function stop() {
+    running = false; clearTimeout(noTimer);
+    window.removeEventListener('deviceorientationabsolute', onAbs); window.removeEventListener('deviceorientation', onOri);
+    $('start').textContent = 'Start compass'; $('setKnown').disabled = $('useSun').disabled = true; $('lock').disabled = lockB == null;
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  $('start').addEventListener('click', function () { if (running) { stop(); say('msg', '', 'Stopped.'); } else start(); });
+  window.addEventListener('compassneedscalibration', function () { accWarn = true; draw(null); });
+  document.addEventListener('visibilitychange', function () { if (running && document.visibilityState === 'visible' && navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); });
+
+  function lockText() { $('lock').textContent = lockB == null ? 'Lock this bearing' : 'Unlock bearing ' + Math.round(lockB) + '°'; $('lock').disabled = !running && lockB == null; }
+  $('lock').addEventListener('click', function () {
+    if (lockB != null) { lockB = null; delete st.lock; say('msg', '', 'Bearing unlocked.'); }
+    else { var h = shown(); if (h == null) return; lockB = Math.round(h) % 360; st.lock = lockB; say('msg', 'ok', 'Bearing ' + lockB + '° ' + cardinal(lockB) + ' locked. The orange mark shows it; follow the arrow text to stay on course.'); }
+    save(); lockText(); draw(null);
+  });
+
+  // ---------- calibration ----------
+  function setTo(target, label) {
+    if (head == null) return say('calMsg', 'bad', 'Start the compass first.');
+    var base = n360(head + ($('north').value === 'true' && decl() != null ? decl() : 0));
+    corr = Math.round(diff(target, base) * 10) / 10; st.corr = corr; save(); draw(null);
+    say('calMsg', 'ok', 'Corrected by ' + (corr > 0 ? '+' : '') + fmtNum(corr, 1) + '° using ' + label + '. Saved on this device.' + (Math.abs(corr) > 20 ? ' That is a big correction: check for nearby metal, and draw a figure 8 first.' : ''));
+  }
+  $('setKnown').addEventListener('click', function () {
+    var v = parseFloat($('known').value);
+    if (!isFinite(v) || v < 0 || v > 360) return say('calMsg', 'bad', 'Type the known bearing in degrees, from 0 to 360.');
+    setTo(n360(v), 'a known bearing of ' + fmtNum(v) + '°' + ($('north').value === 'true' ? ' (true)' : ' (magnetic)'));
+  });
+  $('useSun').addEventListener('click', function () {
+    var l = loc(); if (!l) return say('calMsg', 'bad', 'Set your location first, so the sun position can be worked out.');
+    var s = sun(new Date(), l.lat, l.lon);
+    if (s.el < 3) return say('calMsg', 'bad', 'The sun is too low or below the horizon right now.');
+    var t = s.az, dc = decl();
+    if ($('north').value !== 'true' && dc != null) t = n360(t - dc); // the sun's azimuth is true; convert to magnetic
+    setTo(t, 'the sun (' + Math.round(s.az) + '° true)');
+  });
+  $('calReset').addEventListener('click', function () { corr = 0; delete st.corr; save(); draw(null); say('calMsg', 'ok', 'Correction removed.'); });
+  (function eight() {
+    var p = $('eightPath'), dot = $('eightDot'), L = 0, t0 = performance.now();
+    try { L = p.getTotalLength(); } catch (e) { return; }
+    if (!L || document.documentElement.hasAttribute('data-calm')) return;
+    (function step(now) { var pt = p.getPointAtLength(((now - t0) / 4000 % 1) * L); dot.setAttribute('cx', pt.x.toFixed(1)); dot.setAttribute('cy', pt.y.toFixed(1)); requestAnimationFrame(step); })(t0);
+  })();
+
+  // ---------- sun ----------
+  function sun(date, lat, lon) { // NOAA low-precision solar position, about ±0.5°
+    var n = date.getTime() / 86400000 + 2440587.5 - 2451545;
+    var L = n360(280.460 + 0.9856474 * n), g = n360(357.528 + 0.9856003 * n) * D;
+    var lam = (L + 1.915 * Math.sin(g) + 0.020 * Math.sin(2 * g)) * D, eps = (23.439 - 0.0000004 * n) * D;
+    var ra = Math.atan2(Math.cos(eps) * Math.sin(lam), Math.cos(lam)), dec = Math.asin(Math.sin(eps) * Math.sin(lam));
+    var gmst = n360((18.697374558 + 24.06570982441908 * n) * 15), H = (gmst + lon) * D - ra, la = lat * D;
+    var el = Math.asin(Math.sin(la) * Math.sin(dec) + Math.cos(la) * Math.cos(dec) * Math.cos(H));
+    var az = Math.atan2(-Math.sin(H), Math.tan(dec) * Math.cos(la) - Math.sin(la) * Math.cos(H));
+    return { az: n360(az / D), el: el / D };
+  }
+  function sunText() {
+    var l = loc();
+    if (!l) { $('sunOut').textContent = String($('lat').value + $('lon').value).trim() ? 'Latitude must be between -90 and 90, and longitude between -180 and 180.' : 'Set your location above to see where the sun is now.'; return; }
+    var s = sun(new Date(), l.lat, l.lon), a = Math.round(s.az) % 360, c = cardinal(s.az), dc = decl();
+    if (s.el < -0.8) { $('sunOut').innerHTML = 'The sun is below the horizon right now (it is ' + fmtNum(Math.round(-s.el)) + '° below). Use the night tips below, or try again in daylight.'; return; }
+    var back = Math.round(n360(s.az + 180));
+    $('sunOut').innerHTML = 'Right now the sun is at <b>' + a + '°</b> (' + LONG[c] + ', true bearing), <b>' + fmtNum(Math.round(s.el)) + '°</b> above the horizon. Face the sun: you are facing ' + a + '°. Your shadow points to ' + back + '° ' + cardinal(back) + '. True north is ' + (a <= 180 ? a + '° to your left' : (360 - a) + '° to your right') + '.' + (dc != null ? ' Magnetic declination here: ' + declText(dc) + '.' : '') + (s.el > 75 ? ' The sun is very high, so its direction is hard to judge; wait an hour or two.' : '');
+  }
+  setInterval(sunText, 30000);
+
+  // ---------- location ----------
+  function locChanged() {
+    var l = loc();
+    if (l) { st.lat = l.lat; st.lon = l.lon; save(); var d = decl(); say('locMsg', 'ok', 'Magnetic declination here: ' + declText(d) + '. ' + (new Date().getUTCFullYear() >= 2030 ? 'The magnetic model is from 2025, so this may be slightly out of date.' : '') + (Math.abs(l.lat) > 75 ? ' Close to the poles a magnetic compass is unreliable; use the sun or GPS.' : '')); }
+    else if (String($('lat').value + $('lon').value).trim()) say('locMsg', 'bad', 'Type a latitude from -90 to 90 and a longitude from -180 to 180, in decimal degrees (for example 51.5 and -0.13).');
+    else say('locMsg', '', '');
+    $('useSun').disabled = !running || !got || !l;
+    sunText(); conv(); draw(null);
+  }
+  ['lat', 'lon'].forEach(function (id) { $(id).addEventListener('input', locChanged); });
+  $('geo').addEventListener('click', function () {
+    if (!navigator.geolocation) return say('locMsg', 'bad', 'This browser cannot get your location. Type your latitude and longitude instead (you can find them on any map app).');
+    say('locMsg', '', 'Finding your location… allow it if your browser asks. Outdoors this can take a minute without internet.');
+    $('geo').disabled = true;
+    navigator.geolocation.getCurrentPosition(function (p) {
+      $('geo').disabled = false;
+      $('lat').value = Math.round(p.coords.latitude * 10000) / 10000; $('lon').value = Math.round(p.coords.longitude * 10000) / 10000; locChanged();
+    }, function (e) {
+      $('geo').disabled = false;
+      say('locMsg', 'bad', e && e.code === 1 ? 'Location access was blocked. Allow location for this site in your browser settings, or type your latitude and longitude.' : 'Your location could not be found. Go near a window or outside, or type your latitude and longitude.');
+    }, { enableHighAccuracy: false, timeout: 30000, maximumAge: 600000 });
+  });
+  $('forget').addEventListener('click', function () { delete st.lat; delete st.lon; save(); $('lat').value = ''; $('lon').value = ''; locChanged(); say('locMsg', 'ok', 'Location removed from this device.'); });
+
+  // ---------- convert ----------
+  function conv() {
+    var s = String($('cvIn').value).trim(), v = parseFloat(s), d = decl();
+    if (!s) return say('cvOut', '', '');
+    if (!isFinite(v)) return say('cvOut', 'bad', 'Type a bearing in degrees, for example 120.');
+    if (d == null) return say('cvOut', 'bad', 'Set your location above first; declination depends on where you are.');
+    var out = $('cvDir').value === 't2m' ? n360(v - d) : n360(v + d);
+    say('cvOut', 'ok', fmtNum(Math.round(n360(v) * 10) / 10, 1) + '° ' + ($('cvDir').value === 't2m' ? 'true = ' : 'magnetic = ') + fmtNum(Math.round(out * 10) / 10, 1) + '° ' + ($('cvDir').value === 't2m' ? 'magnetic' : 'true') + ' (declination ' + declText(d) + ')');
+  }
+  ['cvIn', 'cvDir'].forEach(function (id) { $(id).addEventListener('input', conv); $(id).addEventListener('change', conv); });
+  $('north').addEventListener('change', function () { if ($('north').value === 'true' && !loc()) say('locMsg', 'bad', 'Set your location so true north can be worked out. Until then, magnetic north is shown.'); draw(null); });
+  window.addEventListener('orientationchange', function () { hx = null; });
+
+  if (!window.DeviceOrientationEvent) say('msg', '', 'This browser has no compass sensor support. Use the sun section below, or open the page on a phone.');
+  lockText(); locChanged();
+  if (lockB != null) $('lock').disabled = false;
+})();
+</script>

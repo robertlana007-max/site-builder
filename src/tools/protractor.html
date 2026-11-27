@@ -1,0 +1,466 @@
+<style>
+.pr-seg { display: flex; flex-wrap: wrap; margin: 0 0 14px; }
+.pr-seg button { flex: 1 1 auto; }
+.pr-wrap { position: relative; margin: 0 0 8px; }
+.pr-cv { display: block; width: 100%; max-height: 70vh; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); touch-action: none; cursor: crosshair; }
+.pr-cv:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
+.pr-video { display: block; width: 100%; max-height: 60vh; border-radius: 10px; background: #000; }
+.pr-big { text-align: center; font-size: clamp(48px, 14vw, 84px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin: 8px 0 2px; }
+.pr-sub { text-align: center; color: var(--muted); font-weight: 600; min-height: 1.4em; margin: 0 0 6px; }
+.pr-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 16px 0 0; }
+.pr-box h3 { margin: 0 0 6px; font-size: 16px; }
+.pr-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.pr-svg { display: block; margin: 6px auto 0; touch-action: none; max-width: 100%; }
+.pr-svg .base { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+.pr-svg .tk { stroke: var(--ink); stroke-width: 1; }
+.pr-svg .tx { fill: var(--ink); font: 600 10px system-ui, sans-serif; }
+.pr-svg .arm { stroke: var(--bad); stroke-width: 2.5; stroke-linecap: round; }
+.pr-svg .arm2 { stroke: var(--accent); }
+.pr-svg .hd { fill: var(--surface); stroke: var(--bad); stroke-width: 3; cursor: grab; }
+.pr-svg .hd2 { stroke: var(--accent); }
+.pr-svg .ctr { fill: var(--ink); }
+.pr-card { margin: 10px auto; border: 2px dashed var(--accent); border-radius: 3.18mm; background: var(--accent-soft); display: grid; place-items: center; color: var(--accent); font-weight: 700; font-size: 13px; text-align: center; max-width: 100%; box-sizing: border-box; }
+.pr-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pr-row input[type=range] { flex: 1 1 160px; }
+.pr-row .btn { min-width: 44px; justify-content: center; }
+.pr-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 10px 0 0; }
+.pr-main .btn { flex: 1 1 140px; justify-content: center; }
+#prPrint { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  body > *:not(#prPrint) { display: none !important; }
+  html, body { background: #fff !important; }
+  #prPrint { display: block !important; color: #111; font: 12pt system-ui, sans-serif; }
+  #prPrint img { max-width: 100%; max-height: 190mm; display: block; margin: 0 0 6mm; }
+  #prPrint h2 { margin: 0 0 4mm; font-size: 16pt; }
+}
+</style>
+<div class="pr" id="pr">
+<div class="seg pr-seg" role="group" aria-label="How do you want to measure?">
+  <button type="button" data-m="photo" aria-pressed="true">Photo</button>
+  <button type="button" data-m="screen" aria-pressed="false">On the screen</button>
+  <button type="button" data-m="tilt" aria-pressed="false">Phone tilt</button>
+</div>
+
+<!-- photo -->
+<div id="pPhoto">
+  <label class="drop" id="drop" for="file"><b>Choose a photo</b>or drop it here. On a phone you can also take a new picture.</label>
+  <input type="file" id="file" accept="image/*" hidden data-nomemo>
+  <div class="btns" style="margin:0 0 12px"><button class="btn ghost" type="button" id="cam">Use camera</button><button class="btn ghost" type="button" id="sample">Try a sample picture</button></div>
+  <div id="camBox" hidden>
+    <video class="pr-video" id="video" playsinline muted></video>
+    <div class="pr-main"><button class="btn" type="button" id="snap">Take photo</button><button class="btn ghost" type="button" id="camStop">Cancel</button></div>
+  </div>
+  <div id="work" hidden>
+    <div class="pr-big"><span id="pAng">–</span>°</div>
+    <p class="pr-sub" id="pSub">Drag the three dots: the middle one (B) goes on the corner.</p>
+    <div class="pr-wrap"><canvas class="pr-cv" id="cv" tabindex="0" aria-label="Photo with three draggable points A, B and C. Press 1, 2 or 3 to choose a point and the arrow keys to move it."></canvas></div>
+    <div class="stats">
+      <div class="stat"><span>Angle at B</span><b id="sAng">–</b></div>
+      <div class="stat"><span>Other side (360° − angle)</span><b id="sRef">–</b></div>
+      <div class="stat"><span>Arm B→A from horizontal</span><b id="sA">–</b></div>
+      <div class="stat"><span>Arm B→C from horizontal</span><b id="sC">–</b></div>
+    </div>
+    <div class="pr-main">
+      <button class="btn ghost" type="button" id="resetPts">Reset points</button>
+      <button class="btn ghost" type="button" id="png">Download marked photo</button>
+      <button class="btn ghost" type="button" id="print">Print / PDF</button>
+      <button class="btn ghost" type="button" id="newPhoto">New photo</button>
+    </div>
+    <p style="font-size:14px;color:var(--muted);margin:10px 0 0">Tip: for an accurate angle, take the photo straight on (camera square to the object), not from the side. A photo taken at a slant makes angles look bigger or smaller.</p>
+  </div>
+  <p class="msg" id="pMsg"></p>
+</div>
+
+<!-- on screen -->
+<div id="pScreen" hidden>
+  <p style="margin-top:0">Put a small object on the screen with its corner on the dot and one edge along the red line. Drag the blue handle until it lines up with the other edge.</p>
+  <div class="pr-big"><span id="sAngle">–</span>°</div>
+  <p class="pr-sub" id="scaleNote"></p>
+  <svg class="pr-svg" id="prot" aria-label="On-screen protractor"></svg>
+  <div class="fields" style="margin-top:12px"><div><label for="unit">Ruler units</label><select id="unit"><option value="m">Centimetres and millimetres</option><option value="i">Inches</option></select></div></div>
+  <svg class="pr-svg" id="ruler" aria-label="On-screen ruler" style="margin-top:12px"></svg>
+  <div class="pr-box">
+    <h3>Calibrate the screen size (credit card method)</h3>
+    <p>Angles are correct without this. Calibrate to make the protractor and ruler real size. Hold any bank card, ID card or driving licence (standard size 85.6 × 54 mm) against the screen and change the size until the box matches the card exactly.</p>
+    <div class="pr-card" id="card">Card size<br>85.6 × 54 mm</div>
+    <div class="pr-row">
+      <button class="btn ghost" type="button" id="cMinus" aria-label="Smaller">−</button>
+      <input type="range" id="cardW" min="120" max="700" step="0.5" value="323" aria-label="Card box width" data-nomemo>
+      <button class="btn ghost" type="button" id="cPlus" aria-label="Bigger">+</button>
+    </div>
+    <div class="btns"><button class="btn" type="button" id="cSave">Save calibration</button><button class="btn ghost" type="button" id="cReset">Reset</button></div>
+    <p class="msg" id="cMsg"></p>
+  </div>
+</div>
+
+<!-- tilt -->
+<div id="pTilt" hidden>
+  <div class="pr-big"><span id="tAng">–</span>°</div>
+  <p class="pr-sub" id="tSub">Press Start, then put the phone on the surface</p>
+  <div class="fields">
+    <div><label for="how">How the phone touches the surface</label><select id="how"><option value="flat">Lying on it (back of the phone on the surface)</option><option value="edge">Standing on its bottom edge (upright, screen facing you)</option><option value="side">Standing on its long side (sideways, screen facing you)</option></select></div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Angle from level</span><b id="tLvl">–</b></div>
+    <div class="stat"><span>Angle from upright</span><b id="tUp">–</b></div>
+    <div class="stat"><span>Slope</span><b id="tPct">–</b></div>
+    <div class="stat"><span>Compared with mark</span><b id="tRel">–</b></div>
+  </div>
+  <div class="pr-main">
+    <button class="btn" type="button" id="tStart">Start sensor</button>
+    <button class="btn ghost" type="button" id="tMark" disabled>Mark first surface</button>
+    <button class="btn ghost" type="button" id="tHold" aria-pressed="false" disabled>Hold</button>
+  </div>
+  <div class="btns"><button class="btn ghost" type="button" id="tZero" disabled>Set zero (on a level surface)</button><button class="btn ghost" type="button" id="tZeroReset">Reset zero</button></div>
+  <p class="msg" id="tMsg"></p>
+  <p style="font-size:14px;color:var(--muted)">To measure the angle between two surfaces (a bend, a roof pitch against a wall, a chair back), put the phone on the first one and press <b>Mark first surface</b>, then move it to the second: "Compared with mark" shows the angle between them. On iPhone, Safari asks for "Motion and Orientation" access when you press Start.</p>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-protractor', D = Math.PI / 180;
+  var st = (function () { try { var o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function say(id, c, t) { var el = $(id); el.className = 'msg ' + (c || ''); el.textContent = t || ''; }
+  function f1(v) { return fmtNum(Math.round(v * 10) / 10, 1); }
+  function css(v, fb) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb; }
+  var mode = /^(photo|screen|tilt)$/.test(st.mode) ? st.mode : 'photo';
+  function setMode(m) {
+    mode = m; st.mode = m; save();
+    [].forEach.call(document.querySelectorAll('.pr-seg button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.m === m)); });
+    $('pPhoto').hidden = m !== 'photo'; $('pScreen').hidden = m !== 'screen'; $('pTilt').hidden = m !== 'tilt';
+    if (m !== 'photo') camStop();
+    if (m !== 'tilt') tStop();
+    if (m === 'screen') { cardSize(); drawProt(); drawRuler(); }
+    if (m === 'photo' && img) fit();
+  }
+  [].forEach.call(document.querySelectorAll('.pr-seg button'), function (b) { b.addEventListener('click', function () { setMode(b.dataset.m); }); });
+
+  // ================= photo =================
+  var img = null, W = 0, H = 0, pts = null, sel = 1, drag = -1, scale = 1, dpr = 1, ox = 0, oy = 0, cv = $('cv'), ctx = cv.getContext('2d'), stream = null, imgName = 'photo';
+  function defaultPts() { return [[W * 0.78, H * 0.32], [W * 0.3, H * 0.7], [W * 0.82, H * 0.7]]; }
+  function loadImage(src, name, after) {
+    var im = new Image();
+    im.onload = function () {
+      if (!im.naturalWidth || !im.naturalHeight) return say('pMsg', 'bad', 'That picture could not be read. Try a JPG or PNG photo.');
+      if (im.naturalWidth < 16 || im.naturalHeight < 16) { if (src.indexOf('blob:') === 0) URL.revokeObjectURL(src); return say('pMsg', 'bad', 'That picture is too small to measure on (' + im.naturalWidth + ' × ' + im.naturalHeight + ' pixels). Choose a bigger photo.'); }
+      var k = Math.min(1, 2400 / Math.max(im.naturalWidth, im.naturalHeight));
+      var c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+      c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+      if (src.indexOf('blob:') === 0) URL.revokeObjectURL(src);
+      img = c; W = c.width; H = c.height; pts = after ? after() : defaultPts(); sel = 1; imgName = name || 'photo';
+      $('work').hidden = false; $('drop').hidden = true; say('pMsg', '', '');
+      fit(); cv.focus({ preventScroll: true });
+      setTimeout(function () { $('work').scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }, 50);
+    };
+    im.onerror = function () { if (src.indexOf('blob:') === 0) URL.revokeObjectURL(src); say('pMsg', 'bad', 'That file is not a picture this browser can open. Choose a JPG, PNG, WebP or HEIC photo (on iPhone, HEIC works in Safari).'); };
+    im.src = src;
+  }
+  function takeFile(f) {
+    if (!f) return;
+    if (f.type && !/^image\//.test(f.type)) return say('pMsg', 'bad', '"' + f.name + '" is not a picture. Choose a photo (JPG, PNG, WebP or HEIC).');
+    if (f.size > 60 * 1024 * 1024) return say('pMsg', 'bad', 'That picture is over 60 MB, too big for a phone browser. Choose a smaller one.');
+    say('pMsg', '', 'Opening the picture…');
+    loadImage(URL.createObjectURL(f), (f.name || 'photo').replace(/\.[^.]+$/, ''));
+  }
+  $('file').addEventListener('change', function () { takeFile(this.files[0]); this.value = ''; });
+  ['dragover', 'dragenter'].forEach(function (t) { $('drop').addEventListener(t, function (e) { e.preventDefault(); $('drop').classList.add('over'); }); });
+  ['dragleave', 'drop'].forEach(function (t) { $('drop').addEventListener(t, function () { $('drop').classList.remove('over'); }); });
+  $('drop').addEventListener('drop', function (e) { e.preventDefault(); var f = e.dataTransfer && e.dataTransfer.files[0]; if (f) takeFile(f); });
+  $('newPhoto').addEventListener('click', function () { $('drop').hidden = false; $('work').hidden = true; img = null; $('file').click(); });
+  $('sample').addEventListener('click', function () {
+    var c = document.createElement('canvas'); c.width = 1200; c.height = 800; var g = c.getContext('2d');
+    g.fillStyle = '#e8eef6'; g.fillRect(0, 0, 1200, 800); g.fillStyle = '#8b5a2b';
+    g.beginPath(); g.moveTo(200, 650); g.lineTo(1050, 650); g.lineTo(1050, 690); g.lineTo(200, 690); g.fill(); // a board
+    g.save(); g.translate(220, 650); g.rotate(-35 * D); g.fillRect(0, -40, 760, 40); g.restore(); // a 35 degree ramp
+    g.fillStyle = '#1f2937'; g.font = 'bold 34px system-ui, sans-serif'; g.fillText('Sample: a ramp at 35°', 40, 60);
+    loadImage(c.toDataURL('image/png'), 'sample', function () { return [[220 + 700 * Math.cos(35 * D), 650 - 700 * Math.sin(35 * D)], [220, 650], [1000, 650]]; });
+  });
+
+  // camera
+  function camWhy(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera access was blocked. Allow the camera for this site (tap the icon next to the web address), or choose a photo instead.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No camera was found. Choose a photo instead.';
+    if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is busy. Close other apps that use it, then try again.';
+    return 'The camera could not start. Choose a photo instead.';
+  }
+  $('cam').addEventListener('click', function () {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return say('pMsg', 'bad', 'This browser cannot use the camera here. Choose a photo instead; on a phone that also lets you take a new picture.');
+    $('cam').disabled = true; say('pMsg', '', 'Starting the camera… allow it if your browser asks.');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      stream = s; $('video').srcObject = s; $('camBox').hidden = false; $('cam').disabled = false;
+      var p = $('video').play(); if (p && p.catch) p.catch(function () {});
+      say('pMsg', '', 'Hold the phone square to the object, then press Take photo.');
+    }, function (e) { $('cam').disabled = false; say('pMsg', 'bad', camWhy(e)); });
+  });
+  function camStop() { if (stream) stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; $('camBox').hidden = true; }
+  $('camStop').addEventListener('click', function () { camStop(); say('pMsg', '', ''); });
+  $('snap').addEventListener('click', function () {
+    var v = $('video');
+    if (!v.videoWidth) return say('pMsg', 'bad', 'The camera is not ready yet. Wait a moment and try again.');
+    var c = document.createElement('canvas'); c.width = v.videoWidth; c.height = v.videoHeight; c.getContext('2d').drawImage(v, 0, 0);
+    camStop(); loadImage(c.toDataURL('image/jpeg', 0.92), 'camera-photo');
+  });
+
+  function fit() {
+    if (!img) return;
+    dpr = window.devicePixelRatio || 1;
+    var w = cv.parentNode.clientWidth || 300, maxH = Math.max(240, window.innerHeight * 0.7), cw = w, ch = cw * H / W;
+    if (ch > maxH) { ch = maxH; cw = ch * W / H; }
+    var boxW = cw, boxH = Math.max(ch, 180); // very wide pictures get a taller box, with the picture centred in it
+    cv.style.width = boxW + 'px'; cv.style.height = boxH + 'px'; cv.style.marginInline = 'auto';
+    cv.width = Math.round(boxW * dpr); cv.height = Math.round(boxH * dpr); scale = cw * dpr / W; ox = 0; oy = (cv.height - H * scale) / 2;
+    draw();
+  }
+  function angles() {
+    var A = pts[0], B = pts[1], C = pts[2];
+    var a1 = Math.atan2(-(A[1] - B[1]), A[0] - B[0]) / D, a2 = Math.atan2(-(C[1] - B[1]), C[0] - B[0]) / D;
+    var d = Math.abs(a1 - a2) % 360; if (d > 180) d = 360 - d;
+    function hz(a) { a = Math.abs(a); return a > 90 ? 180 - a : a; }
+    return { ang: d, a1: a1, a2: a2, h1: hz(a1), h2: hz(a2), short: Math.hypot(A[0] - B[0], A[1] - B[1]) < 8 || Math.hypot(C[0] - B[0], C[1] - B[1]) < 8 };
+  }
+  function paint(g, k, full) { // draw the marks on context g, where k = canvas px per image px
+    var A = pts[0], B = pts[1], C = pts[2], r = angles(), lw = Math.max(2, 3 * (full ? Math.max(W, H) / 900 : dpr));
+    g.lineCap = 'round';
+    g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = lw + 3;
+    [[A, B], [B, C]].forEach(function (s) { g.beginPath(); g.moveTo(s[0][0] * k, s[0][1] * k); g.lineTo(s[1][0] * k, s[1][1] * k); g.stroke(); });
+    g.strokeStyle = '#facc15'; g.lineWidth = lw;
+    [[A, B], [B, C]].forEach(function (s) { g.beginPath(); g.moveTo(s[0][0] * k, s[0][1] * k); g.lineTo(s[1][0] * k, s[1][1] * k); g.stroke(); });
+    var rad = Math.min(Math.hypot(A[0] - B[0], A[1] - B[1]), Math.hypot(C[0] - B[0], C[1] - B[1])) * k * 0.35;
+    rad = Math.max(12 * (full ? 1 : dpr), Math.min(rad, 80 * (full ? Math.max(W, H) / 900 : dpr)));
+    var s1 = -r.a1 * D, s2 = -r.a2 * D, diff = ((s2 - s1) % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+    g.beginPath(); g.strokeStyle = '#22d3ee'; g.lineWidth = lw;
+    if (diff <= Math.PI) g.arc(B[0] * k, B[1] * k, rad, s1, s2); else g.arc(B[0] * k, B[1] * k, rad, s2, s1);
+    g.stroke();
+    var fs = Math.round(16 * (full ? Math.max(W, H) / 900 : dpr));
+    g.font = '700 ' + fs + 'px system-ui, sans-serif';
+    var mid = (diff <= Math.PI ? s1 + diff / 2 : s2 + (2 * Math.PI - diff) / 2), tx = B[0] * k + Math.cos(mid) * (rad + fs * 1.6), ty = B[1] * k + Math.sin(mid) * (rad + fs * 1.6);
+    var label = f1(r.ang) + '°'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.lineWidth = fs / 4; g.strokeStyle = 'rgba(0,0,0,.75)'; g.strokeText(label, tx, ty); g.fillStyle = '#fff'; g.fillText(label, tx, ty);
+    ['A', 'B', 'C'].forEach(function (n, i) {
+      var p = pts[i], R = (full ? Math.max(W, H) / 900 : dpr) * 11;
+      g.beginPath(); g.arc(p[0] * k, p[1] * k, R, 0, 7); g.fillStyle = i === sel && !full ? 'rgba(37,99,235,.55)' : 'rgba(250,204,21,.35)'; g.fill();
+      g.lineWidth = lw * 0.8; g.strokeStyle = i === 1 ? '#ef4444' : '#facc15'; g.stroke();
+      g.fillStyle = '#fff'; g.font = '700 ' + Math.round(R * 1.1) + 'px system-ui, sans-serif'; g.strokeStyle = 'rgba(0,0,0,.8)'; g.lineWidth = R / 4;
+      g.strokeText(n, p[0] * k + R * 1.7, p[1] * k - R * 1.4); g.fillText(n, p[0] * k + R * 1.7, p[1] * k - R * 1.4);
+    });
+    return r;
+  }
+  function draw() {
+    if (!img) return;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
+    ctx.drawImage(img, ox, oy, W * scale, H * scale);
+    ctx.save(); ctx.translate(ox, oy); var r = paint(ctx, scale, false); ctx.restore();
+    if (drag >= 0) loupe();
+    $('pAng').textContent = f1(r.ang); $('sAng').textContent = f1(r.ang) + '°'; $('sRef').textContent = f1(360 - r.ang) + '°';
+    $('sA').textContent = f1(r.h1) + '°'; $('sC').textContent = f1(r.h2) + '°';
+    $('pSub').textContent = r.short ? 'Two dots are on top of each other. Drag them apart along the edges.' : r.ang < 0.05 ? 'The two arms are on the same line (0°).' : Math.abs(r.ang - 90) < 0.5 ? 'A right angle (90°).' : Math.abs(r.ang - 180) < 0.05 ? 'A straight line (180°).' : 'Drag A and C along the two edges, with B on the corner.';
+  }
+  function loupe() { // a magnified view of the dot being dragged, so a finger does not hide it
+    var p = pts[drag], z = 3, R = Math.min(70 * dpr, cv.width / 4), cx = p[0] * scale < cv.width / 2 ? cv.width - R - 8 * dpr : R + 8 * dpr, cy = R + 8 * dpr;
+    ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.clip();
+    ctx.fillStyle = '#000'; ctx.fillRect(cx - R, cy - R, 2 * R, 2 * R);
+    ctx.drawImage(cv, ox + p[0] * scale - R / z, oy + p[1] * scale - R / z, 2 * R / z, 2 * R / z, cx - R, cy - R, 2 * R, 2 * R);
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, 7); ctx.lineWidth = 2 * dpr; ctx.strokeStyle = '#fff'; ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx - 10 * dpr, cy); ctx.lineTo(cx + 10 * dpr, cy); ctx.moveTo(cx, cy - 10 * dpr); ctx.lineTo(cx, cy + 10 * dpr); ctx.strokeStyle = '#ef4444'; ctx.stroke();
+  }
+  function evPt(e) { var r = cv.getBoundingClientRect(), k = cv.width / r.width; return [((e.clientX - r.left) * k - ox) / scale, ((e.clientY - r.top) * k - oy) / scale]; }
+  cv.addEventListener('pointerdown', function (e) {
+    if (!img) return;
+    var p = evPt(e), best = -1, bd = Infinity, per = cv.width / cv.getBoundingClientRect().width / scale;
+    pts.forEach(function (q, i) { var d = Math.hypot(q[0] - p[0], q[1] - p[1]); if (d < bd) { bd = d; best = i; } });
+    if (bd > 44 * per) { sel = best; pts[best] = [Math.max(0, Math.min(W, p[0])), Math.max(0, Math.min(H, p[1]))]; } // tap away from the dots: move the nearest one there
+    drag = best; sel = best; cv.setPointerCapture(e.pointerId); e.preventDefault(); draw();
+  });
+  cv.addEventListener('pointermove', function (e) {
+    if (drag < 0) return;
+    var p = evPt(e); pts[drag] = [Math.max(0, Math.min(W, p[0])), Math.max(0, Math.min(H, p[1]))]; draw();
+  });
+  function up() { if (drag >= 0) { drag = -1; draw(); } }
+  cv.addEventListener('pointerup', up); cv.addEventListener('pointercancel', up);
+  cv.addEventListener('keydown', function (e) {
+    if (!img) return;
+    if (/^[123]$/.test(e.key)) { sel = +e.key - 1; draw(); return; }
+    var s = e.shiftKey ? 10 : 1, k = { ArrowLeft: [-s, 0], ArrowRight: [s, 0], ArrowUp: [0, -s], ArrowDown: [0, s] }[e.key];
+    if (!k) return;
+    e.preventDefault(); var q = pts[sel]; pts[sel] = [Math.max(0, Math.min(W, q[0] + k[0] * W / 600)), Math.max(0, Math.min(H, q[1] + k[1] * W / 600))]; draw();
+  });
+  $('resetPts').addEventListener('click', function () { if (img) { pts = defaultPts(); draw(); } });
+  function marked() { var c = document.createElement('canvas'); c.width = W; c.height = H; var g = c.getContext('2d'); g.drawImage(img, 0, 0); paint(g, 1, true); return c; }
+  $('png').addEventListener('click', function () {
+    if (!img) return;
+    marked().toBlob(function (b) {
+      if (!b) return say('pMsg', 'bad', 'The picture could not be saved. Try a smaller photo.');
+      var a = document.createElement('a'); a.href = URL.createObjectURL(b); a.download = imgName + '-angle-' + Math.round(angles().ang) + 'deg.png';
+      document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+      say('pMsg', 'ok', 'Saved the photo with the angle marked.');
+    }, 'image/png');
+  });
+  function fillPrint() {
+    var box = $('prPrint'); if (!box) { box = document.createElement('div'); box.id = 'prPrint'; document.body.appendChild(box); }
+    box.textContent = '';
+    if (mode !== 'photo' || !img) return;
+    var r = angles(), h = document.createElement('h2'); h.textContent = 'Measured angle: ' + f1(r.ang) + '°';
+    var im = document.createElement('img'); im.src = marked().toDataURL('image/jpeg', 0.9); im.alt = 'Photo with the measured angle';
+    var p = document.createElement('p'); p.textContent = 'Angle at B: ' + f1(r.ang) + '°. Other side: ' + f1(360 - r.ang) + '°. Arm B→A: ' + f1(r.h1) + '° from horizontal. Arm B→C: ' + f1(r.h2) + '° from horizontal. Measured on ' + new Date().toLocaleString() + '.';
+    box.appendChild(h); box.appendChild(im); box.appendChild(p);
+  }
+  window.addEventListener('beforeprint', fillPrint);
+  $('print').addEventListener('click', function () { fillPrint(); setTimeout(function () { window.print(); }, 60); });
+
+  // ================= on screen =================
+  var pxmm = typeof st.pxmm === 'number' && st.pxmm > 1 && st.pxmm < 40 ? st.pxmm : null, arm = typeof st.arm === 'number' ? st.arm : 60;
+  function mmPx() { return pxmm || 96 / 25.4; }
+  function cardSize() {
+    var w = parseFloat($('cardW').value) || 323; $('card').style.width = w + 'px'; $('card').style.height = (w * 53.98 / 85.6) + 'px';
+  }
+  if (pxmm) $('cardW').value = (pxmm * 85.6).toFixed(1);
+  $('cardW').addEventListener('input', cardSize);
+  $('cMinus').addEventListener('click', function () { $('cardW').value = parseFloat($('cardW').value) - 0.5; cardSize(); });
+  $('cPlus').addEventListener('click', function () { $('cardW').value = parseFloat($('cardW').value) + 0.5; cardSize(); });
+  $('cSave').addEventListener('click', function () {
+    var w = parseFloat($('cardW').value);
+    if (w > $('pScreen').clientWidth + 2) return say('cMsg', 'bad', 'The box is wider than the screen. Turn the phone sideways, or make it smaller.');
+    pxmm = w / 85.6; st.pxmm = pxmm; st.dpr = window.devicePixelRatio || 1; save(); drawProt(); drawRuler();
+    say('cMsg', 'ok', 'Saved: ' + fmtNum(Math.round(pxmm * 100) / 100, 2) + ' screen points per mm (' + fmtNum(Math.round(pxmm * 25.4)) + ' per inch). The protractor and ruler are now real size on this device. If you zoom the page, calibrate again.');
+  });
+  $('cReset').addEventListener('click', function () { pxmm = null; delete st.pxmm; delete st.dpr; save(); $('cardW').value = (96 / 25.4 * 85.6).toFixed(1); cardSize(); drawProt(); drawRuler(); say('cMsg', 'ok', 'Calibration removed. Sizes are a guess again.'); });
+
+  function drawProt() {
+    var svg = $('prot'), avail = Math.max(240, $('pScreen').clientWidth || 300), R = Math.min(avail / 2 - 14, mmPx() * 60), w = 2 * R + 24, h = R + 30, cx = w / 2, cy = R + 12, o = '';
+    svg.setAttribute('width', w); svg.setAttribute('height', h); svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    o += '<path class="base" d="M' + (cx - R) + ' ' + cy + ' A' + R + ' ' + R + ' 0 0 1 ' + (cx + R) + ' ' + cy + ' Z"/>';
+    for (var a = 0; a <= 180; a++) {
+      var L = a % 10 === 0 ? 14 : a % 5 === 0 ? 9 : 5; if (L === 5 && R < 120) continue;
+      var c = Math.cos(a * D), s = Math.sin(a * D);
+      o += '<line class="tk" x1="' + (cx + R * c).toFixed(1) + '" y1="' + (cy - R * s).toFixed(1) + '" x2="' + (cx + (R - L) * c).toFixed(1) + '" y2="' + (cy - (R - L) * s).toFixed(1) + '"/>';
+      if (a % (R < 110 ? 30 : 10) === 0) o += '<text class="tx" text-anchor="middle" x="' + (cx + (R - 24) * c).toFixed(1) + '" y="' + (cy - (R - 24) * s + 3).toFixed(1) + '">' + a + '</text>';
+    }
+    var c2 = Math.cos(arm * D), s2 = Math.sin(arm * D);
+    o += '<line class="arm" x1="' + cx + '" y1="' + cy + '" x2="' + (cx + R) + '" y2="' + cy + '"/>';
+    o += '<line class="arm arm2" x1="' + cx + '" y1="' + cy + '" x2="' + (cx + (R + 6) * c2).toFixed(1) + '" y2="' + (cy - (R + 6) * s2).toFixed(1) + '"/>';
+    o += '<circle class="hd hd2" id="hd" r="11" cx="' + (cx + (R - 34) * c2).toFixed(1) + '" cy="' + (cy - (R - 34) * s2).toFixed(1) + '"/>';
+    o += '<circle class="ctr" r="3.5" cx="' + cx + '" cy="' + cy + '"/>';
+    svg.innerHTML = o; svg._g = { cx: cx, cy: cy };
+    $('sAngle').textContent = f1(arm);
+    $('scaleNote').textContent = (pxmm ? 'Real size (calibrated). ' : 'Not calibrated: the size is a guess (angles are still right). ') + 'Other side: ' + f1(180 - arm) + '°.';
+  }
+  (function () {
+    var svg = $('prot'), on = false;
+    function setFrom(e) { var r = svg.getBoundingClientRect(), g = svg._g, k = r.width / parseFloat(svg.getAttribute('width')); var a = Math.atan2(-(e.clientY - r.top - g.cy * k), e.clientX - r.left - g.cx * k) / D; if (a < -90) a = 180; else if (a < 0) a = 0; arm = Math.round(a * 10) / 10; st.arm = arm; drawProt(); }
+    svg.addEventListener('pointerdown', function (e) { on = true; svg.setPointerCapture(e.pointerId); e.preventDefault(); setFrom(e); });
+    svg.addEventListener('pointermove', function (e) { if (on) setFrom(e); });
+    svg.addEventListener('pointerup', function () { if (on) { on = false; save(); } });
+    svg.addEventListener('pointercancel', function () { on = false; });
+    svg.setAttribute('tabindex', '0');
+    svg.addEventListener('keydown', function (e) { var d = { ArrowLeft: 1, ArrowUp: 1, ArrowRight: -1, ArrowDown: -1 }[e.key]; if (!d) return; e.preventDefault(); arm = Math.max(0, Math.min(180, Math.round((arm + d * (e.shiftKey ? 5 : 0.5)) * 10) / 10)); st.arm = arm; save(); drawProt(); });
+  })();
+  function drawRuler() {
+    var svg = $('ruler'), w = Math.max(200, ($('pScreen').clientWidth || 300) - 2), inch = $('unit').value === 'i', h = 54, o = '<rect x="0" y="0" width="' + w + '" height="' + h + '" rx="4" class="base"/>';
+    svg.setAttribute('width', w); svg.setAttribute('height', h); svg.setAttribute('viewBox', '0 0 ' + w + ' ' + h);
+    if (inch) { var pi = mmPx() * 25.4; for (var i = 0; i * pi / 16 <= w - 4; i++) { var x = 4 + i * pi / 16, L = i % 16 === 0 ? 22 : i % 8 === 0 ? 16 : i % 4 === 0 ? 12 : i % 2 === 0 ? 8 : 5; o += '<line class="tk" x1="' + x.toFixed(2) + '" y1="0" x2="' + x.toFixed(2) + '" y2="' + L + '"/>'; if (i % 16 === 0 && i) o += '<text class="tx" x="' + x.toFixed(1) + '" y="36" text-anchor="middle">' + i / 16 + ' in</text>'; } }
+    else { var pm = mmPx(); for (var j = 0; j * pm <= w - 4; j++) { var x2 = 4 + j * pm, L2 = j % 10 === 0 ? 22 : j % 5 === 0 ? 14 : 8; o += '<line class="tk" x1="' + x2.toFixed(2) + '" y1="0" x2="' + x2.toFixed(2) + '" y2="' + L2 + '"/>'; if (j % 10 === 0 && j) o += '<text class="tx" x="' + x2.toFixed(1) + '" y="36" text-anchor="middle">' + j / 10 + ' cm</text>'; } }
+    svg.innerHTML = o;
+  }
+  $('unit').addEventListener('change', drawRuler);
+
+  // ================= tilt =================
+  var tRun = false, tGot = false, g = null, tLast = 0, tHeld = false, mark = null, tTimer = 0, zero = st.zero && Array.isArray(st.zero.v) && st.zero.v.length === 3 && st.zero.v.every(isFinite) && isFinite(st.zero.e) ? st.zero : { v: [0, 0, -1], e: 0 }, tSamples = null;
+  function clamp1(v) { return Math.max(-1, Math.min(1, v)); }
+  function onOri(e) { if (e.beta == null || e.gamma == null) return; var b = e.beta * D, c = e.gamma * D; feed([Math.cos(b) * Math.sin(c), -Math.sin(b), -Math.cos(b) * Math.cos(c)], 'o'); }
+  var src = '';
+  function onMot(e) { if (src === 'o') return; var a = e.accelerationIncludingGravity; if (!a || a.x == null) return; var n = Math.hypot(a.x, a.y, a.z); if (!(n > 1)) return; feed([-a.x / n, -a.y / n, -a.z / n], 'm'); }
+  function feed(d, s) {
+    if (s === 'o') src = 'o';
+    var now = performance.now(), dt = tLast ? Math.min(0.5, (now - tLast) / 1000) : 1; tLast = now;
+    if (!tGot) { tGot = true; clearTimeout(tTimer); $('tMark').disabled = $('tHold').disabled = $('tZero').disabled = false; say('tMsg', 'ok', 'Measuring.'); }
+    if (!g) g = d.slice(); else { var k = 1 - Math.exp(-dt / 0.2); for (var i = 0; i < 3; i++) g[i] += (d[i] - g[i]) * k; }
+    if (tSamples) tSamples.push(d);
+    if (!tHeld && !tRaf) { tRaf = true; requestAnimationFrame(function () { tRaf = false; if (!tHeld) tShow(); }); }
+  }
+  var tRaf = false;
+  function tAngle(d) { // angle of the surface from level, 0..90 (lying) or 0..90 (edge); signed for comparing
+    var n = Math.hypot(d[0], d[1], d[2]) || 1; d = [d[0] / n, d[1] / n, d[2] / n];
+    if ($('how').value === 'flat') { var z = norm(zero.v); return { lvl: Math.acos(clamp1(Math.abs(d[0] * z[0] + d[1] * z[1] + d[2] * z[2]))) / D, raw: Math.acos(clamp1(Math.abs(d[2]))) / D }; }
+    var r = Math.atan2(d[0], -d[1]) / D - zero.e; // rotation in the screen plane, minus the saved zero
+    var base = $('how').value === 'side' ? (r >= 0 ? 90 : -90) : 0, a = Math.abs(((r - base) % 360 + 540) % 360 - 180);
+    if (a > 90) a = 180 - a; // a surface sloping the other way
+    return { lvl: a, edgeOK: Math.abs(d[2]) < 0.8, signed: r };
+  }
+  function tShow() {
+    if (!g) return;
+    var t = tAngle(g), v = t.lvl;
+    $('tAng').textContent = f1(v); $('tLvl').textContent = f1(v) + '°'; $('tUp').textContent = f1(90 - v) + '°';
+    $('tPct').textContent = v >= 89.9 ? 'vertical' : f1(Math.tan(v * D) * 100) + '%';
+    if (mark) {
+      var rel;
+      if ($('how').value === 'flat') { var a = norm(g), b = mark.d; rel = Math.acos(clamp1(a[0] * b[0] + a[1] * b[1] + a[2] * b[2])) / D; }
+      else { rel = Math.abs(((t.signed - mark.signed) % 360 + 540) % 360 - 180); }
+      $('tRel').textContent = f1(rel) + '° (' + f1(180 - rel) + '° inside)';
+    } else $('tRel').textContent = '–';
+    $('tSub').textContent = $('how').value !== 'flat' && !t.edgeOK ? 'The phone is lying flat. Stand it on its edge, or choose "Lying on it".' : v < 0.3 ? 'Level' : Math.abs(v - 90) < 0.3 ? 'Upright (vertical)' : 'Surface angle';
+  }
+  function norm(v) { var n = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / n, v[1] / n, v[2] / n]; }
+  function tStart() {
+    if (!window.isSecureContext) return say('tMsg', 'bad', 'Motion sensors only work on a secure (https) page.');
+    if (!window.DeviceOrientationEvent && !window.DeviceMotionEvent) return say('tMsg', 'bad', 'This browser cannot read tilt sensors. Use the Photo or On the screen mode instead.');
+    var reqs = [];
+    try {
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') reqs.push(DeviceOrientationEvent.requestPermission());
+      if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') reqs.push(DeviceMotionEvent.requestPermission());
+    } catch (e) { reqs = [Promise.reject(e)]; }
+    $('tStart').disabled = true;
+    Promise.all(reqs).then(function (r) {
+      $('tStart').disabled = false;
+      if (r.some(function (x) { return x === 'denied'; })) return say('tMsg', 'bad', 'Motion sensor access was blocked. iPhone or iPad: close this tab, open the page again, press Start and choose Allow. Android or computer: tap the icon next to the web address and allow Motion sensors.');
+      tRun = true; tGot = false; g = null; tLast = 0; src = '';
+      window.addEventListener('deviceorientation', onOri); window.addEventListener('devicemotion', onMot);
+      $('tStart').textContent = 'Stop sensor'; say('tMsg', '', 'Waiting for the tilt sensor…');
+      clearTimeout(tTimer); tTimer = setTimeout(function () { if (!tGot) { tStop(); say('tMsg', 'bad', 'No tilt sensor answered. Laptops and desktop computers usually have none. Use the Photo or On the screen mode, or open this page on your phone.'); } }, 2500);
+    }, function () { $('tStart').disabled = false; say('tMsg', 'bad', 'The browser did not show the permission question. Tap Start sensor again.'); });
+  }
+  function tStop() {
+    tRun = false; clearTimeout(tTimer);
+    window.removeEventListener('deviceorientation', onOri); window.removeEventListener('devicemotion', onMot);
+    $('tStart').textContent = 'Start sensor'; $('tMark').disabled = $('tHold').disabled = $('tZero').disabled = true;
+    if (tHeld) { tHeld = false; $('tHold').setAttribute('aria-pressed', 'false'); $('tHold').textContent = 'Hold'; }
+  }
+  $('tStart').addEventListener('click', function () { if (tRun) { tStop(); say('tMsg', '', 'Stopped.'); } else tStart(); });
+  $('tHold').addEventListener('click', function () { tHeld = !tHeld; this.setAttribute('aria-pressed', String(tHeld)); this.textContent = tHeld ? 'Release' : 'Hold'; if (!tHeld) tShow(); });
+  $('tMark').addEventListener('click', function () {
+    if (!g) return;
+    if (mark) { mark = null; this.textContent = 'Mark first surface'; tShow(); return say('tMsg', '', 'Mark cleared.'); }
+    var t = tAngle(g); mark = { d: norm(g), signed: t.signed }; this.textContent = 'Clear mark'; tShow();
+    say('tMsg', 'ok', 'First surface marked. Now put the phone on the second surface, the same way round.');
+  });
+  $('tZero').addEventListener('click', function () {
+    if (!tGot) return;
+    tSamples = []; say('tMsg', '', 'Keep the phone still…');
+    setTimeout(function () {
+      var s = tSamples; tSamples = null;
+      if (!s || s.length < 3) return say('tMsg', 'bad', 'Not enough readings. Keep still and try again.');
+      var a = [0, 0, 0]; s.forEach(function (d) { a[0] += d[0]; a[1] += d[1]; a[2] += d[2]; });
+      a = norm(a);
+      var err;
+      if ($('how').value === 'flat') {
+        if (a[2] > -0.98) return say('tMsg', 'bad', 'The phone is tilted more than 10°. Lay it screen-up on a level surface first.');
+        zero.v = a; err = Math.acos(clamp1(-a[2])) / D;
+      } else {
+        if (Math.abs(a[2]) > 0.8) return say('tMsg', 'bad', 'Stand the phone on its edge on a level surface first.');
+        var r = Math.atan2(a[0], -a[1]) / D, off = r - Math.round(r / 90) * 90;
+        if (Math.abs(off) > 10) return say('tMsg', 'bad', 'The surface is tilted more than 10°. Use a level surface.');
+        zero.e = off; err = Math.abs(off);
+      }
+      st.zero = zero; save(); tShow(); say('tMsg', 'ok', 'Zero set (' + f1(err) + '° sensor error removed). Saved on this device.');
+    }, 1000);
+  });
+  $('tZeroReset').addEventListener('click', function () { zero = { v: [0, 0, -1], e: 0 }; delete st.zero; save(); tShow(); say('tMsg', 'ok', 'Zero removed.'); });
+  $('how').addEventListener('change', function () { mark = null; $('tMark').textContent = 'Mark first surface'; tShow(); });
+
+  var rt = 0; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (mode === 'photo') fit(); if (mode === 'screen') { drawProt(); drawRuler(); } }, 120); });
+  cardSize(); setMode(mode);
+})();
+</script>

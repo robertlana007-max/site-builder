@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: pt
 module.exports = {
+"vibration-meter":["medidor de vibração","vibrômetro","medir vibração","acelerômetro online","vibração máquina de lavar"],
+"light-meter":["luxímetro","medidor de luz","fotômetro","medir lux","luz para plantas"],
+"protractor":["transferidor","transferidor online","medir ângulo","medir ângulo na foto","régua online"],
+"compass":["bússola","bússola online","onde fica o norte","bússola digital","norte verdadeiro"],
+"bubble-level":["nível de bolha","nível de bolha online","nível digital","inclinômetro","nivelador no celular"],
 "pros-and-cons":["lista de prós e contras","vantagens e desvantagens","ajuda para decidir","sim ou não aleatório","sorteio de lista"],
 "decision-matrix":["matriz de decisão","matriz de decisão ponderada","comparar opções","ferramenta de decisão","comparar propostas de emprego"],
 "moon-phase":["fase da lua hoje","calendário lunar","próxima lua cheia","lua nova","nascer da lua"],
