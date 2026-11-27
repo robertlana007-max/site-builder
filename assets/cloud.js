@@ -56,7 +56,12 @@
     return 'Something went wrong. Please try again.';
   }
 
-  ready = load('firebase-app-compat.js').then(function () {
+  // In Lite mode the Firebase scripts (several hundred KB) are only fetched for someone who signed in on this device
+  // before (gtnSignedIn), or when they press a sign-in button. Otherwise they load straight away, as before.
+  var SEEN = 'gtnSignedIn';
+  function seen(on) { try { if (on) localStorage.setItem(SEEN, '1'); else localStorage.removeItem(SEEN); } catch (e) {} }
+  function boot() { if (!ready) { ready = start(); ready.catch(function () {}); } return ready; } // if the Firebase scripts cannot load, the dialog reports it when used
+  function start() { return load('firebase-app-compat.js').then(function () {
     return Promise.all([load('firebase-auth-compat.js'), load('firebase-firestore-compat.js')]);
   }).then(function () {
     firebase.initializeApp(cfg);
@@ -64,7 +69,7 @@
     var db = firebase.firestore();
     usersDb = db;
     auth.onAuthStateChanged(function (u) {
-      user = u; doc = null; clearTimeout(timer);
+      user = u; doc = null; clearTimeout(timer); seen(!!u);
       if (window.GTNAuth.onChange) window.GTNAuth.onChange(u);
       if (!u) return;
       var ref = db.collection('users').doc(u.uid);
@@ -77,11 +82,12 @@
       }).catch(function () { if (window.toast) toast('Could not sync right now. Your tools are still saved on this device.'); });
     });
     document.addEventListener('gtn:change', push);
-  });
-  ready.catch(function () {}); // if the Firebase scripts cannot load, the dialog reports it when used
+  }); }
+  var known = false; try { known = !!localStorage.getItem(SEEN); } catch (e) {}
+  if (!document.documentElement.hasAttribute('data-lite') || known) boot();
 
   // The page's sign-in dialog calls these. Each returns a promise that rejects with a readable message.
-  var run = function (fn) { return ready.then(fn).catch(function (e) { var m = why(e); throw new Error(m); }); };
+  var run = function (fn) { return boot().then(fn).catch(function (e) { var m = why(e); throw new Error(m); }); };
   var before = window.GTNAuth || {}; // the page may already have attached its onChange listener
   window.GTNAuth = {
     onChange: before.onChange,
@@ -89,8 +95,8 @@
     user: function () { return user; },
     google: function () { return run(function () { return auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }); },
     // for windows where a popup cannot open: leaves the page, signs in, comes back signed in
-    googleRedirect: function () { return run(function () { return auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }); },
-    ready: function () { return ready; },
+    googleRedirect: function () { seen(true); return run(function () { return auth.signInWithRedirect(new firebase.auth.GoogleAuthProvider()); }); },
+    ready: function () { return boot(); },
     signIn: function (email, pass) { return run(function () { return auth.signInWithEmailAndPassword(email, pass); }); },
     signUp: function (name, email, pass) {
       return run(function () {
