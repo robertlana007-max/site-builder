@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"typing-for-kids":["belajar mengetik untuk anak","latihan mengetik","game mengetik","mengetik sepuluh jari","kursus mengetik gratis"],
+"phonics-for-kids":["phonics anak","bunyi huruf bahasa inggris","belajar membaca bahasa inggris","fonik untuk anak","sight words bahasa inggris"],
+"kids-math-worksheets":["lembar kerja matematika anak","soal matematika sd","latihan matematika tk","lembar kerja jam","soal penjumlahan bersusun"],
 "handwriting-worksheets":["latihan menulis huruf","lembar kerja menebalkan huruf","huruf putus putus","latihan menulis anak tk","menulis tegak bersambung"],
 "menu-maker":["buat menu","desain menu","template menu makanan","daftar harga","menu cafe"],
 "inventory-tracker":["aplikasi stok barang","catatan stok","manajemen inventaris","stok opname","barang masuk keluar"],

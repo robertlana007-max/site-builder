@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: pt
 module.exports = {
+"typing-for-kids":["digitação para crianças","aprender a digitar","jogos de digitação","curso de digitação grátis","treino de teclado"],
+"phonics-for-kids":["fonética inglês para crianças","sons das letras em inglês","aprender a ler em inglês","phonics infantil","alfabeto em inglês com sons"],
+"kids-math-worksheets":["atividades de matemática para imprimir","folhas de exercícios de matemática","fichas de matemática infantil","atividade de horas","contas armadas para imprimir"],
 "handwriting-worksheets":["folhas de caligrafia","letras pontilhadas","atividades de caligrafia","cobrir letras","treino de escrita"],
 "menu-maker":["criar cardápio","modelo de cardápio","cardápio grátis","menu de restaurante","tabela de preços"],
 "inventory-tracker":["controle de estoque","inventário grátis","planilha de estoque","entrada e saída de estoque","estoque com código de barras"],

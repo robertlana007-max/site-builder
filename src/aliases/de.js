@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"typing-for-kids":["tippen lernen für kinder","zehnfingersystem kinder","tastaturschreiben lernen","schreibtrainer kostenlos","tipptrainer"],
+"phonics-for-kids":["englisch phonics kinder","buchstabenlaute englisch","englisch lesen lernen","anlaute englisch","sichtwörter englisch"],
+"kids-math-worksheets":["mathe arbeitsblätter grundschule","arbeitsblätter mathe klasse 1","uhrzeit lernen arbeitsblatt","rechenblätter drucken","schriftliche addition arbeitsblatt"],
 "handwriting-worksheets":["schreibübungen","buchstaben nachspuren","schwungübungen arbeitsblatt","lineatur drucken","schreiben lernen arbeitsblätter"],
 "menu-maker":["speisekarte erstellen","speisekarte vorlage","menükarte gestalten","preisliste erstellen","speisekarte kostenlos"],
 "inventory-tracker":["lagerverwaltung","inventar liste","bestandsliste","lagerbestand verwalten","inventur liste"],
