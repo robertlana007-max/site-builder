@@ -40,7 +40,7 @@
     contrast: false, gray: false, underline: false, bigtargets: false, focus: false, letters: false,
     popular: true, welcome: true, sections: true, homecat: '', order: 'cat',
     toolbar: true, guides: true, related: true, units: 'metric', imgfmt: 'auto', quality: 'auto', pdfres: 'auto',
-    numfmt: 'en-US', decimals: 'auto', shortcuts: true };
+    numfmt: 'en-US', decimals: 'auto', shortcuts: true, lite: false };
   var P = PREF;
   // attribute on <html> for every on/off or choice setting that only changes the look
   var LOOK = { font: 'font', lineh: 'lineh', width: 'width', cards: 'cards', icons: 'icons', bgstyle: 'bg' };
@@ -62,15 +62,31 @@
     root.style.setProperty('--accent-soft', 'color-mix(in srgb, ' + a + ' 15%, var(--surface))');
     root.style.setProperty('--on-accent', dark ? '#0b1220' : '#ffffff');
     root.setAttribute('data-size', p.size); root.setAttribute('data-density', p.density); root.setAttribute('data-corners', p.corners);
-    root.toggleAttribute('data-notiles', !p.tiles); root.toggleAttribute('data-nodesc', !p.desc);
-    calm = calmOS || !p.motion; root.toggleAttribute('data-calm', !p.motion);
+    // Lite mode (for slow or costly data and low-end phones): no motion, no live tiles, no theme art and no web fonts.
+    // It sets the same attributes as turning those off one by one, plus data-lite for the rest (style.css, themes.css).
+    var lite = !!p.lite;
+    root.toggleAttribute('data-lite', lite);
+    root.toggleAttribute('data-notiles', !p.tiles || lite); root.toggleAttribute('data-nodesc', !p.desc);
+    calm = calmOS || !p.motion || lite; root.toggleAttribute('data-calm', !p.motion || lite);
     var k;
     for (k in LOOK) root.setAttribute('data-' + LOOK[k], p[k]);
     for (k in FLAGS) root.toggleAttribute('data-' + FLAGS[k], !!p[k]);
     for (k in OFFS) root.toggleAttribute('data-' + OFFS[k], !p[k]);
     P = p;
+    loadFonts();
     return p;
   };
+  // Tool pages name their Google heading font in <meta name="gtn-font"> and call this right after it. The font is only
+  // requested when Lite mode is off, so in Lite mode nothing is downloaded from Google Fonts. Called again by applyPrefs,
+  // so turning Lite off brings the font back without a reload.
+  function loadFonts() {
+    if (root.hasAttribute('data-lite') || document.getElementById('gtnFont')) return;
+    var m = document.querySelector('meta[name="gtn-font"]'); if (!m) return;
+    var pc = document.createElement('link'); pc.rel = 'preconnect'; pc.href = 'https://fonts.gstatic.com'; pc.crossOrigin = '';
+    var l = document.createElement('link'); l.id = 'gtnFont'; l.rel = 'stylesheet'; l.href = m.content;
+    document.head.appendChild(pc); document.head.appendChild(l);
+  }
+  window.gtnFonts = loadFonts;
   applyPrefs();
   if (darkOS && darkOS.addEventListener) darkOS.addEventListener('change', function () { if (prefsOf(rawState()).theme === 'auto') applyPrefs(); });
   var fine = window.matchMedia && matchMedia('(hover: hover) and (pointer: fine)').matches;
@@ -494,6 +510,21 @@
       setTimeout(function () { bar.hidden = false; }, 2500);
       $('appBarX').addEventListener('click', function () { bar.hidden = true; try { localStorage.setItem('appBarHush', Date.now() + 14 * 864e5); } catch (e) {} });
     }
+
+    // ---------- Lite mode: suggested once, when the browser says the connection is slow or Data Saver is on ----------
+    (function () {
+      var c = navigator.connection;
+      if (!c || APPMODE || /\/appshell\//.test(location.pathname) || P.lite) return;
+      if (!(c.saveData || /^(slow-)?2g$/.test(c.effectiveType || ''))) return;
+      try { if (localStorage.getItem('gtnLiteAsked')) return; localStorage.setItem('gtnLiteAsked', String(Date.now())); } catch (e) { return; }
+      var lb = document.createElement('div');
+      lb.className = 'appbar litebar'; lb.id = 'liteBar'; lb.setAttribute('role', 'region'); lb.setAttribute('aria-label', 'Lite mode');
+      lb.innerHTML = '<span><b>Slow or costly connection?</b><small>Lite mode loads pages faster and uses less data. Every tool still works.</small></span><button type="button" class="btn" id="liteOn">Turn on</button><button type="button" class="x" id="liteX" aria-label="No thanks">×</button>';
+      document.body.appendChild(lb);
+      if (bar) bar.remove(); // one bar at a time
+      $('liteOn').addEventListener('click', function () { Prefs.set('lite', true); lb.remove(); if (window.refreshSettings) refreshSettings(); toast('Lite mode is on. Turn it off any time in Settings.'); });
+      $('liteX').addEventListener('click', function () { lb.remove(); });
+    })();
 
     // ---------- settings dialog ----------
     var setBox = $('setBox');

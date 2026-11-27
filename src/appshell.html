@@ -30,6 +30,9 @@
 }
 @media (prefers-reduced-motion: reduce) { :root { --t: 0s; } }
 :root[data-calm] { --t: 0s; }
+/* Lite mode (site setting, shared with the tool pages): no motion and no live market prices on the home page */
+:root[data-lite] *, :root[data-lite] *::before, :root[data-lite] *::after { animation: none !important; transition: none !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+:root[data-lite] #mkHead, :root[data-lite] #ticker, :root[data-lite] #tickNote, :root[data-lite] #lcCanvas { display: none !important; }
 * { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; overflow: hidden; }
 body { background: var(--bg); color: var(--ink); font: 14px/1.45 "Segoe UI Variable Text", "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing: antialiased; -webkit-tap-highlight-color: transparent; }
@@ -893,7 +896,7 @@ html[data-android-app] .no-android { display: none !important; }
     el('vHome').innerHTML = '<div class="pg">' +
       '<div class="hello"><div><h1 id="hHello">' + greet() + '</h1><p>' + D.n + ' free tools and live trading charts, in one app.</p></div><button class="hsearch" type="button" data-go="pal">' + ic('i-search') + '<span>Search tools</span><kbd>Ctrl K</kbd></button></div>' +
       '<button class="msearch" type="button" data-go="pal">' + ic('i-search') + '<span>Search ' + D.n + ' tools</span></button>' +
-      '<div class="sec-h" style="margin-top:4px"><h2>Markets</h2><button type="button" data-go="charts">Open Live Charts</button></div>' +
+      '<div class="sec-h" id="mkHead" style="margin-top:4px"><h2>Markets</h2><button type="button" data-go="charts">Open Live Charts</button></div>' +
       '<div class="ticker" id="ticker"></div><p class="tick-note" id="tickNote" hidden></p>' +
       '<div class="duo"><button class="lc" type="button" data-go="charts" id="lcCard"><canvas id="lcCanvas" aria-hidden="true"></canvas><div><span class="lc-k"><span class="livebadge" id="lcBadge">LIVE</span>Trading</span><h2>Live Charts</h2><p>Professional candlestick charts for crypto, gold and forex. Drawing tools, indicators, alerts, paper trading and bar replay, free.</p><span class="lc-off" id="lcOff" hidden>' + ic('i-wifi') + 'Live Charts (trading) needs internet.</span></div><span class="lc-px" id="lcPx"></span><span class="lc-go">Open Live Charts ' + ic('i-arrow') + '</span></button>' +
       '<div class="card"><h3>' + ic('i-clock') + '<span id="jbTitle">Jump back in</span></h3><div class="rows" id="jbRows"></div></div></div>' +
@@ -943,7 +946,9 @@ html[data-android-app] .no-android { display: none !important; }
     var dd = sp.map(function (v, i) { return (i ? 'L' : 'M') + (i / (n - 1) * 100).toFixed(2) + ' ' + (28 - (v - lo) / r * 26).toFixed(2); }).join('');
     var p = b.querySelector('.spark path'); p.setAttribute('d', dd); p.setAttribute('stroke', up ? 'var(--up)' : 'var(--dn)');
   }
+  var lite = function () { return root.hasAttribute('data-lite'); }; // Lite mode: no price polling
   function loadMarkets() {
+    if (lite()) return;
     if (!homeVisible() || !navigator.onLine) { netUi(); return; }
     var syms = encodeURIComponent(JSON.stringify(MK.map(function (m) { return m[0]; })));
     fetch(API + 'ticker/24hr?symbols=' + syms).then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (a) {
@@ -951,7 +956,7 @@ html[data-android-app] .no-android { display: none !important; }
     }).catch(function () { if (++mkFails >= 2) { netBad = true; netUi(); } });
   }
   function loadSparks() {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || lite()) return;
     MK.forEach(function (m) {
       if (spark[m[0]]) return;
       fetch(API + 'klines?symbol=' + m[0] + '&interval=1h&limit=24').then(function (r) { if (!r.ok) throw 0; return r.json(); }).then(function (k) {
@@ -1073,6 +1078,7 @@ html[data-android-app] .no-android { display: none !important; }
       '<div class="sr"><div><b>Accent colour</b><small>Buttons, links and highlights.</small></div><div class="sw" id="setAccent">' + Object.keys(ACC).map(function (k) { return '<button type="button" data-v="' + k + '" style="--c:' + ACC[k] + '" aria-label="' + k + '" title="' + k[0].toUpperCase() + k.slice(1) + '"></button>'; }).join('') + '</div></div>' +
       '<div class="sr"><div><b>Show the guide under each tool</b><small>How-to steps, tips and questions.</small></div><button class="tg" type="button" role="switch" data-pref="guides" aria-label="Show the guide under each tool"></button></div>' +
       '<div class="sr"><div><b>Animations</b><small>Off makes everything still.</small></div><button class="tg" type="button" role="switch" data-pref="motion" aria-label="Animations"></button></div>' +
+      '<div class="sr"><div><b>Lite mode: faster pages, less data</b><small>For slow or costly data and older devices. No animations, decorations, live prices or extra fonts. Every tool still works.</small></div><button class="tg" type="button" role="switch" data-pref="lite" aria-label="Lite mode"></button></div>' +
       '</div></div>' +
       '<div class="sgroup" id="setAcct"><h2>Account</h2><div class="sbox acct" id="acctBox"></div></div>' +
       '<div class="sgroup"><h2>Your data</h2><div class="sbox">' +
@@ -1094,7 +1100,7 @@ html[data-android-app] .no-android { display: none !important; }
       if (e.target.closest('#setClrTabs')) { S.tabs.slice().forEach(function (t) { dropFrame(t.id); }); S.tabs = []; persist(); renderTabs(); say('All tabs closed'); }
     });
   };
-  function setPref(k, v) { Prefs.set(k, v); renderSettings(); syncFrames(); themeBars(); say('Saved'); }
+  function setPref(k, v) { Prefs.set(k, v); renderSettings(); syncFrames(); themeBars(); if (k === 'lite' && !v) { loadMarkets(); loadSparks(); } say('Saved'); }
   function syncFrames() { Object.keys(frames).forEach(function (id) { try { var w = frames[id].ifr.contentWindow; if (w.applyPrefs) w.applyPrefs(); } catch (e) {} }); }
   function renderSettings() {
     if (!built.settings) return;
