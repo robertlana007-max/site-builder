@@ -8,7 +8,9 @@
     ['ADAUSDT', 'Cardano', 'ADA/USD', 4], ['LTCUSDT', 'Litecoin', 'LTC/USD', 2]];
   for (var i = M.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = M[i]; M[i] = M[j]; M[j] = t; }
   var k = 0, bars = [], day = null, poll = 0, rot = 0, fails = 0;
-  function visible() { return el.offsetParent !== null && document.visibilityState === 'visible'; }
+  // no polling in Lite mode, or while the tile is hidden (Live tiles off) or the tab is in the background
+  function lite() { return document.documentElement.hasAttribute('data-lite'); }
+  function visible() { return !lite() && el.offsetParent !== null && document.visibilityState === 'visible'; }
   function fmt(v, d) { return v.toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d }); }
   function css(n) { return getComputedStyle(el).getPropertyValue(n).trim(); }
   function draw() {
@@ -50,7 +52,7 @@
     }).catch(function () { if (++fails >= 3) el.classList.add('lc-off'); });
   }
   function next() { k = (k + 1) % M.length; bars = []; day = null; el.classList.add('lc-swap'); setTimeout(function () { el.classList.remove('lc-swap'); }, 450); label(); draw(); load(true); }
-  function start() { stop(); load(true); poll = setInterval(function () { load(false); }, 3000); rot = setInterval(next, 9000); }
+  function start() { stop(); if (lite()) return; load(true); poll = setInterval(function () { load(false); }, 3000); rot = setInterval(next, 9000); }
   function stop() { clearInterval(poll); clearInterval(rot); }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') start(); else stop(); });
   window.addEventListener('resize', draw);
