@@ -1,6 +1,18 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"handwriting-worksheets":["schreibübungen","buchstaben nachspuren","schwungübungen arbeitsblatt","lineatur drucken","schreiben lernen arbeitsblätter"],
+"menu-maker":["speisekarte erstellen","speisekarte vorlage","menükarte gestalten","preisliste erstellen","speisekarte kostenlos"],
+"inventory-tracker":["lagerverwaltung","inventar liste","bestandsliste","lagerbestand verwalten","inventur liste"],
+"cash-book":["kassenbuch","kassenbuch online","einnahmen ausgaben buch","kundenkredit liste","kassenbuch kostenlos"],
+"health-log":["blutdruck tagebuch","blutzucker tagebuch","blutdruck tabelle","gewicht tagebuch","blutzuckerwerte tabelle"],
+"first-aid-guide":["erste hilfe","erste hilfe anleitung","herzdruckmassage","stabile seitenlage","notrufnummern"],
+"medication-schedule":["medikamentenplan","tabletten erinnerung","medikamenten erinnerung","einnahmeplan medikamente","medikationsplan"],
+"emergency-medical-card":["notfallausweis","notfallkarte","allergiepass","medizinischer notfallpass","notfall qr code"],
+"read-along":["text vorlesen","vorlesefunktion","vorlesen lassen","legasthenie leser","pdf vorlesen"],
+"job-application-tracker":["bewerbungen verwalten","bewerbungs tracker","bewerbungsübersicht","jobsuche organisieren"],
+"interview-practice":["vorstellungsgespräch üben","fragen im vorstellungsgespräch","bewerbungsgespräch vorbereitung","interview training"],
+"cover-letter-maker":["anschreiben erstellen","bewerbungsschreiben","anschreiben generator","motivationsschreiben","bewerbung anschreiben"],
 "image-compressor":["bild komprimieren","bild verkleinern","foto komprimieren","bildgröße reduzieren","foto kleiner machen"],
 "image-resizer":["bild größe ändern","bild grosse andern"],
 "qr-code-generator":["qr code erstellen","generatore qr code"],

@@ -5677,5 +5677,505 @@ module.exports = [
       ['Is my data stored?', 'No. Results stay on screen only; nothing is uploaded or saved.']
     ],
     icon: '<path d="M6 9a6 6 0 1 1 12 0c0 3-2 4-3 5s-1 3-3 3a2 2 0 0 1-2-2"/><path d="M9 9a3 3 0 0 1 6 0"/>'
+  },
+  {
+    "slug": "cover-letter-maker",
+    "cat": "Generators",
+    "name": "Cover Letter Maker",
+    "title": "Free Cover Letter Maker - Write a Cover Letter Fast",
+    "desc": "Write a cover letter from a short form: 3 tones, editable preview, no gaps. Download PDF (A4 or Letter), Word or text. Free, private, no sign-up.",
+    "card": "Write a job cover letter and download it.",
+    "intro": "Fill in a short form about the job and yourself, and get a clear, well-structured cover letter in a formal, friendly or short tone. Edit any word in the preview, then download it as a PDF, Word file or plain text, or copy it into an email. It works offline and nothing is uploaded.",
+    "steps": [
+      "Type the job title, the company and, if you know it, the hiring manager.",
+      "Add your name, contact details, years of experience and 2–4 strengths or achievements.",
+      "Pick a tone, then edit the letter in the preview if you want.",
+      "Download a PDF, Word or text file, copy it, or print it."
+    ],
+    "faq": [
+      [
+        "Is this made with AI?",
+        "No. It uses carefully written sentence templates with several wordings, so it works offline and your details never leave your device. Press Different wording for another version."
+      ],
+      [
+        "What if I leave a field empty?",
+        "Optional fields are simply left out and the sentences adjust, so the letter never shows blanks like [company] or gaps."
+      ],
+      [
+        "Can I edit the letter?",
+        "Yes. Click anywhere in the letter and type. Your edits are kept, even after a reload, until you press Undo my edits."
+      ],
+      [
+        "Which file types can I download?",
+        "A PDF in A4 or Letter size, a Word .docx file that opens in Word, Google Docs, LibreOffice and Pages, or a plain .txt file. You can also copy the text or print it."
+      ],
+      [
+        "Does it work with names in Arabic, Chinese or other scripts?",
+        "Yes. Names and text in any language appear correctly in the preview and in the PDF."
+      ],
+      [
+        "Is my information saved?",
+        "Only in this browser on this device, so you can come back to it. Press Start over to clear it."
+      ]
+    ],
+    "icon": "<path d=\"M4 6h16v12H4z\"/><path d=\"m4 7 8 6 8-6\"/><path d=\"M15 21l2-2 4-4-2-2-4 4-2 2z\"/>"
+  },
+  {
+    "slug": "interview-practice",
+    "cat": "Study tools",
+    "name": "Interview Practice",
+    "title": "Interview Practice - 120+ Questions, Tips and Timer",
+    "desc": "Practise job interviews with 123 common questions, tips and answer outlines, thinking and answer timers, recording and filler-word count. Free.",
+    "card": "Practise interview questions with a timer.",
+    "intro": "Get ready for a job interview with 123 common questions in ten groups, each with a tip on what the interviewer wants and an outline of a strong answer. Practice mode gives you a random question, a thinking timer and an answer timer. Record yourself to listen back and, where your browser supports it, see your words with a count of filler words like \"um\" and \"like\".",
+    "steps": [
+      "Choose a category, a thinking time and an answer time.",
+      "Optionally turn on recording and speech to text, and allow the microphone.",
+      "Press Start, think, then answer out loud when the beep sounds.",
+      "Review your recording, words and filler words, read the tip, and try again."
+    ],
+    "faq": [
+      [
+        "What kinds of questions are included?",
+        "123 questions in ten groups: general, behavioural (STAR), teamwork, problem solving, customer service, sales, tech basics, leadership, first job or student, and questions to ask the employer."
+      ],
+      [
+        "Is my recording uploaded?",
+        "No. The recording is made and kept in your browser’s memory only. It disappears when you leave the page unless you download it."
+      ],
+      [
+        "How does the filler-word count work?",
+        "With speech to text on, your answer is turned into text and the tool counts words like um, uh, like, you know, basically and actually. Speech to text often skips \"um\", so listen to the recording too."
+      ],
+      [
+        "Why is speech to text not available?",
+        "It needs the Web Speech API, found in Chrome, Edge and Safari. These browsers use their online speech service, so it needs an internet connection. You can always type your answer to analyse it."
+      ],
+      [
+        "What is the STAR method?",
+        "A way to answer \"tell me about a time\" questions: Situation, Task, Action and Result. The tips and outlines show how to use it."
+      ],
+      [
+        "Are my favourites and notes saved?",
+        "Yes, in this browser on this device. Use Export to keep a backup or move them to another device, and Print to make a study sheet."
+      ]
+    ],
+    "icon": "<path d=\"M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z\"/><path d=\"M10 9.5a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5\"/><path d=\"M12 15.5h.01\"/>"
+  },
+  {
+    "slug": "job-application-tracker",
+    "cat": "Time tools",
+    "name": "Job Application Tracker",
+    "title": "Job Application Tracker - Free Board, Reminders, Stats",
+    "desc": "Track job applications on a drag-and-drop board or list: status, next steps, reminders, salary in any currency, response rate. CSV/JSON export. Private.",
+    "card": "Track job applications, interviews and offers.",
+    "intro": "Keep every job application in one place: company, job title, link, date applied, status, next step, contact, salary and notes. Drag cards between Saved, Applied, Interview, Offer, Rejected and No reply, see upcoming steps in Reminders and your response rate in Stats. Everything is saved only in your browser, with CSV and JSON export and import.",
+    "steps": [
+      "Type the company and job title, pick a status and the date you applied, and press Add application.",
+      "Add a next step and its date, such as a phone interview or a follow-up.",
+      "Drag cards on the board (or use Move to) as things change.",
+      "Check Reminders and Stats, and export a backup now and then."
+    ],
+    "faq": [
+      [
+        "Where are my applications stored?",
+        "Only in this browser on this device. Nothing is uploaded. Export JSON or CSV to back them up or move them to another device."
+      ],
+      [
+        "Does drag and drop work on phones?",
+        "Yes. Hold the ⠿ handle on a card and drag it to another column. You can also use the Move to menu on each card."
+      ],
+      [
+        "How is the response rate worked out?",
+        "Applications that got an answer (interview, offer or rejection) divided by all applications sent, which is everything except Saved."
+      ],
+      [
+        "Can I use my own currency?",
+        "Yes. Choose any currency and whether the salary is per year, month, week, day or hour. Sorting by salary compares them as yearly amounts."
+      ],
+      [
+        "Can I import a spreadsheet?",
+        "Yes. Import a CSV with a header row that includes Company or Job title. Status, Date applied (YYYY-MM-DD), Next step, Contact, Salary, Link and Notes columns are read too."
+      ],
+      [
+        "Will it remind me?",
+        "The Reminders view and the red number on its tab show overdue and today’s steps whenever you open the page. It also lists applications with no news for two weeks."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"m9 13 2 2 4-4\"/>"
+  },
+  {
+    "slug": "read-along",
+    "cat": "Text tools",
+    "name": "Read Along",
+    "title": "Read Along - Read Text Aloud with Word Highlighting",
+    "desc": "Hear any text read aloud while each word lights up. Open TXT, Word or PDF, any language, dyslexia-friendly view, reading ruler. Free and private.",
+    "card": "Read text aloud with highlighted words.",
+    "intro": "Paste text or open a .txt, Word or PDF file and hear it read aloud with your device’s voices while each word and sentence is highlighted. Click any word to start from there. A big, dyslexia-friendly reading view lets you change text size, line spacing, background colour and font (including OpenDyslexic), with a reading ruler. Works in many languages.",
+    "steps": [
+      "Paste text, or open a .txt, .docx or PDF file.",
+      "Check the language and voice, and set the speed.",
+      "Press Read aloud and follow the highlighted words, or click any word to start there.",
+      "Open Reading view or Big reading view to change size, spacing, colour, font and the ruler."
+    ],
+    "faq": [
+      [
+        "Which languages work?",
+        "Any language your device has a voice for. The tool detects the language of your text (for example English, Spanish, Arabic, Hindi, Chinese or Russian) and picks a matching voice. You can choose another voice too."
+      ],
+      [
+        "Why is only the sentence highlighted?",
+        "Some voices, often on Android, do not tell the browser when each word starts. Then the whole sentence is highlighted instead."
+      ],
+      [
+        "Can it read PDF and Word files?",
+        "Yes, .txt, .docx and PDF files with real text. Scanned PDFs are pictures, so use the Image to Text tool first. Old .doc files need to be saved as .docx."
+      ],
+      [
+        "Is it good for dyslexia?",
+        "It offers features many readers with dyslexia find helpful: hearing and seeing words together, big text, wide spacing, tinted backgrounds, the OpenDyslexic font and a reading ruler. Try settings to find what suits you."
+      ],
+      [
+        "Is my text uploaded?",
+        "No. Files are read on your device, and voices built into your device speak the text. A few voices marked \"online\" use your browser’s speech service."
+      ],
+      [
+        "Can I download the audio?",
+        "No. Browsers do not let websites record their built-in voices. Use the voices live on the page."
+      ]
+    ],
+    "icon": "<path d=\"M3 5h8M3 9h8M3 13h5\"/><path d=\"M14 9v6h2l4 3V6l-4 3h-2z\"/><path d=\"M3 17h9\"/>"
+  },
+  {
+    "slug": "emergency-medical-card",
+    "cat": "Generators",
+    "name": "Emergency Medical Card",
+    "title": "Emergency Medical Card Maker - Wallet Card, Lock Screen, QR",
+    "desc": "Make a free medical ID: wallet card PDF (85.6 x 54 mm), phone lock-screen image and an offline QR code with allergies, blood group and contacts. Private.",
+    "card": "Medical ID wallet card, lock screen and QR.",
+    "intro": "Type your name, date of birth, blood group, allergies, conditions, medicines and emergency contacts once, and get three things first responders can use: a credit-card-size wallet card to print, cut out and fold, a phone lock-screen picture with the key facts in large type, and a QR code that shows your details as plain text with no internet. Add a \"Medical ID\" heading in other languages for travel. Your details stay on your device.",
+    "steps": [
+      "Fill in your details and emergency contacts. Leave out anything you do not want to share.",
+      "Choose a colour and, if you travel, up to 3 extra languages for the heading.",
+      "Download the sheet to cut out (or the card-size PDF) and print it at 100%.",
+      "Download the lock-screen image and set it as your phone wallpaper, and test the QR code with your phone camera."
+    ],
+    "faq": [
+      [
+        "Is my medical information uploaded anywhere?",
+        "No. Everything is made in your browser. If you tick \"Remember my details\", they are saved only on this device, and \"Delete my details\" removes them."
+      ],
+      [
+        "What size is the card?",
+        "85.6 × 54 mm, the same as a bank card. Print the sheet at 100% or \"Actual size\", not \"Fit to page\", then cut it out, fold it and laminate or tape it."
+      ],
+      [
+        "Does the QR code need internet?",
+        "No. It holds your details as plain text, so a phone camera or QR scanner app shows them straight away. Test it with your own phone first."
+      ],
+      [
+        "What if my details do not fit on the card?",
+        "The card shortens long text with \"…\" and warns you. The QR code holds everything; if that makes the card's QR code too dense, the card uses the key facts and the downloaded QR code keeps everything."
+      ],
+      [
+        "Which phone sizes are there for the lock screen?",
+        "Common Android sizes (1080 × 2400, 1080 × 2340, 1440 × 3200, 1080 × 1920) and iPhone sizes (SE, 12–14, 14 Pro–16, Plus/Pro Max). The top part is left free for the clock."
+      ],
+      [
+        "Does this replace a medical alert bracelet or my phone's Medical ID?",
+        "No. Use it as well as them. Phones also have a built-in emergency Medical ID that responders can open from the lock screen; fill that in too."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M8 9v6M5 12h6\"/><path d=\"M14 10h5M14 14h4\"/>"
+  },
+  {
+    "slug": "medication-schedule",
+    "cat": "Time tools",
+    "name": "Medication Schedule",
+    "title": "Medication Schedule - Pill Checklist, Chart and Reminders",
+    "desc": "Free medicine schedule: daily pill checklist, weekly chart, printable medication chart PDF, reminders while open and a calendar (.ics) file. Private.",
+    "card": "Daily pill checklist, chart and reminders.",
+    "intro": "Add your medicines with the dose, how often or at which times, food instructions and start and end dates. Tick each dose as you take it in today's checklist, see the week at a glance, and print a medication chart for the fridge. Turn on reminders while the page is open, or download a calendar file so your phone's calendar reminds you. Your list stays on this device.",
+    "steps": [
+      "Add a medicine: name, dose, how often or your own times, food instruction and dates.",
+      "Tick each dose in today's checklist when you take it.",
+      "Check the weekly chart, and print a chart for the fridge if you like.",
+      "Turn on reminders while the page is open, and download the calendar file for reliable alarms."
+    ],
+    "faq": [
+      [
+        "Will it remind me when the page is closed?",
+        "No. Browser reminders only work while this page (or the GetToolNest app) is open, and phones may pause pages in the background. For reliable alarms, download the calendar file (.ics) and add it to your phone's calendar, or set an alarm."
+      ],
+      [
+        "Where are my medicines and ticks saved?",
+        "Only in this browser on this device. Nothing is uploaded. Use \"Back up (JSON)\" to keep a copy or move it to another device."
+      ],
+      [
+        "Can I set different times for each dose?",
+        "Yes. Choose how often to fill in common times, then change any time, add more (up to 8 a day) or remove them. You can also pick only some days of the week."
+      ],
+      [
+        "What does the calendar file do?",
+        "It adds a repeating event with an alert at each dose time, until the end date if you set one. Times follow your device's time zone. If you change your medicines, delete the old events and add a new file."
+      ],
+      [
+        "What if I miss a dose?",
+        "The checklist shows it as not ticked. Do not take a double dose to catch up unless your doctor or pharmacist says so; check the leaflet or ask a pharmacist."
+      ],
+      [
+        "Can I print a chart for someone I care for?",
+        "Yes. Add their name, choose 1, 2 or 4 weeks and A4 or US Letter. Grey boxes mean no dose that day."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"9\" width=\"12\" height=\"7\" rx=\"3.5\" transform=\"rotate(-45 9 12.5)\"/><path d=\"M6.5 15l5-5\"/><circle cx=\"17.5\" cy=\"17.5\" r=\"4\"/><path d=\"M17.5 15.8v1.7l1.2 1\"/>"
+  },
+  {
+    "slug": "first-aid-guide",
+    "cat": "Study tools",
+    "name": "First Aid Guide",
+    "title": "First Aid Guide - CPR, Choking, Bleeding, Burns (Offline)",
+    "desc": "Free offline first aid guide for adults, children and babies: CPR with a 110 bpm metronome, choking, bleeding, burns, stroke and more, plus emergency numbers.",
+    "card": "Step-by-step first aid, CPR metronome, 112/911.",
+    "intro": "Clear, step-by-step first aid for 28 emergencies, from CPR and choking to burns, stroke, allergic reactions, bites and diabetic emergencies. Each topic shows when it is serious, what to do, what NOT to do and when to call for help. A CPR metronome beats at 110 a minute, and the emergency numbers panel finds your country and lets you tap to call. It works offline once opened, and you can print any topic. It does not replace first aid training.",
+    "steps": [
+      "Check the emergency number for your country at the top and call it first in an emergency.",
+      "Search for what happened, such as \"burn\" or \"not breathing\", or pick a topic. Filter for adults, children or babies.",
+      "Follow the steps. For CPR, start the metronome and push in time with the beat.",
+      "Print a topic, or download the whole guide as a PDF for home, car or work."
+    ],
+    "faq": [
+      [
+        "Does this replace a first aid course?",
+        "No. It is a reminder of the main steps from common guidance (Red Cross and Red Crescent, St John, European Resuscitation Council, American Heart Association). Take a course to practise, especially CPR."
+      ],
+      [
+        "How fast should CPR pushes be?",
+        "100 to 120 a minute, about 5–6 cm deep on an adult. The metronome beats at 110 a minute. If you are trained, give 2 breaths after every 30 pushes; if not, push without stopping (hands-only CPR)."
+      ],
+      [
+        "How does it know my emergency number?",
+        "It guesses your country from your device's time zone and language. Check it and pick another country from the list if needed. On most mobile phones, 112 also works in many countries, and 911 in most of the Americas."
+      ],
+      [
+        "Does it work without internet?",
+        "Yes. All the topics are inside the page, so once it has loaded it keeps working offline. Download the PDF to keep a copy."
+      ],
+      [
+        "Is the advice the same for children and babies?",
+        "No. CPR and choking are different for babies under 1 year and for children, so they have their own topics. Use the Adults, Children and Babies filters."
+      ],
+      [
+        "Why does the screen stay on during the metronome?",
+        "So it keeps beating while you do CPR. The page asks the browser to keep the screen awake while the metronome runs."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"3\"/><path d=\"M12 7.5v9M7.5 12h9\"/>"
+  },
+  {
+    "slug": "health-log",
+    "cat": "Calculators",
+    "name": "Health Log",
+    "title": "Health Log - Blood Pressure, Blood Sugar, Weight Tracker",
+    "desc": "Free private diary for blood pressure, blood sugar (mg/dL or mmol/L), weight and temperature: charts, 7/30/90-day averages, doctor PDF report, CSV.",
+    "card": "Track blood pressure, sugar, weight, fever.",
+    "intro": "Record blood pressure and pulse, blood sugar in mg/dL or mmol/L, weight and temperature with the date, time and a note. See charts over time, averages for the last 7, 30 and 90 days, and each reading placed in clearly cited ranges: 2017 ACC/AHA blood pressure categories (with the European ESC/ISH view) and ADA/WHO blood sugar ranges. Make a tidy PDF report with tables and charts for your doctor, and export or import CSV. It is not a diagnosis; always talk to your doctor. Your readings stay on this device.",
+    "steps": [
+      "Choose Blood pressure, Blood sugar, Weight or Temperature.",
+      "Type your reading (the date and time are filled in) and press Add reading.",
+      "See the range, averages and chart. Pick the units you use in Settings.",
+      "Download the PDF report before a doctor visit, and export a CSV now and then as a backup."
+    ],
+    "faq": [
+      [
+        "Which blood pressure categories does it use?",
+        "The 2017 ACC/AHA categories: normal below 120/80, elevated 120–129/<80, stage 1 130–139 or 80–89, stage 2 140+/90+, and the crisis range above 180/120. A note explains the European (ESC 2024) and ISH 2020 thresholds, which start at 140/90 in the clinic or 135/85 at home."
+      ],
+      [
+        "How do mg/dL and mmol/L convert?",
+        "mmol/L = mg/dL ÷ 18.016 (and mg/dL = mmol/L × 18.016). You can switch units at any time; all readings are converted, and each unit uses its own published cut-offs, such as 126 mg/dL and 7.0 mmol/L."
+      ],
+      [
+        "Can it tell me if I have diabetes or high blood pressure?",
+        "No. Home readings help you and your doctor see a pattern, but a diagnosis needs proper tests. Talk to your doctor about your results."
+      ],
+      [
+        "I have diabetes. Can I use my targets?",
+        "Tick \"I have diabetes\" to compare sugar readings with common ADA treatment targets (80–130 mg/dL or 4.4–7.2 mmol/L before meals, below 180 mg/dL or 10.0 mmol/L after meals). Your own targets may differ."
+      ],
+      [
+        "Where are my readings stored?",
+        "Only in this browser on this device. Nothing is uploaded. Export a CSV or JSON backup to keep a copy or move to another device; importing skips readings you already have."
+      ],
+      [
+        "What is in the doctor report?",
+        "For each type of reading: averages for 7, 30 and 90 days, a chart, and a table of every reading in the chosen period with its range and your notes, plus the sources of the ranges."
+      ]
+    ],
+    "icon": "<path d=\"M3 12h4l2-5 4 10 2-5h6\"/><rect x=\"2\" y=\"3\" width=\"20\" height=\"18\" rx=\"2\"/>"
+  },
+  {
+    "slug": "cash-book",
+    "cat": "Finance calculators",
+    "name": "Cash Book",
+    "title": "Cash Book - Daily Money In & Out and Customer Credit Ledger",
+    "desc": "A free daily cash book for small shops and freelancers: money in and out, customer credit, running balance, reports and PDF statements. Saved on your device.",
+    "card": "Daily money in/out and customer credit for shops.",
+    "intro": "Record every sale and expense with the date, category and payment method, keep a credit ledger for customers and suppliers, and always know your balance. Several books, any currency, and everything stays private on this device.",
+    "steps": [
+      "Choose the currency for your book (and add more books for other shops).",
+      "Press Money in or Money out, type the amount, category, payment method and note, then Add entry.",
+      "Use the Credit tab for customers who pay later and suppliers you pay later.",
+      "See daily, monthly and yearly totals in Reports, and download PDF statements, CSV or a backup."
+    ],
+    "faq": [
+      [
+        "Where is my cash book stored?",
+        "Only in this browser on this device. Nothing is uploaded. Download a backup regularly; clearing browser data deletes it."
+      ],
+      [
+        "Can I keep books for two shops?",
+        "Yes. In Books & backup press New book. Each book has its own currency, entries and customers."
+      ],
+      [
+        "How does customer credit work?",
+        "Record Sold on credit when a customer takes goods and Customer paid when they pay, even part of it. Their balance updates and you can print a statement for them."
+      ],
+      [
+        "Are the totals exact?",
+        "Yes. Money is stored as whole cents (or the smallest unit of your currency), so adding thousands of entries never creates rounding errors."
+      ],
+      [
+        "Can I import my old records?",
+        "Yes. Import a CSV with Date and Amount (or In and Out) columns. Type, Category, Method and Note are read when present."
+      ],
+      [
+        "How is this different from the Debt Tracker?",
+        "The Cash Book is for a business: daily takings, expenses and shop credit. The Debt Tracker is a simple IOU list for personal loans."
+      ]
+    ],
+    "icon": "<path d=\"M5 3h12a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2z\"/><path d=\"M9 3v18\"/><path d=\"M12 9h4M12 13h4\"/><path d=\"M14 16v3M12.5 17.5h3\"/>"
+  },
+  {
+    "slug": "inventory-tracker",
+    "cat": "Finance calculators",
+    "name": "Inventory Tracker",
+    "title": "Inventory Tracker - Free Stock List with Barcode Scanning",
+    "desc": "Track stock for a small shop: items, stock in and out, low-stock alerts, stock value and margins, barcode scanning, stock sheet and shelf label PDFs, CSV.",
+    "card": "Stock list with barcode scanning and labels.",
+    "intro": "Keep a simple stock list with cost and sale prices, quantities, low-stock levels and suppliers. Record stock in and out, scan barcodes with your phone camera, see stock value and margins, and print stock sheets and shelf labels. Your data stays on this device.",
+    "steps": [
+      "Add your items with SKU or barcode, unit, cost and sale price, quantity and low-stock level.",
+      "Press + In or − Out on an item when stock arrives or is sold, or Count after a stock take.",
+      "Watch the low-stock list and the stock value at cost and sale price.",
+      "Print a stock sheet or shelf labels, and export CSV or a backup."
+    ],
+    "faq": [
+      [
+        "Can I scan barcodes?",
+        "Yes. Press Scan and point your camera at the barcode. It reads EAN-13, EAN-8, UPC-A, Code 128 and QR codes. A USB or Bluetooth barcode scanner also works by typing into the search box."
+      ],
+      [
+        "How is stock value worked out?",
+        "Quantity in stock times the cost price for each item, added up. The sale-price value and the possible profit are shown too."
+      ],
+      [
+        "Can I print price labels?",
+        "Yes. Shelf labels PDF prints the name, price and a barcode of the SKU, from 8 to 40 labels per A4 or Letter page."
+      ],
+      [
+        "Can I use kilograms or litres?",
+        "Yes. Set the unit to kg, L or anything else and type quantities with up to 3 decimals, like 2.5."
+      ],
+      [
+        "Where is my stock list saved?",
+        "Only in this browser on this device. Download a backup or export CSV regularly."
+      ],
+      [
+        "Can I import from Excel?",
+        "Save your sheet as CSV with a Name column, then press Import items from CSV. Items with the same SKU are updated, not duplicated."
+      ]
+    ],
+    "icon": "<path d=\"M3 8l9-5 9 5v8l-9 5-9-5z\"/><path d=\"M3 8l9 5 9-5M12 13v8\"/><path d=\"M7.5 5.5l9 5\"/>"
+  },
+  {
+    "slug": "menu-maker",
+    "cat": "Generators",
+    "name": "Menu Maker",
+    "title": "Menu Maker - Free Restaurant, Café & Price List Templates",
+    "desc": "Make a menu or price list with 10 templates: print PDF (A4, Letter, A5, tri-fold), WhatsApp status and Instagram PNGs, and a mobile web page with QR code.",
+    "card": "Menus and price lists: PDF, PNG and web page.",
+    "intro": "Create a menu or price list for a café, restaurant, food stall, salon or shop. Add sections, items, prices and tags, add your logo and a QR code, pick a template, and download a print PDF, a social media image or a phone-friendly web page.",
+    "steps": [
+      "Choose a template and type your business name, tagline and details.",
+      "Add sections and items with prices, short descriptions and tags like Veg or Spicy.",
+      "Add a logo and a QR code link if you like, and pick the size.",
+      "Download the PDF or PNG, or the web page to put online."
+    ],
+    "faq": [
+      [
+        "Is the menu maker free?",
+        "Yes. There is no sign-up and no watermark, and everything is made in your browser."
+      ],
+      [
+        "Can I make a menu in Arabic, Urdu or Hindi?",
+        "Yes. Type items in any language. Arabic, Urdu and Hebrew are laid out right to left, and the PDF uses the right fonts for Arabic, Hindi, Bengali and more."
+      ],
+      [
+        "What sizes can I download?",
+        "A4, US Letter and A5 PDFs, a two-sided tri-fold leaflet, a 1080 × 1920 image for WhatsApp status or stories and a 1080 × 1080 square post."
+      ],
+      [
+        "How do I put my menu online?",
+        "Press Download web page. You get one HTML file that works on phones; upload it to any web host and point your QR code at its address."
+      ],
+      [
+        "Can I edit my menu later?",
+        "Your menu is kept in this browser. Press Save menu file to keep a copy you can open again on any device."
+      ],
+      [
+        "Can I add my logo?",
+        "Yes. Upload a PNG, JPG or WebP logo; a PNG with a transparent background looks best."
+      ]
+    ],
+    "icon": "<path d=\"M6 3h12v18H6z\"/><path d=\"M9 7h6M9 11h4M15 11h0.01M9 15h4M15 15h0.01\"/><path d=\"M6 3c-1.5 0-2 1-2 2v14c0 1 .5 2 2 2\"/>"
+  },
+  {
+    "slug": "handwriting-worksheets",
+    "cat": "Study tools",
+    "name": "Handwriting Worksheets",
+    "title": "Handwriting Worksheets - Printable Letter Tracing Sheets",
+    "desc": "Make printable tracing worksheets: letters, numbers 0–20, words or your own text with dotted lines, in Latin, Arabic, Hindi, Chinese, Japanese and more.",
+    "card": "Printable letter and number tracing sheets.",
+    "intro": "Create handwriting practice sheets for children and adult learners. Choose letters, numbers, simple words or your own text, pick dotted, dashed or grey tracing letters on the 4-line guide or square boxes, and download an A4 or Letter PDF with a name and date line.",
+    "steps": [
+      "Choose the writing system and what to practise: letters, numbers, words or your own text.",
+      "Choose the guide lines, tracing style, letter size and copies on each line.",
+      "Check the preview page by page.",
+      "Download the PDF and print it at 100% size."
+    ],
+    "faq": [
+      [
+        "Which languages are supported?",
+        "Latin (English and other European languages), Greek, Cyrillic, Arabic, Urdu, Hebrew, Devanagari (Hindi, Marathi, Nepali), Bengali, Tamil, Thai, Chinese characters and Japanese hiragana and katakana."
+      ],
+      [
+        "What is the 4-line handwriting guide?",
+        "A top line for tall letters, a dashed middle line for small letters, a baseline that letters sit on and a bottom line for tails like g and y."
+      ],
+      [
+        "Can I make a name tracing sheet?",
+        "Yes. Choose My own text and type the name. Each line of text gets a dark example and tracing copies."
+      ],
+      [
+        "Are there start dots and arrows?",
+        "Yes, for Latin letters and numbers: a green dot shows where to start and a red arrow shows the first direction."
+      ],
+      [
+        "Is it free to print?",
+        "Yes. The PDF is made in your browser, with no sign-up and no watermark."
+      ]
+    ],
+    "icon": "<path d=\"M4 6h16M4 12h16M4 18h16\" stroke-dasharray=\"2 2\"/><path d=\"M7 16l2.5-7 2.5 7M8 14h3\"/><path d=\"M15 9l3 3-3 3\"/>"
   }
 ];

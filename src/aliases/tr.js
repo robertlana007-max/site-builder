@@ -1,6 +1,18 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"handwriting-worksheets":["yazı çalışma sayfası","harf takip çalışması","noktalı harfler","el yazısı çalışma","okul öncesi yazı"],
+"menu-maker":["menü hazırlama","menü şablonu","restoran menüsü","fiyat listesi","kafe menüsü"],
+"inventory-tracker":["stok takibi","envanter takibi","stok listesi","depo stok","barkodlu stok"],
+"cash-book":["kasa defteri","veresiye defteri","gelir gider defteri","günlük kasa","dükkan hesap defteri"],
+"health-log":["tansiyon takip","şeker takip","kan şekeri günlüğü","kilo takip"],
+"first-aid-guide":["ilk yardım","ilk yardım rehberi","kalp masajı","heimlich manevrası","acil numaralar"],
+"medication-schedule":["ilaç hatırlatıcı","ilaç takvimi","ilaç saatleri","ilaç takip çizelgesi"],
+"emergency-medical-card":["acil tıbbi kart","alerji kartı","tıbbi kimlik kartı","kan grubu kartı"],
+"read-along":["sesli okuma","metni sesli oku","metin okuyucu","pdf sesli okuma"],
+"job-application-tracker":["iş başvurusu takibi","başvuru takip","iş arama takip","başvuru listesi"],
+"interview-practice":["mülakat soruları","iş görüşmesi pratiği","mülakat hazırlık","iş görüşmesi soruları"],
+"cover-letter-maker":["ön yazı","iş başvuru mektubu","ön yazı oluşturucu","motivasyon mektubu"],
 "image-compressor":["resim sıkıştırma","resim sikistirma"],
 "image-resizer":["resim boyutlandırma","resim boyutlandirma"],
 "qr-code-generator":["karekod oluşturma","karekod olusturucu"],

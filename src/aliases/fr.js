@@ -1,6 +1,18 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"handwriting-worksheets":["fiches d’écriture","lettres à tracer","exercices d’écriture maternelle","feuilles de calligraphie","tracer les lettres"],
+"menu-maker":["créer un menu","modèle de menu","menu restaurant gratuit","carte de restaurant","liste de prix"],
+"inventory-tracker":["gestion de stock","inventaire gratuit","suivi des stocks","feuille d’inventaire","inventaire code-barres"],
+"cash-book":["livre de caisse","cahier de caisse","suivi recettes dépenses","carnet de crédit clients","registre de caisse"],
+"health-log":["carnet de tension artérielle","suivi de glycémie","carnet de glycémie","suivi du poids","relevé de tension"],
+"first-aid-guide":["premiers secours","gestes de premiers secours","massage cardiaque","manœuvre de heimlich","numéros d'urgence"],
+"medication-schedule":["rappel de médicaments","planning de médicaments","pilulier en ligne","tableau de prise de médicaments","suivi des médicaments"],
+"emergency-medical-card":["carte médicale d'urgence","carte d'allergie","carte d'identité médicale","fiche médicale d'urgence","qr code médical"],
+"read-along":["lecture à voix haute","lire un texte à voix haute","lecteur dyslexie","synthèse vocale avec surlignage","lire pdf à voix haute"],
+"job-application-tracker":["suivi des candidatures","tableau de suivi candidatures","organiser sa recherche d’emploi","suivi recherche emploi"],
+"interview-practice":["questions d'entretien d'embauche","entraînement entretien d'embauche","simulation d'entretien","préparer un entretien"],
+"cover-letter-maker":["lettre de motivation","générateur lettre de motivation","lettre de candidature","modèle lettre de motivation"],
 "image-compressor":["compresser image","compresser une image","rendre une photo plus légère","réduire le poids d'une image","compresser photo"],
 "image-resizer":["redimensionner image","redimensionner une image","changer la taille d'une photo"],
 "qr-code-generator":["gerador de qr code","générateur qr code","generateur qr code"],

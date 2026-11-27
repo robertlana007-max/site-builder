@@ -1,6 +1,18 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: pt
 module.exports = {
+"handwriting-worksheets":["folhas de caligrafia","letras pontilhadas","atividades de caligrafia","cobrir letras","treino de escrita"],
+"menu-maker":["criar cardápio","modelo de cardápio","cardápio grátis","menu de restaurante","tabela de preços"],
+"inventory-tracker":["controle de estoque","inventário grátis","planilha de estoque","entrada e saída de estoque","estoque com código de barras"],
+"cash-book":["livro caixa","controle de caixa diário","caderno de fiado","entradas e saídas","livro caixa grátis"],
+"health-log":["controle de pressão arterial","diário de glicemia","registro de glicose","controle de peso"],
+"first-aid-guide":["primeiros socorros","guia de primeiros socorros","como fazer rcp","manobra de heimlich","números de emergência"],
+"medication-schedule":["lembrete de remédios","horário de medicamentos","tabela de remédios","controle de medicação"],
+"emergency-medical-card":["cartão médico de emergência","cartão de alergia","identificação médica","ficha médica de emergência"],
+"read-along":["ler em voz alta","leitor de texto em voz alta","leitor para dislexia","ler pdf em voz alta"],
+"job-application-tracker":["controle de candidaturas","rastreador de vagas","planilha de candidaturas","organizar busca de emprego"],
+"interview-practice":["perguntas de entrevista de emprego","simulação de entrevista","treinar entrevista de emprego","preparação para entrevista"],
+"cover-letter-maker":["carta de apresentação","carta de motivação","gerador de carta de apresentação","carta para emprego"],
 "image-compressor":["comprimir foto","reduzir tamanho da imagem","deixar foto mais leve","diminuir tamanho da foto","comprimir imagem"],
 "image-resizer":["redimensionar foto","redimensionar imagem"],
 "qr-code-generator":["gerador de qr code","gerar qr code","criar qr code","fazer qr code"],
