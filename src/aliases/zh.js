@@ -1,6 +1,14 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"handwriting-worksheets":["字帖生成","田字格字帖","描红字帖","汉字练习纸","拼音描红"],
+"menu-maker":["菜单制作","菜单设计","餐厅菜单模板","价目表","咖啡店菜单"],
+"inventory-tracker":["库存管理","进销存","库存表","盘点表","商品库存"],
+"cash-book":["现金日记账","收支记账","赊账本","店铺账本","流水账"],
+"health-log":["血压记录","血糖记录","体重记录","血压日记","血糖换算"],
+"first-aid-guide":["急救指南","急救知识","心肺复苏","海姆立克急救法","急救电话"],
+"medication-schedule":["吃药提醒","服药时间表","用药记录","药物提醒"],
+"emergency-medical-card":["紧急医疗卡","医疗信息卡","过敏卡","急救信息卡","血型卡"],
 "read-along":["朗读文本","文字朗读","跟读","朗读器","朗读pdf"],
 "job-application-tracker":["求职申请跟踪","求职记录表","投递简历记录","求职进度管理"],
 "interview-practice":["面试问题","模拟面试","面试练习","面试准备","常见面试题"],

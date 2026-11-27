@@ -1,0 +1,430 @@
+<style>
+.hww fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 4px; margin: 0 0 14px; min-width: 0; }
+.hww legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+.hww .fields { margin-bottom: 12px; }
+.hww textarea { min-height: 90px; font-family: inherit; font-size: 16px; }
+.hww .hw-chk { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; font-size: 14.5px; }
+.hww .hw-chk input { width: 20px; height: 20px; flex: none; }
+.hww .hw-hint { display: block; font-size: 13px; color: var(--muted); margin: -4px 0 12px; }
+.hww .hw-prev { background: var(--bg); border: 1px solid var(--line); border-radius: 12px; padding: 12px; margin-bottom: 12px; }
+.hww .hw-prev canvas { width: 100%; max-width: 520px; height: auto; display: block; margin: 0 auto; box-shadow: 0 2px 10px rgba(0,0,0,.18); background: #fff; }
+.hww .hw-pager { display: flex; justify-content: center; align-items: center; gap: 10px; margin-top: 10px; font-size: 14px; }
+.hww .hw-pager button { width: 40px; height: 40px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; font: inherit; font-size: 18px; }
+.hww .hw-pager button:disabled { opacity: .4; cursor: default; }
+</style>
+<div class="hww" id="hww">
+<fieldset><legend>What to practise</legend>
+  <div class="fields">
+    <div><label for="hwScript">Writing system</label><select id="hwScript"></select></div>
+    <div><label for="hwWhat">Content</label><select id="hwWhat"></select></div>
+    <div id="hwStyleBox"><label for="hwFont">Letter style</label><select id="hwFont"><option value="sans">Print (simple)</option><option value="kalam">Handwriting</option><option value="cursive">Joined-up / cursive</option></select></div>
+  </div>
+  <div class="fields" id="hwCustomBox" hidden><div style="grid-column:1/-1"><label for="hwText">Your text: one word, name or sentence per line</label><textarea id="hwText" data-nomemo maxlength="3000" dir="auto" placeholder="e.g. My name is Sara&#10;The cat sat on the mat"></textarea></div></div>
+</fieldset>
+<fieldset><legend>Lines and tracing</legend>
+  <div class="fields">
+    <div><label for="hwGuide">Guide lines</label><select id="hwGuide"><option value="four">4-line handwriting guide</option><option value="base">Baseline only</option><option value="grid">Square boxes (田 grid)</option><option value="grid8">Square boxes (米 grid)</option><option value="none">No lines</option></select></div>
+    <div><label for="hwTrace">Tracing letters</label><select id="hwTrace"><option value="dot">Dotted</option><option value="dash">Dashed</option><option value="grey">Solid light grey</option></select></div>
+    <div><label for="hwSize">Letter size</label><select id="hwSize"><option value="s">Small (lines 10 mm)</option><option value="m" selected>Medium (lines 15 mm)</option><option value="l">Large (lines 20 mm)</option><option value="xl">Extra large (lines 28 mm)</option></select></div>
+    <div><label for="hwReps">Copies on each line</label><select id="hwReps"><option value="fill">Fill the line</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5</option><option value="6">6</option><option value="8">8</option><option value="10">10</option></select></div>
+    <div><label for="hwRows">Lines for each item</label><select id="hwRows"><option value="1">1</option><option value="2">2</option><option value="3">3</option></select></div>
+  </div>
+  <label class="hw-chk"><input type="checkbox" id="hwModel" checked> First copy dark, as an example</label>
+  <label class="hw-chk"><input type="checkbox" id="hwBlank"> Empty line after each item, for writing alone</label>
+  <label class="hw-chk" id="hwArrowBox"><input type="checkbox" id="hwArrows" checked> Start dots and arrows (Latin letters and numbers)</label>
+</fieldset>
+<fieldset><legend>Page</legend>
+  <div class="fields">
+    <div><label for="hwPaper">Paper</label><select id="hwPaper"><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+    <div><label for="hwTitle">Title</label><input type="text" id="hwTitle" data-nomemo maxlength="70" dir="auto" placeholder="Automatic"></div>
+  </div>
+  <label class="hw-chk"><input type="checkbox" id="hwHead" checked> Name and date lines at the top</label>
+</fieldset>
+<div class="hw-prev"><canvas id="hwCanvas" width="595" height="842" aria-label="Worksheet preview"></canvas>
+  <div class="hw-pager" id="hwPager"><button type="button" id="hwPrev" aria-label="Previous page">‹</button><span id="hwPageN">Page 1 of 1</span><button type="button" id="hwNext" aria-label="Next page">›</button></div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="btns"><button type="button" class="btn" id="hwPdf">Download PDF</button></div>
+<p class="hw-hint" style="margin-top:10px">Print at 100% ("Actual size"). Chinese and Japanese characters use your device's fonts, so they look the same as on screen.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  function say(c, t) { var m = $('msg'); m.className = 'msg ' + (c || ''); m.textContent = t || ''; }
+  function region() { var L = navigator.languages || [navigator.language || '']; for (var i = 0; i < L.length; i++) { var m = /[-_]([A-Za-z]{2})\b/.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+  function chars(s) { return Array.from(s); }
+  function range(a, b) { var o = []; for (var c = a; c <= b; c++) o.push(String.fromCodePoint(c)); return o; }
+  function nums(d) { var o = []; for (var i = 0; i <= 20; i++) o.push(String(i).replace(/\d/g, function (x) { return d[+x]; })); return o; }
+  var HAN_NUM = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九', '十', '十一', '十二', '十三', '十四', '十五', '十六', '十七', '十八', '十九', '二十'];
+  function sp(s) { return s.split(' '); }
+
+  // ---------- writing systems ----------
+  var SC = {
+    latin: { name: 'Latin (English, Spanish, French…)', f: 'latin', cased: true, upper: range(65, 90), lower: range(97, 122), words: sp('cat dog sun hat pen cup bed fish tree ball book milk frog star apple house water happy friend school'), m: ['H', 'x', 'p', 'd'] },
+    greek: { name: 'Greek', f: 'latin', cased: true, upper: sp('Α Β Γ Δ Ε Ζ Η Θ Ι Κ Λ Μ Ν Ξ Ο Π Ρ Σ Τ Υ Φ Χ Ψ Ω'), lower: sp('α β γ δ ε ζ η θ ι κ λ μ ν ξ ο π ρ σ τ υ φ χ ψ ω'), words: sp('μήλο νερό ήλιος σπίτι γάτα σκύλος φίλος σχολείο μητέρα αγάπη'), m: ['Θ', 'α', 'ρ', 'β'] },
+    cyrillic: { name: 'Cyrillic (Russian, Ukrainian…)', f: 'latin', cased: true, upper: sp('А Б В Г Д Е Ё Ж З И Й К Л М Н О П Р С Т У Ф Х Ц Ч Ш Щ Ъ Ы Ь Э Ю Я'), lower: sp('а б в г д е ё ж з и й к л м н о п р с т у ф х ц ч ш щ ъ ы ь э ю я'), words: sp('мама папа дом кот сок мир школа книга вода солнце'), m: ['Б', 'а', 'р', 'б'] },
+    arabic: { name: 'Arabic', f: 'arabic', rtl: true, letters: sp('ا ب ت ث ج ح خ د ذ ر ز س ش ص ض ط ظ ع غ ف ق ك ل م ن ه و ي'), digits: '٠١٢٣٤٥٦٧٨٩', digitsName: 'Arabic-Indic digits', words: sp('بيت قلم كتاب شمس قمر ماء باب ولد مدرسة سلام'), m: ['ل', 'ب', 'ي', 'ك'] },
+    urdu: { name: 'Urdu', f: 'arabic', rtl: true, letters: sp('ا ب پ ت ٹ ث ج چ ح خ د ڈ ذ ر ڑ ز ژ س ش ص ض ط ظ ع غ ف ق ک گ ل م ن ں و ہ ھ ء ی ے'), digits: '۰۱۲۳۴۵۶۷۸۹', digitsName: 'Urdu digits', words: sp('گھر قلم کتاب پانی سورج چاند پھول دوست اسکول'), m: ['ل', 'ب', 'ی', 'ک'] },
+    hebrew: { name: 'Hebrew', f: 'hebrew', rtl: true, letters: sp('א ב ג ד ה ו ז ח ט י כ ל מ נ ס ע פ צ ק ר ש ת'), words: sp('אבא אמא בית ספר מים שמש ילד שלום'), m: ['ל', 'ב', 'ק', 'ל'] },
+    devanagari: { name: 'Devanagari (Hindi, Marathi, Nepali)', f: 'devanagari', letters: sp('अ आ इ ई उ ऊ ऋ ए ऐ ओ औ अं अः क ख ग घ ङ च छ ज झ ञ ट ठ ड ढ ण त थ द ध न प फ ब भ म य र ल व श ष स ह क्ष त्र ज्ञ'), digits: '०१२३४५६७८९', digitsName: 'Devanagari digits', words: sp('कमल घर जल फल नमक बतख मछली किताब पानी सूरज'), m: ['ई', 'क', 'कु', 'क'] },
+    bengali: { name: 'Bengali (Bangla)', f: 'bengali', letters: sp('অ আ ই ঈ উ ঊ ঋ এ ঐ ও ঔ ক খ গ ঘ ঙ চ ছ জ ঝ ঞ ট ঠ ড ঢ ণ ত থ দ ধ ন প ফ ব ভ ম য র ল শ ষ স হ ড় ঢ় য় ৎ ং ঃ ঁ'), digits: '০১২৩৪৫৬৭৮৯', digitsName: 'Bengali digits', words: sp('বই ঘর জল ফল মা বাবা পাখি মাছ আম ফুল'), m: ['ঈ', 'ক', 'কু', 'ক'] },
+    tamil: { name: 'Tamil', f: 'tamil', letters: sp('அ ஆ இ ஈ உ ஊ எ ஏ ஐ ஒ ஓ ஔ க ங ச ஞ ட ண த ந ப ம ய ர ல வ ழ ள ற ன'), words: sp('அம்மா அப்பா வீடு பூ மரம் நீர்'), m: ['ஈ', 'க', 'கு', 'ட'] },
+    thai: { name: 'Thai', f: 'thai', letters: sp('ก ข ฃ ค ฅ ฆ ง จ ฉ ช ซ ฌ ญ ฎ ฏ ฐ ฑ ฒ ณ ด ต ถ ท ธ น บ ป ผ ฝ พ ฟ ภ ม ย ร ล ว ศ ษ ส ห ฬ อ ฮ'), digits: '๐๑๒๓๔๕๖๗๘๙', digitsName: 'Thai digits', words: sp('แม่ พ่อ บ้าน น้ำ ปลา ไก่'), m: ['ป', 'ก', 'ฎ', 'ก'] },
+    chinese: { name: 'Chinese characters', f: 'cjk', lang: 'zh', grid: true, letters: sp('人 口 大 小 山 水 火 日 月 木 中 上 下 天 王 手 目 田 土 女 子 学 我 你 好 爱 家 国 书 字 花 鸟 鱼 马 雨 云'), han: true, words: sp('你好 谢谢 学生 老师 朋友 中国 妈妈 爸爸'), m: null },
+    hiragana: { name: 'Japanese hiragana', f: 'cjk', lang: 'ja', grid: true, letters: chars('あいうえおかきくけこさしすせそたちつてとなにぬねのはひふへほまみむめもやゆよらりるれろわをん'), han: true, words: sp('ねこ いぬ さかな やま はな ありがとう'), m: null },
+    katakana: { name: 'Japanese katakana', f: 'cjk', lang: 'ja', grid: true, letters: chars('アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン'), han: true, words: sp('ネコ パン テレビ カメラ アイス'), m: null }
+  };
+  var FONTFILE = { sans: 'noto-sans-subset-400.ttf', kalam: 'kalam-latin-400-normal.woff2', cursive: 'dancing-script-latin-400-normal.woff2', arabic: 'noto-sans-arabic-400.ttf', hebrew: 'noto-sans-hebrew-400.ttf', devanagari: 'noto-sans-devanagari-400.ttf', bengali: 'noto-sans-bengali-400.ttf', tamil: 'noto-sans-tamil-400.ttf', thai: 'noto-sans-thai-400.ttf' };
+  var CJKFAM = { zh: '"Noto Sans SC", "Noto Sans CJK SC", "PingFang SC", "Microsoft YaHei", "Hiragino Sans GB", "Source Han Sans SC", "WenQuanYi Zen Hei", sans-serif', ja: '"Noto Sans JP", "Noto Sans CJK JP", "Hiragino Sans", "Yu Gothic", "Meiryo", "Source Han Sans JP", "WenQuanYi Zen Hei", sans-serif' };
+
+  // ---------- form ----------
+  $('hwScript').innerHTML = Object.keys(SC).map(function (k) { return '<option value="' + k + '">' + SC[k].name + '</option>'; }).join('');
+  function fillWhat() {
+    var s = SC[$('hwScript').value], cur = $('hwWhat').value, o = [];
+    if (s.cased) o.push(['upper', 'Capital letters'], ['lower', 'Small letters'], ['both', 'Capital and small together']);
+    else o.push(['letters', s.han ? (s.lang === 'zh' ? 'Common characters' : 'All the ' + s.name.split(' ').pop()) : 'All letters']);
+    o.push(['num', s.han ? 'Numbers 0–20 (characters)' : 'Numbers 0–20']);
+    if (s.digits) o.push(['numn', 'Numbers 0–20 (' + s.digitsName + ')']);
+    if (s.han) o.push(['numw', 'Numbers 0–20 (0 1 2…)']);
+    o.push(['words', 'Simple words'], ['custom', 'My own text']);
+    $('hwWhat').innerHTML = o.map(function (x) { return '<option value="' + x[0] + '">' + x[1] + '</option>'; }).join('');
+    $('hwWhat').value = o.some(function (x) { return x[0] === cur; }) ? cur : o[0][0];
+    $('hwStyleBox').hidden = s.f !== 'latin' || $('hwScript').value !== 'latin';
+  }
+  function content() {
+    var s = SC[$('hwScript').value], w = $('hwWhat').value;
+    if (w === 'upper') return s.upper; if (w === 'lower') return s.lower;
+    if (w === 'both') return s.upper.map(function (u, i) { return u + s.lower[i]; });
+    if (w === 'letters') return s.letters;
+    if (w === 'num') return s.han ? HAN_NUM : nums('0123456789');
+    if (w === 'numw') return nums('0123456789');
+    if (w === 'numn') return nums(s.digits);
+    if (w === 'words') return s.words;
+    return $('hwText').value.split(/\r?\n/).map(function (l) { return l.replace(/\s+/g, ' ').trim(); }).filter(Boolean).slice(0, 300);
+  }
+  function autoTitle() {
+    var s = SC[$('hwScript').value], o = $('hwWhat').selectedOptions[0];
+    return $('hwWhat').value === 'custom' ? 'Handwriting practice' : (s.han || s.cased || $('hwScript').value === 'latin' ? '' : s.name.replace(/ \(.*\)/, '') + ': ') + o.textContent;
+  }
+
+  // ---------- fonts (fontkit, vector outlines) ----------
+  var fk = {}, fkP = {}, libP = null;
+  function script(src) { return new Promise(function (res, rej) { var e = document.createElement('script'); e.src = src; e.onload = res; e.onerror = function () { e.remove(); rej(new Error('load ' + src)); }; document.head.appendChild(e); }); }
+  function libs() { if (!libP) libP = Promise.all([window.fontkit ? 0 : script('../assets/vendor/fontkit.min.js'), window.regeneratorRuntime ? 0 : script('../assets/vendor/regenerator-runtime.min.js')]).catch(function (e) { libP = null; throw e; }); return libP; }
+  function font(k) {
+    if (!fkP[k]) fkP[k] = libs().then(function () { return fetch('../assets/vendor/fonts/' + FONTFILE[k]); }).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) { fk[k] = fontkit.create(new Uint8Array(b)); return fk[k]; }).catch(function (e) { fkP[k] = null; throw e; });
+    return fkP[k];
+  }
+  function fontOf(cp, latin) {
+    if ((cp >= 0x0600 && cp <= 0x06FF) || (cp >= 0x0750 && cp <= 0x077F) || (cp >= 0xFB50 && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFF)) return 'arabic';
+    if (cp >= 0x0590 && cp <= 0x05FF) return 'hebrew';
+    if (cp >= 0x0900 && cp <= 0x097F) return 'devanagari';
+    if (cp >= 0x0980 && cp <= 0x09FF) return 'bengali';
+    if (cp >= 0x0B80 && cp <= 0x0BFF) return 'tamil';
+    if (cp >= 0x0E00 && cp <= 0x0E7F) return 'thai';
+    if (cp < 0x0530 || (cp >= 0x1D00 && cp <= 0x1EFF) || (cp >= 0x2000 && cp <= 0x20CF)) { var f = fk[latin]; if (f && f.hasGlyphForCodePoint(cp)) return latin; f = fk.sans; if (f && f.hasGlyphForCodePoint(cp)) return 'sans'; if (!f) return 'sans'; }
+    return 'raster';
+  }
+  function needFonts(texts, latin) {
+    var want = {}; want[latin] = 1; want.sans = 1;
+    texts.forEach(function (t) { chars(t).forEach(function (c) { var k = fontOf(c.codePointAt(0), latin); if (k !== 'raster') want[k] = 1; }); });
+    return Promise.all(Object.keys(want).map(function (k) { return font(k).catch(function () { return null; }); }));
+  }
+  var MARK = /[\p{M}‌‍]/u, RTLC = /[֐-ࣿיִ-﷿ﹰ-﻿]/;
+  // text -> runs of one font each, in left-to-right drawing order; sizes in em
+  var runC = new Map();
+  function runsOf(text, latin, lang) {
+    var key = text + '|' + latin + '|' + lang, hit = runC.get(key); if (hit) return hit;
+    var cs = chars(text), out = [], cur = null;
+    cs.forEach(function (c) {
+      var cp = c.codePointAt(0), k = MARK.test(c) && cur ? cur.k : /\s/.test(c) && cur ? cur.k : fontOf(cp, latin);
+      if (k !== 'raster' && !fk[k]) k = 'raster';
+      if (cur && cur.k === k) cur.t += c; else { cur = { k: k, t: c }; out.push(cur); }
+    });
+    var rtl = RTLC.test(text);
+    out.forEach(function (r) {
+      if (r.k === 'raster') { r.w = mctx(lang).measureText(r.t).width / 100; return; }
+      var f = fk[r.k], dir = RTLC.test(r.t) ? 'rtl' : 'ltr', run;
+      try { run = f.layout(r.t, [], undefined, undefined, dir); } catch (e) { r.k = 'raster'; r.w = mctx(lang).measureText(r.t).width / 100; return; }
+      var upm = f.unitsPerEm, pen = 0, d = '', pts = [], x0 = 1e9, x1 = -1e9, y0 = 1e9, y1 = -1e9;
+      run.glyphs.forEach(function (g, i) {
+        var p = run.positions[i], gp = g.path, ox = pen + p.xOffset, oy = p.yOffset;
+        if (gp.commands.length) {
+          var tp = gp.translate(ox, oy); d += tp.scale(1, -1).toSVG(); var bb = tp.bbox; if (bb.minX < x0) x0 = bb.minX; if (bb.maxX > x1) x1 = bb.maxX; if (bb.minY < y0) y0 = bb.minY; if (bb.maxY > y1) y1 = bb.maxY;
+          tp.commands.forEach(function (c) { for (var a = 0; a + 1 < c.args.length; a += 2) pts.push([c.args[a] / upm, c.args[a + 1] / upm]); });
+        }
+        pen += p.xAdvance;
+      });
+      r.d = d; r.upm = upm; r.w = pen / upm; r.pts = pts; r.bb = x0 < 1e9 ? [x0 / upm, y0 / upm, x1 / upm, y1 / upm] : [0, 0, 0, 0];
+    });
+    if (rtl) out.reverse();
+    var res = { runs: out, w: out.reduce(function (a, r) { return a + r.w; }, 0), rtl: rtl };
+    runC.set(key, res);
+    return res;
+  }
+  var mc = {};
+  function mctx(lang) { if (!mc[lang]) { mc[lang] = document.createElement('canvas').getContext('2d'); mc[lang].font = '100px ' + (CJKFAM[lang] || CJKFAM.zh); } return mc[lang]; }
+  // guide-line heights (em) measured from the font: top of tall letters, middle (x-height or headline), baseline 0, bottom of descenders
+  function metrics(scKey, latin) {
+    var s = SC[scKey], m = s.m;
+    if (!m) return { top: 0.88, mid: 0.4, bot: -0.12 };
+    function bb(t) { var r = runsOf(t, s.f === 'latin' ? latin : 'sans', 'zh'); var b = [1e9, 1e9, -1e9, -1e9]; r.runs.forEach(function (x) { if (!x.bb) return; b[1] = Math.min(b[1], x.bb[1]); b[3] = Math.max(b[3], x.bb[3]); }); return b; }
+    var top = Math.max(bb(m[0])[3], bb(m[3])[3]), mid = bb(m[1])[3], bot = Math.min(bb(m[2])[1], -0.05);
+    if (!(top > 0)) top = 0.75; if (!(mid > 0) || mid >= top) mid = top * 0.6;
+    return { top: top, mid: mid, bot: bot };
+  }
+
+  // ---------- start dots and arrows for Latin letters and digits: [x across the letter, height (in x-heights or cap heights), direction in degrees] ----------
+  var START = { A: [0.5, 1, -115], B: [0, 1, -90], C: [0.92, 0.85, 150], D: [0, 1, -90], E: [0, 1, -90], F: [0, 1, -90], G: [0.92, 0.85, 150], H: [0, 1, -90], I: [0.5, 1, -90], J: [0.9, 1, -90], K: [0, 1, -90], L: [0, 1, -90], M: [0, 1, -90], N: [0, 1, -90], O: [0.5, 1, 180], P: [0, 1, -90], Q: [0.5, 1, 180], R: [0, 1, -90], S: [0.9, 0.85, 150], T: [0, 1, 0], U: [0, 1, -90], V: [0, 1, -70], W: [0, 1, -75], X: [0, 1, -55], Y: [0, 1, -55], Z: [0, 1, 0],
+    a: [0.82, 0.8, 160], b: [0.05, 1.45, -90], c: [0.88, 0.8, 150], d: [0.75, 0.8, 160], e: [0.1, 0.5, 0], f: [0.85, 1.4, 160], g: [0.75, 0.8, 160], h: [0.05, 1.45, -90], i: [0.5, 1, -90], j: [0.7, 1, -90], k: [0.05, 1.45, -90], l: [0.5, 1.45, -90], m: [0.05, 1, -90], n: [0.05, 1, -90], o: [0.5, 1, 180], p: [0.05, 1, -90], q: [0.75, 0.8, 160], r: [0.05, 1, -90], s: [0.88, 0.8, 150], t: [0.45, 1.3, -90], u: [0.05, 1, -90], v: [0.05, 1, -70], w: [0.05, 1, -75], x: [0.05, 1, -50], y: [0.05, 1, -65], z: [0.05, 1, 0],
+    0: [0.5, 1, 180], 1: [0.55, 1, -90], 2: [0.1, 0.78, 60], 3: [0.12, 0.85, 30], 4: [0.65, 1, -120], 5: [0.9, 1, 180], 6: [0.8, 0.95, 160], 7: [0.05, 1, 0], 8: [0.85, 0.8, 150], 9: [0.85, 0.75, 160] };
+
+  // ---------- layout: pages of drawing operations (points, top-left origin) ----------
+  var SIZE = { s: 28, m: 42, l: 57, xl: 80 };
+  var INK = '#1f2937', TRACE = '#6b7280', LGREY = '#c7cbd1', BLUE = '#8fb3de', RED = '#e57373';
+  function layout() {
+    var key = $('hwScript').value, s = SC[key], latin = s.f === 'latin' ? (key === 'latin' ? $('hwFont').value : 'sans') : 'sans', lang = s.lang || 'zh';
+    var paper = $('hwPaper').value === 'letter' ? [612, 792] : [595.28, 841.89], W = paper[0], H = paper[1], M = 36;
+    var list = content(), guide = $('hwGuide').value, grid = guide === 'grid' || guide === 'grid8', rowH = SIZE[$('hwSize').value], style = $('hwTrace').value;
+    var reps = $('hwReps').value, perItem = +$('hwRows').value, model = $('hwModel').checked, blank = $('hwBlank').checked;
+    var arrows = $('hwArrows').checked && s.f === 'latin' && key === 'latin' && ($('hwWhat').value !== 'custom' && $('hwWhat').value !== 'words');
+    var met = metrics(key, latin), span = met.top - met.bot, fs = grid ? rowH * 0.78 : rowH / span;
+    var pages = [], ops = null, y = 0, pageNo = 0, cut = 0;
+    function newPage() {
+      ops = []; pages.push({ W: W, H: H, ops: ops }); pageNo++; y = M;
+      if (pageNo === 1) {
+        var title = $('hwTitle').value.trim() || autoTitle();
+        text(ops, title, M, y + 18, 18, INK, W - 2 * M, 'sans', true); y += 30;
+        if ($('hwHead').checked) {
+          var lw = (W - 2 * M - 30) / 2; label(ops, 'Name', M, y + 16); ops.push({ k: 'line', x1: M + 42, y1: y + 18, x2: M + lw, y2: y + 18, c: '#9ca3af', w: 0.8 });
+          label(ops, 'Date', M + lw + 30, y + 16); ops.push({ k: 'line', x1: M + lw + 70, y1: y + 18, x2: W - M, y2: y + 18, c: '#9ca3af', w: 0.8 }); y += 36;
+        } else y += 6;
+      }
+      ops.push({ k: 'pn', t: String(pageNo) });
+    }
+    function label(o, t, x, yy) { text(o, t, x, yy, 11, '#4b5563', 200, 'sans', false); }
+    // a line of guides at row top yy; returns the baseline
+    function guides(o, yy) {
+      var x1 = M, x2 = W - M;
+      if (grid) return yy;
+      var base = yy + met.top * fs;
+      if (guide === 'four') {
+        o.push({ k: 'line', x1: x1, y1: yy, x2: x2, y2: yy, c: BLUE, w: 0.9 });
+        o.push({ k: 'line', x1: x1, y1: base - met.mid * fs, x2: x2, y2: base - met.mid * fs, c: BLUE, w: 0.7, dash: [4, 3] });
+        o.push({ k: 'line', x1: x1, y1: base, x2: x2, y2: base, c: RED, w: 1.1 });
+        o.push({ k: 'line', x1: x1, y1: yy + rowH, x2: x2, y2: yy + rowH, c: BLUE, w: 0.6, op: 0.7 });
+      } else if (guide === 'base') o.push({ k: 'line', x1: x1, y1: base, x2: x2, y2: base, c: '#6b7280', w: 1 });
+      return base;
+    }
+    function boxes(o, yy, n) {
+      var bw = rowH, x = M, ln = guide === 'grid8';
+      for (var i = 0; i < n; i++, x += bw) {
+        o.push({ k: 'rect', x: x, y: yy, w: bw, h: bw, c: RED, lw: 0.9 });
+        o.push({ k: 'line', x1: x + bw / 2, y1: yy, x2: x + bw / 2, y2: yy + bw, c: RED, w: 0.5, dash: [2, 2], op: 0.7 });
+        o.push({ k: 'line', x1: x, y1: yy + bw / 2, x2: x + bw, y2: yy + bw / 2, c: RED, w: 0.5, dash: [2, 2], op: 0.7 });
+        if (ln) { o.push({ k: 'line', x1: x, y1: yy, x2: x + bw, y2: yy + bw, c: RED, w: 0.4, dash: [2, 2], op: 0.55 }); o.push({ k: 'line', x1: x + bw, y1: yy, x2: x, y2: yy + bw, c: RED, w: 0.4, dash: [2, 2], op: 0.55 }); }
+      }
+    }
+    var gap = grid ? 0 : rowH * 0.5, pitch = rowH + (grid ? rowH * 0.22 : rowH * (guide === 'four' ? 0.42 : 0.55));
+    newPage();
+    // long lines are split at spaces so each piece fits on a line (Chinese and Japanese: into rows of boxes)
+    var inner0 = W - 2 * M - rowH * 0.2, nBox = Math.floor((W - 2 * M) / rowH), split = [];
+    list.forEach(function (item) {
+      if (grid) { var g0 = (window.Intl && Intl.Segmenter ? Array.from(new Intl.Segmenter().segment(item), function (x) { return x.segment; }) : chars(item)).filter(function (c) { return c.trim(); }); for (var q = 0; q < g0.length; q += nBox) split.push(g0.slice(q, q + nBox).join('')); if (!g0.length) split.push(item); return; }
+      if (runsOf(item, latin, lang).w * fs <= inner0 || item.indexOf(' ') < 0) { split.push(item); return; }
+      var words = item.split(' '), line = '';
+      words.forEach(function (wd) { var t = line ? line + ' ' + wd : wd; if (line && runsOf(t, latin, lang).w * fs > inner0) { split.push(line); line = wd; } else line = t; });
+      if (line) split.push(line);
+    });
+    list = split;
+    split.forEach(function (item) {
+      // an item that fits only once on a line: the dark example gets its own line, then the tracing lines follow
+      var single = !grid && model && (function () { var w1 = runsOf(item, latin, lang).w * fs, g1 = Math.max(rowH * (chars(item).length > 2 ? 0.9 : 0.5), fs * 0.3); return Math.floor((W - 2 * M - rowH * 0.2 + g1) / (w1 + g1)) <= 1; })(), extra = single ? 1 : 0;
+      for (var r = 0; r < perItem + extra + (blank ? 1 : 0); r++) {
+        var isBlank = r >= perItem + extra, onlyModel = single && r === 0, noModel = single && r > 0;
+        if (y + rowH > H - M - 12) newPage();
+        var avail = W - 2 * M;
+        if (grid) {
+          var n = Math.floor(avail / rowH), cs = (window.Intl && Intl.Segmenter ? Array.from(new Intl.Segmenter().segment(item), function (x) { return x.segment; }) : chars(item)).filter(function (c) { return c.trim(); });
+          boxes(ops, y, n);
+          if (!isBlank && cs.length) {
+            var per = cs.length, fitN = Math.floor(n / per), cnt = reps === 'fill' ? fitN : Math.min(+reps, fitN);
+            if (!fitN) { cut++; cnt = 1; }
+            for (var c = 0, b = 0; c < cnt; c++) for (var k = 0; k < per && b < n; k++, b++) glyphIn(ops, cs[k], M + b * rowH, y, rowH, c === 0 && model ? 'model' : style, latin, lang);
+          }
+          y += pitch; continue;
+        }
+        var base = guides(ops, y);
+        if (!isBlank) {
+          var ru = runsOf(item, latin, lang), uw = ru.w * fs, g = Math.max(rowH * (chars(item).length > 2 ? 0.9 : 0.5), fs * 0.3), inner = avail - rowH * 0.2;
+          var fitC = Math.max(0, Math.floor((inner + g) / (uw + g))), cnt2 = reps === 'fill' ? fitC : Math.min(+reps, fitC), sz = fs;
+          if (!fitC) { sz = fs * inner / uw; cnt2 = 1; cut++; uw = inner; }
+          var rtl = ru.rtl, x = rtl ? W - M - rowH * 0.1 - uw : M + rowH * 0.1;
+          for (var i = 0; i < cnt2; i++) {
+            var st = onlyModel || (i === 0 && model && !noModel) ? 'model' : style;
+            unit(ops, item, x, base, sz, st, latin, lang, arrows && st !== 'model');
+            x += rtl ? -(uw + g) : uw + g;
+          }
+        }
+        y += pitch;
+      }
+    });
+    return { pages: pages, cut: cut, list: list };
+  }
+  // one copy of a word / letter at baseline (vector outlines, or a picture for Chinese and Japanese)
+  function unit(o, t, x, base, fs, st, latin, lang, arrows) {
+    var ru = runsOf(t, latin, lang), px = x;
+    ru.runs.forEach(function (r) {
+      if (r.k === 'raster') o.push({ k: 'rt', t: r.t, x: px, y: base, fs: fs, st: st, lang: lang, w: r.w * fs });
+      else {
+        o.push({ k: 'g', d: r.d, x: px, y: base, sc: fs / r.upm, st: st, fs: fs });
+        if (arrows && chars(r.t).length === 1 && START[r.t]) startMark(o, r, px, base, fs, latin);
+        else if (arrows && /^\d{1,2}$/.test(r.t) && r.t.length === 2) { /* two-digit numbers: no arrows */ }
+      }
+      px += r.w * fs;
+    });
+  }
+  function startMark(o, r, px, base, fs, latin) {
+    var S = START[r.t], f = fk[latin], up = /[a-z]/.test(r.t), ref = up ? (f['xHeight'] || f.unitsPerEm * 0.53) / f.unitsPerEm : (f['capHeight'] || f.unitsPerEm * 0.71) / f.unitsPerEm;
+    var bb = r.bb, tx = bb[0] + (bb[2] - bb[0]) * S[0], ty = Math.min(bb[3], S[1] * ref), best = null, bd = 1e9;
+    r.pts.forEach(function (p) { var d = (p[0] - tx) * (p[0] - tx) + (p[1] - ty) * (p[1] - ty); if (d < bd) { bd = d; best = p; } });
+    if (!best) return;
+    var cx = px + best[0] * fs, cy = base - best[1] * fs, a = S[2] * Math.PI / 180, L = fs * 0.2, dx = Math.cos(a), dy = -Math.sin(a);
+    var ax = cx + dx * fs * 0.06, ay = cy + dy * fs * 0.06, bx = ax + dx * L, by = ay + dy * L, hl = fs * 0.06;
+    o.push({ k: 'line', x1: ax, y1: ay, x2: bx, y2: by, c: '#dc2626', w: Math.max(0.6, fs * 0.018) });
+    o.push({ k: 'poly', p: [[bx + dx * hl * 0.6, by + dy * hl * 0.6], [bx - dx * hl + dy * hl * 0.7, by - dy * hl - dx * hl * 0.7], [bx - dx * hl - dy * hl * 0.7, by - dy * hl + dx * hl * 0.7]], c: '#dc2626' });
+    o.push({ k: 'dot', x: cx, y: cy, r: Math.max(1.6, fs * 0.045), c: '#16a34a' });
+  }
+  function glyphIn(o, ch, x, y, box, st, latin, lang) {
+    var fs = box * 0.78, ru = runsOf(ch, latin, lang), w = ru.w * fs, base = y + box * 0.5 + fs * 0.36;
+    unit(o, ch, x + (box - w) / 2, base, fs, st, latin, lang, false);
+  }
+  function text(o, t, x, y, size, color, maxW, latin, bold) {
+    var ru = runsOf(t, latin, 'zh'), w = ru.w * size; if (w > maxW) { size *= maxW / w; w = maxW; }
+    var px = ru.rtl ? x + maxW - w : x;
+    ru.runs.forEach(function (r) { if (r.k === 'raster') o.push({ k: 'rt', t: r.t, x: px, y: y, fs: size, st: 'label', c: color, lang: 'zh', w: r.w * size }); else o.push({ k: 'g', d: r.d, x: px, y: y, sc: size / r.upm, st: 'label', c: color, fs: size, bold: bold }); px += r.w * size; });
+  }
+  // how each tracing style is painted
+  function look(st, fs, c) {
+    if (st === 'model') return { fill: INK };
+    if (st === 'label') return { fill: c || INK };
+    if (st === 'grey') return { fill: LGREY };
+    if (st === 'dot') { var lw = Math.max(0.9, fs * 0.032); return { stroke: TRACE, lw: lw, dash: [0.001, lw * 2.1], round: true }; }
+    return { stroke: TRACE, lw: Math.max(0.6, fs * 0.018), dash: [Math.max(2, fs * 0.07), Math.max(1.5, fs * 0.05)] };
+  }
+
+  // ---------- drawing: canvas ----------
+  function rasterOn(g, op, sc) {
+    var L = look(op.st, op.fs, op.c), px = op.fs * sc;
+    g.save(); g.font = px + 'px ' + (CJKFAM[op.lang] || CJKFAM.zh); g.textBaseline = 'alphabetic';
+    if (L.fill) { g.fillStyle = L.fill; g.fillText(op.t, op.x * sc, op.y * sc); }
+    else { g.strokeStyle = L.stroke; g.lineWidth = L.lw * sc; g.setLineDash(L.dash.map(function (d) { return d * sc; })); g.lineCap = L.round ? 'round' : 'butt'; g.lineJoin = 'round'; g.strokeText(op.t, op.x * sc, op.y * sc); }
+    g.restore();
+  }
+  function drawCanvas(p, g, sc) {
+    g.fillStyle = '#fff'; g.fillRect(0, 0, p.W * sc, p.H * sc);
+    p.ops.forEach(function (o) {
+      g.save(); g.globalAlpha = o.op == null ? 1 : o.op;
+      if (o.k === 'line') { g.strokeStyle = o.c; g.lineWidth = o.w * sc; if (o.dash) g.setLineDash(o.dash.map(function (d) { return d * sc; })); g.beginPath(); g.moveTo(o.x1 * sc, o.y1 * sc); g.lineTo(o.x2 * sc, o.y2 * sc); g.stroke(); }
+      else if (o.k === 'rect') { g.strokeStyle = o.c; g.lineWidth = o.lw * sc; g.strokeRect(o.x * sc, o.y * sc, o.w * sc, o.h * sc); }
+      else if (o.k === 'dot') { g.fillStyle = o.c; g.beginPath(); g.arc(o.x * sc, o.y * sc, o.r * sc, 0, Math.PI * 2); g.fill(); }
+      else if (o.k === 'poly') { g.fillStyle = o.c; g.beginPath(); o.p.forEach(function (q, i) { g[i ? 'lineTo' : 'moveTo'](q[0] * sc, q[1] * sc); }); g.closePath(); g.fill(); }
+      else if (o.k === 'g' && o.d) {
+        var L = look(o.st, o.fs, o.c), k = o.sc * sc; g.translate(o.x * sc, o.y * sc); g.scale(k, k);
+        var path = new Path2D(o.d);
+        if (L.fill) { g.fillStyle = L.fill; g.fill(path); }
+        else { g.strokeStyle = L.stroke; g.lineWidth = L.lw * sc / k; g.setLineDash(L.dash.map(function (d) { return d * sc / k; })); g.lineCap = L.round ? 'round' : 'butt'; g.lineJoin = 'round'; g.stroke(path); }
+      } else if (o.k === 'rt') rasterOn(g, o, sc);
+      else if (o.k === 'pn') { g.fillStyle = '#9ca3af'; g.font = 9 * sc + 'px sans-serif'; g.textAlign = 'right'; g.fillText(o.t, (p.W - 36) * sc, (p.H - 18) * sc); }
+      g.restore();
+    });
+  }
+
+  // ---------- drawing: PDF ----------
+  async function drawPdf(doc, p, imgs) {
+    var P = PDFLib, page = doc.addPage([p.W, p.H]), H = p.H;
+    function col(h) { var n = parseInt(h.slice(1), 16); return P.rgb((n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255); }
+    for (var i = 0; i < p.ops.length; i++) {
+      var o = p.ops[i], op = o.op == null ? 1 : o.op;
+      if (o.k === 'line') page.drawLine({ start: { x: o.x1, y: H - o.y1 }, end: { x: o.x2, y: H - o.y2 }, thickness: o.w, color: col(o.c), opacity: op, dashArray: o.dash });
+      else if (o.k === 'rect') page.drawRectangle({ x: o.x, y: H - o.y - o.h, width: o.w, height: o.h, borderColor: col(o.c), borderWidth: o.lw, opacity: 0, borderOpacity: op });
+      else if (o.k === 'dot') page.drawCircle({ x: o.x, y: H - o.y, size: o.r, color: col(o.c) });
+      else if (o.k === 'poly') page.drawSvgPath('M' + o.p.map(function (q) { return q[0] + ' ' + q[1]; }).join('L') + 'Z', { x: 0, y: H, color: col(o.c), borderWidth: 0 });
+      else if (o.k === 'g' && o.d) {
+        var L = look(o.st, o.fs, o.c), opt = { x: o.x, y: H - o.y, scale: o.sc };
+        if (L.fill) { opt.color = col(L.fill); opt.borderWidth = 0; }
+        else { opt.borderColor = col(L.stroke); opt.borderWidth = L.lw / o.sc; opt.borderDashArray = L.dash.map(function (d) { return d / o.sc; }); if (L.round) opt.borderLineCap = P.LineCapStyle.Round; }
+        page.drawSvgPath(o.d, opt);
+      } else if (o.k === 'rt') {
+        var key = o.t + '|' + o.st + '|' + o.lang + '|' + Math.round(o.fs * 10), em = imgs.get(key);
+        var padL = o.fs * 0.25, top = o.fs * 1.15, bot = o.fs * 0.4, w = o.w + 2 * padL, h = top + bot;
+        if (!em) {
+          var k = Math.min(8, 2400 / Math.max(w, h)), c = document.createElement('canvas'); c.width = Math.ceil(w * k); c.height = Math.ceil(h * k);
+          rasterOn(c.getContext('2d'), Object.assign({}, o, { x: padL, y: top }), k);
+          em = await doc.embedPng(await fetch(c.toDataURL('image/png')).then(function (r) { return r.arrayBuffer(); }));
+          imgs.set(key, em);
+        }
+        page.drawImage(em, { x: o.x - padL, y: H - o.y - bot, width: w, height: h });
+      } else if (o.k === 'pn') {
+        var t = runsOf(o.t, 'sans', 'zh').runs[0]; if (t && t.d) page.drawSvgPath(t.d, { x: p.W - 36 - t.w * 9, y: 18, scale: 9 / t.upm, color: col('#9ca3af'), borderWidth: 0 });
+      }
+    }
+  }
+
+  // ---------- preview ----------
+  var cur = null, pg = 0, ready = false, seq = 0;
+  function all() { var s = SC[$('hwScript').value]; return content().concat([$('hwTitle').value, autoTitle(), 'Name Date 0123456789']); }
+  function paint() {
+    var my = ++seq, s = SC[$('hwScript').value], latin = s.f === 'latin' && $('hwScript').value === 'latin' ? $('hwFont').value : 'sans';
+    $('hwCustomBox').hidden = $('hwWhat').value !== 'custom';
+    $('hwArrowBox').hidden = $('hwScript').value !== 'latin';
+    return needFonts(all(), latin).then(function () {
+      if (my !== seq) return;
+      ready = true;
+      var list = content();
+      if (!list.length) { cur = null; var g0 = $('hwCanvas').getContext('2d'); g0.fillStyle = '#fff'; g0.fillRect(0, 0, 9999, 9999); say('', $('hwWhat').value === 'custom' ? 'Type your text above: one word, name or sentence per line.' : 'Nothing to show.'); $('hwPageN').textContent = 'Page 1 of 1'; return; }
+      cur = layout(); if (pg >= cur.pages.length) pg = cur.pages.length - 1;
+      var p = cur.pages[pg], cv = $('hwCanvas'), sc = Math.min(2, (window.devicePixelRatio || 1) * 520 / p.W);
+      cv.width = Math.round(p.W * sc); cv.height = Math.round(p.H * sc);
+      drawCanvas(p, cv.getContext('2d'), sc);
+      $('hwPageN').textContent = 'Page ' + (pg + 1) + ' of ' + cur.pages.length; $('hwPrev').disabled = pg === 0; $('hwNext').disabled = pg >= cur.pages.length - 1;
+      var missing = list.join('').replace(/\s/g, '');
+      say(cur.cut ? 'bad' : '', cur.cut ? 'Some lines are too long for the page, so they were made smaller. Use shorter lines or a smaller letter size.' : list.length + (list.length === 1 ? ' item' : ' items') + ' on ' + cur.pages.length + (cur.pages.length === 1 ? ' page.' : ' pages.'));
+    }, function () { say('bad', 'The letter shapes could not be loaded. Check your connection and reload the page.'); });
+  }
+  var tm = 0; function later() { clearTimeout(tm); tm = setTimeout(paint, 200); }
+  $('hwScript').addEventListener('change', function () { var s = SC[this.value]; fillWhat(); $('hwGuide').value = s.grid ? 'grid' : 'four'; pg = 0; paint(); });
+  ['hwWhat', 'hwGuide', 'hwTrace', 'hwSize', 'hwReps', 'hwRows', 'hwModel', 'hwBlank', 'hwArrows', 'hwPaper', 'hwHead', 'hwFont'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'hwWhat' || id === 'hwRows' || id === 'hwBlank' || id === 'hwSize' || id === 'hwPaper') pg = 0; paint(); }); });
+  ['hwText', 'hwTitle'].forEach(function (id) { $(id).addEventListener('input', later); });
+  $('hwText').addEventListener('input', function () { try { localStorage.setItem('gtn-handwriting-worksheets', this.value); } catch (e) {} });
+  $('hwPrev').addEventListener('click', function () { if (pg > 0) { pg--; paint(); } });
+  $('hwNext').addEventListener('click', function () { if (cur && pg < cur.pages.length - 1) { pg++; paint(); } });
+  var busy = false;
+  $('hwPdf').addEventListener('click', async function () {
+    if (busy) return; var btn = this;
+    if (!content().length) return say('bad', 'Type your text first: one word, name or sentence per line.');
+    busy = true; btn.disabled = true; var old = btn.textContent; btn.textContent = 'Making PDF…'; say('', 'Making your worksheet…');
+    try {
+      var s = SC[$('hwScript').value], latin = s.f === 'latin' && $('hwScript').value === 'latin' ? $('hwFont').value : 'sans';
+      await needFonts(all(), latin);
+      if (!window.PDFText) await script('../assets/pdf-text.js');
+      await PDFText.load();
+      var d = layout(), doc = await PDFLib.PDFDocument.create(), imgs = new Map(), title = $('hwTitle').value.trim() || autoTitle();
+      doc.setTitle(title); doc.setCreator('GetToolNest Handwriting Worksheets'); doc.setProducer('GetToolNest');
+      for (var i = 0; i < d.pages.length; i++) { await drawPdf(doc, d.pages[i], imgs); if (i % 5 === 4) await new Promise(function (r) { setTimeout(r, 0); }); }
+      var bytes = await doc.save(), name = (title.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '-').replace(/^-|-$/g, '').slice(0, 40) || 'worksheet') + '.pdf';
+      var u = URL.createObjectURL(new Blob([bytes], { type: 'application/pdf' })), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 10000);
+      say('ok', 'Saved ' + name + ' (' + d.pages.length + (d.pages.length === 1 ? ' page, ' : ' pages, ') + fmtBytes(bytes.length) + '). Print at 100% size.');
+      if (window.burst) burst(btn);
+    } catch (e) { console.warn(e); say('bad', 'Sorry, the PDF could not be made on this device. ' + (e && e.message ? e.message : '')); }
+    busy = false; btn.disabled = false; btn.textContent = old;
+  });
+
+  // ---------- start ----------
+  if (/^(US|CA|MX|PH)$/.test(region())) $('hwPaper').value = 'letter';
+  try { var saved = localStorage.getItem('gtn-handwriting-worksheets'); if (saved) $('hwText').value = saved.slice(0, 3000); } catch (e) {}
+  fillWhat();
+  // the site restores remembered choices after this script; build the preview once they are in place
+  setTimeout(function () { fillWhat(); var s = SC[$('hwScript').value]; if (s.grid && $('hwGuide').value === 'four') $('hwGuide').value = 'grid'; paint(); }, 60);
+})();
+</script>

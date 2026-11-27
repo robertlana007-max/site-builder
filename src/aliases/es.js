@@ -1,6 +1,14 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: es
 module.exports = {
+"handwriting-worksheets":["hojas de caligrafía","letras para repasar","fichas de trazos","caligrafía para niños","abecedario para trazar"],
+"menu-maker":["crear menú","plantilla de menú","menú de restaurante gratis","carta de restaurante","lista de precios"],
+"inventory-tracker":["control de inventario","inventario gratis","control de stock","lista de existencias","inventario con código de barras"],
+"cash-book":["libro de caja","libro diario de caja","control de ingresos y gastos","cuaderno de fiado","libreta de deudas clientes","caja chica"],
+"health-log":["registro de presión arterial","control de glucosa","diario de azúcar en sangre","registro de peso","tensión arterial registro"],
+"first-aid-guide":["primeros auxilios","guía de primeros auxilios","cómo hacer rcp","maniobra de heimlich","números de emergencia"],
+"medication-schedule":["recordatorio de medicamentos","horario de medicamentos","calendario de pastillas","control de medicación","tabla de medicamentos"],
+"emergency-medical-card":["tarjeta médica de emergencia","tarjeta de alergias","tarjeta de identificación médica","ficha médica de emergencia","código qr médico"],
 "read-along":["leer en voz alta","lector de texto en voz alta","texto a voz con resaltado","lector para dislexia","leer pdf en voz alta"],
 "job-application-tracker":["seguimiento de candidaturas","registro de solicitudes de empleo","organizador de búsqueda de empleo","control de postulaciones"],
 "interview-practice":["preguntas de entrevista de trabajo","práctica de entrevista","simulador de entrevista","preparar entrevista de trabajo"],
