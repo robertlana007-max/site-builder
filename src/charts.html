@@ -537,10 +537,17 @@ function bmsg(pre, my) {
   };
 }
 var tws = null;
+// Live candles are built here from the ticks that reach this device, so a finished candle could differ a little from the broker's own.
+// Each time a new candle starts, the last finished ones are replaced by the broker's official candles.
+var syncBusy = false;
+function syncClosed() { if (syncBusy || full || rawB || rp || !bars.length || SEC[S.tf] || BIG[S.tf]) return; syncBusy = true; var id = loadId;
+  getK(S.sym, S.tf, 5).then(function (r) { if (id !== loadId || full || rawB || !bars.length) return; var by = {}; r.bars.forEach(function (k) { by[k.t] = k; }); var n = bars.length, ch = false;
+    for (var i = Math.max(0, n - 6); i < n; i++) { var k = by[bars[i].t], b = bars[i]; if (!k) continue; if (i < n - 1) { if (k.o !== b.o || k.h !== b.h || k.l !== b.l || k.c !== b.c) { bars[i] = k; ch = true; } } else if (k.o !== b.o || k.h > b.h || k.l < b.l) { bars[i] = { t: b.t, o: k.o, h: Math.max(b.h, k.h), l: Math.min(b.l, k.l), c: b.c, v: b.v }; ch = true; } }
+    if (ch) { recalcSoon(); dirty(); } }).catch(function () {}).then(function () { syncBusy = false; }); }
 function tdTick(sy, c) {
   if (!(c > 0)) return; c += offOf(sy); if (sy === S.sym && isD(sy)) lastMsg = Date.now(); var o = tick[sy]; tick[sy] = { c: c, o: o && o.o }; if (sy === S.sym) tapeAdd(c, 0, !o || c >= o.c, Date.now());
   if (sy === S.sym && (SEC[S.tf] || BIG[S.tf])) { lastMsg = Date.now(); tickTo(c); }
-  else if (sy === S.sym) { lastMsg = Date.now(); var l = lastB(), m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); } }
+  else if (sy === S.sym) { lastMsg = Date.now(); var l = lastB(), m = tfMs(), now = Date.now(); if (l && !full) { if (now < l.t + m) { if (c !== l.c) applyK({ t: l.t, o: l.o, h: Math.max(l.h, c), l: Math.min(l.l, c), c: c, v: l.v }); } else { applyK({ t: l.t + Math.floor((now - l.t) / m) * m, o: c, h: c, l: c, c: c, v: 0 }); if (isD(sy)) setTimeout(syncClosed, 1500); } } }
   else { if (o) checkAlerts(sy, o.c, c); checkPaper(sy, c); }
   if (cmpData[sy] && bars.length) { cmpData[sy][bars[bars.length - 1].t] = c; dirty(); } watchSoon();
   xFeed(sy);
@@ -2750,7 +2757,7 @@ function shareLink() {
   var pic = null, copyPic = function (fall) { if (!pic) { toast('The picture is not ready yet, try again'); return; } try { navigator.clipboard.write([new ClipboardItem({ 'image/png': pic })]).then(function () { toast(fall ? 'Picture copied. Open WhatsApp or Telegram and paste it (Ctrl+V).' : 'Picture copied. Paste it anywhere (Ctrl+V).'); }, function () { snapshot(); }); } catch (e) { snapshot(); } }; snapBlob(function (bl) { pic = bl; });
   try { navigator.clipboard.writeText(url).then(function () { done(true); }, function () { done(false); }); } catch (e) { done(false); }
 }
-var VER = '27 Nov, build 80';
+var VER = '27 Nov, build 81';
 var TFDEF = ['1s', '5s', '1m', '5m', '15m', '1h', '4h', '1d', '1w', '1M'];
 function tfList() { return (S.tfq && S.tfq.length ? S.tfq : TFDEF).filter(function (x) { return TFS.some(function (t) { return t[0] === x; }); }).slice().sort(function (a, b) { var f = function (k) { for (var i = 0; i < TFS.length; i++) if (TFS[i][0] === k) return TFS[i][1]; return 0; }; return f(a) - f(b); }); }
 function buildTfs() { (U.tfs || []).forEach(function (b) { b.remove(); }); var own = !!(S.tfq && S.tfq.length), L = tfList(); U.tfKey = L.join(); U.tfs = L.map(function (tf, i) { var b = tb(null, TFNAME[tf] || tf, function () { setTf(tf); }, tf === '1d' ? 'D' : tf === '1w' ? 'W' : tf === '1M' ? 'M' : tfShort(tf)); b._tf = tf; b.classList.add('tf'); if (own ? (L.length <= 6 || i >= L.length - 6 || tf === S.tf) : /^(1m|5m|15m|1h|4h|1d)$/.test(tf)) b.classList.add('tfp'); if (U.tfMore && U.tfMore.parentNode === elTop) elTop.insertBefore(b, U.tfMore); else elTop.appendChild(b); return b; }); }
