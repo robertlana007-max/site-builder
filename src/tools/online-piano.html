@@ -1,0 +1,553 @@
+<style>
+.pn-stage { background: var(--surface); border-radius: 14px; }
+.pn-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 0 0 10px; }
+.pn-chord { font-size: clamp(30px, 8vw, 46px); font-weight: 800; line-height: 1.05; letter-spacing: -.02em; min-height: 1.1em; }
+.pn-chord small { display: block; font-size: 14px; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-top: 4px; min-height: 1.2em; }
+.pn-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.pn-bar .btn { min-height: 44px; padding: 8px 12px; }
+.pn-oct { display: inline-flex; align-items: center; gap: 4px; }
+.pn-oct .btn { width: 44px; padding: 0; justify-content: center; font-size: 20px; }
+.pn-oct output { min-width: 74px; text-align: center; font-weight: 700; font-variant-numeric: tabular-nums; font-size: 14px; }
+.pn-map { position: relative; height: 26px; margin: 10px 0 6px; border-radius: 6px; overflow: hidden; touch-action: none; cursor: pointer; border: 1px solid var(--line); }
+.pn-map canvas { width: 100%; height: 100%; display: block; }
+.pn-win { position: absolute; top: 0; bottom: 0; border: 2px solid var(--accent); background: rgba(37, 99, 235, .18); border-radius: 5px; pointer-events: none; }
+.pn-wrap { overflow-x: auto; overflow-y: hidden; border-radius: 0 0 10px 10px; scrollbar-width: thin; }
+.pn-keys { position: relative; display: flex; height: clamp(150px, 34vw, 220px); --w: 40px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; touch-action: none; border-top: 3px solid #333; }
+.pn-k { position: relative; flex: none; box-sizing: border-box; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; padding-bottom: 6px; font: 600 11px/1.15 system-ui, sans-serif; }
+.pn-w { width: var(--w); height: 100%; background: linear-gradient(#f4f4f4, #fff 70%, #eee); border: 1px solid #9aa0a6; border-top: 0; border-radius: 0 0 6px 6px; color: #555; }
+.pn-b { position: absolute; top: 0; width: calc(var(--w) * .6); height: 62%; z-index: 2; background: linear-gradient(#222, #3a3a3a 85%, #111); border-radius: 0 0 4px 4px; color: #ddd; padding-bottom: 4px; font-size: 10px; box-shadow: 0 2px 3px rgba(0, 0, 0, .35); }
+.pn-w.on { background: linear-gradient(#bcd2ff, #9dbcff); }
+.pn-b.on { background: linear-gradient(#2c58c9, #3f6fe6); }
+.pn-w.sus { background: linear-gradient(#e6edff, #d4e1ff); }
+.pn-b.sus { background: linear-gradient(#24324f, #34466d); }
+.pn-k kbd { font: 700 11px/1 system-ui, sans-serif; background: none; border: 0; padding: 0; margin-bottom: 4px; color: var(--accent); opacity: .9; text-transform: uppercase; }
+.pn-b kbd { color: #9cc0ff; font-size: 10px; }
+.pn-k span { white-space: nowrap; }
+.pn-k .c { font-weight: 800; color: #222; }
+.pn-keys.small .pn-k span:not(.c), .pn-keys.small .pn-b span { display: none; }
+.pn-keys.nokbd kbd { display: none; }
+.pn-stage:fullscreen { padding: 12px; display: flex; flex-direction: column; height: 100vh; box-sizing: border-box; }
+.pn-stage:fullscreen .pn-wrap { flex: 1; display: flex; }
+.pn-stage:fullscreen .pn-keys { height: auto; flex: 1; }
+.pn-rec { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 0; }
+.pn-rec .btn { min-height: 44px; padding: 8px 14px; }
+.pn-dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; background: #d32f2f; }
+.pn-status { font-variant-numeric: tabular-nums; margin-top: 8px; color: var(--muted); font-size: 14px; }
+.pn-status.live { color: #d32f2f; font-weight: 700; }
+.pn-hint { font-size: 13px; color: var(--muted); margin: 6px 0 14px; }
+@media (max-width: 520px) { .pn-bar .btn { padding: 8px 10px; font-size: 14px; } }
+</style>
+<div class="pn-stage" id="pnStage">
+  <div class="pn-head">
+    <div class="pn-chord" aria-live="polite"><span id="pnChord">Play a key</span><small id="pnNotes">Tap the keys, or use your computer keyboard.</small></div>
+    <div class="pn-bar">
+      <span class="pn-oct"><button type="button" class="btn ghost" id="pnDown" aria-label="Octave down">−</button><output id="pnOct" aria-live="polite">Octave 3</output><button type="button" class="btn ghost" id="pnUp" aria-label="Octave up">+</button></span>
+      <button type="button" class="btn ghost" id="pnSus" aria-pressed="false" title="Hold the space bar, or tap to lock">Sustain</button>
+      <button type="button" class="btn ghost" id="pnFull">Full screen</button>
+    </div>
+  </div>
+  <div class="pn-map" id="pnMap" aria-hidden="true"><canvas id="pnMapC"></canvas><div class="pn-win" id="pnWin"></div></div>
+  <div class="pn-wrap" id="pnWrap"><div class="pn-keys" id="pnKeys" role="group" aria-label="Piano keyboard, A0 to C8"></div></div>
+</div>
+<p class="pn-hint">Slide the blue box above the keys to move along the keyboard. Computer keys: bottom row Z to M and top row Q to U play two octaves; ← and → change the octave; hold the space bar for the sustain pedal.</p>
+<div class="fields">
+  <div><label for="pnSound">Sound</label><select id="pnSound"><option value="piano">Grand piano</option><option value="epiano">Electric piano</option><option value="organ">Organ</option><option value="pad">Synth pad</option><option value="pluck">Soft synth</option></select></div>
+  <div><label for="pnSpan">Keys on screen</label><select id="pnSpan"><option value="0">Auto</option><option value="2">2 octaves</option><option value="3">3 octaves</option><option value="4">4 octaves</option></select></div>
+  <div><label for="pnNames">Note names</label><select id="pnNames"><option value="abc">C D E</option><option value="doremi">Do Re Mi</option><option value="none">Hide</option></select></div>
+  <div><label for="pnVol">Volume</label><input type="range" id="pnVol" min="0" max="100" value="80" style="accent-color:var(--accent)"></div>
+</div>
+<div class="checks"><label><input type="checkbox" id="pnShowKeys" checked> Show computer keys on the piano</label></div>
+<fieldset>
+  <legend>Record</legend>
+  <div class="pn-rec">
+    <button type="button" class="btn" id="pnRec"><span class="pn-dot"></span> Record</button>
+    <button type="button" class="btn ghost" id="pnPlay" disabled>▶ Play</button>
+    <button type="button" class="btn ghost" id="pnWav" disabled>Download WAV</button>
+    <button type="button" class="btn ghost" id="pnMidi" disabled>Download MIDI</button>
+    <button type="button" class="btn ghost" id="pnClear" disabled>Delete recording</button>
+  </div>
+  <div class="pn-status" id="pnStatus" aria-live="polite">Nothing recorded yet. Press Record, then play.</div>
+</fieldset>
+<p class="msg" id="pnMsg">On iPhone, turn off silent mode to hear the piano.</p>
+<script>
+(function () {
+  var AC = window.AudioContext || window.webkitAudioContext, OAC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  var LS = 'gtn-online-piano', LO = 21, HI = 108, MAXREC = 600;
+  var NAMES = { abc: ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'], doremi: ['Do', 'Do♯', 'Re', 'Mi♭', 'Mi', 'Fa', 'Fa♯', 'Sol', 'La♭', 'La', 'Si♭', 'Si'] };
+  var BLACK = [0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 1, 0];
+  var GM = { piano: 0, epiano: 4, organ: 16, pad: 89, pluck: 81 };
+  function say(c, t) { $('pnMsg').className = 'msg ' + (c || ''); $('pnMsg').textContent = t; }
+  function load() { try { return JSON.parse(localStorage.getItem(LS)) || {}; } catch (e) { return {}; } }
+  function store(o) { try { localStorage.setItem(LS, JSON.stringify(o)); return true; } catch (e) { return false; } }
+  var saved = load();
+  if (!AC) { say('bad', 'This browser cannot make sound with Web Audio. Please update it, or try Chrome, Edge, Firefox or Safari.'); }
+
+  // ---------------- sound engine (also used for the offline WAV render) ----------------
+  function mtof(m) { return 440 * Math.pow(2, (m - 69) / 12); }
+  function kit(ctx) {
+    if (ctx.__pn) return ctx.__pn;
+    var c = {}, sr = ctx.sampleRate, nb = ctx.createBuffer(1, Math.floor(sr * 0.5), sr), d = nb.getChannelData(0);
+    var seed = 12345; for (var i = 0; i < d.length; i++) { seed = (seed * 16807) % 2147483647; d[i] = seed / 1073741823.5 - 1; }
+    c.noise = nb;
+    function pw(a) { var re = new Float32Array(a.length + 1), im = new Float32Array(a.length + 1); for (var i = 0; i < a.length; i++) im[i + 1] = a[i]; return ctx.createPeriodicWave(re, im, { disableNormalization: true }); }
+    c.mid = pw([0, 0.5, 0.32, 0.2]);                                         // partials 2 to 4 of a piano string
+    c.hi = pw([0, 0, 0, 0, 0.12, 0.09, 0.07, 0.05, 0.04, 0.03, 0.022, 0.016]); // partials 5 to 12
+    c.organ = pw([0.5, 1, 0.55, 0.42, 0, 0.2, 0, 0.26]);                       // drawbars 16' 8' 5⅓' 4' 2⅔' 2' on f/2
+    ctx.__pn = c; return c;
+  }
+  function osc(ctx, type, f, t, dest) { var o = ctx.createOscillator(); if (typeof type === 'string') o.type = type; else o.setPeriodicWave(type); o.frequency.setValueAtTime(f, t); o.connect(dest); o.start(t); return o; }
+  function gain(ctx, v, dest) { var g = ctx.createGain(); g.gain.value = v; g.connect(dest); return g; }
+  // returns { end, release(t), kill(t) }
+  function voice(ctx, out, kind, m, v, t) {
+    var K = kit(ctx), f = mtof(m), nodes = [], rel = gain(ctx, 1, out), env = gain(ctx, 0, rel), end, relTC = 0.08, tail = 0.6;
+    function o(type, fr, dest) { var x = osc(ctx, type, fr, t, dest); nodes.push(x); return x; }
+    function noise(dest, len) { var s = ctx.createBufferSource(); s.buffer = K.noise; s.connect(dest); s.start(t, Math.random() * 0.3, len); nodes.push(s); return s; }
+    v = Math.max(0.05, Math.min(1, v));
+    if (kind === 'piano') {
+      var T = Math.max(0.45, 11 * Math.pow(2, -(m - 21) / 17)), a = 0.26 * (0.35 + 0.65 * v);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(a, t + 0.003);
+      env.gain.setTargetAtTime(a * 0.42, t + 0.003, 0.16); env.gain.setTargetAtTime(0, t + 0.45, T);
+      o('sine', f, gain(ctx, 0.62, env)); o('sine', f * 1.0007, gain(ctx, 0.38, env));
+      var g2 = gain(ctx, 0, env); g2.gain.setValueAtTime(0.35 + 0.65 * v, t); g2.gain.setTargetAtTime(0.1, t, T / 3); o(K.mid, f * 1.0004, g2);
+      if (f * 5 < 14000) { var g3 = gain(ctx, 0, env); g3.gain.setValueAtTime(0.25 + 0.9 * v * v, t); g3.gain.setTargetAtTime(0, t, Math.max(0.06, T / 9)); o(K.hi, f * 1.001, g3); }
+      var bp = ctx.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = Math.min(9000, f * 3 + 600); bp.Q.value = 0.8; bp.connect(env);
+      var hg = gain(ctx, 0, bp); hg.gain.setValueAtTime(0.5 * v, t); hg.gain.setTargetAtTime(0, t, 0.012); noise(hg, 0.08);
+      end = t + 0.45 + T * 5; relTC = m >= 89 ? 0 : 0.06 + 0.06 * Math.max(0, (60 - m) / 39); tail = 0.6;
+    } else if (kind === 'epiano') {
+      var Te = Math.max(0.6, Math.min(6, 3.2 * Math.pow(2, -(m - 60) / 24))), ae = 0.3 * (0.4 + 0.6 * v);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(ae, t + 0.002); env.gain.setTargetAtTime(0, t + 0.02, Te);
+      var car = o('sine', f, env), mg = ctx.createGain(); mg.connect(car.frequency);
+      mg.gain.setValueAtTime(f * (0.6 + 1.6 * v), t); mg.gain.setTargetAtTime(f * 0.12, t, 0.3); o('sine', f, mg);
+      var tg = ctx.createGain(); tg.connect(car.frequency); tg.gain.setValueAtTime(f * 0.9 * v, t); tg.gain.setTargetAtTime(0, t, 0.025); o('sine', f * 14, tg);
+      end = t + 0.02 + Te * 5; relTC = 0.07; tail = 0.6;
+    } else if (kind === 'organ') {
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(0.11 * (0.6 + 0.4 * v), t + 0.012);
+      o(K.organ, f / 2, gain(ctx, 0.6, env)); o(K.organ, f / 2 * 1.0012, gain(ctx, 0.4, env));
+      var hp = ctx.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2500; hp.connect(env);
+      var cg = gain(ctx, 0, hp); cg.gain.setValueAtTime(0.25, t); cg.gain.setTargetAtTime(0, t, 0.004); noise(cg, 0.02);
+      end = Infinity; relTC = 0.025; tail = 0.3;
+    } else if (kind === 'pad') {
+      var lp = ctx.createBiquadFilter(); lp.type = 'lowpass'; lp.Q.value = 0.6; lp.connect(env);
+      lp.frequency.setValueAtTime(350, t); lp.frequency.setTargetAtTime(500 + 2200 * v, t, 0.5);
+      env.gain.setValueAtTime(0, t); env.gain.setTargetAtTime(0.2 * (0.5 + 0.5 * v), t, 0.25);
+      o('sawtooth', f * 1.004, gain(ctx, 0.5, lp)); o('sawtooth', f / 1.004, gain(ctx, 0.5, lp)); o('triangle', f, gain(ctx, 0.6, lp));
+      end = Infinity; relTC = 0.45; tail = 3;
+    } else { // soft synth pluck
+      var lp2 = ctx.createBiquadFilter(); lp2.type = 'lowpass'; lp2.Q.value = 2; lp2.connect(env);
+      lp2.frequency.setValueAtTime(Math.min(12000, f * (4 + 10 * v)), t); lp2.frequency.setTargetAtTime(f * 1.5, t, 0.18);
+      env.gain.setValueAtTime(0, t); env.gain.linearRampToValueAtTime(0.3 * (0.4 + 0.6 * v), t + 0.004); env.gain.setTargetAtTime(0, t + 0.004, 0.9);
+      o('square', f, gain(ctx, 0.35, lp2)); o('sawtooth', f * 1.003, gain(ctx, 0.35, lp2));
+      end = t + 4.6; relTC = 0.12; tail = 0.8;
+    }
+    function stopAll(at) { nodes.forEach(function (n) { try { n.stop(at); } catch (e) {} }); }
+    if (end !== Infinity) stopAll(end);
+    return {
+      end: end,
+      release: function (at) { if (!relTC) return; rel.gain.setTargetAtTime(0, at, relTC); this.end = Math.min(this.end, at + Math.max(tail, relTC * 8)); stopAll(this.end); },
+      kill: function (at) { rel.gain.setTargetAtTime(0, at, 0.012); this.end = at + 0.1; stopAll(this.end); }
+    };
+  }
+  function master(ctx, vol) {
+    var comp = ctx.createDynamicsCompressor();
+    comp.threshold.value = -12; comp.knee.value = 8; comp.ratio.value = 4; comp.attack.value = 0.003; comp.release.value = 0.2;
+    comp.connect(ctx.destination);
+    var g = ctx.createGain(); g.gain.value = vol; g.connect(comp); return g;
+  }
+
+  // ---------------- live audio ----------------
+  var actx = null, out = null, live = {}; // midi -> voice
+  var held = {}, sustained = {}, pedal = false, pedalKey = false, pedalLatch = false;
+  function vol() { var v = +$('pnVol').value / 100; return v * v * 1.2; }
+  function audio() {
+    if (!AC) return null;
+    if (!actx) {
+      try { actx = new AC({ latencyHint: 'interactive' }); } catch (e) { actx = new AC(); }
+      out = master(actx, vol());
+    }
+    if (actx.state !== 'running') actx.resume();
+    return actx;
+  }
+  $('pnVol').addEventListener('input', function () { if (out) out.gain.setTargetAtTime(vol(), actx.currentTime, 0.02); });
+  var activeList = [];
+  function startNote(m, v, kind, at) {
+    var ctx = audio(); if (!ctx) return;
+    var t = at || ctx.currentTime;
+    if (live[m]) { live[m].kill(t); }
+    activeList = activeList.filter(function (x) { return x.end > ctx.currentTime; });
+    if (activeList.length > 40) { activeList.shift().kill(t); }
+    var vc = voice(ctx, out, kind || $('pnSound').value, m, v, t);
+    live[m] = vc; activeList.push(vc);
+  }
+  function stopNote(m, at) { var vc = live[m]; if (!vc) return; vc.release(at || actx.currentTime); delete live[m]; }
+
+  // ---------------- input: notes held by pointer and keyboard ----------------
+  function noteOn(m, v) {
+    if (m < LO || m > HI) return;
+    held[m] = (held[m] || 0) + 1;
+    if (held[m] > 1) return;
+    delete sustained[m];
+    startNote(m, v);
+    recEv('on', m, v); paintKey(m); showChord();
+  }
+  function noteOff(m) {
+    if (!held[m]) return;
+    if (--held[m] > 0) return;
+    delete held[m];
+    if (pedal) sustained[m] = 1; else stopNote(m);
+    recEv('off', m); paintKey(m); showChord();
+  }
+  function setPedal(on) {
+    if (on === pedal) return;
+    pedal = on; $('pnSus').setAttribute('aria-pressed', on ? 'true' : 'false');
+    recEv(on ? 'pd' : 'pu');
+    if (!on) { var was = Object.keys(sustained); sustained = {}; was.forEach(function (m) { if (!held[m]) stopNote(+m); paintKey(+m); }); }
+    showChord();
+  }
+  function pedalUpdate() { setPedal(pedalKey || pedalLatch); }
+
+  // ---------------- drawing the keyboard ----------------
+  var keyEls = {}, whites = 0, posOf = {};
+  (function build() {
+    var box = $('pnKeys'), wi = 0, frag = document.createDocumentFragment();
+    for (var m = LO; m <= HI; m++) {
+      var b = BLACK[m % 12], el = document.createElement('div');
+      el.className = 'pn-k ' + (b ? 'pn-b' : 'pn-w'); el.dataset.m = m;
+      el.innerHTML = '<kbd></kbd><span></span>';
+      if (b) { var sh = { 1: -0.12, 3: 0.12, 6: -0.14, 8: 0, 10: 0.14 }[m % 12]; el.style.left = 'calc(var(--w) * ' + (wi - 0.3 + sh * 0.6).toFixed(3) + ')'; }
+      else wi++;
+      posOf[m] = b ? wi - 0.5 : wi - 0.5;
+      keyEls[m] = el; frag.appendChild(el);
+    }
+    whites = wi; box.appendChild(frag);
+  })();
+  function paintKey(m) { var el = keyEls[m]; if (!el) return; el.classList.toggle('on', !!held[m] || !!playOn[m]); el.classList.toggle('sus', !held[m] && !playOn[m] && !!sustained[m]); }
+  function nameOf(m, oct) { var set = NAMES[$('pnNames').value === 'doremi' ? 'doremi' : 'abc']; return set[m % 12] + (oct ? Math.floor(m / 12) - 1 : ''); }
+  function labelKeys() {
+    var mode = $('pnNames').value;
+    for (var m = LO; m <= HI; m++) {
+      var sp = keyEls[m].querySelector('span');
+      sp.textContent = mode === 'none' ? '' : (m % 12 === 0 ? nameOf(m, true) : nameOf(m, false));
+      sp.className = m % 12 === 0 ? 'c' : '';
+    }
+  }
+  $('pnNames').addEventListener('change', function () { labelKeys(); showChord(); });
+
+  // ---------------- computer keyboard ----------------
+  var LOWER = ['KeyZ', 'KeyS', 'KeyX', 'KeyD', 'KeyC', 'KeyV', 'KeyG', 'KeyB', 'KeyH', 'KeyN', 'KeyJ', 'KeyM', 'Comma', 'KeyL', 'Period', 'Semicolon', 'Slash'];
+  var UPPER = ['KeyQ', 'Digit2', 'KeyW', 'Digit3', 'KeyE', 'KeyR', 'Digit5', 'KeyT', 'Digit6', 'KeyY', 'Digit7', 'KeyU', 'KeyI', 'Digit9', 'KeyO', 'Digit0', 'KeyP', 'BracketLeft', 'Equal', 'BracketRight'];
+  var CODEMAP = {}; LOWER.forEach(function (c, i) { CODEMAP[c] = i; }); UPPER.forEach(function (c, i) { CODEMAP[c] = 12 + i; });
+  var CHARS = { Comma: ',', Period: '.', Semicolon: ';', Slash: '/', BracketLeft: '[', BracketRight: ']', Equal: '=' };
+  function charOf(code) { return CHARS[code] || code.replace(/^Key|^Digit/, ''); }
+  var octave = typeof saved.oct === 'number' && saved.oct >= -3 && saved.oct <= 3 ? saved.oct : 0;
+  function base() { return 48 + 12 * octave; }
+  function labelKbd() {
+    for (var m = LO; m <= HI; m++) keyEls[m].querySelector('kbd').textContent = '';
+    Object.keys(CODEMAP).forEach(function (code) {
+      var m = base() + CODEMAP[code]; if (!keyEls[m]) return;
+      var k = keyEls[m].querySelector('kbd'); k.textContent = (k.textContent ? k.textContent + ' ' : '') + charOf(code);
+    });
+    $('pnOct').textContent = 'Octave ' + (3 + octave);
+  }
+  if (navigator.keyboard && navigator.keyboard.getLayoutMap) navigator.keyboard.getLayoutMap().then(function (lm) {
+    Object.keys(CODEMAP).forEach(function (c) { var ch = lm.get(c); if (ch) CHARS[c] = ch; }); labelKbd();
+  }).catch(function () {});
+  function shift(d) {
+    var n = Math.max(-3, Math.min(3, octave + d)); if (n === octave) return;
+    Object.keys(kbdDown).forEach(function (c) { noteOff(kbdDown[c]); }); kbdDown = {};
+    octave = n; saved = load(); saved.oct = octave; store(saved); labelKbd(); reveal(base(), base() + 24);
+  }
+  $('pnDown').addEventListener('click', function () { shift(-1); });
+  $('pnUp').addEventListener('click', function () { shift(1); });
+  var kbdDown = {};
+  function typing(e) { var t = e.target; return t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) && t.type !== 'range' && t.type !== 'checkbox' || t.isContentEditable); }
+  window.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
+    if (e.code === 'Space') { e.preventDefault(); e.stopPropagation(); if (!e.repeat) { audio(); pedalKey = true; pedalUpdate(); } return; }
+    if (e.code === 'ArrowLeft' || e.code === 'ArrowRight') { if (e.target.type === 'range') return; e.preventDefault(); if (!e.repeat) shift(e.code === 'ArrowLeft' ? -1 : 1); return; }
+    if (!(e.code in CODEMAP)) return;
+    e.preventDefault(); e.stopPropagation();
+    if (e.repeat || kbdDown[e.code] != null) return;
+    var m = base() + CODEMAP[e.code]; if (m < LO || m > HI) return;
+    kbdDown[e.code] = m; noteOn(m, 0.8);
+  }, true);
+  window.addEventListener('keyup', function (e) {
+    if (e.code === 'Space') { if (!typing(e)) e.preventDefault(); if (pedalKey) { pedalKey = false; pedalUpdate(); } return; }
+    if (kbdDown[e.code] != null) { noteOff(kbdDown[e.code]); delete kbdDown[e.code]; }
+  }, true);
+  window.addEventListener('blur', function () { Object.keys(kbdDown).forEach(function (c) { noteOff(kbdDown[c]); }); kbdDown = {}; if (pedalKey) { pedalKey = false; pedalUpdate(); } });
+  $('pnSus').addEventListener('click', function () { audio(); pedalLatch = !pedalLatch; pedalUpdate(); });
+
+  // ---------------- pointers: multitouch and sliding along the keys ----------------
+  var ptr = {};
+  function keyAt(x, y) { var el = document.elementFromPoint(x, y); el = el && el.closest && el.closest('.pn-k'); return el && $('pnKeys').contains(el) ? +el.dataset.m : null; }
+  function velAt(m, y) { var r = keyEls[m].getBoundingClientRect(); var f = (y - r.top) / Math.max(1, r.height); return 0.55 + 0.4 * Math.max(0, Math.min(1, f)); }
+  var keys = $('pnKeys');
+  keys.addEventListener('pointerdown', function (e) {
+    if (e.button > 0) return;
+    e.preventDefault();
+    var m = keyAt(e.clientX, e.clientY); if (m == null) return;
+    try { keys.setPointerCapture(e.pointerId); } catch (x) {}
+    ptr[e.pointerId] = m; noteOn(m, velAt(m, e.clientY));
+  });
+  keys.addEventListener('pointermove', function (e) {
+    if (!(e.pointerId in ptr)) return;
+    var m = keyAt(e.clientX, e.clientY);
+    if (m == null || m === ptr[e.pointerId]) return;
+    noteOff(ptr[e.pointerId]); ptr[e.pointerId] = m; noteOn(m, velAt(m, e.clientY));
+  });
+  function up(e) { if (!(e.pointerId in ptr)) return; noteOff(ptr[e.pointerId]); delete ptr[e.pointerId]; }
+  ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(function (t) { keys.addEventListener(t, up); });
+  keys.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+
+  // ---------------- size, scrolling and the overview strip ----------------
+  var wrap = $('pnWrap'), W = 40;
+  function layout() {
+    var span = +$('pnSpan').value, width = wrap.clientWidth || 360;
+    if (!span) span = width < 560 ? 2 : width < 900 ? 3 : 4;
+    W = Math.max(12, width / (7 * span));
+    keys.style.setProperty('--w', W.toFixed(2) + 'px');
+    keys.classList.toggle('small', W < 24);
+    drawMap(); syncWin();
+  }
+  function drawMap() {
+    var c = $('pnMapC'), r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    c.width = Math.max(1, Math.round(r.width * dpr)); c.height = Math.max(1, Math.round(r.height * dpr));
+    var g = c.getContext('2d'), kw = c.width / whites; g.fillStyle = '#fafafa'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#aaa'; for (var i = 1; i < whites; i++) g.fillRect(Math.round(i * kw), 0, 1, c.height);
+    g.fillStyle = '#333'; for (var m = LO; m <= HI; m++) if (BLACK[m % 12]) g.fillRect((posOf[m] - 0.3) * kw + 0.5 * kw, 0, kw * 0.6, c.height * 0.6);
+  }
+  function syncWin() {
+    var total = whites * W, mw = $('pnMap').clientWidth, win = $('pnWin');
+    win.style.left = (wrap.scrollLeft / total * mw) + 'px'; win.style.width = Math.min(mw, wrap.clientWidth / total * mw) + 'px';
+  }
+  function scrollToWhite(px) { wrap.scrollLeft = px; syncWin(); }
+  function reveal(lo, hi) { // make sure keys lo..hi are on screen
+    var a = whiteIndex(lo) * W, b = (whiteIndex(hi) + 1) * W, l = wrap.scrollLeft, r = l + wrap.clientWidth;
+    if (a >= l && b <= r) return;
+    scrollToWhite(b - a > wrap.clientWidth ? a : a - (wrap.clientWidth - (b - a)) / 2);
+  }
+  function whiteIndex(m) { m = Math.max(LO, Math.min(HI, m)); return Math.floor(posOf[m]); }
+  wrap.addEventListener('scroll', syncWin, { passive: true });
+  var mapDrag = false;
+  function mapTo(e) { var r = $('pnMap').getBoundingClientRect(); scrollToWhite((e.clientX - r.left) / r.width * whites * W - wrap.clientWidth / 2); }
+  $('pnMap').addEventListener('pointerdown', function (e) { mapDrag = true; try { $('pnMap').setPointerCapture(e.pointerId); } catch (x) {} mapTo(e); });
+  $('pnMap').addEventListener('pointermove', function (e) { if (mapDrag) mapTo(e); });
+  ['pointerup', 'pointercancel'].forEach(function (t) { $('pnMap').addEventListener(t, function () { mapDrag = false; }); });
+  $('pnSpan').addEventListener('change', function () { var mid = (wrap.scrollLeft + wrap.clientWidth / 2) / W; layout(); scrollToWhite(mid * W - wrap.clientWidth / 2); });
+  var rt = null; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { var mid = (wrap.scrollLeft + wrap.clientWidth / 2) / W; layout(); scrollToWhite(mid * W - wrap.clientWidth / 2); }, 80); });
+  $('pnShowKeys').addEventListener('change', function () { keys.classList.toggle('nokbd', !$('pnShowKeys').checked); });
+
+  // full screen (turns the phone sideways where the browser allows it)
+  var stage = $('pnStage'), fsOK = !!(stage.requestFullscreen || stage.webkitRequestFullscreen);
+  $('pnFull').hidden = !fsOK;
+  $('pnFull').addEventListener('click', function () {
+    var fe = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fe) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    var p = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
+    if (p && p.then) p.then(function () { try { screen.orientation.lock('landscape').catch(function () {}); } catch (e) {} }).catch(function () { say('bad', 'Full screen is not allowed here. Turn your phone sideways for more keys.'); });
+  });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { $('pnFull').textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? 'Exit full screen' : 'Full screen'; setTimeout(layout, 60); }); });
+
+  // ---------------- chord names ----------------
+  var CHORDS = [['', [0, 4, 7], 'major'], ['m', [0, 3, 7], 'minor'], ['7', [0, 4, 7, 10], 'dominant 7th'], ['maj7', [0, 4, 7, 11], 'major 7th'], ['m7', [0, 3, 7, 10], 'minor 7th'],
+    ['dim', [0, 3, 6], 'diminished'], ['aug', [0, 4, 8], 'augmented'], ['sus4', [0, 5, 7], 'suspended 4th'], ['sus2', [0, 2, 7], 'suspended 2nd'], ['6', [0, 4, 7, 9], 'major 6th'], ['m6', [0, 3, 7, 9], 'minor 6th'],
+    ['m7♭5', [0, 3, 6, 10], 'half-diminished'], ['dim7', [0, 3, 6, 9], 'diminished 7th'], ['m(maj7)', [0, 3, 7, 11], 'minor major 7th'], ['7sus4', [0, 5, 7, 10], '7th suspended 4th'],
+    ['add9', [0, 2, 4, 7], 'major add 9'], ['m(add9)', [0, 2, 3, 7], 'minor add 9'], ['9', [0, 2, 4, 7, 10], 'dominant 9th'], ['maj9', [0, 2, 4, 7, 11], 'major 9th'], ['m9', [0, 2, 3, 7, 10], 'minor 9th'],
+    ['7', [0, 4, 10], 'dominant 7th (no 5th)'], ['maj7', [0, 4, 11], 'major 7th (no 5th)'], ['m7', [0, 3, 10], 'minor 7th (no 5th)'], ['5', [0, 7], 'power chord']];
+  var INTERVALS = ['unison', 'minor 2nd', 'major 2nd', 'minor 3rd', 'major 3rd', 'perfect 4th', 'tritone', 'perfect 5th', 'minor 6th', 'major 6th', 'minor 7th', 'major 7th'];
+  function chordOf(ms) { // ms: sorted midi numbers
+    if (!ms.length) return null;
+    var pcs = [], bass = ms[0] % 12;
+    ms.forEach(function (m) { if (pcs.indexOf(m % 12) < 0) pcs.push(m % 12); });
+    if (pcs.length === 1) return { name: nameOf(ms[0], false), long: ms.length > 1 ? 'octave' : 'single note' };
+    var roots = [bass].concat(pcs.filter(function (p) { return p !== bass; }));
+    for (var c = 0; c < CHORDS.length; c++) for (var r = 0; r < roots.length; r++) {
+      var ch = CHORDS[c], rel = pcs.map(function (p) { return (p - roots[r] + 12) % 12; }).sort(function (a, b) { return a - b; });
+      if (rel.length === ch[1].length && rel.every(function (x, i) { return x === ch[1][i]; })) {
+        if (ch[0] === '5' && pcs.length === 2 && roots[r] !== bass) continue;
+        var root = nameOf(roots[r], false), sol = $('pnNames').value === 'doremi';
+        return { name: root + (sol && ch[0] ? ' ' : '') + ch[0] + (roots[r] !== bass ? '/' + nameOf(bass, false) : ''), long: root + ' ' + ch[2] + (roots[r] !== bass ? ', ' + nameOf(bass, false) + ' in the bass' : '') };
+      }
+    }
+    if (pcs.length === 2) { var iv = (ms[ms.length - 1] - ms[0]) % 12; return { name: nameOf(ms[0], false) + '–' + nameOf(ms[ms.length - 1], false), long: INTERVALS[iv] + (ms[ms.length - 1] - ms[0] > 12 ? ' (wide)' : '') }; }
+    return { name: '?', long: 'no common chord name' };
+  }
+  function showChord() {
+    var ms = Object.keys(held).concat(Object.keys(sustained)).concat(Object.keys(playOn)).map(Number).filter(function (m, i, a) { return a.indexOf(m) === i; }).sort(function (a, b) { return a - b; });
+    var c = chordOf(ms);
+    $('pnChord').textContent = c ? c.name : (recording ? 'Recording…' : 'Play a key');
+    $('pnNotes').textContent = c ? (ms.slice(0, 10).map(function (m) { return nameOf(m, true); }).join(' ') + (ms.length > 10 ? ' …' : '') + ' · ' + c.long) : (pedal ? 'Sustain pedal down' : ' ');
+  }
+
+  // ---------------- recording ----------------
+  var recording = false, recT0 = 0, take = saved.take && Array.isArray(saved.take.ev) ? saved.take : null, recTimer = null, playOn = {};
+  function nowSec() { return actx ? actx.currentTime : performance.now() / 1000; }
+  function recEv(type, m, v) {
+    if (!recording) return;
+    var t = nowSec() - recT0;
+    if (t > MAXREC) { stopRec(); say('', 'Recording stopped at the 10 minute limit.'); return; }
+    var e = [type, +t.toFixed(4)]; if (m != null) e.push(+m); if (v != null) e.push(+v.toFixed(3)); if (type === 'on') e.push($('pnSound').value);
+    take.ev.push(e);
+  }
+  function plural(n, w) { return n + ' ' + w + (n === 1 ? '' : 's'); }
+  function fmtT(s) { s = Math.max(0, s); var m = Math.floor(s / 60), r = Math.floor(s % 60); return m + ':' + (r < 10 ? '0' : '') + r; }
+  function notesOf(tk) { // turn key and pedal events into notes with a start and an end
+    var res = [], open = {}, ped = false, susp = {}, last = 0;
+    tk.ev.forEach(function (e) {
+      var t = e[1]; last = Math.max(last, t);
+      if (e[0] === 'on') { if (open[e[2]]) { open[e[2]].end = t; delete open[e[2]]; } if (susp[e[2]]) { susp[e[2]].end = t; delete susp[e[2]]; } var n = { m: e[2], v: e[3], k: e[4] || tk.sound || 'piano', start: t, end: null }; res.push(n); open[e[2]] = n; }
+      else if (e[0] === 'off') { var n2 = open[e[2]]; if (!n2) return; delete open[e[2]]; if (ped) susp[e[2]] = n2; else n2.end = t; }
+      else if (e[0] === 'pd') ped = true;
+      else if (e[0] === 'pu') { ped = false; Object.keys(susp).forEach(function (m) { susp[m].end = t; }); susp = {}; }
+    });
+    var stop = Math.max(last, tk.len || 0);
+    res.forEach(function (n) { if (n.end == null) n.end = stop; });
+    return res;
+  }
+  function refresh() {
+    var has = !!(take && take.ev.some(function (e) { return e[0] === 'on'; }));
+    ['pnPlay', 'pnWav', 'pnMidi', 'pnClear'].forEach(function (id) { $(id).disabled = !has || recording; });
+    $('pnRec').disabled = playing;
+    if (!recording && !playing) $('pnStatus').className = 'pn-status', $('pnStatus').textContent = has ? 'Recording: ' + fmtT(take.len) + ', ' + plural(notesOf(take).length, 'note') + '. Saved on this device.' : 'Nothing recorded yet. Press Record, then play.';
+  }
+  function startRec() {
+    if (!audio()) return;
+    stopPlay();
+    take = { v: 1, sound: $('pnSound').value, ev: [], len: 0, date: new Date().toISOString() };
+    recording = true; recT0 = nowSec();
+    // notes already held when recording starts are included
+    if (pedal) recEv('pd');
+    Object.keys(held).forEach(function (m) { recEv('on', +m, 0.8); });
+    $('pnRec').innerHTML = '■ Stop recording'; $('pnStatus').className = 'pn-status live';
+    recTimer = setInterval(function () { var t = nowSec() - recT0; $('pnStatus').textContent = '● Recording ' + fmtT(t); if (t > MAXREC) { stopRec(); say('', 'Recording stopped at the 10 minute limit.'); } }, 250);
+    $('pnStatus').textContent = '● Recording 0:00'; say('', 'Recording. Play now, then press Stop recording.'); refresh(); showChord();
+  }
+  function stopRec() {
+    if (!recording) return;
+    take.len = +(nowSec() - recT0).toFixed(3);
+    if (pedal) recEv('pu');
+    recording = false; clearInterval(recTimer);
+    $('pnRec').innerHTML = '<span class="pn-dot"></span> Record';
+    var n = notesOf(take).length;
+    if (!n) { take = null; say('bad', 'Nothing was played, so nothing was recorded.'); }
+    else { // trim silence before the first note
+      var first = take.ev.filter(function (e) { return e[0] === 'on'; })[0][1], cut = Math.max(0, first - 0.05);
+      take.ev.forEach(function (e) { e[1] = +Math.max(0, e[1] - cut).toFixed(4); }); take.len = +(take.len - cut).toFixed(3);
+      saved = load(); saved.take = take; say(store(saved) ? 'ok' : '', 'Recorded ' + plural(n, 'note') + '. Press Play to hear it, or download it as WAV or MIDI.' + (store(saved) ? '' : ' (Too long to keep after you close the page.)'));
+    }
+    refresh(); showChord();
+  }
+  $('pnRec').addEventListener('click', function () { if (recording) stopRec(); else startRec(); });
+
+  // playback of the take, scheduled a little ahead on the audio clock
+  var playing = false, playTimer = null, playIdx = 0, playNotes = [], playT0 = 0, playVoices = [], raf = 0;
+  function stopPlay() {
+    if (!playing) return;
+    playing = false; clearInterval(playTimer); cancelAnimationFrame(raf);
+    playVoices.forEach(function (x) { x.v.kill(actx.currentTime); }); playVoices = [];
+    var was = Object.keys(playOn); playOn = {}; was.forEach(function (m) { paintKey(+m); });
+    $('pnPlay').textContent = '▶ Play'; refresh(); showChord();
+  }
+  function startPlay() {
+    if (!take || !audio()) return;
+    playNotes = notesOf(take).sort(function (a, b) { return a.start - b.start; }); playIdx = 0; playing = true; playVoices = [];
+    playT0 = actx.currentTime + 0.12; $('pnPlay').textContent = '■ Stop'; refresh(); $('pnPlay').disabled = false;
+    $('pnStatus').className = 'pn-status';
+    function pump() {
+      var horizon = actx.currentTime + 0.4;
+      while (playIdx < playNotes.length && playT0 + playNotes[playIdx].start < horizon) {
+        var n = playNotes[playIdx++], v = voice(actx, out, n.k, n.m, n.v, playT0 + n.start); v.release(playT0 + n.end); playVoices.push({ v: v, n: n });
+      }
+      playVoices = playVoices.filter(function (x) { return x.v.end > actx.currentTime; });
+      if (playIdx >= playNotes.length && actx.currentTime > playT0 + take.len + 0.3) stopPlay();
+    }
+    function draw() {
+      if (!playing) return;
+      var t = actx.currentTime - playT0, on = {};
+      playNotes.forEach(function (n) { if (n.start <= t && n.end > t) on[n.m] = 1; });
+      var ch = Object.keys(on).concat(Object.keys(playOn)); playOn = on; ch.forEach(function (m) { paintKey(+m); });
+      $('pnStatus').textContent = '▶ ' + fmtT(t) + ' / ' + fmtT(take.len); showChord();
+      raf = requestAnimationFrame(draw);
+    }
+    pump(); playTimer = setInterval(pump, 50); draw();
+  }
+  $('pnPlay').addEventListener('click', function () { if (playing) stopPlay(); else startPlay(); });
+  $('pnClear').addEventListener('click', function () {
+    if (!confirm('Delete this recording?')) return;
+    stopPlay(); take = null; saved = load(); delete saved.take; store(saved); refresh(); say('', 'Recording deleted.');
+  });
+
+  // ---------------- downloads ----------------
+  function download(blob, name) {
+    var a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+  }
+  function stamp() { var d = new Date(); function p(n) { return (n < 10 ? '0' : '') + n; } return d.getFullYear() + p(d.getMonth() + 1) + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); }
+  function wav(buf) {
+    var ch = buf.numberOfChannels, n = buf.length, sr = buf.sampleRate, data = [], peak = 0, i, c;
+    for (c = 0; c < ch; c++) { data.push(buf.getChannelData(c)); for (i = 0; i < n; i++) { var a = Math.abs(data[c][i]); if (a > peak) peak = a; } }
+    var k = peak > 0.98 ? 0.98 / peak : 1, ab = new ArrayBuffer(44 + n * ch * 2), dv = new DataView(ab), o = 0;
+    function s(t) { for (var j = 0; j < t.length; j++) dv.setUint8(o++, t.charCodeAt(j)); }
+    s('RIFF'); dv.setUint32(o, 36 + n * ch * 2, true); o += 4; s('WAVEfmt '); dv.setUint32(o, 16, true); o += 4; dv.setUint16(o, 1, true); o += 2; dv.setUint16(o, ch, true); o += 2;
+    dv.setUint32(o, sr, true); o += 4; dv.setUint32(o, sr * ch * 2, true); o += 4; dv.setUint16(o, ch * 2, true); o += 2; dv.setUint16(o, 16, true); o += 2; s('data'); dv.setUint32(o, n * ch * 2, true); o += 4;
+    for (i = 0; i < n; i++) for (c = 0; c < ch; c++) { var x = Math.max(-1, Math.min(1, data[c][i] * k)); dv.setInt16(o, x < 0 ? x * 32768 : x * 32767, true); o += 2; }
+    return new Blob([ab], { type: 'audio/wav' });
+  }
+  var busy = false;
+  $('pnWav').addEventListener('click', function () {
+    if (!take || busy) return;
+    if (!OAC) { say('bad', 'This browser cannot make audio files. Try Chrome, Edge, Firefox or Safari.'); return; }
+    var notes = notesOf(take), len = take.len + 0.2, tailEnd = len;
+    notes.forEach(function (n) { tailEnd = Math.max(tailEnd, n.end + (n.k === 'pad' ? 3 : 1.2)); });
+    var dur = Math.min(tailEnd, take.len + 4), sr = 44100;
+    busy = true; $('pnWav').disabled = true; say('', 'Making the WAV file…');
+    var oc;
+    try { oc = new OAC(1, Math.ceil(dur * sr), sr); } catch (e) { busy = false; refresh(); say('bad', 'Could not make the audio file on this device: ' + e.message); return; }
+    var mo = master(oc, vol() || 0.8);
+    notes.forEach(function (n) { var v = voice(oc, mo, n.k, n.m, n.v, n.start + 0.02); v.release(n.end + 0.02); });
+    var p = oc.startRendering(), done = function (buf) {
+      busy = false; refresh();
+      var b = wav(buf); download(b, 'piano-' + stamp() + '.wav'); say('ok', 'WAV downloaded (' + fmtT(dur) + ', ' + fmtBytes(b.size) + ').');
+    };
+    if (p && p.then) p.then(done, function (e) { busy = false; refresh(); say('bad', 'Could not make the audio file: ' + e.message); }); else oc.oncomplete = function (e) { done(e.renderedBuffer); };
+  });
+  function vlq(n) { var b = [n & 0x7f]; while ((n >>= 7)) b.unshift((n & 0x7f) | 0x80); return b; }
+  function midiFile(tk) {
+    var tps = 960, ev = []; // 480 ticks per beat at 120 BPM
+    tk.ev.forEach(function (e, i) {
+      var tick = Math.round(e[1] * tps);
+      if (e[0] === 'on') ev.push([tick, 1, i, [0x90, e[2], Math.max(1, Math.min(127, Math.round(e[3] * 127)))]]);
+      else if (e[0] === 'off') ev.push([tick, 0, i, [0x80, e[2], 64]]);
+      else ev.push([tick, 0, i, [0xB0, 64, e[0] === 'pd' ? 127 : 0]]);
+    });
+    // close any note still sounding at the end
+    var open = {}; tk.ev.forEach(function (e) { if (e[0] === 'on') open[e[2]] = (open[e[2]] || 0) + 1; else if (e[0] === 'off' && open[e[2]]) open[e[2]]--; });
+    var endT = Math.round((tk.len || 0) * tps); ev.forEach(function (x) { endT = Math.max(endT, x[0]); });
+    Object.keys(open).forEach(function (m) { for (var j = 0; j < open[m]; j++) ev.push([endT, 0, 1e9, [0x80, +m, 64]]); });
+    ev.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1] || a[2] - b[2]; });
+    var name = 'GetToolNest piano', trk = [0, 0xFF, 0x51, 3, 0x07, 0xA1, 0x20, 0, 0xFF, 0x58, 4, 4, 2, 24, 8, 0, 0xFF, 0x03, name.length];
+    for (var i = 0; i < name.length; i++) trk.push(name.charCodeAt(i));
+    trk.push(0, 0xC0, GM[tk.sound] || 0);
+    var last = 0; ev.forEach(function (x) { trk.push.apply(trk, vlq(x[0] - last)); trk.push.apply(trk, x[3]); last = x[0]; });
+    trk.push(0, 0xFF, 0x2F, 0);
+    var hd = [0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x01, 0xE0, 0x4D, 0x54, 0x72, 0x6B, (trk.length >>> 24) & 255, (trk.length >>> 16) & 255, (trk.length >>> 8) & 255, trk.length & 255];
+    return new Blob([new Uint8Array(hd.concat(trk))], { type: 'audio/midi' });
+  }
+  $('pnMidi').addEventListener('click', function () { if (!take) return; var b = midiFile(take); download(b, 'piano-' + stamp() + '.mid'); say('ok', 'MIDI file downloaded (' + fmtBytes(b.size) + '). Open it in any music app or DAW.'); });
+
+  // stop sound when the tab is hidden, so notes do not hang
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'hidden') return;
+    Object.keys(ptr).forEach(function (id) { noteOff(ptr[id]); }); ptr = {};
+    Object.keys(kbdDown).forEach(function (c) { noteOff(kbdDown[c]); }); kbdDown = {};
+    if (recording) stopRec();
+  });
+
+  if (window.matchMedia && matchMedia('(pointer: coarse)').matches && !matchMedia('(any-pointer: fine)').matches && !saved.kbdSeen) $('pnShowKeys').checked = false; // phones have no keyboard to show
+  labelKeys(); labelKbd(); layout(); keys.classList.toggle('nokbd', !$('pnShowKeys').checked);
+  setTimeout(function () { layout(); reveal(base(), base() + 23); }, 0);
+  refresh();
+  if (take) say('', 'Your last recording is ready to play or download.');
+  window.__pnTest = { chordOf: chordOf, notesOf: notesOf, midiFile: midiFile }; // used by automated tests only
+})();
+</script>

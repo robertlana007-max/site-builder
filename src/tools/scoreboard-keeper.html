@@ -1,0 +1,533 @@
+<style>
+.sb-stage { background: var(--surface); border-radius: 14px; }
+.sb-stage:fullscreen { padding: 2vmin 3vmin; overflow: auto; box-sizing: border-box; height: 100vh; }
+.sb-title { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; margin: 0 0 8px; }
+.sb-title b { font-size: 17px; }
+.sb-title span { color: var(--muted); font-size: 14px; }
+.sb-clocks { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; justify-content: center; margin: 4px 0 10px; }
+.sb-clock { font: 800 clamp(26px, 7vw, 40px)/1 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums; padding: 6px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--line); }
+.sb-clock.out { color: var(--bad); border-color: var(--bad); }
+.sb-clock small { display: block; font: 600 11px/1.2 system-ui, sans-serif; color: var(--muted); text-align: center; margin-top: 2px; }
+.sb-clocks .btn { min-height: 44px; padding: 6px 12px; }
+.sb-sides { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.sb-side { border: 2px solid var(--line); border-radius: 14px; padding: 10px; text-align: center; min-width: 0; background: var(--bg); }
+.sb-side.lead { border-color: var(--accent); }
+.sb-side.turn { box-shadow: 0 0 0 3px #f59e0b; }
+.sb-name { font-weight: 700; font-size: clamp(15px, 4vw, 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sb-score { white-space: nowrap; overflow: hidden; font-weight: 800; font-size: clamp(56px, 17vw, 110px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin: 4px 0; }
+.sb-score.mid { font-size: clamp(40px, 11vw, 76px); }
+.sb-sub { font-size: 14px; color: var(--muted); min-height: 1.3em; }
+.sb-side .btns { justify-content: center; margin-top: 8px; gap: 6px; }
+.sb-side .btn { min-height: 48px; min-width: 52px; padding: 6px 10px; font-size: 17px; justify-content: center; }
+.sb-ctl { margin: 12px 0 0; }
+.sb-ctl .btns { margin: 8px 0 0; gap: 8px; }
+.sb-ctl .btn { min-height: 48px; justify-content: center; }
+.sb-balls { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
+.sb-balls .btn { min-height: 54px; font-size: 20px; padding: 4px; justify-content: center; }
+.sb-ext { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+.sb-ext .btn { min-height: 44px; font-size: 14px; padding: 4px; justify-content: center; }
+.sb-info { display: flex; flex-wrap: wrap; gap: 6px 18px; justify-content: center; font-size: 16px; margin: 10px 0 0; }
+.sb-info b { font-variant-numeric: tabular-nums; }
+.sb-log { font: 14px/1.7 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; padding: 6px 10px; margin-top: 10px; }
+.sb-log span { display: inline-block; min-width: 26px; text-align: center; border-radius: 6px; margin: 1px; }
+.sb-log .w { background: var(--bad); color: #fff; } .sb-log .f { background: var(--ok); color: #fff; } .sb-log .s { background: #7c3aed; color: #fff; }
+.sb-table { overflow-x: auto; margin-top: 10px; border: 1px solid var(--line); border-radius: 10px; }
+.sb-table table { border-collapse: collapse; width: 100%; font-variant-numeric: tabular-nums; }
+.sb-table th, .sb-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: center; white-space: nowrap; }
+.sb-table td.e { cursor: pointer; }
+.sb-table tfoot td { font-weight: 800; font-size: 18px; }
+.sb-table input { width: 72px; text-align: center; padding: 6px; }
+.sb-banner { text-align: center; font-weight: 800; font-size: clamp(18px, 5vw, 26px); color: var(--ok); margin: 10px 0 0; }
+.sb-note { text-align: center; color: #b45309; font-weight: 700; margin: 8px 0 0; min-height: 0; }
+.sb-hist { list-style: none; padding: 0; margin: 0; }
+.sb-hist li { border: 1px solid var(--line); border-radius: 10px; padding: 10px; margin: 0 0 8px; }
+.sb-hist li small { color: var(--muted); }
+.sb-hist .btns { margin-top: 6px; } .sb-hist .btn { min-height: 38px; padding: 4px 12px; font-size: 14px; }
+.sb-stage:fullscreen .sb-score { font-size: min(24vmin, 220px); }
+.sb-stage:fullscreen .sb-name { font-size: min(5vmin, 40px); }
+.sb-stage:fullscreen .sb-clock { font-size: min(8vmin, 64px); }
+.sb-stage:fullscreen.hidectl .sb-ctl, .sb-stage:fullscreen.hidectl .sb-side .btns, .sb-stage:fullscreen.hidectl .sb-clocks .btn { display: none; }
+.sb-print { display: none; }
+@media print {
+  body > *:not(.sb-print) { display: none !important; }
+  .sb-print { display: block !important; color: #000; font: 11pt/1.4 system-ui, sans-serif; }
+  .sb-print table { border-collapse: collapse; width: 100%; }
+  .sb-print th, .sb-print td { border: 1px solid #999; padding: 4px 6px; text-align: left; vertical-align: top; }
+  .sb-print h2 { margin: 0 0 8px; }
+}
+</style>
+<div id="sbSetup">
+  <div class="fields">
+    <div><label for="sbGame">Game</label><select id="sbGame">
+      <option value="cricket">Cricket</option><option value="football">Football (soccer)</option><option value="basketball">Basketball</option><option value="volleyball">Volleyball</option>
+      <option value="badminton">Badminton</option><option value="tabletennis">Table tennis</option><option value="carrom">Carrom</option><option value="cards">Card game (rounds)</option>
+      <option value="board">Board game (rounds and turn timer)</option><option value="custom">Custom (any game)</option></select></div>
+    <div><label for="sbTitle">Match name (optional)</label><input type="text" id="sbTitle" data-nomemo maxlength="60" placeholder="e.g. Sunday final"></div>
+  </div>
+  <label for="sbNames" id="sbNamesLbl">Teams (one per line)</label>
+  <textarea id="sbNames" data-nomemo rows="3" style="min-height:0" maxlength="800"></textarea>
+  <div class="fields" id="sbOpts" style="margin-top:12px"></div>
+  <div class="btns" style="margin:0"><button type="button" class="btn big" id="sbStart">Start match</button></div>
+</div>
+<div id="sbLive" hidden>
+  <div class="sb-stage" id="sbStage">
+    <div class="sb-title"><b id="sbHead"></b><span id="sbHeadSub"></span></div>
+    <div class="sb-clocks" id="sbClocks"></div>
+    <div id="sbBoard"></div>
+    <div class="sb-note" id="sbNote" aria-live="polite"></div>
+    <div class="sb-ctl" id="sbCtl"></div>
+    <div class="btns">
+      <button type="button" class="btn ghost" id="sbUndo">↶ Undo</button>
+      <button type="button" class="btn ghost" id="sbFull">Full screen</button>
+      <button type="button" class="btn ghost" id="sbHide" hidden>Hide buttons</button>
+    </div>
+  </div>
+  <div class="btns">
+    <button type="button" class="btn" id="sbShare">Share result as image</button>
+    <button type="button" class="btn ghost" id="sbFinish">Finish and save</button>
+    <button type="button" class="btn ghost danger" id="sbQuit">Discard match</button>
+  </div>
+</div>
+<p class="msg" id="sbMsg" aria-live="polite">Choose a game, type the names and press Start. Everything stays on this device.</p>
+<fieldset style="margin-top:18px">
+  <legend>Match history</legend>
+  <ul class="sb-hist" id="sbHist"></ul>
+  <div class="btns" style="margin:0">
+    <button type="button" class="btn ghost" id="sbExport">Export JSON</button>
+    <button type="button" class="btn ghost" id="sbCsv">Export CSV</button>
+    <button type="button" class="btn ghost" id="sbImportBtn">Import JSON</button>
+    <button type="button" class="btn ghost" id="sbPrint">Print / PDF</button>
+    <button type="button" class="btn ghost danger" id="sbWipe">Delete history</button>
+    <input type="file" id="sbImport" accept=".json,application/json" data-nomemo hidden>
+  </div>
+</fieldset>
+<script>
+(function () {
+  var LS = 'gtn-scoreboard-keeper';
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function say(c, t) { $('sbMsg').className = 'msg ' + (c || ''); $('sbMsg').textContent = t; }
+  function save() { try { localStorage.setItem(LS, JSON.stringify(db)); } catch (e) { say('bad', 'Could not save on this device (storage is full or blocked).'); } }
+
+  // ---------------- game definitions ----------------
+  var GAMES = {
+    cricket: { name: 'Cricket', who: 'Teams', names: 'Team A\nTeam B', min: 2, max: 2, opts: [['overs', 'Overs per innings (0 = no limit)', 20, 0, 100], ['players', 'Players per side', 11, 2, 15], ['bpo', 'Balls per over', 6, 4, 10], ['first', 'Batting first', 'sel', ['first team', 'second team']]] },
+    football: { name: 'Football', who: 'Teams', names: 'Home\nAway', min: 2, max: 2, opts: [['half', 'Minutes per half', 45, 1, 60]] },
+    basketball: { name: 'Basketball', who: 'Teams', names: 'Home\nAway', min: 2, max: 2, opts: [['qlen', 'Minutes per quarter', 10, 1, 20], ['quarters', 'Quarters', 4, 1, 8]] },
+    volleyball: { name: 'Volleyball', who: 'Teams', names: 'Team A\nTeam B', min: 2, max: 2, opts: [['bestOf', 'Best of (sets)', 5, 1, 7], ['to', 'Points per set', 25, 5, 50], ['last', 'Points in deciding set', 15, 5, 50], ['srv', 'Serving first', 'sel', ['first team', 'second team']]] },
+    badminton: { name: 'Badminton', who: 'Players or pairs', names: 'Player 1\nPlayer 2', min: 2, max: 2, opts: [['bestOf', 'Best of (games)', 3, 1, 7], ['to', 'Points per game', 21, 5, 50], ['cap', 'Golden point at', 30, 5, 60], ['srv', 'Serving first', 'sel', ['first', 'second']]] },
+    tabletennis: { name: 'Table tennis', who: 'Players or pairs', names: 'Player 1\nPlayer 2', min: 2, max: 2, opts: [['bestOf', 'Best of (games)', 5, 1, 9], ['to', 'Points per game', 11, 5, 30], ['srv', 'Serving first', 'sel', ['first', 'second']]] },
+    carrom: { name: 'Carrom', who: 'Players or pairs', names: 'Player 1\nPlayer 2', min: 2, max: 2, opts: [['target', 'Points to win', 25, 5, 100], ['boards', 'Most boards', 8, 1, 30], ['qcap', 'Queen (3 points) counts until', 22, 0, 100]] },
+    cards: { name: 'Card game', who: 'Players', names: 'Player 1\nPlayer 2\nPlayer 3\nPlayer 4', min: 1, max: 12, opts: [['low', 'Winner', 'sel', ['highest score', 'lowest score']], ['target', 'Game ends at score (0 = no limit)', 0, 0, 100000], ['turn', 'Turn timer seconds (0 = off)', 0, 0, 3600]] },
+    board: { name: 'Board game', who: 'Players', names: 'Player 1\nPlayer 2\nPlayer 3', min: 1, max: 12, opts: [['low', 'Winner', 'sel', ['highest score', 'lowest score']], ['target', 'Game ends at score (0 = no limit)', 0, 0, 100000], ['turn', 'Turn timer seconds (0 = off)', 60, 0, 3600]] },
+    custom: { name: 'Custom game', who: 'Players or teams', names: 'Team A\nTeam B', min: 1, max: 12, opts: [['steps', 'Score buttons', 'text', '1, 2, 5'], ['target', 'Winning score (0 = none)', 0, 0, 100000], ['low', 'Winner', 'sel', ['highest score', 'lowest score']], ['mins', 'Countdown minutes (0 = count up)', 0, 0, 600], ['turn', 'Turn timer seconds (0 = off)', 0, 0, 3600]] }
+  };
+  var db = { cur: null, undo: [], hist: [] };
+  try { var o = JSON.parse(localStorage.getItem(LS)); if (o && Array.isArray(o.hist)) db = { cur: o.cur && GAMES[o.cur.type] && o.cur.d && Array.isArray(o.cur.names) ? o.cur : null, undo: Array.isArray(o.undo) ? o.undo : [], hist: o.hist.filter(function (h) { return h && h.type && h.result; }) }; } catch (e) {}
+  function showOpts() {
+    var g = GAMES[$('sbGame').value], box = $('sbOpts'); box.innerHTML = '';
+    $('sbNamesLbl').textContent = g.who + ' (one per line' + (g.max > 2 ? ', up to ' + g.max : ', two') + ')';
+    $('sbNames').value = g.names; $('sbNames').rows = Math.max(2, g.names.split('\n').length);
+    g.opts.forEach(function (o) {
+      var d = document.createElement('div'), id = 'sbO_' + o[0];
+      if (o[2] === 'sel') d.innerHTML = '<label for="' + id + '">' + o[1] + '</label><select id="' + id + '" data-nomemo>' + o[3].map(function (x, i) { return '<option value="' + i + '">' + x + '</option>'; }).join('') + '</select>';
+      else if (o[2] === 'text') d.innerHTML = '<label for="' + id + '">' + o[1] + '</label><input type="text" id="' + id + '" data-nomemo value="' + o[3] + '">';
+      else d.innerHTML = '<label for="' + id + '">' + o[1] + '</label><input type="number" id="' + id + '" data-nomemo inputmode="numeric" min="' + o[3] + '" max="' + o[4] + '" value="' + o[2] + '">';
+      box.appendChild(d);
+    });
+  }
+  $('sbGame').addEventListener('change', showOpts);
+
+  $('sbStart').addEventListener('click', function () {
+    var type = $('sbGame').value, g = GAMES[type];
+    var names = $('sbNames').value.split('\n').map(function (s) { return s.trim().slice(0, 40); }).filter(Boolean);
+    if (names.length < g.min) { say('bad', 'Please type ' + (g.min === 2 ? 'both names' : 'at least one name') + ', one per line.'); return; }
+    if (names.length > g.max) { say('bad', g.name + ' needs ' + (g.max === 2 ? 'exactly two sides' : 'at most ' + g.max + ' names') + '. You typed ' + names.length + '.'); return; }
+    var opts = {}, bad = null;
+    g.opts.forEach(function (o) {
+      var el = $('sbO_' + o[0]);
+      if (o[2] === 'sel') opts[o[0]] = +el.value;
+      else if (o[2] === 'text') { var st = el.value.split(/[ ,;]+/).map(Number).filter(function (n) { return isFinite(n) && n > 0 && n <= 1000; }).slice(0, 4); if (!st.length) bad = 'Type one or more score steps, like 1, 2, 5.'; opts[o[0]] = st; }
+      else { var v = Number(el.value); if (el.value === '' || !isFinite(v) || v < o[3] || v > o[4] || Math.round(v) !== v) bad = '"' + o[1] + '" must be a whole number from ' + o[3] + ' to ' + o[4] + '.'; opts[o[0]] = v; }
+    });
+    if (bad) { say('bad', bad); return; }
+    if ((type === 'volleyball' || type === 'badminton' || type === 'tabletennis') && opts.bestOf % 2 === 0) { say('bad', '"Best of" should be an odd number, like 3 or 5.'); return; }
+    if (type === 'badminton' && opts.cap <= opts.to) { say('bad', 'The golden point must be higher than the points per game.'); return; }
+    if (db.cur && !confirm('A match is in progress. Start a new one and discard it?')) return;
+    db.cur = { id: Date.now().toString(36), type: type, title: $('sbTitle').value.trim().slice(0, 60), date: new Date().toISOString(), names: names, opts: opts, d: init(type, names, opts), clock: { acc: 0, t0: null }, turn: { i: 0, acc: 0, t0: null } };
+    db.undo = []; save(); showLive(); say('ok', 'Match started. Tap the buttons to score. Undo fixes any mistake.');
+  });
+
+  function init(type, names, o) {
+    var n = names.length, z = function () { return names.map(function () { return 0; }); };
+    if (type === 'cricket') { var b = o.first || 0; return { inn: [inn(b), inn(1 - b)], cur: 0, ext: '', done: false }; }
+    if (type === 'football') return { score: z(), pens: z(), period: 0, log: [] };
+    if (type === 'basketball') return { score: z(), fouls: z(), period: 0, log: [] };
+    if (type === 'volleyball' || type === 'badminton' || type === 'tabletennis') return { pts: z(), sets: z(), hist: [], srv: o.srv || 0, first: o.srv || 0, done: false };
+    if (type === 'carrom') return { score: z(), boards: [], done: false };
+    if (type === 'cards' || type === 'board') return { rounds: [], done: false };
+    return { score: z(), done: false };
+  }
+  function inn(bat) { return { bat: bat, runs: 0, wk: 0, balls: 0, ex: { wd: 0, nb: 0, b: 0, lb: 0 }, log: [[]], over: false }; }
+
+  // ---------------- clocks ----------------
+  function el(c) { return c.acc + (c.t0 ? Date.now() - c.t0 : 0); }
+  function fmt(ms, tenths) { var neg = ms < 0; ms = Math.abs(ms); var s = Math.floor(ms / 1000), m = Math.floor(s / 60), h = Math.floor(m / 60); var t = (h ? h + ':' + String(m % 60).padStart(2, '0') : m) + ':' + String(s % 60).padStart(2, '0'); return (neg ? '−' : '') + t; }
+  function clockLimit(m) { var o = m.opts; return m.type === 'basketball' ? o.qlen * 60000 : m.type === 'custom' && o.mins ? o.mins * 60000 : 0; }
+  function turnSecs(m) { return m.opts.turn || 0; }
+  var beeped = {};
+  function beep(n) {
+    try { var AC = window.AudioContext || window.webkitAudioContext, a = beep.a || (beep.a = new AC()); a.resume(); for (var i = 0; i < (n || 1); i++) { var o = a.createOscillator(), g = a.createGain(), t = a.currentTime + i * 0.25; o.frequency.value = 880; g.gain.setValueAtTime(0.3, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.2); o.connect(g); g.connect(a.destination); o.start(t); o.stop(t + 0.22); } } catch (e) {}
+    try { navigator.vibrate && navigator.vibrate(300); } catch (e) {}
+  }
+  function drawClocks() {
+    var m = db.cur; if (!m) return;
+    var lim = clockLimit(m), e = el(m.clock), h = '';
+    var show = lim ? lim - e : e;
+    if (lim && show <= 0 && m.clock.t0) { m.clock.acc = lim; m.clock.t0 = null; save(); beep(3); show = 0; }
+    var label = m.type === 'football' ? (m.d.period < 4 ? 'match clock' : '') : lim ? 'time left' : 'match time';
+    h += '<div class="sb-clock' + (lim && show <= 0 ? ' out' : '') + '" id="sbClk">' + fmt(show) + '<small>' + label + '</small></div>';
+    h += '<button type="button" class="btn ghost" data-a="clk">' + (m.clock.t0 ? 'Pause' : el(m.clock) ? 'Resume' : 'Start clock') + '</button><button type="button" class="btn ghost" data-a="clkreset">Reset</button>';
+    var ts = turnSecs(m);
+    if (ts) {
+      var left = ts * 1000 - el(m.turn);
+      if (left <= 0 && m.turn.t0) { m.turn.acc = ts * 1000; m.turn.t0 = null; save(); beep(2); left = 0; }
+      h += '<div class="sb-clock' + (left <= 0 ? ' out' : '') + '">' + fmt(Math.max(0, left) + 999) + '<small>' + esc(m.names[m.turn.i % m.names.length]) + '’s turn</small></div>';
+      h += '<button type="button" class="btn" data-a="nextturn">Next turn ▶</button><button type="button" class="btn ghost" data-a="turnpause">' + (m.turn.t0 ? 'Pause' : 'Go') + '</button>';
+    }
+    var box = $('sbClocks'); if (box.innerHTML !== h) box.innerHTML = h;
+  }
+  setInterval(function () { if (db.cur && !$('sbLive').hidden && (db.cur.clock.t0 || db.cur.turn.t0)) drawClocks(); }, 250);
+
+  // ---------------- scoring ----------------
+  function snap() { db.undo.push(JSON.stringify(db.cur)); if (db.undo.length > 150) db.undo.shift(); }
+  var note = '';
+  function act(a, i, v) {
+    var m = db.cur, d = m.d, o = m.opts, t = m.type; note = '';
+    if (a === 'clk') { if (m.clock.t0) { m.clock.acc = el(m.clock); m.clock.t0 = null; } else { var lim = clockLimit(m); if (lim && el(m.clock) >= lim) m.clock.acc = 0; m.clock.t0 = Date.now(); } save(); drawClocks(); return; }
+    if (a === 'clkreset') { if (el(m.clock) && !confirm('Reset the match clock?')) return; m.clock = { acc: 0, t0: null }; save(); drawClocks(); return; }
+    if (a === 'nextturn') { m.turn.i = (m.turn.i + 1) % m.names.length; m.turn.acc = 0; m.turn.t0 = Date.now(); save(); render(); return; }
+    if (a === 'turnpause') { if (m.turn.t0) { m.turn.acc = el(m.turn); m.turn.t0 = null; } else { if (el(m.turn) >= turnSecs(m) * 1000) m.turn.acc = 0; m.turn.t0 = Date.now(); } save(); drawClocks(); return; }
+    snap();
+    if (t === 'cricket') cricket(m, a, v);
+    else if (t === 'football' || t === 'basketball' || t === 'custom') {
+      if (a === 'add') {
+        if (t === 'football' && d.period === 4) d.pens[i] = Math.max(0, d.pens[i] + v);
+        else { d.score[i] += v; if (t !== 'custom') d.score[i] = Math.max(0, d.score[i]); if (v > 0 && d.log) d.log.push([i, v, fmt(el(m.clock))]); }
+        if (t === 'custom' && o.target && !d.done && d.score[i] >= o.target) { d.done = true; note = m.names[i] + ' reached ' + o.target + '. ' + result(m); }
+      } else if (a === 'foul') d.fouls[i] = Math.max(0, d.fouls[i] + v);
+      else if (a === 'period') { d.period++; m.clock = t === 'basketball' ? { acc: 0, t0: null } : m.clock; if (t === 'basketball') d.fouls = d.fouls.map(function () { return 0; }); }
+    } else if (t === 'volleyball' || t === 'badminton' || t === 'tabletennis') rally(m, a, i);
+    else if (t === 'carrom') carrom(m, a, v);
+    else if (t === 'cards' || t === 'board') rounds(m, a, v);
+    save(); render();
+  }
+  function cricket(m, a, v) {
+    var d = m.d, o = m.opts, I = d.inn[d.cur], maxW = o.players - 1, bpo = o.bpo;
+    if (a === 'ext') { d.ext = d.ext === v ? '' : v; return; }
+    if (a === 'endinn') { I.over = true; nextInnings(m); return; }
+    if (I.over || d.done) return;
+    var ex = d.ext, tok, last = I.log[I.log.length - 1];
+    d.ext = '';
+    if (a === 'ball') {
+      var r = v;
+      if (ex === 'wd') { I.runs += 1 + r; I.ex.wd += 1 + r; tok = (r ? r + 1 : '') + 'wd'; }
+      else if (ex === 'nb') { I.runs += 1 + r; I.ex.nb += 1; tok = 'nb' + (r ? '+' + r : ''); }
+      else if (ex === 'b' || ex === 'lb') { I.runs += r; I.ex[ex] += r; I.balls++; tok = r + ex; }
+      else { I.runs += r; I.balls++; tok = r ? String(r) : '•'; }
+    } else if (a === 'wkt') {
+      I.wk++;
+      if (ex === 'wd') { I.runs += 1; I.ex.wd += 1; tok = 'W+wd'; } else if (ex === 'nb') { I.runs += 1; I.ex.nb += 1; tok = 'W+nb'; } else { I.balls++; tok = 'W'; }
+    } else return;
+    last.push(tok);
+    var legal = a === 'wkt' ? ex !== 'wd' && ex !== 'nb' : ex !== 'wd' && ex !== 'nb';
+    if (legal && I.balls % bpo === 0) { I.log.push([]); note = 'End of over ' + I.balls / bpo + '.'; }
+    var target = d.cur === 1 ? d.inn[0].runs + 1 : 0;
+    if (I.wk >= maxW || (o.overs && I.balls >= o.overs * bpo) || (target && I.runs >= target)) { I.over = true; nextInnings(m); }
+  }
+  function nextInnings(m) {
+    var d = m.d;
+    if (d.cur === 0) { d.cur = 1; note = 'Innings over. ' + m.names[d.inn[1].bat] + ' need ' + (d.inn[0].runs + 1) + ' to win.'; }
+    else { d.done = true; note = result(m); }
+  }
+  function rally(m, a, i) {
+    var d = m.d, o = m.opts, t = m.type, n = 2;
+    if (d.done) return;
+    if (a === 'srv') { d.srv = 1 - d.srv; if (!d.pts[0] && !d.pts[1]) d.first = d.srv; return; }
+    if (a === 'minus') { d.pts[i] = Math.max(0, d.pts[i] - 1); serve(m); return; }
+    if (a !== 'pt') return;
+    d.pts[i]++;
+    var setNo = d.hist.length + 1, deciding = setNo === o.bestOf, to = t === 'volleyball' && deciding ? o.last : o.to, j = 1 - i;
+    var won = (d.pts[i] >= to && d.pts[i] - d.pts[j] >= 2) || (t === 'badminton' && d.pts[i] >= o.cap);
+    if (t === 'volleyball' || t === 'badminton') d.srv = i; else serve(m);
+    if (deciding && !won) { var half = Math.ceil(to / 2); if (t === 'tabletennis') half = Math.ceil(to / 2) - 1 + (to % 2 ? 0 : 1); if (t === 'badminton') half = Math.ceil(to / 2); if (d.pts[i] === half && d.pts[j] < half) note = 'Change ends now (' + m.names[i] + ' reached ' + half + ').'; }
+    if (won) {
+      d.hist.push(d.pts.slice()); d.sets[i]++;
+      var need = Math.floor(o.bestOf / 2) + 1, word = t === 'volleyball' ? 'Set' : 'Game';
+      if (d.sets[i] >= need) { d.done = true; note = result(m); }
+      else {
+        note = word + ' ' + setNo + ' to ' + m.names[i] + ' (' + d.pts.join('–') + '). Change ends.';
+        d.pts = [0, 0];
+        if (t === 'volleyball') d.first = 1 - d.first, d.srv = d.first;
+        else if (t === 'badminton') d.srv = i;
+        else { d.first = 1 - d.first; d.srv = d.first; }
+      }
+    }
+    if (t === 'tabletennis' && !d.done) serve(m);
+  }
+  function serve(m) { // table tennis: 2 serves each, 1 each from deuce
+    var d = m.d; if (m.type !== 'tabletennis') return;
+    var tot = d.pts[0] + d.pts[1], dz = 2 * (m.opts.to - 1);
+    d.srv = tot < dz ? d.first ^ (Math.floor(tot / 2) % 2) : d.first ^ (tot % 2);
+  }
+  function carrom(m, a, v) {
+    var d = m.d, o = m.opts;
+    if (a !== 'board' || d.done) return;
+    var w = v.w, coins = Math.max(0, Math.min(9, v.coins)), q = !!v.queen, qp = q && d.score[w] < o.qcap ? 3 : 0, pts = coins + qp;
+    d.score[w] += pts; d.boards.push({ w: w, coins: coins, queen: q, pts: pts });
+    note = 'Board ' + d.boards.length + ': ' + m.names[w] + ' +' + pts + (q && !qp ? ' (queen not counted from ' + o.qcap + ' points)' : '') + '.';
+    if (d.score[w] >= o.target || d.boards.length >= o.boards) { d.done = true; note = result(m); }
+  }
+  function rounds(m, a, v) {
+    var d = m.d, o = m.opts;
+    if (a === 'round') { d.rounds.push(v); var tot = totals(m); if (o.target && tot.some(function (x) { return x >= o.target; })) { d.done = true; note = 'Someone reached ' + o.target + '. ' + result(m); } }
+    else if (a === 'edit') { d.rounds[v.r][v.p] = v.val; }
+    else if (a === 'delround') { d.rounds.splice(v, 1); d.done = false; }
+  }
+  function totals(m) { return m.names.map(function (_, p) { return m.d.rounds.reduce(function (s, r) { return s + (r[p] || 0); }, 0); }); }
+  function scores(m) { // one main number per side, for leader and image
+    var d = m.d, t = m.type;
+    if (t === 'cricket') return m.names.map(function (_, i) { var I = d.inn[0].bat === i ? d.inn[0] : d.inn[1]; return I.runs; });
+    if (t === 'volleyball' || t === 'badminton' || t === 'tabletennis') return d.sets.slice();
+    if (t === 'cards' || t === 'board') return totals(m);
+    return d.score.slice();
+  }
+  function overs(balls, bpo) { return Math.floor(balls / bpo) + (balls % bpo ? '.' + balls % bpo : ''); }
+  function result(m) {
+    var d = m.d, t = m.type, N = m.names, o = m.opts;
+    if (t === 'cricket') {
+      var a = d.inn[0], b = d.inn[1];
+      if (!d.done) return N[a.bat] + ' ' + a.runs + '/' + a.wk + (d.cur ? ', ' + N[b.bat] + ' ' + b.runs + '/' + b.wk + ' (' + overs(b.balls, o.bpo) + ' ov)' : ' (' + overs(a.balls, o.bpo) + ' ov)');
+      if (b.runs > a.runs) return N[b.bat] + ' won by ' + (o.players - 1 - b.wk) + ' wicket' + (o.players - 1 - b.wk === 1 ? '' : 's');
+      if (a.runs > b.runs) return N[a.bat] + ' won by ' + (a.runs - b.runs) + ' run' + (a.runs - b.runs === 1 ? '' : 's');
+      return 'Match tied on ' + a.runs;
+    }
+    var s = scores(m), best = o.low ? Math.min.apply(null, s) : Math.max.apply(null, s), win = N.filter(function (_, i) { return s[i] === best; });
+    if (t === 'football' && s[0] === s[1] && (d.pens[0] || d.pens[1])) return (d.pens[0] > d.pens[1] ? N[0] : d.pens[1] > d.pens[0] ? N[1] : 'Nobody') + ' won on penalties ' + d.pens.join('–') + ' (' + s.join('–') + ')';
+    if (N.length === 1) return N[0] + ': ' + s[0];
+    if (win.length > 1) return 'Draw: ' + win.join(' and ') + ' on ' + best;
+    var detail = t === 'volleyball' || t === 'badminton' || t === 'tabletennis' ? ' (' + d.hist.map(function (h) { return h.join('–'); }).join(', ') + ')' : '';
+    return win[0] + ' won ' + (N.length === 2 ? s.join('–') : 'with ' + best) + detail;
+  }
+
+  // ---------------- drawing ----------------
+  function side(i, score, sub, btns, cls) {
+    return '<div class="sb-side' + (cls || '') + '"><div class="sb-name" title="' + esc(db.cur.names[i]) + '">' + esc(db.cur.names[i]) + '</div><div class="sb-score' + (String(score).length > 4 ? ' mid' : '') + '">' + score + '</div><div class="sb-sub">' + (sub || '&nbsp;') + '</div>' + (btns ? '<div class="btns">' + btns + '</div>' : '') + '</div>';
+  }
+  function B(a, i, v, label, ghost, aria) { return '<button type="button" class="btn' + (ghost ? ' ghost' : '') + '" data-a="' + a + '"' + (i != null ? ' data-i="' + i + '"' : '') + (v != null ? ' data-v="' + esc(typeof v === 'string' ? v : JSON.stringify(v)) + '"' : '') + (aria ? ' aria-label="' + esc(aria) + '"' : '') + '>' + label + '</button>'; }
+  function render() {
+    var m = db.cur; if (!m) return;
+    var d = m.d, t = m.type, o = m.opts, N = m.names, h = '', c = '', s = scores(m), lead = s.length > 1 && !s.every(function (x) { return x === s[0]; }) ? s.indexOf(o.low ? Math.min.apply(null, s) : Math.max.apply(null, s)) : -1;
+    $('sbHead').textContent = (m.title ? m.title + ' · ' : '') + GAMES[t].name;
+    $('sbHeadSub').textContent = new Date(m.date).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+    if (t === 'cricket') {
+      var I = d.inn[d.cur], bpo = o.bpo, tgt = d.cur ? d.inn[0].runs + 1 : 0;
+      h = '<div class="sb-sides">';
+      d.inn.forEach(function (x, k) {
+        var started = k <= d.cur, rr = x.balls ? (x.runs / (x.balls / bpo)).toFixed(2) : '0.00';
+        h += side(x.bat, started ? x.runs + '/' + x.wk : '–', started ? overs(x.balls, bpo) + (o.overs ? '/' + o.overs : '') + ' ov · RR ' + rr : 'yet to bat', '', k === d.cur && !d.done ? ' turn' : '');
+      });
+      h += '</div><div class="sb-info"><span>Extras <b>' + (I.ex.wd + I.ex.nb + I.ex.b + I.ex.lb) + '</b> (wd ' + I.ex.wd + ', nb ' + I.ex.nb + ', b ' + I.ex.b + ', lb ' + I.ex.lb + ')</span>';
+      if (tgt && !d.done) { var need = tgt - I.runs, left = o.overs ? o.overs * bpo - I.balls : 0; h += '<span>Target <b>' + tgt + '</b></span><span>Need <b>' + Math.max(0, need) + '</b>' + (o.overs ? ' off <b>' + left + '</b> balls · required RR <b>' + (left ? (need / (left / bpo)).toFixed(2) : '–') + '</b>' : '') + '</span>'; }
+      h += '</div><div class="sb-log" aria-label="Ball by ball">' + I.log.map(function (ov, k) { if (!ov.length && k) return ''; return '<div>Over ' + (k + 1) + ': ' + ov.map(function (b) { return '<span class="' + (/W/.test(b) ? 'w' : b === '4' || b === '6' ? (b === '6' ? 's' : 'f') : '') + '">' + b + '</span>'; }).join('') + '</div>'; }).reverse().join('') + '</div>';
+      if (d.done) h += '<div class="sb-banner">' + esc(result(m)) + '</div>';
+      else {
+        var ex = d.ext;
+        c = '<div class="sb-balls">' + [0, 1, 2, 3, 4, 6].map(function (r) { return B('ball', null, r, r === 0 ? '0 •' : r, r !== 4 && r !== 6, r + ' runs'); }).join('') + B('ball', null, 5, '5', true, '5 runs') + B('wkt', null, null, 'W', false, 'Wicket') + '</div>';
+        c += '<div class="sb-ext">' + [['wd', 'Wide'], ['nb', 'No ball'], ['b', 'Bye'], ['lb', 'Leg bye']].map(function (e) { return '<button type="button" class="btn ghost" data-a="ext" data-v="' + e[0] + '" aria-pressed="' + (ex === e[0]) + '">' + e[1] + '</button>'; }).join('') + '</div>';
+        c += '<p class="msg" style="text-align:center;font-size:13.5px">' + (ex ? '<b>' + { wd: 'Wide', nb: 'No ball', b: 'Bye', lb: 'Leg bye' }[ex] + ':</b> now tap the runs taken' + (ex === 'wd' || ex === 'nb' ? ' (0 if none; the 1 extra run is added for you)' : '') + ', or W.' : 'For a wide, no ball, bye or leg bye, tap it first and then the runs.') + '</p>';
+        c += '<div class="btns" style="justify-content:center">' + B('endinn', null, null, d.cur ? 'End match' : 'End innings', true) + '</div>';
+      }
+    } else if (t === 'football' || t === 'basketball' || t === 'custom') {
+      var per = t === 'football' ? ['1st half', '2nd half', 'Extra time 1', 'Extra time 2', 'Penalties'][Math.min(4, d.period)] : t === 'basketball' ? (d.period < o.quarters ? 'Quarter ' + (d.period + 1) : 'Overtime ' + (d.period - o.quarters + 1)) : '';
+      h = '<div class="sb-sides">' + N.map(function (n, i) {
+        var sub = t === 'basketball' ? 'Fouls ' + d.fouls[i] : t === 'football' && d.period === 4 ? 'Penalties ' + d.pens[i] : t === 'football' ? d.log.filter(function (g) { return g[0] === i; }).map(function (g) { return g[2]; }).join(', ') : '';
+        var bt = t === 'football' ? B('add', i, 1, d.period === 4 ? '+ Pen' : '+ Goal', false) + B('add', i, -1, '−', true, 'Take away one') :
+          t === 'basketball' ? B('add', i, 1, '+1') + B('add', i, 2, '+2') + B('add', i, 3, '+3') + B('add', i, -1, '−1', true) + B('foul', i, 1, 'Foul', true) :
+            o.steps.map(function (st) { return B('add', i, st, '+' + st); }).join('') + B('add', i, -o.steps[0], '−' + o.steps[0], true);
+        return side(i, s[i], sub ? esc(sub) : '', bt, (i === lead ? ' lead' : '') + (turnSecs(m) && m.turn.i % N.length === i ? ' turn' : ''));
+      }).join('') + '</div>';
+      if (per) h = '<div class="sb-info" style="margin:0 0 8px"><b>' + per + '</b></div>' + h;
+      if (t !== 'custom') c = '<div class="btns" style="justify-content:center">' + B('period', null, null, t === 'football' ? (d.period < 4 ? 'Next: ' + ['2nd half', 'Extra time', 'Extra time 2', 'Penalties'][d.period] : 'Penalties') : 'Next period', true) + '</div>';
+      if (t === 'custom' && d.done) h += '<div class="sb-banner">' + esc(note || result(m)) + '</div>';
+    } else if (t === 'volleyball' || t === 'badminton' || t === 'tabletennis') {
+      var word = t === 'volleyball' ? 'Sets' : 'Games';
+      h = '<div class="sb-sides">' + N.map(function (n, i) {
+        return side(i, d.pts[i], word + ' <b style="font-size:20px;color:var(--ink)">' + d.sets[i] + '</b>' + (!d.done && d.srv === i ? ' · <span style="color:#b45309;font-weight:700">● serving</span>' : ''), d.done ? '' : B('pt', i, null, '+ Point', false, 'Point to ' + n) + B('minus', i, null, '−', true, 'Take away a point'), (i === lead ? ' lead' : '') + (!d.done && d.srv === i ? ' turn' : ''));
+      }).join('') + '</div>';
+      if (d.hist.length) h += '<div class="sb-info">' + d.hist.map(function (x, k) { return '<span>' + (t === 'volleyball' ? 'Set ' : 'Game ') + (k + 1) + ': <b>' + x.join('–') + '</b></span>'; }).join('') + '</div>';
+      if (d.done) h += '<div class="sb-banner">' + esc(result(m)) + '</div>';
+      else c = '<div class="btns" style="justify-content:center">' + B('srv', null, null, 'Switch server', true) + '</div>';
+    } else if (t === 'carrom') {
+      h = '<div class="sb-sides">' + N.map(function (n, i) { return side(i, d.score[i], 'Boards won ' + d.boards.filter(function (b) { return b.w === i; }).length, '', i === lead ? ' lead' : ''); }).join('') + '</div>';
+      if (d.boards.length) h += '<div class="sb-table"><table><thead><tr><th>Board</th><th>Winner</th><th>Coins left</th><th>Queen</th><th>Points</th></tr></thead><tbody>' + d.boards.map(function (b, k) { return '<tr><td>' + (k + 1) + '</td><td>' + esc(N[b.w]) + '</td><td>' + b.coins + '</td><td>' + (b.queen ? 'yes' : '') + '</td><td>+' + b.pts + '</td></tr>'; }).join('') + '</tbody></table></div>';
+      if (d.done) h += '<div class="sb-banner">' + esc(result(m)) + '</div>';
+      else c = '<div class="fields" style="margin:0"><div><label for="sbCw">Board ' + (d.boards.length + 1) + ' won by</label><select id="sbCw" data-nomemo>' + N.map(function (n, i) { return '<option value="' + i + '">' + esc(n) + '</option>'; }).join('') + '</select></div><div><label for="sbCc">Opponent’s coins left (0–9)</label><input type="number" id="sbCc" data-nomemo min="0" max="9" value="0" inputmode="numeric"></div></div><div class="checks" style="margin:0"><label><input type="checkbox" id="sbCq" data-nomemo> The winner covered the queen (+3)</label></div><div class="btns">' + B('carromadd', null, null, 'Add board') + '</div>';
+    } else { // cards and board games
+      var tot = totals(m);
+      h = '<div class="sb-sides">' + N.map(function (n, i) { return side(i, tot[i], '', '', (i === lead ? ' lead' : '') + (turnSecs(m) && m.turn.i % N.length === i ? ' turn' : '')); }).join('') + '</div>';
+      h += '<div class="sb-table"><table><thead><tr><th>Round</th>' + N.map(function (n) { return '<th>' + esc(n) + '</th>'; }).join('') + '<th></th></tr></thead><tbody>' +
+        d.rounds.map(function (r, k) { return '<tr><td>' + (k + 1) + '</td>' + r.map(function (x, p) { return '<td class="e" data-r="' + k + '" data-p="' + p + '" title="Tap to change">' + x + '</td>'; }).join('') + '<td>' + B('delround', null, k, '×', true, 'Delete round ' + (k + 1)) + '</td></tr>'; }).join('') +
+        (d.done ? '' : '<tr><td>' + (d.rounds.length + 1) + '</td>' + N.map(function (n, p) { return '<td><input type="number" inputmode="decimal" step="any" data-nomemo class="sb-rin" data-p="' + p + '" aria-label="' + esc(n) + ' score this round" placeholder="0"></td>'; }).join('') + '<td></td></tr>') +
+        '</tbody><tfoot><tr><td>Total</td>' + tot.map(function (x) { return '<td>' + x + '</td>'; }).join('') + '<td></td></tr></tfoot></table></div>';
+      if (d.done) h += '<div class="sb-banner">' + esc(result(m)) + '</div>';
+      else c = '<div class="btns" style="justify-content:center">' + B('roundadd', null, null, 'Add round ' + (d.rounds.length + 1)) + '</div>';
+    }
+    $('sbBoard').innerHTML = h; $('sbCtl').innerHTML = c; $('sbNote').textContent = note;
+    $('sbUndo').disabled = !db.undo.length; drawClocks(); fit();
+  }
+  function fit() { // shrink a score until it fits its box (long cricket scores, small phones)
+    [].forEach.call(document.querySelectorAll('#sbBoard .sb-score'), function (el) {
+      el.style.fontSize = ''; var fs = parseFloat(getComputedStyle(el).fontSize), n = 0;
+      while (el.scrollWidth > el.clientWidth + 1 && fs > 18 && n++ < 40) { fs *= 0.92; el.style.fontSize = fs + 'px'; }
+    });
+  }
+  var ft = null; window.addEventListener('resize', function () { clearTimeout(ft); ft = setTimeout(fit, 100); });
+  $('sbStage').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-a]'), m = db.cur; if (!b || !m) return;
+    var a = b.dataset.a, i = b.dataset.i != null ? +b.dataset.i : null, v = b.dataset.v;
+    if (v != null && /^-?[\d.]+$/.test(v)) v = +v;
+    if (a === 'carromadd') { var cc = Number($('sbCc').value); if (!(cc >= 0 && cc <= 9) || Math.round(cc) !== cc) { say('bad', 'Coins left must be a whole number from 0 to 9.'); return; } act('board', null, { w: +$('sbCw').value, coins: cc, queen: $('sbCq').checked }); return; }
+    if (a === 'roundadd') {
+      var ins = [].slice.call(document.querySelectorAll('.sb-rin')), row = [], bad = false;
+      ins.forEach(function (x) { var n = x.value.trim() === '' ? 0 : Number(x.value); if (!isFinite(n) || Math.abs(n) > 1e7) bad = true; row[+x.dataset.p] = Math.round(n * 100) / 100; });
+      if (bad) { say('bad', 'Scores must be numbers (negative is fine).'); return; }
+      if (ins.every(function (x) { return x.value.trim() === ''; }) && !confirm('Add a round where everyone scored 0?')) return;
+      act('round', null, row); say('', 'Round ' + m.d.rounds.length + ' added.');
+      var first = document.querySelector('.sb-rin'); if (first) first.focus();
+      return;
+    }
+    act(a === 'ext' ? 'ext' : a, i, v);
+  });
+  $('sbStage').addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target.classList.contains('sb-rin')) { e.preventDefault(); var nx = document.querySelector('.sb-rin[data-p="' + (+e.target.dataset.p + 1) + '"]'); if (nx) nx.focus(); else document.querySelector('[data-a=roundadd]').click(); } });
+  $('sbBoard').addEventListener('click', function (e) {
+    var td = e.target.closest('td.e'), m = db.cur; if (!td || !m) return;
+    var r = +td.dataset.r, p = +td.dataset.p, cur = m.d.rounds[r][p], nv = prompt('New score for ' + m.names[p] + ' in round ' + (r + 1) + ':', cur);
+    if (nv == null) return; var n = Number(nv.trim()); if (nv.trim() === '' || !isFinite(n)) { say('bad', 'That is not a number, so nothing changed.'); return; }
+    act('edit', null, { r: r, p: p, val: Math.round(n * 100) / 100 });
+  });
+  $('sbUndo').addEventListener('click', function () { if (!db.undo.length) return; db.cur = JSON.parse(db.undo.pop()); note = 'Undone.'; save(); render(); });
+
+  // full screen display
+  var stage = $('sbStage');
+  $('sbFull').hidden = !(stage.requestFullscreen || stage.webkitRequestFullscreen);
+  $('sbFull').addEventListener('click', function () {
+    if (document.fullscreenElement || document.webkitFullscreenElement) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    var p = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
+    if (p && p.then) p.then(function () { try { screen.orientation.lock('landscape').catch(function () {}); } catch (e) {} }).catch(function () { say('bad', 'Full screen is not allowed here.'); });
+  });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { var on = !!(document.fullscreenElement || document.webkitFullscreenElement); $('sbFull').textContent = on ? 'Exit full screen' : 'Full screen'; $('sbHide').hidden = !on; if (!on) stage.classList.remove('hidectl'); setTimeout(fit, 80); }); });
+  $('sbHide').addEventListener('click', function () { var h = stage.classList.toggle('hidectl'); $('sbHide').textContent = h ? 'Show buttons' : 'Hide buttons'; fit(); });
+  var lock = null;
+  function wake() { try { if (navigator.wakeLock && db.cur && !lock) navigator.wakeLock.request('screen').then(function (l) { lock = l; l.addEventListener('release', function () { lock = null; }); }).catch(function () {}); } catch (e) {} }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !$('sbLive').hidden) wake(); });
+
+  function showLive() { var live = !!db.cur; $('sbLive').hidden = !live; $('sbSetup').hidden = live; note = ''; if (live) { render(); wake(); } }
+
+  // ---------------- finish, history ----------------
+  function summary(m) {
+    var d = m.d, t = m.type, N = m.names, lines = [];
+    if (t === 'cricket') d.inn.forEach(function (x, k) { if (k <= d.cur) lines.push(N[x.bat] + ': ' + x.runs + '/' + x.wk + ' (' + overs(x.balls, m.opts.bpo) + (x.balls === m.opts.bpo ? ' over' : ' overs') + ', extras ' + (x.ex.wd + x.ex.nb + x.ex.b + x.ex.lb) + ')'); });
+    else if (t === 'volleyball' || t === 'badminton' || t === 'tabletennis') { lines.push(N.join(' v ') + ': ' + d.sets.join('–')); if (d.hist.length) lines.push(d.hist.map(function (h) { return h.join('–'); }).join(', ')); }
+    else { var s = scores(m); N.forEach(function (n, i) { lines.push(n + ': ' + s[i]); }); if (t === 'football' && (d.pens[0] || d.pens[1])) lines.push('Penalties ' + d.pens.join('–')); if (t === 'cards' || t === 'board') lines.push(d.rounds.length + ' rounds'); if (t === 'carrom') lines.push(d.boards.length + ' boards'); }
+    var tm = el(m.clock); if (tm) lines.push('Time ' + fmt(tm));
+    return lines;
+  }
+  function record(m) { return { id: m.id, type: m.type, game: GAMES[m.type].name, title: m.title, date: m.date, names: m.names, result: result(m), lines: summary(m), scores: scores(m), disp: m.type === 'cricket' ? m.names.map(function (_, i) { var I = m.d.inn[0].bat === i ? m.d.inn[0] : m.d.inn[1], k = m.d.inn.indexOf(I); return k <= m.d.cur ? I.runs + '/' + I.wk : '–'; }) : null }; }
+  $('sbFinish').addEventListener('click', function () {
+    var m = db.cur; if (!m) return;
+    if (!m.d.done && !confirm('The match is not over yet. Save it with the score as it is now?')) return;
+    m.clock.acc = el(m.clock); m.clock.t0 = null;
+    var r = record(m); db.hist = db.hist.filter(function (h) { return h.id !== r.id; }); db.hist.unshift(r); if (db.hist.length > 300) db.hist.length = 300;
+    db.cur = null; db.undo = []; save(); showLive(); drawHist(); say('ok', 'Saved to your match history: ' + r.result + '.');
+    if (lock) { try { lock.release(); } catch (e) {} }
+  });
+  $('sbQuit').addEventListener('click', function () { if (!confirm('Discard this match? It will not be saved.')) return; db.cur = null; db.undo = []; save(); showLive(); say('', 'Match discarded.'); });
+  function drawHist() {
+    var ul = $('sbHist');
+    if (!db.hist.length) { ul.innerHTML = '<li style="border-style:dashed;color:var(--muted)">No finished matches yet.</li>'; return; }
+    ul.innerHTML = db.hist.map(function (h, k) {
+      return '<li><b>' + esc(h.result) + '</b><br><small>' + esc((h.title ? h.title + ' · ' : '') + h.game + ' · ' + new Date(h.date).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })) + '</small><div style="font-size:14px;margin-top:4px">' + h.lines.map(esc).join('<br>') + '</div><div class="btns"><button type="button" class="btn ghost" data-h="share" data-k="' + k + '">Share image</button><button type="button" class="btn ghost danger" data-h="del" data-k="' + k + '">Delete</button></div></li>';
+    }).join('');
+  }
+  $('sbHist').addEventListener('click', function (e) {
+    var b = e.target.closest('button[data-h]'); if (!b) return; var k = +b.dataset.k, h = db.hist[k]; if (!h) return;
+    if (b.dataset.h === 'del') { if (!confirm('Delete this match from the history?')) return; db.hist.splice(k, 1); save(); drawHist(); }
+    else shareImage(h);
+  });
+
+  // ---------------- share as image ----------------
+  function wrapText(g, text, x, y, maxW, lh) { var words = String(text).split(' '), line = '', lines = 0; for (var i = 0; i < words.length; i++) { var test = line ? line + ' ' + words[i] : words[i]; if (g.measureText(test).width > maxW && line) { g.fillText(line, x, y + lines * lh); line = words[i]; lines++; } else line = test; } g.fillText(line, x, y + lines * lh); return lines + 1; }
+  function shareImage(h) {
+    var W = 1200, H = 675, c = document.createElement('canvas'); c.width = W; c.height = H; var g = c.getContext('2d');
+    var grd = g.createLinearGradient(0, 0, W, H); grd.addColorStop(0, '#0f172a'); grd.addColorStop(1, '#1e3a8a'); g.fillStyle = grd; g.fillRect(0, 0, W, H);
+    var F = 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", "Noto Sans Arabic", "Noto Sans Devanagari", sans-serif';
+    g.fillStyle = '#93c5fd'; g.font = '600 30px ' + F; g.textAlign = 'center'; g.fillText((h.title ? h.title + ' · ' : '') + h.game, W / 2, 70);
+    g.fillStyle = '#cbd5e1'; g.font = '24px ' + F; g.fillText(new Date(h.date).toLocaleDateString(undefined, { dateStyle: 'long' }), W / 2, 108);
+    var n = Math.min(h.names.length, 6), colW = (W - 80) / n;
+    for (var i = 0; i < n; i++) {
+      var cx = 40 + colW * i + colW / 2;
+      g.fillStyle = '#fff'; g.font = '700 ' + (n > 3 ? 28 : 38) + 'px ' + F; var nm = h.names[i]; while (g.measureText(nm).width > colW - 20 && nm.length > 3) nm = nm.slice(0, -2) + '…'; g.fillText(nm, cx, 200);
+      g.font = '800 ' + (n > 3 ? 96 : 150) + 'px ' + F; g.fillText(h.disp && h.disp[i] != null ? String(h.disp[i]) : String(h.scores[i]), cx, n > 3 ? 320 : 360);
+    }
+    if (h.names.length > 6) { g.font = '24px ' + F; g.fillStyle = '#cbd5e1'; g.fillText('+ ' + (h.names.length - 6) + ' more', W / 2, 400); }
+    g.fillStyle = '#fde68a'; g.font = '700 40px ' + F; var used = wrapText(g, h.result, W / 2, 470, W - 120, 48);
+    g.fillStyle = '#e2e8f0'; g.font = '24px ' + F; wrapText(g, h.lines.filter(function (l) { return !/^.*: -?\d+(\.\d+)?$/.test(l); }).join(' · '), W / 2, 470 + used * 48 + 10, W - 120, 32);
+    g.fillStyle = '#64748b'; g.font = '20px ' + F; g.fillText('GetToolNest Scoreboard', W / 2, H - 28);
+    c.toBlob(function (blob) {
+      var name = 'score-' + (h.game.toLowerCase().replace(/[^a-z]+/g, '-')) + '-' + h.date.slice(0, 10) + '.png', file = null;
+      try { file = new File([blob], name, { type: 'image/png' }); } catch (e) {}
+      if (file && navigator.canShare && navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: h.game + ' result', text: h.result }).catch(function () {}); return; }
+      var a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000);
+      say('ok', 'Image saved as ' + name + '. Send it in any chat app.');
+    }, 'image/png');
+  }
+  $('sbShare').addEventListener('click', function () { if (db.cur) shareImage(record(db.cur)); });
+
+  // ---------------- export, import, print ----------------
+  function download(blob, name) { var a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 4000); }
+  $('sbExport').addEventListener('click', function () { if (!db.hist.length) { say('bad', 'There is no history to export yet.'); return; } download(new Blob([JSON.stringify({ app: 'gtn-scoreboard-keeper', v: 1, exported: new Date().toISOString(), matches: db.hist }, null, 1)], { type: 'application/json' }), 'match-history.json'); say('ok', 'History exported (' + db.hist.length + ' matches).'); });
+  $('sbCsv').addEventListener('click', function () {
+    if (!db.hist.length) { say('bad', 'There is no history to export yet.'); return; }
+    var q = function (s) { s = String(s == null ? '' : s); if (/^[=+\-@]/.test(s)) s = "'" + s; return '"' + s.replace(/"/g, '""') + '"'; };
+    var rows = [['Date', 'Game', 'Match name', 'Players or teams', 'Result', 'Details']].concat(db.hist.map(function (h) { return [h.date.slice(0, 16).replace('T', ' '), h.game, h.title || '', h.names.join(' | '), h.result, h.lines.join('; ')]; }));
+    download(new Blob(['﻿' + rows.map(function (r) { return r.map(q).join(','); }).join('\r\n')], { type: 'text/csv' }), 'match-history.csv'); say('ok', 'CSV exported. It opens in Excel, Google Sheets or LibreOffice.');
+  });
+  $('sbImportBtn').addEventListener('click', function () { $('sbImport').value = ''; $('sbImport').click(); });
+  $('sbImport').addEventListener('change', function () {
+    var f = $('sbImport').files[0]; if (!f) return;
+    if (f.size > 5e6) { say('bad', 'That file is too big to be a match history.'); return; }
+    f.text().then(function (txt) {
+      var o = null; try { o = JSON.parse(txt); } catch (e) {}
+      var list = o && o.app === 'gtn-scoreboard-keeper' && Array.isArray(o.matches) ? o.matches.filter(function (h) { return h && typeof h.id === 'string' && GAMES[h.type] && typeof h.result === 'string' && Array.isArray(h.names) && Array.isArray(h.lines) && Array.isArray(h.scores) && !isNaN(Date.parse(h.date)); }) : null;
+      if (!list) { say('bad', '"' + f.name + '" is not a match history exported from this tool, so nothing was imported.'); return; }
+      var have = {}, added = 0; db.hist.forEach(function (h) { have[h.id] = 1; });
+      list.forEach(function (h) { if (!have[h.id]) { db.hist.push({ id: h.id, type: h.type, game: GAMES[h.type].name, title: String(h.title || '').slice(0, 60), date: h.date, names: h.names.map(String).slice(0, 12), result: h.result.slice(0, 300), lines: h.lines.map(String).slice(0, 20), scores: h.scores.slice(0, 12).map(Number), disp: Array.isArray(h.disp) ? h.disp.slice(0, 12).map(String) : null }); added++; } });
+      db.hist.sort(function (a, b) { return b.date < a.date ? -1 : 1; }); save(); drawHist();
+      say('ok', 'Imported ' + added + ' match' + (added === 1 ? '' : 'es') + (list.length - added ? ' (' + (list.length - added) + ' already here)' : '') + '.');
+    });
+  });
+  $('sbWipe').addEventListener('click', function () { if (!db.hist.length) return; if (!confirm('Delete all ' + db.hist.length + ' saved matches from this device?')) return; db.hist = []; save(); drawHist(); say('', 'History deleted.'); });
+  $('sbPrint').addEventListener('click', function () {
+    var box = document.createElement('div'); box.className = 'sb-print';
+    var cur = db.cur ? record(db.cur) : null, all = (cur ? [cur] : []).concat(db.hist);
+    if (!all.length) { say('bad', 'Nothing to print yet.'); return; }
+    box.innerHTML = '<h2>Match results</h2><p>Printed ' + esc(new Date().toLocaleString()) + '</p><table><thead><tr><th>Date</th><th>Game</th><th>Result</th><th>Details</th></tr></thead><tbody>' + all.map(function (h, k) { return '<tr><td>' + esc(new Date(h.date).toLocaleDateString()) + (cur && k === 0 ? '<br>(in progress)' : '') + '</td><td>' + esc((h.title ? h.title + ' · ' : '') + h.game) + '</td><td>' + esc(h.result) + '</td><td>' + h.lines.map(esc).join('<br>') + '</td></tr>'; }).join('') + '</tbody></table>';
+    document.body.appendChild(box);
+    var done = function () { box.remove(); window.removeEventListener('afterprint', done); };
+    window.addEventListener('afterprint', done); window.print(); setTimeout(function () { if (box.parentNode && !window.matchMedia('print').matches) done(); }, 1500);
+  });
+
+  showOpts(); drawHist();
+  if (db.cur) { showLive(); say('', 'Your match is back where you left it.'); }
+})();
+</script>

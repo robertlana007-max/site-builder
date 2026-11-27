@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"tournament-bracket-maker":["比赛对阵表","淘汰赛对阵图","循环赛赛程","赛事抽签","积分榜生成"],
+"scoreboard-keeper":["记分板","在线计分器","比赛计分","板球计分","桌游计分"],
+"chord-progression-generator":["和弦进行生成器","和弦进行","调内和弦","吉他和弦","和弦移调"],
+"drum-machine":["鼓机","在线鼓机","节拍制作","鼓点编辑器","做beat"],
+"online-piano":["在线钢琴","虚拟钢琴","电脑键盘弹钢琴","网页钢琴","钢琴模拟器"],
 "vibration-meter":["振动仪","测振仪","测量振动","加速度计","洗衣机振动"],
 "light-meter":["照度计","测光表","光照度测量","在线测光","植物光照"],
 "protractor":["量角器","在线量角器","测量角度","图片测角度","在线尺子"],

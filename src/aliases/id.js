@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"tournament-bracket-maker":["bagan turnamen","pembuat bracket","jadwal pertandingan","sistem gugur","klasemen liga"],
+"scoreboard-keeper":["papan skor online","penghitung skor","skor kriket","papan skor bulu tangkis","pencatat skor permainan"],
+"chord-progression-generator":["generator progresi kunci","progresi chord","chord gitar","kunci nada lagu","transpose chord"],
+"drum-machine":["drum machine online","pembuat beat","bikin beat online","sequencer drum","drum online"],
+"online-piano":["piano online","piano virtual","main piano online","keyboard piano","piano gratis"],
 "vibration-meter":["alat ukur getaran","vibration meter","mengukur getaran","akselerometer","getaran mesin cuci"],
 "light-meter":["lux meter","pengukur cahaya","alat ukur cahaya","light meter online","cahaya untuk tanaman"],
 "protractor":["busur derajat","busur derajat online","mengukur sudut","ukur sudut foto","penggaris online"],

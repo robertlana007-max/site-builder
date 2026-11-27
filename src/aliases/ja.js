@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"tournament-bracket-maker":["トーナメント表 作成","トーナメント表 印刷","総当たり表","リーグ表 作成","組み合わせ 抽選"],
+"scoreboard-keeper":["スコアボード","得点板 オンライン","スコア 記録","点数 カウンター","ゲーム スコア 計算"],
+"chord-progression-generator":["コード進行 ジェネレーター","コード進行 作成","ダイアトニックコード","カポ 計算","コード 移調"],
+"drum-machine":["ドラムマシン","ビートメーカー","ドラム 打ち込み","リズムマシン オンライン","ドラムループ 作成"],
+"online-piano":["ピアノ オンライン","バーチャルピアノ","ピアノ 無料 ブラウザ","キーボード ピアノ","ピアノ 鍵盤"],
 "vibration-meter":["振動計","振動を測る","加速度計","洗濯機の振動"],
 "light-meter":["照度計","露出計","明るさを測る","ルクス測定","植物の光量"],
 "protractor":["分度器","オンライン分度器","角度を測る","写真で角度測定","ものさし"],
