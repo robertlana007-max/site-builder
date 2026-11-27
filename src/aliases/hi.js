@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: hi
 module.exports = {
+"read-along":["टेक्स्ट पढ़कर सुनाएं","जोर से पढ़ें","पाठ पढ़ने वाला","पीडीएफ पढ़कर सुनाओ"],
+"job-application-tracker":["नौकरी आवेदन ट्रैकर","जॉब एप्लिकेशन ट्रैकर","नौकरी खोज ट्रैकर"],
+"interview-practice":["इंटरव्यू प्रश्न","इंटरव्यू की तैयारी","मॉक इंटरव्यू","नौकरी इंटरव्यू अभ्यास"],
+"cover-letter-maker":["कवर लेटर","कवर लेटर बनाएं","नौकरी के लिए आवेदन पत्र","आवेदन पत्र"],
 "image-compressor":["तस्वीर छोटी करें","photo compress kaise kare","photo ka size kam kare","tasveer ka size kam","फोटो का साइज कम करें","फोटो छोटा करें","photo ka size kam karna","photo ki kb kam kare"],
 "image-resizer":["फोटो का साइज बदलें","photo resize kare","photo ka size badle"],
 "qr-code-generator":["क्यूआर कोड बनाएं","qr code kaise banaye"],

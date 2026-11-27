@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"read-along":["朗读文本","文字朗读","跟读","朗读器","朗读pdf"],
+"job-application-tracker":["求职申请跟踪","求职记录表","投递简历记录","求职进度管理"],
+"interview-practice":["面试问题","模拟面试","面试练习","面试准备","常见面试题"],
+"cover-letter-maker":["求职信","求职信生成器","自荐信","求职信模板","申请信"],
 "image-compressor":["压缩图片","图片压缩","画像圧縮","压缩照片","图片变小","减小图片大小"],
 "image-resizer":["调整图片大小","调整图片尺寸","修改图片大小","改照片尺寸"],
 "qr-code-generator":["二维码生成器","生成二维码"],

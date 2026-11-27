@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"read-along":["bacakan teks","membaca teks dengan suara","pembaca teks","baca pdf dengan suara"],
+"job-application-tracker":["pelacak lamaran kerja","catatan lamaran kerja","tracker lamaran kerja","daftar lamaran kerja"],
+"interview-practice":["pertanyaan wawancara kerja","latihan wawancara kerja","simulasi interview","persiapan interview"],
+"cover-letter-maker":["surat lamaran kerja","cover letter","pembuat surat lamaran","contoh surat lamaran kerja"],
 "image-compressor":["kompres foto","kompres gambar","perkecil ukuran foto","kecilkan foto","mengurangi ukuran gambar","kompres foto jadi 100kb"],
 "image-resizer":["ubah ukuran foto","ubah ukuran gambar","resize foto","mengubah ukuran foto"],
 "qr-code-generator":["buat qr code","buat kode qr","membuat qr code","qr code gratis"],

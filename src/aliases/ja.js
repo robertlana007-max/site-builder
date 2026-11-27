@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"read-along":["読み上げ","テキスト読み上げ","音読 ハイライト","pdf 読み上げ"],
+"job-application-tracker":["応募管理","就活 管理","転職 応募管理表","求人応募 トラッカー"],
+"interview-practice":["面接 練習","面接 質問","模擬面接","面接対策"],
+"cover-letter-maker":["カバーレター","送付状 作成","志望動機書","カバーレター 作成"],
 "image-compressor":["压缩图片","图片压缩","画像圧縮"],
 "image-resizer":["调整图片大小","画像サイズ変更"],
 "qr-code-generator":["二维码生成器","生成二维码","qrコード作成"],
