@@ -5677,5 +5677,173 @@ module.exports = [
       ['Is my data stored?', 'No. Results stay on screen only; nothing is uploaded or saved.']
     ],
     icon: '<path d="M6 9a6 6 0 1 1 12 0c0 3-2 4-3 5s-1 3-3 3a2 2 0 0 1-2-2"/><path d="M9 9a3 3 0 0 1 6 0"/>'
+  },
+  {
+    "slug": "cover-letter-maker",
+    "cat": "Generators",
+    "name": "Cover Letter Maker",
+    "title": "Free Cover Letter Maker - Write a Cover Letter Fast",
+    "desc": "Write a cover letter from a short form: 3 tones, editable preview, no gaps. Download PDF (A4 or Letter), Word or text. Free, private, no sign-up.",
+    "card": "Write a job cover letter and download it.",
+    "intro": "Fill in a short form about the job and yourself, and get a clear, well-structured cover letter in a formal, friendly or short tone. Edit any word in the preview, then download it as a PDF, Word file or plain text, or copy it into an email. It works offline and nothing is uploaded.",
+    "steps": [
+      "Type the job title, the company and, if you know it, the hiring manager.",
+      "Add your name, contact details, years of experience and 2–4 strengths or achievements.",
+      "Pick a tone, then edit the letter in the preview if you want.",
+      "Download a PDF, Word or text file, copy it, or print it."
+    ],
+    "faq": [
+      [
+        "Is this made with AI?",
+        "No. It uses carefully written sentence templates with several wordings, so it works offline and your details never leave your device. Press Different wording for another version."
+      ],
+      [
+        "What if I leave a field empty?",
+        "Optional fields are simply left out and the sentences adjust, so the letter never shows blanks like [company] or gaps."
+      ],
+      [
+        "Can I edit the letter?",
+        "Yes. Click anywhere in the letter and type. Your edits are kept, even after a reload, until you press Undo my edits."
+      ],
+      [
+        "Which file types can I download?",
+        "A PDF in A4 or Letter size, a Word .docx file that opens in Word, Google Docs, LibreOffice and Pages, or a plain .txt file. You can also copy the text or print it."
+      ],
+      [
+        "Does it work with names in Arabic, Chinese or other scripts?",
+        "Yes. Names and text in any language appear correctly in the preview and in the PDF."
+      ],
+      [
+        "Is my information saved?",
+        "Only in this browser on this device, so you can come back to it. Press Start over to clear it."
+      ]
+    ],
+    "icon": "<path d=\"M4 6h16v12H4z\"/><path d=\"m4 7 8 6 8-6\"/><path d=\"M15 21l2-2 4-4-2-2-4 4-2 2z\"/>"
+  },
+  {
+    "slug": "interview-practice",
+    "cat": "Study tools",
+    "name": "Interview Practice",
+    "title": "Interview Practice - 120+ Questions, Tips and Timer",
+    "desc": "Practise job interviews with 123 common questions, tips and answer outlines, thinking and answer timers, recording and filler-word count. Free.",
+    "card": "Practise interview questions with a timer.",
+    "intro": "Get ready for a job interview with 123 common questions in ten groups, each with a tip on what the interviewer wants and an outline of a strong answer. Practice mode gives you a random question, a thinking timer and an answer timer. Record yourself to listen back and, where your browser supports it, see your words with a count of filler words like \"um\" and \"like\".",
+    "steps": [
+      "Choose a category, a thinking time and an answer time.",
+      "Optionally turn on recording and speech to text, and allow the microphone.",
+      "Press Start, think, then answer out loud when the beep sounds.",
+      "Review your recording, words and filler words, read the tip, and try again."
+    ],
+    "faq": [
+      [
+        "What kinds of questions are included?",
+        "123 questions in ten groups: general, behavioural (STAR), teamwork, problem solving, customer service, sales, tech basics, leadership, first job or student, and questions to ask the employer."
+      ],
+      [
+        "Is my recording uploaded?",
+        "No. The recording is made and kept in your browser’s memory only. It disappears when you leave the page unless you download it."
+      ],
+      [
+        "How does the filler-word count work?",
+        "With speech to text on, your answer is turned into text and the tool counts words like um, uh, like, you know, basically and actually. Speech to text often skips \"um\", so listen to the recording too."
+      ],
+      [
+        "Why is speech to text not available?",
+        "It needs the Web Speech API, found in Chrome, Edge and Safari. These browsers use their online speech service, so it needs an internet connection. You can always type your answer to analyse it."
+      ],
+      [
+        "What is the STAR method?",
+        "A way to answer \"tell me about a time\" questions: Situation, Task, Action and Result. The tips and outlines show how to use it."
+      ],
+      [
+        "Are my favourites and notes saved?",
+        "Yes, in this browser on this device. Use Export to keep a backup or move them to another device, and Print to make a study sheet."
+      ]
+    ],
+    "icon": "<path d=\"M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z\"/><path d=\"M10 9.5a2 2 0 1 1 3 1.7c-.6.4-1 .8-1 1.5\"/><path d=\"M12 15.5h.01\"/>"
+  },
+  {
+    "slug": "job-application-tracker",
+    "cat": "Time tools",
+    "name": "Job Application Tracker",
+    "title": "Job Application Tracker - Free Board, Reminders, Stats",
+    "desc": "Track job applications on a drag-and-drop board or list: status, next steps, reminders, salary in any currency, response rate. CSV/JSON export. Private.",
+    "card": "Track job applications, interviews and offers.",
+    "intro": "Keep every job application in one place: company, job title, link, date applied, status, next step, contact, salary and notes. Drag cards between Saved, Applied, Interview, Offer, Rejected and No reply, see upcoming steps in Reminders and your response rate in Stats. Everything is saved only in your browser, with CSV and JSON export and import.",
+    "steps": [
+      "Type the company and job title, pick a status and the date you applied, and press Add application.",
+      "Add a next step and its date, such as a phone interview or a follow-up.",
+      "Drag cards on the board (or use Move to) as things change.",
+      "Check Reminders and Stats, and export a backup now and then."
+    ],
+    "faq": [
+      [
+        "Where are my applications stored?",
+        "Only in this browser on this device. Nothing is uploaded. Export JSON or CSV to back them up or move them to another device."
+      ],
+      [
+        "Does drag and drop work on phones?",
+        "Yes. Hold the ⠿ handle on a card and drag it to another column. You can also use the Move to menu on each card."
+      ],
+      [
+        "How is the response rate worked out?",
+        "Applications that got an answer (interview, offer or rejection) divided by all applications sent, which is everything except Saved."
+      ],
+      [
+        "Can I use my own currency?",
+        "Yes. Choose any currency and whether the salary is per year, month, week, day or hour. Sorting by salary compares them as yearly amounts."
+      ],
+      [
+        "Can I import a spreadsheet?",
+        "Yes. Import a CSV with a header row that includes Company or Job title. Status, Date applied (YYYY-MM-DD), Next step, Contact, Salary, Link and Notes columns are read too."
+      ],
+      [
+        "Will it remind me?",
+        "The Reminders view and the red number on its tab show overdue and today’s steps whenever you open the page. It also lists applications with no news for two weeks."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M8 7V5a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2\"/><path d=\"m9 13 2 2 4-4\"/>"
+  },
+  {
+    "slug": "read-along",
+    "cat": "Text tools",
+    "name": "Read Along",
+    "title": "Read Along - Read Text Aloud with Word Highlighting",
+    "desc": "Hear any text read aloud while each word lights up. Open TXT, Word or PDF, any language, dyslexia-friendly view, reading ruler. Free and private.",
+    "card": "Read text aloud with highlighted words.",
+    "intro": "Paste text or open a .txt, Word or PDF file and hear it read aloud with your device’s voices while each word and sentence is highlighted. Click any word to start from there. A big, dyslexia-friendly reading view lets you change text size, line spacing, background colour and font (including OpenDyslexic), with a reading ruler. Works in many languages.",
+    "steps": [
+      "Paste text, or open a .txt, .docx or PDF file.",
+      "Check the language and voice, and set the speed.",
+      "Press Read aloud and follow the highlighted words, or click any word to start there.",
+      "Open Reading view or Big reading view to change size, spacing, colour, font and the ruler."
+    ],
+    "faq": [
+      [
+        "Which languages work?",
+        "Any language your device has a voice for. The tool detects the language of your text (for example English, Spanish, Arabic, Hindi, Chinese or Russian) and picks a matching voice. You can choose another voice too."
+      ],
+      [
+        "Why is only the sentence highlighted?",
+        "Some voices, often on Android, do not tell the browser when each word starts. Then the whole sentence is highlighted instead."
+      ],
+      [
+        "Can it read PDF and Word files?",
+        "Yes, .txt, .docx and PDF files with real text. Scanned PDFs are pictures, so use the Image to Text tool first. Old .doc files need to be saved as .docx."
+      ],
+      [
+        "Is it good for dyslexia?",
+        "It offers features many readers with dyslexia find helpful: hearing and seeing words together, big text, wide spacing, tinted backgrounds, the OpenDyslexic font and a reading ruler. Try settings to find what suits you."
+      ],
+      [
+        "Is my text uploaded?",
+        "No. Files are read on your device, and voices built into your device speak the text. A few voices marked \"online\" use your browser’s speech service."
+      ],
+      [
+        "Can I download the audio?",
+        "No. Browsers do not let websites record their built-in voices. Use the voices live on the page."
+      ]
+    ],
+    "icon": "<path d=\"M3 5h8M3 9h8M3 13h5\"/><path d=\"M14 9v6h2l4 3V6l-4 3h-2z\"/><path d=\"M3 17h9\"/>"
   }
 ];

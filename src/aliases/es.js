@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: es
 module.exports = {
+"read-along":["leer en voz alta","lector de texto en voz alta","texto a voz con resaltado","lector para dislexia","leer pdf en voz alta"],
+"job-application-tracker":["seguimiento de candidaturas","registro de solicitudes de empleo","organizador de búsqueda de empleo","control de postulaciones"],
+"interview-practice":["preguntas de entrevista de trabajo","práctica de entrevista","simulador de entrevista","preparar entrevista de trabajo"],
+"cover-letter-maker":["carta de presentación","generador de carta de presentación","carta de motivación","carta para solicitar empleo","carta de presentación para trabajo"],
 "image-compressor":["comprimir imagen","comprimir foto","hacer la foto más pequeña","reducir el peso de una imagen","bajar kb de foto"],
 "image-resizer":["redimensionar imagen","redimensionar foto","cambiar tamaño de imagen"],
 "qr-code-generator":["generador de codigo qr","generador qr","gerador de qr code"],

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"read-along":["sesli okuma","metni sesli oku","metin okuyucu","pdf sesli okuma"],
+"job-application-tracker":["iş başvurusu takibi","başvuru takip","iş arama takip","başvuru listesi"],
+"interview-practice":["mülakat soruları","iş görüşmesi pratiği","mülakat hazırlık","iş görüşmesi soruları"],
+"cover-letter-maker":["ön yazı","iş başvuru mektubu","ön yazı oluşturucu","motivasyon mektubu"],
 "image-compressor":["resim sıkıştırma","resim sikistirma"],
 "image-resizer":["resim boyutlandırma","resim boyutlandirma"],
 "qr-code-generator":["karekod oluşturma","karekod olusturucu"],
