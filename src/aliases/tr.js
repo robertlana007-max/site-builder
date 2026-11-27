@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"typing-for-kids":["çocuklar için klavye eğitimi","on parmak klavye","yazma oyunları","klavye kullanmayı öğren","f klavye q klavye çalışma"],
+"phonics-for-kids":["çocuklar için phonics","ingilizce harf sesleri","ingilizce okuma öğrenme","fonetik ingilizce","sight words"],
+"kids-math-worksheets":["çocuklar için matematik çalışma kağıdı","matematik etkinlikleri yazdır","saat öğrenme çalışma kağıdı","eldeli toplama","birinci sınıf matematik"],
 "handwriting-worksheets":["yazı çalışma sayfası","harf takip çalışması","noktalı harfler","el yazısı çalışma","okul öncesi yazı"],
 "menu-maker":["menü hazırlama","menü şablonu","restoran menüsü","fiyat listesi","kafe menüsü"],
 "inventory-tracker":["stok takibi","envanter takibi","stok listesi","depo stok","barkodlu stok"],

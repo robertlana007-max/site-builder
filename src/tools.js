@@ -6177,5 +6177,123 @@ module.exports = [
       ]
     ],
     "icon": "<path d=\"M4 6h16M4 12h16M4 18h16\" stroke-dasharray=\"2 2\"/><path d=\"M7 16l2.5-7 2.5 7M8 14h3\"/><path d=\"M15 9l3 3-3 3\"/>"
+  },
+  {
+    "slug": "kids-math-worksheets",
+    "cat": "Study tools",
+    "name": "Kids Math Worksheets",
+    "title": "Kids Math Worksheets - Printable PDF with Answer Key",
+    "desc": "Free printable math worksheets for ages 4–11: counting, number lines, place value, fractions, clocks, money, word problems and shapes. PDF with answer key.",
+    "card": "Printable kids math sheets with an answer key.",
+    "intro": "Make printable maths worksheets for young children in seconds. Choose from eleven kinds, such as counting pictures, telling the time, fractions, money and column sums, pick a difficulty and download an A4 or US Letter PDF with the answer key on its own page, or solve the sheet on screen for stars.",
+    "steps": [
+      "Pick a worksheet type and a difficulty: Easy, Medium or Hard.",
+      "Choose the number of questions, and add the child's name, the date and the paper size.",
+      "Check the preview, including the answer key pages.",
+      "Download the PDF and print at 100%, or press Solve it here to answer on screen."
+    ],
+    "faq": [
+      [
+        "Which ages is it for?",
+        "Easy suits about ages 4 to 6, Medium about 6 to 8 and Hard about 8 to 11. Every type has all three levels."
+      ],
+      [
+        "Can I print the same worksheet again?",
+        "Yes. Each sheet has a worksheet code. The same code with the same settings always makes exactly the same questions."
+      ],
+      [
+        "Is there an answer key?",
+        "Yes. The answers are on separate pages at the end of the PDF, so you can print the questions alone."
+      ],
+      [
+        "Which currencies can I use for money sheets?",
+        "Pick from many symbols such as $, €, £, ¥, ₹, ₦, ₱ or Rp, or type your own. The coins and notes are simple neutral drawings, not pictures of real money."
+      ],
+      [
+        "Can children do it on a tablet?",
+        "Yes. Solve it here shows the questions on screen with big answer boxes, checks each answer and gives a star for each right answer."
+      ],
+      [
+        "Is it free?",
+        "Yes. Worksheets are made in your browser with no sign-up, no watermark and nothing uploaded."
+      ]
+    ],
+    "icon": "<rect x=\"4\" y=\"3\" width=\"16\" height=\"18\" rx=\"2\"/><circle cx=\"9\" cy=\"9\" r=\"2.5\"/><path d=\"M9 7.8V9l.8.6\"/><path d=\"M14 8h3M15.5 6.5v3M7 15h3M14 14.5l3 3M17 14.5l-3 3\"/>"
+  },
+  {
+    "slug": "phonics-for-kids",
+    "cat": "Study tools",
+    "name": "Phonics for Kids",
+    "title": "Phonics for Kids - Letter Sounds, Blending and Sight Words",
+    "desc": "Free English phonics for early readers: letter sounds A–Z with pictures, animated CVC blending, letter teams like sh and ee, sight words and a sound game.",
+    "card": "Letter sounds, blending and sight words.",
+    "intro": "Help a young child learn to read in English. Hear and see the sound of every letter with a picture, watch three-letter words blend sound by sound, learn letter teams such as sh, ch and ee, practise sight words and play a picture sound game. Stars are saved on this device.",
+    "steps": [
+      "Choose an English voice and a slow speed.",
+      "Start with Letter sounds: tap a letter, hear the word and read the Say it hint together.",
+      "Move on to Blending, Letter teams and Sight words.",
+      "Play the Sound game and collect stars."
+    ],
+    "faq": [
+      [
+        "Which language is it for?",
+        "English only. The sounds, words and sight words are for children learning to read in English."
+      ],
+      [
+        "Why does it say words instead of single sounds?",
+        "Computer voices are not reliable at single sounds like /b/ or /a/. So the voice says carefully chosen example words slowly, and each sound is shown with a simple spelling and a mouth hint, such as /m/: mmm, lips together."
+      ],
+      [
+        "What if my device has no voice?",
+        "You will see a note. Everything else still works: the pictures, sound spellings and games. You can add an English text-to-speech voice in your device settings."
+      ],
+      [
+        "What are sight words?",
+        "Common words such as the, said and was that children learn to recognise by sight because they do not follow the usual rules."
+      ],
+      [
+        "Where are the stars saved?",
+        "Only in this browser on this device. Nothing is sent anywhere, and you can reset progress in the tips panel."
+      ]
+    ],
+    "icon": "<path d=\"M4 18 7.5 6 11 18M5.2 14h4.6\"/><path d=\"M14 9h2.5a2.5 2.5 0 0 1 0 5H14V9zm0 5h3a2 2 0 0 1 0 4h-3\"/><path d=\"M19.5 4.5a4 4 0 0 1 0 4\"/>"
+  },
+  {
+    "slug": "typing-for-kids",
+    "cat": "Study tools",
+    "name": "Typing for Kids",
+    "title": "Typing for Kids - Free Typing Lessons and Games",
+    "desc": "Free typing lessons for children: home row to sentences, colour-coded fingers, big letters, stars and a calm balloon game. QWERTY, AZERTY and QWERTZ.",
+    "card": "Typing lessons and a balloon game for kids.",
+    "intro": "Teach children to touch type step by step. Sixteen short lessons start on the home row and build up to words and sentences, with big letters, an on-screen keyboard that shows which finger to use, gentle sounds and up to three stars per lesson. Balloon Pop adds a stress-free game.",
+    "steps": [
+      "Choose your keyboard: QWERTY, AZERTY or QWERTZ.",
+      "Rest your fingers on the home row, with pointer fingers on F and J.",
+      "Pick a lesson and type the yellow letter, using the finger shown.",
+      "Collect stars, then play Balloon Pop."
+    ],
+    "faq": [
+      [
+        "What age is it for?",
+        "About 5 to 11. Younger children can play Balloon Pop; lessons suit children who know their letters."
+      ],
+      [
+        "Which keyboards are supported?",
+        "QWERTY for the US and most countries, QWERTY UK, French AZERTY and German or Central European QWERTZ. Lessons follow the keys of the layout you choose."
+      ],
+      [
+        "Does it work on a phone or tablet?",
+        "Lessons need a real keyboard, which you can connect to most phones and tablets. Balloon Pop also works by tapping big letter buttons."
+      ],
+      [
+        "How are stars given?",
+        "Finishing a lesson gives one star, 90% accuracy gives two and 97% gives three. Speed is shown gently but does not affect the stars."
+      ],
+      [
+        "Is my child's progress saved?",
+        "Yes, in this browser only. Nothing is uploaded and there is no account."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"9\" width=\"20\" height=\"11\" rx=\"2\"/><path d=\"M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16.5h8\"/><circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"M12 7v2\"/>"
   }
 ];

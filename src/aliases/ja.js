@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"typing-for-kids":["タイピング 子供","タイピング練習 無料","タイピングゲーム","ホームポジション 練習","キーボード 練習 子供"],
+"phonics-for-kids":["フォニックス 子供","アルファベット 発音","英語 読み方 子供","サイトワード","フォニックス 無料"],
+"kids-math-worksheets":["算数プリント","計算プリント 無料","時計の読み方 プリント","筆算 プリント","幼児 算数"],
 "handwriting-worksheets":["なぞり書き プリント","ひらがな 練習 プリント","漢字 練習帳","カタカナ 練習","書き方 練習"],
 "menu-maker":["メニュー作成","メニュー表 テンプレート","カフェ メニュー","料金表 作成","メニュー デザイン"],
 "inventory-tracker":["在庫管理","在庫表","棚卸し表","在庫管理 無料","入出庫管理"],

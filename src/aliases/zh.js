@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"typing-for-kids":["儿童打字练习","打字游戏","盲打练习","键盘指法练习","学打字"],
+"phonics-for-kids":["自然拼读","英语自然拼读儿童","字母发音","英语高频词","学英语阅读"],
+"kids-math-worksheets":["儿童数学练习题","数学练习纸打印","幼儿数学题","认识钟表练习","竖式加减法练习"],
 "handwriting-worksheets":["字帖生成","田字格字帖","描红字帖","汉字练习纸","拼音描红"],
 "menu-maker":["菜单制作","菜单设计","餐厅菜单模板","价目表","咖啡店菜单"],
 "inventory-tracker":["库存管理","进销存","库存表","盘点表","商品库存"],
