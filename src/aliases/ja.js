@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"vibration-meter":["振動計","振動を測る","加速度計","洗濯機の振動"],
+"light-meter":["照度計","露出計","明るさを測る","ルクス測定","植物の光量"],
+"protractor":["分度器","オンライン分度器","角度を測る","写真で角度測定","ものさし"],
+"compass":["コンパス","方位磁石","オンラインコンパス","北はどっち","方位計"],
+"bubble-level":["水平器","水準器","スマホ水平器","傾斜計","デジタル水平器"],
 "pros-and-cons":["メリット デメリット 表","賛否リスト","決断ツール","イエスノー ランダム"],
 "decision-matrix":["意思決定マトリックス","重み付け評価表","選択肢の比較","比較表 作成"],
 "moon-phase":["今日の月齢","月の満ち欠け","次の満月","新月 いつ","月の出時刻"],

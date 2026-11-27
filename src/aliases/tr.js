@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"vibration-meter":["titreşim ölçer","titreşim ölçme","ivmeölçer","çamaşır makinesi titreşimi"],
+"light-meter":["lüksmetre","ışık ölçer","pozometre","lüks ölçme","bitki ışığı"],
+"protractor":["iletki","online iletki","açı ölçer","fotoğrafta açı ölçme","online cetvel"],
+"compass":["pusula","online pusula","kuzey nerede","dijital pusula","yön bulucu"],
+"bubble-level":["su terazisi","dijital su terazisi","eğim ölçer","telefon su terazisi"],
 "pros-and-cons":["artılar ve eksiler listesi","avantaj dezavantaj","karar verme yardımı","evet hayır rastgele"],
 "decision-matrix":["karar matrisi","ağırlıklı karar matrisi","seçenekleri karşılaştır","karar verme aracı"],
 "moon-phase":["bugün ayın evresi","ay takvimi","sonraki dolunay","yeni ay","ay doğuşu"],

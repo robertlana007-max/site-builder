@@ -6879,5 +6879,215 @@ module.exports = [
       ]
     ],
     "icon": "<path d=\"M12 3v18M5 21h14\"/><path d=\"M4 8h6l-3 6zM14 8h6l-3 6z\"/><path d=\"M4 14a3 3 0 0 0 6 0M14 14a3 3 0 0 0 6 0M7 6h10\"/>"
+  },
+  {
+    "slug": "bubble-level",
+    "cat": "Calculators",
+    "name": "Bubble Level",
+    "title": "Bubble Level - Free Spirit Level App for Your Phone",
+    "desc": "Turn your phone into a spirit level: 2-axis bubble, picture-frame mode, degrees and percent slope, beep when level, hold and calibration. Free, no app.",
+    "card": "Spirit level with degrees, percent and beep.",
+    "intro": "Lay your phone on a shelf or table, or stand it on the edge of a picture frame, to see the tilt in degrees, percent slope and ratio. It beeps and vibrates when level, can hold a reading, and can be calibrated so your sensor reads true. No tilt sensor on your computer? The slope calculator works from measurements.",
+    "steps": [
+      "Choose Flat surface, or Wall / picture for frames, shelves and door posts.",
+      "Press Start level (on iPhone, allow Motion and Orientation) and place the phone.",
+      "Adjust until the bubble turns green and the phone beeps; press Hold reading to read it later.",
+      "Calibrate once with Set zero on a level surface, or with the two-step calibration."
+    ],
+    "faq": [
+      [
+        "How accurate is a phone spirit level?",
+        "After calibration most phones are accurate to about 0.1 to 0.3 degrees on a firm surface. Without calibration they can be off by a degree or more, so use Set zero or the two-step calibration."
+      ],
+      [
+        "What is the two-step calibration?",
+        "Measure, turn the phone around 180 degrees on the same spot, and measure again. The error of the sensor cancels out, so you do not need a surface you know is level."
+      ],
+      [
+        "Why does it ask for permission on iPhone?",
+        "Safari on iPhone and iPad only lets websites read the motion sensors after you tap Allow. The readings stay on your phone."
+      ],
+      [
+        "Does it work on a laptop?",
+        "Most laptops and desktop computers have no tilt sensor. The tool tells you so and offers the slope calculator instead."
+      ],
+      [
+        "How do I convert degrees to percent slope?",
+        "Percent slope is the tangent of the angle times 100. For example 1 degree is about 1.75 percent and 45 degrees is 100 percent. The slope calculator does it for you."
+      ],
+      [
+        "Why does my case matter?",
+        "A curved back or a camera bump can tilt the phone. Take thick cases off, or calibrate with the case on and always measure the same way."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"8\" width=\"20\" height=\"8\" rx=\"4\"/><circle cx=\"12\" cy=\"12\" r=\"2\"/><path d=\"M8.5 9v6M15.5 9v6\"/>"
+  },
+  {
+    "slug": "compass",
+    "cat": "Calculators",
+    "name": "Compass",
+    "title": "Online Compass - True & Magnetic North, Bearing Lock",
+    "desc": "Free compass for your phone: degrees and direction, true or magnetic north, lock a bearing, interference warnings, calibration and a sun compass fallback.",
+    "card": "Phone compass with true north and bearings.",
+    "intro": "Use your phone as a compass. See the direction in degrees and as N, NE or WSW, switch between magnetic north and true (map) north using the World Magnetic Model 2025, lock a bearing to follow it, and calibrate. No compass sensor? Find directions from the sun for your place and time.",
+    "steps": [
+      "Press Start compass (on iPhone, allow Motion and Orientation) and hold the phone flat.",
+      "Read the direction the top of the phone points, in degrees and as a compass direction.",
+      "For map north, set your location and choose True north; press Lock this bearing to follow a direction.",
+      "If the reading is unsteady, move away from metal and draw a figure 8 in the air to calibrate."
+    ],
+    "faq": [
+      [
+        "What is the difference between true north and magnetic north?",
+        "True north is the direction to the North Pole, used on maps and GPS. A compass points to magnetic north. The angle between them is the magnetic declination, which depends on where you are and changes slowly over time."
+      ],
+      [
+        "How is the declination worked out?",
+        "With the World Magnetic Model 2025 from NOAA and the British Geological Survey, calculated on your device from the location you give. Nothing is sent anywhere."
+      ],
+      [
+        "Why does my compass point the wrong way?",
+        "Magnets and metal nearby, such as cars, speakers, laptops and magnetic phone cases, disturb the sensor. Move away from them and draw a figure 8 with the phone. You can also fine-tune with a known landmark or the sun."
+      ],
+      [
+        "Does it work on a computer?",
+        "Laptops and desktops normally have no compass sensor. The tool tells you, and shows where the sun is instead."
+      ],
+      [
+        "Does it need internet?",
+        "No. Once the page is open it works offline, including true north and the sun position. Getting your location may take longer without internet."
+      ],
+      [
+        "Is my location stored?",
+        "Only on this device, so you do not have to type it again. Press Forget location to remove it."
+      ]
+    ],
+    "icon": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M15.5 8.5l-2 5-5 2 2-5z\"/><path d=\"M12 3v2M12 19v2M3 12h2M19 12h2\"/>"
+  },
+  {
+    "slug": "protractor",
+    "cat": "Calculators",
+    "name": "Protractor",
+    "title": "Online Protractor - Measure Angles in Photos & on Screen",
+    "desc": "Measure angles in a photo by dragging three points, use a real-size on-screen protractor and ruler (credit-card calibration), or the phone tilt sensor.",
+    "card": "Measure angles in photos, on screen or by tilt.",
+    "intro": "Measure any angle three ways: drag three dots on a photo or camera picture, place a small object on a real-size protractor on your screen, or lay your phone on a surface to read its angle with the tilt sensor. Calibrate the screen with a standard bank or ID card. Photos never leave your device.",
+    "steps": [
+      "Choose Photo, On the screen or Phone tilt.",
+      "Photo: open or take a picture and drag B onto the corner and A and C along the two edges.",
+      "On the screen: put the object on the protractor and drag the blue handle to its edge; calibrate with a card for real size.",
+      "Phone tilt: press Start sensor, put the phone on the surface, and mark a first surface to compare two."
+    ],
+    "faq": [
+      [
+        "How do I measure an angle in a photo?",
+        "Open the photo, then drag the middle dot B onto the corner and dots A and C along the two edges. The angle at B appears at once, along with the other side (360 degrees minus it)."
+      ],
+      [
+        "Why calibrate with a credit card?",
+        "Screens have different pixel sizes, so a website cannot know how big a millimetre is. Bank, ID and driving licence cards share one standard size, 85.6 by 54 mm, so matching one tells the tool your screen size. Angles are correct even without it."
+      ],
+      [
+        "Can I measure a roof or ramp angle?",
+        "Yes. Use Phone tilt and lay the phone on the surface, or take a straight-on photo and measure it in Photo mode."
+      ],
+      [
+        "Are my photos uploaded?",
+        "No. Pictures are opened and measured only in your browser."
+      ],
+      [
+        "Why is my photo angle a bit off?",
+        "Photos taken at a slant distort angles. Stand square to the object, and use the magnifier to place the dots exactly."
+      ],
+      [
+        "Can I save the result?",
+        "Yes. Download the photo with the angle drawn on it, or use Print / PDF."
+      ]
+    ],
+    "icon": "<path d=\"M3 18a9 9 0 0 1 18 0z\"/><path d=\"M12 18l5-6\"/><path d=\"M7 18v-1M12 18v-2M17 18v-1\"/>"
+  },
+  {
+    "slug": "light-meter",
+    "cat": "Calculators",
+    "name": "Light Meter",
+    "title": "Light Meter - Approximate Lux & EV With Your Phone",
+    "desc": "Estimate light in lux, foot-candles and EV with your phone camera or light sensor. Guides for photography, houseplants and reading light. Calibration.",
+    "card": "Approximate lux and EV for photos and plants.",
+    "intro": "Get an approximate light level in lux or foot-candles and a photographic exposure value from your phone camera, or from the ambient light sensor where your browser allows it. Guides show what the number means for photography, houseplants and reading or work spaces. Calibrate against a real lux meter for better accuracy. Nothing is recorded.",
+    "steps": [
+      "Press Start light meter and allow the camera if asked.",
+      "Lay the phone where you want to measure, front camera facing the light, ideally under thin white paper.",
+      "Read the approximate lux, EV and the plant and reading guides.",
+      "Optional: calibrate against a real lux meter, or use the camera-settings calculator."
+    ],
+    "faq": [
+      [
+        "How accurate is a phone light meter?",
+        "It is an estimate. With the ambient light sensor it is often within about 20 percent. With the camera, expect errors of 2 times or more unless you calibrate, and some browsers only allow a relative brightness."
+      ],
+      [
+        "Why does it say Relative only?",
+        "Your browser does not tell websites the camera exposure, and the camera keeps adjusting itself. Then only a relative brightness can be shown, which is still useful for comparing spots in the same room."
+      ],
+      [
+        "How much light do houseplants need?",
+        "Roughly: low light 500 to 2,500 lux, medium 2,500 to 10,000 lux, bright indirect 10,000 to 20,000 lux, and direct sun above 20,000 lux. Guides differ by plant."
+      ],
+      [
+        "How much light is needed for reading?",
+        "About 300 to 500 lux for reading and desk work, and more for detailed tasks or older eyes, based on common lighting standards."
+      ],
+      [
+        "What is EV?",
+        "Exposure value is a photography scale of light. Each step up doubles the light. A sunny day is about EV 15 at ISO 100, and a living room at night about EV 5 to 6."
+      ],
+      [
+        "Is the camera picture saved?",
+        "No. The tool only reads the average brightness in your browser. No picture is stored or sent."
+      ]
+    ],
+    "icon": "<circle cx=\"12\" cy=\"12\" r=\"4\"/><path d=\"M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4\"/>"
+  },
+  {
+    "slug": "vibration-meter",
+    "cat": "Calculators",
+    "name": "Vibration Meter",
+    "title": "Vibration Meter - Phone Accelerometer, Peak, RMS & Hz",
+    "desc": "Measure vibration with your phone: live graph in m/s² or g, peak, RMS, main frequency in Hz and rpm, record sessions and export CSV. Free and private.",
+    "card": "Measure shaking: RMS, peak, Hz and rpm.",
+    "intro": "Use your phone's accelerometer to measure how much a washing machine, car, fan or other machine vibrates. See a live graph with gravity removed, the peak and RMS strength, and the main frequency in Hz and rpm from an FFT. Record named sessions, compare before and after, and export CSV. Readings stay on your device.",
+    "steps": [
+      "Press Start (on iPhone, allow Motion and Orientation) and lay the phone flat on the machine.",
+      "Watch the live graph, RMS, peak and main frequency in Hz and rpm.",
+      "Type a name and press Record session, then Stop recording to save it.",
+      "Compare sessions, download the raw CSV, export or print the list, and calibrate on a still table."
+    ],
+    "faq": [
+      [
+        "How accurate is a phone vibration meter?",
+        "Good enough to compare before and after, or one machine with another. Phone accelerometers are not calibrated instruments, and calibration here only removes sensor noise and corrects the scale using gravity."
+      ],
+      [
+        "What is RMS?",
+        "Root mean square is the average strength of the vibration over time. It is steadier than the peak and is what most vibration standards use."
+      ],
+      [
+        "What frequencies can it measure?",
+        "Phones report motion about 50 to 100 times a second, so up to about 25 to 50 Hz (1,500 to 3,000 rpm). Faster vibrations can appear at a wrong, lower frequency."
+      ],
+      [
+        "How is gravity removed?",
+        "A high-pass filter removes slow changes such as gravity and the phone tilting, leaving only the vibration. You can choose where it starts (0.5 to 5 Hz)."
+      ],
+      [
+        "Where are my sessions saved?",
+        "Only in this browser. Export them as JSON to keep a backup or move them to another device, and import them again later."
+      ],
+      [
+        "Does it work on a computer?",
+        "Most laptops and desktops have no accelerometer, so the tool says so. You can still view, import and export saved sessions."
+      ]
+    ],
+    "icon": "<rect x=\"8\" y=\"5\" width=\"8\" height=\"14\" rx=\"2\"/><path d=\"M4 8v8M2 10v4M20 8v8M22 10v4\"/>"
   }
 ];
