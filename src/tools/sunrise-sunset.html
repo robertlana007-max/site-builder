@@ -1,0 +1,299 @@
+<style>
+.ss h3 { font-size: 17px; margin: 22px 0 8px; }
+.ss .ss-date { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 0 0 12px; }
+.ss .ss-date > div { flex: 1 1 170px; min-width: 0; }
+.ss .ss-date label { display: block; font-weight: 600; font-size: 14px; margin: 0 0 4px; }
+.ss .ss-date input { width: 100%; min-width: 0; box-sizing: border-box; }
+.ss .ss-date .btn { min-height: 44px; padding: 8px 14px; }
+.ss .ss-note { background: var(--accent-soft); border-radius: 10px; padding: 10px 12px; margin: 0 0 12px; font-size: 15px; }
+.ss .stats { margin: 0 0 12px; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); }
+.ss .stat b { font-size: clamp(18px, 5vw, 24px); }
+.ss .stat small { display: block; color: var(--muted); font-size: 12.5px; margin-top: 2px; overflow-wrap: anywhere; }
+.ss .ss-tl { margin: 4px 0 2px; }
+.ss .ss-tl svg { display: block; width: 100%; height: auto; }
+.ss .ss-key { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--muted); margin: 6px 0 0; padding: 0; list-style: none; }
+.ss .ss-key i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; vertical-align: -1px; margin-inline-end: 5px; border: 1px solid rgba(127,127,127,.4); }
+.ss .ss-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--line); border-radius: 10px; }
+.ss table.sched { margin: 0; }
+.ss table.sched td.l, .ss table.sched th.l { text-align: start; }
+.ss table.sched td small { display: block; color: var(--muted); font-size: 12px; }
+.ss table.sched tr.hi td { font-weight: 700; }
+.ss table.sched tr.today td { background: var(--accent-soft); }
+.ss .ss-month td, .ss .ss-month th { white-space: nowrap; padding: 7px 8px; }
+.ss .ss-pathw { display: grid; grid-template-columns: minmax(0, 360px) minmax(0, 1fr); gap: 16px; align-items: center; }
+.ss .ss-pathw svg { width: 100%; height: auto; display: block; max-width: 360px; margin: 0 auto; }
+.ss .ss-pathw ul { margin: 0; padding-inline-start: 18px; font-size: 14px; color: var(--muted); }
+.ss .ss-pathw ul li { margin: 0 0 4px; }
+.ss .ss-mbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; margin: 0 0 10px; }
+.ss .ss-mbar > div { flex: 1 1 160px; min-width: 0; }
+.ss .ss-mbar label { display: block; font-weight: 600; font-size: 14px; margin: 0 0 4px; }
+.ss .ss-mbar input { width: 100%; box-sizing: border-box; min-width: 0; }
+.ss .ss-mbar .btn { min-height: 44px; }
+.ss .ss-live { font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) { .ss .ss-pathw { grid-template-columns: 1fr; } .ss .ss-month td, .ss .ss-month th { padding: 6px 6px; font-size: 13px; } }
+#ssPrintBox { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  body > *:not(#ssPrintBox) { display: none !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #ssPrintBox { display: block !important; color: #111; font: 10.5pt/1.35 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+  #ssPrintBox h2 { font-size: 16pt; margin: 0 0 2pt; }
+  #ssPrintBox p { margin: 0 0 8pt; color: #444; }
+  #ssPrintBox table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+  #ssPrintBox th, #ssPrintBox td { border-bottom: 1px solid #ccc; padding: 3pt 5pt; text-align: end; white-space: nowrap; }
+  #ssPrintBox th:first-child, #ssPrintBox td:first-child { text-align: start; }
+  #ssPrintBox thead { display: table-header-group; }
+  #ssPrintBox tr { break-inside: avoid; }
+  #ssPrintBox small { color: #555; }
+}
+</style>
+
+<div class="ss">
+  <div id="ssPlace"></div>
+  <div class="ss-date">
+    <button class="btn ghost" id="ssPrev" type="button" aria-label="Previous day">‹ Day</button>
+    <div><label for="ssDate">Date</label><input type="date" id="ssDate" data-nomemo min="1700-01-01" max="2300-12-31"></div>
+    <button class="btn ghost" id="ssNext" type="button" aria-label="Next day">Day ›</button>
+    <button class="btn ghost" id="ssToday" type="button">Today</button>
+  </div>
+  <p class="msg" id="ssMsg" role="status"></p>
+  <p class="ss-note" id="ssNote" hidden></p>
+  <div class="stats" id="ssStats"></div>
+  <div class="ss-tl" id="ssTl" aria-hidden="true"></div>
+  <ul class="ss-key"><li><i style="background:#0b1026"></i>Night</li><li><i style="background:#1f2a5c"></i>Astronomical twilight</li><li><i style="background:#3b4f9e"></i>Nautical twilight</li><li><i style="background:#7d91e0"></i>Civil twilight</li><li><i style="background:#f5b942"></i>Golden hour</li><li><i style="background:#cfe8ff"></i>Daylight</li></ul>
+
+  <h3>Light through the day</h3>
+  <div class="ss-scroll"><table class="sched" id="ssTable"><thead><tr><th class="l">What</th><th>Time</th><th>Sun direction</th></tr></thead><tbody></tbody></table></div>
+
+  <h3>The Sun right now</h3>
+  <div class="stats ss-live" id="ssNow"></div>
+
+  <h3>Sun path</h3>
+  <div class="ss-pathw">
+    <div id="ssPath"></div>
+    <ul id="ssPathInfo"></ul>
+  </div>
+
+  <h3>Month table</h3>
+  <div class="ss-mbar">
+    <div><label for="ssMonth">Month</label><input type="month" id="ssMonth" data-nomemo></div>
+    <button class="btn ghost" id="ssPrint" type="button">Print / PDF</button>
+    <button class="btn ghost" id="ssCsv" type="button">Download CSV</button>
+  </div>
+  <div class="ss-scroll"><table class="sched ss-month" id="ssMonthT"><thead><tr><th class="l">Date</th><th>Dawn</th><th>Sunrise</th><th>Solar noon</th><th>Sunset</th><th>Dusk</th><th>Day length</th></tr></thead><tbody></tbody></table></div>
+  <p class="msg">Dawn and dusk are civil twilight (Sun 6° below the horizon). Times use the place's own time zone, including daylight saving. Hills, buildings and weather can shift what you see by a few minutes.</p>
+</div>
+
+<script src="../assets/vendor/astronomy/astronomy.browser.min.js"></script>
+<script src="../assets/astro.js"></script>
+<script>
+(function () {
+  'use strict';
+  if (!window.AX || !window.Astronomy) { var m = document.getElementById('ssMsg'); if (m) { m.className = 'msg bad'; m.textContent = 'The astronomy files did not load. Check your connection and reload the page.'; } return; }
+  var KEY = 'gtn-sunrise-sunset', el = AX.el, cur = null, place, picker, nowTimer = null;
+  var dateIn = $('ssDate'), monthIn = $('ssMonth');
+  function say(cls, t) { var m = $('ssMsg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = t || ''; }
+  function today() { return AX.ymd(Date.now(), place.zone); }
+  function selDate() { var v = dateIn.value; return AX.parseYmd(v) ? v : today(); }
+  function azOf(t) { return t == null ? null : AX.altAz('Sun', t, place).az; }
+
+  function why(alt, r) { // explain a missing event
+    if (r.lowAlt > alt && r.lowAlt0 > alt) return 'Sun stays above ' + alt + '° all night';
+    if (r.noonAlt < alt) return 'Sun stays below ' + (alt > 0 ? alt : alt) + '° all day';
+    return 'Not on this date';
+  }
+  function stat(label, value, sub) { var d = el('div', 'stat'); d.appendChild(el('span', null, label)); d.appendChild(el('b', null, value)); if (sub) d.appendChild(el('small', null, sub)); return d; }
+  function T(t) { return AX.fmtTimeOn(t, cur.date, place.zone); }
+
+  function render() {
+    var s = selDate();
+    if (dateIn.value !== s) dateIn.value = s;
+    var r;
+    try { r = AX.sunDay(place, s); } catch (e) { console.warn(e); say('bad', 'Sorry, that date could not be worked out. Try a date between the years 1700 and 2300.'); return; }
+    cur = r; say('', '');
+    var prev = null; try { prev = AX.sunDay(place, AX.addDays(s, -1)); } catch (e) {}
+    // note for polar days and nights
+    var note = $('ssNote'), nt = '';
+    if (r.state === 'up') nt = 'Midnight sun: the Sun does not set on this day. It is at its lowest (' + r.lowAlt.toFixed(1) + '° above the horizon) around ' + AX.fmtTime(r.noon + 12 * 36e5, place.zone) + '.';
+    else if (r.state === 'down') nt = 'Polar night: the Sun does not rise on this day. ' + (r.civil[0] != null ? 'There is still twilight around midday (civil twilight ' + T(r.civil[0]) + ' – ' + T(r.civil[1]) + ').' : r.naut[0] != null ? 'Only a dim nautical twilight around midday.' : r.astro[0] != null ? 'Only faint astronomical twilight around midday.' : 'It stays fully dark all day.');
+    else if (r.state === 'noRise') nt = 'The Sun has been up since the night before and sets at ' + T(r.set) + '. The midnight sun is ending.';
+    else if (r.state === 'noSet') nt = 'The Sun rises at ' + T(r.rise) + ' and does not set until a later day. The midnight sun is starting.';
+    note.textContent = nt; note.hidden = !nt;
+    // big numbers
+    var st = $('ssStats'); st.textContent = '';
+    var dl = r.dayLen, chg = prev ? dl - prev.dayLen : null;
+    st.appendChild(stat('Sunrise', r.rise != null ? T(r.rise) : (r.state === 'up' || r.state === 'noRise' ? 'Already up' : 'No sunrise'), r.rise != null ? AX.fmtAz(azOf(r.rise)) : ''));
+    st.appendChild(stat('Sunset', r.set != null ? T(r.set) : (r.state === 'up' || r.state === 'noSet' ? 'Does not set' : 'No sunset'), r.set != null ? AX.fmtAz(azOf(r.set)) : ''));
+    st.appendChild(stat('Day length', r.state === 'up' ? '24 h' : AX.fmtDur(dl), chg == null || r.state === 'up' || r.state === 'down' ? (r.state === 'up' ? 'Sun up all day' : r.state === 'down' ? 'Sun down all day' : '') : (Math.abs(chg) < 1000 ? 'Same as yesterday' : (chg > 0 ? '+' : '−') + AX.fmtDur(Math.abs(chg), true).replace(/^0 h /, '') + ' vs yesterday')));
+    st.appendChild(stat('Solar noon', T(r.noon), 'Sun ' + r.noonAlt.toFixed(1) + '° high'));
+    timeline(r);
+    table(r);
+    sunPath(r);
+    if (!monthIn.value || monthIn.dataset.auto === '1') { monthIn.value = s.slice(0, 7); monthIn.dataset.auto = '1'; }
+    month();
+    live();
+    try { sessionStorage.setItem(KEY + '-date', s === today() ? '' : s); } catch (e) {}
+  }
+
+  function table(r) {
+    var tb = $('ssTable').tBodies[0]; tb.textContent = '';
+    function row(what, sub, time, dir, hi) {
+      var tr = el('tr', hi ? 'hi' : ''), a = el('td', 'l'); a.appendChild(document.createTextNode(what)); if (sub) a.appendChild(el('small', null, sub));
+      tr.appendChild(a); tr.appendChild(el('td', null, time)); tr.appendChild(el('td', null, dir || '')); tb.appendChild(tr);
+    }
+    function ev(t, alt) { return t != null ? T(t) : why(alt, r); }
+    function rng(a, b, altA, altB) {
+      if (a != null && b != null) return T(a) + ' – ' + T(b);
+      if (a == null && b == null) return r.noonAlt < Math.min(altA, altB) ? 'Sun stays lower all day' : (r.lowAlt > Math.max(altA, altB) ? 'Sun stays higher all night' : 'Not on this date');
+      return (a != null ? T(a) : '…') + ' – ' + (b != null ? T(b) : '…');
+    }
+    var g = r.gold, b = r.blue;
+    var goldAllDay = r.noonAlt < 6 && r.noonAlt > -4;
+    row('Astronomical dawn', 'Sun 18° below the horizon; the sky starts to brighten', ev(r.astro[0], -18));
+    row('Nautical dawn', 'Sun 12° below; the horizon becomes visible', ev(r.naut[0], -12));
+    row('Civil dawn', 'Sun 6° below; enough light to be outdoors', ev(r.civil[0], -6));
+    row('Blue hour (morning)', 'Sun 6° to 4° below the horizon', rng(b[0], b[1], -6, -4));
+    row('Sunrise', 'Top of the Sun appears', r.rise != null ? T(r.rise) : (r.state === 'up' || r.state === 'noRise' ? 'Sun already up' : 'No sunrise'), r.rise != null ? AX.fmtAz(azOf(r.rise)) : '', true);
+    if (goldAllDay) row('Golden hour', 'The Sun stays low all day', rng(g[0], g[3], -4, -4));
+    else row('Golden hour (morning)', 'Sun from 4° below to 6° above the horizon', rng(g[0], g[1], -4, 6));
+    row('Solar noon', 'Sun at its highest: ' + r.noonAlt.toFixed(1) + '°', T(r.noon), AX.fmtAz(azOf(r.noon)), true);
+    if (!goldAllDay) row('Golden hour (evening)', 'Sun from 6° above to 4° below the horizon', rng(g[2], g[3], 6, -4));
+    row('Sunset', 'Top of the Sun disappears', r.set != null ? T(r.set) : (r.state === 'up' || r.state === 'noSet' ? 'Sun does not set' : 'No sunset'), r.set != null ? AX.fmtAz(azOf(r.set)) : '', true);
+    row('Blue hour (evening)', 'Sun 4° to 6° below the horizon', rng(b[2], b[3], -4, -6));
+    row('Civil dusk', 'Sun 6° below; lights needed outdoors', ev(r.civil[1], -6));
+    row('Nautical dusk', 'Sun 12° below; the horizon fades', ev(r.naut[1], -12));
+    row('Astronomical dusk', 'Sun 18° below; fully dark sky', ev(r.astro[1], -18));
+  }
+
+  var BANDS = [[-90, '#0b1026'], [-18, '#1f2a5c'], [-12, '#3b4f9e'], [-6, '#7d91e0'], [-4, '#f5b942'], [-0.833, '#f5b942'], [6, '#cfe8ff']];
+  function color(a) { var c = BANDS[0][1]; for (var i = 0; i < BANDS.length; i++) if (a >= BANDS[i][0]) c = BANDS[i][1]; return c; }
+  function svgEl(tag, at) { var e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (var k in at) e.setAttribute(k, at[k]); return e; }
+  function timeline(r) {
+    var W = 720, H = 64, box = $('ssTl'), svg = svgEl('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img' }), span = r.t1 - r.t0, n = 144, step = span / n;
+    var prevC = null, x0 = 0;
+    for (var i = 0; i <= n; i++) {
+      var c = i < n ? color(AX.altAz('Sun', r.t0 + (i + .5) * step, place).alt) : null;
+      if (c !== prevC) { if (prevC) svg.appendChild(svgEl('rect', { x: x0, y: 4, width: (i / n) * W - x0 + .5, height: 34, fill: prevC })); prevC = c; x0 = (i / n) * W; }
+    }
+    svg.appendChild(svgEl('rect', { x: .5, y: 4.5, width: W - 1, height: 33, fill: 'none', stroke: 'rgba(127,127,127,.5)', rx: 3 }));
+    for (var h = 0; h <= 24; h += 3) {
+      var t = AX.localToUtc(+r.date.slice(0, 4), +r.date.slice(5, 7), +r.date.slice(8, 10), h === 24 ? 23 : h, h === 24 ? 59 : 0, place.zone);
+      var x = Math.max(1, Math.min(W - 1, (t - r.t0) / span * W));
+      svg.appendChild(svgEl('line', { x1: x, x2: x, y1: 38, y2: 44, stroke: 'currentColor', 'stroke-width': 1 }));
+      var tx = svgEl('text', { x: Math.max(14, Math.min(W - 14, x)), y: 58, 'text-anchor': 'middle', 'font-size': 13, fill: 'currentColor' }); tx.textContent = h === 24 ? '24' : AX.pad(h); svg.appendChild(tx);
+    }
+    var nw = Date.now(); if (nw >= r.t0 && nw < r.t1) { var nx = (nw - r.t0) / span * W; svg.appendChild(svgEl('line', { x1: nx, x2: nx, y1: 0, y2: 42, stroke: '#e11d48', 'stroke-width': 3 })); }
+    box.textContent = ''; box.appendChild(svg);
+  }
+
+  var pathCache = {};
+  // plan view of the sky: centre = straight up, edge = horizon, north at the top
+  function sunPath(r) {
+    var S = 360, C = S / 2, R = 150, box = $('ssPath'), svg = svgEl('svg', { viewBox: '0 0 ' + S + ' ' + S, role: 'img', 'aria-label': 'Sun path diagram' });
+    function xy(alt, az) { var d = (90 - alt) / 90 * R, a = az * Math.PI / 180; return [C + d * Math.sin(a), C - d * Math.cos(a)]; }
+    svg.appendChild(svgEl('circle', { cx: C, cy: C, r: R, fill: 'rgba(125,145,224,.12)', stroke: 'currentColor', 'stroke-opacity': .5 }));
+    [30, 60].forEach(function (a) { svg.appendChild(svgEl('circle', { cx: C, cy: C, r: (90 - a) / 90 * R, fill: 'none', stroke: 'currentColor', 'stroke-opacity': .18, 'stroke-dasharray': '3 4' })); var t = svgEl('text', { x: C + 3, y: C - (90 - a) / 90 * R - 3, 'font-size': 10, fill: 'currentColor', 'fill-opacity': .6 }); t.textContent = a + '°'; svg.appendChild(t); });
+    for (var az = 0; az < 360; az += 45) { var p1 = xy(0, az); svg.appendChild(svgEl('line', { x1: C, y1: C, x2: p1[0], y2: p1[1], stroke: 'currentColor', 'stroke-opacity': .12 })); }
+    [['N', 0], ['E', 90], ['S', 180], ['W', 270]].forEach(function (k) { var p = xy(-13, k[1]), t = svgEl('text', { x: p[0], y: p[1] + 5, 'text-anchor': 'middle', 'font-size': 15, 'font-weight': 700, fill: 'currentColor' }); t.textContent = k[0]; svg.appendChild(t); });
+    function path(s, opts) {
+      var ck = s + '|' + place.lat + '|' + place.lon + '|' + place.zone, c = pathCache[ck];
+      if (!c) {
+        var t0 = AX.dayStart(s, place.zone), t1 = AX.dayStart(AX.addDays(s, 1), place.zone), d = '', on = false, pts = [];
+        for (var t = t0; t <= t1; t += 6e5) { var h = AX.altAz('Sun', t, place); if (h.alt >= -0.5) { var p = xy(Math.max(0, h.alt), h.az); d += (on ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1); on = true; pts.push([t, h]); } else on = false; }
+        c = pathCache[ck] = { d: d, pts: pts }; if (Object.keys(pathCache).length > 40) pathCache = {};
+      }
+      var d = c.d, pts = c.pts;
+      if (d) svg.appendChild(svgEl('path', { d: d, fill: 'none', stroke: opts.c, 'stroke-width': opts.w, 'stroke-dasharray': opts.dash || '', 'stroke-linejoin': 'round' }));
+      return pts;
+    }
+    var y = r.date.slice(0, 4), south = place.lat < 0;
+    path(y + '-06-21', { c: south ? '#3b82f6' : '#f97316', w: 1.5, dash: '5 4' });
+    path(y + '-12-21', { c: south ? '#f97316' : '#3b82f6', w: 1.5, dash: '5 4' });
+    var pts = path(r.date, { c: '#eab308', w: 4 });
+    pts.forEach(function (x) { var p = AX.parts(x[0], place.zone); if (p.mi === 0 && x[1].alt > 1) { var q = xy(x[1].alt, x[1].az); svg.appendChild(svgEl('circle', { cx: q[0], cy: q[1], r: 3, fill: '#a16207' })); var t = svgEl('text', { x: q[0] + 5, y: q[1] - 5, 'font-size': 10, fill: 'currentColor' }); t.textContent = AX.pad(p.h); svg.appendChild(t); } });
+    [[r.rise, '#f59e0b'], [r.set, '#ef4444']].forEach(function (k) { if (k[0] == null) return; var p = xy(0, azOf(k[0])); svg.appendChild(svgEl('line', { x1: C, y1: C, x2: p[0], y2: p[1], stroke: k[1], 'stroke-width': 2 })); });
+    var nw = Date.now(), hn = AX.altAz('Sun', nw, place);
+    if (AX.ymd(nw, place.zone) === r.date && hn.alt > 0) { var q = xy(hn.alt, hn.az); svg.appendChild(svgEl('circle', { cx: q[0], cy: q[1], r: 9, fill: '#fde047', stroke: '#a16207', 'stroke-width': 2 })); }
+    box.textContent = ''; box.appendChild(svg);
+    var info = $('ssPathInfo'); info.textContent = '';
+    ['Thick yellow line: the Sun on ' + AX.fmtDate(r.date) + ', with the hours marked.',
+     'Dashed orange: the longest day (' + (south ? 'December' : 'June') + ' solstice).',
+     'Dashed blue: the shortest day (' + (south ? 'June' : 'December') + ' solstice).',
+     'The centre is straight overhead and the edge is the horizon, with north at the top, like a map.',
+     'Short coloured lines point to sunrise and sunset.'].forEach(function (t) { info.appendChild(el('li', null, t)); });
+  }
+
+  function live() {
+    var box = $('ssNow'), nw = Date.now(), h = AX.altAz('Sun', nw, place), a = h.alt;
+    var what = a > 6 ? 'Daytime' : a > -0.833 ? 'Golden hour' : a > -4 ? 'Civil twilight (golden)' : a > -6 ? 'Blue hour' : a > -12 ? 'Nautical twilight' : a > -18 ? 'Astronomical twilight' : 'Night';
+    box.textContent = '';
+    box.appendChild(stat('Local time', AX.fmtTime(nw, place.zone), AX.fmtDate(AX.ymd(nw, place.zone)) + ' · ' + AX.zoneShort(place.zone)));
+    box.appendChild(stat('Altitude', a.toFixed(1) + '°', a < 0 ? 'Below the horizon' : 'Above the horizon'));
+    box.appendChild(stat('Azimuth', AX.fmtAz(h.az), 'Clockwise from north'));
+    box.appendChild(stat('Sky', what, 'Shadow length: ' + (a > 1 ? (1 / Math.tan(a * Math.PI / 180)).toFixed(a > 20 ? 1 : 0) + '× height' : '—')));
+  }
+
+  // ---------- month table ----------
+  var monthRows = [], monthKey = '';
+  function month(force) {
+    var v = monthIn.value, m = /^(\d{4})-(\d{2})$/.exec(v);
+    if (!m) { monthIn.value = selDate().slice(0, 7); m = /^(\d{4})-(\d{2})$/.exec(monthIn.value); }
+    var key = monthIn.value + '|' + place.lat + '|' + place.lon + '|' + place.zone + '|' + AX.clock() + '|' + today();
+    if (!force && key === monthKey) { var sel0 = selDate(); [].forEach.call($('ssMonthT').tBodies[0].rows, function (tr, i) { tr.className = monthRows[i] && monthRows[i].s === sel0 ? 'today' : ''; }); return; }
+    monthKey = key;
+    var y = +m[1], mo = +m[2], n = AX.daysInMonth(y, mo), tb = $('ssMonthT').tBodies[0], td = today(), sel = selDate();
+    tb.textContent = ''; monthRows = [];
+    for (var d = 1; d <= n; d++) {
+      var s = y + '-' + AX.pad(mo) + '-' + AX.pad(d), r;
+      try { r = AX.sunDay(place, s); } catch (e) { continue; }
+      var f = function (t) { return AX.fmtTimeOn(t, s, place.zone); };
+      var rise = r.rise != null ? f(r.rise) : r.state === 'up' || r.state === 'noRise' ? 'Up all night' : 'No sunrise';
+      var set = r.set != null ? f(r.set) : r.state === 'up' || r.state === 'noSet' ? 'Does not set' : 'No sunset';
+      var len = r.state === 'up' ? '24 h' : AX.fmtDur(r.dayLen);
+      var row = [AX.fmtDate(s, { weekday: 'short', day: 'numeric', month: 'short' }), f(r.civil[0]), rise, f(r.noon), set, f(r.civil[1]), len];
+      monthRows.push({ s: s, r: r, cells: row });
+      var tr = el('tr', s === sel ? 'today' : ''); row.forEach(function (c, i) { tr.appendChild(el('td', i ? null : 'l', c)); }); tb.appendChild(tr);
+    }
+  }
+  function csvCell(v) { v = String(v == null ? '' : v); return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v; }
+  function iso(t) { if (t == null) return ''; var p = AX.parts(t, place.zone); return p.y + '-' + AX.pad(p.m) + '-' + AX.pad(p.d) + ' ' + AX.pad(p.h) + ':' + AX.pad(p.mi); }
+  $('ssCsv').addEventListener('click', function () {
+    if (!monthRows.length) { say('bad', 'Choose a month first.'); return; }
+    var lines = [['Date', 'Astronomical dawn', 'Nautical dawn', 'Civil dawn', 'Sunrise', 'Solar noon', 'Noon altitude (deg)', 'Sunset', 'Civil dusk', 'Nautical dusk', 'Astronomical dusk', 'Day length (h:mm)', 'Time zone'].join(',')];
+    monthRows.forEach(function (x) {
+      var r = x.r, mins = Math.round(r.dayLen / 60000);
+      lines.push([x.s, iso(r.astro[0]), iso(r.naut[0]), iso(r.civil[0]), r.rise != null ? iso(r.rise) : (r.state === 'up' ? 'sun up all day' : r.state === 'noRise' ? 'already up' : 'no sunrise'), iso(r.noon), r.noonAlt.toFixed(2), r.set != null ? iso(r.set) : (r.state === 'up' || r.state === 'noSet' ? 'does not set' : 'no sunset'), iso(r.civil[1]), iso(r.naut[1]), iso(r.astro[1]), Math.floor(mins / 60) + ':' + AX.pad(mins % 60), place.zone].map(csvCell).join(','));
+    });
+    var name = 'sunrise-sunset-' + place.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') + '-' + monthIn.value + '.csv';
+    var a = document.createElement('a'), url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
+    a.href = url; a.download = name.replace(/--+/g, '-'); document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 4000);
+    say('ok', 'Downloaded ' + a.download + ' (' + monthRows.length + ' days).');
+  });
+  function fillPrint() {
+    var box = $('ssPrintBox'); if (!box) { box = document.createElement('div'); box.id = 'ssPrintBox'; document.body.appendChild(box); }
+    box.textContent = '';
+    var mm = monthIn.value.split('-');
+    box.appendChild(el('h2', null, 'Sunrise and sunset · ' + AX.fmtDate(monthIn.value + '-01', { month: 'long', year: 'numeric' })));
+    box.appendChild(el('p', null, AX.placeLabel(place) + ' · ' + AX.fmtLat(place.lat) + ', ' + AX.fmtLon(place.lon) + ' · times in ' + place.zone.replace(/_/g, ' ') + '. Dawn and dusk = civil twilight (Sun 6° below the horizon).'));
+    var t = $('ssMonthT').cloneNode(true); t.removeAttribute('id'); t.className = ''; box.appendChild(t);
+    box.appendChild(el('p', null, 'Made with GetToolNest Sunrise & Sunset · ' + AX.fmtDate(AX.ymd(Date.now(), place.zone))));
+    return mm;
+  }
+  window.addEventListener('beforeprint', fillPrint);
+  window.addEventListener('afterprint', function () { var b = $('ssPrintBox'); if (b) b.textContent = ''; });
+  $('ssPrint').addEventListener('click', function () { fillPrint(); window.print(); });
+
+  // ---------- wiring ----------
+  dateIn.addEventListener('change', function () { if (!AX.parseYmd(dateIn.value)) { say('bad', 'Please pick a full date.'); return; } monthIn.dataset.auto = '1'; render(); });
+  $('ssPrev').addEventListener('click', function () { dateIn.value = AX.addDays(selDate(), -1); monthIn.dataset.auto = '1'; render(); });
+  $('ssNext').addEventListener('click', function () { dateIn.value = AX.addDays(selDate(), 1); monthIn.dataset.auto = '1'; render(); });
+  $('ssToday').addEventListener('click', function () { dateIn.value = today(); monthIn.dataset.auto = '1'; render(); say('ok', 'Showing today in ' + place.name + '.'); });
+  monthIn.addEventListener('change', function () { if (!/^\d{4}-\d{2}$/.test(monthIn.value)) return; monthIn.dataset.auto = '0'; month(); });
+  picker = AX.placePicker({ box: $('ssPlace'), id: 'ssP', key: KEY, onChange: function (p) { var wasToday = selDate() === today(); place = p; if (wasToday) dateIn.value = today(); render(); } });
+  place = picker.get();
+  var saved = null; try { saved = sessionStorage.getItem(KEY + '-date'); } catch (e) {}
+  dateIn.value = AX.parseYmd(saved) ? saved : today();
+  render();
+  nowTimer = setInterval(function () { if (!document.hidden) live(); }, 30000);
+})();
+</script>

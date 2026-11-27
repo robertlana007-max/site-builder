@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"pros-and-cons":["artılar ve eksiler listesi","avantaj dezavantaj","karar verme yardımı","evet hayır rastgele"],
+"decision-matrix":["karar matrisi","ağırlıklı karar matrisi","seçenekleri karşılaştır","karar verme aracı"],
+"moon-phase":["bugün ayın evresi","ay takvimi","sonraki dolunay","yeni ay","ay doğuşu"],
+"night-sky-map":["gökyüzü haritası","yıldız haritası","bu gece gezegenler","takımyıldız bulucu"],
+"sunrise-sunset":["gün doğumu saati","gün batımı saati","güneş doğuş batış","altın saat","gün uzunluğu"],
 "sudoku-solver":["sudoku çözücü","sudoku çöz","fotoğraftan sudoku çözme"],
 "wifi-qr-code":["wifi qr kod","wifi qr kod oluştur","wifi şifresi paylaş"],
 "image-steganography":["steganografi","resme mesaj gizleme","fotoğrafta gizli mesaj"],

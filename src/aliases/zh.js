@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"pros-and-cons":["利弊清单","优缺点列表","帮我做决定","随机是或否","随机抽选"],
+"decision-matrix":["决策矩阵","加权决策矩阵","比较选项","决策工具","加权评分"],
+"moon-phase":["今天月相","月相日历","下一次满月","新月日期","月出时间"],
+"night-sky-map":["星图","夜空地图","今晚能看到的行星","星座查找","在线天象仪"],
+"sunrise-sunset":["日出时间","日落时间","日出日落","黄金时刻","白天长度","曙暮光"],
 "sudoku-solver":["数独求解","数独解题器","拍照解数独","数独答案"],
 "wifi-qr-code":["wifi二维码","无线网络二维码","wifi二维码生成器","扫码连接wifi"],
 "image-steganography":["图片隐写","隐写术","在图片中隐藏文字","图片隐藏信息"],
