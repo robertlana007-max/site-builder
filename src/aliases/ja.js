@@ -1,6 +1,14 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"handwriting-worksheets":["なぞり書き プリント","ひらがな 練習 プリント","漢字 練習帳","カタカナ 練習","書き方 練習"],
+"menu-maker":["メニュー作成","メニュー表 テンプレート","カフェ メニュー","料金表 作成","メニュー デザイン"],
+"inventory-tracker":["在庫管理","在庫表","棚卸し表","在庫管理 無料","入出庫管理"],
+"cash-book":["現金出納帳","出納帳","売掛帳","お店の帳簿","入出金管理"],
+"health-log":["血圧手帳","血圧記録","血糖値記録","体重記録"],
+"first-aid-guide":["応急手当","応急処置","心肺蘇生","救急車 番号"],
+"medication-schedule":["服薬管理","薬 飲み忘れ防止","服薬スケジュール","お薬カレンダー"],
+"emergency-medical-card":["緊急医療カード","医療情報カード","アレルギーカード","救急情報カード"],
 "read-along":["読み上げ","テキスト読み上げ","音読 ハイライト","pdf 読み上げ"],
 "job-application-tracker":["応募管理","就活 管理","転職 応募管理表","求人応募 トラッカー"],
 "interview-practice":["面接 練習","面接 質問","模擬面接","面接対策"],

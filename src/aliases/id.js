@@ -1,6 +1,14 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"handwriting-worksheets":["latihan menulis huruf","lembar kerja menebalkan huruf","huruf putus putus","latihan menulis anak tk","menulis tegak bersambung"],
+"menu-maker":["buat menu","desain menu","template menu makanan","daftar harga","menu cafe"],
+"inventory-tracker":["aplikasi stok barang","catatan stok","manajemen inventaris","stok opname","barang masuk keluar"],
+"cash-book":["buku kas","buku kas harian","catatan utang pelanggan","pemasukan dan pengeluaran","buku kas toko"],
+"health-log":["catatan tekanan darah","catatan gula darah","pencatat berat badan","tabel tekanan darah"],
+"first-aid-guide":["pertolongan pertama","panduan p3k","cara melakukan cpr","nomor darurat"],
+"medication-schedule":["pengingat minum obat","jadwal minum obat","jadwal obat","catatan minum obat"],
+"emergency-medical-card":["kartu medis darurat","kartu alergi","kartu identitas medis","kartu golongan darah"],
 "read-along":["bacakan teks","membaca teks dengan suara","pembaca teks","baca pdf dengan suara"],
 "job-application-tracker":["pelacak lamaran kerja","catatan lamaran kerja","tracker lamaran kerja","daftar lamaran kerja"],
 "interview-practice":["pertanyaan wawancara kerja","latihan wawancara kerja","simulasi interview","persiapan interview"],
