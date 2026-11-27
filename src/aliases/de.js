@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"pros-and-cons":["pro und contra liste","vor- und nachteile","entscheidungshilfe","ja oder nein generator","zufallsauswahl liste"],
+"decision-matrix":["entscheidungsmatrix","gewichtete entscheidungsmatrix","nutzwertanalyse","optionen vergleichen","entscheidungshilfe"],
+"moon-phase":["mondphase heute","mondkalender","nächster vollmond","neumond","mondaufgang"],
+"night-sky-map":["sternkarte","himmelskarte","sternenhimmel heute","planeten heute nacht","sternbilder finden"],
+"sunrise-sunset":["sonnenaufgang uhrzeit","sonnenuntergang heute","sonnenaufgang und sonnenuntergang","goldene stunde","tageslänge","dämmerung zeiten"],
 "sudoku-solver":["sudoku löser","sudoku lösen","sudoku lösen mit foto","sudoku hilfe"],
 "wifi-qr-code":["wlan qr code","wlan qr code erstellen","wlan passwort teilen","wlan schild","wifi qr code"],
 "image-steganography":["steganographie","nachricht in bild verstecken","versteckte nachricht im bild","text im bild verstecken"],

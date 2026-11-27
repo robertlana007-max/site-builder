@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"pros-and-cons":["メリット デメリット 表","賛否リスト","決断ツール","イエスノー ランダム"],
+"decision-matrix":["意思決定マトリックス","重み付け評価表","選択肢の比較","比較表 作成"],
+"moon-phase":["今日の月齢","月の満ち欠け","次の満月","新月 いつ","月の出時刻"],
+"night-sky-map":["星図","星座早見","今夜の惑星","夜空マップ","星座アプリ"],
+"sunrise-sunset":["日の出時刻","日の入り時刻","日の出 日の入り","マジックアワー","日照時間","薄明"],
 "sudoku-solver":["数独 解く","ナンプレ 解答","数独ソルバー","ナンプレ 写真で解く"],
 "wifi-qr-code":["wifi qrコード","wi-fi qrコード 作成","wifiパスワード 共有"],
 "image-steganography":["画像ステガノグラフィー","画像にメッセージを隠す","隠しメッセージ 画像"],

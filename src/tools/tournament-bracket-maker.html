@@ -28,6 +28,7 @@
 .tb-print { display: none; }
 @media print {
   body > *:not(.tb-print) { display: none !important; }
+  html, body { background: #fff !important; }
   .tb-print { display: block !important; color: #000; background: #fff; }
   .tb-page { break-after: page; page-break-after: always; }
   .tb-page:last-child { break-after: auto; page-break-after: auto; }
@@ -276,7 +277,7 @@
     if (f === 'single' || f === 'double') {
       var w = sec('W', f === 'double' ? 'Winners’ bracket' : '');
       var right = w.cols * (BW + CG), lowY = w.h + 20;
-      if (f === 'double') { y0 = lowY + 30; var l = sec('L', 'Losers’ bracket'); if (l) { right = Math.max(right, l.cols * (BW + CG)); lowY = l.y + l.h + 20; } }
+      if (f === 'double') { y0 = w.y + w.h + 64; var l = sec('L', 'Losers’ bracket'); if (l) { right = Math.max(right, l.cols * (BW + CG)); lowY = l.y + l.h + 20; } }
       MS.filter(function (m) { return m.sec === 'F'; }).forEach(function (m, i) { var wf = pos[m.a.w], lb = m.b.w ? pos[m.b.w] : wf; pos[m.id] = { x: right + i * (BW + CG), y: (wf.y + lb.y) / 2, sec: 'F' }; });
       MS.filter(function (m) { return m.sec === '3'; }).forEach(function (m) { var fin = pos[MS.filter(function (z) { return z.sec === 'W' && z.rt === 'Final'; })[0].id]; pos[m.id] = { x: fin.x, y: fin.y + BH + 70, sec: '3' }; });
     } else if (f === 'groups') {
@@ -429,48 +430,64 @@
     });
     return h;
   }
-  function fixturesHTML() {
-    var ms = MS.filter(function (m) { return m.sec === 'G'; }); if (!ms.length) return '';
-    return '<table style="width:100%"><tr><th>Round</th>' + (T.format === 'groups' ? '<th>Group</th>' : '') + '<th>Match</th><th>Score</th></tr>' + ms.map(function (m) { var r = res(m); return '<tr><td>' + (m.r + 1) + '</td>' + (T.format === 'groups' ? '<td>' + String.fromCharCode(65 + m.g) + '</td>' : '') + '<td class="n">' + esc(T.entrants[m.a.p] + ' v ' + T.entrants[m.b.p]) + '</td><td>' + (r && r.sa != null ? r.sa + '–' + r.sb : '') + '</td></tr>'; }).join('') + '</table>';
+  function fixturePages() { // the league matches as tables of 26 rows, three side by side on each page
+    var ms = MS.filter(function (m) { return m.sec === 'G'; }), out = [], grp = T.format === 'groups';
+    var rows = ms.map(function (m) { var r = res(m); return '<tr><td>' + (m.r + 1) + '</td>' + (grp ? '<td>' + String.fromCharCode(65 + m.g) + '</td>' : '') + '<td class="n">' + esc(T.entrants[m.a.p] + ' v ' + T.entrants[m.b.p]) + '</td><td>' + (r && r.sa != null ? r.sa + '–' + r.sb : '') + '</td></tr>'; });
+    var head = '<tr><th>Round</th>' + (grp ? '<th>Group</th>' : '') + '<th>Match</th><th>Score</th></tr>';
+    for (var i = 0; i < rows.length; i += 78) {
+      var tb = []; for (var j = i; j < Math.min(rows.length, i + 78); j += 26) tb.push('<table style="width:31%">' + head + rows.slice(j, j + 26).join('') + '</table>');
+      out.push('<div style="display:flex;gap:3%;align-items:flex-start">' + tb.join('') + '</div>');
+    }
+    return out;
   }
-  function pages(paper) { // split the bracket into page-sized pieces, cut between match boxes
-    var mm = 96 / 25.4, pw = (paper === 'letter' ? 279.4 : 297) - 20, ph = (paper === 'letter' ? 215.9 : 210) - 20 - 12;
-    var PW = pw * mm, PH = ph * mm, L = layout(), out = [];
-    if (!Object.keys(L.pos).length) return { L: L, list: out };
-    var minScale = 0.62, s = Math.min(1, PW / L.W), colW = BW + CG;
-    var xs = [0];
-    if (s < minScale) { s = minScale; var per = Math.max(1, Math.floor((PW / s + CG) / colW)); for (var x = per * colW; x < L.W - 1; x += per * colW) xs.push(x); }
-    var boxes = Object.keys(L.pos).map(function (k) { return L.pos[k]; });
-    xs.forEach(function (x0, xi) {
-      var x1 = xi + 1 < xs.length ? xs[xi + 1] - CG / 2 : L.W, inCol = boxes.filter(function (b) { return b.x >= x0 - 1 && b.x < x1; });
-      var hmax = PH / s, y = 0;
-      while (y < L.H - 1) {
-        var lim = y + hmax, cut = L.H;
-        if (lim < L.H) { // cut at the lowest gap above the limit
-          cut = y + 40; var cands = inCol.map(function (b) { return b.y - 26; }).filter(function (c) { return c > y + 40 && c <= lim && !inCol.some(function (b) { return b.y - 26 < c && b.y + BH + 2 > c; }); });
-          if (cands.length) cut = Math.max.apply(null, cands); else cut = lim;
+  function pages(paper) { // split the bracket into page-sized pieces: by section, then by columns, then cut between match boxes
+    var mm = 96 / 25.4, PW = ((paper === 'letter' ? 279.4 : 297) - 20) * mm, PH = ((paper === 'letter' ? 215.9 : 210) - 20 - 12) * mm;
+    var L = layout(), out = [], minScale = 0.66, colW = BW + CG, all = Object.keys(L.pos).map(function (k) { return L.pos[k]; });
+    if (!all.length) return { L: L, list: out };
+    var groups = {};
+    all.forEach(function (b) { var k = b.sec === '3' ? (T.format === 'double' ? 'F' : (T.format === 'groups' ? 'K' : 'W')) : b.sec; (groups[k] = groups[k] || []).push(b); });
+    ['W', 'K', 'L', 'F'].forEach(function (k) {
+      var bs = groups[k]; if (!bs) return;
+      var sec = L.secs.filter(function (z) { return z.key === k; })[0];
+      var rx0 = Math.min.apply(null, bs.map(function (b) { return b.x; })) - 6, rx1 = Math.max.apply(null, bs.map(function (b) { return b.x + BW; })) + 10;
+      var ry0 = (sec ? (sec.title ? sec.y - 26 : sec.y) : Math.min.apply(null, bs.map(function (b) { return b.y; })) - 28), ry1 = Math.max.apply(null, bs.map(function (b) { return b.y + BH; })) + 12;
+      var s = Math.min(1, PW / (rx1 - rx0)), xs = [rx0];
+      var fit = Math.min(1.5, PW / (rx1 - rx0), PH / (ry1 - ry0)); if (fit >= s) s = fit; // a small bracket fills the page
+      if (s < minScale) { s = minScale; var per = Math.max(1, Math.floor((PW / s - 16) / colW)); for (var x = rx0 + per * colW; x < rx1 - BW; x += per * colW) xs.push(x); }
+      xs.forEach(function (x0, xi) {
+        var x1 = xi + 1 < xs.length ? xs[xi + 1] - 6 : rx1, inCol = bs.filter(function (b) { return b.x >= x0 - 1 && b.x < x1; });
+        if (!inCol.length) return;
+        var top = xi === 0 ? ry0 : Math.min(ry0, Math.min.apply(null, inCol.map(function (b) { return b.y; })) - 30), bottom = Math.max.apply(null, inCol.map(function (b) { return b.y + BH; })) + 12;
+        if (sec && sec.y < top + 40 && xi > 0) top = Math.min(top, sec.y);
+        var hmax = PH / s, y = top;
+        while (y < bottom - 1) {
+          var lim = y + hmax, cut = bottom;
+          if (lim < bottom) { // cut in a gap, aiming for pages of even height
+            var target = y + (bottom - y) / Math.ceil((bottom - y) / hmax);
+            var cands = inCol.map(function (b) { return b.y - 18; }).filter(function (c) { return c > y + 60 && c <= lim && !inCol.some(function (b) { return b.y - 18 < c && b.y + BH + 2 > c; }); });
+            cut = cands.length ? cands.reduce(function (a, c) { return Math.abs(c - target) < Math.abs(a - target) ? c : a; }) : lim;
+          }
+          if (inCol.some(function (b) { return b.y < cut && b.y + BH > y; })) out.push({ x: x0, y: y, w: x1 - x0, h: cut - y, s: s });
+          y = cut;
         }
-        var cx = Math.max(0, x0 - (xi ? CG / 2 : 0)); out.push({ x: cx, y: y, w: Math.min(L.W, x1 + (xi + 1 < xs.length ? CG / 2 : 0)) - cx, h: cut - y, s: s });
-        y = cut;
-      }
+      });
     });
     return { L: L, list: out };
   }
   $('tbPrint').addEventListener('click', function () {
     fresh(); var paper = $('tbPaper').value, P = pages(paper), box = document.createElement('div'); box.className = 'tb-print';
     var css = document.createElement('style'); css.textContent = '@page { size: ' + (paper === 'letter' ? 'letter' : 'A4') + ' landscape; margin: 10mm; }';
-    var title = esc(T.name), ch = champion(), html = '', total = P.list.length + (GROUPS.length ? 1 : 0), k = 0;
-    if (GROUPS.length) html += '<div class="tb-page"><h2>' + title + (total > 1 ? ' · page ' + (++k) + ' of ' + total : '') + (ch !== undefined && ch !== -1 ? ' · Winner: ' + esc(T.entrants[ch]) : '') + '</h2><div style="display:flex;flex-wrap:wrap;gap:6mm;align-items:flex-start">' + tablesHTML() + '</div>' + (T.format === 'rr' ? fixturesHTML() : '') + '</div>';
-    P.list.forEach(function (c) {
-      html += '<div class="tb-page"><h2>' + title + (total > 1 ? ' · page ' + (++k) + ' of ' + total : '') + (ch !== undefined && ch !== -1 && k === 1 ? ' · Winner: ' + esc(T.entrants[ch]) : '') + '</h2>' + svgBracket(P.L, c, false).replace(/width="[\d.]+" height="[\d.]+"/, 'width="' + (c.w * c.s).toFixed(1) + '" height="' + (c.h * c.s).toFixed(1) + '"') + '</div>';
-    });
-    if (T.format === 'groups') html += '<div class="tb-page"><h2>' + title + ' · group matches</h2>' + fixturesHTML() + '</div>';
+    var title = esc(T.name), ch = champion(), win = ch !== undefined && ch !== -1 ? ' · Winner: ' + esc(T.entrants[ch]) : '', pg = [];
+    if (GROUPS.length) pg.push(['', '<div style="display:flex;flex-wrap:wrap;gap:6mm;align-items:flex-start">' + tablesHTML() + '</div>']);
+    P.list.forEach(function (c) { pg.push(['', svgBracket(P.L, c, false).replace(/width="[\d.]+" height="[\d.]+"/, 'width="' + (c.w * c.s).toFixed(1) + '" height="' + (c.h * c.s).toFixed(1) + '"')]); });
+    fixturePages().forEach(function (h) { pg.push([' · ' + (T.format === 'groups' ? 'group matches' : 'matches'), h]); });
+    var html = pg.map(function (x, i) { return '<div class="tb-page"><h2>' + title + (i === 0 ? win : '') + x[0] + (pg.length > 1 ? ' · page ' + (i + 1) + ' of ' + pg.length : '') + '</h2>' + x[1] + '</div>'; }).join('');
     box.innerHTML = html; box.appendChild(css); document.body.appendChild(box);
     var done = function () { box.remove(); window.removeEventListener('afterprint', done); };
     window.addEventListener('afterprint', done);
     window.print();
     setTimeout(function () { if (box.parentNode && !(window.matchMedia && matchMedia('print').matches)) done(); }, 2000);
-    say('ok', 'Choose "Save as PDF" in the print window to make a PDF. ' + total + ' page' + (total > 1 ? 's' : '') + ' on ' + (paper === 'letter' ? 'Letter' : 'A4') + ' landscape.');
+    var np = box.querySelectorAll('.tb-page').length; say('ok', 'Choose "Save as PDF" in the print window to make a PDF. ' + np + ' page' + (np > 1 ? 's' : '') + ' on ' + (paper === 'letter' ? 'Letter' : 'A4') + ' landscape.');
   });
   function tableSVG(y0) { // league tables as SVG, for the PNG
     var out = [], y = y0, cols = [24, 190, 34, 34, 34, 34, 44, 44, 44, 40], heads = ['#', 'Team', 'P', 'W', 'D', 'L', 'For', 'Agst', 'Diff', 'Pts'], w = cols.reduce(function (a, b) { return a + b; }, 0), x0 = 10, maxW = w + 20;

@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"pros-and-cons":["daftar pro dan kontra","kelebihan dan kekurangan","bantu memutuskan","ya atau tidak acak"],
+"decision-matrix":["matriks keputusan","matriks keputusan berbobot","membandingkan pilihan","alat bantu keputusan"],
+"moon-phase":["fase bulan hari ini","kalender bulan","bulan purnama berikutnya","bulan baru","bulan terbit"],
+"night-sky-map":["peta langit malam","peta bintang","planet terlihat malam ini","rasi bintang","melihat bintang"],
+"sunrise-sunset":["jam matahari terbit","jam matahari terbenam","terbit dan terbenam matahari","golden hour hari ini","lama siang hari"],
 "sudoku-solver":["pemecah sudoku","jawaban sudoku","selesaikan sudoku dari foto"],
 "wifi-qr-code":["qr code wifi","buat qr wifi","bagikan password wifi","barcode wifi"],
 "image-steganography":["steganografi","sembunyikan pesan di gambar","pesan tersembunyi di foto"],

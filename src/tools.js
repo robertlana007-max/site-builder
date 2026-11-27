@@ -6669,5 +6669,215 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"1\"/><path d=\"M9 3v18M15 3v18M3 9h18M3 15h18\"/><path d=\"M16.5 4.5l1.5 2 2.5-3\"/>"
+  },
+  {
+    "slug": "sunrise-sunset",
+    "cat": "Time tools",
+    "name": "Sunrise & Sunset Times",
+    "title": "Sunrise and Sunset Times - Twilight, Golden Hour, Day Length",
+    "desc": "Sunrise, sunset, solar noon, day length, twilight, golden hour and blue hour for any place and date, with a sun path diagram and a printable month table.",
+    "card": "Sunrise, sunset, golden hour and twilight anywhere.",
+    "intro": "Find sunrise and sunset for any city or spot on Earth and any date, in that place's own time zone. See dawn and dusk twilight, golden and blue hour, where the Sun is right now, its path across the sky, and a full month table to print or download. Midnight sun and polar night are handled too.",
+    "steps": [
+      "Search for your city, press Use my location, or type latitude and longitude.",
+      "Pick a date, or step day by day with the arrows.",
+      "Read sunrise, sunset, day length, twilight, golden hour and the Sun's direction.",
+      "Scroll down for the sun path diagram and the month table, which you can print or save as CSV."
+    ],
+    "faq": [
+      [
+        "How accurate are the times?",
+        "They are calculated with a precise astronomy library and match published tables to within about a minute. Hills, tall buildings and the weather can change what you actually see by a few minutes."
+      ],
+      [
+        "What is the difference between civil, nautical and astronomical twilight?",
+        "They are the times when the Sun is 6°, 12° and 18° below the horizon. Civil twilight has enough light for most outdoor activities; at nautical twilight the horizon is hard to see; after astronomical twilight the sky is fully dark."
+      ],
+      [
+        "What are golden hour and blue hour?",
+        "Golden hour is when the Sun is low (from 4° below to 6° above the horizon) and the light is warm and soft. Blue hour is just before sunrise and after sunset, when the Sun is 4° to 6° below the horizon and the sky turns deep blue."
+      ],
+      [
+        "Why does it say the Sun does not set?",
+        "Near the poles the Sun can stay up all day in summer (midnight sun) or stay below the horizon all day in winter (polar night). The tool tells you which, and shows any twilight there is."
+      ],
+      [
+        "Which time zone are the times in?",
+        "The time zone of the place you chose, including daylight saving time on that date. For your own location, your device's time zone is used. You can choose any time zone when you type coordinates."
+      ],
+      [
+        "Is my location sent anywhere?",
+        "No. Everything is calculated on your device and works offline. Your location is only used on this page if you allow it."
+      ]
+    ],
+    "icon": "<path d=\"M12 3v3M4.9 7.9l2.1 2.1M19.1 7.9 17 10M2 17h20M5 21h14\"/><path d=\"M7 17a5 5 0 0 1 10 0\"/>"
+  },
+  {
+    "slug": "night-sky-map",
+    "cat": "Study tools",
+    "name": "Night Sky Map",
+    "title": "Night Sky Map - Live Star Chart with Planets and Moon",
+    "desc": "A live star map for your place and time: bright stars, constellations, planets and the Moon. Drag, zoom, point your phone at the sky, red night mode.",
+    "card": "Live star chart with planets, Moon and constellations.",
+    "intro": "See what is in the sky above you right now, or at any date and time. The map shows the brightest stars, constellation lines and names, the planets, the Sun and the Moon with its phase, with the horizon and compass points. Drag to look around, move the time slider, point your phone at the sky, and tap anything to learn what it is and when it rises and sets.",
+    "steps": [
+      "Choose your place: search a city, use your location, or type coordinates.",
+      "The map shows the sky now. Use the date box or the time slider to see another time.",
+      "Drag to look around, pinch or use + and − to zoom, or press Point phone at sky.",
+      "Tap a star, planet or the Moon for its name, brightness and rise and set times."
+    ],
+    "faq": [
+      [
+        "How do I find a planet?",
+        "Look at the Up in the sky list under the map. Tap a planet to centre the map on it and see its direction and height above the horizon, then look that way."
+      ],
+      [
+        "How does phone mode work?",
+        "Press Point phone at sky and hold your phone up. The map follows your phone's compass and motion sensors. On iPhone you will be asked to allow motion access. The compass can be a few degrees off; move the phone in a figure 8 to calibrate it."
+      ],
+      [
+        "What is red night mode for?",
+        "Red light keeps your eyes adjusted to the dark, so you can still see faint stars after looking at the screen. Turn your screen brightness down as well."
+      ],
+      [
+        "Which stars are shown?",
+        "The 300 brightest stars plus all the stars that make up the constellation figures, from the Hipparcos catalogue, with the 88 constellations."
+      ],
+      [
+        "Why are no stars shown in the daytime?",
+        "When the Sun is up the sky is drawn blue and the stars are dimmed, because you could not see them. Move the time slider to the evening."
+      ],
+      [
+        "Does it need the internet?",
+        "No. All positions are calculated on your device, so it works outdoors without a signal once the page has loaded."
+      ]
+    ],
+    "icon": "<path d=\"M12 3l1.8 3.9 4.2.5-3.1 2.9.8 4.2L12 12.4 8.3 14.5l.8-4.2L6 7.4l4.2-.5z\"/><path d=\"M5 21l3-4M19 21l-3-4M4 18h3M17 18h3\"/>"
+  },
+  {
+    "slug": "moon-phase",
+    "cat": "Time tools",
+    "name": "Moon Phase Calendar",
+    "title": "Moon Phase Today - Moon Calendar, Full Moon and Moonrise",
+    "desc": "The Moon phase today with lit percentage and age, the next new, quarter and full moons, moonrise and moonset for your place, and a printable moon calendar.",
+    "card": "Moon phase today, moonrise and a moon calendar.",
+    "intro": "Check tonight's Moon: its phase, how much is lit and how old it is, drawn the way it looks from your hemisphere. See the dates and times of the next new, first quarter, full and last quarter moons, moonrise and moonset for your place, and a month calendar of drawn phases you can print.",
+    "steps": [
+      "Choose your place by searching a city, using your location, or typing coordinates.",
+      "See today's phase, lit percentage, age, moonrise and moonset.",
+      "Check the next main phases with dates and times in your time zone.",
+      "Browse the month calendar, tap a day for details, and print it."
+    ],
+    "faq": [
+      [
+        "When is the next full moon?",
+        "It is shown in the Next full moon card and in the Next main phases list, with the exact date and time in your time zone."
+      ],
+      [
+        "Why does the Moon look flipped?",
+        "People in the southern hemisphere see the Moon upside down compared with the northern hemisphere, so the lit side is on the other side. The tool draws it the right way for your place; you can also choose a hemisphere yourself."
+      ],
+      [
+        "Is the phase the same everywhere?",
+        "Yes. The phase and the exact time of a full or new moon are the same all over the world; only the local clock time and the date can differ, and the Moon looks rotated in different places."
+      ],
+      [
+        "Why is there no moonrise on some days?",
+        "The Moon rises about 50 minutes later each day, so about once a month it rises just after midnight and skips one calendar day. Near the poles it can also stay up or down all day."
+      ],
+      [
+        "How accurate are the times?",
+        "Phase times are calculated to within about a minute of published astronomical tables. Moonrise and moonset are for a flat horizon."
+      ],
+      [
+        "Does it work offline?",
+        "Yes. Everything is calculated on your device and nothing is sent anywhere."
+      ]
+    ],
+    "icon": "<path d=\"M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z\"/>"
+  },
+  {
+    "slug": "decision-matrix",
+    "cat": "Calculators",
+    "name": "Decision Matrix",
+    "title": "Decision Matrix Calculator - Weighted Scoring with Templates",
+    "desc": "Compare options with a weighted decision matrix: score each choice on what matters, see totals, ranking, a chart and what weight change would flip the winner.",
+    "card": "Weighted scoring to pick the best option.",
+    "intro": "Make a hard choice clearer. List your options and the things that matter, say how important each one is, and score every option. The matrix adds it all up, ranks the options with a chart, and tells you how safe the result is: which weight change would make a different option win. Start from a template for a phone, job offer, home, laptop or supplier.",
+    "steps": [
+      "Start from a template or press New, and name your options and criteria.",
+      "Set how important each criterion is (1 to 5, or percentages).",
+      "Score every option from 0 to 10 for each criterion.",
+      "Read the winner, ranking and sensitivity check, then save, print or download a CSV."
+    ],
+    "faq": [
+      [
+        "How is the score worked out?",
+        "Each score is multiplied by its criterion's weight, the results are added up and divided by the total weight. The result is a weighted average out of 10 for each option."
+      ],
+      [
+        "What does the sensitivity check mean?",
+        "For each criterion it finds the smallest change in its weight that would make another option win. If no single change can do that, the winner is robust. If a small change flips it, think carefully about your weights."
+      ],
+      [
+        "Should I use importance 1–5 or percentages?",
+        "Importance 1–5 is quickest. Percentages let you share exactly 100% between the criteria. You can switch at any time and the weights are converted."
+      ],
+      [
+        "What if a criterion is bad when it is high, like price?",
+        "Always score so that 10 means best for you. A cheap option gets a high price score."
+      ],
+      [
+        "Where are my decisions saved?",
+        "Only in this browser on this device. Use Back up all to download a file you can restore on another device."
+      ],
+      [
+        "Can I share it?",
+        "Yes. Print it, save it as a PDF, or download a CSV that opens in any spreadsheet."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"2\"/><path d=\"M3 9h18M3 15h18M9 3v18M15 3v18\"/><path d=\"M16.5 11.5l1.2 1.2 2-2.4\"/>"
+  },
+  {
+    "slug": "pros-and-cons",
+    "cat": "Calculators",
+    "name": "Pros and Cons List",
+    "title": "Pros and Cons List Maker - Weighted, with Gut Coin Toss",
+    "desc": "Make a weighted pros and cons list with a balance meter and verdict, try a coin toss for your gut, ask yes or no, or pick at random. Save, print, share.",
+    "card": "Weighted pros and cons with a verdict.",
+    "intro": "Write down the good and bad sides of a decision and say how much each one matters. A balance meter and a plain verdict show which way it leans. Not sure? Toss a coin for your gut and notice how you feel when it lands. There is also a simple yes or no answer and a random picker for small choices.",
+    "steps": [
+      "Name your decision, then add pros and cons with an importance from 1 to 5.",
+      "Watch the balance meter and read the verdict.",
+      "Try Gut coin toss and note how you felt when the coin landed.",
+      "Save several decisions, print them, or share the list as an image."
+    ],
+    "faq": [
+      [
+        "How is the verdict worked out?",
+        "Each pro and con counts by its importance. The meter compares the total weight of pros with the total weight of cons, from \"Probably not\" to \"Go for it\"."
+      ],
+      [
+        "What is the coin toss for my gut?",
+        "Let the coin choose, then notice your first feeling. If you feel relieved, the coin picked what you wanted. If you feel disappointed, you really wanted the other side. The coin does not decide; your reaction tells you."
+      ],
+      [
+        "Is the coin, yes or no and random pick fair?",
+        "Yes. They use your device's secure random number generator, so each side or item has an equal chance."
+      ],
+      [
+        "Where are my lists saved?",
+        "Only in this browser on this device. Use Back up all to download a file you can restore later or on another device."
+      ],
+      [
+        "How do I share my list?",
+        "Press Share as image. On phones you can send it straight to a chat app; otherwise it downloads as a picture."
+      ],
+      [
+        "Should I trust the verdict?",
+        "Use it as a guide, not a rule. One very important con can be a deal-breaker even if the total says yes."
+      ]
+    ],
+    "icon": "<path d=\"M12 3v18M5 21h14\"/><path d=\"M4 8h6l-3 6zM14 8h6l-3 6z\"/><path d=\"M4 14a3 3 0 0 0 6 0M14 14a3 3 0 0 0 6 0M7 6h10\"/>"
   }
 ];

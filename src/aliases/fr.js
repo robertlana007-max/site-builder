@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"pros-and-cons":["liste pour et contre","avantages et inconvénients","aide à la décision","oui ou non aléatoire","tirage au sort liste"],
+"decision-matrix":["matrice de décision","matrice de décision pondérée","comparer des options","aide à la décision","grille de choix"],
+"moon-phase":["phase de la lune aujourd'hui","calendrier lunaire","prochaine pleine lune","nouvelle lune","lever de lune"],
+"night-sky-map":["carte du ciel","carte des étoiles","planétarium en ligne","planètes visibles ce soir","trouver une constellation"],
+"sunrise-sunset":["heure du lever du soleil","heure du coucher du soleil","lever et coucher du soleil","heure dorée","durée du jour","crépuscule civil"],
 "sudoku-solver":["solveur de sudoku","résoudre un sudoku","résoudre sudoku photo","aide sudoku"],
 "wifi-qr-code":["qr code wifi","générateur qr code wifi","partager mot de passe wifi","affiche wifi"],
 "image-steganography":["stéganographie","cacher un message dans une image","message caché dans une photo","texte caché image"],
