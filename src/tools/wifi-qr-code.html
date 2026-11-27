@@ -1,0 +1,408 @@
+<style>
+.wq .wq-check { display: flex; align-items: center; gap: 6px; font-weight: 400; margin: 0 0 12px; }
+.wq .wq-hint { display: block; font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.wq .wq-hint.bad { color: var(--bad); }
+.wq .wq-pw { display: flex; gap: 6px; }
+.wq .wq-pw input { width: 100%; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; font-size: inherit; flex: 1; min-width: 0; font-family: var(--mono, ui-monospace, monospace); }
+.wq .wq-pw .btn { min-height: 44px; padding: 6px 12px; flex: none; }
+.wq .wq-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; margin-top: 6px; }
+@media (max-width: 640px) { .wq .wq-grid { grid-template-columns: 1fr; } }
+.wq .wq-qr { text-align: center; }
+.wq .wq-qr canvas { width: 240px; max-width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--line); background: #fff; image-rendering: pixelated; }
+.wq .wq-card { text-align: center; }
+.wq .wq-card canvas { max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; box-shadow: var(--shadow); }
+.wq .wq-cap { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+.wq .wq-raw { font-family: var(--mono, ui-monospace, monospace); font-size: 13px; overflow-wrap: anywhere; word-break: break-all; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; margin-top: 10px; text-align: start; }
+.wq fieldset { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px 2px; margin: 16px 0 0; min-width: 0; }
+.wq legend { font-weight: 700; font-size: 15px; padding: 0 6px; }
+</style>
+<div class="wq" id="wq">
+<div class="fields">
+  <div><label for="wqSsid">Network name (SSID)</label><input type="text" id="wqSsid" maxlength="64" autocapitalize="off" spellcheck="false" placeholder="e.g. Cafe Guest"></div>
+  <div><label for="wqSec">Security</label><select id="wqSec"><option value="WPA" selected>WPA / WPA2 / WPA3 (most networks)</option><option value="WEP">WEP (old routers)</option><option value="nopass">None (open network)</option></select></div>
+</div>
+<div class="fields" id="wqPwBox">
+  <div><label for="wqPw">Password</label><div class="wq-pw"><input type="text" id="wqPw" data-nomemo maxlength="128" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="Wi-Fi password"><button type="button" class="btn ghost" id="wqHideBtn" aria-pressed="false">Hide</button></div>
+    <span class="wq-hint">Capital letters, spaces and symbols must be exactly right. Check the label on your router.</span></div>
+</div>
+<label class="wq-check"><input type="checkbox" id="wqHidden">Hidden network (the name is not broadcast)</label>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<div class="wq-grid">
+  <div class="wq-qr">
+    <canvas id="wqQr" width="512" height="512" aria-label="Wi-Fi QR code"></canvas>
+    <div class="btns" style="justify-content:center"><a class="btn" id="wqPng" download="wifi-qr.png">Download PNG</a><a class="btn ghost" id="wqSvg" download="wifi-qr.svg">Download SVG</a></div>
+    <details><summary class="wq-cap" style="cursor:pointer">What is inside the code?</summary><div class="wq-raw" id="wqRaw"></div></details>
+  </div>
+  <div class="wq-card">
+    <canvas id="wqCard" width="420" height="594" aria-label="Preview of the printable card"></canvas>
+    <p class="wq-cap" id="wqCardCap">Preview of the printable card</p>
+  </div>
+</div>
+<fieldset><legend>Printable "Scan to join Wi-Fi" card</legend>
+  <div class="fields">
+    <div><label for="wqPaper">Paper</label><select id="wqPaper"><option value="a4" selected>A4 sign</option><option value="letter">US Letter sign</option><option value="a6">A6 card (postcard size)</option><option value="tent">Table tent (A4, fold in half)</option><option value="tentl">Table tent (US Letter, fold in half)</option></select></div>
+    <div><label for="wqTitle">Heading</label><input type="text" id="wqTitle" maxlength="40" placeholder="Scan to join Wi-Fi"></div>
+    <div><label for="wqColor">Colour</label><input type="color" id="wqColor" value="#1d4ed8"></div>
+  </div>
+  <label class="wq-check"><input type="checkbox" id="wqShowPw" checked>Print the network name and password as text too</label>
+  <div class="btns" style="margin-bottom:12px"><button type="button" class="btn" id="wqPdf">Make PDF card</button></div>
+</fieldset>
+</div>
+<script src="../assets/vendor/qrcode.js"></script>
+<script>
+(function () {
+  'use strict';
+  // @GD-START (shared drawing helper)
+  // ---------- tiny drawing engine: the same list of shapes is drawn on a canvas (preview, PNG) and into a PDF ----------
+  var GD = (function () {
+    var FONTS = {
+      sans: ['GD Noto Sans', 'noto-sans-subset-400.ttf', 400, 1], sansb: ['GD Noto Sans', 'noto-sans-subset-700.ttf', 700, 1],
+      serif: ['GD Noto Serif', 'noto-serif-subset-400.ttf', 400, 1], serifb: ['GD Noto Serif', 'noto-serif-subset-700.ttf', 700, 1],
+      script: ['GD Great Vibes', 'great-vibes-latin-400-normal.woff2', 400], hand: ['GD Dancing Script', 'dancing-script-latin-400-normal.woff2', 400],
+      display: ['GD Anton', 'anton-latin-400-normal.woff2', 400], caveat: ['GD Caveat', 'caveat-latin-400-normal.woff2', 400]
+    };
+    var bufs = {}, prom = {}, mc = document.createElement('canvas').getContext('2d');
+    function load(k) {
+      if (!prom[k]) prom[k] = fetch('../assets/vendor/fonts/' + FONTS[k][1]).then(function (r) { if (!r.ok) throw new Error('font'); return r.arrayBuffer(); }).then(function (b) {
+        bufs[k] = b; return new FontFace(FONTS[k][0], b.slice(0), { weight: String(FONTS[k][2]) }).load().then(function (f) { document.fonts.add(f); });
+      }).catch(function (e) { prom[k] = null; throw e; });
+      return prom[k];
+    }
+    function loadAll(keys) { return Promise.all(keys.map(load)); }
+    function css(k, s) { var F = FONTS[k] || FONTS.sans; return F[2] + ' ' + s + 'px "' + F[0] + '", sans-serif'; }
+    function chars(t) { return Array.from(String(t)); }
+    function width(t, k, s, ls) { mc.font = css(k, s); return mc.measureText(String(t)).width + (ls || 0) * Math.max(0, chars(t).length - 1); }
+    function fit(t, k, s, maxW, min, ls) { min = min || 3; while (s > min && width(t, k, s, ls) > maxW) s = Math.max(min, s * 0.96); return s; }
+    function wrap(t, k, s, maxW) {
+      var out = [];
+      String(t == null ? '' : t).replace(/\r\n?/g, '\n').split('\n').forEach(function (para) {
+        var cur = '';
+        para.split(/ +/).forEach(function (w) {
+          var trial = cur ? cur + ' ' + w : w;
+          if (width(trial, k, s) <= maxW) { cur = trial; return; }
+          if (cur) out.push(cur);
+          cur = '';
+          while (w && width(w, k, s) > maxW) { var c = chars(w), n = c.length; while (n > 1 && width(c.slice(0, n).join(''), k, s) > maxW) n--; out.push(c.slice(0, n).join('')); w = c.slice(n).join(''); }
+          cur = w;
+        });
+        out.push(cur);
+      });
+      return out;
+    }
+    function startX(o) { var w = width(o.t, o.font, o.s, o.ls); return o.align === 'center' ? o.x - w / 2 : o.align === 'right' ? o.x - w : o.x; }
+    function rgb(h) { h = String(h || '#000').replace('#', ''); if (h.length === 3) h = h.replace(/./g, '$&$&'); var n = parseInt(h, 16) || 0; return [(n >> 16 & 255) / 255, (n >> 8 & 255) / 255, (n & 255) / 255]; }
+    function rrPath(x, y, w, h, r) { r = Math.max(0, Math.min(r || 0, w / 2, h / 2)); return 'M' + (x + r) + ' ' + y + 'H' + (x + w - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w) + ' ' + (y + r) : '') + 'V' + (y + h - r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + w - r) + ' ' + (y + h) : '') + 'H' + (x + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + x + ' ' + (y + h - r) : '') + 'V' + (y + r) + (r ? 'A' + r + ' ' + r + ' 0 0 1 ' + (x + r) + ' ' + y : '') + 'Z'; }
+    // draw an image into a w x h canvas: cover/contain, optional round clip
+    function raster(o, scale) {
+      var img = o.img, W = Math.max(1, Math.round(o.w * scale)), H = Math.max(1, Math.round(o.h * scale)), c = document.createElement('canvas');
+      c.width = W; c.height = H; var g = c.getContext('2d');
+      if (o.clip) { g.beginPath(); if (o.clip === 'circle') g.ellipse(W / 2, H / 2, W / 2, H / 2, 0, 0, Math.PI * 2); else g.roundRect ? g.roundRect(0, 0, W, H, o.clip * scale) : g.rect(0, 0, W, H); g.clip(); }
+      var iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height, k = o.fit === 'contain' ? Math.min(W / iw, H / ih) : Math.max(W / iw, H / ih);
+      g.drawImage(img, (W - iw * k) / 2, (H - ih * k) / 2, iw * k, ih * k);
+      return c;
+    }
+    function drawCanvas(ops, ctx, scale) {
+      ops.forEach(function (o) {
+        ctx.save(); ctx.globalAlpha = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'circle' || o.k === 'path') {
+          var p;
+          if (o.k === 'rect') p = new Path2D(rrPath(o.x * scale, o.y * scale, o.w * scale, o.h * scale, (o.r || 0) * scale));
+          else if (o.k === 'circle') { p = new Path2D(); p.arc(o.x * scale, o.y * scale, o.r * scale, 0, Math.PI * 2); }
+          else { ctx.translate(o.x * scale, o.y * scale); ctx.scale(o.sc * scale, o.sc * scale); if (o.rot) ctx.rotate(o.rot); p = new Path2D(o.d); }
+          var u = o.k === 'path' ? o.sc * scale : 1;
+          if (o.fill) { ctx.fillStyle = o.fill; ctx.fill(p); }
+          if (o.stroke) { ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale / u; ctx.stroke(p); }
+        } else if (o.k === 'line') {
+          ctx.strokeStyle = o.stroke; ctx.lineWidth = (o.lw || 1) * scale; if (o.dash) ctx.setLineDash(o.dash.map(function (d) { return d * scale; }));
+          ctx.beginPath(); ctx.moveTo(o.x1 * scale, o.y1 * scale); ctx.lineTo(o.x2 * scale, o.y2 * scale); ctx.stroke();
+        } else if (o.k === 'text') {
+          ctx.font = css(o.font, o.s * scale); ctx.fillStyle = o.fill; ctx.textBaseline = 'alphabetic';
+          var x = startX(o);
+          if (o.ls) chars(o.t).forEach(function (ch) { ctx.fillText(ch, x * scale, o.y * scale); x += width(ch, o.font, o.s) + o.ls; });
+          else ctx.fillText(o.t, x * scale, o.y * scale);
+        } else if (o.k === 'img' && o.img) {
+          ctx.drawImage(raster(o, scale), o.x * scale, o.y * scale, o.w * scale, o.h * scale);
+        }
+        ctx.restore();
+      });
+    }
+    // render ops into a pdf-lib page. env = { doc, fonts:{}, T: PDFText helper }; ox/oy shift the drawing (in points)
+    async function drawPdf(env, page, ops, ox, oy) {
+      var P = PDFLib, H = page.getHeight(); ox = ox || 0; oy = oy || 0;
+      await env.T.prepare(ops.map(function (o) { return o.k === 'text' ? String(o.t) : ''; }).join(' ')); // fonts for Arabic, Hindi… only when used
+      function col(h) { var a = rgb(h); return P.rgb(a[0], a[1], a[2]); }
+      async function font(k) {
+        if (!env.fonts[k]) { await load(k); env.fonts[k] = await env.doc.embedFont(bufs[k], { subset: !!FONTS[k][3] }); var cs = {}; env.fonts[k].getCharacterSet().forEach(function (c) { cs[c] = 1; }); env.fonts[k].cs = cs; }
+        return env.fonts[k];
+      }
+      async function inFont(o) { // does this decorative font have every letter?
+        await load(o.font);
+        env.fk = env.fk || {}; var fk = env.fk[o.font] || (env.fk[o.font] = fontkit.create(new Uint8Array(bufs[o.font])));
+        return chars(o.t).every(function (ch) { return /\s/.test(ch) || fk.hasGlyphForCodePoint(ch.codePointAt(0)); });
+      }
+      for (var i = 0; i < ops.length; i++) {
+        var o = ops[i], op = o.op == null ? 1 : o.op;
+        if (o.k === 'rect' || o.k === 'path') {
+          var d = o.k === 'rect' ? rrPath(o.x + ox, o.y + oy, o.w, o.h, o.r) : o.d, sc = o.k === 'path' ? o.sc : 1;
+          var opt = { x: o.k === 'path' ? o.x + ox : 0, y: H - (o.k === 'path' ? o.y + oy : 0), scale: sc, opacity: op, borderOpacity: op };
+          if (o.rot) opt.rotate = P.degrees(-o.rot * 180 / Math.PI);
+          if (o.fill) opt.color = col(o.fill);
+          if (o.stroke) { opt.borderColor = col(o.stroke); opt.borderWidth = (o.lw || 1) / sc; } else opt.borderWidth = 0;
+          page.drawSvgPath(d, opt);
+        } else if (o.k === 'circle') {
+          var c = { x: o.x + ox, y: H - o.y - oy, size: o.r, opacity: op, borderOpacity: op };
+          if (o.fill) c.color = col(o.fill); if (o.stroke) { c.borderColor = col(o.stroke); c.borderWidth = o.lw || 1; }
+          page.drawCircle(c);
+        } else if (o.k === 'line') {
+          page.drawLine({ start: { x: o.x1 + ox, y: H - o.y1 - oy }, end: { x: o.x2 + ox, y: H - o.y2 - oy }, thickness: o.lw || 1, color: col(o.stroke), opacity: op, dashArray: o.dash });
+        } else if (o.k === 'text' && /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) && await inFont(o)) {
+          // WOFF2 fonts cannot be embedded in a PDF (readers show nothing), so these are drawn as vector outlines
+          var fk = env.fk[o.font], tw = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!tw.trim()) continue;
+          var run = fk.layout(tw), kk = o.s / fk.unitsPerEm, gx = 0, pd = '';
+          run.glyphs.forEach(function (g, gi) { var gp = g.path; if (gp.commands.length) pd += gp.scale(kk, -kk).translate(gx, 0).toSVG(); gx += run.positions[gi].xAdvance * kk + (o.ls || 0); });
+          if (pd) page.drawSvgPath(pd, { x: startX(o) + ox, y: H - o.y - oy, color: col(o.fill), opacity: op, borderWidth: 0 });
+        } else if (o.k === 'text') {
+          // letters a decorative font does not have are written with Noto Sans instead
+          var fkey = /\.woff2$/.test((FONTS[o.font] || FONTS.sans)[1]) ? (o.font === 'display' ? 'sansb' : 'sans') : o.font;
+          var f = await font(fkey), t = chars(o.t).map(function (ch) { return /\s/.test(ch) ? ' ' : ch; }).join('');
+          if (!t.trim()) continue;
+          if (fkey === o.font && env.T.isSimple(t, f)) {
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(o.ls));
+            page.drawText(t, { x: startX(o) + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+            if (o.ls) page.pushOperators(P.setCharacterSpacing(0));
+          } else { // other scripts (Arabic, Hindi, Chinese, emoji…): PDFText shapes them and lines them up by its own widths
+            var tw2 = env.T.width(t, o.s, f), x2 = o.align === 'center' ? o.x - tw2 / 2 : o.align === 'right' ? o.x - tw2 : o.x;
+            env.T.draw(page, t, { x: x2 + ox, y: H - o.y - oy, size: o.s, font: f, color: col(o.fill), opacity: op });
+          }
+        } else if (o.k === 'img' && o.img) {
+          env.imgs = env.imgs || new Map();
+          var key = o.img.src + '|' + o.w + '|' + o.h + '|' + o.clip + '|' + o.fit, em = env.imgs.get(key);
+          if (!em) {
+            var cv = raster(o, Math.min(300 / 72, 2400 / Math.max(o.w, o.h))), png = o.clip || o.alpha;
+            var url = png ? cv.toDataURL('image/png') : cv.toDataURL('image/jpeg', 0.92), bytes = await fetch(url).then(function (r) { return r.arrayBuffer(); });
+            em = png ? await env.doc.embedPng(bytes) : await env.doc.embedJpg(bytes); env.imgs.set(key, em);
+          }
+          page.drawImage(em, { x: o.x + ox, y: H - o.y - oy - o.h, width: o.w, height: o.h, opacity: op });
+        }
+      }
+    }
+    var libs = null;
+    function script(src) { return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = src; s.onload = res; s.onerror = function () { rej(new Error('load')); }; document.head.appendChild(s); }); }
+    function pdfLibs() { if (!libs) libs = (window.PDFText ? Promise.resolve() : script('../assets/pdf-text.js')).then(function () { return PDFText.load(); }).catch(function (e) { libs = null; throw e; }); return libs; }
+    async function newPdf(title, creator, onStatus) {
+      await pdfLibs();
+      var doc = await PDFLib.PDFDocument.create(); doc.registerFontkit(fontkit);
+      doc.setTitle(title || 'Document'); doc.setCreator(creator || 'GetToolNest'); doc.setProducer('GetToolNest');
+      return { doc: doc, fonts: {}, T: await PDFText.create(doc, { onStatus: onStatus }) };
+    }
+    function readImage(file, maxSide, cb) {
+      if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|svg)$/i.test(file.name)) return cb(null, '"' + file.name + '" is not a picture. Choose a PNG, JPG or WebP file.');
+      if (file.size > 25 * 1048576) return cb(null, 'That picture is over 25 MB. Choose a smaller one.');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        var w = img.naturalWidth || 600, h = img.naturalHeight || 600, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+        c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k)); c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+        var png = /png|gif|svg|webp/.test(file.type), out = new Image(); out.onload = function () { cb(out); }; out.onerror = function () { cb(null, 'That picture could not be opened.'); };
+        out.src = png ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.9); out.alpha = png;
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); cb(null, '"' + file.name + '" could not be opened. HEIC photos need converting to JPG first.'); };
+      img.src = url;
+    }
+    function download(blob, name) { var u = URL.createObjectURL(blob), a = document.createElement('a'); a.href = u; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(u); }, 5000); return u; }
+    return { FONTS: FONTS, load: load, loadAll: loadAll, width: width, fit: fit, wrap: wrap, drawCanvas: drawCanvas, drawPdf: drawPdf, newPdf: newPdf, readImage: readImage, download: download, rgb: rgb };
+  })();
+  // @GD-END
+  // @UT-START (small shared helpers)
+  var UT = (function () {
+    function langs() { var L = (navigator.languages && navigator.languages.length ? navigator.languages : [navigator.language || 'en']).slice(); try { L.push(Intl.DateTimeFormat().resolvedOptions().locale); } catch (e) {} return L; }
+    function region() { var L = langs(); for (var i = 0; i < L.length; i++) { var m = /^[a-z]{2,3}(?:-[A-Za-z]{4})?-([A-Z]{2}|\d{3})\b/i.exec(L[i] || ''); if (m) return m[1].toUpperCase(); } return ''; }
+    // US Letter is used in North America, parts of Central and South America and the Philippines; A4 everywhere else
+    function letter() { return /^(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|SV|NI|HN|PR|BZ)$/.test(region()); }
+    // first day of the week for the visitor's region: 0 = Sunday, 1 = Monday, 6 = Saturday
+    function weekStart() {
+      try { var lo = new Intl.Locale(langs()[0]); if (!lo.region && region()) lo = new Intl.Locale(lo.language + '-' + region()); var wi = lo.getWeekInfo ? lo.getWeekInfo() : lo.weekInfo; if (wi && wi.firstDay) return wi.firstDay % 7; } catch (e) {}
+      var r = region();
+      if (/^(US|CA|MX|BR|JP|KR|TW|HK|IL|PH|IN|ZA|AU|PE|CO|VE|AR|GT|SV|HN|NI|PA|DO|PR|BZ|KE|ET|ZW|SA|YE|PK|TH|ID|KH|LA|MM|NP|BT|MO|UM|WS|JM|BS|TT|PY|BO|CL)$/.test(r)) return 0;
+      if (/^(AF|IR|EG|DZ|IQ|JO|KW|LY|OM|QA|SD|SY|AE|BH|DJ)$/.test(r)) return 6;
+      return 1;
+    }
+    // fair random whole number from 0 to n-1 (crypto, no modulo bias)
+    function rnd(n) {
+      if (n <= 1) return 0;
+      var lim = Math.floor(4294967296 / n) * n, b = new Uint32Array(1);
+      do { crypto.getRandomValues(b); } while (b[0] >= lim);
+      return b[0] % n;
+    }
+    function shuffle(a) { for (var i = a.length - 1; i > 0; i--) { var j = rnd(i + 1), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+    var seg = window.Intl && Intl.Segmenter ? new Intl.Segmenter() : null;
+    // letters as people see them (a Hindi letter with its vowel sign, or an emoji, is one)
+    function graphemes(s) { s = String(s || ''); if (!seg) return Array.from(s); var o = []; for (var x of seg.segment(s)) o.push(x.segment); return o; }
+    function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function rtl(s) { return /[֐-ࣿיִ-﷿ﹰ-﻿]/.test(String(s || '')); }
+    return { letter: letter, weekStart: weekStart, region: region, langs: langs, rnd: rnd, shuffle: shuffle, graphemes: graphemes, esc: esc, rtl: rtl };
+  })();
+  // @UT-END
+  // ---------- the Wi-Fi string (the format phone cameras read) ----------
+  // WIFI:T:<WPA|WEP|nopass>;S:<name>;P:<password>;H:true;;   with \ ; , : " escaped by a backslash
+  function esc(s) { return String(s).replace(/[\\;,:"]/g, function (c) { return '\\' + c; }); }
+  function wifiString(ssid, sec, pw, hidden) {
+    return 'WIFI:T:' + sec + ';S:' + esc(ssid) + ';' + (sec !== 'nopass' ? 'P:' + esc(pw) + ';' : '') + (hidden ? 'H:true;' : '') + ';';
+  }
+  window.GTNWifi = { wifiString: wifiString, esc: esc }; // used by tests
+  var u8len = function (s) { return new TextEncoder().encode(s).length; };
+  function check(ssid, sec, pw) { // -> { err } blocks the code; { warn } is shown with it
+    if (!ssid) return { err: 'Type the network name (SSID) to make the code.', quiet: true };
+    if (u8len(ssid) > 32) return { err: 'That network name is too long. Wi-Fi names have at most 32 bytes (32 English letters, fewer for other scripts and emoji).' };
+    var warn = [];
+    if (/^\s|\s$/.test(ssid)) warn.push('The network name starts or ends with a space. Check that is right.');
+    if (sec === 'WPA') {
+      if (!pw) return { err: 'Type the Wi-Fi password, or choose "None" if the network has no password.' };
+      var hex64 = /^[0-9a-fA-F]{64}$/.test(pw), n = pw.length;
+      if (!hex64 && (n < 8 || n > 63)) return { err: 'WPA passwords are 8 to 63 characters long. This one has ' + n + '. Check the password.' };
+      if (/[^\x20-\x7e]/.test(pw)) warn.push('The password has letters outside basic English. Most routers do not allow these, so check it carefully.');
+    } else if (sec === 'WEP') {
+      if (!pw) return { err: 'Type the WEP key, or choose "None" if the network has no password.' };
+      if (!/^([\x20-\x7e]{5}|[\x20-\x7e]{13}|[\x20-\x7e]{16}|[\x20-\x7e]{29}|[0-9a-fA-F]{10}|[0-9a-fA-F]{26}|[0-9a-fA-F]{32}|[0-9a-fA-F]{58})$/.test(pw)) warn.push('WEP keys are usually 5 or 13 characters, or 10 or 26 hex digits. Check the key.');
+      warn.push('WEP is old and easy to break. If you can, switch your router to WPA2 or WPA3.');
+    }
+    if (sec !== 'nopass' && /^\s|\s$/.test(pw)) warn.push('The password starts or ends with a space. Check that is right.');
+    return { warn: warn.join(' ') };
+  }
+
+  // ---------- QR ----------
+  qrcode.stringToBytes = function (s) { return Array.from(new TextEncoder().encode(s)); };
+  function makeQr(text) { var q = qrcode(0, 'M'); q.addData(text, 'Byte'); q.make(); return q; }
+  function qrPath(q) { // dark modules as one path, 1 unit per module
+    var n = q.getModuleCount(), d = '';
+    for (var r = 0; r < n; r++) { var c = 0; while (c < n) { if (!q.isDark(r, c)) { c++; continue; } var s = c; while (c < n && q.isDark(r, c)) c++; d += 'M' + s + ' ' + r + 'h' + (c - s) + 'v1h' + (s - c) + 'z'; } }
+    return d;
+  }
+  function qrSvg(q) {
+    var n = q.getModuleCount(), z = n + 8;
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + z + ' ' + z + '" width="' + z * 10 + '" height="' + z * 10 + '" shape-rendering="crispEdges"><rect width="' + z + '" height="' + z + '" fill="#fff"/><path transform="translate(4 4)" fill="#000" d="' + qrPath(q) + '"/></svg>';
+  }
+  function drawQr(cv, q, px) {
+    var n = q.getModuleCount(), cell = Math.max(1, Math.floor(px / (n + 8))), size = cell * (n + 8), ctx = cv.getContext('2d');
+    cv.width = cv.height = size; ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, size, size); ctx.fillStyle = '#000';
+    ctx.translate(cell * 4, cell * 4); ctx.scale(cell, cell); ctx.fill(new Path2D(qrPath(q))); ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  // ---------- the printable card ----------
+  var PAPER = { a4: [595.28, 841.89], letter: [612, 792], a6: [297.64, 419.53], tent: [595.28, 841.89], tentl: [612, 792] };
+  var WIFI_ICON = 'M2 8.8a15 15 0 0 1 20 0M5 12.6a10 10 0 0 1 14 0M8.5 16.3a5 5 0 0 1 7 0';
+  // ops for one face of size w x h (points); the QR and every text line are drawn by GD on canvas and in the PDF
+  function faceOps(w, h, o) {
+    var ops = [], m = Math.min(w, h) * 0.07, col = o.color, side = w > h * 1.15, s = Math.min(w, h) / 420;
+    ops.push({ k: 'rect', x: m * 0.5, y: m * 0.5, w: w - m, h: h - m, r: 14 * s, stroke: col, lw: 2.5 * s });
+    var title = o.title || 'Scan to join Wi-Fi', inner = w - 2 * m;
+    var n = o.q.getModuleCount(), qx, qy, qs, tx, tw, ty;
+    if (!side) {
+      var ts = GD.fit(title, 'sansb', 30 * s, inner * 0.82, 8);
+      ops.push({ k: 'path', d: WIFI_ICON, x: w / 2 - 18 * s, y: m + 6 * s, sc: 1.5 * s, stroke: col, lw: 2.2 * s * 1.5 });
+      ops.push({ k: 'circle', x: w / 2, y: m + 6 * s + 19.5 * 1.5 * s, r: 1.8 * s, fill: col });
+      ty = m + 50 * s + ts;
+      ops.push({ k: 'text', t: title, x: w / 2, y: ty, s: ts, font: 'sansb', fill: col, align: 'center' });
+      var textH = o.showText ? 112 * s : 40 * s;
+      qs = Math.min(inner * 0.82, h - ty - textH - m - 18 * s); qx = (w - qs) / 2; qy = ty + 16 * s;
+      tx = w / 2; tw = inner; ty = qy + qs + 30 * s;
+    } else {
+      qs = Math.min(h - 2.4 * m, w * 0.46); qx = m * 1.3; qy = (h - qs) / 2;
+      tx = qx + qs + (w - qx - qs - m) / 2; tw = w - qx - qs - 2 * m;
+      var ts2 = GD.fit(title, 'sansb', 28 * s, tw, 8);
+      ops.push({ k: 'path', d: WIFI_ICON, x: tx - 18 * s, y: qy + 4 * s, sc: 1.5 * s, stroke: col, lw: 2.2 * s * 1.5 });
+      ops.push({ k: 'circle', x: tx, y: qy + 4 * s + 19.5 * 1.5 * s, r: 1.8 * s, fill: col });
+      ty = qy + 52 * s + ts2;
+      ops.push({ k: 'text', t: title, x: tx, y: ty, s: ts2, font: 'sansb', fill: col, align: 'center' });
+      ty += 34 * s;
+    }
+    ops.push({ k: 'rect', x: qx, y: qy, w: qs, h: qs, fill: '#ffffff' });
+    var cell = qs / (n + 4); // a 2-module white margin inside the square; the card itself is white around it
+    ops.push({ k: 'path', d: o.path, x: qx + cell * 2, y: qy + cell * 2, sc: cell, fill: '#000000' });
+    var lab = 12 * s, big = 24 * s;
+    if (o.showText) {
+      ops.push({ k: 'text', t: 'Network', x: tx, y: ty, s: lab, font: 'sans', fill: '#555555', align: 'center' });
+      ops.push({ k: 'text', t: o.ssid, x: tx, y: ty + big + 3 * s, s: GD.fit(o.ssid, 'sansb', big, tw, 5), font: 'sansb', fill: '#111111', align: 'center' });
+      ty += big + 18 * s;
+      if (o.sec !== 'nopass') {
+        ops.push({ k: 'text', t: 'Password', x: tx, y: ty + lab + 4 * s, s: lab, font: 'sans', fill: '#555555', align: 'center' });
+        ops.push({ k: 'text', t: o.pw, x: tx, y: ty + lab + big + 8 * s, s: GD.fit(o.pw, 'sansb', big, tw, 5), font: 'sansb', fill: '#111111', align: 'center' });
+        ty += lab + big + 18 * s;
+      } else { ops.push({ k: 'text', t: 'No password needed', x: tx, y: ty + lab + 6 * s, s: lab * 1.15, font: 'sans', fill: '#111111', align: 'center' }); ty += lab + 16 * s; }
+      ty += 6 * s;
+    }
+    var help = 'Open your phone camera and point it at the code.';
+    ops.push({ k: 'text', t: help, x: tx, y: Math.min(ty + 8 * s, h - m - 4 * s), s: GD.fit(help, 'sans', 10.5 * s, tw, 4), font: 'sans', fill: '#555555', align: 'center' });
+    return ops;
+  }
+  function faceSize(paper) { var P = PAPER[paper]; return /^tent/.test(paper) ? [P[0], P[1] / 2] : P; }
+
+  // ---------- UI ----------
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  var cur = null, pngUrl = null, svgUrl = null, job = 0;
+  function opts() { return { ssid: $('wqSsid').value, sec: $('wqSec').value, pw: $('wqSec').value === 'nopass' ? '' : $('wqPw').value, hidden: $('wqHidden').checked, title: $('wqTitle').value.trim(), color: $('wqColor').value || '#1d4ed8', showText: $('wqShowPw').checked, paper: $('wqPaper').value }; }
+  function nameOf(o) { return 'wifi-' + (o.ssid.replace(/[^\p{L}\p{N}_-]+/gu, '-').replace(/^-+|-+$/g, '').slice(0, 40) || 'network'); }
+  function update() {
+    var o = opts(), mine = ++job;
+    $('wqPwBox').hidden = o.sec === 'nopass';
+    var c = check(o.ssid, o.sec, o.pw);
+    if (c.err) {
+      cur = null; say(c.quiet ? '' : 'bad', c.err);
+      ['wqPng', 'wqSvg'].forEach(function (id) { $(id).removeAttribute('href'); $(id).setAttribute('aria-disabled', 'true'); });
+      $('wqPdf').disabled = true; $('wqRaw').textContent = '';
+      var g = $('wqQr').getContext('2d'); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = '#fff'; g.fillRect(0, 0, $('wqQr').width, $('wqQr').height);
+      var cv = $('wqCard'); cv.getContext('2d').clearRect(0, 0, cv.width, cv.height);
+      return;
+    }
+    var str = wifiString(o.ssid, o.sec, o.pw, o.hidden), q = makeQr(str);
+    cur = { o: o, str: str, q: q, path: qrPath(q) };
+    $('wqRaw').textContent = str;
+    drawQr($('wqQr'), q, 1024);
+    $('wqPdf').disabled = false;
+    $('wqQr').toBlob(function (b) { if (mine !== job) return; if (pngUrl) URL.revokeObjectURL(pngUrl); pngUrl = URL.createObjectURL(b); $('wqPng').href = pngUrl; $('wqPng').download = nameOf(o) + '.png'; $('wqPng').removeAttribute('aria-disabled'); });
+    if (svgUrl) URL.revokeObjectURL(svgUrl); svgUrl = URL.createObjectURL(new Blob([qrSvg(q)], { type: 'image/svg+xml' }));
+    $('wqSvg').href = svgUrl; $('wqSvg').download = nameOf(o) + '.svg'; $('wqSvg').removeAttribute('aria-disabled');
+    say(c.warn ? 'bad' : 'ok', c.warn || 'Ready. Test it: point your phone camera at the code.' + (o.hidden ? ' Hidden networks join only if the phone supports it (most do).' : ''));
+    drawCard();
+  }
+  function drawCard() {
+    if (!cur) return;
+    var o = opts(), fs = faceSize(o.paper), cv = $('wqCard'), k = Math.min(420 / fs[0], 594 / fs[1]) * Math.min(2, window.devicePixelRatio || 1);
+    var ops = faceOps(fs[0], fs[1], { q: cur.q, path: cur.path, ssid: o.ssid, pw: o.pw, sec: o.sec, title: o.title, color: o.color, showText: o.showText });
+    cv.width = Math.round(fs[0] * k); cv.height = Math.round(fs[1] * k);
+    cv.style.width = Math.round(cv.width / Math.min(2, window.devicePixelRatio || 1)) + 'px';
+    var g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); GD.drawCanvas(ops, g, k);
+    $('wqCardCap').textContent = /^tent/.test(o.paper) ? 'One side of the table tent. The PDF prints it twice, once upside down, so it reads from both sides after folding.' : 'Preview of the printable card';
+  }
+  ['wqSsid', 'wqPw', 'wqSec', 'wqHidden'].forEach(function (id) { $(id).addEventListener('input', update); $(id).addEventListener('change', update); });
+  ['wqPaper', 'wqTitle', 'wqColor', 'wqShowPw'].forEach(function (id) { $(id).addEventListener('input', drawCard); $(id).addEventListener('change', drawCard); });
+  $('wqHideBtn').addEventListener('click', function () { var hide = $('wqPw').type === 'text'; $('wqPw').type = hide ? 'password' : 'text'; this.setAttribute('aria-pressed', hide); this.textContent = hide ? 'Show' : 'Hide'; });
+  [$('wqPng'), $('wqSvg')].forEach(function (a) { a.addEventListener('click', function (e) { if (!a.getAttribute('href')) { e.preventDefault(); say('bad', 'Type the network name' + ($('wqSec').value === 'nopass' ? '' : ' and password') + ' first.'); } }); });
+
+  var busy = false;
+  $('wqPdf').addEventListener('click', async function () {
+    if (busy || !cur) return;
+    busy = true; $('wqPdf').disabled = true; say('', 'Making the PDF…');
+    try {
+      var o = opts(), P = PAPER[o.paper], fs = faceSize(o.paper);
+      var ops = faceOps(fs[0], fs[1], { q: cur.q, path: cur.path, ssid: o.ssid, pw: o.pw, sec: o.sec, title: o.title, color: o.color, showText: o.showText });
+      var env = await GD.newPdf('Wi-Fi: ' + o.ssid, 'GetToolNest Wi-Fi QR Code', function (t) { say('', t); });
+      var page = env.doc.addPage([P[0], P[1]]);
+      if (/^tent/.test(o.paper)) {
+        await GD.drawPdf(env, page, ops, 0, fs[1]); // bottom half, upright
+        page.pushOperators(PDFLib.pushGraphicsState(), PDFLib.concatTransformationMatrix(-1, 0, 0, -1, P[0], P[1]));
+        await GD.drawPdf(env, page, ops, 0, fs[1]); // the same face turned 180° into the top half
+        page.pushOperators(PDFLib.popGraphicsState());
+        page.drawLine({ start: { x: 18, y: P[1] / 2 }, end: { x: P[0] - 18, y: P[1] / 2 }, thickness: 0.6, color: PDFLib.rgb(0.6, 0.6, 0.6), dashArray: [4, 4] });
+        page.drawText('fold', { x: P[0] - 34, y: P[1] / 2 + 3, size: 7, font: await env.doc.embedFont(PDFLib.StandardFonts.Helvetica), color: PDFLib.rgb(0.55, 0.55, 0.55) });
+      } else await GD.drawPdf(env, page, ops);
+      var bytes = await env.doc.save();
+      GD.download(new Blob([bytes], { type: 'application/pdf' }), nameOf(o) + '-card.pdf');
+      say('ok', 'PDF ready. Print at 100% (actual size)' + (/^tent/.test(o.paper) ? ', fold along the dashed line and stand it on the table.' : '.') + (o.showText && o.sec !== 'nopass' ? ' Anyone who sees the card can read the password.' : ''));
+    } catch (e) { say('bad', 'The PDF could not be made' + (e && /load|font/i.test(e.message) ? ' because part of the page did not load. Check your connection once and try again.' : '. Please try again.')); }
+    busy = false; $('wqPdf').disabled = !cur;
+  });
+  update();
+  GD.loadAll(['sans', 'sansb']).then(drawCard, function () {});
+})();
+</script>

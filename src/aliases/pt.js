@@ -1,6 +1,15 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: pt
 module.exports = {
+"sudoku-solver":["resolver sudoku","solucionador de sudoku","resolver sudoku pela foto","dica sudoku"],
+"wifi-qr-code":["qr code wifi","gerador de qr code wifi","compartilhar senha do wifi","placa wifi"],
+"image-steganography":["esteganografia","esconder mensagem em imagem","mensagem oculta na foto","texto escondido na imagem"],
+"file-locker":["criptografar arquivo","proteger arquivo com senha","bloquear arquivo com senha","criptografia de arquivos"],
+"secret-note":["nota secreta","mensagem criptografada","criptografar texto","mensagem com senha","enviar senha com segurança"],
+"thumbnail-preview":["pré-visualizar thumbnail","testar thumbnail","comparar thumbnails","prévia de miniatura youtube"],
+"email-template-builder":["modelo de email html","criar newsletter","editor de email","template de email","email marketing html"],
+"website-builder":["criar site","criador de sites grátis","fazer site","site para negócio","site de uma página"],
+"link-in-bio-maker":["link na bio","página de links","alternativa ao linktree","link para bio do instagram","criar link na bio"],
 "typing-for-kids":["digitação para crianças","aprender a digitar","jogos de digitação","curso de digitação grátis","treino de teclado"],
 "phonics-for-kids":["fonética inglês para crianças","sons das letras em inglês","aprender a ler em inglês","phonics infantil","alfabeto em inglês com sons"],
 "kids-math-worksheets":["atividades de matemática para imprimir","folhas de exercícios de matemática","fichas de matemática infantil","atividade de horas","contas armadas para imprimir"],

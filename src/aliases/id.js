@@ -1,6 +1,15 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"sudoku-solver":["pemecah sudoku","jawaban sudoku","selesaikan sudoku dari foto"],
+"wifi-qr-code":["qr code wifi","buat qr wifi","bagikan password wifi","barcode wifi"],
+"image-steganography":["steganografi","sembunyikan pesan di gambar","pesan tersembunyi di foto"],
+"file-locker":["enkripsi file","kunci file dengan kata sandi","proteksi file dengan password"],
+"secret-note":["catatan rahasia","pesan terenkripsi","enkripsi teks","pesan dengan kata sandi"],
+"thumbnail-preview":["preview thumbnail","tes thumbnail","bandingkan thumbnail","cek thumbnail youtube"],
+"email-template-builder":["template email html","buat newsletter","desain email","email marketing template","pembuat email html"],
+"website-builder":["buat website","pembuat website gratis","website satu halaman","website usaha","bikin web"],
+"link-in-bio-maker":["link di bio","halaman link bio","alternatif linktree","link bio instagram","buat link bio gratis"],
 "typing-for-kids":["belajar mengetik untuk anak","latihan mengetik","game mengetik","mengetik sepuluh jari","kursus mengetik gratis"],
 "phonics-for-kids":["phonics anak","bunyi huruf bahasa inggris","belajar membaca bahasa inggris","fonik untuk anak","sight words bahasa inggris"],
 "kids-math-worksheets":["lembar kerja matematika anak","soal matematika sd","latihan matematika tk","lembar kerja jam","soal penjumlahan bersusun"],

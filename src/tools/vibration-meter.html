@@ -1,0 +1,415 @@
+<style>
+.vm-top { text-align: center; margin: 0 0 6px; }
+.vm-big { font-size: clamp(54px, 16vw, 96px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.vm-big small { font-size: 22px; color: var(--muted); font-weight: 600; letter-spacing: 0; margin-inline-start: 6px; }
+.vm-what { color: var(--muted); font-weight: 600; margin: 6px 0 0; min-height: 1.4em; }
+.vm-graph { display: block; width: 100%; height: 170px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin: 12px 0 4px; }
+.vm-spec { display: block; width: 100%; height: 110px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); margin: 8px 0 4px; }
+.vm-note { font-size: 13px; color: var(--muted); margin: 0 0 6px; }
+.vm-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+.vm-main .btn { flex: 1 1 140px; justify-content: center; min-height: 50px; }
+.vm-rec { background: var(--bad) !important; border-color: var(--bad) !important; color: #fff !important; }
+.vm-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 16px 0 0; }
+.vm-box h3 { margin: 0 0 6px; font-size: 16px; }
+.vm-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.vm-t { width: 100%; border-collapse: collapse; font-size: 14px; }
+.vm-t th, .vm-t td { padding: 6px; border-bottom: 1px solid var(--line); text-align: start; vertical-align: top; }
+.vm-t td.n { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.vm-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.vm-x { width: 36px; height: 36px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 8px; cursor: pointer; font-size: 16px; padding: 0; }
+.vm-x:hover { border-color: var(--bad); color: var(--bad); }
+.vm-t tr.on td { background: var(--accent-soft); }
+#vmPrint { display: none; }
+@media print {
+  @page { margin: 12mm; }
+  body > *:not(#vmPrint) { display: none !important; }
+  html, body { background: #fff !important; }
+  #vmPrint { display: block !important; color: #111; font: 11pt system-ui, sans-serif; }
+  #vmPrint h2 { font-size: 16pt; margin: 0 0 3mm; }
+  #vmPrint table { width: 100%; border-collapse: collapse; }
+  #vmPrint th, #vmPrint td { border-bottom: 1px solid #999; padding: 4px; text-align: left; font-size: 10pt; }
+  #vmPrint thead { display: table-header-group; }
+  #vmPrint tr { break-inside: avoid; }
+}
+</style>
+<div class="vm" id="vm">
+<div class="vm-top" aria-live="off">
+  <div class="vm-big"><span id="now">–</span><small id="u1">m/s²</small></div>
+  <div class="vm-what" id="what">Press Start, then put the phone on the machine</div>
+</div>
+<div class="stats">
+  <div class="stat"><span>Peak</span><b id="peak">–</b></div>
+  <div class="stat"><span>RMS (average strength)</span><b id="rms">–</b></div>
+  <div class="stat"><span>Main frequency</span><b id="freq">–</b></div>
+  <div class="stat"><span>Samples per second</span><b id="rate">–</b></div>
+</div>
+<canvas class="vm-graph" id="graph" role="img" aria-label="Vibration strength over the last 10 seconds"></canvas>
+<p class="vm-note">Vibration strength over the last 10 seconds (gravity removed).</p>
+<canvas class="vm-spec" id="spec" role="img" aria-label="Frequency spectrum"></canvas>
+<p class="vm-note" id="specNote">Frequency spectrum: the tallest peak is the main vibration frequency.</p>
+<div class="vm-main">
+  <button class="btn" type="button" id="start">Start</button>
+  <button class="btn ghost" type="button" id="rec" disabled>Record session</button>
+  <button class="btn ghost" type="button" id="resetPk" disabled>Reset peak</button>
+</div>
+<p class="msg" id="msg"></p>
+<div class="fields" style="margin-top:12px">
+  <div><label for="vunit">Units</label><select id="vunit"><option value="ms2">m/s² (metres per second squared)</option><option value="g">g (1 g = 9.81 m/s²)</option></select></div>
+  <div><label for="hp">Ignore slow movement below</label><select id="hp"><option value="0.5">0.5 Hz</option><option value="1" selected>1 Hz (recommended)</option><option value="2">2 Hz</option><option value="5">5 Hz</option></select></div>
+  <div><label for="win">Frequency window</label><select id="win"><option value="2">2 seconds (fast)</option><option value="4" selected>4 seconds</option><option value="8">8 seconds (more precise)</option></select></div>
+</div>
+
+<div class="vm-box">
+  <h3>Calibrate</h3>
+  <p>Put the phone on a solid table, screen up, nobody touching it, and press Calibrate. In 3 seconds the tool measures the sensor's own noise (removed from RMS) and checks gravity reads 9.81 m/s² (fixes the scale). Saved on this device.</p>
+  <div class="btns" style="margin-top:0"><button class="btn ghost" type="button" id="cal" disabled>Calibrate (3 s, keep still)</button><button class="btn ghost" type="button" id="calReset">Reset calibration</button></div>
+  <p class="msg" id="calMsg"></p>
+</div>
+
+<div class="vm-box">
+  <h3>Recorded sessions</h3>
+  <p>Give each session a name, for example "Washing machine spin, before levelling". Sessions are saved only in this browser.</p>
+  <div class="fields"><div><label for="label">Name for the next session</label><input type="text" id="label" maxlength="80" placeholder="for example Car idle, cold engine" data-nomemo></div></div>
+  <div class="vm-scroll"><table class="vm-t" id="list"></table></div>
+  <div class="btns">
+    <button class="btn ghost" type="button" id="csv" disabled>Download last recording (CSV)</button>
+    <button class="btn ghost" type="button" id="expJson">Export sessions (JSON)</button>
+    <button class="btn ghost" type="button" id="expCsv">Export sessions (CSV)</button>
+    <label class="btn ghost" for="imp" style="cursor:pointer">Import sessions</label><input type="file" id="imp" accept=".json,application/json" hidden data-nomemo>
+    <button class="btn ghost" type="button" id="print">Print / PDF</button>
+    <button class="btn ghost danger" type="button" id="clear">Delete all</button>
+  </div>
+  <p class="msg" id="listMsg"></p>
+</div>
+
+<div class="vm-box">
+  <h3>How to measure</h3>
+  <table class="vm-t">
+    <tr><td><b>Washing machine</b></td><td>Lay the phone flat on top during the spin. If it rocks or "walks", adjust the feet until they all touch the floor, then measure again and compare RMS.</td></tr>
+    <tr><td><b>Car at idle</b></td><td>Put the phone on the seat or a flat part of the dashboard with the engine running and nothing else on. Compare with another day or another car. A rough or uneven idle shows as a jumpy graph.</td></tr>
+    <tr><td><b>Fan wobble</b></td><td>Put the phone on the fan's base or, for a ceiling fan, on a firm spot on the housing only if it is safe and the fan is off when you place it. The main frequency usually matches the blade speed (rpm ÷ 60).</td></tr>
+  </table>
+  <p style="margin-top:10px">Feeling guide for people (based on ISO 2631-1, used for comfort in vehicles; phone readings are unweighted, so treat this as rough): below 0.32 m/s² not uncomfortable · 0.32–0.63 a little uncomfortable · 0.5–1 fairly uncomfortable · 0.8–1.6 uncomfortable · 1.25–2.5 very uncomfortable · above 2 extremely uncomfortable.</p>
+  <p style="margin:0"><b>Limits:</b> phones usually report motion only 50–100 times a second, so they can only see vibrations up to about half of that (25–50 Hz, about 1,500–3,000 rpm). Faster vibrations can show up at a wrong, lower frequency. A phone is not a calibrated vibration meter; use it to compare before and after.</p>
+</div>
+
+<div class="vm-box">
+  <h3>Convert rpm and Hz</h3>
+  <div class="fields">
+    <div><label for="cvIn">Value</label><input type="number" id="cvIn" inputmode="decimal" step="any" min="0" placeholder="for example 1200"></div>
+    <div><label for="cvDir">It is in</label><select id="cvDir"><option value="rpm">rpm (turns per minute)</option><option value="hz">Hz (per second)</option></select></div>
+  </div>
+  <p class="msg" id="cvOut"></p>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-vibration-meter', G0 = 9.80665, MAXREC = 20 * 60 * 120, MAXS = 500;
+  var st = (function () { try { var o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+  if (!Array.isArray(st.sessions)) st.sessions = [];
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); return true; } catch (e) { say('listMsg', 'bad', 'This browser could not save (storage full or blocked). Export your sessions to keep them.'); return false; } }
+  function say(id, c, t) { var el = $(id); el.className = 'msg ' + (c || ''); el.textContent = t || ''; }
+  function gU() { return $('vunit').value === 'g'; }
+  function uName() { return gU() ? 'g' : 'm/s²'; }
+  function fmtA(v, unit) { if (v == null || !isFinite(v)) return '–'; var x = gU() ? v / G0 : v; return fmtNum(Math.round(x * 1000) / 1000, x < 10 ? 3 : 2) + (unit ? ' ' + uName() : ''); }
+  function fmtF(f) { return f == null ? 'none clear' : fmtNum(Math.round(f * 10) / 10, 1) + ' Hz (' + fmtNum(Math.round(f * 60)) + ' rpm)'; }
+  function css(v, fb) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim() || fb; }
+  var cal = { floor: typeof st.floor === 'number' && st.floor >= 0 && st.floor < 1 ? st.floor : 0, gain: typeof st.gain === 'number' && st.gain > 0.8 && st.gain < 1.25 ? st.gain : 1 };
+
+  // ---------- state ----------
+  var running = false, got = false, noTimer = 0, raf = 0, wake = null;
+  var prevRaw = null, hpv = [0, 0, 0], lastTs = 0, t0 = 0;
+  var sclock = 0, recClock = 0, ring = [], peak = 0, recOn = false, rec = [], recStart = 0, recSum = 0, recPeak = 0, recFreq = [], lastRec = null, calBuf = null;
+  var curRms = null, curFreq = null, spec = null, fs = 0;
+
+  function onMotion(e) {
+    var a = e.accelerationIncludingGravity, lin = false;
+    if (!a || a.x == null || a.y == null || a.z == null) { a = e.acceleration; lin = true; }
+    if (!a || a.x == null || a.y == null || a.z == null) return;
+    var now = performance.now();
+    var raw = [a.x * cal.gain, a.y * cal.gain, a.z * cal.gain];
+    if (!got) {
+      got = true; clearTimeout(noTimer); t0 = now;
+      $('rec').disabled = $('resetPk').disabled = $('cal').disabled = false;
+      say('msg', 'ok', 'Measuring. Put the phone flat on the thing that vibrates, and do not hold it.');
+    }
+    if (calBuf) calBuf.push({ raw: raw, lin: lin, t: now });
+    var dt = lastTs ? (now - lastTs) / 1000 : 0;
+    if (e.interval > 0) { var iv = e.interval > 1 ? e.interval / 1000 : e.interval; if (!dt || dt > iv * 4 || dt < iv / 4) dt = iv; } // events can arrive in bursts
+    lastTs = now;
+    var fc = parseFloat($('hp').value) || 1, wT = 2 * Math.PI * fc * (dt > 0 ? dt : 1 / 60), fa = (2 - wT) / (2 + wT), fb = 2 / (2 + wT); // first-order high-pass, bilinear transform
+    if (!prevRaw || dt > 0.5) { prevRaw = raw; hpv = [0, 0, 0]; }
+    for (var i = 0; i < 3; i++) { hpv[i] = fa * hpv[i] + fb * (raw[i] - prevRaw[i]); }
+    prevRaw = raw;
+    // a sample clock: the sensor's own interval is more reliable than arrival time, because events can arrive in bursts
+    sclock += dt > 0 && dt < 0.5 ? dt : 1 / 60;
+    var m = Math.sqrt(hpv[0] * hpv[0] + hpv[1] * hpv[1] + hpv[2] * hpv[2]), t = sclock;
+    var settled = t > 1; // let the filter settle first
+    ring.push([t, hpv[0], hpv[1], hpv[2], m]); while (ring.length > 4096 || (ring.length && t - ring[0][0] > 12)) ring.shift();
+    if (settled && m > peak) peak = m;
+    if (recOn) {
+      if (rec.length >= MAXREC) { stopRec(); say('msg', 'bad', 'Recording stopped after 20 minutes (the maximum). It is saved below.'); }
+      else { var rt = sclock - recClock; rec.push([rt, hpv[0], hpv[1], hpv[2], m]); recSum += m * m; if (m > recPeak) recPeak = m; }
+    }
+  }
+  // ---------- analysis ----------
+  function fft(re, im) { // in place, radix-2
+    var n = re.length, i, j, k, l;
+    for (i = 1, j = 0; i < n; i++) { var bit = n >> 1; for (; j & bit; bit >>= 1) j ^= bit; j ^= bit; if (i < j) { var tr = re[i]; re[i] = re[j]; re[j] = tr; tr = im[i]; im[i] = im[j]; im[j] = tr; } }
+    for (l = 2; l <= n; l <<= 1) {
+      var ang = -2 * Math.PI / l, wr = Math.cos(ang), wi = Math.sin(ang);
+      for (i = 0; i < n; i += l) { var cr = 1, ci = 0; for (k = 0; k < l / 2; k++) { var a = i + k, b = a + l / 2, xr = re[b] * cr - im[b] * ci, xi = re[b] * ci + im[b] * cr; re[b] = re[a] - xr; im[b] = im[a] - xi; re[a] += xr; im[a] += xi; var nr = cr * wr - ci * wi; ci = cr * wi + ci * wr; cr = nr; } }
+    }
+  }
+  function analyse() {
+    if (ring.length < 16) { curRms = null; curFreq = null; spec = null; fs = 0; return; }
+    var last = ring[ring.length - 1][0], n2 = 0, s2 = 0, i;
+    // sample rate from the last 2 seconds
+    var cnt = 0, first = null; for (i = ring.length - 1; i >= 0 && last - ring[i][0] <= 2; i--) { cnt++; first = ring[i][0]; }
+    fs = cnt > 2 && last > first ? (cnt - 1) / (last - first) : 0;
+    for (i = ring.length - 1; i >= 0 && last - ring[i][0] <= 1; i--) { s2 += ring[i][4] * ring[i][4]; n2++; }
+    var ms = n2 ? s2 / n2 : 0; curRms = Math.sqrt(Math.max(0, ms - cal.floor * cal.floor));
+    var want = (parseFloat($('win').value) || 4) * (fs || 60), N = 32; while (N * 2 <= want && N < 2048) N *= 2;
+    if (ring.length < N || !fs) { curFreq = null; spec = null; return; }
+    var seg = ring.slice(-N), P = new Float64Array(N / 2), w = new Float64Array(N);
+    for (i = 0; i < N; i++) w[i] = 0.5 - 0.5 * Math.cos(2 * Math.PI * i / (N - 1));
+    for (var ax = 1; ax <= 3; ax++) {
+      var re = new Float64Array(N), im = new Float64Array(N), mean = 0;
+      for (i = 0; i < N; i++) mean += seg[i][ax]; mean /= N;
+      for (i = 0; i < N; i++) re[i] = (seg[i][ax] - mean) * w[i];
+      fft(re, im);
+      for (i = 1; i < N / 2; i++) P[i] += re[i] * re[i] + im[i] * im[i];
+    }
+    var fRes = fs / N, lo = Math.max(1, Math.ceil((parseFloat($('hp').value) || 1) * 1.2 / fRes)), best = -1, bp = 0, tot = 0, cntB = 0;
+    for (i = lo; i < N / 2; i++) { tot += P[i]; cntB++; if (P[i] > bp) { bp = P[i]; best = i; } }
+    var mean2 = cntB ? tot / cntB : 0;
+    spec = { P: P, fRes: fRes, lo: lo, best: best };
+    if (best > 0 && bp > mean2 * 6 && curRms > Math.max(0.01, cal.floor * 1.5)) {
+      var y0 = P[best - 1] || 0, y1 = P[best], y2 = P[best + 1] || 0, d = (y0 - y2) / (2 * (y0 - 2 * y1 + y2) || 1);
+      curFreq = (best + Math.max(-0.5, Math.min(0.5, d))) * fRes;
+    } else curFreq = null;
+    if (recOn && curFreq != null) recFreq.push(curFreq);
+  }
+  function describe(r) {
+    if (r == null) return '';
+    return r < 0.02 ? 'Still: almost no vibration' : r < 0.1 ? 'Very slight vibration' : r < 0.32 ? 'Slight vibration' : r < 0.8 ? 'Noticeable vibration' : r < 2 ? 'Strong vibration' : 'Very strong vibration';
+  }
+  function draw() {
+    cancelAnimationFrame(raf);
+    analyse();
+    $('u1').textContent = uName();
+    $('now').textContent = curRms == null ? '–' : fmtA(curRms);
+    $('what').textContent = curRms == null ? (running ? 'Waiting for readings…' : $('what').textContent) : describe(curRms) + (recOn ? ' · recording ' + Math.round((performance.now() - recStart) / 1000) + ' s' : '');
+    $('peak').textContent = peak ? fmtA(peak, true) : '–';
+    $('rms').textContent = curRms == null ? '–' : fmtA(curRms, true);
+    $('freq').textContent = curRms == null ? '–' : fmtF(curFreq);
+    $('rate').textContent = fs ? fmtNum(Math.round(fs)) + ' (max ' + fmtNum(Math.round(fs / 2)) + ' Hz)' : '–';
+    graph(); specGraph();
+    if (running) raf = requestAnimationFrame(function () { setTimeout(draw, 66); });
+  }
+  function sizeCanvas(cv) { var d = window.devicePixelRatio || 1, r = cv.getBoundingClientRect(), W = Math.max(1, Math.round(r.width * d)), H = Math.max(1, Math.round(r.height * d)); if (cv.width !== W || cv.height !== H) { cv.width = W; cv.height = H; } return d; }
+  function graph() {
+    var cv = $('graph'), d = sizeCanvas(cv), g = cv.getContext('2d'), W = cv.width, H = cv.height, pad = 40 * d;
+    g.clearRect(0, 0, W, H);
+    var last = ring.length ? ring[ring.length - 1][0] : 0, top = 0.2;
+    ring.forEach(function (p) { if (last - p[0] <= 10 && p[4] > top) top = p[4]; });
+    top *= 1.15; var unitTop = gU() ? top / G0 : top, step = Math.pow(10, Math.floor(Math.log10(unitTop / 2))), s2 = unitTop / step > 10 ? step * 5 : unitTop / step > 5 ? step * 2 : step;
+    g.font = (11 * d) + 'px system-ui, sans-serif'; g.fillStyle = css('--muted', '#888'); g.strokeStyle = css('--line', '#ddd'); g.lineWidth = 1;
+    for (var v = 0; v <= unitTop + 1e-9; v += s2) { var y = H - 4 * d - (v / unitTop) * (H - 12 * d); g.beginPath(); g.moveTo(pad, y); g.lineTo(W, y); g.stroke(); g.fillText(String(Math.round(v * 1000) / 1000), 3 * d, Math.max(10 * d, y + 4 * d)); }
+    if (ring.length < 2) return;
+    g.strokeStyle = css('--accent', '#2563eb'); g.lineWidth = 1.5 * d; g.beginPath();
+    var started = false;
+    ring.forEach(function (p) {
+      if (last - p[0] > 10) return;
+      var x = pad + (W - pad) * (1 - (last - p[0]) / 10), y = H - 4 * d - Math.min(1, p[4] / top) * (H - 12 * d);
+      if (started) g.lineTo(x, y); else { g.moveTo(x, y); started = true; }
+    });
+    g.stroke();
+  }
+  function specGraph() {
+    var cv = $('spec'), d = sizeCanvas(cv), g = cv.getContext('2d'), W = cv.width, H = cv.height;
+    g.clearRect(0, 0, W, H);
+    g.font = (11 * d) + 'px system-ui, sans-serif'; g.fillStyle = css('--muted', '#888');
+    if (!spec) { g.fillText(running ? 'Collecting a few seconds of data…' : 'Start to see the spectrum', 8 * d, H / 2); return; }
+    var P = spec.P, n = P.length, mx = 0, i;
+    for (i = spec.lo; i < n; i++) if (P[i] > mx) mx = P[i];
+    var bw = W / n;
+    for (i = 1; i < n; i++) {
+      var h = mx ? Math.sqrt(P[i] / mx) * (H - 18 * d) : 0;
+      g.fillStyle = i === spec.best && curFreq != null ? css('--bad', '#dc2626') : i < spec.lo ? css('--line', '#ddd') : css('--accent', '#2563eb');
+      g.fillRect(i * bw, H - 14 * d - h, Math.max(1, bw - 1), h);
+    }
+    g.fillStyle = css('--muted', '#888');
+    var fmax = n * spec.fRes, stepHz = fmax > 40 ? 10 : 5;
+    for (var f = 0; f <= fmax; f += stepHz) g.fillText(f + (f ? '' : ' Hz'), Math.min(W - 20 * d, f / fmax * W + 2 * d), H - 2 * d);
+  }
+
+  // ---------- start / stop ----------
+  function askPermission() {
+    try { if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') return DeviceMotionEvent.requestPermission().then(function (r) { return r !== 'denied'; }); }
+    catch (e) { return Promise.reject(e); }
+    return Promise.resolve(true);
+  }
+  function start() {
+    if (!window.isSecureContext) return say('msg', 'bad', 'Motion sensors only work on a secure (https) page. Open this tool from its https:// address.');
+    if (!window.DeviceMotionEvent) return noSensor('This browser cannot read the motion sensor.');
+    $('start').disabled = true;
+    askPermission().then(function (ok) {
+      $('start').disabled = false;
+      if (!ok) return say('msg', 'bad', 'Motion sensor access was blocked. iPhone or iPad: close this tab, open the page again, press Start and choose Allow (on older iPhones also turn on Settings > Safari > Motion & Orientation Access). Android or computer: tap the icon next to the web address, allow Motion sensors, then press Start again.');
+      running = true; got = false; sclock = 0; prevRaw = null; hpv = [0, 0, 0]; lastTs = 0; ring = []; peak = 0; curRms = curFreq = null; spec = null;
+      window.addEventListener('devicemotion', onMotion);
+      $('start').textContent = 'Stop';
+      say('msg', '', 'Waiting for the motion sensor…');
+      clearTimeout(noTimer); noTimer = setTimeout(function () { if (!got) noSensor(''); }, 2500);
+      if (navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {});
+      draw();
+    }, function () { $('start').disabled = false; say('msg', 'bad', 'The browser did not show the permission question. Tap Start again (it must be a direct tap).'); });
+  }
+  function noSensor(why) { stop(); say('msg', 'bad', (why ? why + ' ' : 'No motion sensor answered. ') + 'Laptops and desktop computers usually have none. Open this page on your phone. You can still view and export saved sessions here.'); }
+  function stop() {
+    if (recOn) stopRec();
+    running = false; clearTimeout(noTimer); cancelAnimationFrame(raf);
+    window.removeEventListener('devicemotion', onMotion);
+    $('start').textContent = 'Start'; $('rec').disabled = $('resetPk').disabled = $('cal').disabled = true;
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  $('start').addEventListener('click', function () { if (running) { stop(); say('msg', '', 'Stopped.'); draw(); } else start(); });
+  $('resetPk').addEventListener('click', function () { peak = 0; draw(); });
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && running && navigator.wakeLock) navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); });
+
+  // ---------- recording ----------
+  function median(a) { if (!a.length) return null; var s = a.slice().sort(function (x, y) { return x - y; }); return s[Math.floor(s.length / 2)]; }
+  $('rec').addEventListener('click', function () {
+    if (recOn) return stopRec();
+    recOn = true; rec = []; recStart = performance.now(); recClock = sclock; recSum = 0; recPeak = 0; recFreq = [];
+    this.textContent = 'Stop recording'; this.classList.add('vm-rec');
+    say('msg', 'ok', 'Recording… press Stop recording when you are done.');
+  });
+  function stopRec() {
+    recOn = false; $('rec').textContent = 'Record session'; $('rec').classList.remove('vm-rec');
+    if (rec.length < 10) { say('msg', 'bad', 'The recording was too short. Record for at least a few seconds.'); return; }
+    var dur = rec[rec.length - 1][0], rms = Math.sqrt(Math.max(0, recSum / rec.length - cal.floor * cal.floor));
+    lastRec = { rows: rec, when: new Date(), rate: rec.length / Math.max(0.001, dur) };
+    var s = { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), name: String($('label').value).trim().slice(0, 80) || 'Session ' + (st.sessions.length + 1), date: lastRec.when.toISOString(), seconds: Math.round(dur * 10) / 10, peak: Math.round(recPeak * 10000) / 10000, rms: Math.round(rms * 10000) / 10000, freq: recFreq.length ? Math.round(median(recFreq) * 100) / 100 : null, rate: Math.round(lastRec.rate) };
+    st.sessions.unshift(s); if (st.sessions.length > MAXS) st.sessions.length = MAXS;
+    save(); $('label').value = ''; $('csv').disabled = false; list(s.id);
+    say('msg', 'ok', 'Saved "' + s.name + '": ' + fmtNum(s.seconds, 1) + ' s, RMS ' + fmtA(s.rms, true) + ', peak ' + fmtA(s.peak, true) + (s.freq ? ', main frequency ' + fmtF(s.freq) : '') + '.');
+  }
+  function dl(name, text, type) {
+    var a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type: type })); a.download = name;
+    document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 4000);
+  }
+  function stamp(d) { var p = function (n) { return (n < 10 ? '0' : '') + n; }; return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) + '-' + p(d.getHours()) + p(d.getMinutes()); }
+  $('csv').addEventListener('click', function () {
+    if (!lastRec) return;
+    var out = ['time_s,x_m_s2,y_m_s2,z_m_s2,magnitude_m_s2'];
+    lastRec.rows.forEach(function (r) { out.push(r.map(function (v, i) { return i ? v.toFixed(5) : v.toFixed(4); }).join(',')); });
+    dl('vibration-' + stamp(lastRec.when) + '.csv', out.join('\n') + '\n', 'text/csv');
+    say('listMsg', 'ok', 'Downloaded ' + fmtNum(lastRec.rows.length) + ' samples (about ' + Math.round(lastRec.rate) + ' per second). Values are in m/s² with gravity removed.');
+  });
+
+  // ---------- sessions list ----------
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function dateText(iso) { var d = new Date(iso); return isNaN(d) ? '' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }); }
+  function list(hi) {
+    var t = $('list');
+    if (!st.sessions.length) { t.innerHTML = '<tr><td style="color:var(--muted)">No sessions yet. Press Start, then Record session.</td></tr>'; ['expJson', 'expCsv', 'print', 'clear'].forEach(function (id) { $(id).disabled = true; }); return; }
+    ['expJson', 'expCsv', 'print', 'clear'].forEach(function (id) { $(id).disabled = false; });
+    t.innerHTML = '<thead><tr><th>Session</th><th>RMS</th><th>Peak</th><th>Main frequency</th><th aria-label="Delete"></th></tr></thead><tbody>' + st.sessions.map(function (s) {
+      return '<tr' + (s.id === hi ? ' class="on"' : '') + '><td><b>' + esc(s.name) + '</b><br><small>' + esc(dateText(s.date)) + ' · ' + fmtNum(s.seconds, 1) + ' s</small></td><td class="n">' + fmtA(s.rms, true) + '</td><td class="n">' + fmtA(s.peak, true) + '</td><td class="n">' + (s.freq ? fmtF(s.freq) : '–') + '</td><td><button type="button" class="vm-x" data-del="' + esc(s.id) + '" aria-label="Delete ' + esc(s.name) + '">×</button></td></tr>';
+    }).join('') + '</tbody>';
+  }
+  $('list').addEventListener('click', function (e) {
+    var b = e.target.closest('[data-del]'); if (!b) return;
+    var s = st.sessions.filter(function (x) { return x.id === b.dataset.del; })[0]; if (!s) return;
+    if (!confirm('Delete the session "' + s.name + '"?')) return;
+    st.sessions = st.sessions.filter(function (x) { return x !== s; }); save(); list(); say('listMsg', 'ok', 'Deleted.');
+  });
+  $('clear').addEventListener('click', function () {
+    if (!st.sessions.length || !confirm('Delete all ' + st.sessions.length + ' saved sessions from this browser? Export them first if you want to keep them.')) return;
+    st.sessions = []; save(); list(); say('listMsg', 'ok', 'All sessions deleted.');
+  });
+  $('expJson').addEventListener('click', function () {
+    dl('vibration-sessions-' + stamp(new Date()) + '.json', JSON.stringify({ app: 'gettoolnest-vibration-meter', version: 1, exported: new Date().toISOString(), units: 'm/s2', sessions: st.sessions }, null, 2), 'application/json');
+    say('listMsg', 'ok', 'Exported ' + st.sessions.length + ' sessions.');
+  });
+  function csvCell(v) { v = v == null ? '' : String(v); return /[",\n\r]/.test(v) || /^[=+\-@]/.test(v) ? '"' + (/^[=+\-@]/.test(v) ? "'" : '') + v.replace(/"/g, '""') + '"' : v; }
+  $('expCsv').addEventListener('click', function () {
+    var rows = ['name,date,seconds,rms_m_s2,peak_m_s2,main_frequency_hz,main_frequency_rpm,samples_per_second'];
+    st.sessions.forEach(function (s) { rows.push([s.name, s.date, s.seconds, s.rms, s.peak, s.freq == null ? '' : s.freq, s.freq == null ? '' : Math.round(s.freq * 60), s.rate].map(csvCell).join(',')); });
+    dl('vibration-sessions-' + stamp(new Date()) + '.csv', '﻿' + rows.join('\r\n') + '\r\n', 'text/csv');
+    say('listMsg', 'ok', 'Exported ' + st.sessions.length + ' sessions as CSV.');
+  });
+  function validSession(s) {
+    return s && typeof s === 'object' && typeof s.name === 'string' && s.name.length <= 200 && !isNaN(new Date(s.date)) &&
+      [s.seconds, s.rms, s.peak].every(function (v) { return typeof v === 'number' && isFinite(v) && v >= 0 && v < 1e6; }) &&
+      (s.freq == null || (typeof s.freq === 'number' && isFinite(s.freq) && s.freq >= 0 && s.freq < 1000));
+  }
+  $('imp').addEventListener('change', function () {
+    var f = this.files[0]; this.value = '';
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) return say('listMsg', 'bad', 'That file is too big to be a sessions export.');
+    var r = new FileReader();
+    r.onload = function () {
+      var data; try { data = JSON.parse(r.result); } catch (e) { return say('listMsg', 'bad', '"' + f.name + '" is not a sessions file from this tool. Choose a .json file made with "Export sessions (JSON)".'); }
+      if (!data || data.app !== 'gettoolnest-vibration-meter' || !Array.isArray(data.sessions)) return say('listMsg', 'bad', '"' + f.name + '" is not a sessions file from this tool. Nothing was changed.');
+      var good = data.sessions.filter(validSession), have = {}, added = 0;
+      st.sessions.forEach(function (s) { have[s.id] = 1; });
+      good.forEach(function (s) {
+        var id = typeof s.id === 'string' && s.id.length < 40 ? s.id : Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+        if (have[id]) return;
+        have[id] = 1; added++;
+        st.sessions.push({ id: id, name: s.name.slice(0, 80), date: new Date(s.date).toISOString(), seconds: s.seconds, rms: s.rms, peak: s.peak, freq: s.freq == null ? null : s.freq, rate: typeof s.rate === 'number' && isFinite(s.rate) ? Math.round(s.rate) : null });
+      });
+      st.sessions.sort(function (a, b) { return a.date < b.date ? 1 : -1; });
+      var cut = Math.max(0, st.sessions.length - MAXS);
+      if (cut) st.sessions.length = MAXS;
+      save(); list();
+      say('listMsg', added ? 'ok' : '', 'Imported ' + added + ' session' + (added === 1 ? '' : 's') + '.' + (data.sessions.length - good.length ? ' Skipped ' + (data.sessions.length - good.length) + ' damaged entries.' : '') + (good.length - added ? ' ' + (good.length - added) + ' were already here.' : '') + (cut ? ' Only the newest ' + MAXS + ' sessions are kept, so the ' + cut + ' oldest were left out.' : ''));
+    };
+    r.onerror = function () { say('listMsg', 'bad', 'The file could not be read.'); };
+    r.readAsText(f);
+  });
+  function fillPrint() {
+    var box = $('vmPrint'); if (!box) { box = document.createElement('div'); box.id = 'vmPrint'; document.body.appendChild(box); }
+    box.innerHTML = '<h2>Vibration sessions</h2><p>Printed ' + esc(new Date().toLocaleString()) + '. Phone accelerometer readings with gravity removed; for comparison only.</p><table><thead><tr><th>Session</th><th>Date</th><th>Length</th><th>RMS</th><th>Peak</th><th>Main frequency</th></tr></thead><tbody>' +
+      st.sessions.map(function (s) { return '<tr><td>' + esc(s.name) + '</td><td>' + esc(dateText(s.date)) + '</td><td>' + fmtNum(s.seconds, 1) + ' s</td><td>' + fmtA(s.rms, true) + '</td><td>' + fmtA(s.peak, true) + '</td><td>' + (s.freq ? fmtF(s.freq) : '–') + '</td></tr>'; }).join('') + '</tbody></table>';
+  }
+  window.addEventListener('beforeprint', fillPrint);
+  $('print').addEventListener('click', function () { fillPrint(); setTimeout(function () { window.print(); }, 60); });
+
+  // ---------- calibration ----------
+  $('cal').addEventListener('click', function () {
+    if (!got) return;
+    var btn = this; btn.disabled = true; calBuf = []; say('calMsg', '', 'Measuring for 3 seconds… do not touch the phone or the table.');
+    setTimeout(function () {
+      var b = calBuf; calBuf = null; btn.disabled = !running;
+      if (!b || b.length < 20) return say('calMsg', 'bad', 'Not enough readings. Keep the page open and try again.');
+      var mags = b.map(function (s) { return Math.hypot(s.raw[0], s.raw[1], s.raw[2]) / cal.gain; });
+      var mean = mags.reduce(function (a, v) { return a + v; }, 0) / mags.length, sd = Math.sqrt(mags.reduce(function (a, v) { return a + (v - mean) * (v - mean); }, 0) / mags.length);
+      if (sd > 0.3) return say('calMsg', 'bad', 'The phone was moving. Put it on a solid table, let go, and try again.');
+      var msg = '';
+      if (!b[0].lin && mean > 7 && mean < 12.5) { cal.gain = G0 / mean; st.gain = cal.gain; msg = 'Gravity read ' + fmtNum(Math.round(mean * 1000) / 1000, 3) + ' m/s², so readings are scaled by ' + fmtNum(Math.round(cal.gain * 1000) / 1000, 3) + '. '; }
+      // noise floor: RMS of the filtered signal while still
+      var s2 = 0, n = 0; ring.slice(-b.length).forEach(function (p) { s2 += p[4] * p[4]; n++; });
+      cal.floor = n ? Math.sqrt(s2 / n) : 0; st.floor = cal.floor; save(); peak = 0;
+      say('calMsg', 'ok', msg + 'Sensor noise is ' + fmtA(cal.floor, true) + ' RMS and is now removed from readings. Saved on this device.');
+    }, 3000);
+  });
+  $('calReset').addEventListener('click', function () { cal = { floor: 0, gain: 1 }; delete st.floor; delete st.gain; save(); say('calMsg', 'ok', 'Calibration removed.'); });
+
+  // ---------- rpm / Hz ----------
+  function conv() {
+    var s = String($('cvIn').value).trim(), v = parseFloat(s);
+    if (!s) return say('cvOut', '', '');
+    if (!isFinite(v) || v < 0) return say('cvOut', 'bad', 'Type a number of 0 or more.');
+    say('cvOut', 'ok', $('cvDir').value === 'rpm' ? fmtNum(v) + ' rpm = ' + fmtNum(Math.round(v / 60 * 100) / 100, 2) + ' Hz' : fmtNum(v) + ' Hz = ' + fmtNum(Math.round(v * 60 * 10) / 10) + ' rpm');
+  }
+  ['cvIn', 'cvDir'].forEach(function (id) { $(id).addEventListener('input', conv); $(id).addEventListener('change', conv); });
+  ['vunit', 'hp', 'win'].forEach(function (id) { $(id).addEventListener('change', function () { if (id === 'hp') { prevRaw = null; peak = 0; } list(); if (!running) draw(); }); });
+  window.addEventListener('resize', function () { if (!running) { graph(); specGraph(); } });
+  if (!window.DeviceMotionEvent) say('msg', '', 'This browser has no motion sensor support. Open the page on a phone to measure; saved sessions still work here.');
+  list(); conv(); draw();
+})();
+</script>

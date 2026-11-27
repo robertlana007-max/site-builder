@@ -1,0 +1,399 @@
+<style>
+.bl-seg { display: flex; flex-wrap: wrap; margin: 0 0 14px; }
+.bl-seg button { flex: 1 1 auto; }
+.bl-view { display: flex; justify-content: center; margin: 4px 0 6px; }
+.bl-view svg { width: min(300px, 100%); height: auto; display: block; touch-action: manipulation; }
+.bl-view .ring { fill: none; stroke: var(--line); stroke-width: 1.5; }
+.bl-view .face { fill: var(--bg); stroke: var(--line); stroke-width: 2; }
+.bl-view .cross { stroke: var(--muted); stroke-width: 1; opacity: .6; }
+.bl-view .tolring { fill: none; stroke: var(--ok); stroke-width: 2; stroke-dasharray: 4 3; }
+.bl-view .bub { fill: #f59e0b; fill-opacity: .85; stroke: #b45309; stroke-width: 2; transition: fill .2s; }
+.bl-view .bub.lvl { fill: var(--ok); stroke: var(--ok); }
+.bl-view .lbl { fill: var(--muted); font: 600 11px system-ui, sans-serif; }
+.bl-view .hz { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+.bl-read { text-align: center; }
+.bl-big { font-size: clamp(54px, 16vw, 92px); font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; }
+.bl-big small { font-size: 22px; color: var(--muted); font-weight: 600; letter-spacing: 0; margin-inline-start: 4px; }
+.bl-what { color: var(--muted); font-weight: 600; margin: 6px 0 2px; min-height: 1.4em; }
+.bl-what.lvl { color: var(--ok); }
+.bl-held { display: inline-block; font-size: 12px; font-weight: 700; padding: 2px 8px; border-radius: 99px; background: var(--accent); color: var(--on-accent); vertical-align: middle; margin-inline-start: 8px; }
+.bl-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+.bl-main .btn { flex: 1 1 140px; justify-content: center; min-height: 50px; }
+.bl-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 16px 0 0; }
+.bl-box h3 { margin: 0 0 6px; font-size: 16px; }
+.bl-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.bl-res { font-variant-numeric: tabular-nums; }
+.bl-checks { display: flex; flex-wrap: wrap; gap: 8px 18px; margin: 12px 0 0; }
+.bl-checks label { display: flex; gap: 8px; align-items: center; font-weight: 600; margin: 0; }
+.bl-checks input { width: 20px; height: 20px; min-height: 0; }
+</style>
+<div class="bl" id="bl">
+<div class="seg bl-seg" role="group" aria-label="What are you levelling?">
+  <button type="button" data-m="flat" aria-pressed="true">Flat surface</button>
+  <button type="button" data-m="wall" aria-pressed="false">Wall / picture</button>
+  <button type="button" data-m="calc" aria-pressed="false">Slope calculator</button>
+</div>
+
+<div id="live">
+  <div class="bl-view" aria-hidden="true">
+    <svg id="flatSvg" viewBox="0 0 260 260">
+      <circle class="face" cx="130" cy="130" r="124"/>
+      <circle class="ring" cx="130" cy="130" r="31"/><circle class="ring" cx="130" cy="130" r="62"/><circle class="ring" cx="130" cy="130" r="93"/>
+      <line class="cross" x1="6" y1="130" x2="254" y2="130"/><line class="cross" x1="130" y1="6" x2="130" y2="254"/>
+      <circle class="tolring" id="tolRing" cx="130" cy="130" r="8"/>
+      <text class="lbl" x="134" y="96">2.5°</text><text class="lbl" x="134" y="65">5°</text><text class="lbl" x="134" y="34">7.5°</text>
+      <circle class="bub" id="bub" cx="130" cy="130" r="20"/>
+    </svg>
+    <svg id="wallSvg" viewBox="0 0 300 180" hidden>
+      <rect class="face" x="10" y="62" width="280" height="56" rx="28"/>
+      <line class="cross" x1="130" y1="64" x2="130" y2="116"/><line class="cross" x1="170" y1="64" x2="170" y2="116"/>
+      <ellipse class="bub" id="wbub" cx="150" cy="90" rx="26" ry="18"/>
+      <g id="hzG"><line class="hz" x1="20" y1="150" x2="280" y2="150"/></g>
+      <text class="lbl" x="150" y="176" text-anchor="middle">blue line = true level</text>
+      <text class="lbl" x="22" y="40" id="wLeft"></text><text class="lbl" x="278" y="40" text-anchor="end" id="wRight"></text>
+    </svg>
+  </div>
+  <div class="bl-read" aria-live="polite">
+    <div class="bl-big"><span id="ang">–</span><small>°</small><span id="held" class="bl-held" hidden>HOLD</span></div>
+    <div class="bl-what" id="what">Press Start, then lay your phone on the surface</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><span>Slope</span><b id="pct">–</b></div>
+    <div class="stat" id="stX"><span id="lX">Left–right</span><b id="ax">–</b></div>
+    <div class="stat" id="stY"><span id="lY">Top–bottom</span><b id="ay">–</b></div>
+    <div class="stat"><span>Ratio (rise : run)</span><b id="ratio">–</b></div>
+  </div>
+  <div class="bl-main">
+    <button class="btn" type="button" id="start">Start level</button>
+    <button class="btn ghost" type="button" id="hold" aria-pressed="false" disabled>Hold reading</button>
+    <button class="btn ghost" type="button" id="zero" disabled>Set zero here</button>
+  </div>
+  <p class="msg" id="msg"></p>
+  <div class="bl-checks">
+    <label><input type="checkbox" id="snd" checked> Beep when level</label>
+    <label><input type="checkbox" id="buzz" checked> Vibrate when level</label>
+  </div>
+  <div class="fields" style="margin-top:12px">
+    <div><label for="tol">Count as level within</label><select id="tol"><option value="0.1">±0.1°</option><option value="0.25">±0.25°</option><option value="0.5" selected>±0.5°</option><option value="1">±1°</option></select></div>
+    <div><label for="smooth">Smoothing</label><select id="smooth"><option value="0.06">Low (fast, jumpy)</option><option value="0.2" selected>Medium</option><option value="0.6">High (slow, steady)</option></select></div>
+  </div>
+  <div class="bl-box">
+    <h3>Calibrate</h3>
+    <p>Phone sensors are often off by a degree or so. <b>Set zero here</b> uses a surface you know is level. No level surface? Use the two-step calibration: it measures, you turn the phone around, and it measures again. Calibration is saved on this device.</p>
+    <div class="btns" style="margin-top:0">
+      <button class="btn ghost" type="button" id="cal2" disabled>Two-step calibration</button>
+      <button class="btn ghost" type="button" id="calReset">Reset calibration</button>
+    </div>
+    <p class="msg" id="calMsg" style="margin-bottom:0"></p>
+  </div>
+</div>
+
+<div id="calc" hidden>
+  <p style="margin-top:0">No sensor needed. Type the rise and the run (horizontal length) in the same unit, or type an angle or a percentage.</p>
+  <div class="fields">
+    <div><label for="rise">Rise (height change)</label><input type="number" id="rise" inputmode="decimal" step="any" placeholder="for example 5"></div>
+    <div><label for="run">Run (horizontal length)</label><input type="number" id="run" inputmode="decimal" step="any" placeholder="for example 100"></div>
+  </div>
+  <div class="stats bl-res">
+    <div class="stat"><span>Angle</span><b id="cDeg">–</b></div>
+    <div class="stat"><span>Slope</span><b id="cPct">–</b></div>
+    <div class="stat"><span>Ratio</span><b id="cRat">–</b></div>
+    <div class="stat"><span>Length along the slope</span><b id="cLen">–</b></div>
+  </div>
+  <div class="fields" style="margin-top:16px">
+    <div><label for="cvIn">Convert a value</label><input type="number" id="cvIn" inputmode="decimal" step="any" placeholder="for example 2"></div>
+    <div><label for="cvFrom">The value is in</label><select id="cvFrom"><option value="deg">Degrees (°)</option><option value="pct">Percent (%)</option><option value="ratio">Ratio 1 : n (type n)</option></select></div>
+  </div>
+  <p class="msg bl-res" id="cvOut"></p>
+  <p class="msg" id="cMsg"></p>
+</div>
+
+<div class="bl-box">
+  <h3>Good to know</h3>
+  <p><b>Flat surface:</b> lay the phone screen-up on a shelf, table or floor. Take the case off if it is bumpy. <b>Wall / picture:</b> stand the phone on its edge on top of a frame or shelf, or hold its long edge against a door frame, with the screen facing you. Readings follow the way the screen is turned, so you can use the phone upright or sideways.</p>
+  <p style="margin:0">On iPhone and iPad, Safari asks for permission to use "Motion and Orientation" when you press Start. Laptops and desktop computers usually have no tilt sensor; use the slope calculator instead.</p>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-bubble-level', R2D = 180 / Math.PI;
+  var st = load();
+  function load() { try { var o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } }
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function num(v, d) { return typeof v === 'number' && isFinite(v) ? v : d; }
+  var cal = { fx: num(st.fx, 0), fy: num(st.fy, 0), w: num(st.w, 0) };
+  var mode = st.mode === 'wall' || st.mode === 'calc' ? st.mode : 'flat';
+
+  var running = false, got = false, src = '', g = null, lastT = 0, held = false, wasLevel = false, noSensorTimer = 0, actx = null, wake = null;
+  var samples = null, seen = 0;
+  function say(el, c, t) { el = $(el); el.className = 'msg ' + (c || ''); el.textContent = t || ''; }
+  function f1(v) { return fmtNum(Math.round(v * 10) / 10, 1); }
+  function screenAngle() {
+    var a = screen.orientation && typeof screen.orientation.angle === 'number' ? screen.orientation.angle : (typeof window.orientation === 'number' ? window.orientation : 0);
+    return ((a % 360) + 360) % 360;
+  }
+
+  // ---------- mode ----------
+  function setMode(m) {
+    mode = m; st.mode = m; save();
+    [].forEach.call(document.querySelectorAll('.bl-seg button'), function (b) { b.setAttribute('aria-pressed', String(b.dataset.m === m)); });
+    $('live').hidden = m === 'calc'; $('calc').hidden = m !== 'calc';
+    $('flatSvg').hidden = m !== 'flat'; $('wallSvg').hidden = m !== 'wall';
+    $('stX').hidden = $('stY').hidden = m === 'wall';
+    wasLevel = false;
+    if (m === 'calc') { stop(); calc(); } else render();
+  }
+  [].forEach.call(document.querySelectorAll('.bl-seg button'), function (b) { b.addEventListener('click', function () { setMode(b.dataset.m); }); });
+
+  // ---------- sensors ----------
+  // gravity "down" direction in device coordinates, from the orientation angles (W3C: Z-X'-Y'')
+  function downFromOrientation(e) {
+    var b = e.beta / R2D, c = e.gamma / R2D;
+    return [Math.cos(b) * Math.sin(c), -Math.sin(b), -Math.cos(b) * Math.cos(c)];
+  }
+  function onOri(e) {
+    if (e.beta == null || e.gamma == null || !isFinite(e.beta) || !isFinite(e.gamma)) return;
+    src = 'o'; feed(downFromOrientation(e));
+  }
+  function onMot(e) {
+    if (src === 'o') return; // orientation is smoother; motion is only a fallback
+    var a = e.accelerationIncludingGravity;
+    if (!a || a.x == null || a.y == null || a.z == null) return;
+    var n = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    if (!(n > 1)) return;
+    src = 'm'; feed([-a.x / n, -a.y / n, -a.z / n]); // the accelerometer reads "up"; gravity points the other way
+  }
+  function feed(d) {
+    var now = performance.now();
+    if (!got) { got = true; clearTimeout(noSensorTimer); say('msg', 'ok', mode === 'wall' ? 'Measuring. Stand the phone on its edge, screen facing you.' : 'Measuring. Lay the phone flat on the surface.'); $('hold').disabled = $('zero').disabled = $('cal2').disabled = false; }
+    var tau = parseFloat($('smooth').value) || 0.2, dt = lastT ? Math.min(0.5, (now - lastT) / 1000) : 1;
+    lastT = now;
+    if (!g) g = d.slice();
+    else { var k = 1 - Math.exp(-dt / tau); for (var i = 0; i < 3; i++) g[i] += (d[i] - g[i]) * k; }
+    if (samples) samples.push(d);
+    seen++;
+    if (!held && !rafPending) { rafPending = true; requestAnimationFrame(function () { rafPending = false; if (!held) render(); }); }
+  }
+  var rafPending = false;
+  function norm(v) { var n = Math.hypot(v[0], v[1], v[2]) || 1; return [v[0] / n, v[1] / n, v[2] / n]; }
+  function clamp1(v) { return Math.max(-1, Math.min(1, v)); }
+  function wrap(a) { a = ((a + 180) % 360 + 360) % 360 - 180; return a; }
+  // angles in the device frame (before calibration)
+  function rawFlat(d) { return { x: Math.asin(clamp1(d[0])) * R2D, y: Math.asin(clamp1(-d[1])) * R2D, tilt: Math.acos(clamp1(-d[2])) * R2D }; }
+  function rawWall(d) { var r = Math.atan2(d[0], -d[1]) * R2D; return { roll: r, dev: wrap(r - Math.round(r / 90) * 90), flatness: Math.abs(d[2]) }; }
+
+  function reading() {
+    if (!g) return null;
+    var d = norm(g), th = screenAngle(), c = Math.cos(th / R2D), s = Math.sin(th / R2D);
+    if (mode === 'wall') {
+      var w = rawWall(d), dev = wrap(w.roll - cal.w + th), sd = wrap(dev - Math.round(dev / 90) * 90);
+      return { mode: 'wall', dev: sd, flat: w.flatness > 0.75 };
+    }
+    var f = rawFlat(d), x = f.x - cal.fx, y = f.y - cal.fy; // device frame, calibrated (x > 0: right side low, y > 0: top high)
+    // rotate into the screen's frame so "left/right" means what the user sees
+    var xs = x * c - (-y) * s, ys = -(x * s + (-y) * c); // ys > 0: top of the screen is high
+    var tilt = Math.hypot(xs, ys);
+    if (f.tilt > 60) tilt = f.tilt;
+    return { mode: 'flat', x: xs, y: ys, tilt: tilt, upright: f.tilt > 45 };
+  }
+  function tol() { return parseFloat($('tol').value) || 0.5; }
+
+  function render() {
+    if (mode === 'calc') return;
+    var r = reading();
+    $('tolRing').setAttribute('r', String(Math.max(4, tol() / 10 * 124)));
+    if (!r) { $('ang').textContent = '–'; ['pct', 'ax', 'ay', 'ratio'].forEach(function (id) { $(id).textContent = '–'; }); return; }
+    var lvl, main;
+    if (r.mode === 'flat') {
+      main = r.tilt; lvl = !r.upright && main <= tol();
+      var bx = Math.max(-1, Math.min(1, -r.x / 10)), by = Math.max(-1, Math.min(1, -r.y / 10)), m = Math.hypot(bx, by);
+      if (m > 1) { bx /= m; by /= m; }
+      // the bubble floats to the high side
+      var R = 124 - 22; $('bub').setAttribute('cx', (130 + bx * R).toFixed(1)); $('bub').setAttribute('cy', (130 + by * R).toFixed(1));
+      $('bub').setAttribute('class', 'bub' + (lvl ? ' lvl' : ''));
+      $('ax').textContent = f1(Math.abs(r.x)) + '° ' + (Math.abs(r.x) < 0.05 ? '' : r.x > 0 ? '(left high)' : '(right high)');
+      $('ay').textContent = f1(Math.abs(r.y)) + '° ' + (Math.abs(r.y) < 0.05 ? '' : r.y > 0 ? '(top high)' : '(bottom high)');
+      if (r.upright) say0('The phone is not lying flat. For walls, frames and door posts choose "Wall / picture".', false);
+      else say0(lvl ? 'Level' : 'Raise the ' + lowSide(r) + ' side', lvl);
+    } else {
+      main = Math.abs(r.dev); lvl = !r.flat && main <= tol();
+      var off = Math.max(-1, Math.min(1, -r.dev / 10)) * 110;
+      $('wbub').setAttribute('cx', (150 + off).toFixed(1));
+      $('wbub').setAttribute('class', 'bub' + (lvl ? ' lvl' : ''));
+      $('hzG').setAttribute('transform', 'rotate(' + (-r.dev).toFixed(2) + ' 150 150)');
+      if (r.flat) say0('The phone is lying flat. Stand it on its edge, or choose "Flat surface".', false);
+      else say0(lvl ? 'Level' : (r.dev > 0 ? 'Lower the left side (or raise the right)' : 'Lower the right side (or raise the left)'), lvl);
+    }
+    $('ang').textContent = f1(main);
+    var t = Math.tan(Math.min(89.9, main) / R2D);
+    $('pct').textContent = f1(t * 100) + '%';
+    $('ratio').textContent = t < 1e-4 ? 'flat' : '1 : ' + fmtNum(Math.round(1 / t * (1 / t < 100 ? 10 : 1)) / (1 / t < 100 ? 10 : 1));
+    if (lvl && !wasLevel && running && !held) signal();
+    wasLevel = lvl;
+  }
+  function lowSide(r) {
+    var ax = Math.abs(r.x), ay = Math.abs(r.y);
+    if (ax > ay * 2) return r.x > 0 ? 'right' : 'left';
+    if (ay > ax * 2) return r.y > 0 ? 'bottom' : 'top';
+    return (r.y > 0 ? 'bottom' : 'top') + ' ' + (r.x > 0 ? 'right' : 'left');
+  }
+  function say0(t, lvl) { $('what').textContent = t; $('what').className = 'bl-what' + (lvl ? ' lvl' : ''); }
+  function signal() {
+    if ($('snd').checked && actx) {
+      try {
+        var o = actx.createOscillator(), gn = actx.createGain(), t = actx.currentTime;
+        o.frequency.value = 1046; gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(0.25, t + 0.01); gn.gain.exponentialRampToValueAtTime(0.0001, t + 0.15);
+        o.connect(gn); gn.connect(actx.destination); o.start(t); o.stop(t + 0.16);
+      } catch (e) {}
+    }
+    if ($('buzz').checked && navigator.vibrate) try { navigator.vibrate(70); } catch (e) {}
+  }
+
+  function askPermission() {
+    var reqs = [];
+    try {
+      if (window.DeviceOrientationEvent && typeof DeviceOrientationEvent.requestPermission === 'function') reqs.push(DeviceOrientationEvent.requestPermission());
+      if (window.DeviceMotionEvent && typeof DeviceMotionEvent.requestPermission === 'function') reqs.push(DeviceMotionEvent.requestPermission());
+    } catch (e) { return Promise.reject(e); }
+    return Promise.all(reqs).then(function (r) { return !r.some(function (x) { return x === 'denied'; }); }); // 'prompt' (Chrome without an answer yet) still lets events through
+  }
+  function start() {
+    if (!window.isSecureContext) return say('msg', 'bad', 'Motion sensors only work on a secure (https) page. Open this tool from its https:// address.');
+    if (!window.DeviceOrientationEvent && !window.DeviceMotionEvent) return noSensor('This browser cannot read tilt sensors.');
+    $('start').disabled = true;
+    try { var AC = window.AudioContext || window.webkitAudioContext; if (AC && !actx) actx = new AC(); if (actx && actx.resume) actx.resume(); } catch (e) {}
+    askPermission().then(function (ok) {
+      $('start').disabled = false;
+      if (!ok) return say('msg', 'bad', 'Motion sensor access was blocked. iPhone or iPad: close this tab, open the page again, press Start and choose Allow (on older iPhones also turn on Settings > Safari > Motion & Orientation Access). Android or computer: tap the icon next to the web address, allow Motion sensors, then press Start again.');
+      running = true; got = false; g = null; lastT = 0; src = ''; seen = 0; wasLevel = false;
+      window.addEventListener('deviceorientation', onOri);
+      window.addEventListener('devicemotion', onMot);
+      $('start').textContent = 'Stop';
+      say('msg', '', 'Waiting for the tilt sensor…');
+      clearTimeout(noSensorTimer);
+      noSensorTimer = setTimeout(function () { if (!got) noSensor(''); }, 2500);
+      keepAwake();
+    }, function () {
+      $('start').disabled = false;
+      say('msg', 'bad', 'The browser did not show the permission question. Tap Start again (it must be a direct tap).');
+    });
+  }
+  function noSensor(why) {
+    stop();
+    say('msg', 'bad', (why ? why + ' ' : 'No tilt sensor answered. ') + 'Laptops and desktop computers usually have none. Open this page on your phone or tablet, or use the slope calculator, which needs no sensor.');
+  }
+  function stop() {
+    running = false; clearTimeout(noSensorTimer);
+    window.removeEventListener('deviceorientation', onOri); window.removeEventListener('devicemotion', onMot);
+    $('start').textContent = 'Start level';
+    $('hold').disabled = $('zero').disabled = $('cal2').disabled = true;
+    if (held) toggleHold();
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  function keepAwake() { if (navigator.wakeLock && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(function (w) { wake = w; }, function () {}); }
+  document.addEventListener('visibilitychange', function () { if (running && document.visibilityState === 'visible') keepAwake(); });
+  $('start').addEventListener('click', function () { if (running) { stop(); say('msg', '', 'Stopped.'); } else start(); });
+  function toggleHold() {
+    held = !held; $('hold').setAttribute('aria-pressed', String(held)); $('hold').textContent = held ? 'Release hold' : 'Hold reading'; $('held').hidden = !held;
+    if (!held) render();
+  }
+  $('hold').addEventListener('click', toggleHold);
+
+  // average the raw readings over about one second
+  function capture(cb) {
+    samples = [];
+    setTimeout(function () {
+      var s = samples; samples = null;
+      if (!s || s.length < 3) return cb(null);
+      var a = [0, 0, 0]; s.forEach(function (d) { a[0] += d[0]; a[1] += d[1]; a[2] += d[2]; });
+      cb(norm(a));
+    }, 1000);
+  }
+  $('zero').addEventListener('click', function () {
+    if (!got) return;
+    say('calMsg', '', 'Keep the phone still…'); $('zero').disabled = true;
+    capture(function (d) {
+      $('zero').disabled = !running;
+      if (!d) return say('calMsg', 'bad', 'Not enough sensor readings. Keep the phone still and try again.');
+      if (mode === 'wall') {
+        var w = rawWall(d); if (w.flatness > 0.75) return say('calMsg', 'bad', 'Stand the phone on its edge first, then press Set zero.');
+        cal.w = w.dev; st.w = cal.w;
+      } else {
+        var f = rawFlat(d); if (f.tilt > 15) return say('calMsg', 'bad', 'The phone is tilted more than 15°. Lay it on a level surface, then press Set zero.');
+        cal.fx = f.x; cal.fy = f.y; st.fx = cal.fx; st.fy = cal.fy;
+      }
+      save(); wasLevel = false; render();
+      say('calMsg', 'ok', 'Zero set. This spot now reads 0°. The calibration is saved on this device.');
+    });
+  });
+  var step = 0, first = null;
+  $('cal2').addEventListener('click', function () {
+    if (!got) return;
+    var btn = $('cal2'); btn.disabled = true;
+    var n = step === 0 ? 0 : 3;
+    (function count() {
+      if (n > 0) { say('calMsg', '', 'Measuring in ' + n + '… let go of the phone.'); n--; return setTimeout(count, 1000); }
+      say('calMsg', '', 'Measuring… keep still.');
+      capture(function (d) {
+        btn.disabled = !running;
+        if (!d) { step = 0; btn.textContent = 'Two-step calibration'; return say('calMsg', 'bad', 'Not enough sensor readings. Try again.'); }
+        var v = mode === 'wall' ? rawWall(d) : rawFlat(d);
+        if (mode === 'wall' ? v.flatness > 0.75 : v.tilt > 15) { step = 0; btn.textContent = 'Two-step calibration'; return say('calMsg', 'bad', mode === 'wall' ? 'Stand the phone on its edge and try again.' : 'The surface is tilted more than 15°. Use a roughly flat surface.'); }
+        if (step === 0) {
+          first = v; step = 1; btn.textContent = 'Step 2: measure again';
+          say('calMsg', 'ok', mode === 'wall' ? 'Step 1 done. Mark where the phone is. Turn it around so the screen faces the other way, same edge down, same spot. Press "Step 2" and let go within 3 seconds.' : 'Step 1 done. Mark where the phone is. Turn it around 180° (top where the bottom was) on the same spot, then press "Step 2".');
+        } else {
+          if (mode === 'wall') { cal.w = (first.dev + v.dev) / 2; st.w = cal.w; }
+          else { cal.fx = (first.x + v.x) / 2; cal.fy = (first.y + v.y) / 2; st.fx = cal.fx; st.fy = cal.fy; }
+          save(); step = 0; btn.textContent = 'Two-step calibration'; wasLevel = false; render();
+          var err = mode === 'wall' ? Math.abs(cal.w) : Math.hypot(cal.fx, cal.fy);
+          say('calMsg', 'ok', 'Calibrated. Your sensor was off by ' + f1(err) + '°. ' + (mode === 'wall' ? 'The surface itself is tilted ' + f1(Math.abs(first.dev - v.dev) / 2) + '°.' : 'The surface itself is tilted ' + f1(Math.hypot(first.x - v.x, first.y - v.y) / 2) + '°.'));
+        }
+      });
+    })();
+  });
+  $('calReset').addEventListener('click', function () {
+    cal = { fx: 0, fy: 0, w: 0 }; delete st.fx; delete st.fy; delete st.w; save(); step = 0; $('cal2').textContent = 'Two-step calibration'; render();
+    say('calMsg', 'ok', 'Calibration removed. The raw sensor reading is used.');
+  });
+  ['tol', 'smooth'].forEach(function (id) { $(id).addEventListener('change', function () { wasLevel = false; render(); }); });
+  window.addEventListener('orientationchange', function () { setTimeout(render, 50); });
+  if (screen.orientation && screen.orientation.addEventListener) screen.orientation.addEventListener('change', render);
+
+  // ---------- slope calculator ----------
+  function val(id) { var s = String($(id).value).trim(); return s === '' ? null : parseFloat(s); }
+  function ratioText(t) { if (!(t > 0)) return 'flat'; var n = 1 / t; if (n < 0.01) return 'nearly vertical'; return '1 : ' + fmtNum(Math.round(n * (n < 100 ? 100 : 1)) / (n < 100 ? 100 : 1)); }
+  function calc() {
+    var rise = val('rise'), run = val('run');
+    ['cDeg', 'cPct', 'cRat', 'cLen'].forEach(function (id) { $(id).textContent = '–'; });
+    say('cMsg', '', '');
+    if (rise != null || run != null) {
+      if (rise == null || run == null) say('cMsg', '', 'Type both the rise and the run.');
+      else if (!isFinite(rise) || !isFinite(run)) say('cMsg', 'bad', 'Use numbers only, for example 5 and 100.');
+      else if (run <= 0) say('cMsg', 'bad', 'The run (horizontal length) must be more than 0.');
+      else {
+        var r = Math.abs(rise), a = Math.atan2(r, run) * R2D;
+        $('cDeg').textContent = fmtNum(Math.round(a * 100) / 100, 2) + '°';
+        $('cPct').textContent = fmtNum(Math.round(r / run * 10000) / 100, 2) + '%';
+        $('cRat').textContent = ratioText(r / run);
+        $('cLen').textContent = fmtNum(Math.round(Math.hypot(r, run) * 1000) / 1000);
+      }
+    }
+    var v = val('cvIn'), from = $('cvFrom').value, out = '';
+    if (v != null) {
+      if (!isFinite(v)) out = 'Type a number.';
+      else {
+        var t = from === 'deg' ? (Math.abs(v) >= 90 ? NaN : Math.tan(Math.abs(v) / R2D)) : from === 'pct' ? Math.abs(v) / 100 : (v === 0 ? NaN : 1 / Math.abs(v));
+        if (!isFinite(t)) out = from === 'deg' ? 'An angle must be less than 90°.' : 'A ratio of 1 : 0 is not a slope; type n greater than 0.';
+        else out = fmtNum(Math.round(Math.atan(t) * R2D * 100) / 100, 2) + '° = ' + fmtNum(Math.round(t * 10000) / 100, 2) + '% = ' + ratioText(t) + ' (rise ' + fmtNum(Math.round(t * 1000 * 10) / 10) + ' mm per metre)';
+      }
+    }
+    $('cvOut').textContent = out;
+  }
+  ['rise', 'run', 'cvIn', 'cvFrom'].forEach(function (id) { $(id).addEventListener('input', calc); $(id).addEventListener('change', calc); });
+
+  if (!window.DeviceOrientationEvent && !window.DeviceMotionEvent) say('msg', '', 'This browser has no tilt sensor support. Use the slope calculator, or open the page on a phone.');
+  setMode(mode);
+  calc();
+})();
+</script>

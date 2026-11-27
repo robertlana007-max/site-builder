@@ -6295,5 +6295,379 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"2\" y=\"9\" width=\"20\" height=\"11\" rx=\"2\"/><path d=\"M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16.5h8\"/><circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"M12 7v2\"/>"
+  },
+  {
+    "slug": "link-in-bio-maker",
+    "cat": "Social media tools",
+    "name": "Link in Bio Maker",
+    "title": "Link in Bio Maker - Free Bio Link Page, No Account",
+    "desc": "Make a free link-in-bio page with your photo, buttons, social icons, video and QR code. 14 themes, live phone preview, one HTML file to host free.",
+    "card": "Your own bio link page in one HTML file.",
+    "intro": "Build a link-in-bio page for Instagram, TikTok, YouTube or any profile: add your photo, name, bio, link buttons and social icons, pick a theme, and download one small index.html file to put on a free host. No account, no monthly fee, nothing uploaded.",
+    "steps": [
+      "Add your photo, name and a short bio.",
+      "Add link buttons and social links, and reorder them with the arrows.",
+      "Pick a theme and button style, and add a video, email or QR code if you like.",
+      "Download index.html and upload it to GitHub Pages, Netlify Drop or Cloudflare Pages."
+    ],
+    "faq": [
+      [
+        "Is it free?",
+        "Yes. There is no account and no watermark, and free hosts like GitHub Pages, Netlify and Cloudflare Pages can serve your page at no cost."
+      ],
+      [
+        "How do I put my page online?",
+        "Download index.html and follow the short guide under the editor: drag it onto Netlify Drop, upload it to a GitHub repository with Pages turned on, or upload it to Cloudflare Pages."
+      ],
+      [
+        "Can I use my own colours?",
+        "Yes. Pick one of 14 themes or tick Use my own colours. The tool warns you if text becomes hard to read."
+      ],
+      [
+        "Are brand logos included?",
+        "No. Social links use simple generic outlined icons with the platform name written next to them, so there are no trademark issues."
+      ],
+      [
+        "Can I edit my page later?",
+        "Yes. It is kept in this browser, and Save project (JSON) gives you a file to open on any device. Download again and upload the new file to update your page."
+      ],
+      [
+        "Does the page track visitors?",
+        "No. The file has no scripts, trackers or outside fonts. Only an embedded video, if you add one, loads from the video site."
+      ]
+    ],
+    "icon": "<rect x=\"6\" y=\"2\" width=\"12\" height=\"20\" rx=\"2.5\"/><circle cx=\"12\" cy=\"6.5\" r=\"1.6\"/><path d=\"M9 11h6M9 14.5h6M9 18h6\"/>"
+  },
+  {
+    "slug": "website-builder",
+    "cat": "Developer tools",
+    "name": "Website Builder",
+    "title": "Free One-Page Website Builder - No Code, Download HTML",
+    "desc": "Build a one-page website for a shop, portfolio or event from blocks. 11 themes, live phone preview, SEO and accessibility checks. Download HTML or ZIP.",
+    "card": "One-page sites from blocks, ready to host.",
+    "intro": "Make a simple one-page website without code: add blocks for a hero, about, services and prices, gallery, testimonials, FAQ, opening hours, map link and contact, choose a theme and fonts, and download one index.html or a ZIP to put on any free host. Everything stays in your browser.",
+    "steps": [
+      "Type your site name and a short description for search engines.",
+      "Pick a theme, fonts and accent colour.",
+      "Fill in, add and reorder blocks by dragging or with the arrows, and describe each picture.",
+      "Check the desktop, tablet and phone preview, then download index.html or a ZIP."
+    ],
+    "faq": [
+      [
+        "Do I need to know how to code?",
+        "No. You type into simple forms and the tool writes clean, responsive HTML for you."
+      ],
+      [
+        "Where can I host the website?",
+        "Anywhere that serves static files, including free GitHub Pages, Netlify and Cloudflare Pages. Upload index.html, or unzip the ZIP and upload the folder."
+      ],
+      [
+        "Is the website good for search engines?",
+        "Pages include a title, description, language, canonical link, social sharing tags and, for local businesses, structured data with your contact details."
+      ],
+      [
+        "Is the website accessible?",
+        "Yes. The checker asks for picture descriptions, checks colour contrast, keeps one main heading and adds a skip link, and links use a readable shade of your accent colour."
+      ],
+      [
+        "Should I choose one file or the ZIP?",
+        "One file is easiest to upload. The ZIP keeps pictures as separate files, so the page loads faster and social apps can show your main picture."
+      ],
+      [
+        "Can I edit the site later?",
+        "Yes. It is kept in this browser, and Save project (JSON) gives you a file you can open again on any device."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"3\" width=\"20\" height=\"18\" rx=\"2\"/><path d=\"M2 8h20\"/><path d=\"M5 5.5h.01M8 5.5h.01\"/><rect x=\"5\" y=\"11\" width=\"6\" height=\"7\" rx=\"1\"/><path d=\"M14 12h5M14 15h5M14 18h3\"/>"
+  },
+  {
+    "slug": "email-template-builder",
+    "cat": "Developer tools",
+    "name": "Email Template Builder",
+    "title": "Email Template Builder - Free HTML Newsletter Maker",
+    "desc": "Build responsive HTML emails and newsletters from blocks. Email-safe tables, inline styles, Outlook buttons, dark mode. Copy HTML or download .html/.eml.",
+    "card": "HTML newsletters that work in every inbox.",
+    "intro": "Create HTML emails such as newsletters and announcements from simple blocks: header, text, image, button, divider, two columns, social links and footer. The tool writes email-safe code with tables, inline styles, a 600 px layout, Outlook-proof buttons and a preheader, so it looks right in Gmail, Outlook and Apple Mail.",
+    "steps": [
+      "Type the subject and preheader and pick fonts and colours.",
+      "Add blocks such as text, image, button and two columns, and fill them in.",
+      "Check the desktop, phone, light and dark previews and the checks list.",
+      "Copy the HTML, or download an .html or .eml file."
+    ],
+    "faq": [
+      [
+        "Will my email look right in Outlook and Gmail?",
+        "The code follows email best practice: tables, inline styles, a fixed 600 px width for Outlook, VML buttons and stacking columns for phones. Always send a test to check."
+      ],
+      [
+        "How do I use the HTML in my newsletter service?",
+        "Press Copy HTML and paste it into the custom HTML or code editor of your newsletter or email marketing service."
+      ],
+      [
+        "What is the .eml file for?",
+        "It opens in your mail app as a ready email. Outlook opens it as a draft you can send; uploaded pictures travel inside it."
+      ],
+      [
+        "Why do my uploaded images not show in Gmail?",
+        "Gmail and Outlook block pictures stored inside HTML. Put the image online and paste its link instead."
+      ],
+      [
+        "Does it support dark mode?",
+        "Yes. It adds dark styles for apps that support them, and the Dark preview shows the result."
+      ],
+      [
+        "Is anything sent or uploaded?",
+        "No. The email is built in your browser and kept only on this device."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/><path d=\"M7 16h4\"/>"
+  },
+  {
+    "slug": "thumbnail-preview",
+    "cat": "Social media tools",
+    "name": "Thumbnail Preview",
+    "title": "Thumbnail Preview & A/B Tester - See It at Real Size",
+    "desc": "Preview video thumbnails at real size in home, search, sidebar and phone layouts, light and dark. A/B compare, squint test, text size and time badge check.",
+    "card": "Test thumbnails at real size before you upload.",
+    "intro": "See how your video thumbnails will look to viewers: in a home grid, search results, the suggestions sidebar and a phone feed, in light and dark colours, at the real small sizes. Compare up to four versions side by side, run a squint and grayscale test, and check that your text is big enough and clear of the time badge.",
+    "steps": [
+      "Upload 1 to 4 thumbnails and type your title and channel name.",
+      "Compare them side by side, then switch between home, search, sidebar and phone layouts in light and dark.",
+      "Turn on the squint test, grayscale and the time badge area.",
+      "Press Check text size and read the checks to pick the strongest version."
+    ],
+    "faq": [
+      [
+        "What sizes are shown?",
+        "Typical on-screen sizes: 360 × 202 in the home grid and search results, 168 × 94 in the sidebar, and full width in the phone feed."
+      ],
+      [
+        "How does the text size check work?",
+        "It reads the words in your image on this device and works out how many pixels tall they appear at each size. Text under about 8 px in the sidebar is hard to read."
+      ],
+      [
+        "What is the squint test?",
+        "It blurs the thumbnail so you can see which shapes, faces and colours still stand out, like a viewer scrolling quickly."
+      ],
+      [
+        "Is this an official YouTube tool?",
+        "No. It uses generic layouts similar to common video sites, with no logos or branding."
+      ],
+      [
+        "Are my thumbnails uploaded?",
+        "No. Everything runs in your browser, and your thumbnails are only kept on this device."
+      ],
+      [
+        "How do I make a thumbnail?",
+        "Use the YouTube Thumbnail Maker on this site, then come back here to test it."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"4\" width=\"13\" height=\"8\" rx=\"1.5\"/><path d=\"M7 6.5l3 1.5-3 1.5z\"/><rect x=\"17\" y=\"4\" width=\"5\" height=\"3\" rx=\"1\"/><rect x=\"17\" y=\"9\" width=\"5\" height=\"3\" rx=\"1\"/><path d=\"M2 16h13M2 19h9M17 16h5M17 19h3\"/>"
+  },
+  {
+    "slug": "secret-note",
+    "cat": "Text tools",
+    "name": "Secret Note",
+    "title": "Secret Note - Password-Protected Encrypted Message Link",
+    "desc": "Lock a private message with a password and share it as a link, text or QR code. AES-256 encryption in your browser; the note never reaches a server.",
+    "card": "Lock a message with a password and share it.",
+    "intro": "Write a private message, lock it with a password, and share it as a link, a block of text or a QR code. The note is encrypted on your device with AES-256-GCM, and in a link it sits after the # sign, which browsers never send to any server. The other person opens the link, types the password and reads the note. Nobody, including us, can recover a lost password.",
+    "steps": [
+      "Type your note and choose a password (type it twice).",
+      "Press Lock note.",
+      "Share the link, the text block or the QR code.",
+      "Tell the other person the password a different way, for example on a call."
+    ],
+    "faq": [
+      [
+        "Can you read my note?",
+        "No. The note is locked and opened in your browser. In a link it sits after the #, a part of the address that browsers never send to a server, so it never reaches us."
+      ],
+      [
+        "What encryption does it use?",
+        "AES-256-GCM, with a key made from your password by PBKDF2-SHA256 with 600,000 rounds, a random 16-byte salt and a random 12-byte IV, all through the browser's built-in Web Crypto."
+      ],
+      [
+        "I forgot the password. Can you recover the note?",
+        "No. Nobody can. Without the password the note cannot be opened, which is what keeps it safe. Ask the sender to lock it again."
+      ],
+      [
+        "What does \"Wrong password or damaged data\" mean?",
+        "Either the password is wrong (it is case-sensitive), or part of the link or text was lost when copying. The lock includes a tamper check, so a changed note will not open with wrong text."
+      ],
+      [
+        "How long can a note be?",
+        "Up to 20,000 characters. Long notes make long links, and above about 2,000 characters the QR code no longer fits; share the link or text then."
+      ],
+      [
+        "Does the link expire?",
+        "No. The locked note is inside the link itself, so it works as long as you keep the link and the password."
+      ]
+    ],
+    "icon": "<rect x=\"4\" y=\"10\" width=\"16\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3\"/><path d=\"M8 15h8M8 18h5\"/>"
+  },
+  {
+    "slug": "file-locker",
+    "cat": "Developer tools",
+    "name": "File Locker",
+    "title": "File Locker - Encrypt Files with a Password (AES-256)",
+    "desc": "Encrypt any files with a password into one .gtnlock file and unlock them later. AES-256 in your browser, handles 1 GB files, nothing is uploaded.",
+    "card": "Encrypt any files with a password.",
+    "intro": "Lock any files, from one photo to a folder of documents or a large video, with a password. They become a single .gtnlock file that only the password can open, and unlocking gives back the exact original files with their names. Encryption is AES-256-GCM with a PBKDF2 key, done on your device in 4 MB pieces, so large files work and nothing is uploaded.",
+    "steps": [
+      "Add one or more files.",
+      "Choose a password and type it twice.",
+      "Press Lock files and download the .gtnlock file.",
+      "To open it: choose Unlock, pick the .gtnlock file and type the password."
+    ],
+    "faq": [
+      [
+        "Are my files uploaded?",
+        "No. Locking and unlocking happen in your browser. Your files and password never leave your device."
+      ],
+      [
+        "How strong is the encryption?",
+        "AES-256-GCM with a key made from your password by PBKDF2-SHA256 with 600,000 rounds and a random salt. Every 4 MB piece has its own tamper check, and pieces cannot be swapped, removed or cut off without it being noticed."
+      ],
+      [
+        "Can I recover a forgotten password?",
+        "No. Nobody can, not even us. Write the password down somewhere safe and test unlocking before deleting the originals."
+      ],
+      [
+        "How big can the files be?",
+        "Files of 1 GB and more work on a computer, because they are processed in 4 MB pieces. Phones may run out of memory or space with very large files."
+      ],
+      [
+        "How does the other person open the file?",
+        "They open this page, choose \"Unlock a .gtnlock file\", pick the file and type the password. Send the password a different way from the file."
+      ],
+      [
+        "Are the original file names kept?",
+        "Yes. The names, sizes and types are stored inside the encrypted part, so they are hidden too and come back when you unlock."
+      ]
+    ],
+    "icon": "<path d=\"M6 3h8l4 4v5\"/><path d=\"M6 3v18h6\"/><rect x=\"13\" y=\"15\" width=\"8\" height=\"6\" rx=\"1\"/><path d=\"M15 15v-2a2 2 0 0 1 4 0v2\"/>"
+  },
+  {
+    "slug": "image-steganography",
+    "cat": "Image tools",
+    "name": "Image Steganography",
+    "title": "Image Steganography - Hide a Secret Message in a Picture",
+    "desc": "Hide a text message inside a PNG image, optionally locked with a password, and reveal it later. Shows capacity and checks for damage. Free and private.",
+    "card": "Hide a secret message inside a picture.",
+    "intro": "Hide a text message inside a picture so it looks unchanged, and reveal it again later. The message is stored in the lowest bit of each pixel's colours, with a header holding its length and a checksum, and you can lock it with a password too. The result is always a PNG, because JPEG compression and apps that shrink photos wipe hidden messages out. Everything runs on your device.",
+    "steps": [
+      "Pick a picture and check how much text fits.",
+      "Type the message, and add a password if you like.",
+      "Press Hide message and download the PNG.",
+      "To read it: choose Reveal a message and pick the PNG."
+    ],
+    "faq": [
+      [
+        "Why is the result always a PNG?",
+        "PNG keeps every pixel exactly. JPEG and WebP compression change the tiny colour details that hold the message, so the message would be lost."
+      ],
+      [
+        "Can I send the picture on WhatsApp or post it on social media?",
+        "Not as a photo: those apps shrink and recompress pictures, which destroys the message. Send it as a file or document, by email, or through a cloud drive."
+      ],
+      [
+        "How much text fits?",
+        "About 3 bits per pixel, so a 1600 × 1200 picture holds around 720,000 bytes. The tool shows the exact room for your picture."
+      ],
+      [
+        "Is a hidden message secure?",
+        "Hiding only makes it hard to notice. Anyone who suspects a message can read it with a tool like this, unless you also lock it with a password (AES-256-GCM)."
+      ],
+      [
+        "What if the picture was changed?",
+        "A checksum in the header tells you the message is damaged, instead of showing garbage. A JPEG copy usually shows \"no hidden message\"."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><circle cx=\"9\" cy=\"10\" r=\"2\"/><path d=\"M21 16l-5-5-8 9\"/><path d=\"M14 4v3M17 4v2\" />"
+  },
+  {
+    "slug": "wifi-qr-code",
+    "cat": "Generators",
+    "name": "Wi-Fi QR Code",
+    "title": "Wi-Fi QR Code Generator - Scan to Join Wi-Fi Card (Free)",
+    "desc": "Make a QR code that joins your Wi-Fi in one scan. Download PNG or SVG, or print a \"Scan to join Wi-Fi\" sign, A6 card or table tent PDF.",
+    "card": "QR code that joins your Wi-Fi in one scan.",
+    "intro": "Type your Wi-Fi name and password to make a QR code that iPhone and Android cameras scan to join the network, no typing needed. It uses the standard WIFI: format with correct escaping of special characters, supports WPA/WPA2/WPA3, WEP, open and hidden networks, and gives you a PNG, an SVG, or a printable \"Scan to join Wi-Fi\" sign, A6 card or table tent. Your password stays on your device.",
+    "steps": [
+      "Type the network name (SSID) and choose the security type.",
+      "Type the Wi-Fi password exactly.",
+      "Scan the code with your phone to test it.",
+      "Download the PNG or SVG, or make a printable card PDF."
+    ],
+    "faq": [
+      [
+        "Which phones can scan a Wi-Fi QR code?",
+        "iPhones from iOS 11 and most Android phones from Android 10 join directly from the camera app. Older phones can use a QR scanner app."
+      ],
+      [
+        "My network uses WPA3. Which option do I choose?",
+        "Choose \"WPA / WPA2 / WPA3\". The code says WPA, and the phone works out the exact version when it connects."
+      ],
+      [
+        "My password has ; or : in it. Will it work?",
+        "Yes. Special characters (\\ ; , : and \") are escaped in the code as the format requires, so the phone reads the password correctly."
+      ],
+      [
+        "Is my Wi-Fi password saved or uploaded?",
+        "No. The code is made in your browser. The network name is remembered on this device for next time, but the password is not."
+      ],
+      [
+        "Can I hide the password on the printed card?",
+        "Yes. Untick \"Print the network name and password as text\" and the card shows only the heading and the QR code."
+      ],
+      [
+        "What is a table tent?",
+        "A card you fold in half to stand on a table. The PDF prints the design twice, once upside down, so the code faces both sides after folding."
+      ]
+    ],
+    "icon": "<path d=\"M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0\"/><circle cx=\"12\" cy=\"19\" r=\"1.2\"/>"
+  },
+  {
+    "slug": "sudoku-solver",
+    "cat": "Study tools",
+    "name": "Sudoku Solver",
+    "title": "Sudoku Solver - Solve From a Photo, With Step-by-Step Hints",
+    "desc": "Solve any sudoku instantly: type it, paste 81 digits or take a photo. Finds no-solution and multi-solution puzzles and explains hints step by step.",
+    "card": "Solve sudoku from a photo, with hints.",
+    "intro": "Solve any 9x9 sudoku in a moment. Type the puzzle on the board, paste it as 81 digits, or take a photo or screenshot: the tool finds the grid, straightens it, and reads the numbers on your device so you can check and fix them before solving. It tells you if a puzzle has no solution or more than one, and the Hint button explains the next step (naked single or hidden single) in plain words. For new puzzles, try the Sudoku Generator.",
+    "steps": [
+      "Type the puzzle, paste 81 digits, or use a photo or screenshot.",
+      "Check the numbers read from a photo (yellow squares) and fix any mistakes.",
+      "Press Solve for the full answer.",
+      "Or press Hint to see and understand one step at a time."
+    ],
+    "faq": [
+      [
+        "Can it read a sudoku from a photo?",
+        "Yes. It finds the grid, corrects a slight tilt or rotation, and reads the digits with text recognition that runs on your device. Numbers read from the picture are shown in yellow so you can check them; darker yellow means unsure."
+      ],
+      [
+        "What if a number is read wrong?",
+        "Tap the square and tap the right number, or ✕ to empty it. Always compare the board with your puzzle before solving."
+      ],
+      [
+        "What does \"more than one solution\" mean?",
+        "A proper sudoku has exactly one answer. If there are several, a number is probably missing from the board. The tool shows one of the solutions."
+      ],
+      [
+        "How do the hints work?",
+        "A hint finds a naked single (a square where only one number fits) or a hidden single (a number that fits in only one square of a row, column or box) and explains why. Hard puzzles may need techniques beyond these; then press Solve."
+      ],
+      [
+        "Is my photo uploaded?",
+        "No. The picture is read in your browser and never leaves your device."
+      ],
+      [
+        "Where can I get new puzzles?",
+        "Use the Sudoku Generator on this site to play or print puzzles at four levels, each with exactly one solution."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"1\"/><path d=\"M9 3v18M15 3v18M3 9h18M3 15h18\"/><path d=\"M16.5 4.5l1.5 2 2.5-3\"/>"
   }
 ];

@@ -1,0 +1,293 @@
+<style>
+.lm-top { text-align: center; margin: 0 0 6px; }
+.lm-tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; background: rgba(245, 158, 11, .15); color: #b45309; }
+:root[data-theme="dark"] .lm-tag { color: #fbbf24; }
+.lm-big { font-size: clamp(54px, 16vw, 96px); font-weight: 700; line-height: 1.05; font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin-top: 6px; }
+.lm-big small { font-size: 24px; color: var(--muted); font-weight: 600; letter-spacing: 0; margin-inline-start: 6px; }
+.lm-what { color: var(--muted); font-weight: 600; margin: 4px 0 0; min-height: 1.4em; }
+.lm-bar { height: 14px; border-radius: 99px; background: linear-gradient(90deg, #111827, #6b7280, #fde68a, #fffbeb); border: 1px solid var(--line); position: relative; margin: 14px 0 4px; }
+.lm-bar i { position: absolute; top: -5px; width: 4px; height: 22px; margin-inline-start: -2px; border-radius: 2px; background: var(--accent); left: 0; transition: left .2s; }
+.lm-scale { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin: 0 0 12px; }
+.lm-main { display: flex; gap: 10px; flex-wrap: wrap; margin: 14px 0 0; }
+.lm-main .btn { flex: 1 1 140px; justify-content: center; min-height: 50px; }
+.lm-vid { display: block; width: 160px; max-width: 45%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; background: #000; margin: 10px auto 0; }
+.lm-box { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; margin: 16px 0 0; }
+.lm-box h3 { margin: 0 0 6px; font-size: 16px; }
+.lm-box p { margin: 0 0 8px; font-size: 14px; color: var(--muted); }
+.lm-box .fields { margin-top: 6px; }
+.lm-t { width: 100%; border-collapse: collapse; font-size: 14px; margin: 4px 0 0; }
+.lm-t td { padding: 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+.lm-t td:first-child { font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.lm-t tr.on td { background: var(--accent-soft); }
+.lm-tabs { display: flex; flex-wrap: wrap; margin: 0 0 8px; }
+</style>
+<div class="lm" id="lm">
+<div class="lm-top" aria-live="polite">
+  <span class="lm-tag" id="tag">Approximate</span>
+  <div class="lm-big"><span id="val">–</span><small id="u">lux</small></div>
+  <div class="lm-what" id="what">Press Start to measure the light</div>
+</div>
+<div class="lm-bar" aria-hidden="true"><i id="mark"></i></div>
+<div class="lm-scale" aria-hidden="true"><span>1</span><span>10</span><span>100</span><span>1k</span><span>10k</span><span>100k lux</span></div>
+<div class="stats">
+  <div class="stat"><span>Exposure value (EV at ISO 100)</span><b id="ev">–</b></div>
+  <div class="stat"><span>Plants</span><b id="plant">–</b></div>
+  <div class="stat"><span>Reading and work</span><b id="work">–</b></div>
+  <div class="stat"><span>Source</span><b id="srcName">–</b></div>
+</div>
+<video class="lm-vid" id="video" playsinline muted hidden></video>
+<div class="lm-main">
+  <button class="btn" type="button" id="start">Start light meter</button>
+  <button class="btn ghost" type="button" id="hold" aria-pressed="false" disabled>Hold reading</button>
+</div>
+<p class="msg" id="msg"></p>
+<div class="fields" style="margin-top:12px">
+  <div><label for="source">Measure with</label><select id="source"><option value="auto">Best available</option><option value="als">Light sensor (if the browser allows it)</option><option value="front">Front (selfie) camera</option><option value="back">Back camera</option></select></div>
+  <div><label for="lunit">Show light in</label><select id="lunit"><option value="lx">Lux (lx)</option><option value="fc">Foot-candles (fc)</option></select></div>
+</div>
+
+<div class="lm-box">
+  <h3>How accurate is it?</h3>
+  <p><b>Light sensor:</b> a few phones let the browser read the real ambient light sensor (it sits next to the front camera). Then readings are fairly good. Most browsers do not allow it.</p>
+  <p><b>Camera:</b> the tool measures how bright the camera picture is. When the browser also reports the camera's exposure time and ISO, it turns that into an exposure value (EV) and an estimated lux. When it does not, the camera keeps adjusting itself, so you only get a <b>relative</b> brightness, good for comparing spots in the same room. Expect errors of 2× or more unless you calibrate.</p>
+  <p style="margin:0"><b>Best method:</b> for the light falling on a desk or plant, lay the phone there with the front camera facing the light, and cover the camera with a thin piece of white paper. Keep your shadow off it.</p>
+</div>
+
+<div class="lm-box">
+  <h3>Calibrate</h3>
+  <p>If you have a lux meter (or know the light level), type the real value now and press Calibrate. It is saved for this device and source.</p>
+  <div class="fields">
+    <div><label for="real">The real light level now is</label><input type="number" id="real" inputmode="decimal" step="any" min="0" placeholder="for example 500" data-nomemo></div>
+  </div>
+  <div class="btns"><button class="btn ghost" type="button" id="cal" disabled>Calibrate</button><button class="btn ghost" type="button" id="calReset">Reset calibration</button></div>
+  <p class="msg" id="calMsg"></p>
+</div>
+
+<div class="lm-box">
+  <h3>Guide</h3>
+  <div class="seg lm-tabs" role="group" aria-label="Guide">
+    <button type="button" data-g="photo" aria-pressed="true">Photography</button>
+    <button type="button" data-g="plants" aria-pressed="false">Plants</button>
+    <button type="button" data-g="spaces" aria-pressed="false">Reading and work</button>
+  </div>
+  <div id="gPhoto">
+    <table class="lm-t" id="tPhoto"></table>
+    <p style="margin-top:10px">Camera settings for this light. EV comes from the meter, or type your own:</p>
+    <div class="fields">
+      <div><label for="evIn">EV at ISO 100</label><input type="number" id="evIn" inputmode="decimal" step="0.5" placeholder="from the meter" data-nomemo></div>
+      <div><label for="iso">ISO</label><select id="iso"><option>50</option><option selected>100</option><option>200</option><option>400</option><option>800</option><option>1600</option><option>3200</option><option>6400</option></select></div>
+      <div><label for="fnum">Aperture</label><select id="fnum"><option>1.4</option><option>1.8</option><option>2</option><option>2.8</option><option>4</option><option>5.6</option><option selected>8</option><option>11</option><option>16</option><option>22</option></select></div>
+    </div>
+    <p class="msg" id="shutter"></p>
+  </div>
+  <div id="gPlants" hidden><table class="lm-t" id="tPlants"></table><p style="margin-top:10px;margin-bottom:0">Plant guides differ; these ranges are typical. Measure where the leaves are, around midday, and remember light drops quickly as you move away from a window.</p></div>
+  <div id="gSpaces" hidden><table class="lm-t" id="tSpaces"></table><p style="margin-top:10px;margin-bottom:0">Based on common lighting standards for workplaces and schools (such as ISO 8995-1 / EN 12464-1). Older eyes often need more light.</p></div>
+</div>
+
+<div class="lm-box">
+  <h3>No sensor? Work it out from camera settings</h3>
+  <p>If a camera's own meter shows good settings, type them to get the EV and approximate light level.</p>
+  <div class="fields">
+    <div><label for="mN">Aperture (f-number)</label><input type="number" id="mN" inputmode="decimal" step="any" min="0.5" placeholder="for example 8"></div>
+    <div><label for="mT">Shutter speed (seconds, e.g. 0.008 or 1/125)</label><input type="text" id="mT" inputmode="text" placeholder="for example 1/125"></div>
+    <div><label for="mI">ISO</label><input type="number" id="mI" inputmode="numeric" step="any" min="1" placeholder="for example 100"></div>
+  </div>
+  <p class="msg" id="mOut"></p>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-light-meter';
+  var st = (function () { try { var o = JSON.parse(localStorage.getItem(KEY) || '{}'); return o && typeof o === 'object' ? o : {}; } catch (e) { return {}; } })();
+  if (!st.cal || typeof st.cal !== 'object') st.cal = {};
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {} }
+  function say(id, c, t) { var el = $(id); el.className = 'msg ' + (c || ''); el.textContent = t || ''; }
+  var LOG2 = Math.log2 || function (x) { return Math.log(x) / Math.LN2; };
+
+  // ---------- guides ----------
+  var PHOTO = [[16, 'Bright sun on snow or sand'], [15, 'Bright sunny day, hard shadows ("sunny 16")'], [14, 'Sun through light haze, soft shadows'], [13, 'Bright overcast, no shadows'], [12, 'Heavy overcast, or open shade on a sunny day'], [10, 'Just after sunset, or a bright shop'], [8, 'Bright office, floodlit stadium at night'], [6, 'Living room at night, lamps on'], [4, 'Candle-lit room, street lights'], [2, 'Dim room, city skyline at night'], [-2, 'Landscape under a full moon']];
+  var PLANTS = [[0, 500, 'Too dark', 'Too dark for most plants to grow; fine for a short visit only.'], [500, 2500, 'Low light', 'Snake plant, ZZ plant, pothos, peace lily, cast-iron plant survive here.'], [2500, 10000, 'Medium light', 'Most houseplants: ferns, philodendron, calathea, dracaena, monstera.'], [10000, 20000, 'Bright indirect', 'Fiddle-leaf fig, rubber plant, orchids, citrus indoors, most herbs.'], [20000, Infinity, 'Direct sun', 'Cacti, succulents, tomatoes, peppers, many vegetables (they like 30,000 lux and more for several hours).']];
+  var SPACES = [[0, 50, 'Very dim', 'Night-time orientation only.'], [50, 150, 'Dim', 'Corridors, stairs and storage (about 100 lux).'], [150, 300, 'Low', 'General living areas, relaxing, watching TV (about 150–300 lux).'], [300, 750, 'Good for reading', 'Reading, writing, classrooms and office work (300–500 lux; 500 lux for long desk work).'], [750, 1500, 'Bright', 'Detailed work: drawing, sewing, inspection (750–1,000 lux and more).'], [1500, Infinity, 'Very bright', 'Fine precision work, or daylight near a window. Watch for glare.']];
+  function band(list, lux) { for (var i = 0; i < list.length; i++) if (lux >= list[i][0] && lux < list[i][1]) return i; return -1; }
+  function buildTables() {
+    $('tPhoto').innerHTML = PHOTO.map(function (r) { return '<tr data-ev="' + r[0] + '"><td>EV ' + r[0] + '</td><td>' + r[1] + '</td></tr>'; }).join('');
+    function rows(list) { return list.map(function (r) { return '<tr><td>' + (r[1] === Infinity ? fmtNum(r[0]) + '+' : fmtNum(r[0]) + '–' + fmtNum(r[1])) + ' lux</td><td><b>' + r[2] + '.</b> ' + r[3] + '</td></tr>'; }).join(''); }
+    $('tPlants').innerHTML = rows(PLANTS); $('tSpaces').innerHTML = rows(SPACES);
+  }
+  buildTables();
+  [].forEach.call(document.querySelectorAll('.lm-tabs button'), function (b) {
+    b.addEventListener('click', function () {
+      [].forEach.call(document.querySelectorAll('.lm-tabs button'), function (x) { x.setAttribute('aria-pressed', String(x === b)); });
+      $('gPhoto').hidden = b.dataset.g !== 'photo'; $('gPlants').hidden = b.dataset.g !== 'plants'; $('gSpaces').hidden = b.dataset.g !== 'spaces';
+    });
+  });
+  function luxToEv(l) { return LOG2(l / 2.5); } // incident-light meter constant C = 250
+  function evToLux(ev) { return 2.5 * Math.pow(2, ev); }
+  var SPEEDS = [1 / 8000, 1 / 4000, 1 / 2000, 1 / 1000, 1 / 500, 1 / 250, 1 / 125, 1 / 60, 1 / 30, 1 / 15, 1 / 8, 1 / 4, 1 / 2, 1, 2, 4, 8, 15, 30, 60];
+  function speedText(t) {
+    var best = SPEEDS.reduce(function (a, b) { return Math.abs(LOG2(b / t)) < Math.abs(LOG2(a / t)) ? b : a; });
+    if (t > 90) { var mn = Math.round(t / 60); return (mn >= 120 ? fmtNum(Math.round(mn / 6) / 10, 1) + ' hours' : fmtNum(mn) + ' minutes') + ' (long exposure on a tripod; such dim light is hard to measure)'; }
+    if (t > 45) return fmtNum(Math.round(t)) + ' s (use a tripod)';
+    return (best >= 1 ? best + ' s' : '1/' + Math.round(1 / best) + ' s') + (best >= 1 / 30 ? ' (use a tripod or steady support)' : '');
+  }
+  function shutter() {
+    var s = String($('evIn').value).trim(), ev = parseFloat(s);
+    if (!s) return say('shutter', '', 'Start the meter, or type an EV, to see a shutter speed.');
+    if (!isFinite(ev) || ev < -10 || ev > 24) return say('shutter', 'bad', 'Type an EV between -10 and 24.');
+    var iso = parseFloat($('iso').value), N = parseFloat($('fnum').value), t = N * N / Math.pow(2, ev + LOG2(iso / 100));
+    say('shutter', 'ok', 'At ISO ' + iso + ' and f/' + N + ': shutter about ' + speedText(t) + '.');
+    [].forEach.call(document.querySelectorAll('#tPhoto tr'), function (tr) { tr.classList.toggle('on', Math.abs(parseFloat(tr.dataset.ev) - ev) < 1); });
+  }
+  ['evIn', 'iso', 'fnum'].forEach(function (id) { $(id).addEventListener('input', shutter); $(id).addEventListener('change', shutter); });
+  shutter();
+
+  // ---------- manual calculator ----------
+  function manual() {
+    var N = parseFloat($('mN').value), ts = String($('mT').value).trim(), I = parseFloat($('mI').value), t;
+    if (!String($('mN').value).trim() && !ts && !String($('mI').value).trim()) return say('mOut', '', '');
+    var m = ts.match(/^\s*(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)\s*s?\s*$/);
+    t = m ? parseFloat(m[1]) / parseFloat(m[2]) : parseFloat(ts.replace(/s$/, ''));
+    if (!(N > 0.4 && N < 200)) return say('mOut', 'bad', 'Type the aperture as an f-number, for example 2.8 or 8.');
+    if (!(t > 0 && t < 100000)) return say('mOut', 'bad', 'Type the shutter speed in seconds, for example 1/125 or 0.5.');
+    if (!(I >= 1 && I < 1e7)) return say('mOut', 'bad', 'Type the ISO, for example 100 or 400.');
+    var ev = LOG2(N * N / t) - LOG2(I / 100), lux = evToLux(ev);
+    say('mOut', 'ok', 'EV ' + fmtNum(Math.round(ev * 10) / 10, 1) + ' at ISO 100, which is roughly ' + luxText(lux) + ' (for an average scene).');
+  }
+  ['mN', 'mT', 'mI'].forEach(function (id) { $(id).addEventListener('input', manual); });
+
+  // ---------- measuring ----------
+  var running = false, kind = '', sensor = null, stream = null, track = null, timer = 0, held = false, lux = null, ev = null, rel = null, exposure = false, smooth = null, noTimer = 0, got = false, clip = 0;
+  var cv = document.createElement('canvas'); cv.width = 64; cv.height = 48; var cx = cv.getContext('2d', { willReadFrequently: true });
+  var LIN = new Float32Array(256); for (var i = 0; i < 256; i++) { var c = i / 255; LIN[i] = c <= 0.04045 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); }
+  function unitFc() { return $('lunit').value === 'fc'; }
+  function luxText(l) { if (!isFinite(l)) return '–'; var v = unitFc() ? l / 10.764 : l; return fmtNum(v < 10 ? Math.round(v * 10) / 10 : v < 1000 ? Math.round(v) : Math.round(v / 10) * 10, v < 10 ? 1 : 0) + (unitFc() ? ' fc' : ' lux'); }
+  function calKey() { return kind === 'als' ? 'als' : 'cam-' + ($('source').value === 'back' ? 'back' : 'front') + (exposure ? '' : '-rel'); }
+  function factor() { var f = st.cal[calKey()]; return typeof f === 'number' && f > 0 && isFinite(f) ? f : 1; }
+
+  function show() {
+    var f = factor(), l = lux != null ? lux * f : null;
+    $('u').textContent = l != null ? (unitFc() ? 'fc' : 'lux') : rel != null ? '/ 100' : (unitFc() ? 'fc' : 'lux');
+    if (l != null) {
+      var v = unitFc() ? l / 10.764 : l;
+      $('val').textContent = fmtNum(v < 10 ? Math.round(v * 10) / 10 : v < 1000 ? Math.round(v) : Math.round(v / 10) * 10, v < 10 ? 1 : 0);
+      var e2 = luxToEv(Math.max(l, 0.01));
+      $('ev').textContent = fmtNum(Math.round(e2 * 10) / 10, 1);
+      $('evIn').value = Math.round(e2 * 2) / 2; shutter();
+      var p = band(PLANTS, l), s = band(SPACES, l);
+      $('plant').textContent = p >= 0 ? PLANTS[p][2] : '–'; $('work').textContent = s >= 0 ? SPACES[s][2] : '–';
+      $('mark').style.left = Math.max(0, Math.min(100, LOG2(Math.max(1, l)) / LOG2(100000) * 100)) + '%';
+      $('tag').textContent = kind === 'als' ? (f !== 1 ? 'Light sensor, calibrated' : 'Light sensor') : (f !== 1 ? 'Approximate, calibrated' : 'Approximate');
+      $('what').textContent = clip > 0.25 ? 'Much of the picture is pure white, so the real light is probably higher. Cover the camera with white paper.' : (kind === 'als' ? 'From the ambient light sensor' : 'Estimated from the camera exposure') + (l < 1 ? '. Very dark: phones cannot measure this low reliably.' : '');
+    } else if (rel != null) {
+      $('val').textContent = fmtNum(Math.round(rel * 10) / 10, 1);
+      $('ev').textContent = '–'; $('plant').textContent = '–'; $('work').textContent = '–';
+      $('mark').style.left = Math.max(0, Math.min(100, rel)) + '%';
+      $('tag').textContent = 'Relative only';
+      $('what').textContent = 'Relative brightness of the camera picture. This browser does not report the camera exposure, so lux cannot be worked out; compare spots instead.';
+    }
+  }
+  function frame() {
+    var v = $('video');
+    if (!v.videoWidth || held) return;
+    try { cx.drawImage(v, 0, 0, 64, 48); } catch (e) { return; }
+    var d = cx.getImageData(0, 0, 64, 48).data, sum = 0, n = 0, sat = 0;
+    for (var i = 0; i < d.length; i += 4) {
+      sum += 0.2126 * LIN[d[i]] + 0.7152 * LIN[d[i + 1]] + 0.0722 * LIN[d[i + 2]]; n++;
+      if (d[i] > 250 && d[i + 1] > 250 && d[i + 2] > 250) sat++;
+    }
+    var Y = sum / n; clip = sat / n;
+    if (!got) { got = true; clearTimeout(noTimer); $('hold').disabled = false; $('cal').disabled = false; }
+    var s = track && track.getSettings ? track.getSettings() : {}, t = s.exposureTime, iso = s.iso;
+    // exposureTime is in units of 100 microseconds (Image Capture spec)
+    exposure = typeof t === 'number' && t > 0 && typeof iso === 'number' && iso > 0;
+    if (exposure) {
+      var N = 2, secs = t / 10000, e1 = LOG2(N * N / secs) - LOG2(iso / 100) + LOG2(Math.max(Y, 0.0005) / 0.18);
+      smooth = smooth == null ? e1 : smooth + (e1 - smooth) * 0.35;
+      ev = smooth; lux = evToLux(ev); rel = null;
+    } else {
+      var r = Math.sqrt(Y) * 100; // perceptual-ish 0..100
+      smooth = smooth == null ? r : smooth + (r - smooth) * 0.35;
+      rel = smooth; lux = null; ev = null;
+    }
+    show();
+  }
+  function camWhy(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera access was blocked. Allow the camera for this site (tap the icon next to the web address, or check your phone settings), then press Start again.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError') return 'No camera was found on this device. Use the camera-settings calculator below instead.';
+    if (n === 'NotReadableError' || n === 'AbortError') return 'The camera is busy. Close other apps or tabs that use it, then try again.';
+    return 'The camera could not start. Reload the page and try again.';
+  }
+  function startCamera(facing) {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('msg', 'bad', 'This browser cannot use the camera here. Use the camera-settings calculator below instead.'); return stop(); }
+    kind = 'cam'; say('msg', '', 'Starting the camera… allow it if your browser asks. No picture is saved or sent.');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing === 'back' ? 'environment' : 'user' }, width: { ideal: 320 }, height: { ideal: 240 } }, audio: false }).then(function (s) {
+      if (!running) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
+      stream = s; track = s.getVideoTracks()[0];
+      var v = $('video'); v.srcObject = s; v.hidden = false; var p = v.play(); if (p && p.catch) p.catch(function () {});
+      $('srcName').textContent = (facing === 'back' ? 'Back' : 'Front') + ' camera';
+      // try to stop the camera adjusting itself, where the browser allows it
+      try {
+        var caps = track.getCapabilities ? track.getCapabilities() : {};
+        if (caps.exposureMode && caps.exposureMode.indexOf('continuous') >= 0) track.applyConstraints({ advanced: [{ exposureMode: 'continuous' }] }).catch(function () {});
+      } catch (e) {}
+      timer = setInterval(frame, 250);
+      clearTimeout(noTimer); noTimer = setTimeout(function () { if (!got) say('msg', 'bad', 'The camera started but sends no picture. Close other apps that use the camera and try again.'); }, 5000);
+      say('msg', 'ok', 'Measuring with the ' + (facing === 'back' ? 'back' : 'front') + ' camera. Point it at the light you want to measure, and keep your shadow off it.');
+    }, function (e) { say('msg', 'bad', camWhy(e)); stop(); });
+  }
+  function startALS(fallback) {
+    var S;
+    try { S = new window.AmbientLightSensor({ frequency: 2 }); }
+    catch (e) { if (fallback) return startCamera('front'); say('msg', 'bad', 'The light sensor is blocked in this browser. Choose a camera instead.'); return stop(); }
+    sensor = S; kind = 'als'; $('srcName').textContent = 'Light sensor';
+    var t0 = setTimeout(function () { if (!got && fallback && running) { try { S.stop(); } catch (e) {} sensor = null; startCamera('front'); } }, 2500);
+    S.addEventListener('reading', function () {
+      if (held || !(S.illuminance >= 0)) return;
+      if (!got) { got = true; clearTimeout(t0); $('hold').disabled = false; $('cal').disabled = false; say('msg', 'ok', 'Measuring with the ambient light sensor (next to the front camera). Keep it uncovered.'); }
+      lux = S.illuminance; rel = null; show();
+    });
+    S.addEventListener('error', function (e) {
+      clearTimeout(t0); try { S.stop(); } catch (x) {} sensor = null;
+      if (fallback && running && !got) return startCamera('front');
+      say('msg', 'bad', e && e.error && e.error.name === 'NotAllowedError' ? 'Light sensor access was blocked. Allow it in the site settings, or choose a camera.' : 'The light sensor stopped working. Choose a camera instead.'); stop();
+    });
+    try { S.start(); } catch (e) { clearTimeout(t0); sensor = null; if (fallback) return startCamera('front'); say('msg', 'bad', 'The light sensor could not start. Choose a camera instead.'); stop(); }
+  }
+  function start() {
+    running = true; got = false; held = false; lux = rel = ev = smooth = null; clip = 0;
+    $('start').textContent = 'Stop';
+    var src = $('source').value;
+    if (src === 'als') { if (!('AmbientLightSensor' in window)) { say('msg', 'bad', 'This browser does not let websites read the light sensor (most do not). Choose a camera instead.'); return stop(); } startALS(false); }
+    else if (src === 'auto') { if ('AmbientLightSensor' in window) startALS(true); else startCamera('front'); }
+    else startCamera(src);
+  }
+  function stop() {
+    running = false; clearInterval(timer); clearTimeout(noTimer);
+    if (sensor) { try { sensor.stop(); } catch (e) {} sensor = null; }
+    if (stream) stream.getTracks().forEach(function (t) { t.stop(); });
+    stream = null; track = null; $('video').hidden = true; $('video').srcObject = null;
+    $('start').textContent = 'Start light meter'; $('hold').disabled = true; $('cal').disabled = true;
+    if (held) { held = false; $('hold').setAttribute('aria-pressed', 'false'); $('hold').textContent = 'Hold reading'; }
+  }
+  $('start').addEventListener('click', function () { if (running) { stop(); say('msg', '', 'Stopped. The last reading stays on screen.'); } else start(); });
+  $('hold').addEventListener('click', function () { held = !held; this.setAttribute('aria-pressed', String(held)); this.textContent = held ? 'Release hold' : 'Hold reading'; });
+  $('source').addEventListener('change', function () { if (running) { stop(); start(); } });
+  $('lunit').addEventListener('change', function () { show(); manual(); });
+  $('cal').addEventListener('click', function () {
+    var real = parseFloat($('real').value);
+    if (!got) return say('calMsg', 'bad', 'Start the meter first.');
+    if (unitFc()) real *= 10.764;
+    if (!(real > 0) || real > 200000 * 1.0001) return say('calMsg', 'bad', 'Type the real light level in ' + (unitFc() ? 'foot-candles, between 0 and 18,500' : 'lux, between 0 and 200,000') + '.');
+    if (lux == null) {
+      return say('calMsg', 'bad', 'This browser only gives a relative camera brightness (it does not report the exposure), so it cannot be calibrated to lux. Try another browser or the light sensor option.');
+    }
+    if (lux <= 0) return say('calMsg', 'bad', 'The meter reads 0 right now. Measure some light first.');
+    var f = real / lux; st.cal[calKey()] = f; save(); show();
+    say('calMsg', 'ok', 'Calibrated: readings are multiplied by ' + fmtNum(Math.round(f * 100) / 100, 2) + ' for this ' + (kind === 'als' ? 'light sensor' : 'camera') + '. Saved on this device.' + (f > 4 || f < 0.25 ? ' That is a big correction; check the camera is not covered and the light is steady.' : ''));
+  });
+  $('calReset').addEventListener('click', function () { st.cal = {}; save(); show(); say('calMsg', 'ok', 'Calibration removed.'); });
+  document.addEventListener('visibilitychange', function () { if (document.hidden && running && kind === 'cam') { stop(); say('msg', '', 'Stopped because the page was hidden. Press Start to measure again.'); } });
+  if (!window.isSecureContext || !navigator.mediaDevices) say('msg', '', 'This browser cannot use the camera or light sensor here. You can still use the calculator and guides below.');
+})();
+</script>
