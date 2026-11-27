@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"thumbnail-preview":["aperçu miniature","tester miniature youtube","comparer miniatures","test a/b miniature"],
+"email-template-builder":["modèle email html","créer une newsletter","éditeur d’email","template newsletter","email html responsive"],
+"website-builder":["créer un site web","créateur de site gratuit","site une page","site vitrine","faire un site internet"],
+"link-in-bio-maker":["lien en bio","page de liens","alternative linktree","lien bio instagram","créer page de liens"],
 "typing-for-kids":["dactylographie pour enfants","apprendre à taper au clavier","jeux de dactylo","cours de dactylographie gratuit","clavier azerty enfant"],
 "phonics-for-kids":["phonics anglais enfants","sons des lettres en anglais","apprendre à lire en anglais","alphabet anglais sons","mots outils anglais"],
 "kids-math-worksheets":["fiches de maths à imprimer","exercices de maths maternelle","fiches lire l’heure","additions posées avec retenue","exercices de calcul cp ce1"],

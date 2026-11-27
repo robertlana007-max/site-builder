@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"thumbnail-preview":["thumbnail vorschau","thumbnail testen","thumbnails vergleichen","youtube thumbnail vorschau"],
+"email-template-builder":["html email vorlage","newsletter erstellen","email vorlage erstellen","newsletter vorlage","html mail"],
+"website-builder":["website erstellen","homepage baukasten","kostenlose webseite","onepager erstellen","webseite ohne programmieren"],
+"link-in-bio-maker":["link in bio","linkseite erstellen","linktree alternative kostenlos","bio link seite","alle links auf einer seite"],
 "typing-for-kids":["tippen lernen für kinder","zehnfingersystem kinder","tastaturschreiben lernen","schreibtrainer kostenlos","tipptrainer"],
 "phonics-for-kids":["englisch phonics kinder","buchstabenlaute englisch","englisch lesen lernen","anlaute englisch","sichtwörter englisch"],
 "kids-math-worksheets":["mathe arbeitsblätter grundschule","arbeitsblätter mathe klasse 1","uhrzeit lernen arbeitsblatt","rechenblätter drucken","schriftliche addition arbeitsblatt"],

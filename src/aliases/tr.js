@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"thumbnail-preview":["küçük resim önizleme","thumbnail test","kapak görseli karşılaştır","youtube kapak önizleme"],
+"email-template-builder":["e-posta şablonu","html e-posta oluştur","bülten şablonu","newsletter hazırlama","mail şablonu"],
+"website-builder":["web sitesi oluştur","ücretsiz site yapıcı","tek sayfa site","web sitesi yapma","işletme sitesi"],
+"link-in-bio-maker":["biyografi linki","link sayfası","linktree alternatifi","instagram bio linki","tüm linkler tek sayfa"],
 "typing-for-kids":["çocuklar için klavye eğitimi","on parmak klavye","yazma oyunları","klavye kullanmayı öğren","f klavye q klavye çalışma"],
 "phonics-for-kids":["çocuklar için phonics","ingilizce harf sesleri","ingilizce okuma öğrenme","fonetik ingilizce","sight words"],
 "kids-math-worksheets":["çocuklar için matematik çalışma kağıdı","matematik etkinlikleri yazdır","saat öğrenme çalışma kağıdı","eldeli toplama","birinci sınıf matematik"],

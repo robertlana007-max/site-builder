@@ -6295,5 +6295,173 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"2\" y=\"9\" width=\"20\" height=\"11\" rx=\"2\"/><path d=\"M6 13h.01M10 13h.01M14 13h.01M18 13h.01M8 16.5h8\"/><circle cx=\"12\" cy=\"4.5\" r=\"2.5\"/><path d=\"M12 7v2\"/>"
+  },
+  {
+    "slug": "link-in-bio-maker",
+    "cat": "Social media tools",
+    "name": "Link in Bio Maker",
+    "title": "Link in Bio Maker - Free Bio Link Page, No Account",
+    "desc": "Make a free link-in-bio page with your photo, buttons, social icons, video and QR code. 14 themes, live phone preview, one HTML file to host free.",
+    "card": "Your own bio link page in one HTML file.",
+    "intro": "Build a link-in-bio page for Instagram, TikTok, YouTube or any profile: add your photo, name, bio, link buttons and social icons, pick a theme, and download one small index.html file to put on a free host. No account, no monthly fee, nothing uploaded.",
+    "steps": [
+      "Add your photo, name and a short bio.",
+      "Add link buttons and social links, and reorder them with the arrows.",
+      "Pick a theme and button style, and add a video, email or QR code if you like.",
+      "Download index.html and upload it to GitHub Pages, Netlify Drop or Cloudflare Pages."
+    ],
+    "faq": [
+      [
+        "Is it free?",
+        "Yes. There is no account and no watermark, and free hosts like GitHub Pages, Netlify and Cloudflare Pages can serve your page at no cost."
+      ],
+      [
+        "How do I put my page online?",
+        "Download index.html and follow the short guide under the editor: drag it onto Netlify Drop, upload it to a GitHub repository with Pages turned on, or upload it to Cloudflare Pages."
+      ],
+      [
+        "Can I use my own colours?",
+        "Yes. Pick one of 14 themes or tick Use my own colours. The tool warns you if text becomes hard to read."
+      ],
+      [
+        "Are brand logos included?",
+        "No. Social links use simple generic outlined icons with the platform name written next to them, so there are no trademark issues."
+      ],
+      [
+        "Can I edit my page later?",
+        "Yes. It is kept in this browser, and Save project (JSON) gives you a file to open on any device. Download again and upload the new file to update your page."
+      ],
+      [
+        "Does the page track visitors?",
+        "No. The file has no scripts, trackers or outside fonts. Only an embedded video, if you add one, loads from the video site."
+      ]
+    ],
+    "icon": "<rect x=\"6\" y=\"2\" width=\"12\" height=\"20\" rx=\"2.5\"/><circle cx=\"12\" cy=\"6.5\" r=\"1.6\"/><path d=\"M9 11h6M9 14.5h6M9 18h6\"/>"
+  },
+  {
+    "slug": "website-builder",
+    "cat": "Developer tools",
+    "name": "Website Builder",
+    "title": "Free One-Page Website Builder - No Code, Download HTML",
+    "desc": "Build a one-page website for a shop, portfolio or event from blocks. 11 themes, live phone preview, SEO and accessibility checks. Download HTML or ZIP.",
+    "card": "One-page sites from blocks, ready to host.",
+    "intro": "Make a simple one-page website without code: add blocks for a hero, about, services and prices, gallery, testimonials, FAQ, opening hours, map link and contact, choose a theme and fonts, and download one index.html or a ZIP to put on any free host. Everything stays in your browser.",
+    "steps": [
+      "Type your site name and a short description for search engines.",
+      "Pick a theme, fonts and accent colour.",
+      "Fill in, add and reorder blocks by dragging or with the arrows, and describe each picture.",
+      "Check the desktop, tablet and phone preview, then download index.html or a ZIP."
+    ],
+    "faq": [
+      [
+        "Do I need to know how to code?",
+        "No. You type into simple forms and the tool writes clean, responsive HTML for you."
+      ],
+      [
+        "Where can I host the website?",
+        "Anywhere that serves static files, including free GitHub Pages, Netlify and Cloudflare Pages. Upload index.html, or unzip the ZIP and upload the folder."
+      ],
+      [
+        "Is the website good for search engines?",
+        "Pages include a title, description, language, canonical link, social sharing tags and, for local businesses, structured data with your contact details."
+      ],
+      [
+        "Is the website accessible?",
+        "Yes. The checker asks for picture descriptions, checks colour contrast, keeps one main heading and adds a skip link, and links use a readable shade of your accent colour."
+      ],
+      [
+        "Should I choose one file or the ZIP?",
+        "One file is easiest to upload. The ZIP keeps pictures as separate files, so the page loads faster and social apps can show your main picture."
+      ],
+      [
+        "Can I edit the site later?",
+        "Yes. It is kept in this browser, and Save project (JSON) gives you a file you can open again on any device."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"3\" width=\"20\" height=\"18\" rx=\"2\"/><path d=\"M2 8h20\"/><path d=\"M5 5.5h.01M8 5.5h.01\"/><rect x=\"5\" y=\"11\" width=\"6\" height=\"7\" rx=\"1\"/><path d=\"M14 12h5M14 15h5M14 18h3\"/>"
+  },
+  {
+    "slug": "email-template-builder",
+    "cat": "Developer tools",
+    "name": "Email Template Builder",
+    "title": "Email Template Builder - Free HTML Newsletter Maker",
+    "desc": "Build responsive HTML emails and newsletters from blocks. Email-safe tables, inline styles, Outlook buttons, dark mode. Copy HTML or download .html/.eml.",
+    "card": "HTML newsletters that work in every inbox.",
+    "intro": "Create HTML emails such as newsletters and announcements from simple blocks: header, text, image, button, divider, two columns, social links and footer. The tool writes email-safe code with tables, inline styles, a 600 px layout, Outlook-proof buttons and a preheader, so it looks right in Gmail, Outlook and Apple Mail.",
+    "steps": [
+      "Type the subject and preheader and pick fonts and colours.",
+      "Add blocks such as text, image, button and two columns, and fill them in.",
+      "Check the desktop, phone, light and dark previews and the checks list.",
+      "Copy the HTML, or download an .html or .eml file."
+    ],
+    "faq": [
+      [
+        "Will my email look right in Outlook and Gmail?",
+        "The code follows email best practice: tables, inline styles, a fixed 600 px width for Outlook, VML buttons and stacking columns for phones. Always send a test to check."
+      ],
+      [
+        "How do I use the HTML in my newsletter service?",
+        "Press Copy HTML and paste it into the custom HTML or code editor of your newsletter or email marketing service."
+      ],
+      [
+        "What is the .eml file for?",
+        "It opens in your mail app as a ready email. Outlook opens it as a draft you can send; uploaded pictures travel inside it."
+      ],
+      [
+        "Why do my uploaded images not show in Gmail?",
+        "Gmail and Outlook block pictures stored inside HTML. Put the image online and paste its link instead."
+      ],
+      [
+        "Does it support dark mode?",
+        "Yes. It adds dark styles for apps that support them, and the Dark preview shows the result."
+      ],
+      [
+        "Is anything sent or uploaded?",
+        "No. The email is built in your browser and kept only on this device."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M3 7l9 6 9-6\"/><path d=\"M7 16h4\"/>"
+  },
+  {
+    "slug": "thumbnail-preview",
+    "cat": "Social media tools",
+    "name": "Thumbnail Preview",
+    "title": "Thumbnail Preview & A/B Tester - See It at Real Size",
+    "desc": "Preview video thumbnails at real size in home, search, sidebar and phone layouts, light and dark. A/B compare, squint test, text size and time badge check.",
+    "card": "Test thumbnails at real size before you upload.",
+    "intro": "See how your video thumbnails will look to viewers: in a home grid, search results, the suggestions sidebar and a phone feed, in light and dark colours, at the real small sizes. Compare up to four versions side by side, run a squint and grayscale test, and check that your text is big enough and clear of the time badge.",
+    "steps": [
+      "Upload 1 to 4 thumbnails and type your title and channel name.",
+      "Compare them side by side, then switch between home, search, sidebar and phone layouts in light and dark.",
+      "Turn on the squint test, grayscale and the time badge area.",
+      "Press Check text size and read the checks to pick the strongest version."
+    ],
+    "faq": [
+      [
+        "What sizes are shown?",
+        "Typical on-screen sizes: 360 × 202 in the home grid and search results, 168 × 94 in the sidebar, and full width in the phone feed."
+      ],
+      [
+        "How does the text size check work?",
+        "It reads the words in your image on this device and works out how many pixels tall they appear at each size. Text under about 8 px in the sidebar is hard to read."
+      ],
+      [
+        "What is the squint test?",
+        "It blurs the thumbnail so you can see which shapes, faces and colours still stand out, like a viewer scrolling quickly."
+      ],
+      [
+        "Is this an official YouTube tool?",
+        "No. It uses generic layouts similar to common video sites, with no logos or branding."
+      ],
+      [
+        "Are my thumbnails uploaded?",
+        "No. Everything runs in your browser, and your thumbnails are only kept on this device."
+      ],
+      [
+        "How do I make a thumbnail?",
+        "Use the YouTube Thumbnail Maker on this site, then come back here to test it."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"4\" width=\"13\" height=\"8\" rx=\"1.5\"/><path d=\"M7 6.5l3 1.5-3 1.5z\"/><rect x=\"17\" y=\"4\" width=\"5\" height=\"3\" rx=\"1\"/><rect x=\"17\" y=\"9\" width=\"5\" height=\"3\" rx=\"1\"/><path d=\"M2 16h13M2 19h9M17 16h5M17 19h3\"/>"
   }
 ];

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"thumbnail-preview":["缩略图预览","封面预览","缩略图对比","视频封面测试"],
+"email-template-builder":["邮件模板","html邮件制作","电子报模板","邮件编辑器","营销邮件模板"],
+"website-builder":["网站制作","免费建站","单页网站","网站生成器","做网站"],
+"link-in-bio-maker":["个人主页链接","简介链接","linktree替代","链接聚合页","多链接页面"],
 "typing-for-kids":["儿童打字练习","打字游戏","盲打练习","键盘指法练习","学打字"],
 "phonics-for-kids":["自然拼读","英语自然拼读儿童","字母发音","英语高频词","学英语阅读"],
 "kids-math-worksheets":["儿童数学练习题","数学练习纸打印","幼儿数学题","认识钟表练习","竖式加减法练习"],

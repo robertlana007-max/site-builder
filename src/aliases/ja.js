@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"thumbnail-preview":["サムネイル プレビュー","サムネ 比較","サムネイル テスト","サムネ 見え方"],
+"email-template-builder":["メールテンプレート","htmlメール 作成","メルマガ テンプレート","ニュースレター 作成","メール デザイン"],
+"website-builder":["ホームページ作成","無料 ホームページ","ウェブサイト 作成","1ページ サイト","お店 ホームページ"],
+"link-in-bio-maker":["プロフィールリンク","リンクまとめ","リンクツリー 代わり","インスタ プロフィール リンク","リンク集 作成"],
 "typing-for-kids":["タイピング 子供","タイピング練習 無料","タイピングゲーム","ホームポジション 練習","キーボード 練習 子供"],
 "phonics-for-kids":["フォニックス 子供","アルファベット 発音","英語 読み方 子供","サイトワード","フォニックス 無料"],
 "kids-math-worksheets":["算数プリント","計算プリント 無料","時計の読み方 プリント","筆算 プリント","幼児 算数"],
