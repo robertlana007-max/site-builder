@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"sudoku-solver":["sudoku çözücü","sudoku çöz","fotoğraftan sudoku çözme"],
+"wifi-qr-code":["wifi qr kod","wifi qr kod oluştur","wifi şifresi paylaş"],
+"image-steganography":["steganografi","resme mesaj gizleme","fotoğrafta gizli mesaj"],
+"file-locker":["dosya şifreleme","dosyaya şifre koyma","dosya kilitleme"],
+"secret-note":["gizli not","şifreli mesaj","metin şifreleme","şifreli not paylaş"],
 "thumbnail-preview":["küçük resim önizleme","thumbnail test","kapak görseli karşılaştır","youtube kapak önizleme"],
 "email-template-builder":["e-posta şablonu","html e-posta oluştur","bülten şablonu","newsletter hazırlama","mail şablonu"],
 "website-builder":["web sitesi oluştur","ücretsiz site yapıcı","tek sayfa site","web sitesi yapma","işletme sitesi"],

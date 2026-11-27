@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"sudoku-solver":["sudoku löser","sudoku lösen","sudoku lösen mit foto","sudoku hilfe"],
+"wifi-qr-code":["wlan qr code","wlan qr code erstellen","wlan passwort teilen","wlan schild","wifi qr code"],
+"image-steganography":["steganographie","nachricht in bild verstecken","versteckte nachricht im bild","text im bild verstecken"],
+"file-locker":["datei verschlüsseln","datei mit passwort schützen","dateien verschlüsseln","ordner mit passwort schützen"],
+"secret-note":["geheime notiz","verschlüsselte nachricht","text verschlüsseln","passwort sicher senden","nachricht mit passwort"],
 "thumbnail-preview":["thumbnail vorschau","thumbnail testen","thumbnails vergleichen","youtube thumbnail vorschau"],
 "email-template-builder":["html email vorlage","newsletter erstellen","email vorlage erstellen","newsletter vorlage","html mail"],
 "website-builder":["website erstellen","homepage baukasten","kostenlose webseite","onepager erstellen","webseite ohne programmieren"],

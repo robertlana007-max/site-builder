@@ -1,0 +1,453 @@
+<style>
+.ss .ss-board { display: grid; grid-template-columns: repeat(9, 1fr); width: 100%; max-width: 460px; aspect-ratio: 1; margin: 0 auto; border: 2.5px solid var(--ink); background: var(--ink); gap: 1px; user-select: none; touch-action: manipulation; }
+.ss .ss-board button { all: unset; box-sizing: border-box; background: var(--surface); color: var(--ink); display: grid; place-items: center; font-size: clamp(16px, 5.2vw, 26px); font-weight: 800; cursor: pointer; position: relative; aspect-ratio: 1; min-width: 0; }
+.ss .ss-board button.c3 { border-right: 2px solid var(--ink); } .ss .ss-board button.r3 { border-bottom: 2px solid var(--ink); }
+.ss .ss-board button.sol { color: var(--accent); font-weight: 500; }
+.ss .ss-board button.hint { color: var(--ok); font-weight: 600; }
+.ss .ss-board button.ocr { background: color-mix(in srgb, #f59e0b 16%, var(--surface)); }
+.ss .ss-board button.unsure { background: color-mix(in srgb, #f59e0b 42%, var(--surface)); }
+.ss .ss-board button.hl { background: var(--accent-soft); }
+.ss .ss-board button.focus { background: color-mix(in srgb, var(--ok) 30%, var(--surface)); }
+.ss .ss-board button.sel { background: color-mix(in srgb, var(--accent) 35%, var(--surface)); }
+.ss .ss-board button.bad { color: var(--bad); background: color-mix(in srgb, var(--bad) 16%, var(--surface)); }
+.ss .ss-board button:focus-visible { outline: 3px solid var(--accent); outline-offset: -3px; }
+.ss .ss-pad { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; max-width: 460px; margin: 12px auto 0; }
+.ss .ss-pad button { font: inherit; font-size: 19px; font-weight: 700; min-height: 46px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); border-radius: 10px; cursor: pointer; padding: 0; min-width: 0; }
+.ss .ss-pad button:last-child { font-size: 15px; }
+.ss .ss-tools { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; max-width: 460px; margin: 12px auto 0; }
+.ss .ss-tools .btn { min-height: 42px; padding: 6px 14px; }
+.ss .ss-in { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
+@media (max-width: 640px) { .ss .ss-in { grid-template-columns: 1fr; } }
+.ss .ss-in .drop { margin: 0; padding: 22px 12px; }
+.ss textarea { min-height: 82px; font-family: ui-monospace, monospace; font-size: 14px; }
+.ss .ss-hintbox { max-width: 460px; margin: 14px auto 0; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--ok); background: color-mix(in srgb, var(--ok) 9%, var(--surface)); }
+.ss .ss-hintbox b { display: block; margin-bottom: 4px; }
+.ss .ss-hintbox p { margin: 0; font-size: 15px; }
+.ss .ss-hintbox .btns { margin-top: 10px; }
+.ss .ss-hintbox .btn { min-height: 40px; padding: 6px 14px; }
+.ss .ss-scan { max-width: 460px; margin: 0 auto 14px; display: flex; gap: 12px; align-items: center; }
+.ss .ss-scan canvas { width: 120px; height: 120px; border: 1px solid var(--line); border-radius: 8px; flex: none; background: #fff; }
+.ss .ss-scan p { margin: 0; font-size: 14px; color: var(--muted); }
+.ss .ss-meter { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.ss .ss-meter i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .2s; }
+.ss .ss-legend { max-width: 460px; margin: 8px auto 0; font-size: 13px; color: var(--muted); text-align: center; }
+</style>
+<div class="ss" id="ss">
+<div class="ss-in">
+  <div>
+    <div class="drop" id="drop" tabindex="0" role="button"><b>Photo or screenshot</b>Take a picture of the puzzle, or pick a screenshot. It is read on your device.</div>
+    <input type="file" id="file" accept="image/*" hidden>
+  </div>
+  <div>
+    <label for="ssPaste">Or paste 81 digits (0 or . for empty)</label>
+    <textarea id="ssPaste" data-nomemo maxlength="600" spellcheck="false" placeholder="530070000600195000098000060800060003400803001700020006060000280000419005000080079"></textarea>
+    <div class="btns" style="margin-top:8px"><button type="button" class="btn ghost" id="ssLoad">Put it on the board</button></div>
+  </div>
+</div>
+<div class="ss-scan" id="ssScan" hidden><canvas id="ssWarp" width="432" height="432" aria-label="The grid found in your picture"></canvas><div style="flex:1;min-width:0"><p id="ssScanText">Reading…</p><div class="ss-meter" id="ssMeter"><i id="ssBar"></i></div></div></div>
+<div class="ss-board" id="ssBoard" role="grid" aria-label="Sudoku puzzle"></div>
+<p class="ss-legend" id="ssLegend" hidden>Yellow squares were read from your picture. Check them against your puzzle; darker yellow ones are unsure.</p>
+<div class="ss-pad" id="ssPad" aria-label="Numbers"></div>
+<div class="ss-tools">
+  <button type="button" class="btn" id="ssSolve">Solve</button>
+  <button type="button" class="btn ghost" id="ssHint">Hint: next step</button>
+  <button type="button" class="btn ghost" id="ssCheck">Check puzzle</button>
+  <button type="button" class="btn ghost" id="ssClearSol">Hide answer</button>
+  <button type="button" class="btn ghost" id="ssCopy">Copy as 81 digits</button>
+  <button type="button" class="btn ghost danger" id="ssClear">Clear board</button>
+</div>
+<div class="ss-hintbox" id="ssHintBox" hidden><b id="ssHintTitle">Hint</b><p id="ssHintText"></p><div class="btns"><button type="button" class="btn" id="ssPlace">Put it in</button><button type="button" class="btn ghost" id="ssHintClose">Close</button></div></div>
+<p class="msg" id="msg" role="status" aria-live="polite" style="text-align:center"></p>
+<p class="ss-legend">Want a new puzzle to play or print? Try the <a href="../sudoku-generator/">Sudoku Generator</a>.</p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- sudoku engine ----------
+  var ROW = [], COL = [], BOX = [], PEERS = [], UNITS = [];
+  for (var i = 0; i < 81; i++) { ROW[i] = Math.floor(i / 9); COL[i] = i % 9; BOX[i] = Math.floor(ROW[i] / 3) * 3 + Math.floor(COL[i] / 3); }
+  for (var u = 0; u < 9; u++) { var r0 = [], c0 = [], b0 = []; for (var j = 0; j < 81; j++) { if (ROW[j] === u) r0.push(j); if (COL[j] === u) c0.push(j); if (BOX[j] === u) b0.push(j); } UNITS.push({ k: 'row', n: u, c: r0 }, { k: 'col', n: u, c: c0 }, { k: 'box', n: u, c: b0 }); }
+  for (var p = 0; p < 81; p++) { var s = []; for (var q = 0; q < 81; q++) if (q !== p && (ROW[q] === ROW[p] || COL[q] === COL[p] || BOX[q] === BOX[p])) s.push(q); PEERS.push(s); }
+  var BITS = []; for (var m = 0; m < 512; m++) { var n = 0, x = m; while (x) { n += x & 1; x >>= 1; } BITS[m] = n; }
+  function conflicts(g) { var bad = []; for (var i = 0; i < 81; i++) if (g[i]) for (var k = 0; k < 20; k++) if (g[PEERS[i][k]] === g[i]) { bad.push(i); break; } return bad; }
+  // exact solver: bit masks + "fewest options first". Counts solutions up to `limit`, keeps the first in `sol`.
+  function solve(g0, limit, sol) {
+    var g = g0.slice(), rows = [0, 0, 0, 0, 0, 0, 0, 0, 0], cols = rows.slice(), boxes = rows.slice(), count = 0, nodes = 0;
+    for (var i = 0; i < 81; i++) if (g[i]) { var bit = 1 << (g[i] - 1); if ((rows[ROW[i]] | cols[COL[i]] | boxes[BOX[i]]) & bit) return 0; rows[ROW[i]] |= bit; cols[COL[i]] |= bit; boxes[BOX[i]] |= bit; }
+    function rec() {
+      if (++nodes > 2e6) throw new Error('too slow');
+      var best = -1, bestM = 0, bestN = 10;
+      for (var i = 0; i < 81; i++) if (!g[i]) { var mm = 511 & ~(rows[ROW[i]] | cols[COL[i]] | boxes[BOX[i]]), n = BITS[mm]; if (n < bestN) { best = i; bestM = mm; bestN = n; if (n <= 1) break; } }
+      if (best < 0) { count++; if (sol && count === 1) for (var k = 0; k < 81; k++) sol[k] = g[k]; return count >= limit; }
+      if (!bestN) return false;
+      for (var d = 1; d <= 9; d++) {
+        if (!(bestM & (1 << (d - 1)))) continue;
+        var bt = 1 << (d - 1);
+        g[best] = d; rows[ROW[best]] |= bt; cols[COL[best]] |= bt; boxes[BOX[best]] |= bt;
+        if (rec()) return true;
+        g[best] = 0; rows[ROW[best]] &= ~bt; cols[COL[best]] &= ~bt; boxes[BOX[best]] &= ~bt;
+      }
+      return false;
+    }
+    rec();
+    return count;
+  }
+  function cands(g, i) { if (g[i]) return 0; var mm = 511; PEERS[i].forEach(function (q) { if (g[q]) mm &= ~(1 << (g[q] - 1)); }); return mm; }
+  function digitsOf(mask) { var a = []; for (var d = 1; d <= 9; d++) if (mask & (1 << (d - 1))) a.push(d); return a; }
+  var BOXNAME = ['top-left', 'top-middle', 'top-right', 'middle-left', 'centre', 'middle-right', 'bottom-left', 'bottom-middle', 'bottom-right'];
+  function where(i) { return 'row ' + (ROW[i] + 1) + ', column ' + (COL[i] + 1); }
+  function unitName(U) { return U.k === 'row' ? 'row ' + (U.n + 1) : U.k === 'col' ? 'column ' + (U.n + 1) : 'the ' + BOXNAME[U.n] + ' box'; }
+  function list(a) { return a.length <= 1 ? a.join('') : a.slice(0, -1).join(', ') + ' and ' + a[a.length - 1]; }
+  function seenIn(g, cells) { var a = []; cells.forEach(function (c) { if (g[c] && a.indexOf(g[c]) < 0) a.push(g[c]); }); return a.sort(); }
+  // one human step: a naked single, else a hidden single in a box, then in a row or column
+  function nextStep(g) {
+    var order = UNITS.filter(function (U) { return U.k === 'box'; }), rest = UNITS.filter(function (U) { return U.k !== 'box'; });
+    function hidden(units) {
+      for (var a = 0; a < units.length; a++) {
+        var U = units[a];
+        for (var d = 1; d <= 9; d++) {
+          var bit = 1 << (d - 1); if (U.c.some(function (c) { return g[c] === d; })) continue;
+          var spots = U.c.filter(function (c) { return cands(g, c) & bit; });
+          if (spots.length === 1) {
+            var others = U.c.filter(function (c) { return !g[c] && c !== spots[0]; });
+            return { i: spots[0], d: d, kind: 'Hidden single', unit: U.c,
+              text: 'Look at ' + unitName(U) + '. The number ' + d + ' is still missing there, and it fits in only one square: ' + where(spots[0]) + '. ' +
+                (others.length ? 'Every other empty square in ' + unitName(U) + ' already has ' + (d === 8 ? 'an ' : 'a ') + d + ' in its ' + (U.k === 'box' ? 'row or column' : U.k === 'row' ? 'column or box' : 'row or box') + ', so ' + d + ' cannot go there.' : 'It is the last empty square in ' + unitName(U) + '.') };
+          }
+        }
+      }
+      return null;
+    }
+    for (var i = 0; i < 81; i++) {
+      if (g[i]) continue; var c = cands(g, i);
+      if (BITS[c] === 1) {
+        var d1 = digitsOf(c)[0], rr = seenIn(g, UNITS[ROW[i] * 3].c), cc = seenIn(g, UNITS[COL[i] * 3 + 1].c), bb = seenIn(g, UNITS[BOX[i] * 3 + 2].c);
+        return { i: i, d: d1, kind: 'Naked single', unit: PEERS[i],
+          text: 'Look at the square in ' + where(i) + '. Its row already has ' + (rr.length ? list(rr) : 'no numbers') + '; its column has ' + (cc.length ? list(cc) : 'no numbers') + '; its box has ' + (bb.length ? list(bb) : 'no numbers') + '. That leaves only one number for this square: ' + d1 + '.' };
+      }
+      if (!c) return { dead: i };
+    }
+    return hidden(order) || hidden(rest);
+  }
+  window.GTNSudokuSolver = { solve: solve, nextStep: nextStep, conflicts: conflicts }; // used by tests
+
+  // ---------- board ----------
+  var KEY = 'gtn-sudoku-solver';
+  var g = new Array(81).fill(0), mark = new Array(81).fill(''), sol = null, sel = -1, hint = null;
+  function save() { try { localStorage.setItem(KEY, JSON.stringify({ v: 1, g: g.join(''), mark: mark })); } catch (e) {} }
+  function load() { try { var o = JSON.parse(localStorage.getItem(KEY) || 'null'); if (o && /^[0-9]{81}$/.test(o.g)) { g = o.g.split('').map(Number); if (Array.isArray(o.mark) && o.mark.length === 81) mark = o.mark.map(function (x) { return /^(ocr|unsure|hint)$/.test(x) ? x : ''; }); } } catch (e) {} }
+  function say(c, t) { var mm = $('msg'); mm.className = 'msg ' + (c || ''); mm.textContent = t || ''; }
+  var cells = [];
+  for (var ci = 0; ci < 81; ci++) {
+    var b = document.createElement('button'); b.type = 'button'; b.dataset.i = ci; b.setAttribute('role', 'gridcell');
+    b.addEventListener('click', function () { sel = +this.dataset.i; paint(); });
+    $('ssBoard').appendChild(b); cells.push(b);
+  }
+  for (var d0 = 1; d0 <= 10; d0++) { var pb = document.createElement('button'); pb.type = 'button'; pb.textContent = d0 === 10 ? '✕' : d0; pb.setAttribute('aria-label', d0 === 10 ? 'Erase square' : 'Number ' + d0); pb.dataset.d = d0 % 10; pb.addEventListener('click', function () { put(+this.dataset.d); }); $('ssPad').appendChild(pb); }
+  function paint(focus) {
+    var bad = conflicts(g), hu = hint ? hint.unit : [];
+    cells.forEach(function (b, i) {
+      var v = g[i] || (sol ? sol[i] : 0);
+      b.className = (COL[i] === 2 || COL[i] === 5 ? 'c3 ' : '') + (ROW[i] === 2 || ROW[i] === 5 ? 'r3 ' : '') + (!g[i] && sol ? 'sol ' : '') + (mark[i] ? mark[i] + ' ' : '') +
+        (hint && hint.i === i ? 'focus ' : i === sel ? 'sel ' : hu.indexOf(i) >= 0 ? 'hl ' : '') + (bad.indexOf(i) >= 0 ? 'bad' : '');
+      b.textContent = v || '';
+      b.setAttribute('aria-label', where(i) + ': ' + (v || 'empty') + (!g[i] && v ? ' (answer)' : '') + (mark[i] === 'unsure' ? ', unsure, please check' : ''));
+      b.tabIndex = i === (sel < 0 ? 0 : sel) ? 0 : -1;
+    });
+    if (focus && sel >= 0) cells[sel].focus();
+    $('ssLegend').hidden = !mark.some(function (x) { return x === 'ocr' || x === 'unsure'; });
+    $('ssClearSol').hidden = !sol;
+  }
+  function changed() { sol = null; hint = null; $('ssHintBox').hidden = true; save(); paint(); }
+  function put(d) {
+    if (sel < 0) { say('', 'Tap a square first, then a number.'); return; }
+    g[sel] = d; mark[sel] = ''; changed(); // typing the same number again confirms a square read from a photo
+    var bad = conflicts(g); say(bad.indexOf(sel) >= 0 ? 'bad' : '', bad.indexOf(sel) >= 0 ? 'That ' + d + ' is already in the same row, column or box.' : '');
+  }
+  $('ssBoard').addEventListener('keydown', function (e) {
+    if (sel < 0) sel = 0;
+    var k = e.key;
+    if (/^[1-9]$/.test(k)) { put(+k); e.preventDefault(); }
+    else if (k === 'Backspace' || k === 'Delete' || k === '0' || k === '.' || k === ' ') { put(0); e.preventDefault(); }
+    else if (/^Arrow/.test(k)) { var r = ROW[sel], c = COL[sel]; if (k === 'ArrowUp') r = (r + 8) % 9; if (k === 'ArrowDown') r = (r + 1) % 9; if (k === 'ArrowLeft') c = (c + 8) % 9; if (k === 'ArrowRight') c = (c + 1) % 9; sel = r * 9 + c; paint(true); e.preventDefault(); }
+  });
+
+  function parsePuzzle(t) {
+    t = String(t || '').replace(/[٠-٩]/g, function (c) { return c.charCodeAt(0) - 0x660; }).replace(/[۰-۹]/g, function (c) { return c.charCodeAt(0) - 0x6F0; }).replace(/[０-９]/g, function (c) { return c.charCodeAt(0) - 0xFF10; });
+    var ch = t.replace(/[\s|+\-,;:]/g, '').replace(/[._*xX?]/g, '0');
+    if (/[^0-9]/.test(ch)) return { err: 'Only digits 1 to 9, and 0 or a dot for empty squares, can be pasted. Found "' + ch.match(/[^0-9]/)[0] + '".' };
+    if (ch.length !== 81) return { err: 'A sudoku has 81 squares, but you pasted ' + ch.length + (ch.length === 1 ? ' digit' : ' digits') + '. Use 0 or a dot for each empty square.' };
+    return { g: ch.split('').map(Number) };
+  }
+  $('ssLoad').addEventListener('click', function () {
+    var r = parsePuzzle($('ssPaste').value);
+    if (r.err) return say('bad', r.err);
+    g = r.g; mark = new Array(81).fill(''); sel = -1; changed(); $('ssScan').hidden = true;
+    report('Puzzle loaded: ' + g.filter(Boolean).length + ' numbers.');
+  });
+  function report(prefix) {
+    var bad = conflicts(g);
+    if (bad.length) return say('bad', (prefix ? prefix + ' ' : '') + 'Some numbers clash (shown in red): the same number twice in a row, column or box. Fix them first.');
+    say('', (prefix ? prefix + ' ' : '') + 'Check the board matches your puzzle, then press Solve or Hint.');
+  }
+  $('ssClear').addEventListener('click', function () { g = new Array(81).fill(0); mark = new Array(81).fill(''); sel = -1; changed(); $('ssScan').hidden = true; say('', 'Board cleared.'); });
+  $('ssClearSol').addEventListener('click', function () { sol = null; paint(); say('', ''); });
+  $('ssCopy').addEventListener('click', function () { copyText(g.join(''), this); });
+
+  function analyse() { // -> message for a puzzle that cannot be solved properly, or null
+    var given = g.filter(Boolean).length;
+    if (!given) return 'The board is empty. Type the numbers from your puzzle, paste them, or use a photo.';
+    if (conflicts(g).length) return 'Some numbers clash (shown in red): the same number twice in a row, column or box. Fix them first.';
+    return null;
+  }
+  $('ssSolve').addEventListener('click', function () {
+    hint = null; $('ssHintBox').hidden = true;
+    var a = analyse(); if (a) { paint(); return say('bad', a); }
+    var out = new Array(81), t0 = performance.now(), cnt;
+    try { cnt = solve(g, 2, out); } catch (e) { return say('bad', 'This puzzle is taking too long to solve. Check the numbers; it probably has a typing mistake.'); }
+    var ms = Math.max(1, Math.round(performance.now() - t0));
+    if (cnt === 0) { sol = null; paint(); return say('bad', 'This puzzle has no solution. A number is probably wrong: compare the board with your puzzle' + (mark.some(Boolean) ? ', especially the yellow squares read from the picture.' : '.')); }
+    sol = out; paint();
+    if (cnt > 1) say('bad', 'This puzzle has more than one solution, so it is not a proper sudoku (a number may be missing). Here is one of them. Check the board against your puzzle' + (g.filter(Boolean).length < 17 ? ': a proper sudoku needs at least 17 numbers.' : '.'));
+    else { say('ok', 'Solved in ' + ms + ' ms. This puzzle has exactly one solution; the answers are in colour.'); if (window.burst) burst($('ssBoard')); }
+  });
+  $('ssCheck').addEventListener('click', function () {
+    var a = analyse(); if (a) { paint(); return say('bad', a); }
+    var cnt; try { cnt = solve(g, 2); } catch (e) { cnt = -1; }
+    var left = g.filter(function (v) { return !v; }).length;
+    say(cnt === 1 ? 'ok' : 'bad', cnt === 1 ? (left ? 'Looks good: this puzzle has exactly one solution. ' + left + ' squares to go.' : 'Complete and correct!') : cnt === 0 ? 'No solution from here: a number on the board is wrong.' : cnt > 1 ? 'This puzzle has more than one solution: a number may be missing.' : 'Could not check this puzzle.');
+  });
+  $('ssHint').addEventListener('click', function () {
+    sol = null;
+    var a = analyse(); if (a) { paint(); return say('bad', a); }
+    if (g.every(Boolean)) { paint(); return say('ok', 'The puzzle is complete.'); }
+    var cnt; try { cnt = solve(g, 2); } catch (e) { cnt = 2; }
+    if (cnt === 0) { hint = null; paint(); return say('bad', 'There is no solution from here, so a number on the board must be wrong. Press Check puzzle, or fix the last numbers you typed.'); }
+    var st = nextStep(g);
+    if (!st || st.dead != null) {
+      hint = null; $('ssHintBox').hidden = true; if (st && st.dead != null) sel = st.dead; paint();
+      return say(st ? 'bad' : '', st ? 'The square in ' + where(st.dead) + ' has no number left that fits, so a number on the board is wrong.' : 'No simple step left: there is no naked single or hidden single right now. This part needs harder techniques (like pairs). Press Solve to see the answer.');
+    }
+    hint = st; sel = -1; paint();
+    $('ssHintTitle').textContent = st.kind + ': ' + st.d + ' in ' + where(st.i);
+    $('ssHintText').textContent = st.text + (cnt > 1 ? ' (Note: this puzzle has more than one solution.)' : '');
+    $('ssHintBox').hidden = false; say('', '');
+  });
+  $('ssPlace').addEventListener('click', function () { if (!hint) return; var i = hint.i; g[i] = hint.d; mark[i] = 'hint'; changed(); sel = i; paint(); $('ssHint').focus(); say('ok', 'Placed ' + g[i] + ' in ' + where(i) + '. Press Hint for the next step.'); });
+  $('ssHintClose').addEventListener('click', function () { hint = null; $('ssHintBox').hidden = true; paint(); });
+
+  // ---------- reading a photo ----------
+  // 1) find the grid (the biggest connected set of dark lines) and its 4 corners, 2) straighten it,
+  // 3) cut it into 81 squares and find a digit in each, 4) read the digits with Tesseract (digits only).
+  function grayOf(img, maxSide) {
+    var w = img.width, h = img.height, k = Math.min(1, maxSide / Math.max(w, h)), c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(w * k)); c.height = Math.max(1, Math.round(h * k));
+    var x = c.getContext('2d', { willReadFrequently: true }); x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(img, 0, 0, c.width, c.height);
+    var px = x.getImageData(0, 0, c.width, c.height).data, gr = new Uint8Array(c.width * c.height);
+    for (var i = 0, j = 0; j < gr.length; i += 4, j++) gr[j] = (px[i] * 77 + px[i + 1] * 150 + px[i + 2] * 29) >> 8;
+    return { w: c.width, h: c.height, g: gr };
+  }
+  function threshold(im, win, C) { // adaptive: dark when clearly darker than its neighbourhood
+    var w = im.w, h = im.h, I = new Float64Array((w + 1) * (h + 1)), out = new Uint8Array(w * h), r = win >> 1;
+    for (var y = 0; y < h; y++) { var row = 0; for (var x = 0; x < w; x++) { row += im.g[y * w + x]; I[(y + 1) * (w + 1) + x + 1] = I[y * (w + 1) + x + 1] + row; } }
+    for (var y2 = 0; y2 < h; y2++) {
+      var y0 = Math.max(0, y2 - r), y1 = Math.min(h, y2 + r + 1);
+      for (var x2 = 0; x2 < w; x2++) {
+        var x0 = Math.max(0, x2 - r), x1 = Math.min(w, x2 + r + 1), area = (x1 - x0) * (y1 - y0);
+        var sum = I[y1 * (w + 1) + x1] - I[y0 * (w + 1) + x1] - I[y1 * (w + 1) + x0] + I[y0 * (w + 1) + x0];
+        out[y2 * w + x2] = im.g[y2 * w + x2] * area < (sum - C * area) ? 1 : 0;
+      }
+    }
+    return out;
+  }
+  // connected dark areas; returns the one that looks most like a grid with its corner points
+  function findGrid(bin, w, h) {
+    var lab = new Int32Array(w * h), stack = new Int32Array(w * h), best = null, id = 0;
+    for (var s0 = 0; s0 < w * h; s0++) {
+      if (!bin[s0] || lab[s0]) continue;
+      id++; var sp = 0, n = 0, minx = w, maxx = 0, miny = h, maxy = 0, tl = [0, 0, 1e9], br = [0, 0, -1e9], tr = [0, 0, -1e9], bl = [0, 0, 1e9];
+      stack[sp++] = s0; lab[s0] = id;
+      while (sp) {
+        var p = stack[--sp], x = p % w, y = (p - x) / w; n++;
+        if (x < minx) minx = x; if (x > maxx) maxx = x; if (y < miny) miny = y; if (y > maxy) maxy = y;
+        var a = x + y, b = x - y;
+        if (a < tl[2]) tl = [x, y, a]; if (a > br[2]) br = [x, y, a]; if (b > tr[2]) tr = [x, y, b]; if (b < bl[2]) bl = [x, y, b];
+        if (x > 0 && bin[p - 1] && !lab[p - 1]) { lab[p - 1] = id; stack[sp++] = p - 1; }
+        if (x < w - 1 && bin[p + 1] && !lab[p + 1]) { lab[p + 1] = id; stack[sp++] = p + 1; }
+        if (y > 0 && bin[p - w] && !lab[p - w]) { lab[p - w] = id; stack[sp++] = p - w; }
+        if (y < h - 1 && bin[p + w] && !lab[p + w]) { lab[p + w] = id; stack[sp++] = p + w; }
+      }
+      var bw = maxx - minx + 1, bh = maxy - miny + 1;
+      if (bw < Math.min(w, h) * 0.3 || bh < Math.min(w, h) * 0.3 || bw / bh > 1.6 || bh / bw > 1.6) continue;
+      if (n > bw * bh * 0.5) continue; // a solid block (a dark photo edge), not lines
+      // a sudoku grid is crossed by ~10 lines in both directions; a page edge or a frame only by 2
+      var runs = 0;
+      [0.3, 0.5, 0.7].forEach(function (f) {
+        var yy = Math.round(miny + bh * f), xx = Math.round(minx + bw * f), on = false;
+        for (var x2 = minx; x2 <= maxx; x2++) { var hit = lab[yy * w + x2] === id; if (hit && !on) runs++; on = hit; }
+        on = false;
+        for (var y2 = miny; y2 <= maxy; y2++) { var hit2 = lab[y2 * w + xx] === id; if (hit2 && !on) runs++; on = hit2; }
+      });
+      if (runs < 6 * 6) continue;
+      var score = bw * bh;
+      if (!best || score > best.score) best = { score: score, c: [tl, tr, br, bl].map(function (q) { return [q[0] + 0.5, q[1] + 0.5]; }) };
+    }
+    return best;
+  }
+  // homography that maps the square (0,0)-(S,S) onto the 4 corners
+  function homography(S, c) {
+    var src = [[0, 0], [S, 0], [S, S], [0, S]], A = [], B = [];
+    for (var i = 0; i < 4; i++) {
+      var X = src[i][0], Y = src[i][1], u = c[i][0], v = c[i][1];
+      A.push([X, Y, 1, 0, 0, 0, -X * u, -Y * u]); B.push(u);
+      A.push([0, 0, 0, X, Y, 1, -X * v, -Y * v]); B.push(v);
+    }
+    for (var col = 0; col < 8; col++) { // Gaussian elimination
+      var piv = col; for (var r = col + 1; r < 8; r++) if (Math.abs(A[r][col]) > Math.abs(A[piv][col])) piv = r;
+      var t = A[col]; A[col] = A[piv]; A[piv] = t; var tb = B[col]; B[col] = B[piv]; B[piv] = tb;
+      for (var r2 = 0; r2 < 8; r2++) { if (r2 === col) continue; var f = A[r2][col] / A[col][col]; for (var k = col; k < 8; k++) A[r2][k] -= f * A[col][k]; B[r2] -= f * B[col]; }
+    }
+    return B.map(function (bv, i) { return bv / A[i][i]; });
+  }
+  function warp(im, corners, S) {
+    var H = homography(S, corners), out = new Uint8Array(S * S), w = im.w, h = im.h;
+    for (var y = 0; y < S; y++) for (var x = 0; x < S; x++) {
+      var X = x + 0.5, Y = y + 0.5, z = H[6] * X + H[7] * Y + 1, u = (H[0] * X + H[1] * Y + H[2]) / z - 0.5, v = (H[3] * X + H[4] * Y + H[5]) / z - 0.5;
+      var x0 = Math.floor(u), y0 = Math.floor(v), fx = u - x0, fy = v - y0;
+      if (x0 < 0 || y0 < 0 || x0 >= w - 1 || y0 >= h - 1) { out[y * S + x] = 255; continue; }
+      var i0 = y0 * w + x0;
+      out[y * S + x] = (im.g[i0] * (1 - fx) + im.g[i0 + 1] * fx) * (1 - fy) + (im.g[i0 + w] * (1 - fx) + im.g[i0 + w + 1] * fx) * fy;
+    }
+    return { w: S, h: S, g: out };
+  }
+  // the digit blob in each square, or null
+  function digitBlobs(bin, S, gray) {
+    var cs = S / 9, out = [];
+    for (var cell = 0; cell < 81; cell++) {
+      var cx0 = Math.round(COL[cell] * cs), cy0 = Math.round(ROW[cell] * cs), cx1 = Math.round((COL[cell] + 1) * cs), cy1 = Math.round((ROW[cell] + 1) * cs);
+      var cw = cx1 - cx0, ch = cy1 - cy0, lab = new Int32Array(cw * ch), id = 0, best = null, stack = [];
+      for (var yy = 0; yy < ch; yy++) for (var xx = 0; xx < cw; xx++) {
+        var k0 = yy * cw + xx;
+        if (lab[k0] || !bin[(cy0 + yy) * S + cx0 + xx]) continue;
+        id++; stack.length = 0; stack.push(k0); lab[k0] = id;
+        var n = 0, mnx = cw, mxx = 0, mny = ch, mxy = 0, pts = [];
+        while (stack.length) {
+          var p = stack.pop(), x = p % cw, y = (p - x) / cw; n++; pts.push(p);
+          if (x < mnx) mnx = x; if (x > mxx) mxx = x; if (y < mny) mny = y; if (y > mxy) mxy = y;
+          for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) {
+            var nx = x + dx, ny = y + dy; if (nx < 0 || ny < 0 || nx >= cw || ny >= ch) continue;
+            var q = ny * cw + nx; if (!lab[q] && bin[(cy0 + ny) * S + cx0 + nx]) { lab[q] = id; stack.push(q); }
+          }
+        }
+        var bw = mxx - mnx + 1, bh = mxy - mny + 1, mx = (mnx + mxx) / 2, my = (mny + mxy) / 2;
+        // a digit: not a grid line along the edge, of digit height, roughly in the middle
+        if (bh < ch * 0.28 || bh > ch * 0.92 || bw > cw * 0.85 || bw < 2) continue;
+        if (mx < cw * 0.22 || mx > cw * 0.78 || my < ch * 0.22 || my > ch * 0.78) continue;
+        if (n < cw * ch * 0.015 || n < 1.5 * (bw + bh)) continue; // too small, or a hairline (a frame corner), not a digit
+        // real ink is clearly darker than the paper around it; specks of photo noise are not
+        var ink = 0, paper = 0, pn = 0; pts.forEach(function (q) { ink += gray[(cy0 + (q - q % cw) / cw) * S + cx0 + q % cw]; }); ink /= n;
+        for (var py = Math.round(ch * 0.15); py < ch * 0.85; py += 2) for (var px = Math.round(cw * 0.15); px < cw * 0.85; px += 2) if (lab[py * cw + px] !== id) { paper += gray[(cy0 + py) * S + cx0 + px]; pn++; }
+        if (!pn || paper / pn - ink < 45) continue;
+        if (!best || n > best.n) best = { n: n, x0: mnx, y0: mny, x1: mxx, y1: mxy, pts: pts, id: id };
+      }
+      if (!best) { out.push(null); continue; }
+      // keep only that blob, as black on white, scaled to a fixed height for the reader
+      var bw2 = best.x1 - best.x0 + 1, bh2 = best.y1 - best.y0 + 1, H = 48, k = H / bh2, pad = 24;
+      var small = document.createElement('canvas'); small.width = bw2; small.height = bh2;
+      var sx = small.getContext('2d'), id2 = sx.createImageData(bw2, bh2);
+      for (var t = 0; t < id2.data.length; t++) id2.data[t] = 255;
+      best.pts.forEach(function (p) { var x = p % cw - best.x0, y = (p - p % cw) / cw - best.y0, o = (y * bw2 + x) * 4; id2.data[o] = id2.data[o + 1] = id2.data[o + 2] = 0; });
+      sx.putImageData(id2, 0, 0);
+      var c = document.createElement('canvas'); c.width = Math.max(H * 0.5, Math.round(bw2 * k)) + pad * 2; c.height = H + pad * 2;
+      var x2 = c.getContext('2d'); x2.fillStyle = '#fff'; x2.fillRect(0, 0, c.width, c.height); x2.imageSmoothingEnabled = true;
+      x2.drawImage(small, (c.width - bw2 * k) / 2, pad, bw2 * k, H);
+      out.push(c);
+    }
+    return out;
+  }
+  var worker = null, workerP = null;
+  function getWorker(onPct) {
+    if (worker) return Promise.resolve(worker);
+    if (!workerP) workerP = (window.Tesseract ? Promise.resolve() : new Promise(function (ok, no) { var s = document.createElement('script'); s.src = '../assets/vendor/ocr/tesseract.min.js'; s.onload = ok; s.onerror = function () { s.remove(); no(new Error('load')); }; document.head.appendChild(s); }))
+      .then(function () {
+        return Tesseract.createWorker('eng', 1, { workerPath: '../assets/vendor/ocr/worker.min.js', corePath: '../assets/vendor/ocr', langPath: '../assets/vendor/ocr',
+          logger: function (m) { if (onPct && m.status === 'loading language traineddata') onPct(m.progress); } });
+      }).then(function (w) { return w.setParameters({ tessedit_char_whitelist: '123456789', tessedit_pageseg_mode: '10' }).then(function () { worker = w; return w; }); })
+      .catch(function (e) { workerP = null; throw e; });
+    return workerP;
+  }
+  async function readPhoto(file, progress) {
+    var bmp;
+    try { bmp = await createImageBitmap(file); } catch (e) { throw new Error('open'); }
+    var im = grayOf(bmp, 1400); bmp.close && bmp.close();
+    var win = Math.max(15, Math.round(Math.min(im.w, im.h) / 30) | 1), bin = threshold(im, win, 8);
+    var grid = findGrid(bin, im.w, im.h);
+    if (!grid) { // light lines on a dark background (dark mode screenshots): try the negative
+      for (var k = 0; k < im.g.length; k++) im.g[k] = 255 - im.g[k];
+      bin = threshold(im, win, 8); grid = findGrid(bin, im.w, im.h);
+    }
+    if (!grid) throw new Error('nogrid');
+    var S = 9 * 52, wp = warp(im, grid.c, S), wbin = threshold(wp, 25, 10);
+    var view = $('ssWarp'), vx = view.getContext('2d'), vd = vx.createImageData(S, S);
+    view.width = view.height = S;
+    for (var i = 0; i < S * S; i++) { vd.data[i * 4] = vd.data[i * 4 + 1] = vd.data[i * 4 + 2] = wp.g[i]; vd.data[i * 4 + 3] = 255; }
+    vx.putImageData(vd, 0, 0);
+    var blobs = digitBlobs(wbin, S, wp.g), todo = blobs.filter(Boolean).length;
+    if (todo < 8) throw new Error('fewdigits');
+    progress(0.05, 'Found the grid and ' + todo + ' numbers. Loading the number reader…');
+    var w = await getWorker(function (p) { progress(0.05 + p * 0.15, 'Loading the number reader…'); });
+    // all the digits side by side on one line: the reader is much more accurate on a line than on single letters
+    var idx = [], gap = 44, totalW = gap, hgt = 0;
+    blobs.forEach(function (c, i) { if (c) { idx.push(i); totalW += c.width + gap; hgt = Math.max(hgt, c.height); } });
+    var line = document.createElement('canvas'); line.width = totalW; line.height = hgt;
+    var lx = line.getContext('2d'), xs = [], at = gap; lx.fillStyle = '#fff'; lx.fillRect(0, 0, totalW, hgt);
+    idx.forEach(function (i) { lx.drawImage(blobs[i], at, 0); xs.push([at, at + blobs[i].width]); at += blobs[i].width + gap; });
+    progress(0.3, 'Reading the numbers…');
+    await w.setParameters({ tessedit_pageseg_mode: '7' });
+    var r = await w.recognize(line), syms = r.data.symbols || [];
+    if (!syms.length && r.data.words) r.data.words.forEach(function (wd) { (wd.symbols || []).forEach(function (sy) { syms.push(sy); }); });
+    var res = blobs.map(function () { return { d: 0 }; });
+    idx.forEach(function (i, k) {
+      var hit = syms.filter(function (sy) { var m = (sy.bbox.x0 + sy.bbox.x1) / 2; return m >= xs[k][0] - gap / 2 && m <= xs[k][1] + gap / 2 && /^[1-9]$/.test(sy.text); });
+      res[i] = hit.length === 1 ? { d: +hit[0].text, conf: hit[0].confidence, unsure: hit[0].confidence < 50 } : { d: 0, conf: 0, unsure: true };
+    });
+    // a second look, one square at a time, for anything the line reading missed
+    var again = idx.filter(function (i) { return res[i].unsure; });
+    if (again.length) await w.setParameters({ tessedit_pageseg_mode: '10' });
+    for (var a2 = 0; a2 < again.length; a2++) {
+      var i2 = again[a2], r2 = await w.recognize(blobs[i2]), t2 = (r2.data.text || '').replace(/[^1-9]/g, ''), c2 = r2.data.confidence || 0;
+      if (t2.length === 1 && (!res[i2].d || c2 > res[i2].conf)) res[i2] = { d: +t2, conf: c2, unsure: c2 < 60 };
+      progress(0.6 + 0.4 * (a2 + 1) / again.length, 'Checking unclear numbers… ' + (a2 + 1) + ' of ' + again.length);
+    }
+    return res;
+  }
+  window.GTNSudokuSolver.readPhoto = readPhoto;
+  var reading = false;
+  setupDrop('drop', 'file', async function (f) {
+    if (reading) return;
+    if (/\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type)) return say('bad', 'This is a HEIC photo, which this browser cannot open. Take a screenshot of it, or convert it to JPG first.');
+    if (!/^image\//.test(f.type) && !/\.(png|jpe?g|webp|gif|bmp)$/i.test(f.name)) return say('bad', '"' + f.name + '" is not a picture. Choose a photo or screenshot of the puzzle.');
+    reading = true; $('ssScan').hidden = false; $('ssBar').style.width = '2%'; $('ssScanText').textContent = 'Looking for the grid…'; say('', '');
+    var prog = function (p, t) { $('ssBar').style.width = Math.round(p * 100) + '%'; $('ssScanText').textContent = t; };
+    try {
+      var res = await readPhoto(f, prog);
+      g = res.map(function (r) { return r.d; }); mark = res.map(function (r) { return r.conf == null ? '' : r.unsure ? 'unsure' : 'ocr'; }); sel = -1; changed();
+      var unsure = res.filter(function (r) { return r.unsure; }).length, n = g.filter(Boolean).length;
+      $('ssScanText').textContent = 'Read ' + n + ' numbers. Compare with the picture of the grid on the left.';
+      report('Read ' + n + ' numbers from the picture' + (unsure ? '; ' + unsure + ' ' + (unsure === 1 ? 'square is' : 'squares are') + ' unsure (dark yellow).' : '.'));
+    } catch (e) {
+      $('ssScan').hidden = e.message !== 'fewdigits';
+      $('ssScanText').textContent = 'This is what was found.';
+      say('bad', e.message === 'open' ? 'That picture could not be opened. Try a JPG or PNG.'
+        : e.message === 'nogrid' ? 'No sudoku grid was found in this picture. Take the photo straight on, with the whole grid inside the picture and good light, or crop it to the puzzle.'
+        : e.message === 'fewdigits' ? 'A grid was found but hardly any numbers could be seen in it. Try a sharper, brighter photo, or type the numbers in.'
+        : e.message === 'load' ? 'The number reader could not load. Check your connection once and try again, or type the numbers in.'
+        : 'The picture could not be read. Try a sharper photo, or type the numbers in.');
+    }
+    reading = false;
+  });
+
+  load(); paint();
+  if (g.some(Boolean)) say('', 'Your last puzzle is back on the board.');
+})();
+</script>

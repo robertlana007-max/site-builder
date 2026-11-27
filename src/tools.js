@@ -6463,5 +6463,211 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"2\" y=\"4\" width=\"13\" height=\"8\" rx=\"1.5\"/><path d=\"M7 6.5l3 1.5-3 1.5z\"/><rect x=\"17\" y=\"4\" width=\"5\" height=\"3\" rx=\"1\"/><rect x=\"17\" y=\"9\" width=\"5\" height=\"3\" rx=\"1\"/><path d=\"M2 16h13M2 19h9M17 16h5M17 19h3\"/>"
+  },
+  {
+    "slug": "secret-note",
+    "cat": "Text tools",
+    "name": "Secret Note",
+    "title": "Secret Note - Password-Protected Encrypted Message Link",
+    "desc": "Lock a private message with a password and share it as a link, text or QR code. AES-256 encryption in your browser; the note never reaches a server.",
+    "card": "Lock a message with a password and share it.",
+    "intro": "Write a private message, lock it with a password, and share it as a link, a block of text or a QR code. The note is encrypted on your device with AES-256-GCM, and in a link it sits after the # sign, which browsers never send to any server. The other person opens the link, types the password and reads the note. Nobody, including us, can recover a lost password.",
+    "steps": [
+      "Type your note and choose a password (type it twice).",
+      "Press Lock note.",
+      "Share the link, the text block or the QR code.",
+      "Tell the other person the password a different way, for example on a call."
+    ],
+    "faq": [
+      [
+        "Can you read my note?",
+        "No. The note is locked and opened in your browser. In a link it sits after the #, a part of the address that browsers never send to a server, so it never reaches us."
+      ],
+      [
+        "What encryption does it use?",
+        "AES-256-GCM, with a key made from your password by PBKDF2-SHA256 with 600,000 rounds, a random 16-byte salt and a random 12-byte IV, all through the browser's built-in Web Crypto."
+      ],
+      [
+        "I forgot the password. Can you recover the note?",
+        "No. Nobody can. Without the password the note cannot be opened, which is what keeps it safe. Ask the sender to lock it again."
+      ],
+      [
+        "What does \"Wrong password or damaged data\" mean?",
+        "Either the password is wrong (it is case-sensitive), or part of the link or text was lost when copying. The lock includes a tamper check, so a changed note will not open with wrong text."
+      ],
+      [
+        "How long can a note be?",
+        "Up to 20,000 characters. Long notes make long links, and above about 2,000 characters the QR code no longer fits; share the link or text then."
+      ],
+      [
+        "Does the link expire?",
+        "No. The locked note is inside the link itself, so it works as long as you keep the link and the password."
+      ]
+    ],
+    "icon": "<rect x=\"4\" y=\"10\" width=\"16\" height=\"11\" rx=\"2\"/><path d=\"M8 10V7a4 4 0 0 1 8 0v3\"/><path d=\"M8 15h8M8 18h5\"/>"
+  },
+  {
+    "slug": "file-locker",
+    "cat": "Developer tools",
+    "name": "File Locker",
+    "title": "File Locker - Encrypt Files with a Password (AES-256)",
+    "desc": "Encrypt any files with a password into one .gtnlock file and unlock them later. AES-256 in your browser, handles 1 GB files, nothing is uploaded.",
+    "card": "Encrypt any files with a password.",
+    "intro": "Lock any files, from one photo to a folder of documents or a large video, with a password. They become a single .gtnlock file that only the password can open, and unlocking gives back the exact original files with their names. Encryption is AES-256-GCM with a PBKDF2 key, done on your device in 4 MB pieces, so large files work and nothing is uploaded.",
+    "steps": [
+      "Add one or more files.",
+      "Choose a password and type it twice.",
+      "Press Lock files and download the .gtnlock file.",
+      "To open it: choose Unlock, pick the .gtnlock file and type the password."
+    ],
+    "faq": [
+      [
+        "Are my files uploaded?",
+        "No. Locking and unlocking happen in your browser. Your files and password never leave your device."
+      ],
+      [
+        "How strong is the encryption?",
+        "AES-256-GCM with a key made from your password by PBKDF2-SHA256 with 600,000 rounds and a random salt. Every 4 MB piece has its own tamper check, and pieces cannot be swapped, removed or cut off without it being noticed."
+      ],
+      [
+        "Can I recover a forgotten password?",
+        "No. Nobody can, not even us. Write the password down somewhere safe and test unlocking before deleting the originals."
+      ],
+      [
+        "How big can the files be?",
+        "Files of 1 GB and more work on a computer, because they are processed in 4 MB pieces. Phones may run out of memory or space with very large files."
+      ],
+      [
+        "How does the other person open the file?",
+        "They open this page, choose \"Unlock a .gtnlock file\", pick the file and type the password. Send the password a different way from the file."
+      ],
+      [
+        "Are the original file names kept?",
+        "Yes. The names, sizes and types are stored inside the encrypted part, so they are hidden too and come back when you unlock."
+      ]
+    ],
+    "icon": "<path d=\"M6 3h8l4 4v5\"/><path d=\"M6 3v18h6\"/><rect x=\"13\" y=\"15\" width=\"8\" height=\"6\" rx=\"1\"/><path d=\"M15 15v-2a2 2 0 0 1 4 0v2\"/>"
+  },
+  {
+    "slug": "image-steganography",
+    "cat": "Image tools",
+    "name": "Image Steganography",
+    "title": "Image Steganography - Hide a Secret Message in a Picture",
+    "desc": "Hide a text message inside a PNG image, optionally locked with a password, and reveal it later. Shows capacity and checks for damage. Free and private.",
+    "card": "Hide a secret message inside a picture.",
+    "intro": "Hide a text message inside a picture so it looks unchanged, and reveal it again later. The message is stored in the lowest bit of each pixel's colours, with a header holding its length and a checksum, and you can lock it with a password too. The result is always a PNG, because JPEG compression and apps that shrink photos wipe hidden messages out. Everything runs on your device.",
+    "steps": [
+      "Pick a picture and check how much text fits.",
+      "Type the message, and add a password if you like.",
+      "Press Hide message and download the PNG.",
+      "To read it: choose Reveal a message and pick the PNG."
+    ],
+    "faq": [
+      [
+        "Why is the result always a PNG?",
+        "PNG keeps every pixel exactly. JPEG and WebP compression change the tiny colour details that hold the message, so the message would be lost."
+      ],
+      [
+        "Can I send the picture on WhatsApp or post it on social media?",
+        "Not as a photo: those apps shrink and recompress pictures, which destroys the message. Send it as a file or document, by email, or through a cloud drive."
+      ],
+      [
+        "How much text fits?",
+        "About 3 bits per pixel, so a 1600 × 1200 picture holds around 720,000 bytes. The tool shows the exact room for your picture."
+      ],
+      [
+        "Is a hidden message secure?",
+        "Hiding only makes it hard to notice. Anyone who suspects a message can read it with a tool like this, unless you also lock it with a password (AES-256-GCM)."
+      ],
+      [
+        "What if the picture was changed?",
+        "A checksum in the header tells you the message is damaged, instead of showing garbage. A JPEG copy usually shows \"no hidden message\"."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><circle cx=\"9\" cy=\"10\" r=\"2\"/><path d=\"M21 16l-5-5-8 9\"/><path d=\"M14 4v3M17 4v2\" />"
+  },
+  {
+    "slug": "wifi-qr-code",
+    "cat": "Generators",
+    "name": "Wi-Fi QR Code",
+    "title": "Wi-Fi QR Code Generator - Scan to Join Wi-Fi Card (Free)",
+    "desc": "Make a QR code that joins your Wi-Fi in one scan. Download PNG or SVG, or print a \"Scan to join Wi-Fi\" sign, A6 card or table tent PDF.",
+    "card": "QR code that joins your Wi-Fi in one scan.",
+    "intro": "Type your Wi-Fi name and password to make a QR code that iPhone and Android cameras scan to join the network, no typing needed. It uses the standard WIFI: format with correct escaping of special characters, supports WPA/WPA2/WPA3, WEP, open and hidden networks, and gives you a PNG, an SVG, or a printable \"Scan to join Wi-Fi\" sign, A6 card or table tent. Your password stays on your device.",
+    "steps": [
+      "Type the network name (SSID) and choose the security type.",
+      "Type the Wi-Fi password exactly.",
+      "Scan the code with your phone to test it.",
+      "Download the PNG or SVG, or make a printable card PDF."
+    ],
+    "faq": [
+      [
+        "Which phones can scan a Wi-Fi QR code?",
+        "iPhones from iOS 11 and most Android phones from Android 10 join directly from the camera app. Older phones can use a QR scanner app."
+      ],
+      [
+        "My network uses WPA3. Which option do I choose?",
+        "Choose \"WPA / WPA2 / WPA3\". The code says WPA, and the phone works out the exact version when it connects."
+      ],
+      [
+        "My password has ; or : in it. Will it work?",
+        "Yes. Special characters (\\ ; , : and \") are escaped in the code as the format requires, so the phone reads the password correctly."
+      ],
+      [
+        "Is my Wi-Fi password saved or uploaded?",
+        "No. The code is made in your browser. The network name is remembered on this device for next time, but the password is not."
+      ],
+      [
+        "Can I hide the password on the printed card?",
+        "Yes. Untick \"Print the network name and password as text\" and the card shows only the heading and the QR code."
+      ],
+      [
+        "What is a table tent?",
+        "A card you fold in half to stand on a table. The PDF prints the design twice, once upside down, so the code faces both sides after folding."
+      ]
+    ],
+    "icon": "<path d=\"M2 8.5a15 15 0 0 1 20 0M5 12a10 10 0 0 1 14 0M8.5 15.5a5 5 0 0 1 7 0\"/><circle cx=\"12\" cy=\"19\" r=\"1.2\"/>"
+  },
+  {
+    "slug": "sudoku-solver",
+    "cat": "Study tools",
+    "name": "Sudoku Solver",
+    "title": "Sudoku Solver - Solve From a Photo, With Step-by-Step Hints",
+    "desc": "Solve any sudoku instantly: type it, paste 81 digits or take a photo. Finds no-solution and multi-solution puzzles and explains hints step by step.",
+    "card": "Solve sudoku from a photo, with hints.",
+    "intro": "Solve any 9x9 sudoku in a moment. Type the puzzle on the board, paste it as 81 digits, or take a photo or screenshot: the tool finds the grid, straightens it, and reads the numbers on your device so you can check and fix them before solving. It tells you if a puzzle has no solution or more than one, and the Hint button explains the next step (naked single or hidden single) in plain words. For new puzzles, try the Sudoku Generator.",
+    "steps": [
+      "Type the puzzle, paste 81 digits, or use a photo or screenshot.",
+      "Check the numbers read from a photo (yellow squares) and fix any mistakes.",
+      "Press Solve for the full answer.",
+      "Or press Hint to see and understand one step at a time."
+    ],
+    "faq": [
+      [
+        "Can it read a sudoku from a photo?",
+        "Yes. It finds the grid, corrects a slight tilt or rotation, and reads the digits with text recognition that runs on your device. Numbers read from the picture are shown in yellow so you can check them; darker yellow means unsure."
+      ],
+      [
+        "What if a number is read wrong?",
+        "Tap the square and tap the right number, or ✕ to empty it. Always compare the board with your puzzle before solving."
+      ],
+      [
+        "What does \"more than one solution\" mean?",
+        "A proper sudoku has exactly one answer. If there are several, a number is probably missing from the board. The tool shows one of the solutions."
+      ],
+      [
+        "How do the hints work?",
+        "A hint finds a naked single (a square where only one number fits) or a hidden single (a number that fits in only one square of a row, column or box) and explains why. Hard puzzles may need techniques beyond these; then press Solve."
+      ],
+      [
+        "Is my photo uploaded?",
+        "No. The picture is read in your browser and never leaves your device."
+      ],
+      [
+        "Where can I get new puzzles?",
+        "Use the Sudoku Generator on this site to play or print puzzles at four levels, each with exactly one solution."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"18\" rx=\"1\"/><path d=\"M9 3v18M15 3v18M3 9h18M3 15h18\"/><path d=\"M16.5 4.5l1.5 2 2.5-3\"/>"
   }
 ];

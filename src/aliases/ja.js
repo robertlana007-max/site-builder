@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"sudoku-solver":["数独 解く","ナンプレ 解答","数独ソルバー","ナンプレ 写真で解く"],
+"wifi-qr-code":["wifi qrコード","wi-fi qrコード 作成","wifiパスワード 共有"],
+"image-steganography":["画像ステガノグラフィー","画像にメッセージを隠す","隠しメッセージ 画像"],
+"file-locker":["ファイル暗号化","ファイルにパスワード","ファイルをロック"],
+"secret-note":["秘密のメモ","テキスト暗号化","パスワード付きメッセージ","暗号化メッセージ"],
 "thumbnail-preview":["サムネイル プレビュー","サムネ 比較","サムネイル テスト","サムネ 見え方"],
 "email-template-builder":["メールテンプレート","htmlメール 作成","メルマガ テンプレート","ニュースレター 作成","メール デザイン"],
 "website-builder":["ホームページ作成","無料 ホームページ","ウェブサイト 作成","1ページ サイト","お店 ホームページ"],

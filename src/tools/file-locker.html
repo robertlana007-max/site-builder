@@ -1,0 +1,321 @@
+<style>
+.fl .fl-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.fl .fl-tabs .btn { flex: 1; justify-content: center; min-width: 120px; }
+.fl input[type=password] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.fl .fl-pw { display: flex; gap: 6px; }
+.fl .fl-pw input { flex: 1; min-width: 0; }
+.fl .fl-pw .btn { min-height: 44px; padding: 6px 12px; flex: none; }
+.fl .fl-hint { display: block; font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.fl .fl-meter { height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin-top: 8px; }
+.fl .fl-meter i { display: block; height: 100%; width: 0; transition: width .2s, background .2s; }
+.fl .fl-prog { margin-top: 14px; }
+.fl .fl-prog .meter { height: 12px; margin-top: 6px; }
+.fl .fl-prog .meter i { transition: none; }
+.fl .fl-prog p { margin: 0; font-size: 14.5px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.fl .fl-total { font-size: 14px; color: var(--muted); margin: -8px 0 14px; }
+.fl .fl-outs { list-style: none; padding: 0; margin: 14px 0 0; display: grid; gap: 8px; }
+.fl .fl-outs li { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; }
+.fl .fl-outs li span { flex: 1; min-width: 0; overflow-wrap: anywhere; font-size: 14px; }
+.fl .fl-outs .btn { min-height: 40px; padding: 6px 14px; }
+</style>
+<div class="fl" id="fl">
+<div class="fl-tabs" role="group" aria-label="What do you want to do?">
+  <button type="button" class="btn ghost" data-tab="lock" aria-pressed="true">Lock files</button>
+  <button type="button" class="btn ghost" data-tab="unlock" aria-pressed="false">Unlock a .gtnlock file</button>
+</div>
+
+<div id="flLock">
+  <div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop files here</b>Any type, one or many. They are locked on your device and never uploaded.</div>
+  <input type="file" id="file" multiple hidden>
+  <ul class="files" id="list"></ul>
+  <p class="fl-total" id="flTotal" hidden></p>
+  <div class="fields">
+    <div><label for="flPw">Password</label>
+      <div class="fl-pw"><input type="password" id="flPw" data-nomemo autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Choose a password"><button type="button" class="btn ghost" id="flShow" aria-pressed="false">Show</button></div>
+      <div class="fl-meter" aria-hidden="true"><i id="flBar"></i></div>
+      <span class="fl-hint" id="flStrength" aria-live="polite">Tip: four or more random words make a strong password that is easy to type.</span>
+    </div>
+    <div><label for="flPw2">Type the password again</label><input type="password" id="flPw2" data-nomemo autocomplete="new-password" autocapitalize="off" spellcheck="false" placeholder="Same password"></div>
+  </div>
+  <div class="notice"><p>Write your password down somewhere safe. Your files are locked on this device with AES-256 encryption, and <b>nobody can recover a lost password</b> &mdash; not us, not anyone. Without it the files are gone for good. Keep your original files until you have tested unlocking.</p></div>
+  <div class="btns"><button type="button" class="btn" id="flGo">Lock files</button><button type="button" class="btn ghost" id="flStop" hidden>Stop</button></div>
+</div>
+
+<div id="flUnlock" hidden>
+  <div class="drop" id="drop2" tabindex="0" role="button"><b>Click or drop a .gtnlock file here</b>A file made with this File Locker.</div>
+  <input type="file" id="file2" accept=".gtnlock" hidden>
+  <ul class="files" id="list2"></ul>
+  <div class="fields">
+    <div><label for="flOpenPw">Password</label>
+      <div class="fl-pw"><input type="password" id="flOpenPw" data-nomemo autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="Password"><button type="button" class="btn ghost" id="flShow2" aria-pressed="false">Show</button></div>
+    </div>
+  </div>
+  <div class="btns"><button type="button" class="btn" id="flOpenGo">Unlock</button><button type="button" class="btn ghost" id="flStop2" hidden>Stop</button></div>
+</div>
+
+<div class="fl-prog" id="flProg" hidden><p id="flProgText">Working…</p><div class="meter"><i id="flProgBar"></i></div></div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+<ul class="fl-outs" id="flOuts"></ul>
+<div class="btns" id="flAllBox" hidden><button type="button" class="btn ghost" id="flAll">Download all</button></div>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- .gtnlock format, version 1 ----------
+  // Header (44 bytes, not secret): "GTNLOCK" + 0x01 | u32 PBKDF2 iterations | 16-byte salt | 12-byte base IV | u32 chunk size (bytes of plain data per chunk)
+  // Key: PBKDF2-HMAC-SHA256(password as UTF-8 NFC, salt, iterations) -> AES-256-GCM key.
+  // Plain stream: u32 manifest length | manifest JSON {v:1, files:[{name,size,type,mtime}]} | the files' bytes one after another.
+  // The stream is cut into chunks of `chunk size` bytes; each is sealed with AES-GCM on its own (ciphertext + 16-byte tag):
+  //   IV = base IV with its last 4 bytes XOR the chunk number (big-endian); additional data = header | u32 chunk number | 1 byte (1 = last chunk).
+  // So chunks cannot be swapped, dropped, cut off at the end, or have their header changed without the tag check failing.
+  var MAGIC = [71, 84, 78, 76, 79, 67, 75], HEAD = 44, ITER = 600000, CS = 4 * 1048576, FOLD = 64 * 1048576;
+  var enc = new TextEncoder();
+  function Bad(msg) { var e = new Error(msg); e.friendly = true; return e; }
+  function Stopped() { var e = new Error('Stopped.'); e.stopped = true; return e; }
+  function u32(n) { var b = new Uint8Array(4); new DataView(b.buffer).setUint32(0, n); return b; }
+  function keyFrom(pw, salt, iter) {
+    return crypto.subtle.importKey('raw', enc.encode(pw.normalize('NFC')), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: iter }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  function ivFor(base, i) { var iv = base.slice(); var dv = new DataView(iv.buffer); dv.setUint32(8, dv.getUint32(8) ^ i); return iv; }
+  function aadFor(head, i, last) { var a = new Uint8Array(HEAD + 5); a.set(head); new DataView(a.buffer).setUint32(HEAD, i); a[HEAD + 4] = last ? 1 : 0; return a; }
+  // collects many pieces into one Blob without keeping them all in page memory
+  function Sink() { this.acc = new Blob([]); this.parts = []; this.n = 0; }
+  Sink.prototype.push = function (u8) { this.parts.push(u8); this.n += u8.byteLength; if (this.n >= FOLD) this.fold(); };
+  Sink.prototype.fold = function () { if (this.parts.length) { this.acc = new Blob([this.acc].concat(this.parts)); this.parts = []; this.n = 0; } };
+  Sink.prototype.blob = function (type) { this.fold(); return new Blob([this.acc], { type: type || 'application/octet-stream' }); };
+
+  async function lockFiles(files, pw, onProgress, stopped) {
+    var manifest = enc.encode(JSON.stringify({ v: 1, files: files.map(function (f) { return { name: f.name, size: f.size, type: f.type || '', mtime: f.lastModified || 0 }; }) }));
+    if (manifest.length > CS - 4) throw Bad('Too many files, or file names that are too long, to lock together. Lock them in smaller groups.');
+    var stream = new Blob([u32(manifest.length), manifest].concat(files)), total = stream.size, n = Math.ceil(total / CS);
+    var head = new Uint8Array(HEAD), salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), dv = new DataView(head.buffer);
+    head.set(MAGIC); head[7] = 1; dv.setUint32(8, ITER); head.set(salt, 12); head.set(iv, 28); dv.setUint32(40, CS);
+    var key = await keyFrom(pw, salt, ITER), out = new Sink();
+    out.push(head);
+    for (var i = 0; i < n; i++) {
+      if (stopped && stopped()) throw Stopped();
+      var plain;
+      try { plain = await stream.slice(i * CS, Math.min(total, (i + 1) * CS)).arrayBuffer(); }
+      catch (e) { throw Bad('One of the files could not be read. It may have been moved, changed or deleted while locking. Pick it again.'); }
+      out.push(new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: ivFor(iv, i), additionalData: aadFor(head, i, i === n - 1) }, key, plain)));
+      if (onProgress) onProgress(Math.min(total, (i + 1) * CS), total);
+    }
+    return out.blob('application/octet-stream');
+  }
+
+  async function readHeader(file) {
+    if (file.size < HEAD) throw Bad('"' + file.name + '" is not a file locked with File Locker (it is too small).');
+    var head = new Uint8Array(await file.slice(0, HEAD).arrayBuffer()), dv = new DataView(head.buffer);
+    for (var k = 0; k < 7; k++) if (head[k] !== MAGIC[k]) throw Bad('"' + file.name + '" is not a file locked with File Locker. Choose the .gtnlock file you made here.');
+    if (head[7] !== 1) throw Bad('"' + file.name + '" was made with a newer version of File Locker (format ' + head[7] + '). Reload this page to get the latest version, then try again.');
+    var iter = dv.getUint32(8), cs = dv.getUint32(40);
+    if (iter < 100000 || iter > 10000000 || cs < 65536 || cs > 67108864) throw Bad('"' + file.name + '" is damaged: its settings are not valid.');
+    return { head: head, iter: iter, salt: head.slice(12, 28), iv: head.slice(28, 40), cs: cs };
+  }
+  async function unlockFile(file, pw, onProgress, stopped) {
+    var h = await readHeader(file), ecs = h.cs + 16, rest = file.size - HEAD, n = Math.ceil(rest / ecs);
+    var lastLen = rest - (n - 1) * ecs;
+    if (n < 1 || lastLen <= 16) throw Bad('"' + file.name + '" is incomplete or damaged. It may not have finished downloading or copying.');
+    var total = rest - 16 * n, key = await keyFrom(pw, h.salt, h.iter);
+    var man = null, idx = 0, left = 0, sink = null, outs = [], done = 0;
+    for (var i = 0; i < n; i++) {
+      if (stopped && stopped()) throw Stopped();
+      var off = HEAD + i * ecs, ct = await file.slice(off, Math.min(file.size, off + ecs)).arrayBuffer(), plain;
+      try { plain = new Uint8Array(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: ivFor(h.iv, i), additionalData: aadFor(h.head, i, i === n - 1) }, key, ct)); }
+      catch (e) {
+        if (i === 0) {
+          // a file cut off inside its only chunk also fails here; say both
+          throw Bad('Wrong password or damaged data. Check the password (capital letters count). If it is right, the file was changed or did not download completely.');
+        }
+        throw Bad('The password is right, but "' + file.name + '" is damaged or incomplete (part ' + (i + 1) + ' of ' + n + ' failed its check). Nothing was unlocked. Try another copy of the file.');
+      }
+      var p = 0;
+      if (i === 0) {
+        var ml = plain.length >= 4 ? new DataView(plain.buffer, plain.byteOffset).getUint32(0) : -1;
+        try { man = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(plain.subarray(4, 4 + ml))); } catch (e) { man = null; }
+        if (ml < 2 || 4 + ml > plain.length || !man || man.v !== 1 || !Array.isArray(man.files)) throw Bad('"' + file.name + '" is damaged: its list of files could not be read.');
+        var sum = 0; man.files.forEach(function (f) { if (typeof f.name !== 'string' || !(f.size >= 0)) sum = NaN; sum += f.size; });
+        if (sum + 4 + ml !== total) throw Bad('"' + file.name + '" is incomplete or damaged: its size does not match its list of files. It may not have finished downloading or copying.');
+        p = 4 + ml;
+      }
+      while (p < plain.length || (idx < man.files.length && !man.files[idx].size && !sink)) {
+        if (!sink) { if (idx >= man.files.length) break; sink = new Sink(); left = man.files[idx].size; }
+        var take = Math.min(left, plain.length - p);
+        if (take > 0) sink.push(plain.subarray(p, p + take));
+        p += take; left -= take;
+        if (!left) { var f = man.files[idx]; outs.push({ name: f.name, type: f.type, mtime: f.mtime, size: f.size, blob: sink.blob(f.type) }); sink = null; idx++; }
+      }
+      done += plain.length;
+      if (onProgress) onProgress(done, total);
+    }
+    while (idx < man.files.length && !man.files[idx].size) { outs.push({ name: man.files[idx].name, type: man.files[idx].type, size: 0, blob: new Blob([]) }); idx++; }
+    if (outs.length !== man.files.length) throw Bad('"' + file.name + '" is damaged: some files are missing.');
+    return outs;
+  }
+  window.GTNFileLocker = { lock: lockFiles, unlock: unlockFile, chunk: CS }; // used by tests
+
+  // ---------- password strength hint ----------
+  var common = null;
+  function loadCommon() {
+    if (common || window.__flCommon) return; window.__flCommon = 1;
+    var s = document.createElement('script'); s.src = '../assets/vendor/common-passwords/common-passwords-10k.js'; s.async = true;
+    s.onload = function () { common = new Set(String(window.GTN_COMMON_PASSWORDS || '').split('\n')); showStrength(); };
+    document.head.appendChild(s);
+  }
+  function strength(pw) {
+    var ch = Array.from(pw), n = ch.length, pool = 0;
+    if (/[a-z]/.test(pw)) pool += 26; if (/[A-Z]/.test(pw)) pool += 26; if (/[0-9]/.test(pw)) pool += 10;
+    if (/[^A-Za-z0-9\s]/.test(pw)) pool += 33; if (/[^\x00-\x7f]/.test(pw)) pool += 60; if (/\s/.test(pw)) pool += 1;
+    var bits = n * Math.log2(Math.max(pool, 2));
+    var uniq = new Set(ch).size; if (uniq < n / 2) bits *= uniq / (n / 2);
+    if (/(012|123|234|345|456|567|678|789|abc|bcd|cde|qwe|wer|asd|zxc|password|pass|admin|love|1111|0000)/i.test(pw)) bits -= 12;
+    var lower = pw.toLowerCase(), core = lower.replace(/[^a-z]+$/, '').replace(/^[^a-z]+/, '');
+    var plain = lower.replace(/[0@4]/g, function (c) { return c === '0' ? 'o' : 'a'; }).replace(/[1!|]/g, 'i').replace(/3/g, 'e').replace(/[5$]/g, 's').replace(/7/g, 't');
+    if ((plain.match(/[a-z]{5,}/) || [''])[0].length >= 5 && n < 16) bits *= 0.65; // a word with a few swaps is easy to guess
+    var words = pw.split(/[\s\-_.,+]+/).filter(function (w) { return w.length >= 3; });
+    if (words.length >= 3) bits = Math.max(bits, words.length * 11);
+    if (common && (common.has(lower) || (core.length >= 3 && common.has(core) && n - core.length <= 4))) bits = Math.min(bits, 12);
+    if (/^\d+$/.test(pw)) bits = Math.min(bits, n * 3.32);
+    return Math.max(0, bits);
+  }
+  var LEVELS = [
+    [28, 'Very weak', 'A computer could guess this in moments. Use a longer password.', '#dc2626'],
+    [40, 'Weak', 'Easy to guess with a fast computer. Add more words or characters.', '#ea580c'],
+    [56, 'Fair', 'OK for low-risk files. For anything important, make it longer.', '#ca8a04'],
+    [72, 'Strong', 'Good. Hard to guess.', '#16a34a'],
+    [1e9, 'Very strong', 'Excellent.', '#15803d']
+  ];
+  function showStrength() {
+    var pw = $('flPw').value;
+    if (!pw) { $('flBar').style.width = '0'; $('flStrength').textContent = 'Tip: four or more random words make a strong password that is easy to type.'; return; }
+    var b = strength(pw), lv = LEVELS.filter(function (l) { return b < l[0]; })[0], i = LEVELS.indexOf(lv);
+    $('flBar').style.width = (20 + i * 20) + '%'; $('flBar').style.background = lv[3];
+    $('flStrength').textContent = lv[1] + ': ' + lv[2] + (i < 3 ? ' Tip: four or more random words, or 14+ mixed characters.' : '');
+  }
+
+  // ---------- UI ----------
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  var files = [], locked = null, busy = false, stop = false, urls = [];
+  function clearOut() { urls.forEach(function (u) { URL.revokeObjectURL(u); }); urls = []; $('flOuts').innerHTML = ''; $('flAllBox').hidden = true; }
+  function setTab(t) {
+    if (busy) return;
+    [].forEach.call(document.querySelectorAll('.fl-tabs .btn'), function (b) { b.setAttribute('aria-pressed', b.dataset.tab === t); });
+    $('flLock').hidden = t !== 'lock'; $('flUnlock').hidden = t !== 'unlock'; $('flProg').hidden = true; clearOut(); say('', '');
+  }
+  [].forEach.call(document.querySelectorAll('.fl-tabs .btn'), function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+  function eye(btn, ids) {
+    $(btn).addEventListener('click', function () {
+      var on = $(ids[0]).type === 'password';
+      ids.forEach(function (id) { $(id).type = on ? 'text' : 'password'; });
+      this.setAttribute('aria-pressed', on); this.textContent = on ? 'Hide' : 'Show';
+    });
+  }
+  eye('flShow', ['flPw', 'flPw2']); eye('flShow2', ['flOpenPw']);
+  $('flPw').addEventListener('input', function () { loadCommon(); showStrength(); });
+  $('flPw').addEventListener('focus', loadCommon);
+  ['flPw', 'flPw2', 'flOpenPw'].forEach(function (id) { $(id).addEventListener('input', function () { if (!busy) clearOut(); }); });
+
+  function wireDrop(dropId, inputId, onFiles) {
+    var drop = $(dropId), input = $(inputId);
+    function take(list) { var a = Array.prototype.slice.call(list); input.value = ''; if (a.length && !busy) onFiles(a); }
+    drop.addEventListener('click', function () { if (!busy) input.click(); });
+    drop.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!busy) input.click(); } });
+    input.addEventListener('change', function () { take(input.files); });
+    ['dragenter', 'dragover'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.add('over'); }); });
+    ['dragleave', 'drop'].forEach(function (ev) { drop.addEventListener(ev, function (e) { e.preventDefault(); drop.classList.remove('over'); }); });
+    drop.addEventListener('drop', function (e) { take(e.dataTransfer.files); });
+  }
+  function row(ul, text, onRemove) {
+    var li = document.createElement('li'), s = document.createElement('span'); s.textContent = text; li.appendChild(s);
+    if (onRemove) { var b = document.createElement('button'); b.type = 'button'; b.textContent = '✕'; b.setAttribute('aria-label', 'Remove ' + text); b.addEventListener('click', onRemove); li.appendChild(b); }
+    ul.appendChild(li);
+  }
+  function showFiles() {
+    var ul = $('list'); ul.innerHTML = '';
+    files.forEach(function (f, i) { row(ul, f.name + ' (' + fmtBytes(f.size) + ')', function () { if (busy) return; files.splice(i, 1); showFiles(); clearOut(); say('', ''); }); });
+    var tot = files.reduce(function (a, f) { return a + f.size; }, 0);
+    $('flTotal').hidden = !files.length;
+    $('flTotal').textContent = files.length + (files.length === 1 ? ' file, ' : ' files, ') + fmtBytes(tot) + ' in total.' + (tot > 1024 * 1048576 ? ' Very large: this can take a while and may fail on phones with little free space.' : '');
+  }
+  wireDrop('drop', 'file', function (a) {
+    clearOut();
+    if (a.every(function (f) { return /\.gtnlock$/i.test(f.name); }) && !files.length) {
+      setTab('unlock'); locked = a[0]; showLocked(); say('', 'That file is already locked, so it was opened in Unlock. Type its password.'); return;
+    }
+    a.forEach(function (f) { if (!files.some(function (g) { return g.name === f.name && g.size === f.size && g.lastModified === f.lastModified; })) files.push(f); });
+    showFiles(); say('', '');
+  });
+  function showLocked() { var ul = $('list2'); ul.innerHTML = ''; if (locked) row(ul, locked.name + ' (' + fmtBytes(locked.size) + ')', function () { if (busy) return; locked = null; showLocked(); clearOut(); say('', ''); }); }
+  wireDrop('drop2', 'file2', function (a) { clearOut(); locked = a[0]; showLocked(); say('', a.length > 1 ? 'Only one locked file can be opened at a time. Using "' + a[0].name + '".' : ''); });
+
+  function progress(label) {
+    var t0 = Date.now();
+    $('flProg').hidden = false; $('flProgBar').style.width = '0'; $('flProgText').textContent = label + '…';
+    return function (d, t) {
+      var pct = t ? Math.floor(d / t * 100) : 100, s = (Date.now() - t0) / 1000, left = d && s > 2 ? Math.round(s * (t - d) / d) : 0;
+      $('flProgBar').style.width = pct + '%';
+      $('flProgText').textContent = label + '… ' + pct + '% (' + fmtBytes(d) + ' of ' + fmtBytes(t) + ')' + (left > 3 ? ' · about ' + (left > 90 ? Math.round(left / 60) + ' min' : left + ' s') + ' left' : '');
+    };
+  }
+  function start(goId, stopId) { busy = true; stop = false; $(goId).disabled = true; $(stopId).hidden = false; $(stopId).disabled = false; clearOut(); }
+  function end(goId, stopId) { busy = false; $(goId).disabled = false; $(stopId).hidden = true; }
+  $('flStop').addEventListener('click', function () { stop = true; this.disabled = true; });
+  $('flStop2').addEventListener('click', function () { stop = true; this.disabled = true; });
+  function outLink(name, blob) {
+    var u = URL.createObjectURL(blob); urls.push(u);
+    var li = document.createElement('li'), s = document.createElement('span'), a = document.createElement('a');
+    s.textContent = name + ' · ' + fmtBytes(blob.size); a.className = 'btn'; a.href = u; a.download = name; a.textContent = 'Download';
+    li.appendChild(s); li.appendChild(a); $('flOuts').appendChild(li);
+  }
+  function noCrypto() { return !window.crypto || !crypto.subtle; }
+  function base(n) { return n.replace(/\.[^.]+$/, ''); }
+
+  $('flGo').addEventListener('click', async function () {
+    if (busy) return;
+    var pw = $('flPw').value;
+    if (!files.length) return say('bad', 'Add one or more files first.');
+    if (!pw) { $('flPw').focus(); return say('bad', 'Choose a password.'); }
+    if (pw !== $('flPw2').value) { $('flPw2').focus(); return say('bad', 'The two passwords are not the same. Type the same password in both boxes.'); }
+    if (noCrypto()) return say('bad', 'This browser cannot lock files (secure encryption is not available). Open this page with https:// in an up-to-date browser.');
+    start('flGo', 'flStop'); say('', 'Making the key from your password…');
+    var prog = progress('Locking');
+    try {
+      var blob = await lockFiles(files.slice(), pw, prog, function () { return stop; });
+      var name = (files.length === 1 ? files[0].name : base(files[0].name) + '-and-' + (files.length - 1) + '-more') + '.gtnlock';
+      outLink(name, blob); $('flProgText').textContent = 'Done: ' + fmtBytes(blob.size) + ' locked file.';
+      say('ok', 'Locked ' + files.length + (files.length === 1 ? ' file' : ' files') + '. Download the .gtnlock file below. To open it later, come back to this page, choose Unlock and type the password.');
+    } catch (e) {
+      $('flProg').hidden = true;
+      say('bad', e.stopped ? 'Stopped. Nothing was saved.' : e.friendly ? e.message : /quota|memory|allocation/i.test(String(e && (e.name + e.message))) ? 'Your device ran out of memory or storage space. Try fewer or smaller files, or a computer.' : 'Something went wrong while locking. Please try again.');
+    }
+    end('flGo', 'flStop');
+  });
+
+  $('flOpenGo').addEventListener('click', async function () {
+    if (busy) return;
+    var pw = $('flOpenPw').value;
+    if (!locked) return say('bad', 'Choose the .gtnlock file to unlock first.');
+    if (!pw) { $('flOpenPw').focus(); return say('bad', 'Type the password.'); }
+    if (noCrypto()) return say('bad', 'This browser cannot unlock files (secure encryption is not available). Open this page with https:// in an up-to-date browser.');
+    start('flOpenGo', 'flStop2'); say('', 'Checking the password…');
+    var prog = progress('Unlocking');
+    try {
+      var outs = await unlockFile(locked, pw, prog, function () { return stop; });
+      outs.forEach(function (o) { outLink(o.name, o.blob); });
+      $('flAllBox').hidden = outs.length < 2; $('flProgText').textContent = 'Done.';
+      say('ok', 'Unlocked ' + outs.length + (outs.length === 1 ? ' file' : ' files') + ' with the original ' + (outs.length === 1 ? 'name' : 'names') + '. Every part passed its tamper check.');
+    } catch (e) {
+      $('flProg').hidden = true;
+      say('bad', e.stopped ? 'Stopped.' : e.friendly ? e.message : /quota|memory|allocation/i.test(String(e && (e.name + e.message))) ? 'Your device ran out of memory or storage space. Try on a computer.' : 'Wrong password or damaged data.');
+    }
+    end('flOpenGo', 'flStop2');
+  });
+  $('flOpenPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); $('flOpenGo').click(); } });
+  $('flAll').addEventListener('click', function () {
+    var links = [].slice.call(document.querySelectorAll('#flOuts a'));
+    links.forEach(function (a, i) { setTimeout(function () { a.click(); }, i * 400); });
+  });
+})();
+</script>

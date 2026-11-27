@@ -1,0 +1,234 @@
+<style>
+.stg .stg-tabs { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+.stg .stg-tabs .btn { flex: 1; justify-content: center; min-width: 120px; }
+.stg input[type=password] { width: 100%; font: inherit; color: var(--ink); background: var(--field); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; min-height: 44px; }
+.stg .stg-hint { display: block; font-size: 13.5px; color: var(--muted); margin-top: 6px; }
+.stg .stg-cap { font-size: 14.5px; color: var(--muted); margin: -6px 0 14px; }
+.stg .stg-cap.bad { color: var(--bad); }
+.stg .stg-check { display: flex; align-items: center; gap: 6px; font-weight: 600; margin: 0 0 12px; }
+.stg .stg-pw { display: flex; gap: 6px; }
+.stg .stg-pw input { flex: 1; min-width: 0; }
+.stg .stg-pw .btn { min-height: 44px; padding: 6px 12px; flex: none; }
+.stg .stg-prev { margin: 0 0 14px; text-align: center; }
+.stg .stg-prev img { max-width: 100%; max-height: 260px; border-radius: 10px; border: 1px solid var(--line); background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 16px 16px; }
+.stg .stg-plain { white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 16px; min-height: 50px; max-height: 420px; overflow: auto; margin-top: 14px; }
+.stg .notice p + p { margin-top: 6px; }
+</style>
+<div class="stg" id="stg">
+<div class="stg-tabs" role="group" aria-label="What do you want to do?">
+  <button type="button" class="btn ghost" data-tab="hide" aria-pressed="true">Hide a message</button>
+  <button type="button" class="btn ghost" data-tab="reveal" aria-pressed="false">Reveal a message</button>
+</div>
+
+<div id="stHide">
+  <div class="drop" id="drop" tabindex="0" role="button"><b>Click or drop a picture here</b>PNG, JPG, WebP, GIF or BMP. The new picture is always saved as PNG.</div>
+  <input type="file" id="file" accept="image/*" hidden>
+  <div class="stg-prev" id="stPrevBox" hidden><img id="stPrev" alt="Your picture"></div>
+  <p class="stg-cap" id="stCap" hidden></p>
+  <div class="fields" style="grid-template-columns:1fr">
+    <div><label for="stText">Secret message</label><textarea id="stText" class="plain" data-nomemo style="min-height:120px" placeholder="Type the message to hide inside the picture."></textarea></div>
+  </div>
+  <label class="stg-check"><input type="checkbox" id="stLock" data-nomemo>Also lock the message with a password</label>
+  <div class="fields" id="stPwBox" hidden>
+    <div><label for="stPw">Password</label><div class="stg-pw"><input type="password" id="stPw" data-nomemo autocomplete="new-password" autocapitalize="off" spellcheck="false"><button type="button" class="btn ghost" id="stShow" aria-pressed="false">Show</button></div>
+      <span class="stg-hint">Without a password, anyone with this tool can read the message. With one, they also need the password. Nobody can recover a lost password.</span></div>
+    <div><label for="stPw2">Type the password again</label><input type="password" id="stPw2" data-nomemo autocomplete="new-password" autocapitalize="off" spellcheck="false"></div>
+  </div>
+  <div class="notice"><p>Send the new picture as a <b>file</b> (email attachment, cloud drive, "send as document"). WhatsApp, Facebook, Instagram, X and most chat apps shrink and recompress photos, which wipes out the hidden message. Saving it as JPEG, editing, cropping or resizing it does the same.</p></div>
+  <div class="btns"><button type="button" class="btn" id="stGo">Hide message</button><a class="btn ghost" id="dl" hidden>Download PNG</a></div>
+</div>
+
+<div id="stReveal" hidden>
+  <div class="drop" id="drop2" tabindex="0" role="button"><b>Click or drop the picture with the hidden message</b>Use the PNG file exactly as you received it.</div>
+  <input type="file" id="file2" accept="image/*" hidden>
+  <div class="stg-prev" id="stPrevBox2" hidden><img id="stPrev2" alt="Picture to check"></div>
+  <div class="fields" id="stPwBox2" hidden>
+    <div><label for="stOpenPw">This message is locked. Password</label><div class="stg-pw"><input type="password" id="stOpenPw" data-nomemo autocomplete="off" autocapitalize="off" spellcheck="false"><button type="button" class="btn ghost" id="stShow2" aria-pressed="false">Show</button></div></div>
+  </div>
+  <div class="btns" id="stOpenBox" hidden><button type="button" class="btn" id="stOpenGo">Unlock message</button></div>
+  <div id="stShown" hidden>
+    <div class="stg-plain" id="stPlain"></div>
+    <div class="btns"><button type="button" class="btn ghost" id="stCopy">Copy message</button></div>
+  </div>
+</div>
+<p class="msg" id="msg" role="status" aria-live="polite"></p>
+</div>
+<script>
+(function () {
+  'use strict';
+  // ---------- hidden data layout (format 1) ----------
+  // The bits are stored in the lowest bit of the red, green and blue values of each fully opaque pixel,
+  // left to right, top to bottom (see-through pixels are skipped because browsers do not keep their colours exactly).
+  // Header 14 bytes: "GTNS" | version 1 | flags (bit 0 = password) | u32 payload length | u32 CRC-32 of payload.
+  // Payload: UTF-8 text, or with a password: 16-byte salt | 12-byte IV | AES-256-GCM(text) (key: PBKDF2-SHA256, 600,000 rounds; additional data = first 6 header bytes).
+  var MAGIC = [71, 84, 78, 83], HL = 14, ITER = 600000, MAXPX = 50e6;
+  var enc = new TextEncoder();
+  var CRC = (function () { var t = new Uint32Array(256); for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  function crc32(b) { var c = 0xFFFFFFFF; for (var i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+  function Bad(m) { var e = new Error(m); e.friendly = true; return e; }
+  function keyFrom(pw, salt) {
+    return crypto.subtle.importKey('raw', enc.encode(pw.normalize('NFC')), 'PBKDF2', false, ['deriveKey']).then(function (base) {
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', hash: 'SHA-256', salt: salt, iterations: ITER }, base, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  // the usable channel positions in RGBA pixel data
+  function slots(px) { var n = 0; for (var i = 3; i < px.length; i += 4) if (px[i] === 255) n++; return n * 3; }
+  function capacity(px) { return Math.max(0, Math.floor(slots(px) / 8) - HL); }
+  function Cursor(px) { this.px = px; this.p = 0; this.c = 0; }
+  Cursor.prototype.next = function () { // index of the next usable byte in px
+    var px = this.px;
+    while (this.p < px.length && px[this.p + 3] !== 255) this.p += 4;
+    if (this.p >= px.length) return -1;
+    var i = this.p + this.c; if (++this.c === 3) { this.c = 0; this.p += 4; }
+    return i;
+  };
+  function writeBits(px, bytes) {
+    var cur = new Cursor(px);
+    for (var b = 0; b < bytes.length; b++) for (var k = 7; k >= 0; k--) { var i = cur.next(); px[i] = (px[i] & 254) | ((bytes[b] >> k) & 1); }
+  }
+  function readBytes(cur, n) {
+    var out = new Uint8Array(n);
+    for (var b = 0; b < n; b++) { var v = 0; for (var k = 0; k < 8; k++) { var i = cur.next(); if (i < 0) return null; v = (v << 1) | (cur.px[i] & 1); } out[b] = v; }
+    return out;
+  }
+  async function pack(text, pw) {
+    var payload = enc.encode(text), flags = 0;
+    var head = new Uint8Array(HL); head.set(MAGIC); head[4] = 1;
+    if (pw) {
+      flags = 1; head[5] = flags;
+      var salt = crypto.getRandomValues(new Uint8Array(16)), iv = crypto.getRandomValues(new Uint8Array(12)), key = await keyFrom(pw, salt);
+      var ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv, additionalData: head.subarray(0, 6) }, key, payload));
+      payload = new Uint8Array(28 + ct.length); payload.set(salt); payload.set(iv, 16); payload.set(ct, 28);
+    }
+    var dv = new DataView(head.buffer); dv.setUint32(6, payload.length); dv.setUint32(10, crc32(payload));
+    var all = new Uint8Array(HL + payload.length); all.set(head); all.set(payload, HL);
+    return all;
+  }
+  // -> { locked: bool, payload } or throws a friendly error
+  function extract(px) {
+    var cur = new Cursor(px), head = readBytes(cur, HL);
+    if (!head || MAGIC.some(function (m, i) { return head[i] !== m; })) return null;
+    if (head[4] !== 1) throw Bad('This picture holds a message made with a newer version of this tool. Reload the page to get the latest version.');
+    var dv = new DataView(head.buffer), len = dv.getUint32(6), sum = dv.getUint32(10);
+    if (len > capacity(px) || len < 1) throw Bad('A hidden message was found, but it is damaged: the picture was changed after the message was hidden (for example recompressed, resized or edited).');
+    var payload = readBytes(cur, len);
+    if (!payload || crc32(payload) !== sum) throw Bad('A hidden message was found, but it is damaged (its checksum does not match). The picture was changed after the message was hidden, for example by JPEG compression, a chat app, resizing or editing. Ask for the original PNG file.');
+    if (head[5] & 1 && len < 44) throw Bad('The hidden message is damaged.');
+    return { locked: !!(head[5] & 1), head: head, payload: payload };
+  }
+  async function openLocked(r, pw) {
+    var key = await keyFrom(pw, r.payload.subarray(0, 16)), plain;
+    try { plain = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: r.payload.subarray(16, 28), additionalData: r.head.subarray(0, 6) }, key, r.payload.subarray(28)); }
+    catch (e) { throw Bad('Wrong password or damaged data. Check the password (capital letters count).'); }
+    return new TextDecoder().decode(plain);
+  }
+  function decodeText(b) { try { return new TextDecoder('utf-8', { fatal: true }).decode(b); } catch (e) { throw Bad('The hidden message is damaged.'); } }
+
+  // read a picture's exact pixels (no colour conversion)
+  async function pixels(file) {
+    if (/\.hei[cf]$/i.test(file.name) || /hei[cf]/i.test(file.type)) throw Bad('This is a HEIC photo (the iPhone format), which this browser cannot open. Convert it to PNG or JPG first.');
+    if (!/^image\//.test(file.type) && !/\.(png|jpe?g|webp|gif|bmp|avif)$/i.test(file.name)) throw Bad('"' + file.name + '" is not a picture. Choose a PNG, JPG, WebP, GIF or BMP file.');
+    var bmp;
+    try { bmp = await createImageBitmap(file, { colorSpaceConversion: 'none', premultiplyAlpha: 'none' }); }
+    catch (e) { throw Bad('"' + file.name + '" could not be opened. It may be damaged, or in a format this browser cannot read.'); }
+    var w = bmp.width, h = bmp.height;
+    if (w * h > MAXPX) { bmp.close && bmp.close(); throw Bad('This picture is very large (' + w + ' × ' + h + ' px). Choose one under 50 megapixels.'); }
+    var c = document.createElement('canvas'); c.width = w; c.height = h;
+    var ctx = c.getContext('2d', { willReadFrequently: true }); ctx.drawImage(bmp, 0, 0); bmp.close && bmp.close();
+    return { canvas: c, ctx: ctx, data: ctx.getImageData(0, 0, w, h), w: w, h: h };
+  }
+  window.GTNStego = { pack: pack, extract: extract, writeBits: writeBits, capacity: capacity, openLocked: openLocked }; // used by tests
+
+  // ---------- UI ----------
+  function say(cls, t) { var m = $('msg'); m.className = 'msg ' + (cls || ''); m.textContent = t || ''; }
+  var src = null, srcName = 'picture', isJpeg = false, outUrl = null, busy = false, prevUrls = {};
+  function setTab(t) {
+    if (busy) return;
+    [].forEach.call(document.querySelectorAll('.stg-tabs .btn'), function (b) { b.setAttribute('aria-pressed', b.dataset.tab === t); });
+    $('stHide').hidden = t !== 'hide'; $('stReveal').hidden = t !== 'reveal'; say('', '');
+  }
+  [].forEach.call(document.querySelectorAll('.stg-tabs .btn'), function (b) { b.addEventListener('click', function () { setTab(b.dataset.tab); }); });
+  function eye(btn, ids) { $(btn).addEventListener('click', function () { var on = $(ids[0]).type === 'password'; ids.forEach(function (id) { $(id).type = on ? 'text' : 'password'; }); this.setAttribute('aria-pressed', on); this.textContent = on ? 'Hide' : 'Show'; }); }
+  eye('stShow', ['stPw', 'stPw2']); eye('stShow2', ['stOpenPw']);
+  function preview(id, file) { if (prevUrls[id]) URL.revokeObjectURL(prevUrls[id]); prevUrls[id] = URL.createObjectURL(file); $(id).src = prevUrls[id]; $(id).parentNode.hidden = false; }
+  function stale() { $('dl').hidden = true; }
+
+  function showCap() {
+    if (!src) { $('stCap').hidden = true; return; }
+    var cap = src.cap, used = enc.encode($('stText').value).length + ($('stLock').checked ? 44 : 0);
+    $('stCap').hidden = false;
+    $('stCap').className = 'stg-cap' + (used > cap ? ' bad' : '');
+    $('stCap').textContent = src.w + ' × ' + src.h + ' px · room for ' + fmtNum(cap, 0) + ' bytes (about ' + fmtNum(cap, 0) + ' English letters, fewer for other scripts and emoji). Your message uses ' + fmtNum(used, 0) + (used === 1 ? ' byte' : ' bytes') + (used > cap ? ': too long for this picture. Shorten it or use a bigger picture.' : '.');
+  }
+  setupDrop('drop', 'file', async function (f) {
+    if (busy) return; src = null; stale(); $('stPrevBox').hidden = true; showCap(); say('', 'Opening…');
+    try {
+      var p = await pixels(f);
+      src = p; src.cap = capacity(p.data.data); srcName = f.name.replace(/\.[^.]+$/, '') || 'picture'; isJpeg = /jpe?g/i.test(f.type) || /\.jpe?g$/i.test(f.name);
+      preview('stPrev', f); showCap();
+      if (src.cap < 1) { say('bad', 'This picture has no room for a message (it is too small or fully see-through). Choose a bigger picture.'); return; }
+      say('', isJpeg ? 'A JPG is fine to start from: the new picture will be a PNG, which keeps the message safe (the file will be bigger than the JPG).' : '');
+    } catch (e) { say('bad', e.friendly ? e.message : 'That picture could not be opened.'); }
+  });
+  $('stText').addEventListener('input', function () { showCap(); stale(); });
+  $('stLock').addEventListener('change', function () { $('stPwBox').hidden = !this.checked; showCap(); stale(); });
+  ['stPw', 'stPw2'].forEach(function (id) { $(id).addEventListener('input', stale); });
+
+  $('stGo').addEventListener('click', async function () {
+    if (busy) return;
+    var text = $('stText').value, lock = $('stLock').checked, pw = $('stPw').value;
+    if (!src) return say('bad', 'Choose a picture first.');
+    if (!text) { $('stText').focus(); return say('bad', 'Type the message to hide.'); }
+    if (lock && !pw) { $('stPw').focus(); return say('bad', 'Choose a password, or untick "lock with a password".'); }
+    if (lock && pw !== $('stPw2').value) { $('stPw2').focus(); return say('bad', 'The two passwords are not the same.'); }
+    if (lock && (!window.crypto || !crypto.subtle)) return say('bad', 'This browser cannot use passwords here (secure encryption is not available). Open the page with https://, or hide the message without a password.');
+    busy = true; $('stGo').disabled = true; say('', lock ? 'Locking and hiding…' : 'Hiding…');
+    try {
+      var bytes = await pack(text, lock ? pw : '');
+      if (bytes.length - HL > src.cap) throw Bad('The message is too long for this picture: it needs ' + fmtNum(bytes.length - HL, 0) + ' bytes and the picture has room for ' + fmtNum(src.cap, 0) + '. Shorten it or use a bigger picture.');
+      var img = new ImageData(new Uint8ClampedArray(src.data.data), src.w, src.h);
+      writeBits(img.data, bytes);
+      var c = document.createElement('canvas'); c.width = src.w; c.height = src.h; c.getContext('2d').putImageData(img, 0, 0);
+      var blob = await new Promise(function (res) { c.toBlob(res, 'image/png'); });
+      if (!blob) throw Bad('Your browser could not save the PNG. Try a smaller picture.');
+      // check the PNG really holds the message before handing it out
+      var back = await pixels(new File([blob], 'check.png', { type: 'image/png' })), r = extract(back.data.data);
+      if (!r || crc32(r.payload) !== crc32(bytes.subarray(HL))) throw Bad('This browser changed the picture\'s colours while saving, so the message could not be stored safely. Try another browser (Chrome, Edge, Firefox or Safari).');
+      if (outUrl) URL.revokeObjectURL(outUrl);
+      outUrl = URL.createObjectURL(blob);
+      $('dl').href = outUrl; $('dl').download = srcName + '-hidden.png'; $('dl').hidden = false;
+      say('ok', 'Done. The message is hidden and checked. Download the PNG (' + fmtBytes(blob.size) + ') and send it as a file, not as a photo.');
+    } catch (e) { say('bad', e.friendly ? e.message : 'Something went wrong. Please try again.'); }
+    busy = false; $('stGo').disabled = false;
+  });
+
+  var found = null;
+  setupDrop('drop2', 'file2', async function (f) {
+    if (busy) return; found = null; $('stShown').hidden = true; $('stPwBox2').hidden = true; $('stOpenBox').hidden = true; say('', 'Looking for a hidden message…');
+    var jpeg = /jpe?g/i.test(f.type) || /\.jpe?g$/i.test(f.name);
+    try {
+      var p = await pixels(f); preview('stPrev2', f);
+      var r = extract(p.data.data);
+      if (!r) {
+        return say('bad', jpeg ? 'No hidden message found. This picture is a JPEG: JPEG compression destroys hidden messages. If someone sent you a message, ask them to send the original PNG file as a document or attachment, not as a photo.'
+          : 'No hidden message found in this picture. If a message was hidden in it, the picture was probably changed afterwards (sent as a photo through a chat or social app, saved as JPEG, resized or edited). Ask for the original PNG file.');
+      }
+      found = r;
+      if (r.locked) { $('stPwBox2').hidden = false; $('stOpenBox').hidden = false; $('stOpenPw').value = ''; $('stOpenPw').focus(); say('', 'A hidden message was found. It is locked with a password.'); return; }
+      $('stPlain').textContent = decodeText(r.payload); $('stShown').hidden = false; say('ok', 'A hidden message was found.');
+    } catch (e) { say('bad', e.friendly ? e.message : 'That picture could not be checked.'); }
+  });
+  async function openGo() {
+    if (busy || !found) return;
+    var pw = $('stOpenPw').value; if (!pw) return say('bad', 'Type the password.');
+    if (!window.crypto || !crypto.subtle) return say('bad', 'This browser cannot open password-locked messages (secure encryption is not available). Open this page with https://.');
+    busy = true; $('stOpenGo').disabled = true; say('', 'Unlocking…');
+    try { $('stPlain').textContent = await openLocked(found, pw); $('stShown').hidden = false; say('ok', 'Unlocked.'); }
+    catch (e) { $('stShown').hidden = true; say('bad', e.friendly ? e.message : 'Wrong password or damaged data.'); }
+    busy = false; $('stOpenGo').disabled = false;
+  }
+  $('stOpenGo').addEventListener('click', openGo);
+  $('stOpenPw').addEventListener('keydown', function (e) { if (e.key === 'Enter') { e.preventDefault(); openGo(); } });
+  $('stCopy').addEventListener('click', function () { copyText($('stPlain').textContent, this); });
+})();
+</script>
