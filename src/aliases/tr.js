@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"tournament-bracket-maker":["turnuva fikstürü","eleme tablosu","fikstür oluşturma","lig tablosu","kura çekimi"],
+"scoreboard-keeper":["skor tabelası","puan sayacı","online skorbord","maç skoru tutma","oyun puan tablosu"],
+"chord-progression-generator":["akor yürüyüşü oluşturucu","akor dizisi","gitar akorları","tonalite akorları","akor transpoze"],
+"drum-machine":["davul makinesi","beat yapma","online beat maker","ritim yapıcı","davul online"],
+"online-piano":["online piyano","sanal piyano","piyano çal","klavye piyano","org çal"],
 "vibration-meter":["titreşim ölçer","titreşim ölçme","ivmeölçer","çamaşır makinesi titreşimi"],
 "light-meter":["lüksmetre","ışık ölçer","pozometre","lüks ölçme","bitki ışığı"],
 "protractor":["iletki","online iletki","açı ölçer","fotoğrafta açı ölçme","online cetvel"],

@@ -7089,5 +7089,215 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"8\" y=\"5\" width=\"8\" height=\"14\" rx=\"2\"/><path d=\"M4 8v8M2 10v4M20 8v8M22 10v4\"/>"
+  },
+  {
+    "slug": "online-piano",
+    "cat": "Media tools",
+    "name": "Online Piano",
+    "title": "Online Piano - Play, Record and Download WAV or MIDI",
+    "desc": "Play a free online piano with your mouse, touch or computer keyboard. Grand piano, electric piano, organ and pads, sustain, chord names, WAV and MIDI.",
+    "card": "Play piano on any screen and record it.",
+    "intro": "Play a full 88-key piano in your browser. Tap the keys (several fingers at once on a phone) or use your computer keyboard, hold the space bar for the sustain pedal and change octave with the arrow keys. The chord you play is named as you go. Record your playing and download it as a WAV sound file or a MIDI file. The sounds are made on your device, nothing is uploaded.",
+    "steps": [
+      "Tap a key, or press Z to M and Q to U on your computer keyboard.",
+      "Choose a sound, the number of keys on screen and the note names you like.",
+      "Hold the space bar (or tap Sustain) for the pedal; use − and + to change octave.",
+      "Press Record, play, then Play it back or download it as WAV or MIDI."
+    ],
+    "faq": [
+      [
+        "Which computer keys play the notes?",
+        "The bottom letter row Z X C V B N M plays the white keys from C, with S D G H J for the black keys. The top row Q W E R T Y U plays the next octave, with the number keys 2 3 5 6 7 for black keys. The letters are shown on the piano keys. The arrow keys ← and → change the octave."
+      ],
+      [
+        "Can I play chords on a phone?",
+        "Yes. Several fingers can press keys at the same time, and you can slide along the keys. Move along the keyboard with the blue box above the keys. Turning the phone sideways or using Full screen shows more keys."
+      ],
+      [
+        "Why is there no sound on my iPhone?",
+        "iPhone mutes web sounds when the silent switch is on. Turn silent mode off and turn the volume up, then tap a key again."
+      ],
+      [
+        "What is the difference between the WAV and MIDI downloads?",
+        "WAV is the sound itself, ready to play or share. MIDI holds the notes you played (which key, when and how long), so you can open it in a music app, change the instrument or print it as sheet music."
+      ],
+      [
+        "How does the chord name work?",
+        "It looks at all the keys you hold (and keys still ringing with the pedal) and names the chord, such as C, Am7 or G/B. Two keys show the interval between them."
+      ],
+      [
+        "Is my recording saved?",
+        "Your last recording is kept in this browser on this device until you delete it or record a new one. Download it as WAV or MIDI to keep it for good."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"16\" rx=\"2\"/><path d=\"M8 4v16M12 4v16M16 4v16\"/><path d=\"M6.5 4v8h3V4M14.5 4v8h3V4\" fill=\"currentColor\"/>"
+  },
+  {
+    "slug": "drum-machine",
+    "cat": "Media tools",
+    "name": "Drum Machine",
+    "title": "Online Drum Machine - 16-Step Beat Maker with WAV Export",
+    "desc": "Make beats in your browser: a 16-step drum machine with 8 drum sounds, swing, velocity, A/B patterns, presets for many styles, mute and solo, and WAV export.",
+    "card": "Make drum beats and download them as WAV.",
+    "intro": "Make a drum beat on a 16-step grid. Eight drum sounds (kick, snare, clap, closed and open hi-hat, tom, rim and cowbell) are made on your device. Set the tempo and swing, choose loud, medium or soft hits, chain pattern A into pattern B, start from presets such as house, hip-hop, rock, reggaeton, afrobeat and trap, then download a loop-ready WAV file or save the pattern.",
+    "steps": [
+      "Choose a preset or start empty, and press Play.",
+      "Tap steps on the grid to add or remove hits; pick Loud, Medium or Soft first.",
+      "Set the tempo and swing, and use Pattern B and \"A then B\" for a longer groove.",
+      "Download the beat as a WAV loop, or save the pattern as a file to open later."
+    ],
+    "faq": [
+      [
+        "How do I make a beat?",
+        "Each row is a drum and each square is a sixteenth note, so 16 squares make one bar of 4/4. Tap a square to place a hit. A typical start: kick on 1, 5, 9 and 13, snare on 5 and 13, and closed hi-hat on every odd step."
+      ],
+      [
+        "What does swing do?",
+        "Swing delays every second sixteenth note a little, which gives a bouncy, human feel. 50% is straight, about 66% is a triplet shuffle, and 75% is the most."
+      ],
+      [
+        "Is the timing accurate?",
+        "Yes. The hits are scheduled ahead on your device's audio clock rather than with a simple timer, so the beat stays steady. The WAV file is made offline with every hit placed on its exact sample."
+      ],
+      [
+        "Can I use the WAV in my song?",
+        "Yes. The sounds are made by this page, not copied from sample packs, so you can use your beats however you like. \"Loop-ready\" makes the file repeat without a gap in any audio editor."
+      ],
+      [
+        "What are patterns A and B?",
+        "Two separate bars. Edit each one with the Pattern A and Pattern B buttons, and choose \"A then B\" to play them one after the other, for example a groove and a fill."
+      ],
+      [
+        "Where is my beat saved?",
+        "Your current beat is kept in this browser on this device. Use \"Save pattern (JSON)\" to keep a copy, share it, or open it on another device."
+      ]
+    ],
+    "icon": "<ellipse cx=\"12\" cy=\"9\" rx=\"8\" ry=\"3\"/><path d=\"M4 9v7c0 1.7 3.6 3 8 3s8-1.3 8-3V9\"/><path d=\"M8 3l4 6M16 3l-4 6\"/>"
+  },
+  {
+    "slug": "chord-progression-generator",
+    "cat": "Media tools",
+    "name": "Chord Progression Generator",
+    "title": "Chord Progression Generator - Play, Guitar Shapes, MIDI",
+    "desc": "Generate chord progressions in any key, scale or mode by mood: names and Roman numerals, guitar and piano diagrams, capo tips, playback and MIDI export.",
+    "card": "Chord progressions in any key, with shapes.",
+    "intro": "Get chord progressions that work. Choose a key, a scale (major, minor or a mode) and a mood such as pop, sad, rock, jazz or blues, and get well-known patterns like I–V–vi–IV spelled correctly in that key, with Roman numerals. Hear them as block chords or arpeggios, see guitar shapes and piano keys, get a capo suggestion, transpose, or type your own numerals, then download a MIDI file.",
+    "steps": [
+      "Choose the key, the scale and a mood or style.",
+      "Press Generate progression, or pick a pattern from the list.",
+      "Press Play to hear it, and change the style, sound and tempo.",
+      "Look at the guitar or piano diagrams, transpose, and download the MIDI."
+    ],
+    "faq": [
+      [
+        "What do the Roman numerals mean?",
+        "They number each chord by the scale step its root is on: I is the first step, V the fifth. Capitals are major chords, small letters are minor, ° is diminished. In C major, I–V–vi–IV is C–G–Am–F; in G major the same numerals give G–D–Em–C."
+      ],
+      [
+        "Are the chord names spelled correctly?",
+        "Yes. Every chord is built from note letters a third apart, so you get E♭ and B♭ in E♭ major and F♯ and C♯ in D major, never mixed spellings. Keys are named with the fewest sharps or flats (D♭ major, C♯ minor)."
+      ],
+      [
+        "How does the capo suggestion work?",
+        "It checks capo positions from fret 1 to 7 and picks the one that turns your chords into easy open shapes. For example, B♭ F Gm E♭ becomes G D Em C shapes with a capo on fret 3."
+      ],
+      [
+        "Why does a minor key use a major V chord?",
+        "Many minor-key songs raise the seventh note to make a stronger pull back home, which makes V major (E major in A minor). The patterns use it where musicians usually do. Choose Harmonic minor to see that scale."
+      ],
+      [
+        "What are modes?",
+        "Scales that start from a different step of the major scale. Dorian sounds minor but bright, Mixolydian major but bluesy, Lydian dreamy, Phrygian dark and Spanish-sounding. The generator uses only the chords of the mode you pick."
+      ],
+      [
+        "Can I use the progressions in my songs?",
+        "Yes. Chord progressions are common building blocks of music and are free for everyone to use."
+      ]
+    ],
+    "icon": "<path d=\"M4 4v16M9 4v16M14 4v16M19 4v16M4 8h15\"/><circle cx=\"9\" cy=\"11\" r=\"1.6\" fill=\"currentColor\"/><circle cx=\"14\" cy=\"14\" r=\"1.6\" fill=\"currentColor\"/><circle cx=\"19\" cy=\"11\" r=\"1.6\" fill=\"currentColor\"/>"
+  },
+  {
+    "slug": "scoreboard-keeper",
+    "cat": "Time tools",
+    "name": "Scoreboard Keeper",
+    "title": "Scoreboard Keeper - Cricket, Football, Card and Board Games",
+    "desc": "A free scoreboard for any game: cricket with overs and run rate, football, basketball, volleyball, badminton, table tennis, carrom, card and board games.",
+    "card": "Keep score for any sport or game.",
+    "intro": "Keep score for any game on a big, easy-to-read board. Choose cricket (runs, wickets, overs, extras, ball-by-ball and run rate), football, basketball, volleyball, badminton, table tennis, carrom, card games or board games with any number of players, or a custom game. Undo any mistake, run a match clock or a turn timer, show it full screen to everyone, keep a match history on your device and share the result as a picture.",
+    "steps": [
+      "Choose the game, type the team or player names and press Start match.",
+      "Tap the big buttons to score; Undo fixes any mistake.",
+      "Start the match clock or turn timer, and use Full screen to show the crowd.",
+      "Press Finish and save, then share the result as an image."
+    ],
+    "faq": [
+      [
+        "How do I score extras in cricket?",
+        "Tap Wide, No ball, Bye or Leg bye first, then the runs. A wide or no ball adds 1 extra run for you and does not count as a ball; byes and leg byes count as a ball. For a plain wide with no runs, tap Wide then 0."
+      ],
+      [
+        "Does it know the rules of each sport?",
+        "The basics, yes. Volleyball sets go to 25 (15 in the deciding set), badminton to 21 with a golden point at 30, table tennis to 11, all with a two-point lead, and the server is shown. Cricket ends an innings at all out, the overs limit or when the target is reached. You can change the numbers before you start."
+      ],
+      [
+        "Can I use it for card and board games?",
+        "Yes. Add up to 12 players, type each round's scores and the totals add up. Choose whether the highest or lowest score wins, set a score that ends the game, and use the turn timer to keep turns short."
+      ],
+      [
+        "How do I show the score on a big screen?",
+        "Press Full screen. On phones and tablets the board turns sideways where the browser allows it. \"Hide buttons\" leaves only the scores for the crowd."
+      ],
+      [
+        "Where is the history saved?",
+        "Only in this browser on this device. Export it as JSON or CSV to keep a copy, and import the JSON on another device. Nothing is uploaded."
+      ],
+      [
+        "What if I close the page by mistake?",
+        "The match in progress is saved after every tap, so it comes back when you open the page again, with the undo list."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M12 5v14\"/><path d=\"M6 10h2v4H6zM16 10h2v4h-2z\"/>"
+  },
+  {
+    "slug": "tournament-bracket-maker",
+    "cat": "Generators",
+    "name": "Tournament Bracket Maker",
+    "title": "Tournament Bracket Maker - Knockout, League and Groups",
+    "desc": "Make a tournament bracket for 2 to 64 teams: single or double elimination with byes, round robin league table, or groups then knockout. Print, PDF and PNG.",
+    "card": "Brackets, leagues and groups for 2 to 64.",
+    "intro": "Make a tournament for any sport or game. Type 2 to 64 teams or players and choose single elimination (with byes for the top seeds), double elimination, a round robin league with a points table, or groups followed by a knockout. Draw at random or keep your order, enter the scores, and winners move on by themselves. Print it or save a PDF that fits A4 or Letter landscape, download a PNG, and save it as a file to carry on later.",
+    "steps": [
+      "Type the teams or players, one per line.",
+      "Choose the format and whether to draw at random or keep your order, then press Make the bracket.",
+      "Tap a match to enter the score; the winner moves on.",
+      "Print, save as PDF or PNG, or save the tournament as a file."
+    ],
+    "faq": [
+      [
+        "What happens if the number of teams is not 4, 8, 16, 32 or 64?",
+        "The bracket is filled up with byes, which go to the top seeds, so they go straight through to round 2. With 13 teams, for example, 3 teams get a bye."
+      ],
+      [
+        "How does double elimination work?",
+        "A team is out only after losing twice. Losers of the winners' bracket drop into the losers' bracket. The two bracket winners meet in the grand final; if the losers' bracket winner wins it, a second final decides the title (you can turn this off)."
+      ],
+      [
+        "How is the league table sorted?",
+        "By points (3 for a win, 1 for a draw and 0 for a loss unless you change them), then score difference, then scores for, then the result between the tied teams."
+      ],
+      [
+        "What if a knockout match is a draw?",
+        "Enter the level score and choose who went through, for example after penalties or a tie-break. You can also choose the winner without a score."
+      ],
+      [
+        "Will it print nicely?",
+        "Yes. Choose A4 or Letter. The bracket is fitted to landscape pages, and large brackets are split across several pages between matches, with the page number on each. Use \"Save as PDF\" in the print window for a PDF."
+      ],
+      [
+        "Is my tournament saved?",
+        "It is saved in this browser on this device after every result. Use Save (JSON) to keep a copy or move it to another device, and Open a saved file to continue."
+      ]
+    ],
+    "icon": "<path d=\"M3 4h5v4H3zM3 16h5v4H3zM8 6h3v12H8M11 12h4M15 10h6v4h-6z\"/>"
   }
 ];

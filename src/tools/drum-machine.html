@@ -138,7 +138,7 @@
     for (var i = 0; i < d.length; i++) { s = (s * 16807) % 2147483647; d[i] = s / 1073741823.5 - 1; }
     ctx.__dm = { noise: b, ohh: null }; return ctx.__dm;
   }
-  function hit(ctx, out, k, t, v) {
+  function synth(ctx, out, k, t, v) { // draws one drum hit with oscillators, noise and filters
     var K = kit(ctx), all = [];
     function g(val, dest) { var x = ctx.createGain(); x.gain.value = val; x.connect(dest); return x; }
     function env(node, peak, decay, attack) { node.gain.setValueAtTime(0, t); node.gain.linearRampToValueAtTime(peak, t + (attack || 0.001)); node.gain.setTargetAtTime(0, t + (attack || 0.001), decay / 4); }
@@ -178,6 +178,29 @@
     }
     all.forEach(function (x) { x.stop(t + len); });
   }
+  // Each drum is drawn once at the three strengths into a short buffer, so playing and exporting stay light even on cheap phones.
+  function render(oc) { return new Promise(function (ok, no) { var pr; try { pr = oc.startRendering(); } catch (e) { no(e); return; } if (pr && pr.then) pr.then(ok, no); else oc.oncomplete = function (e) { ok(e.renderedBuffer); }; }); }
+  var banks = {};
+  function makeBank(sr) {
+    if (banks[sr]) return banks[sr];
+    var slot = 0.8, oc = new OAC(1, Math.ceil(slot * KEYS.length * 3 * sr), sr);
+    KEYS.forEach(function (k, ki) { [1, 2, 3].forEach(function (lv) { synth(oc, oc.destination, k, (ki * 3 + lv - 1) * slot, VEL[lv]); }); });
+    return (banks[sr] = render(oc).then(function (buf) {
+      var d = buf.getChannelData(0), B = {}, len = Math.round(slot * sr);
+      KEYS.forEach(function (k, ki) { B[k] = [null]; [1, 2, 3].forEach(function (lv) { var b = oc.createBuffer(1, len, sr), s0 = Math.round((ki * 3 + lv - 1) * slot * sr); b.getChannelData(0).set(d.subarray(s0, s0 + len)); B[k].push(b); }); });
+      return B;
+    }));
+  }
+  function hit(ctx, out, k, t, v) {
+    var B = ctx.__bank, lv = VEL.indexOf(v);
+    if (!B || lv < 1) { synth(ctx, out, k, t, v); return; } // the sounds are still being prepared
+    var K = kit(ctx), src = ctx.createBufferSource(), g = ctx.createGain(); src.buffer = B[k][lv]; src.connect(g); g.connect(out);
+    if (k === 'chh' || k === 'ohh') {
+      if (K.ohh && K.ohh.t < t && K.ohh.end > t) K.ohh.g.gain.setTargetAtTime(0, t, 0.008); // a closed hat (or a new open hat) cuts the ringing open hat
+      if (k === 'ohh') K.ohh = { g: g, t: t, end: t + 0.6 };
+    }
+    src.start(t); src.stop(t + 0.8);
+  }
   function master(ctx) {
     var comp = ctx.createDynamicsCompressor(); comp.threshold.value = -8; comp.knee.value = 6; comp.ratio.value = 4; comp.attack.value = 0.002; comp.release.value = 0.15; comp.connect(ctx.destination);
     var m = ctx.createGain(); m.gain.value = 0.8; m.connect(comp); return m;
@@ -194,7 +217,7 @@
   function swingOff(i) { return i % 2 ? (st.swing / 50 - 1) * stepDur() : 0; }
   function audio() {
     if (!AC) return null;
-    if (!actx) { try { actx = new AC({ latencyHint: 'interactive' }); } catch (e) { actx = new AC(); } outs = trackOuts(actx, master(actx)); }
+    if (!actx) { try { actx = new AC({ latencyHint: 'interactive' }); } catch (e) { actx = new AC(); } outs = trackOuts(actx, master(actx)); if (OAC) makeBank(actx.sampleRate).then(function (b) { actx.__bank = b; }, function () {}); }
     if (actx.state !== 'running') actx.resume();
     return actx;
   }
@@ -343,14 +366,15 @@
     var any = ['A', 'B'].some(function (p) { return order().indexOf(p) >= 0 && st.pats[p].some(function (r, i) { return audible(i) && r.some(Boolean); }); });
     if (!any) { say('bad', 'The pattern is empty (or every drum is muted). Add some steps first.'); return; }
     var sr = 44100, seq = order(), loops = +$('dmLoops').value, sd = 60 / st.tempo / 4, loopLen = seq.length * N * sd, len = Math.round(loopLen * loops * sr), tail = Math.round(1.0 * sr);
-    var oc = new OAC(1, len + tail, sr), m = master(oc), to = trackOuts(oc, m);
+    busy = true; $('dmWav').disabled = true; say('', 'Making the WAV file…');
+    makeBank(sr).then(function (bank) {
+    var oc = new OAC(1, len + tail, sr), m = master(oc), to = trackOuts(oc, m); oc.__bank = bank;
     for (var L = 0; L < loops; L++) seq.forEach(function (pk, pi) {
       for (var i = 0; i < N; i++) {
         var step = (L * seq.length + pi) * N + i, t = Math.round((step * sd + swingOff(i)) * sr) / sr; // on an exact sample
         for (var r = 0; r < TRACKS.length; r++) { var v = st.pats[pk][r][i]; if (v && audible(r)) hit(oc, to[r], KEYS[r], t, VEL[v]); }
       }
     });
-    busy = true; $('dmWav').disabled = true; say('', 'Making the WAV file…');
     var fin = function (buf) {
       busy = false; $('dmWav').disabled = false;
       var d = buf.getChannelData(0), outBuf;
@@ -361,7 +385,8 @@
       var b = wav(outBuf), name = 'beat-' + st.tempo + 'bpm.wav'; download(b, name);
       say('ok', 'Downloaded ' + name + ': ' + (outBuf.length / sr).toFixed(2) + ' seconds, ' + fmtBytes(b.size) + '.');
     };
-    var pr = oc.startRendering(); if (pr && pr.then) pr.then(fin, function (e) { busy = false; $('dmWav').disabled = false; say('bad', 'Could not make the audio file: ' + e.message); }); else oc.oncomplete = function (e) { fin(e.renderedBuffer); };
+    return render(oc).then(fin);
+    }).catch(function (e) { busy = false; $('dmWav').disabled = false; say('bad', 'Could not make the audio file on this device: ' + (e && e.message || e)); });
   });
 
   // ---------------- JSON save and load ----------------

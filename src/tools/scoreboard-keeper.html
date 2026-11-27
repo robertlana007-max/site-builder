@@ -14,7 +14,7 @@
 .sb-side.lead { border-color: var(--accent); }
 .sb-side.turn { box-shadow: 0 0 0 3px #f59e0b; }
 .sb-name { font-weight: 700; font-size: clamp(15px, 4vw, 20px); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.sb-score { font-weight: 800; font-size: clamp(56px, 17vw, 110px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin: 4px 0; }
+.sb-score { white-space: nowrap; overflow: hidden; font-weight: 800; font-size: clamp(56px, 17vw, 110px); line-height: 1; font-variant-numeric: tabular-nums; letter-spacing: -.03em; margin: 4px 0; }
 .sb-score.mid { font-size: clamp(40px, 11vw, 76px); }
 .sb-sub { font-size: 14px; color: var(--muted); min-height: 1.3em; }
 .sb-side .btns { justify-content: center; margin-top: 8px; gap: 6px; }
@@ -383,8 +383,15 @@
       else c = '<div class="btns" style="justify-content:center">' + B('roundadd', null, null, 'Add round ' + (d.rounds.length + 1)) + '</div>';
     }
     $('sbBoard').innerHTML = h; $('sbCtl').innerHTML = c; $('sbNote').textContent = note;
-    $('sbUndo').disabled = !db.undo.length; drawClocks();
+    $('sbUndo').disabled = !db.undo.length; drawClocks(); fit();
   }
+  function fit() { // shrink a score until it fits its box (long cricket scores, small phones)
+    [].forEach.call(document.querySelectorAll('#sbBoard .sb-score'), function (el) {
+      el.style.fontSize = ''; var fs = parseFloat(getComputedStyle(el).fontSize), n = 0;
+      while (el.scrollWidth > el.clientWidth + 1 && fs > 18 && n++ < 40) { fs *= 0.92; el.style.fontSize = fs + 'px'; }
+    });
+  }
+  var ft = null; window.addEventListener('resize', function () { clearTimeout(ft); ft = setTimeout(fit, 100); });
   $('sbStage').addEventListener('click', function (e) {
     var b = e.target.closest('button[data-a]'), m = db.cur; if (!b || !m) return;
     var a = b.dataset.a, i = b.dataset.i != null ? +b.dataset.i : null, v = b.dataset.v;
@@ -418,8 +425,8 @@
     var p = (stage.requestFullscreen || stage.webkitRequestFullscreen).call(stage);
     if (p && p.then) p.then(function () { try { screen.orientation.lock('landscape').catch(function () {}); } catch (e) {} }).catch(function () { say('bad', 'Full screen is not allowed here.'); });
   });
-  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { var on = !!(document.fullscreenElement || document.webkitFullscreenElement); $('sbFull').textContent = on ? 'Exit full screen' : 'Full screen'; $('sbHide').hidden = !on; if (!on) stage.classList.remove('hidectl'); }); });
-  $('sbHide').addEventListener('click', function () { var h = stage.classList.toggle('hidectl'); $('sbHide').textContent = h ? 'Show buttons' : 'Hide buttons'; });
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(function (ev) { document.addEventListener(ev, function () { var on = !!(document.fullscreenElement || document.webkitFullscreenElement); $('sbFull').textContent = on ? 'Exit full screen' : 'Full screen'; $('sbHide').hidden = !on; if (!on) stage.classList.remove('hidectl'); setTimeout(fit, 80); }); });
+  $('sbHide').addEventListener('click', function () { var h = stage.classList.toggle('hidectl'); $('sbHide').textContent = h ? 'Show buttons' : 'Hide buttons'; fit(); });
   var lock = null;
   function wake() { try { if (navigator.wakeLock && db.cur && !lock) navigator.wakeLock.request('screen').then(function (l) { lock = l; l.addEventListener('release', function () { lock = null; }); }).catch(function () {}); } catch (e) {} }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && !$('sbLive').hidden) wake(); });

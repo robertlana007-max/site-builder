@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: es
 module.exports = {
+"tournament-bracket-maker":["generador de brackets","cuadro de torneo","creador de torneos","fixture de torneo","tabla de liga"],
+"scoreboard-keeper":["marcador online","marcador de puntos","contador de puntos","marcador de fútbol","anotador de juegos"],
+"chord-progression-generator":["generador de progresiones de acordes","progresiones de acordes","acordes por tonalidad","generador de acordes","transportar acordes"],
+"drum-machine":["caja de ritmos online","hacer beats online","secuenciador de batería","creador de ritmos","batería online"],
+"online-piano":["piano online","piano virtual","tocar piano online","teclado piano","piano gratis"],
 "vibration-meter":["medidor de vibraciones","vibrómetro","medir vibración","acelerómetro online","vibración lavadora"],
 "light-meter":["luxómetro","medidor de luz","medidor de lux","fotómetro","luz para plantas"],
 "protractor":["transportador","transportador online","medir ángulos","medir ángulo en foto","regla online"],
