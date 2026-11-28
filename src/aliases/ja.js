@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"memory-game":["神経衰弱","記憶ゲーム","ペア探し ゲーム","カード めくり ゲーム","子供 記憶力 ゲーム"],
+"map-quiz":["地理 クイズ","国旗 クイズ","世界の首都 クイズ","世界地図 ゲーム","国当て クイズ"],
+"coloring-pages":["塗り絵","ぬりえ 無料 印刷","写真 塗り絵 変換","マンダラ 塗り絵","子供 ぬりえ"],
 "warranty-tracker":["保証期間 管理","保証書 管理","レシート 保存","保証期限 計算"],
 "meal-planner":["献立表","1週間の献立","献立 作成","レシピ 買い物リスト"],
 "grocery-list":["買い物リスト","買い物メモ","スーパー 買い物リスト","食費 予算"],
