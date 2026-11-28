@@ -7929,5 +7929,173 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"3\" y=\"4\" width=\"8\" height=\"11\" rx=\"1.5\"/><rect x=\"13\" y=\"9\" width=\"8\" height=\"11\" rx=\"1.5\"/><path d=\"M5.5 9.5l1.5 1.5 2.5-3\"/><path d=\"M15.5 14.5l1.5 1.5 2.5-3\"/>"
+  },
+  {
+    "slug": "freelancer-time-tracker",
+    "cat": "Time tools",
+    "name": "Freelancer Time Tracker",
+    "title": "Freelancer Time Tracker - Timer, Timesheet & Invoice PDF",
+    "desc": "Track billable hours per client and project with a timer that survives reloads, see weekly timesheets and reports, and turn hours into an invoice PDF.",
+    "card": "Track billable hours and invoice clients.",
+    "intro": "Track the hours you work for each client and project. Start and stop a timer that keeps counting even if you close the page, or add time by hand. See a weekly timesheet and reports by client, project or tag, then turn the billable hours into an invoice PDF with tax, discount and your payment details. Each client has its own hourly rate and currency, and everything stays on your device.",
+    "steps": [
+      "Add a client with their currency and hourly rate, then add a project.",
+      "Press Start timer when you begin work, or add time by hand.",
+      "Check the weekly timesheet and the reports by client, project or tag.",
+      "In Invoice, pick the client and dates, tick the entries and download the invoice PDF."
+    ],
+    "faq": [
+      [
+        "Does the timer keep running if I close the page?",
+        "Yes. The tracker saves the moment you pressed Start, so the time keeps counting even if you close the tab, restart the browser or turn off your phone. Open the page again and press Stop timer."
+      ],
+      [
+        "Can I bill clients in different currencies?",
+        "Yes. Each client has its own currency and hourly rate, and a project can have its own rate. Reports keep each currency separate and never mix them."
+      ],
+      [
+        "Do the totals match the Invoice Generator?",
+        "Yes. Hours are counted with three decimals and money in whole cents, exactly like the Invoice Generator. Press Open in Invoice Generator to add a logo, shipping or a part payment to the same invoice."
+      ],
+      [
+        "How do I stop billing the same hours twice?",
+        "When you download an invoice, the entries are marked as invoiced with its number. The invoice list then shows only billable time that has not been invoiced yet."
+      ],
+      [
+        "Can I import my old time log?",
+        "Yes. Import a CSV with Date and either Start and End or Hours. Client, Project, Note, Tags and Billable columns are used when present."
+      ],
+      [
+        "Where is my data stored?",
+        "Only in this browser on this device. Nothing is uploaded. Download a backup to keep a copy or move to another device."
+      ]
+    ],
+    "icon": "<circle cx=\"12\" cy=\"13\" r=\"8\"/><path d=\"M12 9v4l2.5 2.5M10 2h4M12 2v3\"/><path d=\"M18.5 5.5l1.5-1.5\"/>"
+  },
+  {
+    "slug": "vehicle-service-tracker",
+    "cat": "Calculators",
+    "name": "Vehicle Service Tracker",
+    "title": "Vehicle Service & Fuel Log - Economy, Costs & Reminders",
+    "desc": "Log fuel, services and costs for cars, motorbikes and trucks. Get fuel economy in L/100 km, km/L or mpg, cost per km, service reminders and a history PDF.",
+    "card": "Fuel log, service reminders and costs.",
+    "intro": "Keep a log book for every vehicle you own: car, motorbike, scooter, van or truck. Record fill-ups to see your real fuel economy in L/100 km, km/L, mpg (US) or mpg (UK) and your cost per kilometre or mile. Log oil changes, tyres, brakes and repairs, get reminders like \"Oil change due in 450 km or 12 days\", see your spending in charts, and print a service history to show a buyer.",
+    "steps": [
+      "Set up your vehicle with its units (km or miles, litres or gallons) and currency.",
+      "Log each fill-up with the odometer reading, the fuel amount and the price.",
+      "Add services and repairs, and set reminders by distance, by time or both.",
+      "Read your fuel economy, costs and reminders, then print a service history PDF."
+    ],
+    "faq": [
+      [
+        "How is fuel economy worked out?",
+        "With the full-tank method: the distance between two full fill-ups divided by the fuel you put in, including any part fills in between. It is the most accurate way to measure what your vehicle really uses."
+      ],
+      [
+        "Are the mpg conversions right for both US and UK gallons?",
+        "Yes. A US gallon is 3.785411784 litres and a UK (imperial) gallon is 4.54609 litres, and a mile is exactly 1.609344 km. Records are stored in metric and converted exactly, so you can switch units at any time."
+      ],
+      [
+        "How do service reminders work?",
+        "Give an interval in distance, in months, or both. The reminder counts from the last time you logged that service and shows whichever comes first, for example \"Oil change due in 450 km or 12 days\". Always follow your owner's manual."
+      ],
+      [
+        "Can I track more than one vehicle?",
+        "Yes. Add as many vehicles as you like, each with its own units and currency."
+      ],
+      [
+        "What does the service history PDF show?",
+        "The vehicle details, every service and repair with date, odometer and garage, and optionally the costs. It is handy when you sell the vehicle."
+      ],
+      [
+        "Where are my records saved?",
+        "Only in this browser on this device. Nothing is uploaded. Use Download backup to keep a copy."
+      ]
+    ],
+    "icon": "<path d=\"M5 17h14v-5l-2-5H7l-2 5z\"/><path d=\"M5 12h14\"/><circle cx=\"8\" cy=\"17\" r=\"2\"/><circle cx=\"16\" cy=\"17\" r=\"2\"/><path d=\"M19 4l2 2-3 3\"/>"
+  },
+  {
+    "slug": "event-budget-planner",
+    "cat": "Finance calculators",
+    "name": "Event Budget Planner",
+    "title": "Event Budget Planner - Wedding, Party & Conference Budget",
+    "desc": "Plan the budget for a wedding, birthday, conference or trip: planned vs actual by category, vendors, payments due, cost per guest, alerts and a PDF summary.",
+    "card": "Budget any wedding, party or event.",
+    "intro": "Plan the money for any event, from a wedding or birthday to a family celebration, conference or group trip. Start from a template for your type of event, share out your budget across categories, and add each cost with its vendor, what you have paid and when the rest is due. See planned against actual in a chart, get alerts when you go over budget, track the cost per guest and print a PDF summary, in any currency.",
+    "steps": [
+      "Start a new event: pick the type, date, total budget and number of guests.",
+      "Adjust the planned amount for each category, or add your own categories.",
+      "Add each cost with its vendor, the amount paid and when the rest is due.",
+      "Watch the alerts and payments, then download a PDF summary or CSV."
+    ],
+    "faq": [
+      [
+        "Which events can I plan?",
+        "Any event: weddings, birthdays, parties, family or religious celebrations, baby celebrations, graduations, conferences, work events and group trips. Pick Something else for anything different."
+      ],
+      [
+        "What are templates?",
+        "Each event type starts with common categories and a suggested share of the budget, such as 22% for the venue at a wedding. You can change them, and save your own categories as the template for that type."
+      ],
+      [
+        "How do over-budget alerts work?",
+        "You get an alert when a category costs more than planned, when all costs go over the total budget, when your plans add up to more than the budget, and when a payment is late or due within 7 days."
+      ],
+      [
+        "Can I track deposits and balances?",
+        "Yes. For every cost, enter what you have paid so far and the date the rest is due. The Payments tab lists what is still to pay in date order."
+      ],
+      [
+        "Can I plan more than one event?",
+        "Yes. Keep as many events as you like, each with its own currency, and copy an event to plan a similar one."
+      ],
+      [
+        "Where is my budget saved?",
+        "Only in this browser on this device. Nothing is uploaded. Download a backup to keep it safe."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"7\" width=\"18\" height=\"13\" rx=\"2\"/><path d=\"M3 11h18M8 3v4M16 3v4\"/><path d=\"M12 13.5v4M10.5 14.5h2.3a1 1 0 0 1 0 2h-1.6a1 1 0 0 0 0 2h2.3\"/>"
+  },
+  {
+    "slug": "meeting-minutes",
+    "cat": "Text tools",
+    "name": "Meeting Minutes Maker",
+    "title": "Meeting Minutes Maker - Agenda, Actions, PDF & Word",
+    "desc": "Write meeting minutes with attendees, agenda, notes, decisions and action items. Live timer per item, then export PDF, Word, Markdown or email text.",
+    "card": "Minutes with decisions and action items.",
+    "intro": "Write clear meeting minutes in minutes. Add the date, place or online link, who was present and absent, and the agenda. For each item, note what was discussed, the decisions and the action items with an owner and due date. A live mode times each agenda item and has quick buttons to add decisions and actions. Share the minutes as a PDF, a Word file, Markdown or email text, and follow up every action across all your meetings.",
+    "steps": [
+      "Fill in the title, date, place, attendees and the agenda.",
+      "During the meeting, use Live mode to time each item and add decisions and actions.",
+      "Check the notes, then download a PDF or Word file, or copy Markdown or email text.",
+      "Tick actions off in All actions, and start the next meeting from this one."
+    ],
+    "faq": [
+      [
+        "What should meeting minutes include?",
+        "The meeting title, date, time and place, who attended and who sent apologies, the agenda, a short summary of each discussion, the decisions made, and the action items with who does them and by when."
+      ],
+      [
+        "How does live mode work?",
+        "Press Start and a timer runs for the current agenda item, turning red when it goes over the planned minutes. Press Next to move on. Type a decision or action and press Add to save it under the current item."
+      ],
+      [
+        "Can I download the minutes as a Word document?",
+        "Yes. Download Word (.docx) makes a document that opens in Microsoft Word, Google Docs, LibreOffice and Pages. You can also download a PDF or Markdown, or copy text for an email."
+      ],
+      [
+        "How do I follow up action items?",
+        "The All actions tab lists every action from every meeting with its owner and due date. Filter by owner, tick them off when done, or export a CSV or PDF list."
+      ],
+      [
+        "Can I reuse a meeting for the next one?",
+        "Yes. In Saved & backup, press Next meeting. It copies the attendees and agenda and carries over any open actions."
+      ],
+      [
+        "Are my meetings private?",
+        "Yes. They are saved only in this browser on this device and never uploaded. Download a backup to keep a copy."
+      ]
+    ],
+    "icon": "<path d=\"M8 3h8v3H8z\"/><path d=\"M16 4.5h2a1 1 0 0 1 1 1V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V5.5a1 1 0 0 1 1-1h2\"/><path d=\"M8.5 11l1.2 1.2 2-2.2M13.5 11.5H16M8.5 16l1.2 1.2 2-2.2M13.5 16.5H16\"/>"
   }
 ];

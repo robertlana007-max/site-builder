@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"meeting-minutes":["besprechungsprotokoll","protokoll vorlage","sitzungsprotokoll","meeting notizen"],
+"event-budget-planner":["hochzeitsbudget","budgetplaner hochzeit","eventbudget","partykosten berechnen","kosten pro gast"],
+"vehicle-service-tracker":["fahrtenbuch tanken","spritverbrauch berechnen","wartungsheft auto","ölwechsel erinnerung","autokosten"],
+"freelancer-time-tracker":["zeiterfassung freelancer","stundenzettel","arbeitszeit erfassen","stunden abrechnen","zeiterfassung kostenlos"],
 "memory-game":["memory spiel","memo spiel","paare finden","gedächtnisspiel","memory für kinder"],
 "map-quiz":["geografie quiz","länder quiz","hauptstädte quiz","flaggen quiz","weltkarte spiel"],
 "coloring-pages":["malvorlagen","ausmalbilder","ausmalbilder mandala","foto zu malvorlage","ausmalbilder für kinder"],
