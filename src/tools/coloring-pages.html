@@ -1,0 +1,478 @@
+<style>
+.cp-tabs { display: flex; margin: 0 0 14px; }
+.cp-tabs .seg { flex-wrap: wrap; }
+.cp-tabs .seg button { height: 40px; font-size: 14px; }
+.cp-cats { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.cp-cats button { font: inherit; font-size: 14px; font-weight: 600; min-height: 38px; padding: 4px 12px; border-radius: 99px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); cursor: pointer; }
+.cp-cats button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.cp-thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; margin-bottom: 12px; max-height: 300px; overflow-y: auto; padding: 2px; }
+.cp-thumbs button { font: inherit; font-size: 12px; color: var(--muted); padding: 4px; border-radius: 10px; border: 1px solid var(--line); background: #fff; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 0; }
+.cp-thumbs button img { width: 100%; aspect-ratio: 1; display: block; }
+.cp-thumbs button span { color: #444; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+.cp-thumbs button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent); }
+.cp-thumbs .ch { font: 800 34px/1 system-ui, sans-serif; color: #222; aspect-ratio: 1; width: 100%; display: flex; align-items: center; justify-content: center; }
+.cp-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-bottom: 12px; }
+.cp-row label output { font-weight: 400; color: var(--muted); margin-inline-start: 6px; }
+.cp-work { display: grid; grid-template-columns: minmax(0, 1fr) 210px; gap: 14px; align-items: start; }
+.cp-stage { position: relative; background: #fff; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; display: flex; justify-content: center; align-items: center; min-height: 220px; touch-action: manipulation; }
+.cp-stage canvas { display: block; max-width: 100%; max-height: 72vh; width: auto; height: auto; cursor: crosshair; image-rendering: auto; }
+.cp-stage.busy::after { content: 'Working…'; position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,.7); color: #333; font-weight: 600; }
+.cp-tools { display: grid; gap: 10px; }
+.cp-pal { display: grid; grid-template-columns: repeat(6, 1fr); gap: 5px; }
+.cp-pal button { aspect-ratio: 1; min-height: 30px; border-radius: 8px; border: 2px solid rgba(0,0,0,.18); cursor: pointer; padding: 0; }
+.cp-pal button[aria-pressed="true"] { outline: 3px solid var(--accent); outline-offset: 1px; border-color: #fff; }
+.cp-pal button.er { background: #fff repeating-linear-gradient(45deg, #fff 0 5px, #e8e8e8 5px 10px); }
+.cp-own { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.cp-own input[type=color] { width: 44px; height: 36px; padding: 0; border: 1px solid var(--line); border-radius: 8px; background: none; }
+.cp-tools .btn { width: 100%; justify-content: center; min-height: 40px; padding: 6px 10px; }
+.cp-tools .two { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.cp-hint { font-size: 13px; color: var(--muted); margin: 6px 0 0; }
+.cp-book { margin-top: 14px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); }
+.cp-book .btns { margin: 8px 0 0; }
+.cp-bthumbs { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+.cp-bthumbs img { height: 70px; border: 1px solid var(--line); background: #fff; }
+#cpPrintBox { display: none; }
+@media print {
+  body > *:not(#cpPrintBox) { display: none !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #cpPrintBox { display: block !important; }
+  #cpPrintBox img { display: block; width: 100%; height: 100vh; object-fit: contain; page-break-after: always; break-after: page; page-break-inside: avoid; }
+  #cpPrintBox img:last-child { page-break-after: auto; break-after: auto; }
+}
+@media (max-width: 720px) { .cp-thumbs { grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); max-height: 250px; } .cp-work { grid-template-columns: 1fr; } .cp-pal { grid-template-columns: repeat(8, 1fr); } .cp-tools { grid-template-columns: 1fr; } }
+</style>
+<div id="cp">
+<div class="cp-tabs"><div class="seg" role="group" aria-label="Where the picture comes from"><button type="button" id="cpTabB" aria-pressed="true">Ready-made pages</button><button type="button" id="cpTabP" aria-pressed="false">From a photo</button></div></div>
+
+<div id="cpBuilt">
+  <div class="cp-cats" id="cpCats" role="group" aria-label="Kind of picture"></div>
+  <div id="cpMandalaOpts" class="cp-row" hidden>
+    <div><label for="cpSym">Symmetry</label><select id="cpSym" data-nomemo><option value="6">6 parts</option><option value="8">8 parts</option><option value="10">10 parts</option><option value="12">12 parts</option><option value="16">16 parts</option></select></div>
+    <div><label for="cpRings">Detail</label><select id="cpRings" data-nomemo><option value="4">Simple (big spaces)</option><option value="6">Medium</option><option value="8">Detailed</option></select></div>
+    <div><label for="cpMirror">Style</label><select id="cpMirror" data-nomemo><option value="1">Mirror symmetry</option><option value="0">Swirl (turning)</option></select></div>
+    <div style="display:flex;align-items:end"><button type="button" class="btn" id="cpNewMandala" style="width:100%;justify-content:center">New mandala</button></div>
+  </div>
+  <div class="cp-thumbs" id="cpThumbs" role="group" aria-label="Pictures"></div>
+</div>
+
+<div id="cpPhoto" hidden>
+  <div class="drop" id="cpDrop" tabindex="0" role="button"><b>Click or drop a photo here</b>JPG, PNG or WebP. Your photo never leaves your device.</div>
+  <input type="file" id="cpFile" accept="image/*" hidden data-nomemo>
+  <div class="cp-row">
+    <div><label for="cpDetail">Detail <output id="cpDetailV"></output></label><input type="range" id="cpDetail" min="1" max="10" step="1" value="5" data-nomemo></div>
+    <div><label for="cpStyle">Style</label><select id="cpStyle" data-nomemo><option value="edges">Outlines (best for photos)</option><option value="dark">Dark lines (drawings and sketches)</option><option value="both">Outlines and dark areas</option></select></div>
+    <div><label for="cpSpeck">Remove small specks <output id="cpSpeckV"></output></label><input type="range" id="cpSpeck" min="0" max="10" step="1" value="4" data-nomemo></div>
+  </div>
+  <p class="cp-hint" style="margin:-4px 0 12px">Photos with one clear subject and a plain background work best. Lower the detail for simpler pages for small children.</p>
+</div>
+
+<div class="cp-row">
+  <div><label for="cpThick">Line thickness <output id="cpThickV"></output></label><input type="range" id="cpThick" min="1" max="6" step="1" value="3" data-nomemo></div>
+  <div><label for="cpPaper">Paper</label><select id="cpPaper" data-nomemo><option value="a4">A4</option><option value="letter">US Letter</option></select></div>
+  <div class="checks" style="margin:0;align-self:end;flex-direction:column;gap:4px"><label><input type="checkbox" id="cpName" checked data-nomemo> Name line at the top</label><label><input type="checkbox" id="cpTitle" checked data-nomemo> Picture name under it</label></div>
+</div>
+
+<div class="cp-work">
+  <div>
+    <div class="cp-stage" id="cpStage"><canvas id="cpCanvas" width="10" height="10" aria-label="Colouring page. Pick a colour, then tap an area to fill it."></canvas></div>
+    <p class="msg" id="cpMsg" role="status" aria-live="polite"></p>
+  </div>
+  <div class="cp-tools">
+    <div><label id="cpPalL">Colour it on screen</label><div class="cp-pal" id="cpPal" role="group" aria-labelledby="cpPalL"></div></div>
+    <div class="cp-own"><input type="color" id="cpOwn" value="#ff7f50" aria-label="Choose your own colour" data-nomemo><span>Your own colour</span></div>
+    <div class="two"><button type="button" class="btn ghost" id="cpUndo" disabled>↶ Undo</button><button type="button" class="btn ghost" id="cpClear" disabled>Clear colours</button></div>
+    <button type="button" class="btn ghost" id="cpPng">Save picture (PNG)</button>
+    <button type="button" class="btn" id="cpPdf">Download PDF</button>
+    <button type="button" class="btn ghost" id="cpPrint">Print</button>
+    <button type="button" class="btn ghost" id="cpAdd">+ Add page to a booklet</button>
+  </div>
+</div>
+<p class="cp-hint">Tap inside a shape to fill it with colour. Print it blank for colouring with crayons, or print what you coloured. Print at 100% (actual size).</p>
+<div class="cp-book" id="cpBook" hidden>
+  <b id="cpBookT"></b>
+  <div class="cp-bthumbs" id="cpBookThumbs"></div>
+  <div class="btns"><button type="button" class="btn" id="cpBookPdf">Download booklet PDF</button><button type="button" class="btn ghost" id="cpBookPrint">Print booklet</button><button type="button" class="btn ghost danger" id="cpBookClear">Empty the booklet</button></div>
+</div>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-coloring-pages';
+  var S = { tab: 'b', cat: 'animals', id: 'cat', thick: 3, detail: 5, speck: 4, style: 'edges', paper: '', name: true, title: true, sym: '8', rings: '6', mirror: '1', seed: 0, color: '#ff4d4d' };
+  try { var s0 = JSON.parse(localStorage.getItem(KEY)); if (s0 && typeof s0 === 'object') for (var k in S) if (k in s0 && typeof s0[k] === typeof S[k]) S[k] = s0[k]; } catch (e) {}
+  if (!S.paper) { var reg = ''; try { reg = (Intl.DateTimeFormat().resolvedOptions().locale || navigator.language || '').toUpperCase(); } catch (e) {} S.paper = /-(US|CA|MX|PH|CL|CO|VE|GT|CR|PA|DO|PR|SV|NI|HN)\b/.test(reg) ? 'letter' : 'a4'; }
+  if (!S.seed) S.seed = newSeed();
+  function save() { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} }
+  function say(cls, t) { $('cpMsg').className = 'msg ' + (cls || ''); $('cpMsg').textContent = t || ''; }
+  function newSeed() { var x = new Uint32Array(1); crypto.getRandomValues(x); return (x[0] % 999999) + 1; }
+  function f1(n) { return Math.round(n * 10) / 10; }
+
+  // ---------- drawing helpers (200 × 200 space) ----------
+  function C(cx, cy, r, a) { return '<circle cx="' + cx + '" cy="' + cy + '" r="' + r + '"' + (a || '') + '/>'; }
+  function E(cx, cy, rx, ry, a) { return '<ellipse cx="' + cx + '" cy="' + cy + '" rx="' + rx + '" ry="' + ry + '"' + (a || '') + '/>'; }
+  function P(d, a) { return '<path d="' + d + '"' + (a || '') + '/>'; }
+  function Rc(x, y, w, h, r, a) { return '<rect x="' + x + '" y="' + y + '" width="' + w + '" height="' + h + '"' + (r ? ' rx="' + r + '"' : '') + (a || '') + '/>'; }
+  function L(d) { return P(d, ' fill="none"'); }
+  var BK = ' fill="#000"';
+  function pts(cx, cy, list) { return list.map(function (p, i) { return (i ? 'L' : 'M') + f1(cx + p[0]) + ' ' + f1(cy + p[1]); }).join('') + 'Z'; }
+  function star(cx, cy, R, r, n, rot) { var a = []; n = n || 5; rot = rot || 0; for (var i = 0; i < n * 2; i++) { var ang = rot - Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? r : R; a.push([rr * Math.cos(ang), rr * Math.sin(ang)]); } return P(pts(cx, cy, a)); }
+  function poly(cx, cy, r, n, rot) { var a = []; for (var i = 0; i < n; i++) { var ang = (rot || 0) - Math.PI / 2 + i * 2 * Math.PI / n; a.push([r * Math.cos(ang), r * Math.sin(ang)]); } return P(pts(cx, cy, a)); }
+  function heart(cx, cy, s) { return P('M' + cx + ' ' + f1(cy + s * 0.85) + 'C' + f1(cx - s * 1.45) + ' ' + f1(cy + s * 0.05) + ' ' + f1(cx - s * 0.85) + ' ' + f1(cy - s * 0.95) + ' ' + cx + ' ' + f1(cy - s * 0.3) + 'C' + f1(cx + s * 0.85) + ' ' + f1(cy - s * 0.95) + ' ' + f1(cx + s * 1.45) + ' ' + f1(cy + s * 0.05) + ' ' + cx + ' ' + f1(cy + s * 0.85) + 'Z'); }
+  function cloud(cx, cy, s) { return P('M' + f1(cx - 30 * s) + ' ' + f1(cy + 10 * s) + 'a' + f1(12 * s) + ' ' + f1(12 * s) + ' 0 0 1 ' + f1(4 * s) + ' ' + f1(-22 * s) + 'a' + f1(16 * s) + ' ' + f1(16 * s) + ' 0 0 1 ' + f1(28 * s) + ' ' + f1(-8 * s) + 'a' + f1(14 * s) + ' ' + f1(14 * s) + ' 0 0 1 ' + f1(24 * s) + ' ' + f1(8 * s) + 'a' + f1(11 * s) + ' ' + f1(11 * s) + ' 0 0 1 ' + f1(4 * s) + ' ' + f1(22 * s) + 'Z'); }
+  function rays(cx, cy, r0, r1, n, w) { var s = ''; for (var i = 0; i < n; i++) { var a = i * 2 * Math.PI / n; s += P(pts(cx, cy, [[r0 * Math.cos(a - w), r0 * Math.sin(a - w)], [r1 * Math.cos(a), r1 * Math.sin(a)], [r0 * Math.cos(a + w), r0 * Math.sin(a + w)]])); } return s; }
+  function grass(y) { var d = 'M6 ' + (y + 14) + 'L6 ' + y; for (var x = 6; x < 194; x += 12) d += 'L' + (x + 6) + ' ' + (y - 8) + 'L' + (x + 12) + ' ' + y; return P(d + 'L194 ' + (y + 14) + 'Z'); }
+
+  var PICS = [
+    // animals
+    { id: 'cat', n: 'Cat', c: 'animals', s: function () { return P('M138 160Q190 150 178 98Q172 84 162 92Q170 120 140 138Z') + E(100, 148, 46, 38) + P('M68 66L70 26L98 50Z') + P('M132 66L130 26L102 50Z') + P('M75 52L76 36L89 47Z') + P('M125 52L124 36L111 47Z') + C(100, 82, 38) + E(86, 76, 7, 9) + E(114, 76, 7, 9) + E(86, 78, 3, 5, BK) + E(114, 78, 3, 5, BK) + P('M95 91L105 91L100 97Z') + L('M100 97Q94 106 87 101M100 97Q106 106 113 101M60 86L82 90M60 98L82 94M140 86L118 90M140 98L118 94') + E(80, 183, 14, 8) + E(120, 183, 14, 8) + E(100, 150, 20, 22); } },
+    { id: 'dog', n: 'Dog', c: 'animals', s: function () { return P('M140 140Q176 120 170 92Q166 86 160 92Q160 112 136 124Z') + E(100, 148, 48, 36) + E(78, 184, 14, 8) + E(122, 184, 14, 8) + C(100, 80, 36) + E(64, 84, 12, 28, ' transform="rotate(18 64 84)"') + E(136, 84, 12, 28, ' transform="rotate(-18 136 84)"') + E(100, 98, 19, 14) + E(100, 90, 7, 5, BK) + C(86, 72, 5, BK) + C(114, 72, 5, BK) + P('M94 104Q100 120 106 104Z') + L('M100 95L100 104') + C(118, 140, 12) + Rc(76, 112, 48, 9, 4) + C(100, 125, 6); } },
+    { id: 'fish', n: 'Fish', c: 'animals', s: function () { return P('M80 60Q100 30 125 62Z') + P('M90 140Q105 165 122 136Z') + P('M140 100L184 66L176 100L184 134Z') + P('M24 100Q70 40 145 100Q70 160 24 100Z') + C(56, 92, 9) + C(58, 92, 4, BK) + L('M72 76Q84 100 72 124') + L('M90 82Q98 100 90 118M106 84Q114 100 106 116M122 88Q128 100 122 112') + L('M30 104Q38 110 46 106') + C(30, 46, 7) + C(18, 30, 5) + C(34, 22, 4) + L('M10 182Q30 170 50 182T90 182T130 182T170 182T210 182'); } },
+    { id: 'bird', n: 'Bird', c: 'animals', s: function () { return P('M52 108L14 88L20 122L54 126Z') + L('M92 148L88 172M108 148L112 172M80 172L96 172M104 172L120 172') + E(98, 116, 50, 36) + C(140, 80, 25) + P('M161 74L188 82L161 90Z') + C(146, 74, 5, BK) + P('M64 108Q92 78 126 108Q96 138 64 108Z') + L('M78 108Q96 98 112 108') + E(100, 132, 22, 10) + L('M6 178L194 178'); } },
+    { id: 'butterfly', n: 'Butterfly', c: 'animals', s: function () { return P('M100 96Q60 20 24 46Q8 90 98 104Z') + P('M100 96Q140 20 176 46Q192 90 102 104Z') + P('M98 106Q40 110 46 160Q70 180 99 116Z') + P('M102 106Q160 110 154 160Q130 180 101 116Z') + C(56, 62, 12) + C(144, 62, 12) + C(70, 145, 9) + C(130, 145, 9) + C(42, 82, 6) + C(158, 82, 6) + E(100, 106, 7, 44) + C(100, 58, 9) + L('M96 52Q88 26 76 22M104 52Q112 26 124 22') + C(76, 22, 4) + C(124, 22, 4); } },
+    { id: 'turtle', n: 'Turtle', c: 'animals', s: function () { return E(58, 144, 15, 11) + E(142, 144, 15, 11) + P('M34 128L16 136L36 138Z') + C(170, 118, 18) + C(176, 112, 3, BK) + L('M168 126Q176 130 182 124') + P('M36 132Q36 54 100 54Q164 54 164 132Z') + Rc(30, 126, 140, 12, 6) + poly(100, 98, 20, 6) + L('M100 78L100 56M117 88L140 72M117 108L150 118M83 108L50 118M83 88L60 72M100 118L100 132') + L('M6 172Q60 164 100 172T194 172'); } },
+    { id: 'owl', n: 'Owl', c: 'animals', s: function () { return Rc(14, 168, 172, 14, 7) + P('M52 64L48 26L76 50Z') + P('M148 64L152 26L124 50Z') + E(100, 112, 56, 66) + E(100, 136, 34, 38) + C(78, 88, 22) + C(122, 88, 22) + C(78, 88, 11) + C(122, 88, 11) + C(80, 90, 5, BK) + C(124, 90, 5, BK) + P('M92 104L108 104L100 118Z') + L('M84 126Q92 134 100 126Q108 134 116 126M80 144Q90 152 100 144Q110 152 120 144M84 160Q92 168 100 160Q108 168 116 160') + P('M46 100Q30 140 60 160Q56 130 60 104Z') + P('M154 100Q170 140 140 160Q144 130 140 104Z') + E(84, 176, 9, 7) + E(116, 176, 9, 7); } },
+    { id: 'snail', n: 'Snail', c: 'animals', s: function () { return P('M16 160Q14 146 36 144L172 144Q190 146 186 160Z') + P('M38 146Q24 110 44 92Q60 86 64 104L64 146Z') + L('M46 94L36 62M56 92L62 60') + C(36, 60, 5) + C(62, 58, 5) + C(52, 106, 3, BK) + C(116, 100, 46) + L('M116 100m0 -6a6 6 0 1 1 -6 8a12 12 0 1 1 18 -14a20 20 0 1 1 -28 22a30 30 0 1 1 44 -30a40 40 0 1 1 -50 46') + L('M6 182L194 182') + P('M150 182Q150 166 162 170Q172 166 172 182Z'); } },
+    { id: 'elephant', n: 'Elephant', c: 'animals', s: function () { return P('M164 112Q184 120 178 136L174 136Q176 124 162 120Z') + Rc(66, 128, 22, 52, 6) + Rc(96, 132, 22, 48, 6) + Rc(126, 132, 22, 48, 6) + Rc(150, 126, 20, 54, 6) + E(116, 116, 58, 42) + C(62, 92, 34) + P('M38 104Q16 150 38 172Q48 176 48 166Q34 148 52 116Z') + E(84, 94, 24, 30) + C(56, 84, 4, BK) + P('M52 112Q40 122 30 116Q42 112 48 104Z'); } },
+    { id: 'rabbit', n: 'Rabbit', c: 'animals', s: function () { return E(84, 40, 12, 36) + E(116, 40, 12, 36) + E(84, 42, 5, 24) + E(116, 42, 5, 24) + C(144, 150, 12) + E(100, 146, 42, 40) + E(100, 150, 22, 26) + C(100, 88, 32) + C(88, 82, 5, BK) + C(112, 82, 5, BK) + E(100, 96, 5, 4) + L('M100 100L100 106M100 106Q94 112 88 108M100 106Q106 112 112 108M64 96L84 98M64 104L84 102M136 96L116 98M136 104L116 102') + E(80, 184, 16, 8) + E(120, 184, 16, 8); } },
+    // vehicles
+    { id: 'car', n: 'Car', c: 'vehicles', s: function () { return P('M14 134L14 108Q16 96 32 94L58 90L80 64Q86 58 96 58L136 58Q144 58 150 64L170 90Q186 94 186 108L186 134Z') + P('M86 68L70 90L112 90L112 68Z') + P('M118 68L118 90L160 90L144 68Z') + L('M115 92L115 132') + Rc(118, 98, 14, 5, 2) + C(54, 134, 20) + C(150, 134, 20) + C(54, 134, 8) + C(150, 134, 8) + Rc(172, 104, 14, 10, 3) + Rc(14, 104, 10, 10, 3) + L('M6 160L194 160'); } },
+    { id: 'bus', n: 'Bus', c: 'vehicles', s: function () { return Rc(14, 46, 172, 100, 14) + Rc(26, 58, 30, 30, 4) + Rc(62, 58, 30, 30, 4) + Rc(98, 58, 30, 30, 4) + Rc(150, 58, 26, 56, 4) + Rc(134, 58, 12, 30, 3) + Rc(14, 104, 130, 10) + C(52, 146, 18) + C(148, 146, 18) + C(52, 146, 7) + C(148, 146, 7) + Rc(176, 124, 10, 10, 2) + L('M163 58L163 114') + L('M6 168L194 168'); } },
+    { id: 'train', n: 'Train', c: 'vehicles', s: function () { return cloud(52, 26, 0.7) + cloud(30, 46, 0.5) + Rc(40, 44, 20, 32, 3) + Rc(32, 72, 96, 58, 6) + Rc(116, 48, 66, 82, 6) + Rc(130, 60, 38, 28, 4) + Rc(110, 40, 78, 12, 4) + C(26, 102, 12) + P('M18 130L32 130L32 108L10 130Z') + C(60, 140, 18) + C(104, 140, 18) + C(156, 140, 18) + C(60, 140, 6) + C(104, 140, 6) + C(156, 140, 6) + Rc(40, 84, 70, 12, 4) + L('M4 162L196 162'); } },
+    { id: 'boat', n: 'Sailboat', c: 'vehicles', s: function () { return C(160, 36, 18) + P('M100 22L100 128L36 128Z') + P('M106 40L106 128L160 128Z') + L('M102 16L102 132') + P('M100 16L124 22L100 28Z') + P('M22 132L178 132L156 162L44 162Z') + C(70, 147, 6) + C(100, 147, 6) + C(130, 147, 6) + L('M4 170Q24 160 44 170T84 170T124 170T164 170T204 170M4 186Q24 176 44 186T84 186T124 186T164 186T204 186'); } },
+    { id: 'plane', n: 'Aeroplane', c: 'vehicles', s: function () { return cloud(40, 40, 0.6) + cloud(160, 160, 0.6) + P('M88 92L52 40L70 40L118 92Z') + P('M150 86L162 52L174 52L172 92Z') + P('M24 100Q24 84 48 84L160 84Q182 86 182 100Q182 114 160 116L48 116Q24 116 24 100Z') + P('M88 108L52 160L70 160L118 108Z') + P('M24 100Q24 86 42 85L40 100Z') + C(70, 98, 5) + C(88, 98, 5) + C(106, 98, 5) + C(124, 98, 5) + C(142, 98, 5); } },
+    { id: 'rocket', n: 'Rocket', c: 'vehicles', s: function () { return star(32, 36, 10, 4) + star(168, 52, 8, 3) + star(40, 140, 7, 3) + C(160, 150, 4) + P('M86 150L100 192L114 150Z') + P('M92 150L100 176L108 150Z') + P('M76 120L48 156L78 150Z') + P('M124 120L152 156L122 150Z') + P('M100 14Q132 40 128 150L72 150Q68 40 100 14Z') + P('M78 50L122 50Q114 30 100 18Q86 30 78 50Z') + C(100, 84, 14) + C(100, 84, 8) + Rc(84, 120, 32, 10, 3); } },
+    { id: 'truck', n: 'Truck', c: 'vehicles', s: function () { return Rc(10, 50, 112, 86, 6) + P('M126 136L126 70L160 70L186 104L186 136Z') + P('M134 78L134 102L176 102L158 78Z') + Rc(170, 112, 16, 8, 2) + L('M24 66L108 66M24 82L108 82') + C(42, 140, 18) + C(150, 140, 18) + C(42, 140, 7) + C(150, 140, 7) + C(84, 140, 18) + C(84, 140, 7) + L('M4 162L196 162'); } },
+    // nature
+    { id: 'flower', n: 'Flower', c: 'nature', s: function () { var s = P('M96 104L104 104L106 186L94 186Z') + P('M98 160Q60 130 50 150Q70 172 98 166Z') + P('M102 140Q140 110 150 130Q130 152 102 146Z'); for (var i = 0; i < 8; i++) { var a = i * Math.PI / 4; s += E(f1(100 + 34 * Math.cos(a)), f1(70 + 34 * Math.sin(a)), 22, 13, ' transform="rotate(' + (i * 45) + ' ' + f1(100 + 34 * Math.cos(a)) + ' ' + f1(70 + 34 * Math.sin(a)) + ')"'); } return s + C(100, 70, 20) + L('M6 186L194 186'); } },
+    { id: 'tree', n: 'Tree', c: 'nature', s: function () { return P('M88 186L92 120L74 100L84 96L96 112L100 92L108 92L106 114L124 98L132 104L110 124L114 186Z') + C(70, 80, 30) + C(130, 80, 30) + C(100, 52, 36) + C(78, 112, 24) + C(124, 112, 24) + C(100, 92, 26) + C(70, 76, 6) + C(124, 60, 6) + C(100, 104, 6) + C(140, 96, 6) + C(84, 46, 6) + grass(184); } },
+    { id: 'sun', n: 'Sun', c: 'nature', s: function () { return rays(100, 100, 50, 92, 12, 0.16) + C(100, 100, 50) + C(84, 90, 6, BK) + C(116, 90, 6, BK) + L('M76 108Q100 132 124 108') + C(72, 106, 7) + C(128, 106, 7); } },
+    { id: 'mushroom', n: 'Mushroom', c: 'nature', s: function () { return P('M80 106Q74 160 70 180L130 180Q126 160 120 106Z') + P('M16 112Q20 30 100 28Q180 30 184 112Q100 128 16 112Z') + C(60, 70, 12) + C(108, 54, 10) + C(144, 84, 13) + C(92, 92, 8) + E(100, 134, 8, 10) + grass(182); } },
+    { id: 'apple', n: 'Apple', c: 'nature', s: function () { return P('M100 52Q70 30 44 52Q18 82 34 128Q52 182 82 176Q100 168 118 176Q148 182 166 128Q182 82 156 52Q130 30 100 52Z') + P('M98 52Q96 30 88 16L96 14Q104 30 104 52Z') + P('M106 36Q130 10 156 24Q132 50 106 36Z') + L('M110 30L146 24') + E(62, 84, 10, 18, ' transform="rotate(20 62 84)"'); } },
+    { id: 'house', n: 'House', c: 'nature', s: function () { return cloud(40, 30, 0.6) + C(170, 28, 14) + Rc(128, 38, 18, 40) + Rc(36, 92, 128, 90) + P('M24 98L100 34L176 98Z') + Rc(86, 128, 30, 54, 3) + C(110, 156, 3) + Rc(48, 110, 28, 26, 2) + Rc(126, 110, 28, 26, 2) + L('M62 110L62 136M48 123L76 123M140 110L140 136M126 123L154 123') + C(100, 72, 11) + L('M6 182L194 182'); } },
+    { id: 'rainbow', n: 'Rainbow', c: 'nature', s: function () { return P('M10 150A90 90 0 0 1 190 150L178 150A78 78 0 0 0 22 150Z') + P('M22 150A78 78 0 0 1 178 150L166 150A66 66 0 0 0 34 150Z') + P('M34 150A66 66 0 0 1 166 150L154 150A54 54 0 0 0 46 150Z') + P('M46 150A54 54 0 0 1 154 150L142 150A42 42 0 0 0 58 150Z') + P('M58 150A42 42 0 0 1 142 150L130 150A30 30 0 0 0 70 150Z') + cloud(36, 150, 1) + cloud(164, 150, 1) + star(100, 132, 12, 5); } },
+    { id: 'cactus', n: 'Cactus', c: 'nature', s: function () { return P('M84 140L84 40Q100 22 116 40L116 140Z') + P('M84 100L60 100Q46 98 46 82L46 56Q52 48 58 56L58 86L84 86Z') + P('M116 84L140 84L140 50Q146 42 152 50L152 86Q150 98 138 98L116 98Z') + L('M100 40L100 136') + P('M62 140L138 140L130 186L70 186Z') + Rc(56, 132, 88, 14, 4) + C(100, 30, 8) + L('M92 56L88 52M108 70L112 66M92 90L88 86M108 112L112 108'); } },
+    // shapes and patterns
+    { id: 'shapes', n: 'Shapes', c: 'shapes', s: function () { return C(42, 50, 28) + Rc(76, 22, 54, 54, 2) + P('M168 22L194 76L142 76Z') + star(42, 140, 32, 13) + heart(104, 138, 30) + poly(166, 140, 28, 6) ; } },
+    { id: 'hearts', n: 'Hearts', c: 'shapes', s: function () { var s = '', R = mul(7); for (var y = 0; y < 4; y++) for (var x = 0; x < 4; x++) { var sz = 13 + R() * 9; s += heart(f1(28 + x * 48 + (y % 2) * 10 - 5), f1(30 + y * 46), f1(sz)); } return s; } },
+    { id: 'stars', n: 'Stars and moon', c: 'shapes', s: function () { var s = P('M60 20A44 44 0 1 0 104 82A34 34 0 1 1 60 20Z'), R = mul(3), list = [[150, 40, 20], [120, 110, 16], [170, 130, 22], [40, 150, 18], [96, 170, 14], [160, 186, 9], [24, 100, 10], [130, 22, 8], [70, 120, 10], [186, 80, 9]]; list.forEach(function (q) { s += star(q[0], q[1], q[2], q[2] * 0.42, 5, R() * 0.6); }); return s; } },
+    { id: 'glass', n: 'Stained glass', c: 'shapes', s: function () { return Rc(10, 10, 180, 180, 0) + L('M10 10L190 190M190 10L10 190M100 10L100 190M10 100L190 100M10 60Q100 120 190 60M10 140Q100 80 190 140') + C(100, 100, 26) + C(100, 100, 12); } },
+    { id: 'scales', n: 'Fish scales', c: 'shapes', s: function () { var s = Rc(10, 10, 180, 180, 0); for (var y = 0; y < 8; y++) for (var x = -1; x < 6; x++) { var cx = 10 + x * 36 + (y % 2) * 18, cy = 22 + y * 22; if (cx > 200) continue; s += P('M' + (cx - 18) + ' ' + cy + 'A18 18 0 0 0 ' + (cx + 18) + ' ' + cy, ' fill="none" clip-path="url(#cpclip)"'); } return '<defs><clipPath id="cpclip"><rect x="10" y="10" width="180" height="180"/></clipPath></defs>' + s; } }
+  ];
+  function mul(a) { return function () { a |= 0; a = a + 0x6D2B79F5 | 0; var t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+
+  // ---------- mandalas ----------
+  function mandala(seed, n, rings, mirror) {
+    var R = mul(seed), cx = 100, cy = 100, out = '', edges = [94], i;
+    for (i = 1; i < rings; i++) edges.push(94 - i * (78 / rings) - (R() - 0.5) * 4);
+    edges.push(10);
+    function p(r, a) { return f1(cx + r * Math.cos(a)) + ' ' + f1(cy + r * Math.sin(a)); }
+    var used = -1;
+    for (i = 0; i < edges.length - 1; i++) {
+      var r1 = edges[i], r0 = edges[i + 1], rm = (r0 + r1) / 2, step = 2 * Math.PI / n, off = (i % 2 && R() < 0.6) ? step / 2 : 0, kind;
+      do { kind = Math.floor(R() * 6); } while (kind === used); used = kind;
+      out += C(cx, cy, f1(r1));
+      for (var k = 0; k < n; k++) {
+        var a = -Math.PI / 2 + k * step + off, w = step * (0.32 + R() * 0) , sw = mirror ? 0 : step * 0.35;
+        if (kind === 0) out += P('M' + p(r0, a) + 'Q' + p(rm, a - step * 0.48) + ' ' + p(r1 * 0.98, a + sw) + 'Q' + p(rm, a + step * 0.48) + ' ' + p(r0, a) + 'Z');
+        else if (kind === 1) { var cr = Math.min((r1 - r0) / 2 * 0.92, rm * Math.sin(step / 2) * 0.92); out += C(f1(cx + rm * Math.cos(a)), f1(cy + rm * Math.sin(a)), f1(cr)); if (cr > 6) out += C(f1(cx + rm * Math.cos(a)), f1(cy + rm * Math.sin(a)), f1(cr * 0.45)); }
+        else if (kind === 2) out += P('M' + p(r0, a - step / 2) + 'L' + p(r1 * 0.98, a + sw) + 'L' + p(r0, a + step / 2) + 'Z');
+        else if (kind === 3) out += P('M' + p(r0, a - step / 2) + 'Q' + p(r1 * 1.05, a - step / 2 + sw) + ' ' + p(r1 * 0.98, a) + 'Q' + p(r1 * 1.05, a + step / 2 + sw) + ' ' + p(r0, a + step / 2) + 'Z') + P('M' + p(r0, a - step / 4) + 'Q' + p(rm * 1.02, a + sw / 2) + ' ' + p(r0, a + step / 4) + 'Z');
+        else if (kind === 4) out += P('M' + p(r0, a) + 'Q' + p(rm, a - step * 0.45) + ' ' + p(r1 * 0.98, a + sw) + 'Q' + p(rm, a + step * 0.45) + ' ' + p(r0, a) + 'Z') + P('M' + p(r0 + (r1 - r0) * 0.12, a) + 'Q' + p(rm, a - step * 0.2) + ' ' + p(r1 * 0.86, a + sw * 0.8) + 'Q' + p(rm, a + step * 0.2) + ' ' + p(r0 + (r1 - r0) * 0.12, a) + 'Z');
+        else { out += L('M' + p(r0, a) + 'L' + p(r1, a + sw * 0.5)); var dr = Math.min((r1 - r0) * 0.22, rm * Math.sin(step / 2) * 0.5); if (dr > 2.5) out += C(f1(cx + rm * Math.cos(a + step / 2)), f1(cy + rm * Math.sin(a + step / 2)), f1(dr)); }
+      }
+    }
+    out += C(cx, cy, 10) + star(cx, cy, 8, 4, n > 8 ? 8 : n, 0);
+    return out;
+  }
+
+  // ---------- letters and numbers ----------
+  var CHARS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').concat('0 1 2 3 4 5 6 7 8 9 10'.split(' '));
+  function charSvg(ch, sw) {
+    var isNum = /\d/.test(ch), font = ' font-family="Arial Rounded MT Bold, Arial Black, Arial, Helvetica, sans-serif" font-weight="700" text-anchor="middle"', t = [];
+    if (!isNum) t = [[76, 150, 140, ch, 0], [162, 150, 92, ch.toLowerCase(), 0]];
+    else t = [[100, ch === '0' ? 150 : 106, ch === '0' ? 150 : 104, ch, ch.length > 1]];
+    // bubble letters: a wide black stroke with a slightly narrower white stroke on top gives a clean outline to colour in
+    function layer(col, w) { return t.map(function (q) { return '<text x="' + q[0] + '" y="' + q[1] + '"' + font + ' font-size="' + q[2] + '"' + (q[4] ? ' textLength="150" lengthAdjust="spacingAndGlyphs"' : '') + ' fill="' + col + '" stroke="' + col + '" stroke-width="' + w + '">' + q[3] + '</text>'; }).join(''); }
+    var s = layer('#000', 10 + 2 * sw) + layer('#fff', 10);
+    if (isNum) { var n = +ch; for (var i = 0; i < n; i++) { var x = 28 + (i % 5) * 36, y = n > 5 ? 140 + Math.floor(i / 5) * 36 : 160; s += star(x, y, 15, 6.5); } }
+    return s;
+  }
+
+  // ---------- SVG to line canvas ----------
+  var CATS = [['animals', 'Animals'], ['vehicles', 'Vehicles'], ['nature', 'Nature and places'], ['shapes', 'Shapes and patterns'], ['mandala', 'Mandalas'], ['letters', 'Letters and numbers']];
+  function picById(id) { for (var i = 0; i < PICS.length; i++) if (PICS[i].id === id) return PICS[i]; return null; }
+  function svgFor(id, sw) {
+    var inner, name;
+    if (id === 'mandala') { inner = mandala(S.seed, +S.sym, +S.rings, S.mirror === '1'); name = 'Mandala'; }
+    else if (/^ch-/.test(id)) { inner = charSvg(id.slice(3), sw); name = (/\d/.test(id) ? 'Number ' : 'Letter ') + id.slice(3); }
+    else { var p = picById(id) || PICS[0]; inner = p.s(); name = p.n; }
+    return { name: name, svg: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-6 -6 212 212" width="1200" height="1200"><rect x="-6" y="-6" width="212" height="212" fill="#fff"/><g fill="#fff" stroke="#000" stroke-width="' + sw + '" stroke-linejoin="round" stroke-linecap="round">' + inner + '</g></svg>' };
+  }
+  function svgUrl(svg) { return 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg); }
+  function thickPx() { return [0, 1.2, 1.8, 2.5, 3.3, 4.2, 5.2][S.thick] || 2.5; }
+
+  // ---------- state of the page ----------
+  var line = document.createElement('canvas'), lineCtx = line.getContext('2d'), view = $('cpCanvas'), vctx = view.getContext('2d');
+  var paint = null, wall = null, W = 0, H = 0, undo = [], pageName = '', photo = null, renderId = 0;
+  function setArt(canvasSrc, name, keepPaint) {
+    W = canvasSrc.width; H = canvasSrc.height; line.width = W; line.height = H; lineCtx.drawImage(canvasSrc, 0, 0);
+    var d = lineCtx.getImageData(0, 0, W, H).data; wall = new Uint8Array(W * H);
+    for (var i = 0, j = 0; j < wall.length; i += 4, j++) wall[j] = (d[i] * 0.299 + d[i + 1] * 0.587 + d[i + 2] * 0.114) < 170 ? 1 : 0;
+    if (!keepPaint || !paint || paint.width !== W || paint.height !== H) { paint = new ImageData(W, H); new Uint32Array(paint.data.buffer).fill(0xffffffff); undo = []; }
+    pageName = name; view.width = W; view.height = H; draw(); btnState();
+  }
+  var tmp = document.createElement('canvas');
+  function draw() {
+    tmp.width = W; tmp.height = H; tmp.getContext('2d').putImageData(paint, 0, 0);
+    vctx.globalCompositeOperation = 'source-over'; vctx.drawImage(tmp, 0, 0);
+    vctx.globalCompositeOperation = 'multiply'; vctx.drawImage(line, 0, 0); vctx.globalCompositeOperation = 'source-over';
+  }
+  function btnState() { $('cpUndo').disabled = !undo.length; $('cpClear').disabled = !painted(); }
+  function painted() { if (!paint) return false; var u = new Uint32Array(paint.data.buffer); for (var i = 0; i < u.length; i += 7) if (u[i] !== 0xffffffff) return true; return false; }
+
+  function renderBuilt(keep) {
+    var id = S.id, my = ++renderId, r = svgFor(id, thickPx()), img = new Image();
+    img.onload = function () {
+      if (my !== renderId) return;
+      var c = document.createElement('canvas'); c.width = 1200; c.height = 1200; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, 1200, 1200); x.drawImage(img, 0, 0, 1200, 1200);
+      setArt(c, r.name, keep); $('cpStage').classList.remove('busy');
+    };
+    img.onerror = function () { $('cpStage').classList.remove('busy'); say('bad', 'Sorry, this picture could not be drawn.'); };
+    $('cpStage').classList.add('busy'); img.src = svgUrl(r.svg);
+  }
+
+  // ---------- photo to outlines ----------
+  function blur(src, w, h, sigma) {
+    var r = Math.max(1, Math.ceil(sigma * 2.5)), k = [], s = 0, i, x, y;
+    for (i = -r; i <= r; i++) { var v = Math.exp(-i * i / (2 * sigma * sigma)); k.push(v); s += v; } k = k.map(function (v) { return v / s; });
+    var tmpA = new Float32Array(w * h), out = new Float32Array(w * h);
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { var a = 0; for (i = -r; i <= r; i++) { var xx = x + i; xx = xx < 0 ? 0 : xx >= w ? w - 1 : xx; a += src[y * w + xx] * k[i + r]; } tmpA[y * w + x] = a; }
+    for (y = 0; y < h; y++) for (x = 0; x < w; x++) { var b = 0; for (i = -r; i <= r; i++) { var yy = y + i; yy = yy < 0 ? 0 : yy >= h ? h - 1 : yy; b += tmpA[yy * w + x] * k[i + r]; } out[y * w + x] = b; }
+    return out;
+  }
+  function outline(img, detail, speck, thick, style) {
+    var maxS = 1200, sc = Math.min(maxS / Math.max(img.width, img.height), 4), w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+    var c = document.createElement('canvas'); c.width = w; c.height = h; var x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, h); x.imageSmoothingQuality = 'high'; x.drawImage(img, 0, 0, w, h);
+    var d = x.getImageData(0, 0, w, h).data, n = w * h, g = new Float32Array(n), i, X, Y;
+    for (i = 0; i < n; i++) g[i] = d[i * 4] * 0.299 + d[i * 4 + 1] * 0.587 + d[i * 4 + 2] * 0.114;
+    var sigma = 2.7 - detail * 0.2 + (Math.max(w, h) > 900 ? 0.3 : 0), b = blur(g, w, h, sigma);
+    var mag = new Float32Array(n), dir = new Uint8Array(n);
+    for (Y = 1; Y < h - 1; Y++) for (X = 1; X < w - 1; X++) {
+      i = Y * w + X;
+      var gx = -b[i - w - 1] - 2 * b[i - 1] - b[i + w - 1] + b[i - w + 1] + 2 * b[i + 1] + b[i + w + 1];
+      var gy = -b[i - w - 1] - 2 * b[i - w] - b[i - w + 1] + b[i + w - 1] + 2 * b[i + w] + b[i + w + 1];
+      mag[i] = Math.sqrt(gx * gx + gy * gy);
+      var ang = Math.atan2(gy, gx) * 180 / Math.PI; if (ang < 0) ang += 180;
+      dir[i] = ang < 22.5 || ang >= 157.5 ? 0 : ang < 67.5 ? 1 : ang < 112.5 ? 2 : 3;
+    }
+    var nms = new Float32Array(n), vals = [];
+    for (Y = 1; Y < h - 1; Y++) for (X = 1; X < w - 1; X++) {
+      i = Y * w + X; var m = mag[i], q, r2; if (m < 4) continue;
+      if (dir[i] === 0) { q = mag[i - 1]; r2 = mag[i + 1]; } else if (dir[i] === 1) { q = mag[i - w - 1]; r2 = mag[i + w + 1]; } else if (dir[i] === 2) { q = mag[i - w]; r2 = mag[i + w]; } else { q = mag[i - w + 1]; r2 = mag[i + w - 1]; }
+      if (m >= q && m >= r2) { nms[i] = m; vals.push(m); }
+    }
+    var edge = new Uint8Array(n);
+    if (vals.length) {
+      // thresholds from the noise level of the photo (median gradient) and from the strongest edges, so grainy photos stay clean
+      var sm = []; for (i = 0; i < n; i += 7) sm.push(mag[i]); sm.sort(function (a, b2) { return a - b2; });
+      vals.sort(function (a, b2) { return b2 - a; });
+      var noise = Math.max(1, sm[Math.floor(sm.length * 0.5)]), strong = vals[Math.floor(vals.length * 0.02)] || vals[0];
+      var hi = Math.max(noise * (9 - detail * 0.6), strong * (0.62 - detail * 0.05), 14), lo = Math.max(hi * 0.4, noise * 2.2, 8);
+      var stack = [];
+      for (i = 0; i < n; i++) if (nms[i] >= hi && !edge[i]) { edge[i] = 1; stack.push(i); while (stack.length) { var p = stack.pop(), px = p % w, py = (p - px) / w; for (var dy = -1; dy <= 1; dy++) for (var dx = -1; dx <= 1; dx++) { var nx = px + dx, ny = py + dy; if (nx < 0 || ny < 0 || nx >= w || ny >= h) continue; var j = ny * w + nx; if (!edge[j] && nms[j] >= lo) { edge[j] = 1; stack.push(j); } } } }
+    }
+    if (style === 'dark') edge.fill(0);
+    if (style !== 'edges') { // dark lines and areas: darker than their surroundings
+      var bg = blur(g, w, h, 10), k3 = 42 - detail * 3.2;
+      for (i = 0; i < n; i++) if (b[i] < bg[i] - k3 && b[i] < 205) edge[i] = 1;
+    }
+    // remove small specks (connected bits of line shorter than the limit)
+    var minSize = Math.round(speck * speck * 1.6 * Math.max(0.5, Math.sqrt(n) / 1000));
+    if (minSize > 1) {
+      var seen = new Uint8Array(n), comp = [];
+      for (i = 0; i < n; i++) if (edge[i] && !seen[i]) {
+        comp.length = 0; var st = [i]; seen[i] = 1;
+        while (st.length) { var q2 = st.pop(); comp.push(q2); var qx = q2 % w, qy = (q2 - qx) / w; for (var ey = -1; ey <= 1; ey++) for (var ex = -1; ex <= 1; ex++) { var mx = qx + ex, my = qy + ey; if (mx < 0 || my < 0 || mx >= w || my >= h) continue; var k2 = my * w + mx; if (edge[k2] && !seen[k2]) { seen[k2] = 1; st.push(k2); } } }
+        if (comp.length < minSize) for (var z = 0; z < comp.length; z++) edge[comp[z]] = 0;
+      }
+    }
+    // thicken lines with a round brush
+    var rad = [0, 0.5, 1.0, 1.6, 2.2, 2.9, 3.6][thick] * Math.max(1, Math.max(w, h) / 1200), offs = [], R2 = Math.ceil(rad);
+    for (var oy = -R2; oy <= R2; oy++) for (var ox = -R2; ox <= R2; ox++) if (ox * ox + oy * oy <= rad * rad + 0.25) offs.push([ox, oy]);
+    var ink = new Uint8Array(n);
+    for (Y = 0; Y < h; Y++) for (X = 0; X < w; X++) if (edge[Y * w + X]) for (var o = 0; o < offs.length; o++) { var ax = X + offs[o][0], ay = Y + offs[o][1]; if (ax >= 0 && ay >= 0 && ax < w && ay < h) ink[ay * w + ax] = 1; }
+    // soft edges, then black on white
+    var outD = x.createImageData(w, h), od = outD.data;
+    for (Y = 0; Y < h; Y++) for (X = 0; X < w; X++) {
+      i = Y * w + X; var s = 0, cnt = 8;
+      if (!ink[i]) for (var yy = Y - 1; yy <= Y + 1; yy++) for (var xx = X - 1; xx <= X + 1; xx++) if (xx >= 0 && yy >= 0 && xx < w && yy < h) s += ink[yy * w + xx];
+      var v = ink[i] ? 0 : 255 - Math.round(150 * s / cnt); od[i * 4] = od[i * 4 + 1] = od[i * 4 + 2] = v; od[i * 4 + 3] = 255;
+    }
+    x.putImageData(outD, 0, 0);
+    return c;
+  }
+  var photoTimer = null;
+  function renderPhoto(keep) {
+    if (!photo) { blankStage('Choose a photo to turn it into a colouring page.'); return; }
+    var my = ++renderId; $('cpStage').classList.add('busy');
+    clearTimeout(photoTimer);
+    photoTimer = setTimeout(function () {
+      try { var c = outline(photo.img, S.detail, S.speck, S.thick, S.style); if (my === renderId) setArt(c, photo.name, keep); say('', ''); }
+      catch (e) { console.warn(e); say('bad', 'Sorry, this photo could not be turned into a page. Try a smaller photo.'); }
+      $('cpStage').classList.remove('busy');
+    }, 40);
+  }
+  function blankStage(t) { W = 0; view.width = 600; view.height = 340; vctx.fillStyle = '#fff'; vctx.fillRect(0, 0, 600, 340); vctx.fillStyle = '#777'; vctx.font = '20px system-ui, sans-serif'; vctx.textAlign = 'center'; vctx.fillText(t, 300, 175); paint = null; undo = []; btnState(); }
+  setupDrop('cpDrop', 'cpFile', function (f) {
+    $('cpFile').value = '';
+    if (!/^image\//.test(f.type || '') && !/\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i.test(f.name || '')) { say('bad', 'That is not a picture file. Please choose a JPG, PNG or WebP photo.'); return; }
+    if (f.size > 60 * 1024 * 1024) { say('bad', 'This photo is too big (over 60 MB). Please choose a smaller one.'); return; }
+    say('', 'Opening the photo…');
+    loadImage(f, function (img) {
+      if (!img || !img.width) { say('bad', /heic|heif/i.test(f.type + f.name) ? 'This browser cannot open HEIC photos. Save it as JPG first (or use our HEIC to JPG tool), then try again.' : 'This file could not be opened as a picture. It may be damaged, or in a format your browser cannot read.'); return; }
+      photo = { img: img, name: (f.name || 'photo').replace(/\.[^.]+$/, '').slice(0, 40) };
+      renderPhoto(false);
+    });
+  });
+
+  // ---------- flood fill ----------
+  function fillAt(px, py, rgb) {
+    if (!paint || !W) return;
+    var x0 = Math.round(px), y0 = Math.round(py), idx = -1;
+    if (x0 < 0 || y0 < 0 || x0 >= W || y0 >= H) return;
+    if (!wall[y0 * W + x0]) idx = y0 * W + x0;
+    else for (var r = 1; r <= 8 && idx < 0; r++) for (var dy = -r; dy <= r && idx < 0; dy++) for (var dx = -r; dx <= r; dx++) { var xx = x0 + dx, yy = y0 + dy; if (xx >= 0 && yy >= 0 && xx < W && yy < H && !wall[yy * W + xx]) { idx = yy * W + xx; break; } }
+    if (idx < 0) return;
+    var u = new Uint32Array(paint.data.buffer), col = (255 << 24) | (rgb[2] << 16) | (rgb[1] << 8) | rgb[0], col32 = col >>> 0;
+    var mark = new Uint8Array(W * H), list = [], st = [idx]; mark[idx] = 1;
+    while (st.length) {
+      var p = st.pop(), x = p % W, y = (p - x) / W, l = x, rr = x;
+      while (l > 0 && !wall[p - (x - l) - 1] && !mark[p - (x - l) - 1]) l--;
+      while (rr < W - 1 && !wall[p + (rr - x) + 1] && !mark[p + (rr - x) + 1]) rr++;
+      for (var i = l; i <= rr; i++) {
+        var q = y * W + i; mark[q] = 1; list.push(q);
+        if (y > 0) { var a = q - W; if (!mark[a] && !wall[a]) { mark[a] = 1; st.push(a); } }
+        if (y < H - 1) { var b = q + W; if (!mark[b] && !wall[b]) { mark[b] = 1; st.push(b); } }
+      }
+    }
+    if (list.length > W * H * 0.92 && S.tab === 'p') { /* almost everything: still allowed (background) */ }
+    // spread 2 px under the lines so no white halo is left next to them
+    var grow = [], n0 = list.length;
+    for (var pass = 0; pass < 2; pass++) {
+      var src = pass === 0 ? list : grow.slice(), add = [];
+      for (var k = 0; k < src.length; k++) { var q2 = src[k], qx = q2 % W; var nb = [qx > 0 ? q2 - 1 : -1, qx < W - 1 ? q2 + 1 : -1, q2 - W, q2 + W]; for (var m = 0; m < 4; m++) { var t = nb[m]; if (t >= 0 && t < W * H && !mark[t] && wall[t]) { mark[t] = 1; add.push(t); } } }
+      grow = grow.concat(add); if (!add.length) break;
+    }
+    var all = n0 === list.length ? list.concat(grow) : list;
+    var old = new Uint32Array(all.length), ids = new Uint32Array(all), same = true;
+    for (var z = 0; z < all.length; z++) { old[z] = u[all[z]]; if (old[z] !== col32) same = false; }
+    if (same) return;
+    for (z = 0; z < all.length; z++) u[all[z]] = col32;
+    undo.push({ ids: ids, old: old }); var bytes = 0; for (var ui = undo.length - 1; ui >= 0; ui--) { bytes += undo[ui].ids.length * 8; if (bytes > 80e6 || undo.length - ui > 40) { undo.splice(0, ui + 1); break; } }
+    draw(); btnState();
+  }
+  function hex(c) { c = String(c).replace('#', ''); if (c.length === 3) c = c.replace(/./g, '$&$&'); var n = parseInt(c, 16) || 0; return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+  view.addEventListener('click', function (e) {
+    if (!W) return; var r = view.getBoundingClientRect(); fillAt((e.clientX - r.left) * W / r.width, (e.clientY - r.top) * H / r.height, hex(S.color));
+  });
+  $('cpUndo').addEventListener('click', function () { var u0 = undo.pop(); if (!u0 || !paint) return; var u = new Uint32Array(paint.data.buffer); for (var i = 0; i < u0.ids.length; i++) u[u0.ids[i]] = u0.old[i]; draw(); btnState(); });
+  $('cpClear').addEventListener('click', function () { if (!paint) return; if (!confirm('Remove all the colours from this page?')) return; new Uint32Array(paint.data.buffer).fill(0xffffffff); undo = []; draw(); btnState(); });
+
+  // palette: bright colours plus a range of skin tones
+  var PAL = ['#ff4d4d', '#ff9f1c', '#ffd60a', '#7bd389', '#2a9d8f', '#3a86ff', '#8ecae6', '#7b2cbf', '#ff70a6', '#c77dff', '#8d5524', '#2b2d42', '#9e9e9e', '#06d6a0', '#118ab2', '#e76f51', '#a3b18a', '#f6bd60', '#ffe0bd', '#f1c27d', '#c68642', '#8d5a3b', '#5c3a21', 'eraser'];
+  PAL.forEach(function (c) { var b = document.createElement('button'); b.type = 'button'; if (c === 'eraser') { b.className = 'er'; b.setAttribute('aria-label', 'Eraser (white)'); b.setAttribute('data-c', '#ffffff'); } else { b.style.background = c; b.setAttribute('aria-label', 'Colour ' + c); b.setAttribute('data-c', c); } $('cpPal').appendChild(b); });
+  function syncPal() { var found = false; $('cpPal').querySelectorAll('button').forEach(function (b) { var on = b.getAttribute('data-c') === S.color; if (on) found = true; b.setAttribute('aria-pressed', String(on)); }); if (!found) $('cpOwn').value = S.color; }
+  $('cpPal').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.color = b.getAttribute('data-c'); save(); syncPal(); });
+  $('cpOwn').addEventListener('input', function () { S.color = this.value; save(); syncPal(); });
+
+  // ---------- choosing pictures ----------
+  function syncTabs() {
+    $('cpTabB').setAttribute('aria-pressed', String(S.tab === 'b')); $('cpTabP').setAttribute('aria-pressed', String(S.tab === 'p'));
+    $('cpBuilt').hidden = S.tab !== 'b'; $('cpPhoto').hidden = S.tab !== 'p';
+    $('cpCats').innerHTML = CATS.map(function (c) { return '<button type="button" data-c="' + c[0] + '" aria-pressed="' + (S.cat === c[0]) + '">' + c[1] + '</button>'; }).join('');
+    $('cpMandalaOpts').hidden = S.cat !== 'mandala';
+    var th = $('cpThumbs'); th.innerHTML = ''; th.hidden = S.cat === 'mandala';
+    if (S.cat === 'letters') CHARS.forEach(function (ch) { var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-id', 'ch-' + ch); b.setAttribute('aria-pressed', String(S.id === 'ch-' + ch)); b.setAttribute('aria-label', (/\d/.test(ch) ? 'Number ' : 'Letter ') + ch); b.innerHTML = '<span class="ch">' + ch + '</span>'; th.appendChild(b); });
+    else if (S.cat !== 'mandala') PICS.forEach(function (p) { if (p.c !== S.cat) return; var b = document.createElement('button'); b.type = 'button'; b.setAttribute('data-id', p.id); b.setAttribute('aria-pressed', String(S.id === p.id)); var im = document.createElement('img'); im.alt = ''; im.src = svgUrl(svgFor(p.id, 3).svg.replace('width="1200" height="1200"', 'width="96" height="96"')); b.appendChild(im); var sp = document.createElement('span'); sp.textContent = p.n; b.appendChild(sp); th.appendChild(b); });
+    $('cpSym').value = S.sym; $('cpRings').value = S.rings; $('cpMirror').value = S.mirror;
+  }
+  function validId() { if (S.cat === 'mandala') return S.id === 'mandala'; if (S.cat === 'letters') return /^ch-/.test(S.id) && CHARS.indexOf(S.id.slice(3)) !== -1; var p = picById(S.id); return !!p && p.c === S.cat; }
+  function firstOf(cat) { if (cat === 'mandala') return 'mandala'; if (cat === 'letters') return 'ch-A'; for (var i = 0; i < PICS.length; i++) if (PICS[i].c === cat) return PICS[i].id; return 'cat'; }
+  function show() { if (S.tab === 'b') { if (!validId()) S.id = firstOf(S.cat); renderBuilt(false); } else renderPhoto(false); }
+  $('cpTabB').addEventListener('click', function () { if (S.tab === 'b') return; S.tab = 'b'; save(); syncTabs(); show(); });
+  $('cpTabP').addEventListener('click', function () { if (S.tab === 'p') return; S.tab = 'p'; save(); syncTabs(); show(); });
+  $('cpCats').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.cat = b.getAttribute('data-c'); S.id = firstOf(S.cat); save(); syncTabs(); show(); });
+  $('cpThumbs').addEventListener('click', function (e) { var b = e.target.closest('button'); if (!b) return; S.id = b.getAttribute('data-id'); save(); $('cpThumbs').querySelectorAll('button').forEach(function (x) { x.setAttribute('aria-pressed', String(x === b)); }); renderBuilt(false); if (window.innerWidth < 720) $('cpStage').scrollIntoView({ behavior: 'smooth', block: 'center' }); });
+  ['cpSym', 'cpRings', 'cpMirror'].forEach(function (id) { $(id).addEventListener('change', function () { S.sym = $('cpSym').value; S.rings = $('cpRings').value; S.mirror = $('cpMirror').value; save(); renderBuilt(false); }); });
+  $('cpNewMandala').addEventListener('click', function () { S.seed = newSeed(); save(); renderBuilt(false); });
+  function sliders() { $('cpThickV').textContent = S.thick; $('cpDetailV').textContent = S.detail; $('cpSpeckV').textContent = S.speck ? S.speck : 'off'; }
+  $('cpThick').addEventListener('input', function () { S.thick = +this.value; save(); sliders(); if (S.tab === 'b') renderBuilt(true); else renderPhoto(true); });
+  $('cpDetail').addEventListener('input', function () { S.detail = +this.value; save(); sliders(); renderPhoto(false); });
+  $('cpStyle').addEventListener('change', function () { S.style = this.value; save(); renderPhoto(false); });
+  $('cpSpeck').addEventListener('input', function () { S.speck = +this.value; save(); sliders(); renderPhoto(false); });
+  $('cpPaper').addEventListener('change', function () { S.paper = this.value; save(); });
+  $('cpName').addEventListener('change', function () { S.name = this.checked; save(); });
+  $('cpTitle').addEventListener('change', function () { S.title = this.checked; save(); });
+
+  // ---------- page for print / PDF ----------
+  function composite() { var c = document.createElement('canvas'); c.width = W; c.height = H; var x = c.getContext('2d'); x.putImageData(paint, 0, 0); x.globalCompositeOperation = 'multiply'; x.drawImage(line, 0, 0); return c; }
+  function makePage() {
+    var land = W > H * 1.15, P = S.paper === 'letter' ? [1275, 1650] : [1240, 1754]; if (land) P = [P[1], P[0]];
+    var c = document.createElement('canvas'); c.width = P[0]; c.height = P[1]; var x = c.getContext('2d'), m = 70, top = m;
+    x.fillStyle = '#fff'; x.fillRect(0, 0, P[0], P[1]); x.fillStyle = '#222'; x.strokeStyle = '#444'; x.lineWidth = 2;
+    var font = 'system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif';
+    if (S.name) { x.font = '600 32px ' + font; x.textBaseline = 'alphabetic'; x.textAlign = 'left'; x.fillText('Name:', m, top + 34); var nw = x.measureText('Name:').width; x.beginPath(); x.moveTo(m + nw + 14, top + 38); x.lineTo(P[0] - m, top + 38); x.stroke(); top += 70; }
+    if (S.title && pageName && S.tab === 'b') { x.font = '700 40px ' + font; x.textAlign = 'center'; x.fillText(pageName, P[0] / 2, top + 40); top += 66; }
+    var bw = P[0] - 2 * m, bh = P[1] - top - m, k = Math.min(bw / W, bh / H), dw = W * k, dh = H * k;
+    x.imageSmoothingQuality = 'high'; x.drawImage(composite(), (P[0] - dw) / 2, top + (bh - dh) / 2, dw, dh);
+    return { c: c, land: land, paper: S.paper };
+  }
+  function fileBase() { return 'coloring-page-' + (pageName || 'page').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') ; }
+  function dlBlob(blob, name) { var url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(url); }, 60000); }
+  function ready() { if (!W || !paint) { say('bad', S.tab === 'p' ? 'Choose a photo first.' : 'Pick a picture first.'); return false; } return true; }
+  $('cpPng').addEventListener('click', function () { if (!ready()) return; composite().toBlob(function (b) { if (!b) { say('bad', 'The picture could not be saved.'); return; } dlBlob(b, fileBase() + '.png'); say('ok', 'Saved ' + fileBase() + '.png.'); }, 'image/png'); });
+  function libs() { if (window.PDFLib) return Promise.resolve(); return new Promise(function (res, rej) { var s = document.createElement('script'); s.src = '../assets/vendor/pdf-lib.min.js'; s.onload = res; s.onerror = function () { s.remove(); rej(new Error('load')); }; document.head.appendChild(s); }); }
+  function toBytes(c) { return new Promise(function (res, rej) { c.toBlob(function (b) { if (!b) return rej(new Error('blob')); b.arrayBuffer().then(res, rej); }, 'image/png'); }); }
+  var busy = false;
+  async function pdf(pages, name) {
+    if (busy) return; busy = true; say('', 'Making your PDF…');
+    try {
+      await libs(); var doc = await PDFLib.PDFDocument.create();
+      for (var i = 0; i < pages.length; i++) {
+        var pg = pages[i], sz = pg.paper === 'letter' ? [612, 792] : [595.28, 841.89]; if (pg.land) sz = [sz[1], sz[0]];
+        var png = await doc.embedPng(pg.bytes || await toBytes(pg.c)), page = doc.addPage(sz); page.drawImage(png, { x: 0, y: 0, width: sz[0], height: sz[1] });
+      }
+      doc.setTitle(name.replace(/\.pdf$/, '')); doc.setCreator('GetToolNest Coloring Pages');
+      dlBlob(new Blob([await doc.save()], { type: 'application/pdf' }), name);
+      say('ok', 'Downloaded ' + name + ' (' + pages.length + ' page' + (pages.length > 1 ? 's' : '') + '). Print at 100% (actual size).');
+    } catch (e) { console.warn(e); say('bad', 'Sorry, the PDF could not be made. If you are offline, open this page once while online so it can save what it needs, then try again.'); }
+    busy = false;
+  }
+  $('cpPdf').addEventListener('click', function () { if (!ready()) return; pdf([makePage()], fileBase() + '.pdf'); });
+  function printPages(pages) {
+    var box = $('cpPrintBox'); if (!box) { box = document.createElement('div'); box.id = 'cpPrintBox'; document.body.appendChild(box); }
+    box.innerHTML = ''; var st = $('cpPageCss'); if (!st) { st = document.createElement('style'); st.id = 'cpPageCss'; document.head.appendChild(st); }
+    var p0 = pages[0]; st.textContent = '@page { size: ' + (p0.paper === 'letter' ? 'letter' : 'A4') + ' ' + (p0.land ? 'landscape' : 'portrait') + '; margin: 0; }';
+    var left = pages.length;
+    pages.forEach(function (pg) { var im = new Image(); im.alt = 'Colouring page'; im.onload = im.onerror = function () { if (--left === 0) setTimeout(function () { window.print(); }, 60); }; im.src = pg.url || pg.c.toDataURL('image/png'); box.appendChild(im); });
+  }
+  $('cpPrint').addEventListener('click', function () { if (!ready()) return; printPages([makePage()]); });
+
+  // ---------- booklet ----------
+  var book = [];
+  function bookUi() {
+    $('cpBook').hidden = !book.length; $('cpBookT').textContent = 'Booklet: ' + book.length + ' page' + (book.length === 1 ? '' : 's') + ' (kept until you close this page)';
+    var t = $('cpBookThumbs'); t.innerHTML = ''; book.forEach(function (b, i) { var im = new Image(); im.src = b.url; im.alt = 'Booklet page ' + (i + 1); t.appendChild(im); });
+  }
+  $('cpAdd').addEventListener('click', async function () {
+    if (!ready()) return; if (book.length >= 40) { say('bad', 'A booklet can have up to 40 pages. Download it, then start a new one.'); return; }
+    var pg = makePage(); try { var bytes = await toBytes(pg.c); book.push({ bytes: bytes, url: pg.c.toDataURL('image/jpeg', 0.5), land: pg.land, paper: pg.paper }); bookUi(); say('ok', 'Added “' + pageName + '” as page ' + book.length + ' of your booklet.'); } catch (e) { say('bad', 'This page could not be added.'); }
+  });
+  $('cpBookPdf').addEventListener('click', function () { if (book.length) pdf(book, 'coloring-book-' + book.length + '-pages.pdf'); });
+  $('cpBookPrint').addEventListener('click', function () { if (book.length) printPages(book); });
+  $('cpBookClear').addEventListener('click', function () { if (!confirm('Remove all pages from the booklet?')) return; book = []; bookUi(); });
+
+  // ---------- start ----------
+  $('cpThick').value = S.thick; $('cpDetail').value = S.detail; $('cpSpeck').value = S.speck; $('cpStyle').value = /^(edges|dark|both)$/.test(S.style) ? S.style : 'edges'; $('cpPaper').value = S.paper; $('cpName').checked = S.name; $('cpTitle').checked = S.title;
+  sliders(); syncPal(); syncTabs(); show();
+})();
+</script>

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: es
 module.exports = {
+"color-identifier":["identificador de colores","detector de colores","qué color es","nombre del color","app para daltónicos"],
+"magnifier":["lupa","lupa con cámara","lupa online","lupa con linterna","ampliar letra pequeña"],
+"big-text-display":["texto grande","letrero led","texto en pantalla completa","cartel de aeropuerto","texto que se desplaza"],
+"letter-templates":["plantillas de cartas","carta formal","carta de renuncia","carta de reclamación","solicitud de permiso laboral","carta de recomendación"],
 "tournament-bracket-maker":["generador de brackets","cuadro de torneo","creador de torneos","fixture de torneo","tabla de liga"],
 "scoreboard-keeper":["marcador online","marcador de puntos","contador de puntos","marcador de fútbol","anotador de juegos"],
 "chord-progression-generator":["generador de progresiones de acordes","progresiones de acordes","acordes por tonalidad","generador de acordes","transportar acordes"],

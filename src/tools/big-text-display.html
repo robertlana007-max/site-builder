@@ -1,0 +1,449 @@
+<style>
+.btd h3.btd-h { font-size: 16px; margin: 18px 0 8px; }
+.btd h3.btd-h:first-child { margin-top: 0; }
+.btd .btd-modes { display: flex; flex-wrap: wrap; margin: 0 0 14px; }
+.btd .btd-modes button { flex: 1 1 auto; }
+.btd textarea#btdText { min-height: 96px; font-size: 20px; font-weight: 600; }
+.btd .btd-chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 6px; }
+.btd .btd-chips button { font: inherit; font-size: 15px; font-weight: 600; min-height: 42px; padding: 6px 14px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; max-width: 100%; overflow-wrap: anywhere; text-align: start; }
+.btd .btd-chips button:hover, .btd .btd-chips button:focus-visible { border-color: var(--accent); color: var(--accent); }
+.btd .btd-chips .btd-mine { display: inline-flex; align-items: stretch; border-radius: 999px; border: 1px solid var(--line); background: var(--bg); max-width: 100%; }
+.btd .btd-chips .btd-mine button { border: 0; background: none; }
+.btd .btd-chips .btd-mine button.btd-x { padding: 6px 12px 6px 4px; color: var(--muted); font-size: 18px; line-height: 1; }
+.btd .btd-note { font-size: 14px; color: var(--muted); margin: 4px 0 12px; }
+.btd .btd-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin: 0 0 14px; }
+.btd .btd-themes button { font: 700 14px/1.1 system-ui, sans-serif; min-height: 52px; border-radius: 10px; border: 2px solid transparent; cursor: pointer; padding: 6px; box-shadow: inset 0 0 0 1px rgba(127,127,127,.35); }
+.btd .btd-themes button[aria-pressed="true"] { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.btd .btd-colors { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; margin: 0 0 14px; }
+.btd .btd-colors label { display: inline-flex; align-items: center; gap: 8px; margin: 0; font-weight: 600; }
+.btd .btd-colors input[type=color] { width: 48px; height: 40px; border: 1px solid var(--line); border-radius: 8px; background: var(--field); padding: 2px; }
+.btd .btd-prev { position: relative; width: 100%; aspect-ratio: 16 / 9; border-radius: 12px; overflow: hidden; border: 1px solid var(--line); margin: 6px 0 4px; }
+.btd .btd-go { width: 100%; justify-content: center; }
+.btd .btd-sign { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); margin-bottom: 14px; }
+/* the display itself (used for the preview and the full-screen view) */
+.btd-disp { position: absolute; inset: 0; overflow: hidden; background: var(--btd-bg, #000); color: var(--btd-fg, #fff); display: flex; align-items: center; justify-content: center; user-select: none; -webkit-user-select: none; }
+.btd-disp .btd-rot { position: absolute; left: 50%; top: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; transform-origin: 50% 50%; }
+.btd-disp .btd-t { margin: 0; text-align: center; line-height: 1.08; white-space: pre-wrap; overflow-wrap: normal; word-break: normal; font-weight: 800; letter-spacing: -.01em; }
+.btd-disp .btd-t.btd-cjk { overflow-wrap: anywhere; }
+.btd-disp.btd-glow .btd-t { text-shadow: 0 0 .06em currentColor, 0 0 .18em currentColor; }
+.btd-disp.btd-led .btd-t { font-family: "Courier New", Courier, ui-monospace, monospace; font-weight: 900; letter-spacing: .04em; text-shadow: 0 0 .05em currentColor, 0 0 .14em currentColor; }
+.btd-disp.btd-led::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(circle at 50% 50%, transparent 0 46%, var(--btd-bg, #000) 62%); background-size: var(--btd-dot, 7px) var(--btd-dot, 7px); }
+.btd-disp .btd-small { font-weight: 700; text-align: center; line-height: 1.1; white-space: pre-wrap; margin: 0; opacity: .92; }
+.btd-disp .btd-line { width: 70%; height: 0; border-top: max(2px, .5vmin) solid currentColor; opacity: .5; margin: 1.2vmin 0; }
+.btd-disp.btd-marq .btd-rot { display: block; }
+.btd-disp.btd-marq .btd-t { white-space: pre; position: absolute; left: 0; top: 0; will-change: transform; }
+.btd-disp.btd-off .btd-t, .btd-disp.btd-off .btd-small { visibility: hidden; }
+.btd-disp.btd-inv { background: var(--btd-fg, #fff); color: var(--btd-bg, #000); }
+.btd-disp.btd-inv.btd-led::after { background-image: radial-gradient(circle at 50% 50%, transparent 0 46%, var(--btd-fg, #fff) 62%); }
+.btd-stage { position: fixed; inset: 0; z-index: 2147483000; display: none; background: #000; touch-action: manipulation; }
+.btd-stage.open { display: block; }
+.btd-stage .btd-bar { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; padding: 12px 12px max(12px, env(safe-area-inset-bottom)); background: linear-gradient(transparent, rgba(0,0,0,.7)); transition: opacity .25s; }
+.btd-stage .btd-bar button { font: 700 15px/1 system-ui, sans-serif; min-height: 46px; min-width: 46px; padding: 0 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,.35); background: rgba(20,20,20,.85); color: #fff; cursor: pointer; }
+.btd-stage.quiet .btd-bar { opacity: 0; pointer-events: none; }
+.btd-stage .btd-hint { position: absolute; z-index: 3; top: max(10px, env(safe-area-inset-top)); left: 50%; transform: translateX(-50%); font: 600 13px/1.3 system-ui, sans-serif; color: #fff; background: rgba(0,0,0,.6); padding: 6px 12px; border-radius: 99px; transition: opacity .4s; pointer-events: none; max-width: 92%; text-align: center; }
+.btd-stage.quiet .btd-hint { opacity: 0; }
+@media print {
+  @page { size: A4 landscape; margin: 10mm; }
+  body > *:not(#btdPrint) { display: none !important; }
+  html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; }
+  #btdPrint { display: flex !important; flex-direction: column; align-items: center; justify-content: center; width: 277mm; height: 188mm; color: #000; text-align: center; overflow: hidden; }
+  #btdPrint p { margin: 0; max-width: 100%;
+  }
+  #btdPrint p.btd-cjk { overflow-wrap: anywhere; }
+  #btdPrint p { line-height: 1.08; white-space: pre-wrap; font-weight: 800; }
+  #btdPrint .btd-small { font-weight: 700; }
+  #btdPrint .btd-line { width: 70%; border-top: 2px solid #000; opacity: .5; margin: 4mm 0; }
+}
+</style>
+<div class="btd">
+<div class="tabs btd-modes" role="tablist" aria-label="What to show" style="margin-right:0">
+  <button type="button" role="tab" id="btdModeText" aria-selected="true">Big text</button>
+  <button type="button" role="tab" id="btdModeSign" aria-selected="false">Name sign (pickup)</button>
+</div>
+
+<div id="btdTextBox">
+  <label for="btdText">Your message</label>
+  <textarea id="btdText" class="plain" data-nomemo maxlength="400" dir="auto" placeholder="Type here, or tap a quick phrase below"></textarea>
+  <h3 class="btd-h">Quick phrases</h3>
+  <p class="btd-note" style="margin-top:0">Tap one to show it full screen straight away.</p>
+  <div class="btd-chips" id="btdQuick"></div>
+  <h3 class="btd-h">Your saved phrases</h3>
+  <div class="btd-chips" id="btdMine"></div>
+  <p class="btd-note" id="btdMineNote">Save phrases you use often. They stay on this device only.</p>
+  <div class="btns" style="margin:0 0 6px"><button type="button" class="btn ghost" id="btdSave">+ Save this phrase</button></div>
+</div>
+
+<div id="btdSignBox" hidden>
+  <div class="btd-sign">
+    <div><label for="btdName">Name on the sign</label><input type="text" id="btdName" data-nomemo maxlength="80" dir="auto" autocomplete="off" placeholder="e.g. MARIA GARCIA"></div>
+    <div><label for="btdTop">Top line <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input type="text" id="btdTop" data-nomemo maxlength="60" dir="auto" autocomplete="off" placeholder="e.g. Welcome, or a company name"></div>
+    <div><label for="btdBottom">Bottom line <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input type="text" id="btdBottom" data-nomemo maxlength="60" dir="auto" autocomplete="off" placeholder="e.g. Flight EK 202 or Hotel Sol"></div>
+  </div>
+  <label style="font-weight:500"><input type="checkbox" id="btdUpper" data-nomemo checked>Show the name in CAPITALS (easier to read from far away)</label>
+</div>
+
+<h3 class="btd-h">Look</h3>
+<div class="btd-themes" id="btdThemes" role="group" aria-label="Colour theme"></div>
+<div class="btd-colors">
+  <label>Text <input type="color" id="btdFg" data-nomemo value="#ffffff"></label>
+  <label>Background <input type="color" id="btdBg" data-nomemo value="#000000"></label>
+</div>
+<div class="fields">
+  <div><label for="btdEffect">Effect</label><select id="btdEffect" data-nomemo>
+    <option value="fit">Still, fills the screen</option>
+    <option value="scroll">Scrolling (marquee)</option>
+    <option value="flash">Flashing</option>
+    <option value="blink">Blinking text</option>
+  </select></div>
+  <div id="btdSpeedBox"><label for="btdSpeed">Speed <span id="btdSpeedOut" style="font-weight:400;color:var(--muted)"></span></label><input type="range" id="btdSpeed" data-nomemo min="1" max="10" step="1" value="4"></div>
+  <div><label for="btdFont">Font</label><select id="btdFont" data-nomemo>
+    <option value="sans">Bold (clear)</option>
+    <option value="round">Rounded</option>
+    <option value="serif">Serif</option>
+    <option value="narrow">Narrow (fits long words)</option>
+    <option value="mono">Typewriter</option>
+  </select></div>
+  <div><label for="btdOrient">Direction</label><select id="btdOrient" data-nomemo>
+    <option value="auto">Follow the phone</option>
+    <option value="land">Sideways (landscape)</option>
+  </select></div>
+</div>
+<p class="btd-note" id="btdFlashNote" hidden>Flashing is kept slow (at most 2 flashes a second). If flashing lights affect you or people nearby, use Still or Scrolling.</p>
+
+<h3 class="btd-h">Preview</h3>
+<div class="btd-prev" id="btdPrev"></div>
+<div class="btns">
+  <button type="button" class="btn big btd-go" id="btdShow">Show full screen</button>
+</div>
+<div class="btns">
+  <button type="button" class="btn ghost" id="btdPrintBtn">Print / save as PDF</button>
+  <button type="button" class="btn ghost" id="btdClear">Clear</button>
+</div>
+<p class="msg" id="msg" aria-live="polite">Works offline. Nothing you type leaves this device.</p>
+</div>
+
+<div class="btd-stage" id="btdStage" role="dialog" aria-modal="true" aria-label="Big text, full screen">
+  <div class="btd-hint" id="btdHint">Tap the screen for buttons</div>
+  <div class="btd-bar" id="btdBar">
+    <button type="button" id="btdClose" aria-label="Close full screen">✕ Close</button>
+    <button type="button" id="btdPause">Pause</button>
+    <button type="button" id="btdTurn">Turn ⟳</button>
+    <button type="button" id="btdInvert">Swap colours</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  var KEY = 'gtn-big-text-display';
+  var THEMES = [
+    { id: 'wb', n: 'White on black', fg: '#ffffff', bg: '#000000' },
+    { id: 'bw', n: 'Black on white', fg: '#000000', bg: '#ffffff' },
+    { id: 'yb', n: 'Yellow on black', fg: '#ffe500', bg: '#000000' },
+    { id: 'by', n: 'Black on yellow', fg: '#000000', bg: '#ffd60a' },
+    { id: 'gl', n: 'Neon green', fg: '#39ff14', bg: '#000000', glow: 1 },
+    { id: 'rl', n: 'Red LED', fg: '#ff2a1a', bg: '#0a0000', led: 1 },
+    { id: 'al', n: 'Amber LED', fg: '#ffb000', bg: '#0b0700', led: 1 },
+    { id: 'wr', n: 'White on red', fg: '#ffffff', bg: '#c1121f' },
+    { id: 'wbl', n: 'White on blue', fg: '#ffffff', bg: '#0b3d91' },
+    { id: 'pk', n: 'Pink party', fg: '#ff4fd8', bg: '#14001a', glow: 1 }
+  ];
+  var QUICK = ['I am deaf', 'I am hard of hearing', 'Please write it down', 'Please type it on my phone', 'Please speak slowly and face me', 'I can lip-read', 'I use sign language', 'Thank you', 'Yes', 'No', 'Please wait', 'Sorry, I do not understand', 'Can you help me?', 'I need help', 'Call an ambulance', 'Where is the toilet?', 'How much is it?', 'Happy birthday!', 'Taxi'];
+  var FONTS = {
+    sans: 'system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans", Arial, sans-serif',
+    round: '"Arial Rounded MT Bold", "Varela Round", "Nunito", ui-rounded, "SF Pro Rounded", system-ui, sans-serif',
+    serif: 'Georgia, "Noto Serif", "Times New Roman", serif',
+    narrow: '"Arial Narrow", "Roboto Condensed", "Helvetica Neue Condensed", "Liberation Sans Narrow", "sans-serif-condensed", Impact, sans-serif',
+    mono: '"Courier New", Courier, ui-monospace, monospace'
+  };
+  var IDS = ['btdText', 'btdName', 'btdTop', 'btdBottom', 'btdUpper', 'btdFg', 'btdBg', 'btdEffect', 'btdSpeed', 'btdFont', 'btdOrient'];
+  var st = { mode: 'text', theme: 'wb', mine: [] };
+  function save() {
+    var f = {}; IDS.forEach(function (id) { var el = $(id); f[id] = el.type === 'checkbox' ? el.checked : el.value; });
+    st.f = f; try { localStorage.setItem(KEY, JSON.stringify(st)); } catch (e) {}
+  }
+  function say(cls, t) { PT_say(cls, t); }
+  function PT_say(cls, t) { var m = $('msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = t || ''; }
+
+  // ---------- measuring: the biggest font size that fits a box ----------
+  var meas = document.createElement('div');
+  meas.setAttribute('aria-hidden', 'true');
+  meas.style.cssText = 'position:fixed;left:-99999px;top:0;visibility:hidden;pointer-events:none;contain:layout style;';
+  document.body.appendChild(meas);
+  var CJK = /[　-鿿가-힯豈-﫿฀-๿က-႟຀-໿]/;
+  function fit(text, font, weight, w, h, wrap, ls) {
+    if (!text || w < 4 || h < 4) return 8;
+    meas.style.fontFamily = font; meas.style.fontWeight = weight; meas.style.letterSpacing = ls || 'normal';
+    meas.style.lineHeight = '1.08'; meas.style.whiteSpace = wrap ? 'pre-wrap' : 'pre';
+    meas.style.overflowWrap = CJK.test(text) ? 'anywhere' : 'normal'; meas.style.wordBreak = 'normal';
+    meas.style.width = wrap ? w + 'px' : 'auto';
+    meas.textContent = text;
+    var lo = 6, hi = Math.max(12, Math.min(h * 1.2, 4000));
+    for (var i = 0; i < 18; i++) {
+      var mid = (lo + hi) / 2; meas.style.fontSize = mid + 'px';
+      var ok = meas.scrollWidth <= w + 0.5 && meas.scrollHeight <= h + 0.5;
+      if (ok) lo = mid; else hi = mid;
+      if (hi - lo < 0.5) break;
+    }
+    return Math.floor(lo);
+  }
+  function fitText(p, text, font, weight, w, h, ls) { // wrap at spaces; break long words only when that is far better
+    var a = fit(text, font, weight, w, h, true, ls), any = CJK.test(text);
+    if (!any) { meas.style.overflowWrap = 'anywhere'; meas.style.fontSize = a + 'px'; if (meas.scrollWidth > w + 0.5) any = true; }
+    if (!any) { var lo = 6, hi = Math.max(12, Math.min(h * 1.2, 4000)); meas.style.overflowWrap = 'anywhere'; for (var i = 0; i < 18 && hi - lo >= 0.5; i++) { var m = (lo + hi) / 2; meas.style.fontSize = m + 'px'; if (meas.scrollWidth <= w + 0.5 && meas.scrollHeight <= h + 0.5) lo = m; else hi = m; } if (lo > a * 3.5) { a = Math.floor(lo); any = true; } }
+    p.classList.toggle('btd-cjk', any); return a;
+  }
+
+  // ---------- one display (preview or full screen) ----------
+  function Disp(host) {
+    this.host = host; this.el = document.createElement('div'); this.el.className = 'btd-disp';
+    this.rot = document.createElement('div'); this.rot.className = 'btd-rot'; this.el.appendChild(this.rot);
+    host.appendChild(this.el); this.x = null; this.raf = 0; this.flashT = 0; this.paused = false; this.turn = 0; this.inv = false;
+  }
+  Disp.prototype.stop = function () { cancelAnimationFrame(this.raf); this.raf = 0; clearInterval(this.flashT); this.flashT = 0; this.el.classList.remove('btd-off'); this.el.classList.toggle('btd-inv', this.inv); };
+  Disp.prototype.draw = function (s) {
+    var me = this, el = this.el, rot = this.rot;
+    this.stop(); this.s = s;
+    var W = this.host.clientWidth, H = this.host.clientHeight;
+    if (!W || !H) return;
+    var t = theme(s.theme);
+    el.style.setProperty('--btd-fg', s.fg); el.style.setProperty('--btd-bg', s.bg);
+    el.classList.toggle('btd-glow', !!t.glow); el.classList.toggle('btd-led', !!t.led);
+    el.style.setProperty('--btd-dot', Math.max(3, Math.round(Math.min(W, H) / 70)) + 'px');
+    var side = s.orient === 'land' && H > W && this.host !== $('btdPrev'); // phone held upright: turn the text sideways
+    var deg = (this.turn % 4) * 90 + (side ? 90 : 0), turned = deg % 180 === 90;
+    var bw = turned ? H : W, bh = turned ? W : H;
+    rot.style.width = bw + 'px'; rot.style.height = bh + 'px';
+    rot.style.transform = 'translate(-50%,-50%) rotate(' + deg + 'deg)';
+    rot.textContent = '';
+    var font = t.led ? FONTS.mono : FONTS[s.font] || FONTS.sans, weight = t.led ? 900 : 800, ls = t.led ? '.04em' : '-.01em';
+    var padX = Math.round(bw * 0.04), padY = Math.round(bh * 0.05);
+    var marq = s.effect === 'scroll';
+    el.classList.toggle('btd-marq', marq);
+    if (s.mode === 'sign') {
+      var name = s.name || 'Your name here', top = s.top, bot = s.bottom;
+      var hasT = !!top, hasB = !!bot, small = (hasT ? 1 : 0) + (hasB ? 1 : 0);
+      var nameH = (bh - 2 * padY) * (small === 2 ? 0.62 : small ? 0.74 : 1), smH = (bh - 2 * padY) * (small === 2 ? 0.14 : 0.16);
+      var bits = [];
+      if (hasT) bits.push(['small', top, smH]);
+      if (small) bits.push(['line']);
+      bits.push(['t', name, nameH]);
+      if (hasB) bits.push(['line'], ['small', bot, smH]);
+      if (!hasT && hasB) bits.splice(0, 1);
+      bits.forEach(function (b) {
+        if (b[0] === 'line') { var ln = document.createElement('div'); ln.className = 'btd-line'; rot.appendChild(ln); return; }
+        var p = document.createElement('p'); p.className = b[0] === 't' ? 'btd-t' : 'btd-small'; p.dir = 'auto'; p.textContent = b[1];
+        p.style.fontFamily = font; p.style.letterSpacing = ls;
+        var sz = fitText(p, b[1], font, b[0] === 't' ? weight : 700, bw - 2 * padX, b[2], ls);
+        if (b[0] === 'small') sz = Math.min(sz, Math.round(bh * 0.12));
+        p.style.fontSize = sz + 'px'; p.style.maxWidth = (bw - 2 * padX) + 'px';
+        rot.appendChild(p);
+      });
+    } else {
+      var text = s.text || 'Type your message';
+      var p = document.createElement('p'); p.className = 'btd-t'; p.dir = 'auto'; p.style.fontFamily = font; p.style.letterSpacing = ls;
+      rot.appendChild(p);
+      if (marq) {
+        var line = text.replace(/\s*\n\s*/g, '   ');
+        p.textContent = line;
+        var sz = Math.floor((bh - 2 * padY) / 1.08 * 0.92);
+        p.style.fontSize = sz + 'px';
+        var tw = p.scrollWidth, y = (bh - p.offsetHeight) / 2;
+        var rtl = /^[^A-Za-zÀ-ɏͰ-ϿЀ-ӿ]*[֐-ࣿיִ-﷿ﹰ-ﻼ]/.test(line);
+        var speed = (+s.speed || 4) * bh * 0.09, x = rtl ? -tw : bw, last = 0;
+        if (me.mx != null && me.mkey === line + bw + bh) x = me.mx;
+        me.mkey = line + bw + bh;
+        var step = function (now) {
+          if (!last) last = now;
+          var dt = Math.min(0.1, (now - last) / 1000); last = now;
+          if (!me.paused) { x += (rtl ? 1 : -1) * speed * dt; if (!rtl && x < -tw) x = bw; if (rtl && x > bw) x = -tw; }
+          me.mx = x;
+          p.style.transform = 'translate3d(' + x.toFixed(1) + 'px,' + y.toFixed(1) + 'px,0)';
+          me.raf = requestAnimationFrame(step);
+        };
+        p.style.transform = 'translate3d(' + x + 'px,' + y + 'px,0)';
+        me.raf = requestAnimationFrame(step);
+      } else {
+        p.textContent = text;
+        p.style.fontSize = fitText(p, text, font, weight, bw - 2 * padX, bh - 2 * padY, ls) + 'px';
+        p.style.maxWidth = (bw - 2 * padX) + 'px';
+      }
+    }
+    if (s.effect === 'flash' || s.effect === 'blink') {
+      var per = 1000 / Math.min(2, Math.max(0.5, (+s.speed || 4) / 4)) / 2; // half a cycle; at most 2 flashes a second
+      var on = false;
+      this.flashT = setInterval(function () {
+        if (me.paused) return;
+        on = !on;
+        if (s.effect === 'flash') el.classList.toggle('btd-inv', on !== me.inv); else el.classList.toggle('btd-off', on);
+      }, per);
+    }
+  };
+  function theme(id) { for (var i = 0; i < THEMES.length; i++) if (THEMES[i].id === id) return THEMES[i]; return { id: 'custom' }; }
+
+  // ---------- state from the form ----------
+  function cur() {
+    var up = $('btdUpper').checked, nm = $('btdName').value.trim();
+    return {
+      mode: st.mode, theme: st.theme, fg: $('btdFg').value, bg: $('btdBg').value,
+      text: $('btdText').value.replace(/\r/g, '').trim(), name: up ? nm.toLocaleUpperCase() : nm,
+      top: $('btdTop').value.trim(), bottom: $('btdBottom').value.trim(),
+      effect: $('btdEffect').value, speed: $('btdSpeed').value, font: $('btdFont').value, orient: $('btdOrient').value
+    };
+  }
+  var prev = new Disp($('btdPrev'));
+  function ui() {
+    var e = $('btdEffect').value;
+    $('btdSpeedBox').hidden = e === 'fit';
+    $('btdFlashNote').hidden = !(e === 'flash' || e === 'blink');
+    var sp = +$('btdSpeed').value;
+    $('btdSpeedOut').textContent = e === 'scroll' ? '(' + sp + ' of 10)' : e === 'fit' ? '' : '(' + Math.min(2, Math.max(0.5, sp / 4)).toFixed(1).replace(/\.0$/, '') + ' a second)';
+    $('btdModeText').setAttribute('aria-selected', st.mode === 'text'); $('btdModeSign').setAttribute('aria-selected', st.mode === 'sign');
+    $('btdTextBox').hidden = st.mode !== 'text'; $('btdSignBox').hidden = st.mode !== 'sign';
+    [].forEach.call($('btdThemes').children, function (b) { b.setAttribute('aria-pressed', b.dataset.id === st.theme); });
+  }
+  var rt = 0;
+  function refresh() { ui(); clearTimeout(rt); rt = setTimeout(function () { prev.draw(cur()); if (stage.classList.contains('open')) big.draw(cur()); }, 60); }
+
+  // themes
+  THEMES.forEach(function (t) {
+    var b = document.createElement('button'); b.type = 'button'; b.dataset.id = t.id; b.textContent = t.n;
+    b.style.background = t.bg; b.style.color = t.fg; if (t.glow || t.led) b.style.textShadow = '0 0 6px ' + t.fg;
+    b.addEventListener('click', function () { st.theme = t.id; $('btdFg').value = t.fg; $('btdBg').value = t.bg; if (t.led && $('btdEffect').value === 'fit' && st.mode === 'text') $('btdEffect').value = 'scroll'; refresh(); save(); });
+    $('btdThemes').appendChild(b);
+  });
+  ['btdFg', 'btdBg'].forEach(function (id) { $(id).addEventListener('input', function () { st.theme = 'custom'; refresh(); save(); }); });
+  IDS.forEach(function (id) { if (id === 'btdFg' || id === 'btdBg') return; $(id).addEventListener(/^(SELECT)$/.test($(id).tagName) || $(id).type === 'checkbox' ? 'change' : 'input', function () { refresh(); save(); }); });
+  $('btdModeText').addEventListener('click', function () { st.mode = 'text'; refresh(); save(); });
+  $('btdModeSign').addEventListener('click', function () { st.mode = 'sign'; if (st.theme === 'wb') { st.theme = 'bw'; $('btdFg').value = '#000000'; $('btdBg').value = '#ffffff'; } refresh(); save(); });
+
+  // quick and saved phrases
+  function chip(box, text, onX) {
+    var b = document.createElement('button'); b.type = 'button'; b.textContent = text; b.dir = 'auto';
+    b.addEventListener('click', function () { $('btdText').value = text; st.mode = 'text'; refresh(); save(); open(); });
+    if (!onX) { box.appendChild(b); return; }
+    var w = document.createElement('span'); w.className = 'btd-mine'; w.appendChild(b);
+    var x = document.createElement('button'); x.type = 'button'; x.className = 'btd-x'; x.textContent = '×'; x.setAttribute('aria-label', 'Remove “' + text + '”');
+    x.addEventListener('click', onX); w.appendChild(x); box.appendChild(w);
+  }
+  QUICK.forEach(function (q) { chip($('btdQuick'), q); });
+  function mine() {
+    var box = $('btdMine'); box.textContent = '';
+    st.mine.forEach(function (m, i) { chip(box, m, function () { st.mine.splice(i, 1); mine(); save(); }); });
+    $('btdMineNote').hidden = st.mine.length > 0;
+  }
+  $('btdSave').addEventListener('click', function () {
+    var t = $('btdText').value.replace(/\r/g, '').trim();
+    if (!t) { say('bad', 'Type a phrase first, then save it.'); $('btdText').focus(); return; }
+    if (st.mine.indexOf(t) >= 0) { say('', 'That phrase is already saved.'); return; }
+    if (st.mine.length >= 30) { say('bad', 'You can save up to 30 phrases. Remove one first (tap ×).'); return; }
+    st.mine.push(t.slice(0, 400)); mine(); save(); say('ok', 'Saved. Tap it any time to show it.');
+  });
+
+  // ---------- full screen ----------
+  var stage = $('btdStage'), big = new Disp(stage), wake = null, hideT = 0, pushed = false, lastFocus = null;
+  stage.insertBefore(big.el, stage.firstChild);
+  function wakeOn() {
+    if (!navigator.wakeLock || !navigator.wakeLock.request) { hint('Tip: your browser cannot keep the screen on. Turn off auto-lock in settings if it dims.'); return; }
+    navigator.wakeLock.request('screen').then(function (l) { wake = l; l.addEventListener && l.addEventListener('release', function () { if (wake === l) wake = null; }); }, function () {});
+  }
+  function wakeOff() { if (wake) { try { wake.release(); } catch (e) {} wake = null; } }
+  function hint(t) { $('btdHint').textContent = t; }
+  function quietSoon() { stage.classList.remove('quiet'); clearTimeout(hideT); hideT = setTimeout(function () { stage.classList.add('quiet'); }, 2600); }
+  function open() {
+    var s = cur();
+    if (s.mode === 'text' && !s.text) { say('bad', 'Type a message or tap a quick phrase first.'); $('btdText').focus(); return; }
+    if (s.mode === 'sign' && !s.name) { say('bad', 'Type the name for the sign first.'); $('btdName').focus(); return; }
+    say('', '');
+    lastFocus = document.activeElement;
+    big.turn = 0; big.inv = false; big.paused = false; big.mx = null;
+    $('btdPause').textContent = 'Pause'; $('btdPause').hidden = s.effect === 'fit';
+    stage.classList.add('open'); document.documentElement.style.overflow = 'hidden';
+    if (!pushed) { try { history.pushState({ btd: 1 }, ''); pushed = true; } catch (e) {} }
+    hint('Tap the screen for buttons');
+    var f = stage.requestFullscreen || stage.webkitRequestFullscreen, p = null;
+    if (f) { try { p = f.call(stage); } catch (e) { p = null; } }
+    Promise.resolve(p).then(function () {
+      if (s.orient === 'land' && screen.orientation && screen.orientation.lock) return screen.orientation.lock('landscape').catch(function () {});
+    }, function () {}).then(function () { setTimeout(function () { big.draw(cur()); }, 120); });
+    big.draw(s); wakeOn(); quietSoon(); $('btdClose').focus({ preventScroll: true });
+  }
+  function close(fromPop) {
+    if (!stage.classList.contains('open')) return;
+    big.stop(); stage.classList.remove('open', 'quiet'); document.documentElement.style.overflow = '';
+    try { if (screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); } catch (e) {}
+    if (document.fullscreenElement || document.webkitFullscreenElement) { var x = document.exitFullscreen || document.webkitExitFullscreen; try { var p = x.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    wakeOff();
+    if (pushed && !fromPop) { pushed = false; try { history.back(); } catch (e) {} }
+    pushed = false;
+    if (lastFocus && lastFocus.focus) lastFocus.focus({ preventScroll: true }); else $('btdShow').focus();
+  }
+  window.addEventListener('popstate', function () { if (stage.classList.contains('open')) { pushed = false; close(true); } });
+  $('btdShow').addEventListener('click', open);
+  $('btdClose').addEventListener('click', function (e) { e.stopPropagation(); close(); });
+  $('btdPause').addEventListener('click', function (e) { e.stopPropagation(); big.paused = !big.paused; this.textContent = big.paused ? 'Play' : 'Pause'; quietSoon(); });
+  $('btdTurn').addEventListener('click', function (e) { e.stopPropagation(); big.turn = (big.turn + 1) % 4; big.mx = null; big.draw(cur()); quietSoon(); });
+  $('btdInvert').addEventListener('click', function (e) { e.stopPropagation(); big.inv = !big.inv; big.el.classList.toggle('btd-inv', big.inv); quietSoon(); });
+  stage.addEventListener('click', function (e) { if (e.target.closest && e.target.closest('.btd-bar')) return; if (stage.classList.contains('quiet')) quietSoon(); else { stage.classList.add('quiet'); clearTimeout(hideT); } });
+  document.addEventListener('keydown', function (e) {
+    if (!stage.classList.contains('open')) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if (e.key === ' ' && !(e.target && e.target.tagName === 'BUTTON')) { e.preventDefault(); $('btdPause').click(); }
+    else if (e.key === 'Tab') { // keep focus inside the full-screen view
+      var bs = [].filter.call(stage.querySelectorAll('button'), function (b) { return !b.hidden; }); if (!bs.length) return;
+      var i = bs.indexOf(document.activeElement); e.preventDefault(); quietSoon();
+      bs[(i + (e.shiftKey ? -1 : 1) + bs.length) % bs.length].focus();
+    }
+  });
+  document.addEventListener('fullscreenchange', function () {
+    if (!document.fullscreenElement && stage.classList.contains('open')) { /* user left full screen with the system gesture: keep the view open */ }
+    if (stage.classList.contains('open')) setTimeout(function () { big.draw(cur()); }, 80);
+  });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible' && stage.classList.contains('open') && !wake) wakeOn(); });
+  var rz = 0;
+  window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { prev.draw(cur()); if (stage.classList.contains('open')) big.draw(cur()); }, 100); });
+
+  // ---------- print ----------
+  $('btdPrintBtn').addEventListener('click', function () {
+    var s = cur();
+    if (s.mode === 'text' && !s.text) { say('bad', 'Type a message first.'); return; }
+    if (s.mode === 'sign' && !s.name) { say('bad', 'Type the name for the sign first.'); return; }
+    var box = $('btdPrint'); if (!box) { box = document.createElement('div'); box.id = 'btdPrint'; box.hidden = true; document.body.appendChild(box); }
+    box.textContent = '';
+    var W = 1040, H = 700, font = FONTS[s.font] || FONTS.sans; // A4 landscape inside 10 mm margins, in CSS pixels
+    box.style.fontFamily = font;
+    function add(cls, t, h, wt) { var p = document.createElement('p'); p.className = cls; p.dir = 'auto'; p.textContent = t; p.style.fontFamily = font; var sz = fitText(p, t, font, wt, W - 20, h); if (cls === 'btd-small') sz = Math.min(sz, 80); p.style.fontSize = sz + 'px'; box.appendChild(p); }
+    if (s.mode === 'sign') {
+      var n = (s.top ? 1 : 0) + (s.bottom ? 1 : 0), nh = H * (n === 2 ? 0.6 : n ? 0.72 : 0.95);
+      if (s.top) { add('btd-small', s.top, H * 0.13, 700); box.appendChild(Object.assign(document.createElement('div'), { className: 'btd-line' })); }
+      add('btd-t', s.name, nh, 800);
+      if (s.bottom) { box.appendChild(Object.assign(document.createElement('div'), { className: 'btd-line' })); add('btd-small', s.bottom, H * 0.13, 700); }
+    } else add('btd-t', s.text, H * 0.95, 800);
+    box.hidden = false; window.print(); setTimeout(function () { box.hidden = true; }, 600);
+    say('ok', 'Printed in black on white to save ink, on A4 or Letter sideways.');
+  });
+  $('btdClear').addEventListener('click', function () {
+    if (st.mode === 'sign') { $('btdName').value = ''; $('btdTop').value = ''; $('btdBottom').value = ''; $('btdName').focus(); }
+    else { $('btdText').value = ''; $('btdText').focus(); }
+    refresh(); save(); say('', '');
+  });
+
+  // ---------- start ----------
+  try {
+    var o = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (o && typeof o === 'object') {
+      if (o.mode === 'sign' || o.mode === 'text') st.mode = o.mode;
+      if (typeof o.theme === 'string' && (o.theme === 'custom' || theme(o.theme).fg)) st.theme = o.theme;
+      if (Array.isArray(o.mine)) st.mine = o.mine.filter(function (m) { return typeof m === 'string' && m.trim(); }).map(function (m) { return m.slice(0, 400); }).slice(0, 30);
+      if (o.f && typeof o.f === 'object') IDS.forEach(function (id) {
+        var el = $(id), v = o.f[id]; if (v == null) return;
+        if (el.type === 'checkbox') el.checked = !!v;
+        else if (el.tagName === 'SELECT') { if ([].some.call(el.options, function (op) { return op.value === v; })) el.value = v; }
+        else if (el.type === 'color') { if (/^#[0-9a-f]{6}$/i.test(v)) el.value = v; }
+        else if (typeof v === 'string') el.value = v.slice(0, +el.maxLength > 0 ? +el.maxLength : 400);
+      });
+    }
+  } catch (e) {}
+  mine(); ui(); prev.draw(cur());
+  window.addEventListener('pagehide', wakeOff);
+})();
+</script>

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"color-identifier":["色識別","色を判定","これは何色","色の名前","色覚サポート"],
+"magnifier":["拡大鏡","ルーペ","スマホ拡大鏡","ライト付きルーペ","小さい文字を読む"],
+"big-text-display":["大きな文字","電光掲示板","全画面文字","空港お迎えボード","流れる文字"],
+"letter-templates":["手紙テンプレート","ビジネス文書","退職届","休暇届","苦情の手紙"],
 "tournament-bracket-maker":["トーナメント表 作成","トーナメント表 印刷","総当たり表","リーグ表 作成","組み合わせ 抽選"],
 "scoreboard-keeper":["スコアボード","得点板 オンライン","スコア 記録","点数 カウンター","ゲーム スコア 計算"],
 "chord-progression-generator":["コード進行 ジェネレーター","コード進行 作成","ダイアトニックコード","カポ 計算","コード 移調"],
