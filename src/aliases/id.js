@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"color-identifier":["pendeteksi warna","identifikasi warna","warna apa ini","nama warna","aplikasi buta warna"],
+"magnifier":["kaca pembesar","aplikasi kaca pembesar","pembesar kamera","baca tulisan kecil"],
+"big-text-display":["teks besar","papan led","teks layar penuh","papan nama jemputan bandara","teks berjalan"],
+"letter-templates":["contoh surat","surat resmi","surat pengunduran diri","surat izin sakit","surat keluhan"],
 "tournament-bracket-maker":["bagan turnamen","pembuat bracket","jadwal pertandingan","sistem gugur","klasemen liga"],
 "scoreboard-keeper":["papan skor online","penghitung skor","skor kriket","papan skor bulu tangkis","pencatat skor permainan"],
 "chord-progression-generator":["generator progresi kunci","progresi chord","chord gitar","kunci nada lagu","transpose chord"],

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"color-identifier":["renk tanımlayıcı","renk algılama","bu ne renk","renk adı","renk körü yardım"],
+"magnifier":["büyüteç","telefon büyüteç","online büyüteç","ışıklı büyüteç","küçük yazı okuma"],
+"big-text-display":["büyük yazı","led tabela","tam ekran yazı","havalimanı karşılama tabelası","kayan yazı"],
+"letter-templates":["dilekçe örnekleri","resmi mektup","istifa dilekçesi","izin dilekçesi","şikayet mektubu"],
 "tournament-bracket-maker":["turnuva fikstürü","eleme tablosu","fikstür oluşturma","lig tablosu","kura çekimi"],
 "scoreboard-keeper":["skor tabelası","puan sayacı","online skorbord","maç skoru tutma","oyun puan tablosu"],
 "chord-progression-generator":["akor yürüyüşü oluşturucu","akor dizisi","gitar akorları","tonalite akorları","akor transpoze"],

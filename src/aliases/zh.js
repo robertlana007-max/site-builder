@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"color-identifier":["颜色识别","识别颜色","这是什么颜色","颜色名称","色盲助手"],
+"magnifier":["放大镜","手机放大镜","在线放大镜","带灯放大镜","看小字"],
+"big-text-display":["大字显示","手机led字幕","全屏文字","接机牌","滚动字幕"],
+"letter-templates":["信件模板","正式信函","请假条","辞职信","投诉信"],
 "tournament-bracket-maker":["比赛对阵表","淘汰赛对阵图","循环赛赛程","赛事抽签","积分榜生成"],
 "scoreboard-keeper":["记分板","在线计分器","比赛计分","板球计分","桌游计分"],
 "chord-progression-generator":["和弦进行生成器","和弦进行","调内和弦","吉他和弦","和弦移调"],

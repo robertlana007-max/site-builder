@@ -7299,5 +7299,173 @@ module.exports = [
       ]
     ],
     "icon": "<path d=\"M3 4h5v4H3zM3 16h5v4H3zM8 6h3v12H8M11 12h4M15 10h6v4h-6z\"/>"
+  },
+  {
+    "slug": "letter-templates",
+    "cat": "Text tools",
+    "name": "Letter Templates",
+    "title": "Free Letter Templates - Leave, Complaint & Formal Letters",
+    "desc": "27 formal letter templates: leave, resignation, complaint, refund, landlord, bank and school letters. Fill in, edit, download PDF, Word or text.",
+    "card": "Write formal letters from 27 ready templates.",
+    "intro": "Pick a letter, fill in a few details and get a clear, polite formal letter with no gaps or blanks. There are 27 templates for work (sick, casual, emergency, maternity and paternity leave, resignation, salary increase, work from home, apology), school, shops and services, landlords and neighbours, banks and offices, and everyday letters. Edit any word, then download a PDF, Word file or plain text. Nothing is uploaded.",
+    "steps": [
+      "Choose the letter you need, for example Sick leave application or Complaint: faulty product.",
+      "Fill in the details. Leave out anything you do not know and the sentences adjust.",
+      "Add your name and who the letter is to, then read the letter and change any words you like.",
+      "Download a PDF, Word (.docx) or text file, copy it, or print it."
+    ],
+    "faq": [
+      [
+        "Which letters are included?",
+        "Sick, casual, emergency, maternity and paternity leave; resignation; experience certificate and reference requests; salary increase; work from home; apology; school leave, fee concession and transfer certificate; product and service complaints; refund and cancellation; repair request, notice to vacate and noise complaint; bank account closure, change of address and card block; thank-you, invitation and recommendation letters."
+      ],
+      [
+        "What if I leave a field empty?",
+        "The letter is rewritten around it, so you never see blanks like [date] or [name]. A note above the letter tells you which details would make it complete."
+      ],
+      [
+        "Does it work in my country?",
+        "Yes. The wording is neutral and polite, dates follow your region (28 November 2026 or November 28, 2026) or the style you choose, and paper can be A4 or Letter. Rules for notice periods and leave differ by country, so check your contract or local law."
+      ],
+      [
+        "Can I change the wording?",
+        "Yes. Tap anywhere in the letter and type. Your edits are kept, even after a reload, until you press Undo my edits."
+      ],
+      [
+        "Is my information private?",
+        "Yes. Everything runs in your browser and is saved only on this device. Use Save draft to keep a copy as a file, and Start over to clear it."
+      ],
+      [
+        "Is this written by AI?",
+        "No. Each letter uses carefully written sentences that adjust to what you type, so it works offline and nothing is sent anywhere."
+      ]
+    ],
+    "icon": "<path d=\"M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z\"/><path d=\"M14 3v5h5M9 12h6M9 16h4\"/><path d=\"M8 8h2\"/>"
+  },
+  {
+    "slug": "big-text-display",
+    "cat": "Text tools",
+    "name": "Big Text Display",
+    "title": "Big Text Display - Full Screen Text, LED Sign & Name Sign",
+    "desc": "Show a message huge on your phone: auto-fit full screen, scrolling LED sign, flashing, airport pickup name sign and quick phrases for deaf people. Offline.",
+    "card": "Show huge text full screen, like an LED sign.",
+    "intro": "Type a message and show it as big as your screen allows. The text fits itself to the screen, sideways or upright, and can scroll like an LED sign or flash slowly. Quick phrases such as “I am deaf” and “Please write it down” help you talk to people when hearing is hard, and the name sign mode makes an airport pickup sign in seconds. The screen stays on, it works offline and nothing is sent anywhere.",
+    "steps": [
+      "Type your message, or tap a quick phrase to show it straight away.",
+      "Pick a colour theme and an effect: still, scrolling, flashing or blinking.",
+      "Press Show full screen. Tap the screen for Close, Pause, Turn and Swap colours.",
+      "For an airport pickup, choose Name sign, type the name, and show or print it."
+    ],
+    "faq": [
+      [
+        "How big does the text get?",
+        "As big as fits. The tool measures your screen and picks the largest size that shows the whole message, wrapping long messages onto several lines."
+      ],
+      [
+        "Can I show it sideways?",
+        "Yes. Choose Sideways (landscape). If your phone is locked upright, the text turns itself. Press Turn in full screen to rotate it any way you like."
+      ],
+      [
+        "Will the screen turn off?",
+        "In most browsers it stays on while the text is shown, using the Wake Lock feature. If yours does not support it, a tip appears so you can change the auto-lock setting."
+      ],
+      [
+        "Does it work without internet?",
+        "Yes. After the page has loaded once it works offline. Nothing you type is sent anywhere, and saved phrases stay on this device."
+      ],
+      [
+        "Is the flashing safe?",
+        "Flashing is kept to at most 2 flashes a second, below the level known to trigger seizures. If flashing lights affect you or people nearby, use Still or Scrolling."
+      ],
+      [
+        "Can I print a name sign?",
+        "Yes. Press Print / save as PDF to get a large black-on-white sign that fills a sideways A4 or Letter page."
+      ]
+    ],
+    "icon": "<rect x=\"2\" y=\"5\" width=\"20\" height=\"14\" rx=\"2\"/><path d=\"M7 15V9l3 6V9M14 9v6M14 9h3M14 12h2M14 15h3\"/>"
+  },
+  {
+    "slug": "magnifier",
+    "cat": "Image tools",
+    "name": "Magnifier",
+    "title": "Magnifier - Use Your Phone Camera as a Magnifying Glass",
+    "desc": "Turn your phone into a magnifying glass: zoom, light, freeze and pinch to zoom, high contrast and invert colours, reading guide. Free, private.",
+    "card": "Phone camera magnifying glass for small print.",
+    "intro": "Read small print on medicine labels, menus, receipts and forms with your phone camera. Zoom in, turn on the light where your phone allows it, then freeze the picture and pinch to look closer. High-contrast, black-and-white, invert and yellow-on-black colours help with low vision, and a reading guide keeps your place. You can also open a photo to magnify it. Nothing is recorded or uploaded.",
+    "steps": [
+      "Press Start magnifier and allow the camera. The back camera is used.",
+      "Hold the phone 10 to 20 cm above the page and zoom with the slider, + and −, or by pinching.",
+      "Turn on the light if it is dark, and pick High contrast, Invert or Yellow on black if that is easier to read.",
+      "Press Freeze to hold the picture still, pinch and drag to read it, and Save image to keep a copy."
+    ],
+    "faq": [
+      [
+        "Why is the zoom blurry?",
+        "Some phones and browsers only allow digital zoom, which enlarges the picture without adding detail. Hold the phone a little closer, add light, and freeze the picture once it is in focus. Chrome on Android often uses the camera’s own sharper zoom."
+      ],
+      [
+        "Why is there no light button?",
+        "Only some browsers can switch on the phone’s flashlight, mainly Chrome on Android. On iPhone use the flashlight in Control Center while the magnifier is open."
+      ],
+      [
+        "Is anything recorded?",
+        "No. The camera picture stays in your browser. Only Save image creates a file, and it is saved on your device."
+      ],
+      [
+        "It says camera access was blocked. What do I do?",
+        "Allow the camera for this site: tap the icon next to the web address, or open your phone settings for the browser, then press Start magnifier again. You can still open a photo to magnify it."
+      ],
+      [
+        "What do the colour options do?",
+        "High contrast makes text darker and sharper, Black & white removes colour, Invert shows light text on a dark background, and Yellow on black is a popular low-vision style. Brightness lifts dark pictures."
+      ],
+      [
+        "Does it work offline?",
+        "Yes. Once the page has loaded it works without internet."
+      ]
+    ],
+    "icon": "<circle cx=\"10.5\" cy=\"10.5\" r=\"6.5\"/><path d=\"M15.5 15.5 21 21M8 10.5h5M10.5 8v5\"/>"
+  },
+  {
+    "slug": "color-identifier",
+    "cat": "Image tools",
+    "name": "Color Identifier",
+    "title": "Color Identifier - Name Any Colour With Your Camera",
+    "desc": "Point your camera or open a photo and hear the colour named in plain words, like dark navy blue, plus HEX and RGB. Made for colour-blind users.",
+    "card": "Point your camera and hear the colour’s name.",
+    "intro": "Find out what colour something is. Point your phone camera at it, or open a photo and tap a spot, and the tool names the colour in plain words such as “dark navy blue” or “light olive green”, gives its colour family, and shows HEX and RGB codes. It can say the name aloud, which helps colour-blind and low-vision users. Freeze the picture, keep a history of colours and export it. Nothing is uploaded.",
+    "steps": [
+      "Press Use camera and point the circle at the colour, or open a photo and tap a spot.",
+      "Read the colour name, colour family and HEX and RGB codes.",
+      "Press Say it to hear the name, or turn on Say the name when I tap or freeze.",
+      "Press Freeze to hold the picture, and Save to history to keep colours."
+    ],
+    "faq": [
+      [
+        "How accurate is it?",
+        "The maths is exact for the picture, but cameras change colours with the light. Use daylight or a white light, avoid shadows and coloured lamps, and hold the camera close. Use the Area setting to average out noise."
+      ],
+      [
+        "Where do the colour names come from?",
+        "From the xkcd colour survey, a large online survey in which many thousands of people named colours (public domain, with joke and rude names removed). The nearest name is found with CIEDE2000, a formula for how different two colours look to the eye."
+      ],
+      [
+        "What is the colour family?",
+        "A simple everyday name such as dark blue, light green, beige or grey, for when the detailed name is unusual."
+      ],
+      [
+        "Can it help with colour blindness?",
+        "Yes. Point at clothes, food, cables or charts to hear the colour named aloud. It is a helper, not a medical test."
+      ],
+      [
+        "How is this different from Color Picker?",
+        "Color Picker gives exact colour codes from images and palettes for design. Color Identifier uses the camera, names colours in plain words and speaks them."
+      ],
+      [
+        "Is my camera picture saved?",
+        "No. The picture stays in your browser. Only the colours you save are kept, on this device."
+      ]
+    ],
+    "icon": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 3v3M12 18v3M3 12h3M18 12h3\"/>"
   }
 ];

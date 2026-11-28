@@ -1,0 +1,378 @@
+<style>
+.mg .mg-start { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 12px; }
+.mg .mg-start .btn { flex: 1 1 170px; justify-content: center; }
+.mg .mg-stage { display: none; }
+.mg .mg-stage.on { display: block; }
+.mg .mg-view { position: relative; width: 100%; height: min(64vh, 520px); min-height: 260px; background: #000; border-radius: 14px; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
+.mg .mg-view video, .mg .mg-view canvas { position: absolute; left: 0; top: 0; transform-origin: 0 0; max-width: none; }
+.mg .mg-tag { position: absolute; left: 10px; top: 10px; z-index: 2; font: 700 13px/1 system-ui, sans-serif; color: #fff; background: rgba(0,0,0,.62); padding: 7px 11px; border-radius: 99px; pointer-events: none; }
+.mg .mg-guide { position: absolute; left: 0; right: 0; height: 0; z-index: 2; top: 50%; pointer-events: none; }
+.mg .mg-guide.line::before { content: ""; position: absolute; left: 0; right: 0; top: -2px; height: 4px; background: #ff2a2a; box-shadow: 0 0 0 1px rgba(255,255,255,.8); }
+.mg .mg-guide.band::before { content: ""; position: absolute; left: 0; right: 0; top: calc(var(--mg-band, 70px) / -2); height: var(--mg-band, 70px); box-shadow: 0 0 0 100vmax rgba(0,0,0,.62); outline: 2px solid #ffe500; }
+.mg .mg-grip { position: absolute; right: 8px; top: -22px; width: 44px; height: 44px; border-radius: 50%; background: #ffe500; color: #000; border: 2px solid #000; font: 700 20px/40px system-ui, sans-serif; text-align: center; pointer-events: auto; cursor: ns-resize; touch-action: none; }
+.mg .mg-bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 10px 0 0; }
+.mg .mg-bar .btn { min-height: 48px; justify-content: center; }
+.mg .mg-zoom { display: grid; grid-template-columns: 52px 1fr 52px; gap: 8px; align-items: center; margin: 12px 0 0; }
+.mg .mg-zoom .btn { min-height: 52px; font-size: 24px; padding: 0; justify-content: center; }
+.mg .mg-zoom output { display: block; text-align: center; font-weight: 700; font-size: 15px; margin-top: 2px; }
+.mg .mg-filters { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0 0; }
+.mg .mg-filters button { flex: 1 1 auto; font: inherit; font-weight: 700; font-size: 14px; min-height: 46px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); cursor: pointer; }
+.mg .mg-filters button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+.mg .mg-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin: 12px 0 0; }
+.mg .mg-note { font-size: 14px; color: var(--muted); margin: 12px 0 0; }
+.mg-stage.mg-full { position: fixed; inset: 0; z-index: 2147483000; background: #000; display: flex !important; flex-direction: column; padding: max(8px, env(safe-area-inset-top)) 8px max(8px, env(safe-area-inset-bottom)); overflow-y: auto; color: #fff; }
+.mg-stage.mg-full .mg-view { flex: 1 1 auto; height: auto; min-height: 50vh; border-radius: 10px; }
+.mg-stage.mg-full .mg-more { display: none; }
+.mg-stage.mg-full .btn.ghost { background: #222; color: #fff; border-color: #555; }
+.mg-stage.mg-full .mg-filters button { background: #222; color: #fff; border-color: #555; }
+.mg-stage.mg-full .mg-filters button[aria-pressed="true"] { background: #ffe500; color: #000; border-color: #ffe500; }
+</style>
+<div class="mg">
+<div class="mg-start" id="mgStart">
+  <button type="button" class="btn big" id="mgCam">Start magnifier</button>
+  <button type="button" class="btn ghost" id="mgPhoto">Open a photo</button>
+</div>
+<input type="file" id="mgFile" accept="image/*" hidden data-nomemo>
+<p class="mg-note" id="mgIntro" style="margin-top:0">Uses the back camera. Nothing is recorded or sent. Freeze the picture to read it comfortably, then pinch or use + and − to zoom further.</p>
+
+<div class="mg-stage" id="mgStage">
+  <div class="mg-view" id="mgView" tabindex="0" aria-label="Magnified view. Pinch or use the plus and minus keys to zoom. When frozen, drag or use the arrow keys to move around.">
+    <video id="mgVideo" playsinline muted autoplay></video>
+    <canvas id="mgCanvas" hidden></canvas>
+    <div class="mg-guide" id="mgGuide" hidden><div class="mg-grip" id="mgGrip" role="slider" tabindex="0" aria-label="Reading guide position" aria-valuemin="0" aria-valuemax="100" aria-valuenow="50">↕</div></div>
+    <span class="mg-tag" id="mgTag">1×</span>
+  </div>
+  <div class="mg-zoom">
+    <button type="button" class="btn ghost" id="mgOut" aria-label="Zoom out">−</button>
+    <div><input type="range" id="mgZoom" data-nomemo min="1" max="10" step="0.1" value="2" aria-label="Zoom"><output id="mgZoomOut" for="mgZoom">2×</output></div>
+    <button type="button" class="btn ghost" id="mgIn" aria-label="Zoom in">+</button>
+  </div>
+  <div class="mg-bar">
+    <button type="button" class="btn" id="mgFreeze" style="flex:2 1 120px">Freeze</button>
+    <button type="button" class="btn ghost" id="mgTorch" aria-pressed="false" hidden style="flex:1 1 90px">💡 Light</button>
+    <button type="button" class="btn ghost" id="mgSave" hidden style="flex:1 1 90px">Save image</button>
+    <button type="button" class="btn ghost" id="mgFull" style="flex:1 1 90px">Full screen</button>
+  </div>
+  <div class="mg-filters" role="group" aria-label="Colours">
+    <button type="button" data-f="normal" aria-pressed="true">Normal</button>
+    <button type="button" data-f="contrast" aria-pressed="false">High contrast</button>
+    <button type="button" data-f="grey" aria-pressed="false">Black &amp; white</button>
+    <button type="button" data-f="invert" aria-pressed="false">Invert</button>
+    <button type="button" data-f="yellow" aria-pressed="false">Yellow on black</button>
+  </div>
+  <div class="mg-row">
+    <div><label for="mgBright">Brightness <span id="mgBrightOut" style="font-weight:400"></span></label><input type="range" id="mgBright" data-nomemo min="0.5" max="2" step="0.05" value="1"></div>
+    <div><label for="mgGuideSel">Reading guide</label><select id="mgGuideSel" data-nomemo><option value="off">Off</option><option value="line">Red line</option><option value="band">Reading window</option></select></div>
+  </div>
+  <div class="mg-bar mg-more">
+    <button type="button" class="btn ghost" id="mgFlip" hidden>Switch camera</button>
+    <button type="button" class="btn ghost" id="mgStop">Stop camera</button>
+  </div>
+</div>
+<p class="msg" id="msg" aria-live="polite"></p>
+<p class="mg-note">Tips: hold the phone 10 to 20 cm (4 to 8 inches) above the page and let it focus before you zoom. In dim light, turn on the light where your phone allows it. Freeze, then rest the phone and read in comfort.</p>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><filter id="mgYellow" color-interpolation-filters="sRGB"><feColorMatrix type="matrix" values="-0.2126 -0.7152 -0.0722 0 1  -0.2126 -0.7152 -0.0722 0 1  0 0 0 0 0  0 0 0 1 0"/><feComponentTransfer><feFuncR type="linear" slope="1.8" intercept="-0.4"/><feFuncG type="linear" slope="1.8" intercept="-0.4"/></feComponentTransfer></filter></svg>
+</div>
+<script>
+(function () {
+  var KEY = 'gtn-magnifier';
+  var view = $('mgView'), video = $('mgVideo'), cv = $('mgCanvas'), cx = cv.getContext('2d'), stage = $('mgStage');
+  var stream = null, track = null, caps = {}, facing = 'environment', mode = '', torch = false, wake = null, pushed = false;
+  var filter = 'normal', hwZoom = 1, pend = null, busyZ = false;
+  // frozen view: s = scale on top of the fitted size, tx/ty = offset in view pixels
+  var fz = { s: 1, tx: 0, ty: 0, base: 1, ox: 0, oy: 0 };
+  function say(cls, t) { var m = $('msg'); m.className = 'msg' + (cls ? ' ' + cls : ''); m.textContent = t || ''; }
+  function store() { try { localStorage.setItem(KEY, JSON.stringify({ z: $('mgZoom').value, f: filter, b: $('mgBright').value, g: $('mgGuideSel').value, gy: guideY })); } catch (e) {} }
+
+  // ---------- colour filters ----------
+  var CSSF = { normal: '', contrast: 'contrast(1.9) saturate(1.3)', grey: 'grayscale(1) contrast(1.8)', invert: 'grayscale(1) invert(1) contrast(1.8)', yellow: 'url(#mgYellow)' };
+  function cssFilter() { var b = +$('mgBright').value; return ((b !== 1 ? 'brightness(' + b + ') ' : '') + CSSF[filter]).trim() || 'none'; }
+  function applyFilter() {
+    var f = cssFilter(); video.style.filter = f; cv.style.filter = f;
+    [].forEach.call(document.querySelectorAll('.mg-filters button'), function (b) { b.setAttribute('aria-pressed', b.dataset.f === filter); });
+    $('mgBrightOut').textContent = Math.round(+$('mgBright').value * 100) + '%';
+  }
+  // the same filters done by hand, for the saved picture (works in every browser)
+  function bakeFilter(c) {
+    var b = +$('mgBright').value; if (filter === 'normal' && b === 1) return;
+    var x = c.getContext('2d'), d = x.getImageData(0, 0, c.width, c.height), p = d.data;
+    function cl(v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
+    function con(v, k) { return (v - 127.5) * k + 127.5; }
+    for (var i = 0; i < p.length; i += 4) {
+      var r = p[i] * b, g = p[i + 1] * b, bl = p[i + 2] * b; r = cl(r); g = cl(g); bl = cl(bl);
+      if (filter === 'contrast') {
+        r = cl(con(r, 1.9)); g = cl(con(g, 1.9)); bl = cl(con(bl, 1.9)); // contrast(1.9), then saturate(1.3)
+        var L = 0.213 * r + 0.715 * g + 0.072 * bl; r = cl(L + (r - L) * 1.3); g = cl(L + (g - L) * 1.3); bl = cl(L + (bl - L) * 1.3);
+      } else if (filter === 'grey' || filter === 'invert') {
+        var L = 0.2126 * r + 0.7152 * g + 0.0722 * bl; if (filter === 'invert') L = 255 - L; L = cl(con(L, 1.8)); r = g = bl = L;
+      } else if (filter === 'yellow') {
+        L = 255 - (0.2126 * r + 0.7152 * g + 0.0722 * bl); L = cl(L * 1.8 - 0.4 * 255); r = g = L; bl = 0;
+      }
+      p[i] = r; p[i + 1] = g; p[i + 2] = bl;
+    }
+    x.putImageData(d, 0, 0);
+  }
+
+  // ---------- layout of the picture inside the view ----------
+  function natural() { return mode === 'live' ? [video.videoWidth, video.videoHeight] : [cv.width, cv.height]; }
+  function fitBase(cover) {
+    var n = natural(), W = view.clientWidth, H = view.clientHeight; if (!n[0] || !W) return null;
+    var k = cover ? Math.max(W / n[0], H / n[1]) : Math.min(W / n[0], H / n[1]);
+    return { k: k, w: n[0] * k, h: n[1] * k, ox: (W - n[0] * k) / 2, oy: (H - n[1] * k) / 2, W: W, H: H };
+  }
+  function layoutLive() {
+    var f = fitBase(true); if (!f) return;
+    var dz = digital(); video.style.width = f.w + 'px'; video.style.height = f.h + 'px';
+    // scale about the centre of the view
+    var tx = f.W / 2 - (f.W / 2 - f.ox) * dz, ty = f.H / 2 - (f.H / 2 - f.oy) * dz;
+    video.style.transform = 'translate(' + tx + 'px,' + ty + 'px) scale(' + dz + ')';
+    tag();
+  }
+  function clampFrozen() {
+    var f = fitBase(mode !== 'photo'); if (!f) return;
+    var w = f.w * fz.s, h = f.h * fz.s;
+    // keep the picture covering the view (or centred when smaller)
+    if (w <= f.W) fz.tx = (f.W - w) / 2; else fz.tx = Math.min(0, Math.max(f.W - w, fz.tx));
+    if (h <= f.H) fz.ty = (f.H - h) / 2; else fz.ty = Math.min(0, Math.max(f.H - h, fz.ty));
+    cv.style.width = f.w + 'px'; cv.style.height = f.h + 'px';
+    cv.style.transform = 'translate(' + fz.tx + 'px,' + fz.ty + 'px) scale(' + fz.s + ')';
+    tag();
+  }
+  function zoomFrozenAt(ns, px, py) {
+    var f = fitBase(mode !== 'photo'); if (!f) return;
+    ns = Math.max(1, Math.min(mode === 'photo' ? 20 : 12, ns));
+    fz.tx = px - (px - fz.tx) * ns / fz.s; fz.ty = py - (py - fz.ty) * ns / fz.s; fz.s = ns; clampFrozen();
+  }
+  function tag() {
+    var t;
+    if (mode === 'live') t = (+$('mgZoom').value).toFixed(1).replace(/\.0$/, '') + '×' + (hwZoom > 1.01 ? ' (camera zoom ' + hwZoom.toFixed(1).replace(/\.0$/, '') + '×)' : '');
+    else if (mode === 'frozen') t = 'Frozen · ' + (fz.s * frozenZ).toFixed(1).replace(/\.0$/, '') + '× · drag to move';
+    else t = 'Photo · ' + fz.s.toFixed(1).replace(/\.0$/, '') + '× · drag to move';
+    $('mgTag').textContent = t;
+    $('mgZoomOut').textContent = mode === 'live' ? (+$('mgZoom').value).toFixed(1).replace(/\.0$/, '') + '×' : (mode === 'frozen' ? fz.s * frozenZ : fz.s).toFixed(1).replace(/\.0$/, '') + '×';
+  }
+  var frozenZ = 1; // zoom already in the frozen picture
+
+  // ---------- zoom ----------
+  function digital() { return Math.max(1, +$('mgZoom').value / hwZoom); }
+  function setZoom(z) {
+    var max = +$('mgZoom').max; z = Math.max(1, Math.min(max, z));
+    if (mode === 'frozen' || mode === 'photo') { var f = fitBase(mode !== 'photo'); zoomFrozenAt(mode === 'frozen' ? z / frozenZ : z, f ? f.W / 2 : 0, f ? f.H / 2 : 0); $('mgZoom').value = mode === 'frozen' ? fz.s * frozenZ : fz.s; tag(); return; }
+    $('mgZoom').value = z;
+    if (caps.zoom && track) {
+      var want = Math.max(caps.zoom.min || 1, Math.min(caps.zoom.max, z));
+      if (Math.abs(want - hwZoom) > 0.04) { pend = want; pump(); }
+    }
+    layoutLive(); store();
+  }
+  function pump() {
+    if (busyZ || pend == null || !track) return;
+    var w = pend; pend = null; busyZ = true;
+    track.applyConstraints({ advanced: [{ zoom: w }] }).then(function () { hwZoom = w; }, function () { caps.zoom = null; hwZoom = 1; })
+      .then(function () { busyZ = false; layoutLive(); pump(); });
+  }
+  $('mgZoom').addEventListener('input', function () { setZoom(+this.value); });
+  $('mgIn').addEventListener('click', function () { setZoom(cur() * 1.25); });
+  $('mgOut').addEventListener('click', function () { setZoom(cur() / 1.25); });
+  function cur() { return mode === 'frozen' ? fz.s * frozenZ : mode === 'photo' ? fz.s : +$('mgZoom').value; }
+
+  // ---------- camera ----------
+  function camWhy(e) {
+    var n = e && e.name;
+    if (n === 'NotAllowedError' || n === 'SecurityError') return 'Camera access was blocked. Allow the camera for this site (tap the icon next to the web address, or check your phone settings), then press Start again. You can also open a photo to magnify it.';
+    if (n === 'NotFoundError' || n === 'OverconstrainedError' || n === 'DevicesNotFoundError') return 'No camera was found on this device. You can still open a photo to magnify it.';
+    if (n === 'NotReadableError' || n === 'AbortError' || n === 'TrackStartError') return 'The camera is busy. Close other apps or tabs that use it, then try again.';
+    return 'The camera could not start. Reload the page and try again.';
+  }
+  function stopCam() {
+    if (stream) { stream.getTracks().forEach(function (t) { t.stop(); }); stream = null; }
+    track = null; caps = {}; hwZoom = 1; torch = false; video.srcObject = null;
+    if (wake) { try { wake.release(); } catch (e) {} wake = null; }
+  }
+  function startCam() {
+    if (!window.isSecureContext || !navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { say('bad', 'This browser cannot use the camera here. Try Chrome, Safari or Firefox, or open a photo instead.'); return; }
+    stopCam(); $('mgCam').disabled = true; say('', 'Starting the camera… allow it if your browser asks.');
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false }).then(function (s) {
+      stream = s; track = s.getVideoTracks()[0];
+      try { caps = track.getCapabilities ? track.getCapabilities() || {} : {}; } catch (e) { caps = {}; }
+      if (caps.zoom && !(caps.zoom.max > (caps.zoom.min || 1))) caps.zoom = null;
+      if (caps.focusMode && caps.focusMode.indexOf('continuous') >= 0) track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(function () {});
+      $('mgTorch').hidden = !caps.torch; $('mgTorch').setAttribute('aria-pressed', 'false');
+      $('mgZoom').max = caps.zoom ? Math.max(10, Math.min(30, Math.round(caps.zoom.max * 2))) : 10;
+      video.srcObject = s; var p = video.play(); if (p && p.catch) p.catch(function () {});
+      live();
+      if (navigator.wakeLock && navigator.wakeLock.request) navigator.wakeLock.request('screen').then(function (l) { wake = l; }, function () {});
+      navigator.mediaDevices.enumerateDevices().then(function (d) { $('mgFlip').hidden = d.filter(function (x) { return x.kind === 'videoinput'; }).length < 2; }, function () {});
+      say('ok', (caps.zoom ? 'Using the camera’s own zoom for a sharper picture.' : 'Zoom is digital on this phone or browser, so very high zoom gets blurry: hold the phone closer instead.') + (caps.torch ? '' : ' The light cannot be controlled from this browser.'));
+      setZoom(+$('mgZoom').value);
+    }, function (e) { say('bad', camWhy(e)); }).then(function () { $('mgCam').disabled = false; });
+  }
+  function live() {
+    mode = 'live'; stage.classList.add('on'); video.hidden = false; cv.hidden = true;
+    $('mgFreeze').textContent = 'Freeze'; $('mgSave').hidden = true; $('mgStop').hidden = false;
+    $('mgZoom').min = 1; $('mgZoom').max = caps.zoom ? Math.max(10, Math.min(30, Math.round(caps.zoom.max * 2))) : 10;
+    video.onloadedmetadata = layoutLive; layoutLive(); $('mgCam').textContent = 'Restart camera';
+  }
+  video.addEventListener('resize', layoutLive);
+  $('mgCam').addEventListener('click', startCam);
+  $('mgStop').addEventListener('click', function () { stopCam(); mode = ''; stage.classList.remove('on'); exitFull(); $('mgCam').textContent = 'Start magnifier'; say('', 'Camera stopped.'); });
+  $('mgFlip').addEventListener('click', function () { facing = facing === 'environment' ? 'user' : 'environment'; startCam(); });
+  $('mgTorch').addEventListener('click', function () {
+    if (!track) return; var on = !torch;
+    track.applyConstraints({ advanced: [{ torch: on }] }).then(function () { torch = on; $('mgTorch').setAttribute('aria-pressed', on); }, function () { say('bad', 'The light could not be switched on from this browser.'); $('mgTorch').hidden = true; });
+  });
+  document.addEventListener('visibilitychange', function () {
+    if (document.hidden && mode === 'live') { stopCam(); mode = 'paused'; }
+    else if (!document.hidden && mode === 'paused') startCam();
+  });
+  window.addEventListener('pagehide', stopCam);
+
+  // ---------- freeze ----------
+  function freeze() {
+    if (mode === 'frozen') { if (stream && track && track.readyState === 'live') live(); else startCam(); return; }
+    if (mode === 'photo') { startCam(); return; }
+    if (mode !== 'live' || !video.videoWidth) { say('bad', 'The camera is not showing a picture yet. Wait a moment and try again.'); return; }
+    cv.width = video.videoWidth; cv.height = video.videoHeight; cx.drawImage(video, 0, 0);
+    frozenZ = hwZoom; mode = 'frozen';
+    var f = fitBase(true); fz.s = digital(); fz.tx = f.W / 2 - (f.W / 2 - f.ox) * fz.s; fz.ty = f.H / 2 - (f.H / 2 - f.oy) * fz.s;
+    cv.hidden = false; video.hidden = true; clampFrozen();
+    $('mgFreeze').textContent = 'Back to live'; $('mgSave').hidden = false;
+    $('mgZoom').min = frozenZ; $('mgZoom').max = 12 * frozenZ; $('mgZoom').value = fz.s * frozenZ; tag();
+    say('ok', 'Frozen. Pinch or use + and − to zoom, and drag to move around. Save image keeps a copy.');
+  }
+  $('mgFreeze').addEventListener('click', freeze);
+
+  // ---------- photos ----------
+  $('mgPhoto').addEventListener('click', function () { $('mgFile').click(); });
+  $('mgFile').addEventListener('change', function () {
+    var f = this.files[0]; this.value = ''; if (!f) return;
+    if (!/^image\//.test(f.type) && !/\.(jpe?g|png|gif|webp|bmp|avif|heic|heif)$/i.test(f.name || '')) { say('bad', '“' + f.name + '” is not a picture. Choose a photo (JPG, PNG, WebP…).'); return; }
+    var url = URL.createObjectURL(f), img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      var w = img.naturalWidth, h = img.naturalHeight, k = Math.min(1, 4096 / Math.max(w, h));
+      if (!w || !h) { say('bad', 'This picture is empty.'); return; }
+      stopCam(); mode = 'photo'; stage.classList.add('on');
+      cv.width = Math.max(1, Math.round(w * k)); cv.height = Math.max(1, Math.round(h * k)); cx.drawImage(img, 0, 0, cv.width, cv.height);
+      cv.hidden = false; video.hidden = true; fz.s = 1; frozenZ = 1; clampFrozen();
+      $('mgZoom').min = 1; $('mgZoom').max = 20; $('mgZoom').value = 1; $('mgFreeze').textContent = 'Use camera'; $('mgSave').hidden = false; $('mgTorch').hidden = true; $('mgStop').hidden = true; $('mgFlip').hidden = true; tag();
+      say('ok', 'Pinch or use + and − to zoom, and drag to move around.');
+      view.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); say('bad', /\.hei[cf]$/i.test(f.name || '') ? 'This browser cannot open HEIC photos. Convert it first with the HEIC to JPG tool.' : 'This picture could not be opened. It may be damaged or in a format this browser does not support.'); };
+    img.src = url;
+  });
+
+  // ---------- touch: pinch to zoom, drag to move ----------
+  var pts = {}, gest = null;
+  function list() { return Object.keys(pts).map(function (k) { return pts[k]; }); }
+  view.addEventListener('pointerdown', function (e) {
+    if (e.target === $('mgGrip')) return;
+    if (!mode || mode === 'paused') return;
+    try { view.setPointerCapture(e.pointerId); } catch (x) {}
+    var r = view.getBoundingClientRect(); pts[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top };
+    begin();
+  });
+  function begin() {
+    var l = list();
+    if (l.length >= 2) gest = { d: Math.hypot(l[0].x - l[1].x, l[0].y - l[1].y) || 1, z: cur(), s: fz.s };
+    else if (l.length === 1) gest = { x: l[0].x, y: l[0].y, tx: fz.tx, ty: fz.ty };
+  }
+  view.addEventListener('pointermove', function (e) {
+    if (!pts[e.pointerId] || !gest) return;
+    var r = view.getBoundingClientRect(); pts[e.pointerId] = { x: e.clientX - r.left, y: e.clientY - r.top };
+    var l = list();
+    if (l.length >= 2 && gest.d) {
+      var d = Math.hypot(l[0].x - l[1].x, l[0].y - l[1].y), k = d / gest.d;
+      if (mode === 'live') setZoom(gest.z * k);
+      else { zoomFrozenAt(gest.s * k, (l[0].x + l[1].x) / 2, (l[0].y + l[1].y) / 2); $('mgZoom').value = cur(); gest = { d: d, s: fz.s, z: cur() }; }
+    } else if (l.length === 1 && mode !== 'live' && gest.x != null) {
+      fz.tx = gest.tx + l[0].x - gest.x; fz.ty = gest.ty + l[0].y - gest.y; clampFrozen();
+    }
+  });
+  function up(e) { delete pts[e.pointerId]; begin(); if (!list().length) { gest = null; if (mode === 'live') store(); } }
+  view.addEventListener('pointerup', up); view.addEventListener('pointercancel', up);
+  view.addEventListener('wheel', function (e) {
+    if (!mode || mode === 'paused') return; e.preventDefault();
+    var k = Math.exp(-e.deltaY * 0.0015), r = view.getBoundingClientRect();
+    if (mode === 'live') setZoom(cur() * k); else { zoomFrozenAt(fz.s * k, e.clientX - r.left, e.clientY - r.top); $('mgZoom').value = cur(); }
+  }, { passive: false });
+  view.addEventListener('dblclick', function (e) {
+    if (mode !== 'frozen' && mode !== 'photo') return;
+    var r = view.getBoundingClientRect(); zoomFrozenAt(fz.s > 1.5 ? 1 : 3, e.clientX - r.left, e.clientY - r.top); $('mgZoom').value = cur();
+  });
+  view.addEventListener('keydown', function (e) {
+    if (e.key === '+' || e.key === '=') { e.preventDefault(); setZoom(cur() * 1.25); return; }
+    if (e.key === '-' || e.key === '_') { e.preventDefault(); setZoom(cur() / 1.25); return; }
+    var k = { ArrowLeft: [1, 0], ArrowRight: [-1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] }[e.key];
+    if (k && (mode === 'frozen' || mode === 'photo')) { e.preventDefault(); fz.tx += k[0] * 60; fz.ty += k[1] * 60; clampFrozen(); }
+  });
+
+  // ---------- reading guide ----------
+  var guideY = 0.5;
+  function guide() {
+    var g = $('mgGuide'), v = $('mgGuideSel').value;
+    g.hidden = v === 'off'; g.className = 'mg-guide ' + v; g.style.top = (guideY * 100) + '%';
+    $('mgGrip').setAttribute('aria-valuenow', Math.round(guideY * 100));
+  }
+  $('mgGuideSel').addEventListener('change', function () { guide(); store(); });
+  var gdrag = false;
+  $('mgGrip').addEventListener('pointerdown', function (e) { e.stopPropagation(); gdrag = true; try { this.setPointerCapture(e.pointerId); } catch (x) {} });
+  $('mgGrip').addEventListener('pointermove', function (e) { if (!gdrag) return; var r = view.getBoundingClientRect(); guideY = Math.max(0.06, Math.min(0.94, (e.clientY - r.top) / r.height)); guide(); });
+  $('mgGrip').addEventListener('pointerup', function () { gdrag = false; store(); });
+  $('mgGrip').addEventListener('pointercancel', function () { gdrag = false; });
+  $('mgGrip').addEventListener('keydown', function (e) { var d = e.key === 'ArrowUp' ? -0.04 : e.key === 'ArrowDown' ? 0.04 : 0; if (!d) return; e.preventDefault(); e.stopPropagation(); guideY = Math.max(0.06, Math.min(0.94, guideY + d)); guide(); store(); });
+
+  // ---------- filters ----------
+  [].forEach.call(document.querySelectorAll('.mg-filters button'), function (b) { b.addEventListener('click', function () { filter = b.dataset.f; applyFilter(); store(); }); });
+  $('mgBright').addEventListener('input', function () { applyFilter(); store(); });
+
+  // ---------- save ----------
+  $('mgSave').addEventListener('click', function () {
+    if (!cv.width || (mode !== 'frozen' && mode !== 'photo')) { say('', 'Freeze the picture first.'); return; }
+    var c = document.createElement('canvas'); c.width = cv.width; c.height = cv.height; c.getContext('2d').drawImage(cv, 0, 0);
+    bakeFilter(c);
+    c.toBlob(function (blob) {
+      if (!blob) { say('bad', 'The picture could not be saved.'); return; }
+      var d = new Date(), pad = function (n) { return ('0' + n).slice(-2); };
+      var name = 'magnifier-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + pad(d.getSeconds()) + '.jpg';
+      var a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function () { URL.revokeObjectURL(a.href); }, 5000);
+      say('ok', 'Saved ' + name + ' (' + c.width + ' × ' + c.height + ', ' + fmtBytes(blob.size) + '). It is saved on this device only.');
+    }, 'image/jpeg', 0.92);
+  });
+
+  // ---------- full screen ----------
+  function enterFull() {
+    stage.classList.add('mg-full'); document.documentElement.style.overflow = 'hidden'; $('mgFull').textContent = 'Exit full screen';
+    if (!pushed) { try { history.pushState({ mg: 1 }, ''); pushed = true; } catch (e) {} }
+    var f = stage.requestFullscreen || stage.webkitRequestFullscreen; if (f) { try { var p = f.call(stage); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    setTimeout(relayout, 150);
+  }
+  function exitFull(fromPop) {
+    if (!stage.classList.contains('mg-full')) return;
+    stage.classList.remove('mg-full'); document.documentElement.style.overflow = ''; $('mgFull').textContent = 'Full screen';
+    if (document.fullscreenElement || document.webkitFullscreenElement) { var x = document.exitFullscreen || document.webkitExitFullscreen; try { var p = x.call(document); if (p && p.catch) p.catch(function () {}); } catch (e) {} }
+    if (pushed && !fromPop) { pushed = false; try { history.back(); } catch (e) {} }
+    pushed = false; setTimeout(relayout, 150);
+  }
+  $('mgFull').addEventListener('click', function () { if (stage.classList.contains('mg-full')) exitFull(); else enterFull(); });
+  window.addEventListener('popstate', function () { if (stage.classList.contains('mg-full')) { pushed = false; exitFull(true); } });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && stage.classList.contains('mg-full')) exitFull(); });
+  document.addEventListener('fullscreenchange', function () { if (!document.fullscreenElement && stage.classList.contains('mg-full')) exitFull(); setTimeout(relayout, 100); });
+  function relayout() { if (mode === 'live') layoutLive(); else if (mode === 'frozen' || mode === 'photo') clampFrozen(); }
+  var rz = 0; window.addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(relayout, 100); });
+
+  // ---------- start ----------
+  try {
+    var o = JSON.parse(localStorage.getItem(KEY) || 'null');
+    if (o) {
+      if (isFinite(+o.z) && +o.z >= 1 && +o.z <= 10) $('mgZoom').value = +o.z;
+      if (CSSF.hasOwnProperty(o.f)) filter = o.f;
+      if (isFinite(+o.b) && +o.b >= 0.5 && +o.b <= 2) $('mgBright').value = +o.b;
+      if (/^(off|line|band)$/.test(o.g)) $('mgGuideSel').value = o.g;
+      if (isFinite(+o.gy) && +o.gy > 0 && +o.gy < 1) guideY = +o.gy;
+    }
+  } catch (e) {}
+  applyFilter(); guide(); tag();
+})();
+</script>
