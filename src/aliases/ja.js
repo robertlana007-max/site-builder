@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"seating-chart":["座席表 作成","席替え","席替え アプリ","座席配置図"],
+"report-card-maker":["通知表 作成","成績表 作成","成績通知書","通信簿 テンプレート"],
+"star-chart":["ご褒美シール表","お手伝い表","がんばり表","ごほうびチャート"],
 "color-identifier":["色識別","色を判定","これは何色","色の名前","色覚サポート"],
 "magnifier":["拡大鏡","ルーペ","スマホ拡大鏡","ライト付きルーペ","小さい文字を読む"],
 "big-text-display":["大きな文字","電光掲示板","全画面文字","空港お迎えボード","流れる文字"],

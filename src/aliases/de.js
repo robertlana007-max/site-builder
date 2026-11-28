@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"seating-chart":["sitzplan","sitzplan erstellen","sitzordnung klasse","tischplan hochzeit","sitzplan generator"],
+"report-card-maker":["zeugnis erstellen","zeugnisgenerator","notenübersicht schüler","schulzeugnis vorlage","zwischenzeugnis"],
+"star-chart":["belohnungstafel","belohnungssystem kinder","sternchen tabelle kinder","ämterplan kinder","verstärkerplan"],
 "color-identifier":["farberkennung","farbe erkennen","welche farbe ist das","farbnamen finden","farbenblind hilfe"],
 "magnifier":["lupe","handy lupe","lupe online","lupe mit licht","kleine schrift lesen"],
 "big-text-display":["großer text","led laufschrift","text vollbild","abholschild flughafen","lauftext"],

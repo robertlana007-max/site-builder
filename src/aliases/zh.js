@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"seating-chart":["座位表","座位表生成器","教室座位安排","随机排座位","婚礼座位安排"],
+"report-card-maker":["成绩单生成器","学生成绩单","成绩报告单","期末成绩单","班级排名"],
+"star-chart":["儿童奖励表","星星奖励表","家务表 儿童","行为奖励表","打卡表 儿童"],
 "color-identifier":["颜色识别","识别颜色","这是什么颜色","颜色名称","色盲助手"],
 "magnifier":["放大镜","手机放大镜","在线放大镜","带灯放大镜","看小字"],
 "big-text-display":["大字显示","手机led字幕","全屏文字","接机牌","滚动字幕"],
