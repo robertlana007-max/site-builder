@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"seating-chart":["oturma planı","sınıf oturma düzeni","oturma planı oluşturucu","masa düzeni"],
+"report-card-maker":["karne hazırlama","karne oluşturucu","öğrenci not çizelgesi","karne şablonu"],
+"star-chart":["ödül tablosu","çocuk yıldız tablosu","çocuk görev çizelgesi","davranış tablosu"],
 "color-identifier":["renk tanımlayıcı","renk algılama","bu ne renk","renk adı","renk körü yardım"],
 "magnifier":["büyüteç","telefon büyüteç","online büyüteç","ışıklı büyüteç","küçük yazı okuma"],
 "big-text-display":["büyük yazı","led tabela","tam ekran yazı","havalimanı karşılama tabelası","kayan yazı"],

@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: es
 module.exports = {
+"seating-chart":["plano de asientos","distribución de asientos en el aula","organizar asientos de alumnos","mapa de asientos","distribución de mesas boda"],
+"report-card-maker":["boleta de calificaciones","generador de boletas","libreta de notas","informe de notas escolar","boletín de calificaciones"],
+"star-chart":["tabla de recompensas","tabla de estrellas para niños","tabla de tareas para niños","tabla de comportamiento","cuadro de recompensas imprimible"],
 "color-identifier":["identificador de colores","detector de colores","qué color es","nombre del color","app para daltónicos"],
 "magnifier":["lupa","lupa con cámara","lupa online","lupa con linterna","ampliar letra pequeña"],
 "big-text-display":["texto grande","letrero led","texto en pantalla completa","cartel de aeropuerto","texto que se desplaza"],

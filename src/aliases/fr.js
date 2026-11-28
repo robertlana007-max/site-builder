@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"seating-chart":["plan de classe","plan de table","générateur de plan de classe","placement des élèves","plan de table mariage"],
+"report-card-maker":["bulletin scolaire","générateur de bulletin scolaire","bulletin de notes","relevé de notes élève","modèle bulletin scolaire"],
+"star-chart":["tableau de récompenses","tableau de motivation enfant","tableau des tâches enfant","tableau de comportement","tableau étoiles enfant"],
 "color-identifier":["identificateur de couleurs","détecteur de couleur","quelle est cette couleur","nom de couleur","aide daltonien"],
 "magnifier":["loupe","loupe téléphone","loupe en ligne","loupe avec lampe","agrandir petit texte"],
 "big-text-display":["texte géant","panneau led","texte plein écran","pancarte aéroport","texte défilant"],

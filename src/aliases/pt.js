@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: pt
 module.exports = {
+"seating-chart":["mapa de sala","mapa de assentos","organização de carteiras","mapa de lugares da turma","distribuição de mesas"],
+"report-card-maker":["boletim escolar","gerador de boletim escolar","boletim de notas","modelo de boletim","ficha de avaliação"],
+"star-chart":["quadro de recompensas","quadro de tarefas infantil","tabela de estrelas para crianças","quadro de comportamento","quadro de rotina infantil"],
 "color-identifier":["identificador de cores","detector de cores","que cor é essa","nome da cor","app para daltônicos"],
 "magnifier":["lupa","lupa celular","lupa online","lupa com lanterna","ampliar letra"],
 "big-text-display":["texto grande","letreiro led","texto em tela cheia","placa de aeroporto","texto rolando"],

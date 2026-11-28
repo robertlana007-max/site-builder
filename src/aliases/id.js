@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"seating-chart":["denah tempat duduk","pengaturan tempat duduk kelas","denah duduk siswa","denah meja acara"],
+"report-card-maker":["pembuat rapor","rapor siswa","template rapor","lembar nilai siswa"],
+"star-chart":["tabel hadiah anak","bagan bintang anak","jadwal tugas anak","tabel perilaku anak"],
 "color-identifier":["pendeteksi warna","identifikasi warna","warna apa ini","nama warna","aplikasi buta warna"],
 "magnifier":["kaca pembesar","aplikasi kaca pembesar","pembesar kamera","baca tulisan kecil"],
 "big-text-display":["teks besar","papan led","teks layar penuh","papan nama jemputan bandara","teks berjalan"],

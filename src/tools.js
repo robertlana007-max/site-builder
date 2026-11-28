@@ -7467,5 +7467,131 @@ module.exports = [
       ]
     ],
     "icon": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 3v3M12 18v3M3 12h3M18 12h3\"/>"
+  },
+  {
+    "slug": "star-chart",
+    "cat": "Generators",
+    "name": "Star Chart for Kids",
+    "title": "Star Chart for Kids - Reward and Chore Chart, Printable PDF",
+    "desc": "Make a reward and chore chart for children: tasks with emoji, stars for each day, a reward goal with a celebration, weekly history and a colourful PDF.",
+    "card": "Reward and chore chart with stars and a PDF.",
+    "intro": "Help children build good habits with a fun star chart. Add each child, their jobs or habits with emoji icons, and a reward goal such as \"10 stars = trip to the park\". Tap a box to give a star and watch the progress bar fill up; when the goal is reached, the chart celebrates. A new week starts by itself and the old one is kept in the history. Print a colourful chart in one of nine themes, on A4 or Letter, portrait or landscape.",
+    "steps": [
+      "Type the child's name, the number of stars needed and the reward.",
+      "Choose the tasks or habits (tap an idea or type your own) and the days they apply.",
+      "Tap a box each time the task is done to give a star. Add more children with + Add a child.",
+      "Download the PDF to print the chart, or keep using it on your phone."
+    ],
+    "faq": [
+      [
+        "Where are the stars saved?",
+        "Only in this browser on this device. Nothing is uploaded. Use Back up (JSON) to keep a copy or move the charts to another phone or computer."
+      ],
+      [
+        "What happens at the end of the week?",
+        "On the first day of a new week the boxes empty by themselves and last week's stars, goal and reward go into Past weeks. You can choose which day the week starts, or start a new week early."
+      ],
+      [
+        "Can I have charts for several children?",
+        "Yes, up to 12 children, each with their own tasks, theme, stamp, goal and history."
+      ],
+      [
+        "Can a task be only on some days?",
+        "Yes. Tap the day buttons under a task to turn days on or off, for example swimming only on Tuesday and Friday."
+      ],
+      [
+        "Can I print a blank chart?",
+        "Yes. Choose \"Empty, to fill in by hand\" for stickers or a pen, or print it with this week's stars. You can print one child or every child, one page each."
+      ],
+      [
+        "How many stars should the goal be?",
+        "Start small so the first reward comes quickly, for example 5 to 10 stars a week for young children, then raise it slowly."
+      ]
+    ],
+    "icon": "<path d=\"M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.4 6.8 19.1l1-5.8L3.5 9.2l5.9-.9z\"/>"
+  },
+  {
+    "slug": "report-card-maker",
+    "cat": "Study tools",
+    "name": "Report Card Maker",
+    "title": "Report Card Maker - Whole Class PDF with Grades and Ranks",
+    "desc": "Make student report cards for a whole class: paste marks from Excel, choose a grading scale, get totals, grades, GPA and rank, and one PDF page per student.",
+    "card": "Report cards for a whole class as one PDF.",
+    "intro": "Make clean, professional report cards for your class in minutes. Add your school name and logo, the term and the subjects, then type or paste the marks for every student from Excel, Google Sheets or a CSV file. Totals, percentages, grades, GPA and class position are worked out for you. Pick a grading scale (letters A to F, GPA 4.0 with plus and minus, 1 to 10, Distinction-Merit-Pass, or your own bands), write remarks with the help of templates, and download one PDF with a page for each student. Works for any country and school system, and student data never leaves your device.",
+    "steps": [
+      "Fill in the school, term and class details, and choose a grading scale.",
+      "Add the subjects with their maximum marks.",
+      "Type the marks, or paste the whole class from a spreadsheet.",
+      "Add remarks, choose a template and download the PDF with one page per student."
+    ],
+    "faq": [
+      [
+        "How is the class position worked out?",
+        "Students are ranked by their overall percentage. Only students with a mark in every subject are ranked, so enter the whole class first. Students with the same percentage share a place, shown with \"=\", and the next place is skipped."
+      ],
+      [
+        "How is the GPA calculated?",
+        "Each subject's grade gives the points shown in the grading scale. The points are averaged, weighted by each subject's credits (1 by default). The GPA appears when every band in the scale has points."
+      ],
+      [
+        "Can I type grades instead of marks?",
+        "Yes. Type a grade from your scale, such as B+ or Merit, and it is used for the GPA and shown on the report. Type AB for absent or EX for exempt. Grades and absences are left out of the total and percentage."
+      ],
+      [
+        "How do I paste a whole class?",
+        "In your spreadsheet, select the table including the header row (Name, ID, Present, one column per subject, Remark) and copy it. Paste it into the box under \"Add a whole class at once\". You can also open a CSV or Excel file, or download a blank class sheet to fill in."
+      ],
+      [
+        "Is student data uploaded anywhere?",
+        "No. Everything stays in this browser on this device, including the logo. Use Back up all classes to save a copy, and keep that file somewhere private."
+      ],
+      [
+        "Can I change the grade boundaries?",
+        "Yes. Edit the bands under Grading scale: the lowest percentage, the grade, the points and the meaning. Add or remove bands to match your school."
+      ]
+    ],
+    "icon": "<path d=\"M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z\"/><path d=\"M14 3v6h6M8 13h5M8 17h3\"/><path d=\"M15.5 15.5l1.2 1.2 2.3-2.7\"/>"
+  },
+  {
+    "slug": "seating-chart",
+    "cat": "Study tools",
+    "name": "Seating Chart Maker",
+    "title": "Seating Chart Maker - Classroom and Event Seating Plans",
+    "desc": "Make a classroom or event seating plan: rows, pairs, groups, U-shape or round tables. Drag names, shuffle with rules, lock seats and print a PDF.",
+    "card": "Classroom and event seating plans with shuffle.",
+    "intro": "Plan where everyone sits in a classroom, exam hall or event. Choose rows of desks, desks for two, groups, a U-shape or round tables, or move seats to match your own room. Paste your names, then drag them onto seats (it works with a finger on a phone too) or shuffle them with rules: keep two people apart, give some people a front seat, and mix people by a tag such as group or level. Lock seats you want to keep, save several charts, and print or download a PDF with the teacher's desk marked.",
+    "steps": [
+      "Choose a layout (rows, pairs, groups, U-shape or round tables) and press Make this layout.",
+      "Paste the names, one per line, with an optional tag and the word \"front\".",
+      "Add rules if you need them, then press Shuffle seats, or drag names onto seats.",
+      "Lock seats you want to keep, then download the PDF or print it."
+    ],
+    "faq": [
+      [
+        "How do I move a name on a phone?",
+        "Press on a name and drag it to a seat. You can also tap a name and then tap a seat. Dropping a name on a full seat swaps the two people."
+      ],
+      [
+        "What does \"keep apart\" mean?",
+        "The two people are not put next to each other, in front of or behind each other, or at the same table or group."
+      ],
+      [
+        "What does a lock do?",
+        "Tap a seat and press Lock. Shuffling leaves that seat and its person where they are. Locked seats have a double border and a padlock."
+      ],
+      [
+        "Can I make my own room layout?",
+        "Yes. Press \"Move seats and desk\" and drag seats, tables and the teacher's desk where they are in your room. Add or delete seats as you need."
+      ],
+      [
+        "What if some rules cannot be met?",
+        "The shuffle finds the best seating it can and lists any rule it could not meet, for example when more people need the front than there are front seats."
+      ],
+      [
+        "Where are my charts saved?",
+        "Only in this browser on this device, and you can keep up to 40 charts. Use Back up all charts to save a copy or move them to another device."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"4\" rx=\"1\"/><rect x=\"4\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><rect x=\"10\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><rect x=\"16\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><path d=\"M5 19h2M11 19h2M17 19h2\"/>"
   }
 ];
