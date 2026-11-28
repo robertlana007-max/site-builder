@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"memory-game":["hafıza oyunu","eşleştirme oyunu","kart eşleştirme","çocuk hafıza oyunu","çiftleri bul"],
+"map-quiz":["harita oyunu","coğrafya testi","başkentler testi","bayrak bilmece","dünya ülkeleri oyunu"],
+"coloring-pages":["boyama sayfaları","boyama sayfası çıktı","fotoğraftan boyama sayfası","mandala boyama","çocuk boyama"],
 "warranty-tracker":["garanti takip","garanti bitiş tarihi","fiş saklama","fatura düzenleyici"],
 "meal-planner":["haftalık yemek planı","yemek planlayıcı","haftalık menü","tariften alışveriş listesi"],
 "grocery-list":["alışveriş listesi","market listesi","fiyatlı alışveriş listesi","market bütçesi"],

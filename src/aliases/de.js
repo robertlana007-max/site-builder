@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: de
 module.exports = {
+"memory-game":["memory spiel","memo spiel","paare finden","gedächtnisspiel","memory für kinder"],
+"map-quiz":["geografie quiz","länder quiz","hauptstädte quiz","flaggen quiz","weltkarte spiel"],
+"coloring-pages":["malvorlagen","ausmalbilder","ausmalbilder mandala","foto zu malvorlage","ausmalbilder für kinder"],
 "warranty-tracker":["garantie tracker","garantieablauf","kassenbon speichern","belege verwalten","gewährleistung ende berechnen"],
 "meal-planner":["essensplaner","wochenplan essen","menüplaner","einkaufsliste aus rezepten","speiseplan woche"],
 "grocery-list":["einkaufsliste","einkaufsliste mit preisen","einkaufszettel","supermarkt preisvergleich","einkaufsbudget"],

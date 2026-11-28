@@ -1,6 +1,9 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"memory-game":["记忆游戏","翻牌配对","配对游戏","儿童记忆力游戏","记忆翻牌"],
+"map-quiz":["地图测验","地理小测验","世界各国首都","猜国旗","世界地图游戏"],
+"coloring-pages":["涂色页","儿童涂色","填色画","照片转线稿","曼陀罗涂色"],
 "warranty-tracker":["保修期管理","保修到期提醒","保存购物小票","发票收据管理"],
 "meal-planner":["每周菜单计划","膳食计划","一周菜谱","菜谱购物清单"],
 "grocery-list":["购物清单","买菜清单","超市购物清单","购物预算","比价购物清单"],

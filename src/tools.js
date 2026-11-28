@@ -7803,5 +7803,131 @@ module.exports = [
       ]
     ],
     "icon": "<path d=\"M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z\"/><path d=\"M12 8v4l2.5 1.5\"/>"
+  },
+  {
+    "slug": "coloring-pages",
+    "cat": "Image tools",
+    "name": "Coloring Pages",
+    "title": "Coloring Pages - Printable, Photo to Coloring Page, Mandalas",
+    "desc": "Free printable colouring pages: 30+ drawings, mandalas, letters and numbers, or turn a photo into outlines. Colour on screen, print or save a PDF.",
+    "card": "Printable colouring pages, or make one from a photo.",
+    "intro": "Make printable colouring pages in seconds. Pick from more than 30 simple drawings of animals, vehicles, nature and shapes, make a new mandala with the symmetry you like, choose a big bubble letter or number, or turn your own photo into clean black outlines. Colour it on screen with a tap-to-fill paint bucket, or print it blank on A4 or US Letter with a name line. Your photos never leave your device.",
+    "steps": [
+      "Pick a ready-made picture, a mandala or a letter, or choose From a photo and open a photo.",
+      "Adjust the line thickness (and the detail for photos).",
+      "Tap a colour and tap inside shapes to colour on screen, or leave it blank.",
+      "Press Print or Download PDF, or add several pages to a booklet."
+    ],
+    "faq": [
+      [
+        "Are the colouring pages free to print?",
+        "Yes. All the drawings were made for GetToolNest and you can print as many copies as you like for home, school or a party, with no sign-up and no watermark."
+      ],
+      [
+        "How does photo to colouring page work?",
+        "The tool smooths the photo, finds the edges where brightness changes (edge detection), keeps the strong ones, removes small specks and draws the result as black lines on white. It all happens in your browser; the photo is not uploaded."
+      ],
+      [
+        "Which photos work best?",
+        "A clear subject on a plain background, in good light, such as a pet, a toy, a car or a building. For a pencil drawing or sketch, choose the Dark lines style."
+      ],
+      [
+        "Can children colour on a tablet or phone?",
+        "Yes. Tap a colour, then tap inside a shape to fill it. There is an eraser, undo and a range of skin tones, and you can save the coloured picture as a PNG or print it."
+      ],
+      [
+        "Can I make a colouring book?",
+        "Yes. Press “+ Add page to a booklet” for each page you want (up to 40), then download the booklet as one PDF or print it."
+      ],
+      [
+        "What paper sizes are there?",
+        "A4 and US Letter. Wide pictures are turned to landscape automatically. Print at 100% (actual size)."
+      ]
+    ],
+    "icon": "<path d=\"M4 20l4-1L19 8a2.1 2.1 0 0 0-3-3L5 16z\"/><path d=\"M14 7l3 3\"/><path d=\"M3 4h7M3 8h4\"/><circle cx=\"18\" cy=\"18\" r=\"3\"/>"
+  },
+  {
+    "slug": "map-quiz",
+    "cat": "Study tools",
+    "name": "Map Quiz",
+    "title": "Map Quiz - Countries, Capitals and Flags Geography Game",
+    "desc": "Free geography quiz that works offline: find countries on a world map, type capitals, multiple choice and flags. Filter by continent, beat your best score.",
+    "card": "Learn countries, capitals and flags on a world map.",
+    "intro": "Learn the world with a geography quiz that works offline. Find countries on a world map you can drag and pinch to zoom, type capital cities, answer multiple-choice questions or name the country from its flag. Practise one continent or the whole world, beat your best score and review your mistakes. Explore mode shows each country’s name, capital and flag.",
+    "steps": [
+      "Choose Explore to look around, or pick a quiz: Find on map, Type the capital, Multiple choice or Flag to country.",
+      "Choose a continent and how many questions, then press Start quiz.",
+      "Answer each question; wrong answers show the right one.",
+      "See your score and time, review your mistakes and practise them again."
+    ],
+    "faq": [
+      [
+        "Does it work offline?",
+        "Yes. The map is built into the page. Flags are downloaded the first time you use them and then kept by your browser, so after one visit online everything works without a connection."
+      ],
+      [
+        "Which countries are included?",
+        "The countries and larger territories on the Natural Earth 1:110 million world map, about 170 in all. Very small island countries are too small for this map and are not asked about."
+      ],
+      [
+        "How are disputed areas shown?",
+        "Borders and areas are shown as Natural Earth draws them. A few areas whose status is disputed appear on the map and can be tapped in Explore, but they are not asked about in the quizzes."
+      ],
+      [
+        "Do I have to spell capitals exactly?",
+        "No. Accents and capital letters do not matter and a small typo is accepted; the correct spelling is shown. Where a country has more than one capital, such as South Africa or Bolivia, the main ones are accepted."
+      ],
+      [
+        "How do I zoom on a phone?",
+        "Pinch with two fingers, or use the + and − buttons. Drag with one finger to move the map, and press ⤢ to see the whole area again."
+      ],
+      [
+        "Where is my best score kept?",
+        "In this browser on this device, separately for each quiz type, continent and length."
+      ]
+    ],
+    "icon": "<circle cx=\"12\" cy=\"12\" r=\"9\"/><path d=\"M3 12h18M12 3c3 3.2 3 14.8 0 18M12 3c-3 3.2-3 14.8 0 18\"/><path d=\"M17 17l3 3\"/>"
+  },
+  {
+    "slug": "memory-game",
+    "cat": "Study tools",
+    "name": "Memory Game",
+    "title": "Memory Game - Matching Pairs Card Game for Kids and Adults",
+    "desc": "Free matching pairs memory game: 4×3 to 6×6 grids, animals, numbers, letters, shapes, colours and words. Play solo against the clock or with 1–4 players.",
+    "card": "Classic matching-pairs card game for all ages.",
+    "intro": "Play the classic memory card game. Turn over two cards at a time and find all the matching pairs. Choose a grid from 4 × 3 to 6 × 6 and a card set: animals, food, numbers, letters, shapes, colours, or learning sets such as words and pictures for early readers, big and small letters, and dots and numbers. Play alone for your best moves and time, or with up to four players taking turns.",
+    "steps": [
+      "Choose a card set and a grid size.",
+      "Choose 1 to 4 players and type their names.",
+      "Press Start game and turn over two cards at a time to find pairs.",
+      "Find every pair to see your moves and time, or who won."
+    ],
+    "faq": [
+      [
+        "How do you play the memory game?",
+        "All the cards start face down. Turn over two. If they match, they stay up; if not, they turn back, so try to remember where each card is. Find all the pairs to win."
+      ],
+      [
+        "How do turns work with several players?",
+        "Players take turns. If you find a pair you score a point and go again; if you miss, the next player goes. The player with the most pairs at the end wins."
+      ],
+      [
+        "What is a good score on my own?",
+        "The fewest possible moves equals the number of pairs, which needs some luck. On 4 × 4 (8 pairs), about 12 to 16 moves is very good. Your best score is kept for each card set and grid size."
+      ],
+      [
+        "Which sets help children learn?",
+        "Words and pictures (match the word “cat” to a cat), Big and small letters (A and a), Dots and numbers (count the dots), Shapes and Colours, which show the name on each card."
+      ],
+      [
+        "Can I play with a keyboard or a screen reader?",
+        "Yes. Arrow keys move between cards and Enter or Space turns one over. Each card says its row, column and what is on it once it is face up."
+      ],
+      [
+        "Can I turn off the sound or the animation?",
+        "Press the 🔊 button to mute. The flip animation is skipped if your device asks for reduced motion or animations are turned off in Settings."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"8\" height=\"11\" rx=\"1.5\"/><rect x=\"13\" y=\"9\" width=\"8\" height=\"11\" rx=\"1.5\"/><path d=\"M5.5 9.5l1.5 1.5 2.5-3\"/><path d=\"M15.5 14.5l1.5 1.5 2.5-3\"/>"
   }
 ];
