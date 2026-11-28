@@ -7593,5 +7593,215 @@ module.exports = [
       ]
     ],
     "icon": "<rect x=\"3\" y=\"3\" width=\"18\" height=\"4\" rx=\"1\"/><rect x=\"4\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><rect x=\"10\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><rect x=\"16\" y=\"11\" width=\"4\" height=\"4\" rx=\"1\"/><path d=\"M5 19h2M11 19h2M17 19h2\"/>"
+  },
+  {
+    "slug": "packing-list",
+    "cat": "Generators",
+    "name": "Packing List Generator",
+    "title": "Packing List Generator - Smart Travel Checklist for Any Trip",
+    "desc": "Make a packing list for your trip: days, weather, trip type, transport and travellers. Quantities scale with laundry. Tick off, save, print or share.",
+    "card": "A smart travel checklist for any trip.",
+    "intro": "Tell it how long you are going, what the weather will be, what kind of trip it is and how you are travelling, and get a complete packing checklist with sensible quantities for every traveller. Clothes scale with the number of days and how often you can wash. Tick items off as you pack, add your own, save lists to reuse next time, and print, download or share them as text.",
+    "steps": [
+      "Type the number of days and choose the weather and the kind of trip.",
+      "Choose how you are travelling, who is going and whether you can do laundry.",
+      "Press Make my packing list, then tick items off, change numbers or add your own.",
+      "Save the list, print it as a PDF or share it as text or on WhatsApp."
+    ],
+    "faq": [
+      [
+        "How are the quantities worked out?",
+        "Underwear and socks are one per day plus a spare, tops and trousers are fewer because they can be worn again. If you can wash clothes, everything is counted only up to the wash interval, so a three-week trip with weekly laundry needs about a week of clothes."
+      ],
+      [
+        "What changes with carry-on only?",
+        "Clothes are counted for at most five days, and the list adds a clear bag for liquids and travel-size bottles. Liquids in cabin bags usually must be in containers of 100 ml or less, but always check your airline's rules."
+      ],
+      [
+        "Can I choose more than one trip type?",
+        "Yes. A trip can be both city and beach, or hiking and camping. Every type you choose adds its own items without repeating the basics."
+      ],
+      [
+        "Can I use the same list again?",
+        "Yes. Lists are saved in this browser. Press Untick all to pack again, or Save as new list to keep a copy you can change for another trip."
+      ],
+      [
+        "Is my list uploaded anywhere?",
+        "No. Everything stays in your browser. Use Export all lists to keep a backup file or move your lists to another device."
+      ],
+      [
+        "Does it work offline?",
+        "Yes. Once the page has loaded, making, ticking and saving lists works without a connection."
+      ]
+    ],
+    "icon": "<rect x=\"4\" y=\"7\" width=\"16\" height=\"13\" rx=\"2\"/><path d=\"M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2\"/><path d=\"M8.5 13.5l2 2 4-4\"/>"
+  },
+  {
+    "slug": "lost-and-found-poster",
+    "cat": "Generators",
+    "name": "Lost and Found Poster Maker",
+    "title": "Lost and Found Poster Maker - Lost Pet, Missing, Found Flyer",
+    "desc": "Make a LOST or FOUND poster for a pet, person, item or vehicle with a big photo, reward, QR code and tear-off phone strips. PDF and PNG, many languages.",
+    "card": "Lost pet or found item posters with QR codes.",
+    "intro": "Make a clear LOST or FOUND poster in a minute: a big photo, a bold headline, a description, where and when it was last seen, an optional reward and your phone number. A QR code opens a phone call, a WhatsApp chat or a web page, and tear-off strips with your number go along the bottom. Print it as an A4 or US Letter PDF, or save a PNG for WhatsApp and social media. Posters can be written in English, Spanish, French, Arabic, Urdu, Hindi, Chinese and more.",
+    "steps": [
+      "Choose Lost or Found, what it is, a style and the poster language.",
+      "Add a clear photo and the details: description, place, date and reward.",
+      "Type your phone number and choose what the QR code opens.",
+      "Download the PDF to print, or a PNG to share on WhatsApp and social media."
+    ],
+    "faq": [
+      [
+        "What should I do first if a person is missing?",
+        "Contact the police or your local emergency number straight away. A poster helps people look, but it does not replace a report."
+      ],
+      [
+        "How do the tear-off strips work?",
+        "Print the PDF at actual size, then cut along the dotted lines between the strips. People can tear one off and take your number with them."
+      ],
+      [
+        "What can the QR code open?",
+        "A phone call to your number, a WhatsApp chat with you, or a web page such as a social media post. For WhatsApp, type the number with the country code, like +44 7700 900123."
+      ],
+      [
+        "Can I make the poster in my language?",
+        "Yes. Choose the poster language for the printed words such as LOST, FOUND and Reward, and type the details in any language. Arabic and Urdu posters are laid out right to left."
+      ],
+      [
+        "Which size should I use for WhatsApp or Instagram?",
+        "Use Square or Portrait post for feeds and Story for status and stories. Paper sizes are for printing and include tear-off strips."
+      ],
+      [
+        "Is my photo uploaded?",
+        "No. The poster is made on your device. A small copy of the photo is kept in your browser so your poster is still there next time."
+      ]
+    ],
+    "icon": "<rect x=\"4\" y=\"3\" width=\"16\" height=\"18\" rx=\"1.5\"/><path d=\"M7 7h10\"/><rect x=\"7\" y=\"9.5\" width=\"10\" height=\"5\" rx=\"1\"/><path d=\"M6.5 18v3M9.5 18v3M12.5 18v3M15.5 18v3M4 18h16\"/>"
+  },
+  {
+    "slug": "grocery-list",
+    "cat": "Time tools",
+    "name": "Grocery List",
+    "title": "Grocery List - Shopping List with Prices, Budget and Stores",
+    "desc": "A grocery shopping list with aisles, quantities, prices per store, a budget and the cheapest store. Big tick boxes, quick add, share on WhatsApp.",
+    "card": "Shopping list with prices, budget and stores.",
+    "intro": "A shopping list that helps you spend less. Add items with amounts and units and they are sorted by aisle. Type what things cost in the shops you use to see the total, how much of your budget is left and which store is cheapest for the whole list. In the shop, switch to the shopping view with big tick boxes. Frequently bought items are one tap away, you can keep several lists, and you can share a list as text or on WhatsApp.",
+    "steps": [
+      "Add items with an amount and unit; they are sorted into aisles.",
+      "Add the stores you use and type prices, plus a budget if you like.",
+      "See the estimate and the cheapest store, then tap Shopping to tick items off.",
+      "Share the list as text or on WhatsApp, or print it."
+    ],
+    "faq": [
+      [
+        "How is the cheapest store worked out?",
+        "For each store the tool adds up the price of every item on the list, using the amount you need. The cheapest store is the one with the lowest total among stores that have a price for every item. It also shows how much you would pay if you bought each item where it is cheapest."
+      ],
+      [
+        "What does the price mean?",
+        "The price is per unit: per kg for kg and g, per litre for L and ml, per pound for lb and oz, or per item, pack, can or bottle. So 500 g of cheese at 12.00 per kg costs 6.00."
+      ],
+      [
+        "How do I compare pack sizes?",
+        "Use the Unit Price Comparer to find out whether the big or the small pack is better value, then type the price per kg or litre here."
+      ],
+      [
+        "Where are my lists saved?",
+        "Only in this browser on this device. Use Export everything to keep a backup or move your lists to another phone."
+      ],
+      [
+        "Can I use it in the shop without internet?",
+        "Yes. Once the page is open, adding, ticking and totals all work offline."
+      ],
+      [
+        "What are frequently bought items?",
+        "Things you have added before, sorted by how often. Tap one to add it again with its usual unit and aisle."
+      ]
+    ],
+    "icon": "<path d=\"M3 4h2l2.4 10.2a1.5 1.5 0 0 0 1.5 1.1h8.3a1.5 1.5 0 0 0 1.5-1.1L20.5 8H6.2\"/><circle cx=\"9.5\" cy=\"19.5\" r=\"1.3\"/><circle cx=\"17\" cy=\"19.5\" r=\"1.3\"/><path d=\"M10 11l1.6 1.6L15 9.2\"/>"
+  },
+  {
+    "slug": "meal-planner",
+    "cat": "Time tools",
+    "name": "Meal Planner",
+    "title": "Weekly Meal Planner with Recipes and Shopping List",
+    "desc": "Plan breakfast, lunch, dinner and snacks for the week with your own recipes, then get one combined shopping list with the same ingredients added up.",
+    "card": "Plan the week's meals and get a shopping list.",
+    "intro": "Plan your meals for the whole week and let the shopping list write itself. Add recipes to breakfast, lunch, dinner and snacks for each day, choosing how many servings you need. The tool adds up every ingredient across the week, merges the same ones and converts units sensibly, so 1 tbsp + 2 tbsp of oil becomes 3 tbsp and 400 g + 800 g of tomatoes becomes 1.2 kg. Start with sample recipes from cuisines around the world or add your own, then print the weekly plan and the shopping list.",
+    "steps": [
+      "Press + Add under a meal and choose a recipe and the number of servings.",
+      "Fill the week; notes like \"Eat out\" are fine too.",
+      "Read the combined shopping list and tick what you already have.",
+      "Print the weekly plan and the shopping list, share it or send it to the Grocery List."
+    ],
+    "faq": [
+      [
+        "How does the shopping list add things up?",
+        "Each recipe is scaled to the servings you chose. The same ingredients are merged by name (onion and onions count as one), weights are added in grams, volumes in millilitres, and counts like cloves or cans separately. Amounts are rounded up so you buy enough."
+      ],
+      [
+        "Can I use US cups and ounces?",
+        "Yes. Choose US units and the shopping list shows ounces, pounds and cups. Recipes can mix g, kg, ml, L, tsp, tbsp, cups, oz and lb."
+      ],
+      [
+        "How do I add my own recipe?",
+        "Type a name, how many it serves and the ingredients one per line, like \"200 g rice\" or \"2 onions\". The line under the box shows how each line was understood."
+      ],
+      [
+        "Which cuisines are in the sample recipes?",
+        "Indian, Mexican, Japanese, Italian, Nigerian, Middle Eastern, Lebanese, Chinese, Thai, Moroccan, Brazilian, Greek, Turkish, Korean, Pakistani, Ethiopian, Kenyan, French, Indonesian, Filipino, Peruvian, Vietnamese and more. You can edit or delete any of them."
+      ],
+      [
+        "Does it count calories?",
+        "No. This is a planner for meals and shopping only."
+      ],
+      [
+        "Where are my plans saved?",
+        "Only in this browser. Use Export plans and recipes to keep a backup or move them to another device."
+      ]
+    ],
+    "icon": "<rect x=\"3\" y=\"4\" width=\"18\" height=\"17\" rx=\"2\"/><path d=\"M3 9h18M8 2v4M16 2v4\"/><path d=\"M9 13v5M7.5 13v2a1.5 1.5 0 0 0 3 0v-2M15 13c-1 0-1.5 1-1.5 2.2S14 17 15 17v1\"/>"
+  },
+  {
+    "slug": "warranty-tracker",
+    "cat": "Time tools",
+    "name": "Warranty Tracker",
+    "title": "Warranty Tracker - Receipts, Expiry Dates and Reminders List",
+    "desc": "Keep track of purchases, warranties and receipt photos: see days left, what is ending soon, search, print the list and back up everything as a ZIP.",
+    "card": "Warranty end dates with receipt photos.",
+    "intro": "Never miss a warranty claim again. Add what you bought, where, when, the price, the warranty length and the serial number, and keep a photo or PDF of the receipt with it. The tracker counts down the days left on every warranty, lists what is ending soon, and lets you search everything. Receipt photos are made smaller and stored only on your device. Back up all purchases with their receipts as one ZIP file, and print a tidy list.",
+    "steps": [
+      "Type the item, shop, date bought, price and warranty length.",
+      "Add a photo or PDF of the receipt, then press Add purchase.",
+      "See days left, what is ending soon, and search your purchases.",
+      "Print the list, and export a ZIP backup with all receipts."
+    ],
+    "faq": [
+      [
+        "How is the end date worked out?",
+        "The warranty length is added to the date you bought the item. A 2-year warranty on 31 January 2025 ends on 31 January 2027. For months that are shorter, the last day of the month is used."
+      ],
+      [
+        "Where are my receipt photos kept?",
+        "In your browser's own storage on this device (IndexedDB), which has room for many photos. Nothing is uploaded. Photos are shrunk to about 1600 pixels, which keeps the text readable at a fraction of the size."
+      ],
+      [
+        "How do I move my warranties to a new phone?",
+        "Press Export ZIP with receipts, move the ZIP file to the new device, open this page there and press Import ZIP."
+      ],
+      [
+        "Can I keep PDF receipts?",
+        "Yes. Choose a PDF instead of a photo. PDFs up to 10 MB are stored as they are."
+      ],
+      [
+        "What does \"ending soon\" mean?",
+        "Warranties that end within 30 days by default. You can change it to 60 days, 90 days or 6 months."
+      ],
+      [
+        "Will it remind me?",
+        "It cannot send notifications, but the Ending soon box at the top shows what needs attention every time you open it."
+      ]
+    ],
+    "icon": "<path d=\"M12 3l7 3v5c0 4.5-3 8.5-7 10-4-1.5-7-5.5-7-10V6z\"/><path d=\"M12 8v4l2.5 1.5\"/>"
   }
 ];

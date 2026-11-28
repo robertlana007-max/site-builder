@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"warranty-tracker":["保修期管理","保修到期提醒","保存购物小票","发票收据管理"],
+"meal-planner":["每周菜单计划","膳食计划","一周菜谱","菜谱购物清单"],
+"grocery-list":["购物清单","买菜清单","超市购物清单","购物预算","比价购物清单"],
+"lost-and-found-poster":["寻狗启事","寻猫启事","寻人启事模板","失物招领海报","寻物启事"],
+"packing-list":["旅行打包清单","出行物品清单","行李清单","旅行必备清单"],
 "seating-chart":["座位表","座位表生成器","教室座位安排","随机排座位","婚礼座位安排"],
 "report-card-maker":["成绩单生成器","学生成绩单","成绩报告单","期末成绩单","班级排名"],
 "star-chart":["儿童奖励表","星星奖励表","家务表 儿童","行为奖励表","打卡表 儿童"],

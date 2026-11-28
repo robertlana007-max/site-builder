@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"warranty-tracker":["pelacak garansi","kapan garansi habis","simpan struk belanja","catatan garansi barang"],
+"meal-planner":["perencana menu","menu mingguan","rencana makan seminggu","daftar belanja dari resep"],
+"grocery-list":["daftar belanja","daftar belanja bulanan","list belanja dengan harga","anggaran belanja dapur"],
+"lost-and-found-poster":["poster hewan hilang","poster kucing hilang","poster orang hilang","pengumuman barang ditemukan","brosur anjing hilang"],
+"packing-list":["daftar barang bawaan","checklist liburan","apa yang harus dibawa traveling","daftar packing koper"],
 "seating-chart":["denah tempat duduk","pengaturan tempat duduk kelas","denah duduk siswa","denah meja acara"],
 "report-card-maker":["pembuat rapor","rapor siswa","template rapor","lembar nilai siswa"],
 "star-chart":["tabel hadiah anak","bagan bintang anak","jadwal tugas anak","tabel perilaku anak"],

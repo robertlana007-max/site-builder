@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: tr
 module.exports = {
+"warranty-tracker":["garanti takip","garanti bitiş tarihi","fiş saklama","fatura düzenleyici"],
+"meal-planner":["haftalık yemek planı","yemek planlayıcı","haftalık menü","tariften alışveriş listesi"],
+"grocery-list":["alışveriş listesi","market listesi","fiyatlı alışveriş listesi","market bütçesi"],
+"lost-and-found-poster":["kayıp ilanı","kayıp köpek ilanı","kayıp kedi afişi","kayıp kişi ilanı","bulundu ilanı"],
+"packing-list":["bavul listesi","seyahat kontrol listesi","tatile ne götürmeli","valiz listesi"],
 "seating-chart":["oturma planı","sınıf oturma düzeni","oturma planı oluşturucu","masa düzeni"],
 "report-card-maker":["karne hazırlama","karne oluşturucu","öğrenci not çizelgesi","karne şablonu"],
 "star-chart":["ödül tablosu","çocuk yıldız tablosu","çocuk görev çizelgesi","davranış tablosu"],
