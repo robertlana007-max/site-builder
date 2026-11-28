@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: id
 module.exports = {
+"meeting-minutes":["notulen rapat","contoh notulen rapat","catatan rapat","notulensi"],
+"event-budget-planner":["anggaran pernikahan","perencana anggaran acara","anggaran pesta","biaya per tamu","budget nikah"],
+"vehicle-service-tracker":["catatan servis kendaraan","konsumsi bbm","pengingat ganti oli","biaya kendaraan","servis motor"],
+"freelancer-time-tracker":["pelacak waktu freelancer","catatan jam kerja","timesheet mingguan","hitung jam kerja","tagihan per jam"],
 "memory-game":["permainan memori","game mencocokkan kartu","cari pasangan","game ingatan anak","memori kartu"],
 "map-quiz":["kuis peta","kuis geografi","ibu kota negara","tebak bendera","negara di dunia"],
 "coloring-pages":["halaman mewarnai","gambar mewarnai","mewarnai anak","foto jadi gambar mewarnai","mandala mewarnai"],

@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: zh
 module.exports = {
+"meeting-minutes":["会议纪要","会议记录模板","会议记录","会议待办事项"],
+"event-budget-planner":["婚礼预算","活动预算规划","派对预算","每位客人成本","婚礼开支"],
+"vehicle-service-tracker":["车辆保养记录","油耗计算","换机油提醒","汽车费用记录","加油记录"],
+"freelancer-time-tracker":["自由职业者时间追踪","工时记录","每周工时表","计时器 工作","按小时开发票"],
 "memory-game":["记忆游戏","翻牌配对","配对游戏","儿童记忆力游戏","记忆翻牌"],
 "map-quiz":["地图测验","地理小测验","世界各国首都","猜国旗","世界地图游戏"],
 "coloring-pages":["涂色页","儿童涂色","填色画","照片转线稿","曼陀罗涂色"],

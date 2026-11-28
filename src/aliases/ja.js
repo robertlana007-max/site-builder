@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"meeting-minutes":["議事録","議事録 テンプレート","会議メモ","アクションアイテム"],
+"event-budget-planner":["結婚式 予算","イベント 予算管理","パーティー 予算","ゲスト 一人当たり 費用"],
+"vehicle-service-tracker":["車 メンテナンス記録","燃費 記録","オイル交換 リマインダー","車 維持費"],
+"freelancer-time-tracker":["タイムトラッカー","作業時間 記録","タイムシート","フリーランス 時間管理","時間 請求書"],
 "memory-game":["神経衰弱","記憶ゲーム","ペア探し ゲーム","カード めくり ゲーム","子供 記憶力 ゲーム"],
 "map-quiz":["地理 クイズ","国旗 クイズ","世界の首都 クイズ","世界地図 ゲーム","国当て クイズ"],
 "coloring-pages":["塗り絵","ぬりえ 無料 印刷","写真 塗り絵 変換","マンダラ 塗り絵","子供 ぬりえ"],

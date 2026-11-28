@@ -1,6 +1,10 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"meeting-minutes":["compte rendu de réunion","procès-verbal de réunion","modèle de compte rendu","notes de réunion"],
+"event-budget-planner":["budget mariage","budget événement","budget fête d'anniversaire","planificateur de budget mariage","coût par invité"],
+"vehicle-service-tracker":["carnet d'entretien voiture","suivi consommation carburant","rappel vidange","frais de voiture","consommation l/100 km"],
+"freelancer-time-tracker":["suivi du temps freelance","feuille de temps","compteur d'heures de travail","facturer des heures","suivi des heures facturables"],
 "memory-game":["jeu de mémoire","memory en ligne","jeu de paires","jeu de mémoire enfant","trouver les paires"],
 "map-quiz":["quiz géographie","jeu de carte du monde","capitales du monde quiz","quiz drapeaux","pays du monde jeu"],
 "coloring-pages":["coloriage","coloriage à imprimer","mandala à colorier","photo en coloriage","coloriage enfant gratuit"],
