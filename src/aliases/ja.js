@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: ja
 module.exports = {
+"warranty-tracker":["保証期間 管理","保証書 管理","レシート 保存","保証期限 計算"],
+"meal-planner":["献立表","1週間の献立","献立 作成","レシピ 買い物リスト"],
+"grocery-list":["買い物リスト","買い物メモ","スーパー 買い物リスト","食費 予算"],
+"lost-and-found-poster":["迷子ポスター","迷い犬 チラシ","迷い猫 ポスター","行方不明 ポスター","落とし物 ポスター"],
+"packing-list":["持ち物リスト 旅行","パッキングリスト","旅行 チェックリスト","荷造りリスト"],
 "seating-chart":["座席表 作成","席替え","席替え アプリ","座席配置図"],
 "report-card-maker":["通知表 作成","成績表 作成","成績通知書","通信簿 テンプレート"],
 "star-chart":["ご褒美シール表","お手伝い表","がんばり表","ごほうびチャート"],

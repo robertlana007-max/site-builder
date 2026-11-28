@@ -1,6 +1,11 @@
 // Search aliases for the site finder. Generated data; one entry per tool slug.
 // Language: fr
 module.exports = {
+"warranty-tracker":["suivi des garanties","fin de garantie","conserver les tickets de caisse","organiser ses factures","date de fin de garantie"],
+"meal-planner":["planificateur de repas","menu de la semaine","planning repas","liste de courses des recettes","organiser ses repas"],
+"grocery-list":["liste de courses","liste de courses avec prix","liste supermarché","budget courses","liste de courses à imprimer"],
+"lost-and-found-poster":["affiche chien perdu","affiche chat perdu","avis de recherche animal","affiche personne disparue","affiche objet trouvé"],
+"packing-list":["liste de valise","quoi mettre dans sa valise","check-list voyage","liste de bagages","liste vacances à imprimer"],
 "seating-chart":["plan de classe","plan de table","générateur de plan de classe","placement des élèves","plan de table mariage"],
 "report-card-maker":["bulletin scolaire","générateur de bulletin scolaire","bulletin de notes","relevé de notes élève","modèle bulletin scolaire"],
 "star-chart":["tableau de récompenses","tableau de motivation enfant","tableau des tâches enfant","tableau de comportement","tableau étoiles enfant"],
